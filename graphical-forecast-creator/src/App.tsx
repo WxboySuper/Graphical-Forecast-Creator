@@ -23,6 +23,7 @@ import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 const AppContent = () => {
   const dispatch = useDispatch();
   const { outlooks, isSaved } = useSelector((state: RootState) => state.forecast);
+  const { drawingState } = useSelector((state: RootState) => state.forecast);
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }>>([]);
@@ -154,8 +155,7 @@ const AppContent = () => {
 
   // Add keyboard shortcuts
   React.useEffect(() => {
-    const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
-    const { activeOutlookType, activeProbability } = drawingState;
+    const { activeOutlookType, activeProbability, isSignificant } = drawingState;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input
@@ -178,14 +178,14 @@ const AppContent = () => {
       const getProbabilityList = () => {
         switch (activeOutlookType) {
           case 'categorical':
-            return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
+            return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as const;
           case 'tornado':
-            return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'];
+            return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as const;
           case 'wind':
           case 'hail':
-            return ['5%', '15%', '30%', '45%', '60%'];
+            return ['5%', '15%', '30%', '45%', '60%'] as const;
           default:
-            return [];
+            return [] as const;
         }
       };
 
@@ -238,7 +238,7 @@ const AppContent = () => {
               !['5%'].includes(activeProbability));
           if (canToggleSignificant) {
             dispatch(toggleSignificant());
-            addToast(`${drawingState.isSignificant ? 'Disabled' : 'Enabled'} significant threat`, 'info');
+            addToast(`${isSignificant ? 'Disabled' : 'Enabled'} significant threat`, 'info');
           } else {
             addToast('Significant threat not available for this probability', 'warning');
           }
@@ -281,7 +281,7 @@ const AppContent = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, isSaved]);
+  }, [dispatch, isSaved, drawingState, handleSave, addToast]);
   
   return (
     <div className="App">
