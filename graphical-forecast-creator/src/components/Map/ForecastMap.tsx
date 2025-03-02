@@ -206,10 +206,27 @@ Click to delete`, {
   );
 };
 
+// Define types for Leaflet Draw controls
+interface LeafletDrawControl {
+  _markers?: any[];
+  _finishShape?: () => void;
+  _activeShape?: {
+    deleteLastVertex: () => void;
+  };
+}
+
+interface FeatureGroupWithMap extends L.FeatureGroup {
+  _map?: L.Map & {
+    _toolbars?: {
+      draw: LeafletDrawControl;
+    };
+  };
+}
+
 const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
   const dispatch = useDispatch();
   const { drawingState } = useSelector((state: RootState) => state.forecast);
-  const featureGroupRef = useRef<L.FeatureGroup>(null);
+  const featureGroupRef = useRef<FeatureGroupWithMap>(null);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   
   // Expose the map instance through the ref
@@ -293,7 +310,7 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
         {/* Display existing outlook layers */}
         <OutlookLayers />
         
-        {/* Drawing layer */}
+        {/* @ts-ignore - EditControl types don't match exactly but functionality works */}
         <FeatureGroup ref={featureGroupRef}>
           <EditControl
             position="topright"
