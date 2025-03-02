@@ -32,7 +32,7 @@ const AppContent = () => {
   useAutoCategorical();
   
   // Save forecast data to localStorage
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     try {
       // Convert Map objects to arrays for serialization
       const serializedOutlooks = {
@@ -60,7 +60,7 @@ const AppContent = () => {
       console.error('Error saving forecast:', error);
       alert('Error saving forecast. Please try again.');
     }
-  };
+  }, [outlooks, dispatch, mapRef]);
   
   // Load forecast data from localStorage
   const handleLoad = () => {
@@ -184,14 +184,14 @@ const AppContent = () => {
       const getProbabilityList = () => {
         switch (activeOutlookType) {
           case 'categorical':
-            return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as const;
+            return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as readonly string[];
           case 'tornado':
-            return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as const;
+            return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as readonly string[];
           case 'wind':
           case 'hail':
-            return ['5%', '15%', '30%', '45%', '60%'] as const;
+            return ['5%', '15%', '30%', '45%', '60%'] as readonly string[];
           default:
-            return [] as const;
+            return [] as readonly string[];
         }
       };
 
