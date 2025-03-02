@@ -124,28 +124,36 @@ const OutlookPanel: React.FC = () => {
       
       <div className="outlook-section">
         <h3>Outlook Type</h3>
-        <div className="outlook-buttons">
+        <div className="outlook-buttons" role="radiogroup" aria-label="Outlook type selection">
           <button 
             className={activeOutlookType === 'tornado' ? 'active' : ''} 
             onClick={() => handleOutlookTypeChange('tornado')}
+            aria-pressed={activeOutlookType === 'tornado'}
+            aria-label="Tornado outlook (T)"
           >
             Tornado
           </button>
           <button 
             className={activeOutlookType === 'wind' ? 'active' : ''} 
             onClick={() => handleOutlookTypeChange('wind')}
+            aria-pressed={activeOutlookType === 'wind'}
+            aria-label="Wind outlook (W)"
           >
             Wind
           </button>
           <button 
             className={activeOutlookType === 'hail' ? 'active' : ''} 
             onClick={() => handleOutlookTypeChange('hail')}
+            aria-pressed={activeOutlookType === 'hail'}
+            aria-label="Hail outlook (L)"
           >
             Hail
           </button>
           <button 
             className={activeOutlookType === 'categorical' ? 'active' : ''} 
             onClick={() => handleOutlookTypeChange('categorical')}
+            aria-pressed={activeOutlookType === 'categorical'}
+            aria-label="Categorical outlook (C)"
           >
             Categorical
           </button>
@@ -154,13 +162,15 @@ const OutlookPanel: React.FC = () => {
       
       <div className="outlook-section">
         <h3>{activeOutlookType === 'categorical' ? 'Risk Level' : 'Probability'}</h3>
-        <div className="probability-selector">
+        <div className="probability-selector" role="radiogroup" aria-label="Risk level or probability selection">
           {getAvailableProbabilities().map(prob => (
             <button 
               key={prob} 
               className={activeProbability === prob ? 'active' : ''} 
               onClick={() => handleProbabilityChange(prob)}
               style={getProbabilityButtonStyle(prob)}
+              aria-pressed={activeProbability === prob}
+              aria-label={`${prob}${activeOutlookType === 'categorical' ? ` (${getCategoricalRiskDisplayName(prob as CategoricalRiskLevel)})` : ''}`}
               title={activeOutlookType === 'categorical' ? getCategoricalRiskDisplayName(prob as CategoricalRiskLevel) : undefined}
             >
               {prob}
