@@ -105,6 +105,8 @@ const Documentation: React.FC = () => {
                 <li><kbd>C</kbd> - Switch to Categorical outlook</li>
                 <li><kbd>G</kbd> - Add General Thunderstorm risk (only in Categorical mode)</li>
                 <li><kbd>S</kbd> - Toggle significant threat (when applicable)</li>
+                <li><kbd>↑</kbd> or <kbd>→</kbd> - Increase risk level/probability</li>
+                <li><kbd>↓</kbd> or <kbd>←</kbd> - Decrease risk level/probability</li>
                 <li><kbd>H</kbd> - Toggle this documentation</li>
                 <li><kbd>Ctrl/Cmd + S</kbd> - Save forecast</li>
                 <li><kbd>Esc</kbd> - Cancel current drawing</li>
