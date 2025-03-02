@@ -183,15 +183,13 @@ const OutlookPanel: React.FC = () => {
       
       <div className="outlook-section">
         <h3>Current Selection</h3>
-        <div className="color-preview" style={{ backgroundColor: getCurrentColor() }}>
+        <div 
+          className={`color-preview ${drawingState.isSignificant ? 'significant' : ''}`} 
+          style={{ backgroundColor: getCurrentColor() }}
+        >
           {activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)} - {activeProbability}
           {isSignificant && ' (Significant)'}
         </div>
-        {isSignificant && (
-          <div className="hatch-preview">
-            <div className="hatch-pattern"></div>
-          </div>
-        )}
       </div>
     </div>
   );
