@@ -257,7 +257,7 @@ const AppContent = () => {
             const probabilities = getProbabilityList();
             const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
             if (currentIndex < probabilities.length - 1) {
-              const nextProb = probabilities[currentIndex + 1];
+              const nextProb = probabilities[currentIndex + 1] as "TSTM" | "MRGL" | "SLGT" | "ENH" | "MDT" | "HIGH" | "2%" | "5%" | "10%" | "10#" | "15%" | "15#" | "30%" | "30#" | "45%" | "45#" | "60%" | "60#";
               dispatch(setActiveProbability(nextProb));
               addToast(`Increased to ${nextProb}`, 'info');
             }
@@ -270,7 +270,7 @@ const AppContent = () => {
             const probabilities = getProbabilityList();
             const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
             if (currentIndex > 0) {
-              const prevProb = probabilities[currentIndex - 1];
+              const prevProb = probabilities[currentIndex - 1] as "TSTM" | "MRGL" | "SLGT" | "ENH" | "MDT" | "HIGH" | "2%" | "5%" | "10%" | "10#" | "15%" | "15#" | "30%" | "30#" | "45%" | "45#" | "60%" | "60#";
               dispatch(setActiveProbability(prevProb));
               addToast(`Decreased to ${prevProb}`, 'info');
             }
