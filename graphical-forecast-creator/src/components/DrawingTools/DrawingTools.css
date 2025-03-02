@@ -1,0 +1,91 @@
+.drawing-tools {
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  background-color: #f9f9f9;
+}
+
+.drawing-tools h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.tools-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.tool-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+  transition: all 0.2s;
+  flex: 1;
+  min-width: 100px;
+}
+
+.tool-button:hover:not(:disabled) {
+  background-color: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+.tool-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-button {
+  background-color: #4caf50;
+  color: white;
+}
+
+.load-button {
+  background-color: #2196f3;
+  color: white;
+}
+
+.export-button {
+  background-color: #ff9800;
+  color: white;
+}
+
+.reset-button {
+  background-color: #f44336;
+  color: white;
+}
+
+.tool-icon {
+  font-size: 1.5rem;
+  margin-bottom: 5px;
+}
+
+.tool-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.tools-help {
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.tools-help p {
+  margin: 5px 0;
+}
+
+.unsaved-warning {
+  color: #f44336;
+  font-weight: bold;
+}
