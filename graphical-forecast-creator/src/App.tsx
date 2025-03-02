@@ -5,8 +5,9 @@ import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
-import { importForecasts, markAsSaved } from './store/forecastSlice';
+import { importForecasts, markAsSaved, resetForecasts } from './store/forecastSlice';
 import { RootState } from './store';
+import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
 // Import required libraries 
@@ -19,6 +20,9 @@ const AppContent = () => {
   const { outlooks, isSaved } = useSelector((state: RootState) => state.forecast);
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
+  
+  // Use the auto categorical hook to generate categorical outlooks
+  useAutoCategorical();
   
   // Save forecast data to localStorage
   const handleSave = () => {
@@ -48,6 +52,9 @@ const AppContent = () => {
         alert('No saved forecast found.');
         return;
       }
+      
+      // Clear existing forecasts before loading new ones
+      dispatch(resetForecasts());
       
       const parsedData = JSON.parse(savedData);
       
