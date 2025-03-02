@@ -1,3 +1,5 @@
+import { GeoJSON } from 'leaflet';
+
 /**
  * Defines the types for the Storm Prediction Center's severe weather outlook system
  * Based on the specifications in Outlook_Info.md
