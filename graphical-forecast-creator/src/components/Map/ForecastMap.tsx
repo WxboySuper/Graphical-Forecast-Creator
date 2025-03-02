@@ -317,8 +317,7 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
                   color: '#97009c',
                   fillOpacity: 0.6,
                   weight: 2
-                },
-                showArea: true
+                }
               },
               polygon: {
                 allowIntersection: false,
