@@ -5,7 +5,7 @@ import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
-import { importForecasts, markAsSaved, resetForecasts } from './store/forecastSlice';
+import { importForecasts, markAsSaved, resetForecasts, setMapView } from './store/forecastSlice';
 import { RootState } from './store';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
@@ -34,8 +34,19 @@ const AppContent = () => {
         hail: Array.from(outlooks.hail.entries()),
         categorical: Array.from(outlooks.categorical.entries())
       };
+
+      // Save both outlooks and current map view
+      const saveData = {
+        outlooks: serializedOutlooks,
+        mapView: {
+          center: mapRef.current?.getMap()?.getCenter() 
+            ? [mapRef.current.getMap()!.getCenter().lat, mapRef.current.getMap()!.getCenter().lng]
+            : [39.8283, -98.5795],
+          zoom: mapRef.current?.getMap()?.getZoom() || 4
+        }
+      };
       
-      localStorage.setItem('forecastData', JSON.stringify(serializedOutlooks));
+      localStorage.setItem('forecastData', JSON.stringify(saveData));
       dispatch(markAsSaved());
       alert('Forecast saved successfully!');
     } catch (error) {
@@ -60,13 +71,17 @@ const AppContent = () => {
       
       // Convert arrays back to Map objects
       const deserializedOutlooks = {
-        tornado: new Map(parsedData.tornado),
-        wind: new Map(parsedData.wind),
-        hail: new Map(parsedData.hail),
-        categorical: new Map(parsedData.categorical)
+        tornado: new Map(parsedData.outlooks.tornado),
+        wind: new Map(parsedData.outlooks.wind),
+        hail: new Map(parsedData.outlooks.hail),
+        categorical: new Map(parsedData.outlooks.categorical)
       };
       
+      // Restore both the outlooks and map view
       dispatch(importForecasts(deserializedOutlooks));
+      if (parsedData.mapView) {
+        dispatch(setMapView(parsedData.mapView));
+      }
       alert('Forecast loaded successfully!');
     } catch (error) {
       console.error('Error loading forecast:', error);
