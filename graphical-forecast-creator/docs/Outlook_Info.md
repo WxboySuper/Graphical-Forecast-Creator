@@ -36,6 +36,7 @@ When creating outlook maps, the probabilistic outlooks (Tornado, Wind, Hail) are
 
 This visual correlation allows forecasters and users to quickly understand both the specific threats (tornado, wind, hail) and the overall severe weather risk level for any location on the map. 
 General Thunderstorm is as the name suggests a general thunderstorm threat and doesn't have any coorilating probabilities. General Thunderstorm threats should be drawn on the categorical outlook manually.
+The Significant hatch is a blanket layer but has differing affects on it's underlying color. Not all 10% has to be hatched. The hatch needs to be able to flow between risks and should be displayed on top of the other layers. **
 
 Labels:
 - General Thunderstorm (0/5) - #bfe7bc
