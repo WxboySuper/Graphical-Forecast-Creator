@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
@@ -26,13 +26,21 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Helper component to sync map with Redux state
-const MapController: React.FC = () => {
+// Define a handle type that exposes the map instance
+export type ForecastMapHandle = {
+  getMap: () => L.Map | null;
+};
+
+// Helper component to sync map with Redux state and store map reference
+const MapController: React.FC<{ setMapInstance: (map: L.Map) => void }> = ({ setMapInstance }) => {
   const { currentMapView } = useSelector((state: RootState) => state.forecast);
   const dispatch = useDispatch();
   const map = useMap();
   
   useEffect(() => {
+    // Store map instance for export functionality
+    setMapInstance(map);
+    
     map.setView(currentMapView.center, currentMapView.zoom);
     
     const onMoveEnd = () => {
@@ -48,7 +56,7 @@ const MapController: React.FC = () => {
     return () => {
       map.off('moveend', onMoveEnd);
     };
-  }, [map, dispatch, currentMapView]);
+  }, [map, dispatch, currentMapView, setMapInstance]);
   
   return null;
 };
@@ -120,10 +128,16 @@ const OutlookLayers: React.FC = () => {
   );
 };
 
-const ForecastMap: React.FC = () => {
+const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
   const dispatch = useDispatch();
   const { drawingState } = useSelector((state: RootState) => state.forecast);
   const featureGroupRef = useRef<L.FeatureGroup>(null);
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  
+  // Expose the map instance through the ref
+  useImperativeHandle(ref, () => ({
+    getMap: () => mapInstance
+  }), [mapInstance]);
   
   // Drawing creation handler
   const handleCreated = (e: any) => {
@@ -159,7 +173,7 @@ const ForecastMap: React.FC = () => {
         zoom={4} 
         style={{ height: '100%', width: '100%' }}
       >
-        <MapController />
+        <MapController setMapInstance={setMapInstance} />
         
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -201,6 +215,9 @@ const ForecastMap: React.FC = () => {
       </MapContainer>
     </div>
   );
-};
+});
+
+// Set display name for better debugging
+ForecastMap.displayName = 'ForecastMap';
 
 export default ForecastMap;
