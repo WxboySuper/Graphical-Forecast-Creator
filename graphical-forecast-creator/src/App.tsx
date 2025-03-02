@@ -147,7 +147,7 @@ const AppContent = () => {
 
       // Get current state
       const { drawingState } = useSelector((state: RootState) => state.forecast);
-      const { activeOutlookType } = drawingState;
+      const { activeOutlookType, activeProbability } = drawingState;
 
       // Handle Ctrl/Cmd + S first
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -160,6 +160,20 @@ const AppContent = () => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) {
         return;
       }
+
+      const getProbabilityList = () => {
+        switch (activeOutlookType) {
+          case 'categorical':
+            return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
+          case 'tornado':
+            return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'];
+          case 'wind':
+          case 'hail':
+            return ['5%', '15%', '30%', '45%', '60%'];
+          default:
+            return [];
+        }
+      };
 
       switch (e.key.toLowerCase()) {
         // Toggle documentation with 'h' (help)
@@ -197,14 +211,40 @@ const AppContent = () => {
           break;
 
         // Toggle significant threat with 's'
-        const canToggleSignificant = activeOutlookType !== 'categorical' && 
-          (activeOutlookType === 'tornado' ? 
-            !['2%', '5%'].includes(drawingState.activeProbability) :
-            !['5%'].includes(drawingState.activeProbability));
-        if (canToggleSignificant) {
-          dispatch(toggleSignificant());
-        }
-        break;
+        case 's':
+          const canToggleSignificant = activeOutlookType !== 'categorical' && 
+            (activeOutlookType === 'tornado' ? 
+              !['2%', '5%'].includes(activeProbability) :
+              !['5%'].includes(activeProbability));
+          if (canToggleSignificant) {
+            dispatch(toggleSignificant());
+          }
+          break;
+
+        // Navigate probabilities with arrow keys
+        case 'arrowup':
+        case 'arrowright':
+          {
+            const probabilities = getProbabilityList();
+            const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
+            if (currentIndex < probabilities.length - 1) {
+              const nextProb = probabilities[currentIndex + 1];
+              dispatch(setActiveProbability(nextProb));
+            }
+          }
+          break;
+
+        case 'arrowdown':
+        case 'arrowleft':
+          {
+            const probabilities = getProbabilityList();
+            const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
+            if (currentIndex > 0) {
+              const prevProb = probabilities[currentIndex - 1];
+              dispatch(setActiveProbability(prevProb));
+            }
+          }
+          break;
 
         // Delete selected feature with Delete key
         case 'delete':
