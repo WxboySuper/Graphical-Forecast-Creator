@@ -117,6 +117,9 @@ input:checked + .slider:before {
 .switch-label {
   margin-left: 10px;
   vertical-align: middle;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .color-preview {
@@ -136,10 +139,18 @@ input:checked + .slider:before {
   background-color: rgba(255, 255, 255, 0.7);
   border-radius: 4px;
   overflow: hidden;
+  margin-top: 8px;
 }
 
 .hatch-pattern {
   width: 100%;
   height: 100%;
-  background-image: repeating-linear-gradient(45deg, #000, #000 2px, transparent 2px, transparent 10px);
+  background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7) 2px, transparent 2px, transparent 10px);
+}
+
+.probability-note {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 4px;
+  font-style: italic;
 }
