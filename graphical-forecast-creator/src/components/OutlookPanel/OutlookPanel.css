@@ -52,13 +52,38 @@
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.2s;
   min-width: 40px;
   text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  animation: slideIn 0.3s ease forwards;
 }
 
 .probability-selector button.active {
+  transform: scale(1.05);
   box-shadow: 0 0 0 2px white, 0 0 0 4px #3f51b5;
+}
+
+.probability-selector button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #3f51b5;
+}
+
+.probability-selector button:hover:not(.active) {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Active button slide-in animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Toggle switch styling */
