@@ -11,3 +11,47 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Global significant threat pattern that can be used across components */
+.significant-threat-pattern {
+  position: relative;
+  z-index: 1;
+}
+
+.significant-threat-pattern::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 999; /* Ensure hatching is always on top */
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.8),
+    rgba(0, 0, 0, 0.8) 2px,
+    transparent 2px,
+    transparent 12px
+  );
+  background-size: 16px 16px;
+  background-position: 0 0;
+  /* Add subtle border to better define hatched areas */
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Style for keyboard shortcut hints */
+kbd {
+  background-color: #f7f7f7;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+  color: #333;
+  display: inline-block;
+  font-size: .85em;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  white-space: nowrap;
+  margin: 0 2px;
+}
