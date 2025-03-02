@@ -64,7 +64,8 @@ const MapController: React.FC<{ setMapInstance: (map: L.Map) => void }> = ({ set
 // Component to render the outlook polygons
 const OutlookLayers: React.FC = () => {
   const dispatch = useDispatch();
-  const { outlooks } = useSelector((state: RootState) => state.forecast);
+  const { outlooks, drawingState } = useSelector((state: RootState) => state.forecast);
+  const { activeOutlookType } = drawingState;
   
   // Create a style function for GeoJSON features
   const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
@@ -103,26 +104,36 @@ const OutlookLayers: React.FC = () => {
     }
   };
   
+  // Determine which layers to show based on active outlook type
+  const shouldShowLayer = (outlookType: OutlookType) => {
+    if (activeOutlookType === 'categorical') {
+      return outlookType === 'categorical';
+    }
+    return outlookType !== 'categorical';
+  };
+  
   // Render all outlook types with their probabilities
   return (
     <>
       {(Object.keys(outlooks) as OutlookType[]).map(outlookType => (
-        <React.Fragment key={outlookType}>
-          {Array.from(outlooks[outlookType].entries()).map(([probability, features]) => (
-            <FeatureGroup key={`${outlookType}-${probability}`}>
-              {features.map(feature => (
-                <GeoJSON
-                  key={feature.id as string}
-                  data={feature}
-                  style={() => getFeatureStyle(outlookType, probability)}
-                  eventHandlers={{
-                    click: () => onFeatureClick(outlookType, probability, feature.id as string)
-                  }}
-                />
-              ))}
-            </FeatureGroup>
-          ))}
-        </React.Fragment>
+        shouldShowLayer(outlookType) && (
+          <React.Fragment key={outlookType}>
+            {Array.from(outlooks[outlookType].entries()).map(([probability, features]) => (
+              <FeatureGroup key={`${outlookType}-${probability}`}>
+                {features.map(feature => (
+                  <GeoJSON
+                    key={feature.id as string}
+                    data={feature}
+                    style={() => getFeatureStyle(outlookType, probability)}
+                    eventHandlers={{
+                      click: () => onFeatureClick(outlookType, probability, feature.id as string)
+                    }}
+                  />
+                ))}
+              </FeatureGroup>
+            ))}
+          </React.Fragment>
+        )
       ))}
     </>
   );
