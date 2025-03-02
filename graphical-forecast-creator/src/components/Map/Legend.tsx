@@ -2,6 +2,7 @@ import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { colorMappings, getCategoricalRiskDisplayName } from '../../utils/outlookUtils';
+import { CategoricalRiskLevel, TornadoProbability, WindHailProbability } from '../../types/outlooks';
 import './Legend.css';
 
 const Legend: React.FC = () => {
@@ -17,9 +18,9 @@ const Legend: React.FC = () => {
               className="legend-color" 
               style={{ backgroundColor: colorMappings.categorical[risk] }}
               role="img"
-              aria-label={`Color for ${getCategoricalRiskDisplayName(risk)}`}
+              aria-label={`Color for ${getCategoricalRiskDisplayName(risk as CategoricalRiskLevel)}`}
             />
-            <span>{getCategoricalRiskDisplayName(risk)}</span>
+            <span>{getCategoricalRiskDisplayName(risk as CategoricalRiskLevel)}</span>
           </div>
         ))}
       </div>
@@ -29,8 +30,8 @@ const Legend: React.FC = () => {
   const renderProbabilisticLegend = () => {
     const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
     const probabilities = activeOutlookType === 'tornado' 
-      ? (['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as const)
-      : (['5%', '15%', '30%', '45%', '60%'] as const);
+      ? (['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as TornadoProbability[])
+      : (['5%', '15%', '30%', '45%', '60%'] as WindHailProbability[]);
 
     return (
       <>
@@ -41,7 +42,7 @@ const Legend: React.FC = () => {
               <div className="legend-item" role="listitem">
                 <div 
                   className="legend-color" 
-                  style={{ backgroundColor: colorMap[prob] }}
+                  style={{ backgroundColor: activeOutlookType === 'tornado' ? colorMappings.tornado[prob] : colorMappings.wind[prob] }}
                   role="img"
                   aria-label={`Color for ${prob} probability`}
                 />
@@ -53,7 +54,7 @@ const Legend: React.FC = () => {
                 <div className="legend-item" role="listitem">
                   <div 
                     className="legend-color significant-threat-pattern" 
-                    style={{ backgroundColor: colorMap[prob] }}
+                    style={{ backgroundColor: activeOutlookType === 'tornado' ? colorMappings.tornado[prob] : colorMappings.wind[prob] }}
                     role="img"
                     aria-label={`Color for ${prob.replace('%', '#')} significant threat probability`}
                   />
