@@ -244,6 +244,38 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
     }
   };
 
+  // Handle keyboard navigation in drawing mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!mapInstance) return;
+
+      // Don't handle keyboard events if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key) {
+        case 'Enter':
+          // Complete the current shape when Enter is pressed
+          const drawControl = featureGroupRef.current?._map?._toolbars?.draw;
+          if (drawControl?._markers?.length >= 3) {
+            drawControl._finishShape();
+          }
+          break;
+        case 'Escape':
+          // Cancel current drawing
+          const activeDrawControl = featureGroupRef.current?._map?._toolbars?.draw?._activeShape;
+          if (activeDrawControl) {
+            activeDrawControl.deleteLastVertex();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mapInstance]);
+
   return (
     <div className="map-container">
       <MapContainer 
@@ -267,7 +299,14 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
             position="topright"
             onCreated={handleCreated}
             draw={{
-              rectangle: true,
+              rectangle: {
+                shapeOptions: {
+                  color: '#97009c',
+                  fillOpacity: 0.6,
+                  weight: 2
+                },
+                showArea: true
+              },
               polygon: {
                 allowIntersection: false,
                 drawError: {
@@ -275,8 +314,14 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
                   message: '<strong>Error:</strong> Shapes cannot intersect!'
                 },
                 shapeOptions: {
-                  color: '#97009c'
-                }
+                  color: '#97009c',
+                  fillOpacity: 0.6,
+                  weight: 2
+                },
+                showArea: true,
+                metric: true,
+                repeatMode: false,
+                guideLayers: []
               },
               circle: false,
               circlemarker: false,
@@ -285,10 +330,15 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
             }}
             edit={{
               featureGroup: featureGroupRef.current as L.FeatureGroup,
-              remove: false, // We handle deletion through our own click handler
-              edit: false // We don't support editing for now
+              remove: false,
+              edit: false
             }}
           />
+          {/* Add accessible instructions for keyboard users */}
+          <div className="sr-only" role="note" aria-live="polite">
+            Press Enter to complete shape, Escape to cancel. 
+            Use arrow keys to navigate the map while drawing.
+          </div>
         </FeatureGroup>
 
         <Legend />
