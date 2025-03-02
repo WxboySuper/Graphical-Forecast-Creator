@@ -2,7 +2,6 @@
 
 declare module 'react-leaflet-draw' {
   import { FC } from 'react';
-  import { FeatureGroup } from 'react-leaflet';
   import * as L from 'leaflet';
 
   interface EditControlProps {
