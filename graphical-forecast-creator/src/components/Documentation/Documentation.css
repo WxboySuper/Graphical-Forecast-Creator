@@ -1,0 +1,110 @@
+.documentation {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.documentation h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.doc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 10px;
+}
+
+.doc-tabs button {
+  padding: 8px 15px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.doc-tabs button.active {
+  background-color: #3f51b5;
+  color: white;
+  border-color: #3f51b5;
+}
+
+.doc-tabs button:hover:not(.active) {
+  background-color: #e0e0e0;
+}
+
+.doc-content {
+  min-height: 300px;
+}
+
+.doc-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+  color: #333;
+}
+
+.doc-section h4 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+  color: #444;
+}
+
+.doc-section p {
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.doc-section ul, .doc-section ol {
+  margin-bottom: 15px;
+  padding-left: 20px;
+}
+
+.doc-section li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.color-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.color-item {
+  width: 80px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.conversion-list {
+  columns: 2;
+  column-gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .conversion-list {
+    columns: 1;
+  }
+  
+  .color-examples {
+    justify-content: center;
+  }
+}
