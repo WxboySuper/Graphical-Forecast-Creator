@@ -96,6 +96,21 @@ const Documentation: React.FC = () => {
                 <li>Save your work frequently to avoid losing your forecast</li>
               </ul>
             </p>
+            <p>
+              <strong>Keyboard Shortcuts:</strong>
+              <ul>
+                <li><kbd>T</kbd> - Switch to Tornado outlook</li>
+                <li><kbd>W</kbd> - Switch to Wind outlook</li>
+                <li><kbd>L</kbd> - Switch to Hail outlook</li>
+                <li><kbd>C</kbd> - Switch to Categorical outlook</li>
+                <li><kbd>G</kbd> - Add General Thunderstorm risk (only in Categorical mode)</li>
+                <li><kbd>S</kbd> - Toggle significant threat (when applicable)</li>
+                <li><kbd>H</kbd> - Toggle this documentation</li>
+                <li><kbd>Ctrl/Cmd + S</kbd> - Save forecast</li>
+                <li><kbd>Esc</kbd> - Cancel current drawing</li>
+                <li><kbd>Delete</kbd> - Delete selected area</li>
+              </ul>
+            </p>
           </div>
         )}
         
