@@ -129,7 +129,17 @@ export const forecastSlice = createSlice({
     
     // Reset just the categorical outlooks (used by useAutoCategorical)
     resetCategorical: (state) => {
+      // Store TSTM features before resetting
+      const tstmFeatures = state.outlooks.categorical.get('TSTM') || [];
+      
+      // Clear all categorical outlooks
       state.outlooks.categorical = new Map();
+      
+      // Restore TSTM features if they exist
+      if (tstmFeatures.length > 0) {
+        state.outlooks.categorical.set('TSTM', tstmFeatures);
+      }
+      
       state.isSaved = false;
     },
 
@@ -164,9 +174,22 @@ export const forecastSlice = createSlice({
       state.isSaved = true;
     },
 
-    // Import forecast data
+    // Import forecast data with TSTM preservation
     importForecasts: (state, action: PayloadAction<OutlookData>) => {
+      // Store existing TSTM features before importing
+      const existingTstm = state.outlooks.categorical.get('TSTM') || [];
+      
+      // Import new data
       state.outlooks = action.payload;
+      
+      // Merge existing TSTM features with imported ones
+      const importedTstm = state.outlooks.categorical.get('TSTM') || [];
+      const mergedTstm = [...existingTstm, ...importedTstm];
+      
+      if (mergedTstm.length > 0) {
+        state.outlooks.categorical.set('TSTM', mergedTstm);
+      }
+      
       state.isSaved = true;
     }
   }
