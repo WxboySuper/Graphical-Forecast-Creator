@@ -11,7 +11,7 @@ const Legend: React.FC = () => {
     <>
       <h4 id="legend-title">Categorical Risk Levels</h4>
       <div className="legend-items" role="list" aria-labelledby="legend-title">
-        {['HIGH', 'MDT', 'ENH', 'SLGT', 'MRGL', 'TSTM'].map(risk => (
+        {(['HIGH', 'MDT', 'ENH', 'SLGT', 'MRGL', 'TSTM'] as const).map(risk => (
           <div key={risk} className="legend-item" role="listitem">
             <div 
               className="legend-color" 
@@ -29,8 +29,8 @@ const Legend: React.FC = () => {
   const renderProbabilisticLegend = () => {
     const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
     const probabilities = activeOutlookType === 'tornado' 
-      ? ['2%', '5%', '10%', '15%', '30%', '45%', '60%']
-      : ['5%', '15%', '30%', '45%', '60%'];
+      ? (['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as const)
+      : (['5%', '15%', '30%', '45%', '60%'] as const);
 
     return (
       <>
