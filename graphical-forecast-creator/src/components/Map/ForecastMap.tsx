@@ -66,42 +66,59 @@ const OutlookLayers: React.FC = () => {
   const dispatch = useDispatch();
   const { outlooks, drawingState } = useSelector((state: RootState) => state.forecast);
   const { activeOutlookType } = drawingState;
-  
-  // Create a style function for GeoJSON features
-  const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
-    let color = '#FFFFFF';
-    const isSignificant = probability.includes('#');
-    
-    // Get color based on outlook type and probability
-    switch (outlookType) {
-      case 'tornado':
-        color = colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
-        break;
-      case 'wind':
-      case 'hail':
-        color = colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
-        break;
-      case 'categorical':
-        color = colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
-        break;
-    }
-    
-    return {
-      color: color,
-      weight: 2,
-      opacity: 1,
-      fillColor: color,
-      fillOpacity: 0.6,
-    };
+
+  // Helper function to sort probabilities to ensure proper layer order
+  const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
+    return entries.sort((a, b) => {
+      const [probA, probB] = [a[0], b[0]];
+      
+      // Handle special cases first
+      if (probA === 'TSTM') return -1;
+      if (probB === 'TSTM') return 1;
+      
+      // Sort significant threats to the top
+      const isSignificantA = probA.includes('#');
+      const isSignificantB = probB.includes('#');
+      if (isSignificantA !== isSignificantB) {
+        return isSignificantA ? 1 : -1;
+      }
+      
+      // For categorical risks, sort by severity
+      const riskOrder: Record<string, number> = {
+        'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
+      };
+      if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) {
+        return riskOrder[probA] - riskOrder[probB];
+      }
+      
+      // For probabilistic outlooks, sort by percentage
+      const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, ''));
+      return getPercentValue(probA) - getPercentValue(probB);
+    });
   };
   
-  // Handle click on a polygon for deletion
-  const onFeatureClick = (outlookType: OutlookType, probability: string, featureId: string) => {
-    if (window.confirm('Do you want to delete this outlook area?')) {
-      dispatch(removeFeature({ outlookType, probability, featureId }));
-    }
+  // Render features for an outlook type
+  const renderOutlookFeatures = (outlookType: OutlookType) => {
+    const entries = Array.from(outlooks[outlookType].entries());
+    const sortedEntries = sortProbabilities(entries);
+    
+    return sortedEntries.map(([probability, features]) => (
+      <FeatureGroup key={`${outlookType}-${probability}`}>
+        {features.map(feature => (
+          <GeoJSON
+            key={feature.id as string}
+            data={feature}
+            style={() => getFeatureStyle(outlookType, probability)}
+            className={probability.includes('#') ? 'significant-threat-pattern' : undefined}
+            eventHandlers={{
+              click: () => onFeatureClick(outlookType, probability, feature.id as string)
+            }}
+          />
+        ))}
+      </FeatureGroup>
+    ));
   };
-  
+
   // Determine which layers to show based on active outlook type
   const shouldShowLayer = (outlookType: OutlookType) => {
     if (activeOutlookType === 'categorical') {
@@ -109,65 +126,16 @@ const OutlookLayers: React.FC = () => {
     }
     return outlookType !== 'categorical';
   };
-  
-  // First render regular areas
-  const renderRegularAreas = () => (
-    (Object.keys(outlooks) as OutlookType[]).map(outlookType => (
-      shouldShowLayer(outlookType) && (
-        <React.Fragment key={outlookType}>
-          {Array.from(outlooks[outlookType].entries()).map(([probability, features]) => (
-            !probability.includes('#') && (
-              <FeatureGroup key={`${outlookType}-${probability}`}>
-                {features.map(feature => (
-                  <GeoJSON
-                    key={feature.id as string}
-                    data={feature}
-                    style={() => getFeatureStyle(outlookType, probability)}
-                    eventHandlers={{
-                      click: () => onFeatureClick(outlookType, probability, feature.id as string)
-                    }}
-                  />
-                ))}
-              </FeatureGroup>
-            )
-          ))}
-        </React.Fragment>
-      )
-    ))
-  );
-  
-  // Then render significant threat areas on top with the hatched pattern
-  const renderSignificantAreas = () => (
-    (Object.keys(outlooks) as OutlookType[]).map(outlookType => (
-      shouldShowLayer(outlookType) && (
-        <React.Fragment key={`${outlookType}-significant`}>
-          {Array.from(outlooks[outlookType].entries()).map(([probability, features]) => (
-            probability.includes('#') && (
-              <FeatureGroup key={`${outlookType}-${probability}`}>
-                {features.map(feature => (
-                  <GeoJSON
-                    key={feature.id as string}
-                    data={feature}
-                    style={() => getFeatureStyle(outlookType, probability)}
-                    className="significant-threat-pattern"
-                    eventHandlers={{
-                      click: () => onFeatureClick(outlookType, probability, feature.id as string)
-                    }}
-                  />
-                ))}
-              </FeatureGroup>
-            )
-          ))}
-        </React.Fragment>
-      )
-    ))
-  );
-  
-  // Render all outlook types with their probabilities, non-significant first, then significant
+
   return (
     <>
-      {renderRegularAreas()}
-      {renderSignificantAreas()}
+      {Object.keys(outlooks).map(outlookType => (
+        shouldShowLayer(outlookType as OutlookType) && (
+          <React.Fragment key={outlookType}>
+            {renderOutlookFeatures(outlookType as OutlookType)}
+          </React.Fragment>
+        )
+      ))}
     </>
   );
 };
