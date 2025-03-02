@@ -49,13 +49,13 @@ const OutlookPanel: React.FC = () => {
   // Get available probabilities based on active outlook type
   const getAvailableProbabilities = () => {
     switch (activeOutlookType) {
+      case 'categorical':
+        return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
       case 'tornado':
-        return Object.keys(colorMappings.tornado).filter(key => !key.includes('#'));
+        return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'];
       case 'wind':
       case 'hail':
-        return Object.keys(colorMappings.wind).filter(key => !key.includes('#'));
-      case 'categorical':
-        return Object.keys(colorMappings.categorical);
+        return ['5%', '15%', '30%', '45%', '60%'];
       default:
         return [];
     }
@@ -78,17 +78,34 @@ const OutlookPanel: React.FC = () => {
         return false;
     }
   };
-  
-  // Get color for the current selection
-  const getCurrentColor = () => {
+
+  // Get button style for probability selector
+  const getProbabilityButtonStyle = (prob: string) => {
+    const isActive = activeProbability === prob;
+    let color = '#FFFFFF';
+    let textColor = '#000000';
+
+    // Get the appropriate color based on outlook type and probability
     if (activeOutlookType === 'categorical') {
-      return colorMappings.categorical[activeProbability as keyof typeof colorMappings.categorical];
-    } else if (activeOutlookType === 'tornado') {
-      return colorMappings.tornado[activeProbability as keyof typeof colorMappings.tornado];
-    } else if (activeOutlookType === 'wind' || activeOutlookType === 'hail') {
-      return colorMappings.wind[activeProbability as keyof typeof colorMappings.wind];
+      color = colorMappings.categorical[prob as keyof typeof colorMappings.categorical];
+      // Light background colors need dark text
+      if (['TSTM', 'MRGL', 'SLGT'].includes(prob)) {
+        textColor = '#000000';
+      } else {
+        textColor = '#FFFFFF';
+      }
+    } else {
+      const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
+      color = colorMap[prob as keyof typeof colorMap];
+      // Most probability colors need white text
+      textColor = '#FFFFFF';
     }
-    return '#FFFFFF';
+
+    return {
+      backgroundColor: color,
+      color: textColor,
+      boxShadow: isActive ? '0 0 0 2px white, 0 0 0 4px #3f51b5' : undefined
+    };
   };
   
   return (
@@ -133,20 +150,7 @@ const OutlookPanel: React.FC = () => {
               key={prob} 
               className={activeProbability === prob ? 'active' : ''} 
               onClick={() => handleProbabilityChange(prob)}
-              style={{ 
-                backgroundColor: activeOutlookType === 'categorical' 
-                  ? colorMappings.categorical[prob as keyof typeof colorMappings.categorical] 
-                  : activeOutlookType === 'tornado'
-                    ? colorMappings.tornado[prob as keyof typeof colorMappings.tornado]
-                    : colorMappings.wind[prob as keyof typeof colorMappings.wind],
-                color: ['#f3f67d', '#bfe7bc', '#7dc580'].includes(
-                  activeOutlookType === 'categorical' 
-                    ? colorMappings.categorical[prob as keyof typeof colorMappings.categorical] 
-                    : activeOutlookType === 'tornado'
-                      ? colorMappings.tornado[prob as keyof typeof colorMappings.tornado]
-                      : colorMappings.wind[prob as keyof typeof colorMappings.wind]
-                ) ? '#000' : '#fff'
-              }}
+              style={getProbabilityButtonStyle(prob)}
               title={activeOutlookType === 'categorical' ? getCategoricalRiskDisplayName(prob as CategoricalRiskLevel) : undefined}
             >
               {prob}
