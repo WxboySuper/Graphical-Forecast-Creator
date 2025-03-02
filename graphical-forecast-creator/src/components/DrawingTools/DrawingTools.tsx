@@ -110,8 +110,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
           <div className="loading-spinner" />
           <div className="loading-text">
             Generating forecast image...
-            <br />
-            <small>This may take a few moments</small>
+          </div>
+          <div className="loading-subtext">
+            Processing map layers and applying significant threat patterns
           </div>
         </div>
       )}
