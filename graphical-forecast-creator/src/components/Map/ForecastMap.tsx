@@ -232,8 +232,8 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
   }), [mapInstance]);
   
   // Drawing creation handler
-  const handleCreated = (e: LeafletCreateEvent) => {
-    const { layerType, layer } = e;
+  const handleCreated = (e: { layerType: string; layer: L.Layer }) => {
+    const { layerType, layer } = e as LeafletCreateEvent;
     
     // Only handle polygons for now
     if (layerType === 'polygon' || layerType === 'rectangle') {
