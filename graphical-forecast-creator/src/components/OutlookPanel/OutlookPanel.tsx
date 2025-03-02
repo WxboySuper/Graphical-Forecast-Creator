@@ -107,6 +107,16 @@ const OutlookPanel: React.FC = () => {
       boxShadow: isActive ? '0 0 0 2px white, 0 0 0 4px #3f51b5' : undefined
     };
   };
+
+  // Get the current color based on outlook type and probability
+  const getCurrentColor = () => {
+    if (activeOutlookType === 'categorical') {
+      return colorMappings.categorical[activeProbability as keyof typeof colorMappings.categorical] || '#FFFFFF';
+    } else {
+      const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
+      return colorMap[activeProbability as keyof typeof colorMap] || '#FFFFFF';
+    }
+  };
   
   return (
     <div className="outlook-panel">
