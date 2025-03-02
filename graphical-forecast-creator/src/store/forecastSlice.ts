@@ -132,6 +132,16 @@ export const forecastSlice = createSlice({
       state.outlooks.categorical = new Map();
       state.isSaved = false;
     },
+
+    // Set a specific outlook map (used for preserving TSTM areas)
+    setOutlookMap: (state, action: PayloadAction<{ 
+      outlookType: OutlookType, 
+      map: Map<string, GeoJSON.Feature[]> 
+    }>) => {
+      const { outlookType, map } = action.payload;
+      state.outlooks[outlookType] = map;
+      state.isSaved = false;
+    },
     
     // Set map view (center and zoom)
     setMapView: (state, action: PayloadAction<{ center: [number, number], zoom: number }>) => {
@@ -169,6 +179,7 @@ export const {
   addFeature,
   removeFeature,
   resetCategorical,
+  setOutlookMap,
   setMapView,
   resetForecasts,
   markAsSaved,
