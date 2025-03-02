@@ -1,17 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetForecasts } from '../../store/forecastSlice';
 import { RootState } from '../../store';
+import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
+import { ForecastMapHandle } from '../Map/ForecastMap';
 import './DrawingTools.css';
 
 interface DrawingToolsProps {
   onSave: () => void;
   onLoad: () => void;
+  mapRef: React.RefObject<ForecastMapHandle>;
 }
 
-const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad }) => {
+const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) => {
   const dispatch = useDispatch();
   const { isSaved } = useSelector((state: RootState) => state.forecast);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
@@ -19,9 +23,37 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad }) => {
     }
   };
 
-  const handleExport = () => {
-    // This will be implemented later
-    alert('Export functionality coming soon!');
+  const handleExport = async () => {
+    if (!mapRef.current) {
+      alert('Map reference not available. Cannot export.');
+      return;
+    }
+
+    const map = mapRef.current.getMap();
+    if (!map) {
+      alert('Map not fully loaded. Please try again.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      
+      // Show export options dialog
+      const title = prompt('Enter a title for your forecast image (optional):');
+      
+      // Generate the image
+      const dataUrl = await exportMapAsImage(map, title || undefined);
+      
+      // Download the image
+      const filename = `forecast-outlook-${getFormattedDate()}.png`;
+      downloadDataUrl(dataUrl, filename);
+      
+    } catch (error) {
+      console.error('Error exporting map:', error);
+      alert('Failed to export the map. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -46,9 +78,10 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad }) => {
         <button 
           className="tool-button export-button" 
           onClick={handleExport}
+          disabled={isExporting}
         >
           <span className="tool-icon">📤</span>
-          <span className="tool-label">Export as Image</span>
+          <span className="tool-label">{isExporting ? 'Exporting...' : 'Export as Image'}</span>
         </button>
         <button 
           className="tool-button reset-button" 
