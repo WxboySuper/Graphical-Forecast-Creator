@@ -35,6 +35,7 @@ When creating outlook maps, the probabilistic outlooks (Tornado, Wind, Hail) are
 - The conversion follows the guidelines detailed in the sections above
 
 This visual correlation allows forecasters and users to quickly understand both the specific threats (tornado, wind, hail) and the overall severe weather risk level for any location on the map. 
+General Thunderstorm is as the name suggests a general thunderstorm threat and doesn't have any coorilating probabilities. General Thunderstorm threats should be drawn on the categorical outlook manually.
 
 Labels:
 - General Thunderstorm (0/5) - #bfe7bc
