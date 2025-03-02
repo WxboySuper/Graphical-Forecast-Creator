@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './store';
-import ForecastMap from './components/Map/ForecastMap';
+import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
@@ -18,6 +18,7 @@ const AppContent = () => {
   const dispatch = useDispatch();
   const { outlooks, isSaved } = useSelector((state: RootState) => state.forecast);
   const [showDocumentation, setShowDocumentation] = useState(false);
+  const mapRef = useRef<ForecastMapHandle>(null);
   
   // Save forecast data to localStorage
   const handleSave = () => {
@@ -97,9 +98,9 @@ const AppContent = () => {
       
       <main className="App-main">
         {showDocumentation && <Documentation />}
-        <DrawingTools onSave={handleSave} onLoad={handleLoad} />
+        <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} />
         <OutlookPanel />
-        <ForecastMap />
+        <ForecastMap ref={mapRef} />
       </main>
       
       <footer className="App-footer">
