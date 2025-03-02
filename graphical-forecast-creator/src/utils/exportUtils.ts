@@ -1,6 +1,19 @@
 import L from 'leaflet';
 import html2canvas from 'html2canvas';
 
+// Extended layer type with proper options
+interface ExtendedLayer extends L.Layer {
+  toGeoJSON(): GeoJSON.Feature;
+  options: L.PathOptions & {
+    className?: string;
+    color?: string;
+    fillColor?: string;
+    fillOpacity?: number;
+    weight?: number;
+    opacity?: number;
+  };
+}
+
 /**
  * Exports the current map view as a PNG image
  * @param map The Leaflet map instance to export
@@ -43,17 +56,18 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       map.eachLayer((layer) => {
         if (layer instanceof L.TileLayer) return; // Skip the base tile layer
         
-        if ('toGeoJSON' in layer) {
-          if (!layer.options.className?.includes('significant-threat-pattern')) {
+        const pathLayer = layer as ExtendedLayer;
+        if ('toGeoJSON' in pathLayer) {
+          if (!pathLayer.options.className?.includes('significant-threat-pattern')) {
             // Clone the path/polygon with its style
-            const clonedLayer = L.geoJSON((layer as any).toGeoJSON(), {
+            const clonedLayer = L.geoJSON((pathLayer).toGeoJSON(), {
               style: function() {
                 return {
-                  color: layer.options.color,
-                  fillColor: layer.options.fillColor,
-                  fillOpacity: layer.options.fillOpacity,
-                  weight: layer.options.weight,
-                  opacity: layer.options.opacity
+                  color: pathLayer.options.color || '#000000',
+                  fillColor: pathLayer.options.fillColor || '#000000',
+                  fillOpacity: pathLayer.options.fillOpacity || 0.2,
+                  weight: pathLayer.options.weight || 2,
+                  opacity: pathLayer.options.opacity || 1
                 };
               }
             });
@@ -65,16 +79,17 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       // Then add significant layers with hatching on top
       map.eachLayer((layer) => {
         if ('toGeoJSON' in layer) {
-          if (layer.options.className?.includes('significant-threat-pattern')) {
+          const pathLayer = layer as ExtendedLayer;
+          if (pathLayer.options.className?.includes('significant-threat-pattern')) {
             // Clone the path/polygon with its style plus hatching
-            const clonedLayer = L.geoJSON((layer as any).toGeoJSON(), {
+            const clonedLayer = L.geoJSON((pathLayer).toGeoJSON(), {
               style: function() {
                 return {
-                  color: layer.options.color,
-                  fillColor: layer.options.fillColor,
-                  fillOpacity: layer.options.fillOpacity,
-                  weight: layer.options.weight,
-                  opacity: layer.options.opacity,
+                  color: pathLayer.options.color || '#000000',
+                  fillColor: pathLayer.options.fillColor || '#000000',
+                  fillOpacity: pathLayer.options.fillOpacity || 0.2,
+                  weight: pathLayer.options.weight || 2,
+                  opacity: pathLayer.options.opacity || 1,
                   className: 'significant-threat-pattern'
                 };
               }
