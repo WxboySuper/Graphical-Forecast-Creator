@@ -1,3 +1,4 @@
+/* Global styles */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -10,6 +11,22 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Add SVG pattern definition for significant threat hatching */
+body::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Define SVG pattern */
+@supports (mask-image: none) {
+  body::before {
+    content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cdefs%3E%3Cpattern id='significant-hatch' patternUnits='userSpaceOnUse' width='16' height='16' patternTransform='rotate(45)'%3E%3Cline x1='0' y1='0' x2='0' y2='16' stroke='black' stroke-width='2' opacity='0.8'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='16' height='16' fill='url(%23significant-hatch)'/%3E%3C/svg%3E");
+  }
 }
 
 /* Global significant threat pattern that can be used across components */
@@ -27,15 +44,20 @@ code {
   bottom: 0;
   pointer-events: none;
   z-index: 999; /* Ensure hatching is always on top */
-  background-image: repeating-linear-gradient(
-    45deg,
-    rgba(0, 0, 0, 0.8),
-    rgba(0, 0, 0, 0.8) 2px,
-    transparent 2px,
-    transparent 12px
-  );
-  background-size: 16px 16px;
-  background-position: 0 0;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cdefs%3E%3Cpattern id='significant-hatch' patternUnits='userSpaceOnUse' width='16' height='16' patternTransform='rotate(45)'%3E%3Cline x1='0' y1='0' x2='0' y2='16' stroke='black' stroke-width='2' opacity='0.8'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='16' height='16' fill='url(%23significant-hatch)'/%3E%3C/svg%3E");
+  mask-size: 16px 16px;
+  background-color: rgba(0, 0, 0, 0.8);
+  /* Fallback for browsers that don't support mask-image */
+  @supports not (mask-image: none) {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.8),
+      rgba(0, 0, 0, 0.8) 2px,
+      transparent 2px,
+      transparent 12px
+    );
+    background-size: 16px 16px;
+  }
   /* Add subtle border to better define hatched areas */
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.3);
 }
