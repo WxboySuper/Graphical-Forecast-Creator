@@ -145,6 +145,8 @@ const AppContent = () => {
         return;
       }
 
+      const { activeOutlookType } = useSelector((state: RootState) => state.forecast.drawingState);
+
       switch (e.key.toLowerCase()) {
         // Toggle documentation with 'h' (help)
         case 'h':
@@ -165,9 +167,23 @@ const AppContent = () => {
           dispatch(setActiveOutlookType('categorical'));
           break;
 
+        // Add General Thunderstorm risk with 'g'
+        case 'g':
+          if (activeOutlookType === 'categorical') {
+            dispatch(setActiveProbability('TSTM'));
+          }
+          break;
+
         // Toggle significant threat with 's'
         case 's':
-          dispatch(toggleSignificant());
+          if (activeOutlookType !== 'categorical') {
+            dispatch(toggleSignificant());
+          }
+          break;
+
+        // Delete selected feature with Delete key
+        case 'delete':
+          // TODO: Implement feature selection and deletion
           break;
 
         // Save with Ctrl/Cmd + S
