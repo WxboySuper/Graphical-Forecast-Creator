@@ -205,3 +205,54 @@ input:checked + .slider:before {
   margin-top: 4px;
   font-style: italic;
 }
+
+/* Keyboard navigation improvements */
+.outlook-buttons button,
+.probability-selector button {
+  position: relative;
+}
+
+/* Focus indicator that works with both mouse and keyboard */
+.outlook-buttons button:focus-visible,
+.probability-selector button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #3f51b5;
+  z-index: 1;
+}
+
+/* Ensure active state is visible even when focused */
+.outlook-buttons button.active:focus-visible,
+.probability-selector button.active:focus-visible {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #3f51b5, inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Improve switch keyboard interaction */
+.switch input:focus-visible + .slider {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #3f51b5;
+}
+
+/* Accessible button hover states */
+.outlook-buttons button:hover:not(:disabled),
+.probability-selector button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  transition: transform 0.2s ease;
+}
+
+/* Better visual feedback for active states */
+.outlook-buttons button.active,
+.probability-selector button.active {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .outlook-buttons button.active,
+  .probability-selector button.active {
+    border: 2px solid SelectedItem;
+  }
+  
+  .switch input:checked + .slider {
+    background-color: SelectedItem;
+  }
+}
