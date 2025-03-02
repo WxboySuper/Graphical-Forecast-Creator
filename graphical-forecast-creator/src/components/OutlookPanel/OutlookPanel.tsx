@@ -6,7 +6,7 @@ import {
   setActiveProbability, 
   toggleSignificant 
 } from '../../store/forecastSlice';
-import { OutlookType, CategoricalRiskLevel } from '../../types/outlooks';
+import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindHailProbability } from '../../types/outlooks';
 import { colorMappings, getCategoricalRiskDisplayName } from '../../utils/outlookUtils';
 import './OutlookPanel.css';
 
@@ -21,7 +21,7 @@ const OutlookPanel: React.FC = () => {
   };
   
   // Handler for changing the probability/risk level
-  const handleProbabilityChange = (probability: string) => {
+  const handleProbabilityChange = (probability: TornadoProbability | WindHailProbability | CategoricalRiskLevel) => {
     dispatch(setActiveProbability(probability));
   };
   
@@ -50,12 +50,12 @@ const OutlookPanel: React.FC = () => {
   const getAvailableProbabilities = () => {
     switch (activeOutlookType) {
       case 'categorical':
-        return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
+        return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as CategoricalRiskLevel[];
       case 'tornado':
-        return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'];
+        return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as TornadoProbability[];
       case 'wind':
       case 'hail':
-        return ['5%', '15%', '30%', '45%', '60%'];
+        return ['5%', '15%', '30%', '45%', '60%'] as WindHailProbability[];
       default:
         return [];
     }
