@@ -203,17 +203,17 @@ export function getHighestCategoricalRisk(
 export function getCategoricalRiskDisplayName(risk: CategoricalRiskLevel): string {
   switch (risk) {
     case 'TSTM':
-      return 'General Thunderstorm (0/5)';
+      return 'General Thunder (0/5)';
     case 'MRGL':
-      return 'Marginal (1/5)';
+      return 'Marginal Risk (1/5)';
     case 'SLGT':
-      return 'Slight (2/5)';
+      return 'Slight Risk (2/5)';
     case 'ENH':
-      return 'Enhanced (3/5)';
+      return 'Enhanced Risk (3/5)';
     case 'MDT':
-      return 'Moderate (4/5)';
+      return 'Moderate Risk (4/5)';
     case 'HIGH':
-      return 'High (5/5)';
+      return 'High Risk (5/5)';
     default:
       return 'Unknown';
   }
