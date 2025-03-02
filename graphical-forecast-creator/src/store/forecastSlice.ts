@@ -116,6 +116,12 @@ export const forecastSlice = createSlice({
       }
     },
     
+    // Reset just the categorical outlooks (used by useAutoCategorical)
+    resetCategorical: (state) => {
+      state.outlooks.categorical = new Map();
+      state.isSaved = false;
+    },
+    
     // Set map view (center and zoom)
     setMapView: (state, action: PayloadAction<{ center: [number, number], zoom: number }>) => {
       state.currentMapView = action.payload;
@@ -151,6 +157,7 @@ export const {
   toggleSignificant,
   addFeature,
   removeFeature,
+  resetCategorical,
   setMapView,
   resetForecasts,
   markAsSaved,
