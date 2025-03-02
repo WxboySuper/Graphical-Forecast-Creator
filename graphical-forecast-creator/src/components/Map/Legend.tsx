@@ -28,7 +28,6 @@ const Legend: React.FC = () => {
   );
 
   const renderProbabilisticLegend = () => {
-    const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
     const probabilities = activeOutlookType === 'tornado' 
       ? (['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as TornadoProbability[])
       : (['5%', '15%', '30%', '45%', '60%'] as WindHailProbability[]);
@@ -42,7 +41,7 @@ const Legend: React.FC = () => {
               <div className="legend-item" role="listitem">
                 <div 
                   className="legend-color" 
-                  style={{ backgroundColor: activeOutlookType === 'tornado' ? colorMappings.tornado[prob] : colorMappings.wind[prob] }}
+                  style={{ backgroundColor: activeOutlookType === 'tornado' ? colorMappings.tornado[prob as TornadoProbability] : colorMappings.wind[prob as WindHailProbability] }}
                   role="img"
                   aria-label={`Color for ${prob} probability`}
                 />
@@ -54,7 +53,7 @@ const Legend: React.FC = () => {
                 <div className="legend-item" role="listitem">
                   <div 
                     className="legend-color significant-threat-pattern" 
-                    style={{ backgroundColor: activeOutlookType === 'tornado' ? colorMappings.tornado[prob] : colorMappings.wind[prob] }}
+                    style={{ backgroundColor: activeOutlookType === 'tornado' ? colorMappings.tornado[prob as TornadoProbability] : colorMappings.wind[prob as WindHailProbability] }}
                     role="img"
                     aria-label={`Color for ${prob.replace('%', '#')} significant threat probability`}
                   />
