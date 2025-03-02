@@ -86,14 +86,12 @@ const OutlookLayers: React.FC = () => {
         break;
     }
     
-    // Use className to apply hatched pattern for significant threats
     return {
       color: color,
       weight: 2,
       opacity: 1,
       fillColor: color,
       fillOpacity: 0.6,
-      className: isSignificant ? 'significant-threat-pattern' : ''
     };
   };
   
@@ -112,13 +110,13 @@ const OutlookLayers: React.FC = () => {
     return outlookType !== 'categorical';
   };
   
-  // Render all outlook types with their probabilities
-  return (
-    <>
-      {(Object.keys(outlooks) as OutlookType[]).map(outlookType => (
-        shouldShowLayer(outlookType) && (
-          <React.Fragment key={outlookType}>
-            {Array.from(outlooks[outlookType].entries()).map(([probability, features]) => (
+  // First render regular areas
+  const renderRegularAreas = () => (
+    (Object.keys(outlooks) as OutlookType[]).map(outlookType => (
+      shouldShowLayer(outlookType) && (
+        <React.Fragment key={outlookType}>
+          {Array.from(outlooks[outlookType].entries()).map(([probability, features]) => (
+            !probability.includes('#') && (
               <FeatureGroup key={`${outlookType}-${probability}`}>
                 {features.map(feature => (
                   <GeoJSON
@@ -131,10 +129,45 @@ const OutlookLayers: React.FC = () => {
                   />
                 ))}
               </FeatureGroup>
-            ))}
-          </React.Fragment>
-        )
-      ))}
+            )
+          ))}
+        </React.Fragment>
+      )
+    ))
+  );
+  
+  // Then render significant threat areas on top with the hatched pattern
+  const renderSignificantAreas = () => (
+    (Object.keys(outlooks) as OutlookType[]).map(outlookType => (
+      shouldShowLayer(outlookType) && (
+        <React.Fragment key={`${outlookType}-significant`}>
+          {Array.from(outlooks[outlookType].entries()).map(([probability, features]) => (
+            probability.includes('#') && (
+              <FeatureGroup key={`${outlookType}-${probability}`}>
+                {features.map(feature => (
+                  <GeoJSON
+                    key={feature.id as string}
+                    data={feature}
+                    style={() => getFeatureStyle(outlookType, probability)}
+                    className="significant-threat-pattern"
+                    eventHandlers={{
+                      click: () => onFeatureClick(outlookType, probability, feature.id as string)
+                    }}
+                  />
+                ))}
+              </FeatureGroup>
+            )
+          ))}
+        </React.Fragment>
+      )
+    ))
+  );
+  
+  // Render all outlook types with their probabilities, non-significant first, then significant
+  return (
+    <>
+      {renderRegularAreas()}
+      {renderSignificantAreas()}
     </>
   );
 };
