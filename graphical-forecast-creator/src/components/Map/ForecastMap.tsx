@@ -149,11 +149,11 @@ const OutlookLayers: React.FC = () => {
     
     return sortedEntries.map(([probability, features]) => (
       <FeatureGroup key={`${outlookType}-${probability}`}>
+        {features.map(feature => (
           <GeoJSON
             key={feature.id as string}
             data={feature}
             style={() => getFeatureStyle(outlookType, probability)}
-            eventHandlers={{
             eventHandlers={{
               click: () => onFeatureClick(outlookType, probability, feature.id as string),
               mouseover: (e) => {
