@@ -27,7 +27,23 @@ const OutlookPanel: React.FC = () => {
   
   // Handler for toggling significant status
   const handleToggleSignificant = () => {
-    dispatch(toggleSignificant());
+    // Update the probability to match significant status
+    const currentProb = activeProbability;
+    if (!currentProb.includes('%')) {
+      dispatch(toggleSignificant());
+      return;
+    }
+
+    // Convert probability to/from significant variant
+    const newProb = isSignificant
+      ? currentProb.replace('#', '')
+      : currentProb.replace('%', '#');
+
+    if (newProb !== currentProb) {
+      dispatch(setActiveProbability(newProb as any));
+    } else {
+      dispatch(toggleSignificant());
+    }
   };
   
   // Get available probabilities based on active outlook type
@@ -142,6 +158,11 @@ const OutlookPanel: React.FC = () => {
           </label>
           <span className="switch-label">
             {isSignificant ? 'Enabled' : 'Disabled'}
+            {isSignificant && (
+              <div className="probability-note">
+                Current: {activeProbability}
+              </div>
+            )}
           </span>
         </div>
       )}
