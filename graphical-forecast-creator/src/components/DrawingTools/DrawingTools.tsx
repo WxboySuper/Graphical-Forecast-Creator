@@ -9,7 +9,7 @@ import './DrawingTools.css';
 interface DrawingToolsProps {
   onSave: () => void;
   onLoad: () => void;
-  mapRef: React.RefObject<ForecastMapHandle>;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
 }
 
 const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) => {
