@@ -137,7 +137,8 @@ const OutlookLayers: React.FC = () => {
       opacity: 1,
       fillColor: color,
       fillOpacity: 0.6,
-      zIndex // Add z-index for proper layering
+      zIndex, // Add z-index for proper layering
+      className: probability.includes('#') ? 'significant-threat-pattern' : undefined
     };
   };
   
@@ -148,12 +149,11 @@ const OutlookLayers: React.FC = () => {
     
     return sortedEntries.map(([probability, features]) => (
       <FeatureGroup key={`${outlookType}-${probability}`}>
-        {features.map(feature => (
           <GeoJSON
             key={feature.id as string}
             data={feature}
             style={() => getFeatureStyle(outlookType, probability)}
-            className={probability.includes('#') ? 'significant-threat-pattern' : undefined}
+            eventHandlers={{
             eventHandlers={{
               click: () => onFeatureClick(outlookType, probability, feature.id as string),
               mouseover: (e) => {
