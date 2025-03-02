@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
@@ -56,8 +56,7 @@ const MapController: React.FC = () => {
 // Component to render the outlook polygons
 const OutlookLayers: React.FC = () => {
   const dispatch = useDispatch();
-  const { outlooks, drawingState } = useSelector((state: RootState) => state.forecast);
-  const { activeOutlookType } = drawingState;
+  const { outlooks } = useSelector((state: RootState) => state.forecast);
   
   // Create a style function for GeoJSON features
   const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
@@ -78,21 +77,14 @@ const OutlookLayers: React.FC = () => {
         break;
     }
     
+    // Use className to apply hatched pattern for significant threats
     return {
       color: color,
       weight: 2,
       opacity: 1,
       fillColor: color,
       fillOpacity: 0.6,
-      // Add a pattern fill for significant threats
-      fillPattern: isSignificant ? L.pattern({
-        patternUnits: 'userSpaceOnUse',
-        patternTransform: 'rotate(45)',
-        width: 10,
-        height: 10,
-        patternContentUnits: 'userSpaceOnUse',
-        pattern: `<rect width="2" height="10" fill="black" opacity="0.7" x="0" y="0" />`
-      }) : undefined
+      className: isSignificant ? 'significant-threat-pattern' : ''
     };
   };
   
