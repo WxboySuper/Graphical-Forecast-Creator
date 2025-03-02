@@ -5,16 +5,19 @@ import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
-import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, toggleSignificant } from './store/forecastSlice';
+import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant } from './store/forecastSlice';
 import { RootState } from './store';
+import { OutlookData } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
 // Import required libraries 
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { ToastManager } from './components/Toast/Toast';
 import { v4 as uuidv4 } from 'uuid';
+import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 
 // App content component to access hooks
 const AppContent = () => {
@@ -72,12 +75,12 @@ const AppContent = () => {
       
       const parsedData = JSON.parse(savedData);
       
-      // Convert arrays back to Map objects
-      const deserializedOutlooks = {
-        tornado: new Map(parsedData.outlooks.tornado),
-        wind: new Map(parsedData.outlooks.wind),
-        hail: new Map(parsedData.outlooks.hail),
-        categorical: new Map(parsedData.outlooks.categorical)
+      // Convert arrays back to Map objects with proper typing
+      const deserializedOutlooks: OutlookData = {
+        tornado: new Map(parsedData.outlooks.tornado as [string, Feature<Geometry, GeoJsonProperties>[]][]),
+        wind: new Map(parsedData.outlooks.wind as [string, Feature<Geometry, GeoJsonProperties>[]][]),
+        hail: new Map(parsedData.outlooks.hail as [string, Feature<Geometry, GeoJsonProperties>[]][]),
+        categorical: new Map(parsedData.outlooks.categorical as [string, Feature<Geometry, GeoJsonProperties>[]][])
       };
       
       // Restore the outlooks
@@ -151,15 +154,14 @@ const AppContent = () => {
 
   // Add keyboard shortcuts
   React.useEffect(() => {
+    const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+    const { activeOutlookType, activeProbability } = drawingState;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
-
-      // Get current state
-      const { drawingState } = useSelector((state: RootState) => state.forecast);
-      const { activeOutlookType, activeProbability } = drawingState;
 
       // Handle Ctrl/Cmd + S first
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -279,7 +281,7 @@ const AppContent = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, isSaved, activeOutlookType, activeProbability, drawingState]);
+  }, [dispatch, isSaved]);
   
   return (
     <div className="App">
