@@ -207,26 +207,23 @@ Click to delete`, {
 };
 
 // Define types for Leaflet Draw controls
-interface LeafletDrawControl {
-  _markers?: any[];
-  _finishShape?: () => void;
-  _activeShape?: {
-    deleteLastVertex: () => void;
+interface LeafletDrawLayer extends L.Layer {
+  toGeoJSON(): GeoJSON.Feature;
+  _latlngs?: L.LatLng[];
+  options: L.PathOptions & {
+    className?: string;
   };
 }
 
-interface FeatureGroupWithMap extends L.FeatureGroup {
-  _map?: L.Map & {
-    _toolbars?: {
-      draw: LeafletDrawControl;
-    };
-  };
+interface LeafletCreateEvent {
+  layer: LeafletDrawLayer;
+  layerType: 'polygon' | 'rectangle';
 }
 
-const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
+const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
   const { drawingState } = useSelector((state: RootState) => state.forecast);
-  const featureGroupRef = useRef<FeatureGroupWithMap>(null);
+  const featureGroupRef = useRef<L.FeatureGroup>(null);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   
   // Expose the map instance through the ref
@@ -235,7 +232,7 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
   }), [mapInstance]);
   
   // Drawing creation handler
-  const handleCreated = (e: any) => {
+  const handleCreated = (e: LeafletCreateEvent) => {
     const { layerType, layer } = e;
     
     // Only handle polygons for now
@@ -271,20 +268,20 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
         return;
       }
 
+      // Get the current draw handler if any
+      const drawHandler = (featureGroupRef.current as any)?._map?._toolbars?.draw;
+      if (!drawHandler) return;
+
       switch (e.key) {
         case 'Enter':
           // Complete the current shape when Enter is pressed
-          const drawControl = featureGroupRef.current?._map?._toolbars?.draw;
-          if (drawControl?._markers?.length >= 3) {
-            drawControl._finishShape();
+          if (drawHandler._markers?.length >= 3) {
+            drawHandler._finishShape?.();
           }
           break;
         case 'Escape':
           // Cancel current drawing
-          const activeDrawControl = featureGroupRef.current?._map?._toolbars?.draw?._activeShape;
-          if (activeDrawControl) {
-            activeDrawControl.deleteLastVertex();
-          }
+          drawHandler._activeShape?.deleteLastVertex?.();
           break;
       }
     };
@@ -296,7 +293,7 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
   return (
     <div className="map-container">
       <MapContainer 
-        center={[39.8283, -98.5795]} // Geographic center of the contiguous United States
+        center={[39.8283, -98.5795]}
         zoom={4} 
         style={{ height: '100%', width: '100%' }}
       >
@@ -307,11 +304,10 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* Display existing outlook layers */}
         <OutlookLayers />
         
-        {/* @ts-ignore - EditControl types don't match exactly but functionality works */}
         <FeatureGroup ref={featureGroupRef}>
+          {/* @ts-ignore - Types aren't perfect but functionality works */}
           <EditControl
             position="topright"
             onCreated={handleCreated}
@@ -337,8 +333,7 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
                 },
                 showArea: true,
                 metric: true,
-                repeatMode: false,
-                guideLayers: []
+                repeatMode: false
               },
               circle: false,
               circlemarker: false,
@@ -346,16 +341,11 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
               polyline: false
             }}
             edit={{
-              featureGroup: featureGroupRef.current as L.FeatureGroup,
+              featureGroup: featureGroupRef.current,
               remove: false,
               edit: false
             }}
           />
-          {/* Add accessible instructions for keyboard users */}
-          <div className="sr-only" role="note" aria-live="polite">
-            Press Enter to complete shape, Escape to cancel. 
-            Use arrow keys to navigate the map while drawing.
-          </div>
         </FeatureGroup>
 
         <Legend />
