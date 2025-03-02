@@ -8,7 +8,23 @@
 
 /* Custom styling for the drawing controls */
 .leaflet-draw-toolbar a {
+  background-color: white;
+  border: 1px solid #ccc;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
   background-image: linear-gradient(transparent, transparent), url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZyBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTUwIDUwbDIwMCAyMDBtLTIwMCAwbDIwMC0yMDAiLz48L2c+PC9zdmc+');
+}
+
+.leaflet-draw-toolbar a:hover {
+  background-color: #f4f4f4;
+}
+
+.leaflet-draw-draw-polygon,
+.leaflet-draw-draw-rectangle {
+  font-size: 16px;
+  font-weight: bold;
 }
 
 /* Override default Leaflet styles for better UI */
@@ -25,20 +41,56 @@
 
 /* Significant threat hatched pattern */
 .significant-threat-pattern {
-  fill-opacity: 0.6;
-  stroke-width: 2;
-  stroke-opacity: 1;
-  /* Hatched pattern using SVG background */
-  background-image: repeating-linear-gradient(
-    45deg,
-    rgba(0, 0, 0, 0.7),
-    rgba(0, 0, 0, 0.7) 2px,
-    transparent 2px,
-    transparent 10px
-  );
+  position: relative;
 }
 
-/* Make sure Leaflet paths have a background-clip property for the hatching to work */
+.significant-threat-pattern::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Double-layered pattern for better visibility */
+  background-image: 
+    repeating-linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.7),
+      rgba(0, 0, 0, 0.7) 2px,
+      transparent 2px,
+      transparent 10px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.3),
+      rgba(255, 255, 255, 0.3) 2px,
+      transparent 2px,
+      transparent 10px
+    );
+  pointer-events: none;
+}
+
+/* Ensure proper z-index stacking for patterns */
 .leaflet-interactive {
   background-clip: padding-box;
+  z-index: 1;
+}
+
+/* Draw controls visibility */
+.leaflet-draw-section {
+  margin-bottom: 8px;
+}
+
+/* Draw error styling */
+.leaflet-draw-tooltip {
+  background: rgba(255, 0, 0, 0.7);
+  border: none;
+  color: white;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.leaflet-draw-tooltip:before {
+  border-right-color: rgba(255, 0, 0, 0.7);
 }
