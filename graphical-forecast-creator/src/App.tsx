@@ -102,8 +102,8 @@ const AppContent = () => {
           
           // Type-safe feature iteration
           Object.values(deserializedOutlooks).forEach(outlookMap => {
-            Array.from(outlookMap.values()).forEach((features: Feature<Geometry, GeoJsonProperties>[]) => {
-              features.forEach((feature: Feature<Geometry, GeoJsonProperties>) => {
+            Array.from(outlookMap.values()).forEach((features) => {
+              (features as Feature<Geometry, GeoJsonProperties>[]).forEach((feature: Feature<Geometry, GeoJsonProperties>) => {
                 L.geoJSON(feature).addTo(allFeatures);
               });
             });
