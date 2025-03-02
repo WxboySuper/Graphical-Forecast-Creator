@@ -22,3 +22,23 @@
   box-shadow: 0 1px 5px rgba(0,0,0,0.2);
   border-radius: 4px;
 }
+
+/* Significant threat hatched pattern */
+.significant-threat-pattern {
+  fill-opacity: 0.6;
+  stroke-width: 2;
+  stroke-opacity: 1;
+  /* Hatched pattern using SVG background */
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.7),
+    rgba(0, 0, 0, 0.7) 2px,
+    transparent 2px,
+    transparent 10px
+  );
+}
+
+/* Make sure Leaflet paths have a background-clip property for the hatching to work */
+.leaflet-interactive {
+  background-clip: padding-box;
+}
