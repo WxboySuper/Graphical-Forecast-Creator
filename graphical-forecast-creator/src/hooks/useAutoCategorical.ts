@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { addFeature } from '../store/forecastSlice';
+import { addFeature, resetCategorical } from '../store/forecastSlice';
 import { getHighestCategoricalRisk } from '../utils/outlookUtils';
-import { CategoricalRiskLevel, TornadoProbability, WindHailProbability } from '../types/outlooks';
+import { TornadoProbability, WindHailProbability } from '../types/outlooks';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -25,14 +25,8 @@ const useAutoCategorical = () => {
       return;
     }
 
-    // TODO: Implement the actual conversion from probabilistic to categorical
-    // This would involve GeoJSON operations to:
-    // 1. Find overlaps between probabilistic areas
-    // 2. Determine the highest risk level for each overlapping area
-    // 3. Create new GeoJSON features for the categorical outlook
-
-    // For now, this is a placeholder that simply copies each probabilistic area
-    // and assigns it the appropriate categorical risk level
+    // Clear all existing categorical outlooks before regenerating them
+    dispatch(resetCategorical());
 
     // Process tornado features
     tornadoFeatures.forEach(([probability, features]) => {
@@ -108,6 +102,13 @@ const useAutoCategorical = () => {
         dispatch(addFeature({ feature: categoricalFeature }));
       });
     });
+
+    // TODO: In a future enhancement, implement GeoJSON operations to properly combine overlapping areas
+    // This would require:
+    // 1. Find overlaps between probabilistic areas
+    // 2. Determine the highest risk level for each overlapping area
+    // 3. Create new GeoJSON features for the categorical outlook with proper boundaries
+
   }, [outlooks.tornado, outlooks.wind, outlooks.hail, dispatch]);
 
   return null;
