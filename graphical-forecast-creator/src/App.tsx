@@ -13,6 +13,8 @@ import './App.css';
 // Import required libraries 
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
+import { ToastManager } from './components/Toast/Toast';
+import { v4 as uuidv4 } from 'uuid';
 
 // App content component to access hooks
 const AppContent = () => {
@@ -20,6 +22,7 @@ const AppContent = () => {
   const { outlooks, isSaved } = useSelector((state: RootState) => state.forecast);
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }>>([]);
   
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
@@ -137,6 +140,15 @@ const AppContent = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isSaved]);
 
+  const addToast = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    const id = uuidv4();
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
   // Add keyboard shortcuts
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -179,27 +191,32 @@ const AppContent = () => {
         // Toggle documentation with 'h' (help)
         case 'h':
           setShowDocumentation(prev => !prev);
+          addToast('Documentation toggled', 'info');
           break;
 
         // Switch between outlook types
         case 't':
           if (activeOutlookType !== 'tornado') {
             dispatch(setActiveOutlookType('tornado'));
+            addToast('Switched to Tornado outlook', 'info');
           }
           break;
         case 'w':
           if (activeOutlookType !== 'wind') {
             dispatch(setActiveOutlookType('wind'));
+            addToast('Switched to Wind outlook', 'info');
           }
           break;
         case 'l':
           if (activeOutlookType !== 'hail') {
             dispatch(setActiveOutlookType('hail'));
+            addToast('Switched to Hail outlook', 'info');
           }
           break;
         case 'c':
           if (activeOutlookType !== 'categorical') {
             dispatch(setActiveOutlookType('categorical'));
+            addToast('Switched to Categorical outlook', 'info');
           }
           break;
 
@@ -207,6 +224,7 @@ const AppContent = () => {
         case 'g':
           if (activeOutlookType === 'categorical') {
             dispatch(setActiveProbability('TSTM'));
+            addToast('Added General Thunderstorm risk', 'info');
           }
           break;
 
@@ -218,6 +236,9 @@ const AppContent = () => {
               !['5%'].includes(activeProbability));
           if (canToggleSignificant) {
             dispatch(toggleSignificant());
+            addToast(`${drawingState.isSignificant ? 'Disabled' : 'Enabled'} significant threat`, 'info');
+          } else {
+            addToast('Significant threat not available for this probability', 'warning');
           }
           break;
 
@@ -230,6 +251,7 @@ const AppContent = () => {
             if (currentIndex < probabilities.length - 1) {
               const nextProb = probabilities[currentIndex + 1];
               dispatch(setActiveProbability(nextProb));
+              addToast(`Increased to ${nextProb}`, 'info');
             }
           }
           break;
@@ -242,6 +264,7 @@ const AppContent = () => {
             if (currentIndex > 0) {
               const prevProb = probabilities[currentIndex - 1];
               dispatch(setActiveProbability(prevProb));
+              addToast(`Decreased to ${prevProb}`, 'info');
             }
           }
           break;
@@ -256,7 +279,7 @@ const AppContent = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, isSaved]);
+  }, [dispatch, isSaved, activeOutlookType, activeProbability, drawingState]);
   
   return (
     <div className="App">
@@ -278,6 +301,7 @@ const AppContent = () => {
       <footer className="App-footer">
         <p>Based on Storm Prediction Center's severe weather outlooks</p>
       </footer>
+      <ToastManager toasts={toasts} onDismiss={removeToast} />
     </div>
   );
 };
