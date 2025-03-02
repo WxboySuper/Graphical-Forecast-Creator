@@ -145,7 +145,21 @@ const AppContent = () => {
         return;
       }
 
-      const { activeOutlookType } = useSelector((state: RootState) => state.forecast.drawingState);
+      // Get current state
+      const { drawingState } = useSelector((state: RootState) => state.forecast);
+      const { activeOutlookType } = drawingState;
+
+      // Handle Ctrl/Cmd + S first
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (!isSaved) handleSave();
+        return;
+      }
+
+      // Don't trigger other shortcuts if modifiers are pressed
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) {
+        return;
+      }
 
       switch (e.key.toLowerCase()) {
         // Toggle documentation with 'h' (help)
@@ -155,16 +169,24 @@ const AppContent = () => {
 
         // Switch between outlook types
         case 't':
-          dispatch(setActiveOutlookType('tornado'));
+          if (activeOutlookType !== 'tornado') {
+            dispatch(setActiveOutlookType('tornado'));
+          }
           break;
         case 'w':
-          dispatch(setActiveOutlookType('wind'));
+          if (activeOutlookType !== 'wind') {
+            dispatch(setActiveOutlookType('wind'));
+          }
           break;
         case 'l':
-          dispatch(setActiveOutlookType('hail'));
+          if (activeOutlookType !== 'hail') {
+            dispatch(setActiveOutlookType('hail'));
+          }
           break;
         case 'c':
-          dispatch(setActiveOutlookType('categorical'));
+          if (activeOutlookType !== 'categorical') {
+            dispatch(setActiveOutlookType('categorical'));
+          }
           break;
 
         // Add General Thunderstorm risk with 'g'
@@ -175,23 +197,19 @@ const AppContent = () => {
           break;
 
         // Toggle significant threat with 's'
-        case 's':
-          if (activeOutlookType !== 'categorical') {
-            dispatch(toggleSignificant());
-          }
-          break;
+        const canToggleSignificant = activeOutlookType !== 'categorical' && 
+          (activeOutlookType === 'tornado' ? 
+            !['2%', '5%'].includes(drawingState.activeProbability) :
+            !['5%'].includes(drawingState.activeProbability));
+        if (canToggleSignificant) {
+          dispatch(toggleSignificant());
+        }
+        break;
 
         // Delete selected feature with Delete key
         case 'delete':
+        case 'backspace':
           // TODO: Implement feature selection and deletion
-          break;
-
-        // Save with Ctrl/Cmd + S
-        case 's':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            if (!isSaved) handleSave();
-          }
           break;
       }
     };
