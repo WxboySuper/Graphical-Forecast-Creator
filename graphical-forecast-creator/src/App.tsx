@@ -5,7 +5,7 @@ import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
-import { importForecasts, markAsSaved, resetForecasts, setMapView } from './store/forecastSlice';
+import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, toggleSignificant } from './store/forecastSlice';
 import { RootState } from './store';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
@@ -77,11 +77,40 @@ const AppContent = () => {
         categorical: new Map(parsedData.outlooks.categorical)
       };
       
-      // Restore both the outlooks and map view
+      // Restore the outlooks
       dispatch(importForecasts(deserializedOutlooks));
-      if (parsedData.mapView) {
+
+      // Restore map view if saved, otherwise fit to feature bounds
+      if (parsedData.mapView && mapRef.current?.getMap()) {
         dispatch(setMapView(parsedData.mapView));
+      } else if (mapRef.current?.getMap()) {
+        // Create FeatureGroup with all features to get bounds
+        const map = mapRef.current.getMap();
+        const allFeatures = L.featureGroup();
+        
+        // Add all features to temporary group
+        Object.values(deserializedOutlooks).forEach(outlookMap => {
+          Array.from(outlookMap.values()).forEach(features => {
+            features.forEach(feature => {
+              L.geoJSON(feature).addTo(allFeatures);
+            });
+          });
+        });
+
+        // If there are features, fit the map to their bounds
+        if (allFeatures.getLayers().length > 0) {
+          const bounds = allFeatures.getBounds();
+          map.fitBounds(bounds, { padding: [50, 50] });
+          
+          // Update the store with new view
+          const center = map.getCenter();
+          dispatch(setMapView({
+            center: [center.lat, center.lng],
+            zoom: map.getZoom()
+          }));
+        }
       }
+      
       alert('Forecast loaded successfully!');
     } catch (error) {
       console.error('Error loading forecast:', error);
@@ -107,6 +136,53 @@ const AppContent = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isSaved]);
+
+  // Add keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        // Toggle documentation with 'h' (help)
+        case 'h':
+          setShowDocumentation(prev => !prev);
+          break;
+
+        // Switch between outlook types
+        case 't':
+          dispatch(setActiveOutlookType('tornado'));
+          break;
+        case 'w':
+          dispatch(setActiveOutlookType('wind'));
+          break;
+        case 'l':
+          dispatch(setActiveOutlookType('hail'));
+          break;
+        case 'c':
+          dispatch(setActiveOutlookType('categorical'));
+          break;
+
+        // Toggle significant threat with 's'
+        case 's':
+          dispatch(toggleSignificant());
+          break;
+
+        // Save with Ctrl/Cmd + S
+        case 's':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (!isSaved) handleSave();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dispatch, isSaved]);
   
   return (
     <div className="App">
