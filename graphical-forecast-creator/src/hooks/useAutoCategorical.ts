@@ -3,11 +3,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { addFeature, resetCategorical } from '../store/forecastSlice';
 import { getHighestCategoricalRisk } from '../utils/outlookUtils';
-import { TornadoProbability, WindHailProbability } from '../types/outlooks';
+import { TornadoProbability, WindHailProbability, CategoricalRiskLevel } from '../types/outlooks';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Hook that automatically generates categorical outlooks based on probabilistic outlooks
+ * Hook that automatically generates categorical outlooks based on probabilistic outlooks.
+ * Note: General Thunderstorm (TSTM) areas must be drawn manually in categorical mode.
  */
 const useAutoCategorical = () => {
   const dispatch = useDispatch();
@@ -19,95 +20,87 @@ const useAutoCategorical = () => {
     const tornadoFeatures = Array.from(outlooks.tornado.entries());
     const windFeatures = Array.from(outlooks.wind.entries());
     const hailFeatures = Array.from(outlooks.hail.entries());
+    const categoricalFeatures = Array.from(outlooks.categorical.entries());
 
     // Skip if there are no probabilistic outlooks
     if (tornadoFeatures.length === 0 && windFeatures.length === 0 && hailFeatures.length === 0) {
+      // Keep any manually drawn TSTM areas, only clear other categorical risks
+      const newCategoricalFeatures = categoricalFeatures.filter(([risk]) => risk === 'TSTM');
+      if (newCategoricalFeatures.length > 0) {
+        const newCategoricalMap = new Map(newCategoricalFeatures);
+        dispatch({ type: 'forecast/setOutlookMap', payload: { outlookType: 'categorical', map: newCategoricalMap } });
+      } else {
+        dispatch(resetCategorical());
+      }
       return;
     }
 
-    // Clear all existing categorical outlooks before regenerating them
+    // Clear all categorical outlooks except TSTM before regenerating
+    const tstmFeatures = outlooks.categorical.get('TSTM') || [];
     dispatch(resetCategorical());
+    
+    // Restore TSTM features if they exist
+    if (tstmFeatures.length > 0) {
+      dispatch(addFeature({ feature: tstmFeatures[0] }));
+    }
 
-    // Process tornado features
-    tornadoFeatures.forEach(([probability, features]) => {
-      features.forEach(feature => {
-        const categoricalRisk = getHighestCategoricalRisk(
-          probability as TornadoProbability,
-          undefined,
-          undefined
-        );
-
-        const categoricalFeature = {
-          ...feature,
-          id: uuidv4(), // New ID for the categorical feature
-          properties: {
-            ...feature.properties,
-            outlookType: 'categorical',
-            probability: categoricalRisk,
-            derivedFrom: 'tornado',
-            originalProbability: probability
+    // Process features from each outlook type
+    [
+      { type: 'tornado', features: tornadoFeatures },
+      { type: 'wind', features: windFeatures },
+      { type: 'hail', features: hailFeatures }
+    ].forEach(({ type, features }) => {
+      features.forEach(([probability, featureList]) => {
+        featureList.forEach(feature => {
+          // Get the categorical risk level based on the outlook type
+          let categoricalRisk: CategoricalRiskLevel;
+          switch (type) {
+            case 'tornado':
+              categoricalRisk = getHighestCategoricalRisk(
+                probability as TornadoProbability,
+                undefined,
+                undefined
+              );
+              break;
+            case 'wind':
+              categoricalRisk = getHighestCategoricalRisk(
+                undefined,
+                probability as WindHailProbability,
+                undefined
+              );
+              break;
+            case 'hail':
+              categoricalRisk = getHighestCategoricalRisk(
+                undefined,
+                undefined,
+                probability as WindHailProbability
+              );
+              break;
+            default:
+              return;
           }
-        };
 
-        dispatch(addFeature({ feature: categoricalFeature }));
+          // Skip if the conversion resulted in TSTM (this shouldn't happen normally)
+          if (categoricalRisk === 'TSTM') {
+            return;
+          }
+
+          const categoricalFeature = {
+            ...feature,
+            id: uuidv4(),
+            properties: {
+              ...feature.properties,
+              outlookType: 'categorical',
+              probability: categoricalRisk,
+              derivedFrom: type,
+              originalProbability: probability
+            }
+          };
+
+          dispatch(addFeature({ feature: categoricalFeature }));
+        });
       });
     });
-
-    // Process wind features
-    windFeatures.forEach(([probability, features]) => {
-      features.forEach(feature => {
-        const categoricalRisk = getHighestCategoricalRisk(
-          undefined,
-          probability as WindHailProbability,
-          undefined
-        );
-
-        const categoricalFeature = {
-          ...feature,
-          id: uuidv4(), // New ID for the categorical feature
-          properties: {
-            ...feature.properties,
-            outlookType: 'categorical',
-            probability: categoricalRisk,
-            derivedFrom: 'wind',
-            originalProbability: probability
-          }
-        };
-
-        dispatch(addFeature({ feature: categoricalFeature }));
-      });
-    });
-
-    // Process hail features
-    hailFeatures.forEach(([probability, features]) => {
-      features.forEach(feature => {
-        const categoricalRisk = getHighestCategoricalRisk(
-          undefined,
-          undefined,
-          probability as WindHailProbability
-        );
-
-        const categoricalFeature = {
-          ...feature,
-          id: uuidv4(), // New ID for the categorical feature
-          properties: {
-            ...feature.properties,
-            outlookType: 'categorical',
-            probability: categoricalRisk,
-            derivedFrom: 'hail',
-            originalProbability: probability
-          }
-        };
-
-        dispatch(addFeature({ feature: categoricalFeature }));
-      });
-    });
-
-    // TODO: In a future enhancement, implement GeoJSON operations to properly combine overlapping areas
-    // This would require:
-    // 1. Find overlaps between probabilistic areas
-    // 2. Determine the highest risk level for each overlapping area
-    // 3. Create new GeoJSON features for the categorical outlook with proper boundaries
 
   }, [outlooks.tornado, outlooks.wind, outlooks.hail, dispatch]);
 
