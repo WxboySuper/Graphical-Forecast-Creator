@@ -104,6 +104,17 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
           </p>
         )}
       </div>
+      
+      {isExporting && (
+        <div className="loading-overlay">
+          <div className="loading-spinner" />
+          <div className="loading-text">
+            Generating forecast image...
+            <br />
+            <small>This may take a few moments</small>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
