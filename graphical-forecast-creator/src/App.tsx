@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './store';
 import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
@@ -76,12 +76,16 @@ const AppContent = () => {
       
       const parsedData = JSON.parse(savedData);
       
-      // Convert arrays back to Map objects with proper typing
+      // Type check the loaded data
+      const entries = parsedData.outlooks as {
+        [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
+      };
+
       const deserializedOutlooks: OutlookData = {
-        tornado: new Map(parsedData.outlooks.tornado as [string, Feature<Geometry, GeoJsonProperties>[]][]),
-        wind: new Map(parsedData.outlooks.wind as [string, Feature<Geometry, GeoJsonProperties>[]][]),
-        hail: new Map(parsedData.outlooks.hail as [string, Feature<Geometry, GeoJsonProperties>[]][]),
-        categorical: new Map(parsedData.outlooks.categorical as [string, Feature<Geometry, GeoJsonProperties>[]][])
+        tornado: new Map(entries.tornado),
+        wind: new Map(entries.wind),
+        hail: new Map(entries.hail),
+        categorical: new Map(entries.categorical)
       };
       
       // Restore the outlooks
@@ -93,28 +97,30 @@ const AppContent = () => {
       } else if (mapRef.current?.getMap()) {
         // Create FeatureGroup with all features to get bounds
         const map = mapRef.current.getMap();
-        const allFeatures = L.featureGroup();
-        
-        // Add all features to temporary group
-        Object.values(deserializedOutlooks).forEach(outlookMap => {
-          Array.from(outlookMap.values()).forEach(features => {
-            features.forEach(feature => {
-              L.geoJSON(feature).addTo(allFeatures);
+        if (map) {
+          const allFeatures = L.featureGroup();
+          
+          // Type-safe feature iteration
+          Object.values(deserializedOutlooks).forEach(outlookMap => {
+            Array.from(outlookMap.values()).forEach((features: Feature<Geometry, GeoJsonProperties>[]) => {
+              features.forEach((feature: Feature<Geometry, GeoJsonProperties>) => {
+                L.geoJSON(feature).addTo(allFeatures);
+              });
             });
           });
-        });
 
-        // If there are features, fit the map to their bounds
-        if (allFeatures.getLayers().length > 0) {
-          const bounds = allFeatures.getBounds();
-          map.fitBounds(bounds, { padding: [50, 50] });
-          
-          // Update the store with new view
-          const center = map.getCenter();
-          dispatch(setMapView({
-            center: [center.lat, center.lng],
-            zoom: map.getZoom()
-          }));
+          // If there are features, fit the map to their bounds
+          if (allFeatures.getLayers().length > 0) {
+            const bounds = allFeatures.getBounds();
+            map.fitBounds(bounds, { padding: [50, 50] });
+            
+            // Update the store with new view
+            const center = map.getCenter();
+            dispatch(setMapView({
+              center: [center.lat, center.lng],
+              zoom: map.getZoom()
+            }));
+          }
         }
       }
       
@@ -144,10 +150,10 @@ const AppContent = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isSaved]);
 
-  const addToast = (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+  const addToast = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     const id = uuidv4();
     setToasts(prev => [...prev, { id, message, type }]);
-  };
+  }, []);
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
