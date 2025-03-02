@@ -72,22 +72,33 @@ export const forecastSlice = createSlice({
 
     // Add a drawn feature to the appropriate outlook
     addFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
-      const { activeOutlookType, activeProbability, isSignificant } = state.drawingState;
-      
-      // Create formatted probability string with # for significant threats
-      let probKey = activeProbability;
-      if (isSignificant && activeOutlookType !== 'categorical') {
-        if (!probKey.includes('#')) {
-          probKey = `${probKey.replace('%', '')}#` as any;
-        }
-      }
+      // Get the outlook type and probability from feature properties if available
+      const feature = action.payload.feature;
+      const outlookType = feature.properties?.outlookType || state.drawingState.activeOutlookType;
+      const probability = feature.properties?.probability || 
+        (state.drawingState.isSignificant && !feature.properties?.probability ? 
+          `${state.drawingState.activeProbability.replace('%', '')}#` : 
+          state.drawingState.activeProbability);
       
       // Get existing features for this probability or create new array
-      const outlookMap = state.outlooks[activeOutlookType];
-      const existingFeatures = outlookMap.get(probKey) || [];
+      const outlookMap = state.outlooks[outlookType];
+      const existingFeatures = outlookMap.get(probability) || [];
+      
+      // Ensure the feature has all required properties
+      const featureWithProps = {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          outlookType,
+          probability,
+          isSignificant: feature.properties?.isSignificant || state.drawingState.isSignificant,
+          derivedFrom: feature.properties?.derivedFrom || outlookType,
+          originalProbability: feature.properties?.originalProbability || probability
+        }
+      };
       
       // Add new feature
-      outlookMap.set(probKey, [...existingFeatures, action.payload.feature]);
+      outlookMap.set(probability, [...existingFeatures, featureWithProps]);
       
       state.isSaved = false;
     },
