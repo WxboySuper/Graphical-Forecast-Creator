@@ -81,7 +81,7 @@ export const forecastSlice = createSlice({
           state.drawingState.activeProbability);
       
       // Get existing features for this probability or create new array
-      const outlookMap = state.outlooks[outlookType];
+      const outlookMap = state.outlooks[outlookType as keyof OutlookData];
       const existingFeatures = outlookMap.get(probability) || [];
       
       // Ensure the feature has all required properties
