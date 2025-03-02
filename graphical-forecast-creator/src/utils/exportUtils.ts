@@ -43,10 +43,10 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       map.eachLayer((layer) => {
         if (layer instanceof L.TileLayer) return; // Skip the base tile layer
         
-        if (layer instanceof L.Path || layer instanceof L.Polygon) {
+        if ('toGeoJSON' in layer) {
           if (!layer.options.className?.includes('significant-threat-pattern')) {
             // Clone the path/polygon with its style
-            const clonedLayer = L.geoJSON(layer.toGeoJSON(), {
+            const clonedLayer = L.geoJSON((layer as any).toGeoJSON(), {
               style: function() {
                 return {
                   color: layer.options.color,
@@ -64,10 +64,10 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
 
       // Then add significant layers with hatching on top
       map.eachLayer((layer) => {
-        if (layer instanceof L.Path || layer instanceof L.Polygon) {
+        if ('toGeoJSON' in layer) {
           if (layer.options.className?.includes('significant-threat-pattern')) {
             // Clone the path/polygon with its style plus hatching
-            const clonedLayer = L.geoJSON(layer.toGeoJSON(), {
+            const clonedLayer = L.geoJSON((layer as any).toGeoJSON(), {
               style: function() {
                 return {
                   color: layer.options.color,
