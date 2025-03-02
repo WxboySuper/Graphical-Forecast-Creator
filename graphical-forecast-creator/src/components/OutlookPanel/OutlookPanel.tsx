@@ -6,8 +6,8 @@ import {
   setActiveProbability, 
   toggleSignificant 
 } from '../../store/forecastSlice';
-import { OutlookType } from '../../types/outlooks';
-import { colorMappings } from '../../utils/outlookUtils';
+import { OutlookType, CategoricalRiskLevel } from '../../types/outlooks';
+import { colorMappings, getCategoricalRiskDisplayName } from '../../utils/outlookUtils';
 import './OutlookPanel.css';
 
 const OutlookPanel: React.FC = () => {
@@ -63,11 +63,20 @@ const OutlookPanel: React.FC = () => {
   
   // Check if current probability allows significant variants
   const canBeSignificant = () => {
-    return (
-      activeOutlookType !== 'categorical' && 
-      activeProbability !== '2%' && 
-      activeProbability !== '5%'
-    );
+    if (activeOutlookType === 'categorical') return false;
+    
+    const probability = activeProbability.replace('#', '');
+    switch (activeOutlookType) {
+      case 'tornado':
+        // Tornado probabilities of 10% and higher can be significant
+        return !['2%', '5%'].includes(probability);
+      case 'wind':
+      case 'hail':
+        // Wind and hail probabilities of 15% and higher can be significant
+        return !['5%'].includes(probability);
+      default:
+        return false;
+    }
   };
   
   // Get color for the current selection
@@ -138,6 +147,7 @@ const OutlookPanel: React.FC = () => {
                       : colorMappings.wind[prob as keyof typeof colorMappings.wind]
                 ) ? '#000' : '#fff'
               }}
+              title={activeOutlookType === 'categorical' ? getCategoricalRiskDisplayName(prob as CategoricalRiskLevel) : undefined}
             >
               {prob}
             </button>
