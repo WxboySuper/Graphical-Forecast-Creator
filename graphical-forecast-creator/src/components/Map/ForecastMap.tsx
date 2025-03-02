@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import './ForecastMap.css';
+import Legend from './Legend';
 
 // Need to manually set up Leaflet icon paths
 import L from 'leaflet';
@@ -97,6 +98,49 @@ const OutlookLayers: React.FC = () => {
     });
   };
   
+  // Get style for GeoJSON features
+  const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
+    let color = '#FFFFFF';
+    let zIndex = 400; // Base z-index for features
+    
+    // Determine color based on outlook type and probability
+    switch (outlookType) {
+      case 'categorical':
+        color = colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
+        // Risk level based z-index ordering
+        const riskOrder: Record<string, number> = {
+          'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
+        };
+        zIndex += (riskOrder[probability] || 0) * 10;
+        break;
+      case 'tornado':
+        color = colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
+        // Higher probabilities on top
+        zIndex += parseInt(probability) || 0;
+        break;
+      case 'wind':
+      case 'hail':
+        color = colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
+        // Higher probabilities on top
+        zIndex += parseInt(probability) || 0;
+        break;
+    }
+    
+    // Significant threats always on top of their respective risk level
+    if (probability.includes('#')) {
+      zIndex += 5;
+    }
+    
+    return {
+      color: color,
+      weight: 2,
+      opacity: 1,
+      fillColor: color,
+      fillOpacity: 0.6,
+      zIndex // Add z-index for proper layering
+    };
+  };
+  
   // Render features for an outlook type
   const renderOutlookFeatures = (outlookType: OutlookType) => {
     const entries = Array.from(outlooks[outlookType].entries());
@@ -111,7 +155,18 @@ const OutlookLayers: React.FC = () => {
             style={() => getFeatureStyle(outlookType, probability)}
             className={probability.includes('#') ? 'significant-threat-pattern' : undefined}
             eventHandlers={{
-              click: () => onFeatureClick(outlookType, probability, feature.id as string)
+              click: () => onFeatureClick(outlookType, probability, feature.id as string),
+              mouseover: (e) => {
+                const layer = e.target;
+                layer.bindTooltip(`${outlookType.charAt(0).toUpperCase() + outlookType.slice(1)} Outlook
+Risk Level: ${probability}${probability.includes('#') ? ' (Significant)' : ''}
+Click to delete`, {
+                  direction: 'top',
+                  sticky: true,
+                  opacity: 0.9,
+                  className: 'feature-tooltip'
+                }).openTooltip();
+              }
             }}
           />
         ))}
@@ -125,6 +180,17 @@ const OutlookLayers: React.FC = () => {
       return outlookType === 'categorical';
     }
     return outlookType !== 'categorical';
+  };
+
+  const onFeatureClick = (outlookType: OutlookType, probability: string, featureId: string) => {
+    const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
+    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${probability}${
+      probability.includes('#') ? ' (Significant)' : ''
+    }`;
+    
+    if (window.confirm(message)) {
+      dispatch(removeFeature({ outlookType, probability, featureId }));
+    }
   };
 
   return (
@@ -224,6 +290,8 @@ const ForecastMap = forwardRef<ForecastMapHandle, {}>(({}, ref) => {
             }}
           />
         </FeatureGroup>
+
+        <Legend />
       </MapContainer>
     </div>
   );
