@@ -340,7 +340,7 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
               polyline: false
             }}
             edit={{
-              featureGroup: featureGroupRef.current,
+              featureGroup: featureGroupRef.current || undefined,
               remove: false,
               edit: false
             }}
