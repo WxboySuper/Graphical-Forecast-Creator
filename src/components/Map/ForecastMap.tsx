@@ -184,10 +184,14 @@ Click to delete`, {
 
   // Determine which layers to show based on active outlook type
   const shouldShowLayer = (outlookType: OutlookType) => {
+    // Only show the active outlook type, except when in categorical view
     if (activeOutlookType === 'categorical') {
+      // In categorical view, only show categorical layers
       return outlookType === 'categorical';
+    } else {
+      // In specific outlook views (tornado, wind, hail), only show that specific outlook's layers
+      return outlookType === activeOutlookType;
     }
-    return outlookType !== 'categorical';
   };
 
   const onFeatureClick = (outlookType: OutlookType, probability: string, featureId: string) => {
