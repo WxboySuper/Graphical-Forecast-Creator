@@ -105,7 +105,7 @@
 }
 
 .leaflet-popup {
-  z-index: 1000; /* Ensure the popup appears above other layers */
+  z-index: 3000 !important; /* Ensure the popup appears above other layers */
 }
 
 .leaflet-marker-icon {
