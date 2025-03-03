@@ -99,6 +99,10 @@
   column-gap: 20px;
 }
 
+.documentation-content {
+  white-space: nowrap; /* Prevent text wrapping */
+}
+
 @media (max-width: 768px) {
   .conversion-list {
     columns: 1;
