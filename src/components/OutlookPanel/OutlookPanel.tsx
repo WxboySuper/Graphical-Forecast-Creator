@@ -37,7 +37,7 @@ const OutlookPanel: React.FC = () => {
     // Convert probability to/from significant variant
     const newProb = isSignificant
       ? currentProb.replace('#', '')
-      : currentProb.replace('%', '#');
+      : `${currentProb.replace('%', '')}#`;
 
     if (newProb !== currentProb) {
       dispatch(setActiveProbability(newProb as any));
