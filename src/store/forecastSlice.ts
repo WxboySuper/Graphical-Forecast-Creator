@@ -73,18 +73,19 @@ export const forecastSlice = createSlice({
 
     // Add a drawn feature to the appropriate outlook
     addFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
-      // Get the outlook type and probability from feature properties if available
       const feature = action.payload.feature;
       const outlookType = feature.properties?.outlookType || state.drawingState.activeOutlookType;
-      const probability = feature.properties?.probability || 
-        (state.drawingState.isSignificant && !feature.properties?.probability ? 
-          `${state.drawingState.activeProbability.replace('%', '')}#` : 
-          state.drawingState.activeProbability);
-      
+      let probability = feature.properties?.probability || state.drawingState.activeProbability;
+
+      // If the feature is significant, add it on top of existing layers
+      if (state.drawingState.isSignificant) {
+        probability = `${probability.replace('%', '')}#`;
+      }
+
       // Get existing features for this probability or create new array
       const outlookMap = state.outlooks[outlookType as keyof OutlookData];
       const existingFeatures = outlookMap.get(probability) || [];
-      
+
       // Ensure the feature has all required properties
       const featureWithProps = {
         ...feature,
@@ -92,15 +93,15 @@ export const forecastSlice = createSlice({
           ...feature.properties,
           outlookType,
           probability,
-          isSignificant: feature.properties?.isSignificant || state.drawingState.isSignificant,
+          isSignificant: state.drawingState.isSignificant,
           derivedFrom: feature.properties?.derivedFrom || outlookType,
           originalProbability: feature.properties?.originalProbability || probability
         }
       };
-      
+
       // Add new feature
       outlookMap.set(probability, [...existingFeatures, featureWithProps]);
-      
+
       state.isSaved = false;
     },
     
