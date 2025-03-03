@@ -1,3 +1,4 @@
+import '../immerSetup';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer from './forecastSlice';
 
