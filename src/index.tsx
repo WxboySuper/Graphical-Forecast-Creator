@@ -1,13 +1,9 @@
 import './immerSetup';
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import * as ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { enableMapSet } from 'immer';
-
-// Enable the MapSet plugin for Immer
-enableMapSet();
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
