@@ -101,12 +101,15 @@ const OutlookLayers: React.FC = () => {
   // Get style for GeoJSON features
   const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
     let color = '#FFFFFF';
+    let fillColor = '#FFFFFF';
+    let fillOpacity = 0.6;
     let zIndex = 400; // Base z-index for features
     
     // Determine color based on outlook type and probability
     switch (outlookType) {
       case 'categorical':
         color = colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
+        fillColor = color; // Set fillColor to the same as color
         // Risk level based z-index ordering
         const riskOrder: Record<string, number> = {
           'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
@@ -115,12 +118,14 @@ const OutlookLayers: React.FC = () => {
         break;
       case 'tornado':
         color = colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
+        fillColor = color; // Set fillColor to the same as color
         // Higher probabilities on top
         zIndex += parseInt(probability) || 0;
         break;
       case 'wind':
       case 'hail':
         color = colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
+        fillColor = color; // Set fillColor to the same as color
         // Higher probabilities on top
         zIndex += parseInt(probability) || 0;
         break;
@@ -129,14 +134,17 @@ const OutlookLayers: React.FC = () => {
     // Significant threats always on top of their respective risk level
     if (probability.includes('#')) {
       zIndex += 5;
+      fillColor = 'url(#hatchPattern)'; // Apply hatch pattern
+      fillOpacity = 1; // Ensure hatch pattern is fully visible
+      color = 'transparent'; // Remove the border color for significant threats
     }
     
     return {
       color: color,
       weight: 2,
       opacity: 1,
-      fillColor: color,
-      fillOpacity: 0.6,
+      fillColor: fillColor,
+      fillOpacity: fillOpacity,
       zIndex, // Add z-index for proper layering
       className: probability.includes('#') ? 'significant-threat-pattern' : undefined
     };
@@ -303,6 +311,14 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        
+        <svg>
+          <defs>
+            <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="10" height="10">
+              <path d="M0,0 L10,10 M10,0 L0,10" stroke="black" strokeWidth="2" />
+            </pattern>
+          </defs>
+        </svg>
         
         <OutlookLayers />
         
