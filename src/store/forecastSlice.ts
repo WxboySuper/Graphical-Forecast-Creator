@@ -1,3 +1,4 @@
+import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState } from '../types/outlooks';
 import { GeoJSON } from 'leaflet';

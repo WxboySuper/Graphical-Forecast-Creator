@@ -1,10 +1,6 @@
-// Import the immerSetup first to ensure MapSet is enabled before configureStore is used
-import { immerConfigured } from '../immerSetup';
+import '../immerSetup';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer from './forecastSlice';
-
-// Log that Immer has been configured with MapSet
-console.log('Immer configured with MapSet:', immerConfigured);
 
 export const store = configureStore({
   reducer: {
@@ -18,8 +14,6 @@ export const store = configureStore({
         ignoredPaths: ['forecast.outlooks'],
         ignoredActions: ['forecast/addFeature', 'forecast/removeFeature', 'forecast/importForecasts'],
       },
-      // Add immutableCheck option to help with debugging
-      immutableCheck: { warnAfter: 128 },
     }),
 });
 
