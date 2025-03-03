@@ -80,10 +80,12 @@
   gap: 10px;
   margin: 15px 0;
   overflow-x: auto; /* Allow horizontal scrolling if needed */
+  white-space: nowrap; /* Ensure text doesn't wrap */
 }
 
 .color-item {
-  width: 80px;
+  width: auto; /* Allow the width to adjust based on content */
+  padding: 0 10px; /* Add padding to ensure text doesn't touch the edges */
   height: 30px;
   display: flex;
   align-items: center;
@@ -93,6 +95,7 @@
   font-weight: bold;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  white-space: nowrap; /* Ensure text doesn't wrap */
 }
 
 .conversion-list {
