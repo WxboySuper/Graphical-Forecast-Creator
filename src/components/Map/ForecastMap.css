@@ -107,3 +107,10 @@
 .leaflet-popup {
   z-index: 1000; /* Ensure the popup appears above other layers */
 }
+
+.leaflet-marker-icon {
+  width: 10px; /* Adjust the width */
+  height: 10px; /* Adjust the height */
+  margin-left: -5px; /* Center the icon */
+  margin-top: -5px; /* Center the icon */
+}
