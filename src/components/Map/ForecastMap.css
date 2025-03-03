@@ -1,0 +1,109 @@
+.map-container {
+  width: 100%;
+  height: 70vh;
+  position: relative;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Custom styling for the drawing controls */
+.leaflet-draw-toolbar {
+  background-color: white;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+
+.leaflet-draw-toolbar a {
+  background-color: white;
+  border: 1px solid #ccc;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+}
+
+.leaflet-draw-toolbar a:hover {
+  background-color: #f4f4f4;
+}
+
+.leaflet-draw-draw-polygon,
+.leaflet-draw-draw-rectangle {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Override default Leaflet styles for better UI */
+.leaflet-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Custom styling for layers */
+.leaflet-pane {
+  z-index: 400;
+}
+
+.leaflet-overlay-pane {
+  z-index: 410;
+}
+
+.leaflet-pane .significant-threat-pattern {
+  z-index: 420 !important;
+}
+
+.leaflet-pane .significant-threat-pattern::after {
+  z-index: 430 !important;
+}
+
+/* Override z-index for significant pattern on map */
+.leaflet-pane .significant-threat-pattern::after {
+  z-index: 999 !important;
+}
+
+/* Ensure proper z-index stacking for patterns */
+.leaflet-interactive {
+  background-clip: padding-box;
+}
+
+/* Draw controls visibility */
+.leaflet-draw-section {
+  margin-bottom: 8px;
+}
+
+/* Draw error styling */
+.leaflet-draw-tooltip {
+  background: rgba(255, 0, 0, 0.7);
+  border: none;
+  color: white;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.leaflet-draw-tooltip:before {
+  border-right-color: rgba(255, 0, 0, 0.7);
+}
+
+/* Draw control positioning */
+.leaflet-draw.leaflet-control {
+  z-index: 1000;
+}
+
+/* Feature tooltip styling */
+.feature-tooltip {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 8px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  font-size: 0.9rem !important;
+  white-space: pre-line !important;
+  line-height: 1.4 !important;
+}
+
+.feature-tooltip::before {
+  border-top-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+.leaflet-popup {
+  z-index: 1000; /* Ensure the popup appears above other layers */
+}
