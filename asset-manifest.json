@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "/graphical-forcast-creator/static/css/main.3e432955.css",
+    "main.js": "/graphical-forcast-creator/static/js/main.09e7cb40.js",
+    "static/js/453.38c09663.chunk.js": "/graphical-forcast-creator/static/js/453.38c09663.chunk.js",
+    "static/media/spritesheet.svg": "/graphical-forcast-creator/static/media/spritesheet.a4e0eb7ad904a4858361.svg",
+    "index.html": "/graphical-forcast-creator/index.html",
+    "main.3e432955.css.map": "/graphical-forcast-creator/static/css/main.3e432955.css.map",
+    "main.09e7cb40.js.map": "/graphical-forcast-creator/static/js/main.09e7cb40.js.map",
+    "453.38c09663.chunk.js.map": "/graphical-forcast-creator/static/js/453.38c09663.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.3e432955.css",
+    "static/js/main.09e7cb40.js"
+  ]
+}
