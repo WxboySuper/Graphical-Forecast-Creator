@@ -38,7 +38,7 @@ const OutlookPanel: React.FC = () => {
       case 'wind': return featureFlags.windOutlookEnabled;
       case 'hail': return featureFlags.hailOutlookEnabled;
       case 'categorical': return featureFlags.categoricalOutlookEnabled;
-      default: return true;
+      default: return false;
     }
   };
   
