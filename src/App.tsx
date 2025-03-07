@@ -5,7 +5,7 @@ import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
-import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant } from './store/forecastSlice';
+import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode } from './store/forecastSlice';
 import { RootState } from './store';
 import { OutlookData } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
@@ -18,10 +18,12 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { ToastManager } from './components/Toast/Toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
+import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
 
 // App content component to access hooks
 const AppContent = () => {
   const dispatch = useDispatch();
+  const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const { outlooks, isSaved } = useSelector((state: RootState) => state.forecast);
   const { drawingState } = useSelector((state: RootState) => state.forecast);
   const [showDocumentation, setShowDocumentation] = useState(false);
@@ -31,6 +33,21 @@ const AppContent = () => {
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
   
+  // Initialize feature flags state
+  React.useEffect(() => {
+    // Check if any outlook types are enabled
+    const anyEnabled = isAnyOutlookEnabled(featureFlags);
+    dispatch(setEmergencyMode(!anyEnabled));
+
+    // If current outlook type is disabled, switch to first available
+    if (!anyEnabled) {
+      dispatch(setActiveOutlookType('categorical')); // Fallback when all disabled
+    } else {
+      const firstEnabled = getFirstEnabledOutlookType(featureFlags);
+      dispatch(setActiveOutlookType(firstEnabled));
+    }
+  }, [dispatch, featureFlags]);
+
   // Save forecast data to localStorage
   const handleSave = useCallback(() => {
     try {
