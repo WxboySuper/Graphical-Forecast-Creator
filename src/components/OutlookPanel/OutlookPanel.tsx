@@ -27,23 +27,8 @@ const OutlookPanel: React.FC = () => {
   
   // Handler for toggling significant status
   const handleToggleSignificant = () => {
-    // Update the probability to match significant status
-    const currentProb = activeProbability;
-    if (!currentProb.includes('%')) {
-      dispatch(toggleSignificant());
-      return;
-    }
-
-    // Convert probability to/from significant variant
-    const newProb = isSignificant
-      ? currentProb.replace('#', '')
-      : `${currentProb.replace('%', '')}#`;
-
-    if (newProb !== currentProb) {
-      dispatch(setActiveProbability(newProb as any));
-    } else {
-      dispatch(toggleSignificant());
-    }
+    // Just dispatch the toggle action once - the reducer will handle the logic
+    dispatch(toggleSignificant());
   };
   
   // Get available probabilities based on active outlook type
