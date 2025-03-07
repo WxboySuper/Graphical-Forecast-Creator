@@ -22,7 +22,7 @@
     "package.json": "^2.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-leaflet": "^5.0.0",
+    "react-leaflet": "^4.2.1",
     "react-leaflet-draw": "github:alex3165/react-leaflet-draw",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.2.0",
