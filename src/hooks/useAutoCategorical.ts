@@ -103,7 +103,7 @@ const useAutoCategorical = () => {
       }}));
     });
 
-  }, [outlooks.tornado, outlooks.wind, outlooks.hail, dispatch]);
+  }, [dispatch, outlooks.categorical, outlooks.tornado, outlooks.wind, outlooks.hail]);
 
   return null;
 };
