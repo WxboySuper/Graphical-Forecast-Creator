@@ -2,6 +2,8 @@ import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState } from '../types/outlooks';
 import { GeoJSON } from 'leaflet';
+import { getFirstEnabledOutlookType, isAnyOutlookEnabled } from '../utils/featureFlagsUtils';
+import { store } from './index';
 
 interface ForecastState {
   outlooks: OutlookData;
@@ -11,7 +13,30 @@ interface ForecastState {
     zoom: number;
   };
   isSaved: boolean;
+  emergencyMode: boolean;
 }
+
+// Helper function to get initial outlook type based on feature flags
+const getInitialOutlookType = (): OutlookType => {
+  // Access feature flags from the store
+  const featureFlags = store.getState().featureFlags;
+  return getFirstEnabledOutlookType(featureFlags);
+};
+
+// Helper function to get initial probability based on outlook type
+const getInitialProbability = (outlookType: OutlookType): string => {
+  switch (outlookType) {
+    case 'tornado':
+      return '2%';
+    case 'wind':
+    case 'hail':
+      return '5%';
+    case 'categorical':
+      return 'MRGL';
+    default:
+      return 'MRGL';
+  }
+};
 
 const initialState: ForecastState = {
   outlooks: {
@@ -21,7 +46,7 @@ const initialState: ForecastState = {
     categorical: new Map()
   },
   drawingState: {
-    activeOutlookType: 'tornado',
+    activeOutlookType: getInitialOutlookType(),
     activeProbability: '2%',
     isSignificant: false
   },
@@ -29,8 +54,12 @@ const initialState: ForecastState = {
     center: [39.8283, -98.5795], // Geographic center of the contiguous United States
     zoom: 4
   },
-  isSaved: true
+  isSaved: true,
+  emergencyMode: false
 };
+
+// Initialize the probability based on the initial outlook type
+initialState.drawingState.activeProbability = getInitialProbability(initialState.drawingState.activeOutlookType);
 
 export const forecastSlice = createSlice({
   name: 'forecast',
@@ -38,16 +67,38 @@ export const forecastSlice = createSlice({
   reducers: {
     // Set the active outlook type for drawing (tornado, wind, hail, categorical)
     setActiveOutlookType: (state, action: PayloadAction<OutlookType>) => {
-      state.drawingState.activeOutlookType = action.payload;
-      // Reset probability when changing outlook type
-      if (action.payload === 'tornado') {
-        state.drawingState.activeProbability = '2%';
-      } else if (action.payload === 'wind' || action.payload === 'hail') {
-        state.drawingState.activeProbability = '5%';
+      const featureFlags = store.getState().featureFlags;
+      const isEnabled = (() => {
+        switch (action.payload) {
+          case 'tornado': return featureFlags.tornadoOutlookEnabled;
+          case 'wind': return featureFlags.windOutlookEnabled;
+          case 'hail': return featureFlags.hailOutlookEnabled;
+          case 'categorical': return featureFlags.categoricalOutlookEnabled;
+          default: return false;
+        }
+      })();
+
+      // Only change if the outlook type is enabled
+      if (isEnabled) {
+        state.drawingState.activeOutlookType = action.payload;
+        // Reset probability when changing outlook type
+        if (action.payload === 'tornado') {
+          state.drawingState.activeProbability = '2%';
+        } else if (action.payload === 'wind' || action.payload === 'hail') {
+          state.drawingState.activeProbability = '5%';
+        } else {
+          state.drawingState.activeProbability = 'MRGL';
+        }
+        state.isSaved = false;
       } else {
-        state.drawingState.activeProbability = 'MRGL';
+        // If the requested type is disabled, switch to the first available type
+        const newType = getFirstEnabledOutlookType(featureFlags);
+        state.drawingState.activeOutlookType = newType;
+        state.drawingState.activeProbability = getInitialProbability(newType);
       }
-      state.isSaved = false;
+
+      // Check if we're in emergency mode (all outlooks disabled)
+      state.emergencyMode = !isAnyOutlookEnabled(featureFlags);
     },
 
     // Set the active probability/risk level for drawing
