@@ -29,7 +29,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const handleExport = async () => {
     // Don't proceed if export is disabled
     if (isExportDisabled) {
-      alert('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more inforamtion.');
+      alert('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.');
       return;
     }
 
