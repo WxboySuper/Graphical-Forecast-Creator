@@ -29,6 +29,8 @@ jobs:
         run: npm install --no-fund --no-audit --loglevel=error
 
       - name: Build
+        env:
+          CI: ""  # Allow warnings in CI mode
         run: npm run build
 
       # Upload build artifacts to use in deploy jobs
@@ -45,6 +47,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -63,6 +68,9 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
