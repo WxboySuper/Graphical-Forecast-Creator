@@ -18,7 +18,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const [isExporting, setIsExporting] = useState(false);
   
   // Flag to disable export feature - set to true to disable
-  const isExportDisabled = true;
+  const isExportDisabled = false;
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
