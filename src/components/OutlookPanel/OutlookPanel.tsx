@@ -12,7 +12,7 @@ import './OutlookPanel.css';
 
 const OutlookPanel: React.FC = () => {
   const dispatch = useDispatch();
-  const { drawingState } = useSelector((state: RootState) => state.forecast);
+  const { drawingState, emergencyMode } = useSelector((state: RootState) => state.forecast);
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const { activeOutlookType, activeProbability, isSignificant } = drawingState;
   
@@ -207,6 +207,20 @@ const OutlookPanel: React.FC = () => {
             )}
           </div>
         </div>
+        
+        {/* Emergency mode warning */}
+        {emergencyMode && (
+          <div className="emergency-warning">
+            <h4>⚠️ Emergency Mode - All Outlooks Disabled</h4>
+            <p>
+              All outlook types are currently disabled. This is typically done during critical maintenance 
+              or when addressing severe issues. Please check back later or contact the administrator.
+            </p>
+            <p>
+              You can still view existing forecasts, but creating new ones is temporarily unavailable.
+            </p>
+          </div>
+        )}
         
         {/* Warning if current outlook type is disabled */}
         {!getOutlookTypeEnabled(activeOutlookType) && (
