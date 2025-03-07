@@ -24,7 +24,7 @@ const getInitialOutlookType = (): OutlookType => {
 };
 
 // Helper function to get initial probability based on outlook type
-const getInitialProbability = (outlookType: OutlookType): string => {
+const getInitialProbability = (outlookType: OutlookType): "TSTM" | "MRGL" | "SLGT" | "ENH" | "MDT" | "HIGH" | "2%" | "5%" | "10%" | "10#" | "15%" | "15#" | "30%" | "30#" | "45%" | "45#" | "60%" | "60#" => {
   switch (outlookType) {
     case 'tornado':
       return '2%';
@@ -32,7 +32,6 @@ const getInitialProbability = (outlookType: OutlookType): string => {
     case 'hail':
       return '5%';
     case 'categorical':
-      return 'MRGL';
     default:
       return 'MRGL';
   }
