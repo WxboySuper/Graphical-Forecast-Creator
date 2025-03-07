@@ -27,14 +27,7 @@ const OutlookPanel: React.FC = () => {
   
   // Handler for toggling significant status
   const handleToggleSignificant = () => {
-    // For categorical outlooks or non-percentage values, just use the toggleSignificant reducer
-    if (!activeProbability.includes('%')) {
-      dispatch(toggleSignificant());
-      return;
-    }
-
-    // Use the redux action directly to avoid potential infinite updates
-    // Instead of trying to modify both state values separately, let the reducer handle it
+    // Just dispatch the toggle action once - the reducer will handle the logic
     dispatch(toggleSignificant());
   };
   
