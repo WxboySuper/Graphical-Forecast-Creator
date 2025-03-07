@@ -40,6 +40,87 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* Feature flag disabled button state */
+.outlook-buttons button.button-disabled {
+  background-color: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  opacity: 0.7;
+  position: relative;
+}
+
+.outlook-buttons .tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+/* Maintenance badge for disabled features */
+.maintenance-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #ff5252;
+  color: white;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Tooltip text */
+.tooltip .tooltip-text {
+  visibility: hidden;
+  width: 200px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  font-size: 0.85rem;
+}
+
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tooltip .tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
 .probability-selector {
   display: flex;
   flex-wrap: wrap;
@@ -59,6 +140,11 @@
   animation: slideIn 0.3s ease forwards;
 }
 
+.probability-selector button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .probability-selector button.active {
   transform: scale(1.05);
   box-shadow: 0 0 0 2px white, 0 0 0 4px #3f51b5;
@@ -69,7 +155,7 @@
   box-shadow: 0 0 0 2px white, 0 0 0 4px #3f51b5;
 }
 
-.probability-selector button:hover:not(.active) {
+.probability-selector button:hover:not(.active):not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -127,8 +213,23 @@ input:checked + .slider {
   background-color: #2196F3;
 }
 
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
 input:checked + .slider:before {
   transform: translateX(26px);
+}
+
+/* Disabled slider state */
+input:disabled + .slider {
+  background-color: #ddd;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+input:disabled + .slider.disabled:before {
+  background-color: #eee;
 }
 
 .slider.round {
@@ -204,6 +305,45 @@ input:checked + .slider:before {
   color: #666;
   margin-top: 4px;
   font-style: italic;
+}
+
+/* Warning notifications for disabled features */
+.warning-notice {
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 10px 0;
+  color: #856404;
+  font-size: 0.9rem;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Feature status list */
+.feature-flags-info {
+  border-top: 1px solid #ddd;
+  padding-top: 15px;
+  margin-top: 20px;
+}
+
+.feature-status-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.feature-status-list li {
+  margin-bottom: 5px;
 }
 
 /* Keyboard navigation improvements */
