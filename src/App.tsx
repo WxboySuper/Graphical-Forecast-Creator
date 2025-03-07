@@ -330,6 +330,9 @@ const AppContent = () => {
               The application's drawing capabilities have been temporarily suspended. 
               Please check back later or contact the administrator.
             </p>
+            <p>
+              For more information visit the GitHub repository  <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues?q=is%3Aissue%20state%3Aopen%20label%3AEmergency">here</a>.
+            </p>
           </div>
         ) : (
           <>
