@@ -17,11 +17,10 @@ export interface FeatureFlags {
 }
 
 const initialState: FeatureFlags = {
-  // All features enabled by default
-  exportMapEnabled: true,
-  tornadoOutlookEnabled: true,
-  windOutlookEnabled: true,
-  hailOutlookEnabled: true,
+  exportMapEnabled: false,
+  tornadoOutlookEnabled: false,
+  windOutlookEnabled: false,
+  hailOutlookEnabled: false,
   categoricalOutlookEnabled: true,
   saveLoadEnabled: true,
   significantThreatsEnabled: true,
