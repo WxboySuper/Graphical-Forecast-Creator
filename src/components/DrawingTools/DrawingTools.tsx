@@ -16,6 +16,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const dispatch = useDispatch();
   const { isSaved } = useSelector((state: RootState) => state.forecast);
   const [isExporting, setIsExporting] = useState(false);
+  
+  // Flag to disable export feature - set to true to disable
+  const isExportDisabled = true;
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
@@ -24,6 +27,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   };
 
   const handleExport = async () => {
+    // Don't proceed if export is disabled
+    if (isExportDisabled) {
+      alert('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.');
+      return;
+    }
+
     if (!mapRef.current) {
       alert('Map reference not available. Cannot export.');
       return;
@@ -75,14 +84,22 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
           <span className="tool-icon">📂</span>
           <span className="tool-label">Load Forecast</span>
         </button>
-        <button 
-          className="tool-button export-button" 
-          onClick={handleExport}
-          disabled={isExporting}
-        >
-          <span className="tool-icon">📤</span>
-          <span className="tool-label">{isExporting ? 'Exporting...' : 'Export as Image'}</span>
-        </button>
+        <div className="tooltip">
+          <button 
+            className={`tool-button ${isExportDisabled ? 'export-button-disabled' : 'export-button'}`}
+            onClick={isExportDisabled ? undefined : handleExport}
+            disabled={isExporting || isExportDisabled}
+          >
+            <span className="tool-icon">📤</span>
+            <span className="tool-label">{isExporting ? 'Exporting...' : 'Export as Image'}</span>
+            {isExportDisabled && <span className="maintenance-badge">!</span>}
+          </button>
+          {isExportDisabled && (
+            <span className="tooltip-text">
+              Export feature is temporarily unavailable due to an issue. We're working on it!
+            </span>
+          )}
+        </div>
         <button 
           className="tool-button reset-button" 
           onClick={handleReset}
@@ -98,6 +115,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         <p>
           <strong>Click on any drawn area to delete it.</strong>
         </p>
+        {isExportDisabled && (
+          <p className="unsaved-warning">
+            ⚠️ The export feature is temporarily unavailable due to an issue.
+          </p>
+        )}
         {!isSaved && (
           <p className="unsaved-warning">
             ⚠️ You have unsaved changes
