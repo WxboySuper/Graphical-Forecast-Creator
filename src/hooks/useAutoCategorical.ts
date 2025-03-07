@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { addFeature, resetCategorical, setOutlookMap } from '../store/forecastSlice';
@@ -13,97 +13,118 @@ import { v4 as uuidv4 } from 'uuid';
 const useAutoCategorical = () => {
   const dispatch = useDispatch();
   const { outlooks } = useSelector((state: RootState) => state.forecast);
+  const processingRef = useRef(false);
 
   // Process probabilistic outlooks to generate categorical outlooks
   useEffect(() => {
-    // Store existing TSTM areas before clearing categoricals
-    const tstmFeatures = outlooks.categorical.get('TSTM') || [];
-    const tstmMap = new Map([['TSTM', tstmFeatures]]);
-
-    // Clear categorical outlooks except TSTM
-    dispatch(resetCategorical());
-    
-    // Restore TSTM features if they exist
-    if (tstmFeatures.length > 0) {
-      dispatch(setOutlookMap({ 
-        outlookType: 'categorical', 
-        map: tstmMap 
-      }));
-    }
-
-    // Get all the probabilistic data
-    const tornadoFeatures = Array.from(outlooks.tornado.entries());
-    const windFeatures = Array.from(outlooks.wind.entries());
-    const hailFeatures = Array.from(outlooks.hail.entries());
-
-    // Skip if there are no probabilistic outlooks
-    if (tornadoFeatures.length === 0 && windFeatures.length === 0 && hailFeatures.length === 0) {
+    // Prevent recursive updates
+    if (processingRef.current) {
       return;
     }
 
-    // Create a map to track the highest risk level for each area
-    const highestRiskFeatures = new Map<string, {
-      risk: CategoricalRiskLevel;
-      feature: GeoJSON.Feature;
-      sources: { type: string; probability: string }[];
-    }>();
+    // Skip if there are no changes to process
+    const hasChanges = ['tornado', 'wind', 'hail'].some(type => 
+      outlooks[type as keyof typeof outlooks].size > 0
+    );
+    
+    if (!hasChanges) {
+      return;
+    }
 
-    // Process features from each outlook type
-    [
-      { type: 'tornado', features: tornadoFeatures },
-      { type: 'wind', features: windFeatures },
-      { type: 'hail', features: hailFeatures }
-    ].forEach(({ type, features }) => {
-      features.forEach(([probability, featureList]) => {
-        featureList.forEach(feature => {
-          // Skip existing TSTM areas
-          if (type === 'categorical' && probability === 'TSTM') return;
+    processingRef.current = true;
+    
+    try {
+      // Store existing TSTM areas before clearing categoricals
+      const tstmFeatures = outlooks.categorical.get('TSTM') || [];
+      const tstmMap = new Map([['TSTM', tstmFeatures]]);
 
-          // Get the categorical risk level based on the outlook type
-          const risk = getHighestCategoricalRisk(
-            type === 'tornado' ? probability as TornadoProbability : undefined,
-            type === 'wind' ? probability as WindHailProbability : undefined,
-            type === 'hail' ? probability as WindHailProbability : undefined
-          );
+      // Clear categorical outlooks except TSTM
+      dispatch(resetCategorical());
+      
+      // Restore TSTM features if they exist
+      if (tstmFeatures.length > 0) {
+        dispatch(setOutlookMap({ 
+          outlookType: 'categorical', 
+          map: tstmMap 
+        }));
+      }
 
-          // Skip TSTM risk level (should be drawn manually)
-          if (risk === 'TSTM') return;
+      // Get all the probabilistic data
+      const tornadoFeatures = Array.from(outlooks.tornado.entries());
+      const windFeatures = Array.from(outlooks.wind.entries());
+      const hailFeatures = Array.from(outlooks.hail.entries());
 
-          const featureId = feature.id as string;
-          const existingFeature = highestRiskFeatures.get(featureId);
+      // Skip if there are no probabilistic outlooks
+      if (tornadoFeatures.length === 0 && windFeatures.length === 0 && hailFeatures.length === 0) {
+        return;
+      }
 
-          if (!existingFeature || shouldReplaceRisk(existingFeature.risk, risk)) {
-            highestRiskFeatures.set(featureId, {
-              risk,
-              feature: {
-                ...feature,
-                properties: {
-                  ...feature.properties,
-                  outlookType: 'categorical',
-                  probability: risk,
-                  derivedFrom: type,
-                  originalProbability: probability
-                }
-              },
-              sources: [{ type, probability }]
-            });
-          } else if (existingFeature.risk === risk) {
-            // Add this outlook as an additional source
-            existingFeature.sources.push({ type, probability });
-          }
+      // Create a map to track the highest risk level for each area
+      const highestRiskFeatures = new Map<string, {
+        risk: CategoricalRiskLevel;
+        feature: GeoJSON.Feature;
+        sources: { type: string; probability: string }[];
+      }>();
+
+      // Process features from each outlook type
+      [
+        { type: 'tornado', features: tornadoFeatures },
+        { type: 'wind', features: windFeatures },
+        { type: 'hail', features: hailFeatures }
+      ].forEach(({ type, features }) => {
+        features.forEach(([probability, featureList]) => {
+          featureList.forEach(feature => {
+            // Skip existing TSTM areas
+            if (type === 'categorical' && probability === 'TSTM') return;
+
+            // Get the categorical risk level based on the outlook type
+            const risk = getHighestCategoricalRisk(
+              type === 'tornado' ? probability as TornadoProbability : undefined,
+              type === 'wind' ? probability as WindHailProbability : undefined,
+              type === 'hail' ? probability as WindHailProbability : undefined
+            );
+
+            // Skip TSTM risk level (should be drawn manually)
+            if (risk === 'TSTM') return;
+
+            const featureId = feature.id as string;
+            const existingFeature = highestRiskFeatures.get(featureId);
+
+            if (!existingFeature || shouldReplaceRisk(existingFeature.risk, risk)) {
+              highestRiskFeatures.set(featureId, {
+                risk,
+                feature: {
+                  ...feature,
+                  properties: {
+                    ...feature.properties,
+                    outlookType: 'categorical',
+                    probability: risk,
+                    derivedFrom: type,
+                    originalProbability: probability
+                  }
+                },
+                sources: [{ type, probability }]
+              });
+            } else if (existingFeature.risk === risk) {
+              // Add this outlook as an additional source
+              existingFeature.sources.push({ type, probability });
+            }
+          });
         });
       });
-    });
 
-    // Add all generated categorical features
-    highestRiskFeatures.forEach(({ feature }) => {
-      dispatch(addFeature({ feature: {
-        ...feature,
-        id: uuidv4() // Generate new ID to avoid conflicts
-      }}));
-    });
+      // Add all generated categorical features
+      highestRiskFeatures.forEach(({ feature }) => {
+        dispatch(addFeature({ feature: {
+          ...feature,
+          id: uuidv4() // Generate new ID to avoid conflicts
+        }}));
+      });
 
-  }, [dispatch, outlooks.categorical, outlooks.tornado, outlooks.wind, outlooks.hail]);
+    } finally {
+      processingRef.current = false;
+    }
+  }, [dispatch, outlooks]); // Include all outlooks since we access outlooks.categorical
 
   return null;
 };
