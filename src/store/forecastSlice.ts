@@ -61,11 +61,12 @@ export const forecastSlice = createSlice({
     // Toggle significant status
     toggleSignificant: (state) => {
       const currentProb = state.drawingState.activeProbability;
-      // Only applicable to probabilities that support significant variants
-      if (
-        state.drawingState.activeOutlookType !== 'categorical' &&
-        !['2%', '5%'].includes(currentProb as string)
-      ) {
+      
+      // Only toggle if we're not in categorical mode and the probability supports significant variants
+      if (state.drawingState.activeOutlookType !== 'categorical' && 
+          !(state.drawingState.activeOutlookType === 'tornado' && ['2%', '5%'].includes(currentProb)) &&
+          !((['wind', 'hail'].includes(state.drawingState.activeOutlookType)) && ['5%'].includes(currentProb))) {
+        // Toggle the significant state
         state.drawingState.isSignificant = !state.drawingState.isSignificant;
         state.isSaved = false;
       }
