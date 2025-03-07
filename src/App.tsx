@@ -5,7 +5,7 @@ import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
-import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant } from './store/forecastSlice';
+import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode } from './store/forecastSlice';
 import { RootState } from './store';
 import { OutlookData } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
@@ -18,11 +18,13 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { ToastManager } from './components/Toast/Toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
+import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
 
 // App content component to access hooks
 const AppContent = () => {
   const dispatch = useDispatch();
-  const { outlooks, isSaved } = useSelector((state: RootState) => state.forecast);
+  const featureFlags = useSelector((state: RootState) => state.featureFlags);
+  const { outlooks, isSaved, emergencyMode } = useSelector((state: RootState) => state.forecast);
   const { drawingState } = useSelector((state: RootState) => state.forecast);
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
@@ -31,6 +33,21 @@ const AppContent = () => {
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
   
+  // Initialize feature flags state
+  React.useEffect(() => {
+    // Check if any outlook types are enabled
+    const anyEnabled = isAnyOutlookEnabled(featureFlags);
+    dispatch(setEmergencyMode(!anyEnabled));
+
+    // If current outlook type is disabled, switch to first available
+    if (!anyEnabled) {
+      dispatch(setActiveOutlookType('categorical')); // Fallback when all disabled
+    } else {
+      const firstEnabled = getFirstEnabledOutlookType(featureFlags);
+      dispatch(setActiveOutlookType(firstEnabled));
+    }
+  }, [dispatch, featureFlags]);
+
   // Save forecast data to localStorage
   const handleSave = useCallback(() => {
     try {
@@ -299,16 +316,32 @@ const AppContent = () => {
         </button>
       </header>
       
-      <main className="App-main">
+      <main className={`App-main ${emergencyMode ? 'emergency-mode' : ''}`}>
         {showDocumentation && <Documentation />}
-        <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} />
-        <OutlookPanel />
-        <ForecastMap ref={mapRef} />
+        
+        {emergencyMode ? (
+          <div className="emergency-mode-message">
+            <h2>⚠️ Application in Emergency Mode</h2>
+            <p>
+              All outlook types are currently disabled. This is typically done during critical maintenance 
+              or when addressing severe issues.
+            </p>
+            <p>
+              The application's drawing capabilities have been temporarily suspended. 
+              Please check back later or contact the administrator.
+            </p>
+            <p>
+              For more information visit the GitHub repository  <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues?q=is%3Aissue%20state%3Aopen%20label%3AEmergency">here</a>.
+            </p>
+          </div>
+        ) : (
+          <>
+            <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} />
+            <OutlookPanel />
+            <ForecastMap ref={mapRef} />
+          </>
+        )}
       </main>
-      
-      <footer className="App-footer">
-        <p>Based on Storm Prediction Center's severe weather outlooks</p>
-      </footer>
       <ToastManager toasts={toasts} onDismiss={removeToast} />
     </div>
   );

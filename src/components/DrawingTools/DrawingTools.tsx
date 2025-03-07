@@ -15,10 +15,12 @@ interface DrawingToolsProps {
 const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) => {
   const dispatch = useDispatch();
   const { isSaved } = useSelector((state: RootState) => state.forecast);
+  const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const [isExporting, setIsExporting] = useState(false);
   
-  // Flag to disable export feature - set to true to disable
-  const isExportDisabled = true;
+  // Use feature flags instead of hardcoded disabled state
+  const isExportDisabled = !featureFlags.exportMapEnabled;
+  const isSaveLoadDisabled = !featureFlags.saveLoadEnabled;
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
@@ -69,21 +71,40 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
     <div className="drawing-tools">
       <h3>Drawing Tools</h3>
       <div className="tools-container">
-        <button 
-          className="tool-button save-button" 
-          onClick={onSave}
-          disabled={isSaved}
-        >
-          <span className="tool-icon">💾</span>
-          <span className="tool-label">Save Forecast</span>
-        </button>
-        <button 
-          className="tool-button load-button" 
-          onClick={onLoad}
-        >
-          <span className="tool-icon">📂</span>
-          <span className="tool-label">Load Forecast</span>
-        </button>
+        <div className="tooltip">
+          <button 
+            className={`tool-button ${isSaveLoadDisabled ? 'button-disabled' : 'save-button'}`}
+            onClick={isSaveLoadDisabled ? undefined : onSave}
+            disabled={isSaveLoadDisabled || isSaved}
+          >
+            <span className="tool-icon">💾</span>
+            <span className="tool-label">Save Forecast</span>
+            {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
+          </button>
+          {isSaveLoadDisabled && (
+            <span className="tooltip-text">
+              Save feature is temporarily unavailable
+            </span>
+          )}
+        </div>
+        
+        <div className="tooltip">
+          <button 
+            className={`tool-button ${isSaveLoadDisabled ? 'button-disabled' : 'load-button'}`}
+            onClick={isSaveLoadDisabled ? undefined : onLoad}
+            disabled={isSaveLoadDisabled}
+          >
+            <span className="tool-icon">📂</span>
+            <span className="tool-label">Load Forecast</span>
+            {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
+          </button>
+          {isSaveLoadDisabled && (
+            <span className="tooltip-text">
+              Load feature is temporarily unavailable
+            </span>
+          )}
+        </div>
+        
         <div className="tooltip">
           <button 
             className={`tool-button ${isExportDisabled ? 'export-button-disabled' : 'export-button'}`}
@@ -100,6 +121,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
             </span>
           )}
         </div>
+        
         <button 
           className="tool-button reset-button" 
           onClick={handleReset}
@@ -118,6 +140,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         {isExportDisabled && (
           <p className="unsaved-warning">
             ⚠️ The export feature is temporarily unavailable due to an issue.
+          </p>
+        )}
+        {isSaveLoadDisabled && (
+          <p className="unsaved-warning">
+            ⚠️ The save/load features are temporarily unavailable due to an issue.
           </p>
         )}
         {!isSaved && (

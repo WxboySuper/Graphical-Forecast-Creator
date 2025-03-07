@@ -11,6 +11,7 @@ interface ForecastState {
     zoom: number;
   };
   isSaved: boolean;
+  emergencyMode: boolean;
 }
 
 const initialState: ForecastState = {
@@ -21,15 +22,17 @@ const initialState: ForecastState = {
     categorical: new Map()
   },
   drawingState: {
+    // Start with wind as default since it's enabled in feature flags
     activeOutlookType: 'tornado',
-    activeProbability: '2%',
+    activeProbability: '5%',
     isSignificant: false
   },
   currentMapView: {
-    center: [39.8283, -98.5795], // Geographic center of the contiguous United States
+    center: [39.8283, -98.5795],
     zoom: 4
   },
-  isSaved: true
+  isSaved: true,
+  emergencyMode: false
 };
 
 export const forecastSlice = createSlice({
@@ -38,16 +41,21 @@ export const forecastSlice = createSlice({
   reducers: {
     // Set the active outlook type for drawing (tornado, wind, hail, categorical)
     setActiveOutlookType: (state, action: PayloadAction<OutlookType>) => {
-      state.drawingState.activeOutlookType = action.payload;
-      // Reset probability when changing outlook type
-      if (action.payload === 'tornado') {
-        state.drawingState.activeProbability = '2%';
-      } else if (action.payload === 'wind' || action.payload === 'hail') {
-        state.drawingState.activeProbability = '5%';
-      } else {
-        state.drawingState.activeProbability = 'MRGL';
-      }
-      state.isSaved = false;
+        state.drawingState.activeOutlookType = action.payload;
+        // Reset probability when changing outlook type
+        if (action.payload === 'tornado') {
+          state.drawingState.activeProbability = '2%';
+        } else if (action.payload === 'wind' || action.payload === 'hail') {
+          state.drawingState.activeProbability = '5%';
+        } else {
+          state.drawingState.activeProbability = 'MRGL';
+        }
+        state.isSaved = false;
+      },
+
+      // Update emergency mode status
+      setEmergencyMode: (state, action: PayloadAction<boolean>) => {
+        state.emergencyMode = action.payload;
     },
 
     // Set the active probability/risk level for drawing
@@ -209,7 +217,8 @@ export const {
   setMapView,
   resetForecasts,
   markAsSaved,
-  importForecasts
+  importForecasts,
+  setEmergencyMode
 } = forecastSlice.actions;
 
 export default forecastSlice.reducer;
