@@ -21,7 +21,8 @@
 .outlook-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  /* Increase the gap between buttons to prevent badge clipping */
+  gap: 14px;
 }
 
 .outlook-buttons button {
@@ -32,6 +33,8 @@
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
+  /* Add position relative to contain the badge properly */
+  position: relative;
 }
 
 .outlook-buttons button.active {
@@ -52,13 +55,16 @@
 .outlook-buttons .tooltip {
   position: relative;
   display: inline-block;
+  /* Add margin to ensure the badge has enough space */
+  margin: 5px;
 }
 
 /* Maintenance badge for disabled features */
 .maintenance-badge {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  /* Adjust position to ensure it's visible */
+  top: -8px;
+  right: -8px;
   background-color: #ff5252;
   color: white;
   width: 18px;
@@ -71,6 +77,8 @@
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   animation: pulse 2s infinite;
+  /* Ensure badge is above other elements */
+  z-index: 10;
 }
 
 @keyframes pulse {
@@ -95,7 +103,7 @@
   border-radius: 6px;
   padding: 5px;
   position: absolute;
-  z-index: 1;
+  z-index: 20;
   bottom: 125%;
   left: 50%;
   margin-left: -100px;
