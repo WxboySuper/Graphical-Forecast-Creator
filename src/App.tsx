@@ -24,7 +24,7 @@ import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/feature
 const AppContent = () => {
   const dispatch = useDispatch();
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
-  const { outlooks, isSaved } = useSelector((state: RootState) => state.forecast);
+  const { outlooks, isSaved, emergencyMode } = useSelector((state: RootState) => state.forecast);
   const { drawingState } = useSelector((state: RootState) => state.forecast);
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
@@ -316,16 +316,29 @@ const AppContent = () => {
         </button>
       </header>
       
-      <main className="App-main">
+      <main className={`App-main ${emergencyMode ? 'emergency-mode' : ''}`}>
         {showDocumentation && <Documentation />}
-        <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} />
-        <OutlookPanel />
-        <ForecastMap ref={mapRef} />
+        
+        {emergencyMode ? (
+          <div className="emergency-mode-message">
+            <h2>⚠️ Application in Emergency Mode</h2>
+            <p>
+              All outlook types are currently disabled. This is typically done during critical maintenance 
+              or when addressing severe issues.
+            </p>
+            <p>
+              The application's drawing capabilities have been temporarily suspended. 
+              Please check back later or contact the administrator.
+            </p>
+          </div>
+        ) : (
+          <>
+            <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} />
+            <OutlookPanel />
+            <ForecastMap ref={mapRef} />
+          </>
+        )}
       </main>
-      
-      <footer className="App-footer">
-        <p>Based on Storm Prediction Center's severe weather outlooks</p>
-      </footer>
       <ToastManager toasts={toasts} onDismiss={removeToast} />
     </div>
   );
