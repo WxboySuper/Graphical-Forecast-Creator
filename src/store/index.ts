@@ -1,10 +1,12 @@
 import '../immerSetup';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer from './forecastSlice';
+import featureFlagsReducer from './featureFlagsSlice';
 
 export const store = configureStore({
   reducer: {
     forecast: forecastReducer,
+    featureFlags: featureFlagsReducer,
   },
   // Configure to handle Maps in Redux state - this allows for serialization of Map objects
   middleware: (getDefaultMiddleware) =>
