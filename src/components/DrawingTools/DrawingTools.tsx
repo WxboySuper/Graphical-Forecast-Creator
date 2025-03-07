@@ -29,7 +29,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const handleExport = async () => {
     // Don't proceed if export is disabled
     if (isExportDisabled) {
-      alert('The export feature is currently unavailable due to maintenance. Please check back later.');
+      alert('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more inforamtion.');
       return;
     }
 
@@ -96,7 +96,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
           </button>
           {isExportDisabled && (
             <span className="tooltip-text">
-              Export feature is temporarily unavailable due to maintenance. We're working on it!
+              Export feature is temporarily unavailable due to an issue. We're working on it!
             </span>
           )}
         </div>
@@ -117,7 +117,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         </p>
         {isExportDisabled && (
           <p className="unsaved-warning">
-            ⚠️ The export feature is temporarily unavailable due to maintenance.
+            ⚠️ The export feature is temporarily unavailable due to an issue.
           </p>
         )}
         {!isSaved && (
