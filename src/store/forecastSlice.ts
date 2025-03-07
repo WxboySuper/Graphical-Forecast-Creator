@@ -23,7 +23,7 @@ const initialState: ForecastState = {
   },
   drawingState: {
     // Start with wind as default since it's enabled in feature flags
-    activeOutlookType: 'wind',
+    activeOutlookType: 'tornado',
     activeProbability: '5%',
     isSignificant: false
   },
