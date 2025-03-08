@@ -186,7 +186,6 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         logging: true,  // Enable logging to debug issues
         foreignObjectRendering: true,
         removeContainer: true,
-        async: true,
         ignoreElements: (element) => {
           // Only render map-related elements
           return !(
