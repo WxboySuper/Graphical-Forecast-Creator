@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { resetForecasts } from '../../store/forecastSlice';
 import { RootState } from '../../store';
 import { ForecastMapHandle } from '../Map/ForecastMap';
+import { exportMapAsImage } from '../../utils/exportUtils';
 import './DrawingTools.css';
 
 interface DrawingToolsProps {
@@ -16,9 +17,23 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const { isSaved } = useSelector((state: RootState) => state.forecast);
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
   
-  // Use feature flags instead of hardcoded disabled state
   const isExportDisabled = !featureFlags.exportMapEnabled;
   const isSaveLoadDisabled = !featureFlags.saveLoadEnabled;
+
+  const handleExport = async () => {
+    if (!mapRef.current?.getMap()) return;
+    
+    try {
+      const dataUrl = await exportMapAsImage(mapRef.current.getMap());
+      const link = document.createElement('a');
+      link.download = 'forecast-map.png';
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Failed to export map:', error);
+      alert('Failed to export map. Please try again.');
+    }
+  };
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
@@ -67,16 +82,18 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         <div className="tooltip">
           <button 
             className={`tool-button ${isExportDisabled ? 'export-button-disabled' : 'export-button'}`}
-            onClick={undefined}
-            disabled={true}
+            onClick={isExportDisabled ? undefined : handleExport}
+            disabled={isExportDisabled}
           >
             <span className="tool-icon">📤</span>
             <span className="tool-label">Export as Image</span>
-            <span className="maintenance-badge">!</span>
+            {isExportDisabled && <span className="maintenance-badge">!</span>}
           </button>
-          <span className="tooltip-text">
-            Export feature is temporarily unavailable while being rebuilt
-          </span>
+          {isExportDisabled && (
+            <span className="tooltip-text">
+              Export feature is temporarily unavailable while being rebuilt
+            </span>
+          )}
         </div>
         
         <button 
