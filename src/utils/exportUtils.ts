@@ -131,25 +131,4 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
   });
 };
 
-/**
- * Helper to download a data URL as a file
- */
-export const downloadDataUrl = (dataUrl: string, filename: string): void => {
-  const link = document.createElement('a');
-  link.href = dataUrl;
-  link.download = filename;
-  link.click();
-};
-
-/**
- * Format current date for filenames and display
- */
-export const getFormattedDate = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-};
+// Export functionality will be reimplemented

@@ -330,10 +330,17 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <svg>
+        <svg style={{ position: 'absolute', width: 0, height: 0 }}>
           <defs>
-            <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="10" height="10">
-              <path d="M0,0 L10,10 M10,0 L0,10" stroke="black" strokeWidth="2" />
+            <pattern 
+              id="hatchPattern" 
+              patternUnits="userSpaceOnUse" 
+              width="10" 
+              height="10"
+              patternTransform="rotate(45)"
+            >
+              <line x1="0" y1="0" x2="0" y2="10" stroke="black" strokeWidth="2" />
+              <line x1="10" y1="0" x2="10" y2="10" stroke="black" strokeWidth="2" />
             </pattern>
           </defs>
         </svg>
