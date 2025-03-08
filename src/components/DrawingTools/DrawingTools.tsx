@@ -29,12 +29,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   };
 
   const handleExport = async () => {
-    // Don't proceed if export is disabled
-    if (isExportDisabled) {
-      alert('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.');
-      return;
-    }
-
     if (!mapRef.current) {
       alert('Map reference not available. Cannot export.');
       return;
@@ -48,17 +42,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
 
     try {
       setIsExporting(true);
-      
-      // Show export options dialog
-      const title = prompt('Enter a title for your forecast image (optional):');
-      
-      // Generate the image
-      const dataUrl = await exportMapAsImage(map, title || undefined);
-      
-      // Download the image
+      const dataUrl = await exportMapAsImage(map);
       const filename = `forecast-outlook-${getFormattedDate()}.png`;
       downloadDataUrl(dataUrl, filename);
-      
     } catch (error) {
       console.error('Error exporting map:', error);
       alert('Failed to export the map. Please try again.');
