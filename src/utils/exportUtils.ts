@@ -2,9 +2,7 @@ import L from 'leaflet';
 import html2canvas from 'html2canvas';
 
 interface ExportOptions {
-  title?: string;
-  date?: string;
-  attribution?: boolean;
+  scale?: number;
 }
 
 /**
@@ -16,7 +14,7 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
       // Get the map container
       const container = map.getContainer();
       
-      // Force map to refresh
+      // Force map to refresh and wait for all tiles
       map.invalidateSize();
       
       // Wait for any animations to finish and tiles to load
@@ -24,7 +22,7 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
         map.once('moveend', () => {
           setTimeout(resolve, 1000); // Additional delay for tiles
         });
-        map.panBy([1, 0], { animate: false });
+        map.fire('moveend');
       });
 
       // Create clone container with same dimensions
@@ -47,7 +45,12 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
         if (pane instanceof HTMLElement) {
           pane.style.position = 'absolute';
           pane.style.visibility = 'visible';
-          pane.style.transform = 'none'; // Reset any transforms
+          
+          // Preserve transforms by copying them from original panes
+          const originalPane = container.querySelector(`.${pane.className.split(' ')[0]}`);
+          if (originalPane instanceof HTMLElement) {
+            pane.style.transform = originalPane.style.transform;
+          }
           
           // For overlay pane, ensure it's on top
           if (pane.classList.contains('leaflet-overlay-pane')) {
@@ -61,10 +64,10 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
       paths.forEach(path => {
         if (path instanceof SVGElement) {
           path.style.visibility = 'visible';
+          
           // Preserve fill colors and opacity
           const fill = path.getAttribute('fill');
           if (fill?.includes('url(#hatchPattern)')) {
-            // Force pattern to be visible for significant threats
             path.style.fill = fill;
             path.style.fillOpacity = '1';
           }
@@ -107,16 +110,27 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
         }
       });
 
-      // Capture the modified clone
+      // Capture the modified clone with proper scaling
       const canvas = await html2canvas(clone, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#fff',
-        scale: window.devicePixelRatio * 2,
+        scale: options.scale || window.devicePixelRatio * 2,
         logging: false,
         width: container.clientWidth,
         height: container.clientHeight,
-        foreignObjectRendering: false // Disable foreign object rendering for better compatibility
+        onclone: (clonedDoc) => {
+          // Additional transform fixes for cloned document
+          const clonedPanes = clonedDoc.querySelectorAll('.leaflet-pane');
+          clonedPanes.forEach(pane => {
+            if (pane instanceof HTMLElement) {
+              const originalPane = container.querySelector(`.${pane.className.split(' ')[0]}`);
+              if (originalPane instanceof HTMLElement) {
+                pane.style.transform = originalPane.style.transform;
+              }
+            }
+          });
+        }
       });
 
       // Clean up
@@ -130,5 +144,3 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
     }
   });
 };
-
-// Export functionality will be reimplemented
