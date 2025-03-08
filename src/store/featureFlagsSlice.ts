@@ -17,7 +17,7 @@ export interface FeatureFlags {
 }
 
 const initialState: FeatureFlags = {
-  exportMapEnabled: false,
+  exportMapEnabled: true,
   tornadoOutlookEnabled: false,
   windOutlookEnabled: false,
   hailOutlookEnabled: false,
