@@ -16,54 +16,88 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
       // Get the map container
       const container = map.getContainer();
       
-      // Force a map redraw and wait for it to complete
+      // Force map to refresh
       map.invalidateSize();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Wait for any animations to finish and tiles to load
+      await new Promise(resolve => {
+        map.once('moveend', () => {
+          setTimeout(resolve, 1000); // Additional delay for tiles
+        });
+        map.panBy([1, 0], { animate: false });
+      });
 
-      // Create a temporary container for the clone
+      // Create clone container with same dimensions
       const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'absolute';
-      tempContainer.style.left = '-9999px';
-      tempContainer.style.width = container.clientWidth + 'px';
-      tempContainer.style.height = container.clientHeight + 'px';
+      tempContainer.style.cssText = `
+        position: absolute;
+        left: -9999px;
+        width: ${container.clientWidth}px;
+        height: ${container.clientHeight}px;
+      `;
       document.body.appendChild(tempContainer);
 
-      // Clone the map container
+      // Clone map container
       const clone = container.cloneNode(true) as HTMLElement;
       tempContainer.appendChild(clone);
 
-      // Fix SVG patterns in the clone
-      const svgElements = clone.querySelectorAll('svg');
-      svgElements.forEach(svg => {
-        // Ensure pattern definitions are present
-        const defs = svg.querySelector('defs');
-        if (defs) {
-          const pattern = defs.querySelector('pattern');
-          if (pattern) {
-            // Force pattern to be visible
-            pattern.setAttribute('patternTransform', 'rotate(45)');
-            const path = pattern.querySelector('path');
-            if (path) {
-              path.setAttribute('stroke-width', '2');
-              path.setAttribute('opacity', '0.8');
-            }
+      // Process all panes to ensure correct stacking and visibility
+      const panes = clone.querySelectorAll('.leaflet-pane');
+      panes.forEach(pane => {
+        if (pane instanceof HTMLElement) {
+          pane.style.position = 'absolute';
+          pane.style.visibility = 'visible';
+          pane.style.transform = 'none'; // Reset any transforms
+          
+          // For overlay pane, ensure it's on top
+          if (pane.classList.contains('leaflet-overlay-pane')) {
+            pane.style.zIndex = '400';
           }
         }
       });
 
-      // Apply styles to ensure significant threat patterns are visible
+      // Find all path elements (polygons) and ensure they're visible
+      const paths = clone.querySelectorAll('path');
+      paths.forEach(path => {
+        if (path instanceof SVGElement) {
+          path.style.visibility = 'visible';
+          // Preserve fill colors and opacity
+          const fill = path.getAttribute('fill');
+          if (fill?.includes('url(#hatchPattern)')) {
+            // Force pattern to be visible for significant threats
+            path.style.fill = fill;
+            path.style.fillOpacity = '1';
+          }
+        }
+      });
+
+      // Fix SVG patterns
+      const svgElements = clone.querySelectorAll('svg');
+      svgElements.forEach(svg => {
+        // Ensure svg is visible
+        svg.style.display = 'block';
+        svg.style.visibility = 'visible';
+        
+        // Find and clone the pattern definition if it exists
+        const originalPattern = document.querySelector('#hatchPattern');
+        if (originalPattern && svg.querySelector('defs')) {
+          const patternClone = originalPattern.cloneNode(true);
+          svg.querySelector('defs')?.appendChild(patternClone);
+        }
+      });
+
+      // Ensure significant threat patterns are preserved
       const significantThreats = clone.querySelectorAll('.significant-threat-pattern');
       significantThreats.forEach(threat => {
         if (threat instanceof HTMLElement) {
           threat.style.position = 'relative';
+          threat.style.zIndex = '999';
+          // Add backup hatching using CSS
           const after = document.createElement('div');
           after.style.cssText = `
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            inset: 0;
             background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8) 2px, transparent 2px, transparent 12px);
             background-size: 16px 16px;
             pointer-events: none;
@@ -73,7 +107,7 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
         }
       });
 
-      // Capture the cloned and modified map
+      // Capture the modified clone
       const canvas = await html2canvas(clone, {
         useCORS: true,
         allowTaint: true,
@@ -82,6 +116,7 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
         logging: false,
         width: container.clientWidth,
         height: container.clientHeight,
+        foreignObjectRendering: false // Disable foreign object rendering for better compatibility
       });
 
       // Clean up
