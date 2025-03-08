@@ -249,8 +249,22 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
     
     // Only handle polygons for now
     if (layerType === 'polygon' || layerType === 'rectangle') {
-      // Convert to GeoJSON
-      const geoJson = layer.toGeoJSON();
+      // Get the layer's coordinates in the correct CRS
+      const geoJson = (layer as L.Polygon).toGeoJSON();
+      
+      // Ensure coordinates are in proper bounds
+      if (geoJson.type === 'Feature' && geoJson.geometry.type === 'Polygon') {
+        // Normalize coordinates to ensure they're within valid bounds
+        geoJson.geometry.coordinates = geoJson.geometry.coordinates.map(ring =>
+          ring.map(coord => [
+            // Ensure longitude is between -180 and 180
+            ((coord[0] + 180) % 360 + 360) % 360 - 180,
+            // Ensure latitude is between -90 and 90
+            Math.max(-90, Math.min(90, coord[1]))
+          ])
+        );
+      }
+
       // Add a unique ID
       geoJson.id = uuidv4();
       
