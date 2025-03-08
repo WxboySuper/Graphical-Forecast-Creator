@@ -1,151 +1,38 @@
 import L from 'leaflet';
 import html2canvas from 'html2canvas';
 
-// Extended layer type with proper options
-interface ExtendedLayer extends L.Layer {
-  toGeoJSON(): GeoJSON.Feature;
-  options: L.PathOptions & {
-    className?: string;
-    color?: string;
-    fillColor?: string;
-    fillOpacity?: number;
-    weight?: number;
-    opacity?: number;
-  };
-}
-
 /**
  * Exports the current map view as a PNG image
  * @param map The Leaflet map instance to export
  * @param title Optional title to add to the image
  */
 export const exportMapAsImage = async (map: L.Map, title?: string): Promise<string> => {
-  let container: HTMLDivElement | null = null;
-  let mapStyles: HTMLStyleElement | null = null;
-  let exportMap: L.Map | null = null;
-  let featureGroup: L.FeatureGroup | null = null;
+  // Store original map container
+  const originalContainer = map.getContainer();
+  const originalStyle = window.getComputedStyle(originalContainer);
+  
+  // Store original dimensions and position
+  const originalWidth = originalStyle.width;
+  const originalHeight = originalStyle.height;
+  const originalPosition = originalStyle.position;
 
   return new Promise(async (resolve, reject) => {
     try {
-      // Create a container to hold a copy of the map for export
-      container = document.createElement('div');
-      container.style.width = '1200px';
-      container.style.height = '800px';
-      container.style.position = 'absolute';  // Changed back to absolute
-      container.style.left = '-9999px';      // Move off-screen
-      container.style.top = '-9999px';       // Move off-screen
-      container.style.backgroundColor = '#fff';
-      container.className = 'export-map-container';
-      
-      // Add map container styles
-      mapStyles = document.createElement('style');
-      mapStyles.textContent = `
-        .export-map-container .leaflet-container {
-          width: 1200px !important;
-          height: 800px !important;
-          background: #fff !important;
-        }
-      `;
-      document.head.appendChild(mapStyles);
-      document.body.appendChild(container);
-
-      // Create a temporary map for export
-      exportMap = L.map(container, {
-        center: map.getCenter(),
-        zoom: map.getZoom(),
-        zoomControl: false,
-        attributionControl: false,
-        dragging: false,
-        touchZoom: false,
-        scrollWheelZoom: false,
-        doubleClickZoom: false,
-        boxZoom: false,
-        keyboard: false
-      });
+      // Temporarily modify the map container for export
+      originalContainer.style.width = '1200px';
+      originalContainer.style.height = '800px';
+      originalContainer.style.position = 'fixed';
+      originalContainer.style.top = '0';
+      originalContainer.style.left = '0';
+      originalContainer.style.zIndex = '999999';
 
       // Force a map size update
-      exportMap.invalidateSize({animate: false, duration: 0});
-
-      // Add the tile layer first
-      const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(exportMap);
-
-      // Wait for tiles to load
-      await new Promise<void>((resolve) => {
-        const checkTiles = () => {
-          if (tileLayer.isLoading()) {
-            setTimeout(checkTiles, 100);
-          } else {
-            setTimeout(resolve, 500); // Give extra time for rendering
-          }
-        };
-        checkTiles();
-      });
-
-      // Create a feature group for the layers
-      featureGroup = L.featureGroup().addTo(exportMap);
-
-      // Add non-significant layers first
-      map.eachLayer((layer) => {
-        if (layer instanceof L.TileLayer) return;
-        
-        const pathLayer = layer as ExtendedLayer;
-        if ('toGeoJSON' in pathLayer && !pathLayer.options.className?.includes('significant-threat-pattern')) {
-          try {
-            const geoJson = pathLayer.toGeoJSON();
-            // Create a new layer with exact style copying
-            const clonedLayer = L.geoJSON(geoJson, {
-              style: () => {
-                const originalStyle = { ...pathLayer.options };
-                delete originalStyle.className; // Remove className to prevent style conflicts
-                return originalStyle;
-              }
-            });
-            if (featureGroup) featureGroup.addLayer(clonedLayer);
-          } catch (e) {
-            console.warn('Failed to clone layer:', e);
-          }
-        }
-      });
-
-      // Add significant layers on top
-      map.eachLayer((layer) => {
-        if (layer instanceof L.TileLayer) return;
-        
-        const pathLayer = layer as ExtendedLayer;
-        if ('toGeoJSON' in pathLayer && pathLayer.options.className?.includes('significant-threat-pattern')) {
-          try {
-            const geoJson = pathLayer.toGeoJSON();
-            // Create a new layer with exact style copying
-            const clonedLayer = L.geoJSON(geoJson, {
-              style: () => {
-                const originalStyle = { ...pathLayer.options };
-                // Ensure the significant pattern class is preserved
-                originalStyle.className = 'significant-threat-pattern';
-                return originalStyle;
-              }
-            });
-            if (featureGroup) featureGroup.addLayer(clonedLayer);
-          } catch (e) {
-            console.warn('Failed to clone significant layer:', e);
-          }
-        }
-      });
-
-      // Fit bounds if we have features
-      if (featureGroup && featureGroup.getLayers().length > 0) {
-        exportMap.fitBounds(featureGroup.getBounds(), {
-          padding: [20, 20]
-        });
-      }
-
-      // Wait for rendering
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      map.invalidateSize({animate: false, duration: 0});
 
       // Add title if provided
+      let titleDiv: HTMLDivElement | null = null;
       if (title) {
-        const titleDiv = document.createElement('div');
+        titleDiv = document.createElement('div');
         titleDiv.style.position = 'absolute';
         titleDiv.style.top = '20px';
         titleDiv.style.left = '20px';
@@ -156,7 +43,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         titleDiv.style.fontWeight = 'bold';
         titleDiv.style.fontSize = '18px';
         titleDiv.innerHTML = title;
-        container.appendChild(titleDiv);
+        originalContainer.appendChild(titleDiv);
       }
 
       // Add attribution
@@ -170,83 +57,47 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       footerDiv.style.borderRadius = '4px';
       footerDiv.style.fontSize = '12px';
       footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
-      container.appendChild(footerDiv);
+      originalContainer.appendChild(footerDiv);
 
-      // Wait a bit longer for rendering to complete
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for any tile loading to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Capture the map with improved html2canvas settings
-      const canvas = await html2canvas(container, {
+      // Capture the map
+      const canvas = await html2canvas(originalContainer, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#fff',
         scale: 2,
         width: 1200,
         height: 800,
-        logging: true,  // Enable logging to debug issues
-        foreignObjectRendering: true,
-        removeContainer: true,
-        ignoreElements: (element) => {
-          // Only render map-related elements
-          return !(
-            element.classList.contains('leaflet-tile-container') ||
-            element.classList.contains('leaflet-overlay-pane') ||
-            element.classList.contains('leaflet-marker-pane') ||
-            element.classList.contains('export-map-container') ||
-            element.tagName === 'CANVAS'
-          );
-        }
+        logging: false
       });
 
-      // Ensure we have valid canvas data before proceeding
-      if (!canvas || canvas.width === 0 || canvas.height === 0) {
-        throw new Error('Canvas generation failed');
-      }
+      // Restore original container state
+      originalContainer.style.width = originalWidth;
+      originalContainer.style.height = originalHeight;
+      originalContainer.style.position = originalPosition;
+      originalContainer.style.top = '';
+      originalContainer.style.left = '';
+      originalContainer.style.zIndex = '';
 
+      // Remove temporary elements
+      if (titleDiv) {
+        originalContainer.removeChild(titleDiv);
+      }
+      originalContainer.removeChild(footerDiv);
+
+      // Force a map size update to restore the original view
+      map.invalidateSize({animate: false, duration: 0});
+
+      // Convert to data URL and resolve
       const dataUrl = canvas.toDataURL('image/png');
-      
-      // Clean up before resolving
-      cleanup();
-      
       resolve(dataUrl);
     } catch (err) {
       console.error('Export failed:', err);
       reject(err);
-    } finally {
-      // Ensure cleanup happens even if there's an error
-      cleanup();
     }
   });
-
-  function cleanup() {
-    try {
-      if (featureGroup) {
-        featureGroup.eachLayer((layer) => {
-          layer.remove();
-        });
-        featureGroup.clearLayers();
-        featureGroup.remove();
-        featureGroup = null;
-      }
-      if (exportMap) {
-        exportMap.eachLayer((layer) => {
-          layer.remove();
-        });
-        exportMap.remove();
-        exportMap = null;
-      }
-      if (container && document.body.contains(container)) {
-        document.body.removeChild(container);
-        container = null;
-      }
-      if (mapStyles && document.head.contains(mapStyles)) {
-        document.head.removeChild(mapStyles);
-        mapStyles = null;
-      }
-    } catch (e) {
-      console.warn('Cleanup error:', e);
-    }
-  }
 };
 
 /**
