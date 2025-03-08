@@ -21,10 +21,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const isSaveLoadDisabled = !featureFlags.saveLoadEnabled;
 
   const handleExport = async () => {
-    if (!mapRef.current?.getMap()) return;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
     
     try {
-      const dataUrl = await exportMapAsImage(mapRef.current.getMap());
+      const dataUrl = await exportMapAsImage(map);
       const link = document.createElement('a');
       link.download = 'forecast-map.png';
       link.href = dataUrl;
