@@ -32,16 +32,14 @@ export type ForecastMapHandle = {
   getMap: () => L.Map | null;
 };
 
-// Helper component to sync map with Redux state and store map reference
+// Helper component to sync map with Redux state
 const MapController: React.FC<{ setMapInstance: (map: L.Map) => void }> = ({ setMapInstance }) => {
   const { currentMapView } = useSelector((state: RootState) => state.forecast);
   const dispatch = useDispatch();
   const map = useMap();
   
   useEffect(() => {
-    // Store map instance for export functionality
     setMapInstance(map);
-    
     map.setView(currentMapView.center, currentMapView.zoom);
     
     const onMoveEnd = () => {
@@ -237,12 +235,12 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
   const { drawingState } = useSelector((state: RootState) => state.forecast);
   const featureGroupRef = useRef<L.FeatureGroup>(null);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
-  
+
   // Expose the map instance through the ref
   useImperativeHandle(ref, () => ({
     getMap: () => mapInstance
   }), [mapInstance]);
-  
+
   // Drawing creation handler
   const handleCreated = (e: { layerType: string; layer: L.Layer }) => {
     const { layerType, layer } = e as LeafletCreateEvent;
@@ -289,24 +287,20 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!mapInstance) return;
 
-      // Don't handle keyboard events if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
 
-      // Get the current draw handler if any
       const drawHandler = (featureGroupRef.current as any)?._map?._toolbars?.draw;
       if (!drawHandler) return;
 
       switch (e.key) {
         case 'Enter':
-          // Complete the current shape when Enter is pressed
           if (drawHandler._markers?.length >= 3) {
             drawHandler._finishShape?.();
           }
           break;
         case 'Escape':
-          // Cancel current drawing
           drawHandler._activeShape?.deleteLastVertex?.();
           break;
       }
@@ -394,7 +388,6 @@ const ForecastMap = forwardRef<ForecastMapHandle>((_, ref) => {
   );
 });
 
-// Set display name for better debugging
 ForecastMap.displayName = 'ForecastMap';
 
 export default ForecastMap;
