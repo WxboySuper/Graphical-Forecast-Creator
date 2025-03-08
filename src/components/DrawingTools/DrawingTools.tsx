@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetForecasts } from '../../store/forecastSlice';
 import { RootState } from '../../store';
-import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import './DrawingTools.css';
 
@@ -16,7 +15,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const dispatch = useDispatch();
   const { isSaved } = useSelector((state: RootState) => state.forecast);
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
-  const [isExporting, setIsExporting] = useState(false);
   
   // Use feature flags instead of hardcoded disabled state
   const isExportDisabled = !featureFlags.exportMapEnabled;
@@ -25,31 +23,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
       dispatch(resetForecasts());
-    }
-  };
-
-  const handleExport = async () => {
-    if (!mapRef.current) {
-      alert('Map reference not available. Cannot export.');
-      return;
-    }
-
-    const map = mapRef.current.getMap();
-    if (!map) {
-      alert('Map not fully loaded. Please try again.');
-      return;
-    }
-
-    try {
-      setIsExporting(true);
-      const dataUrl = await exportMapAsImage(map);
-      const filename = `forecast-outlook-${getFormattedDate()}.png`;
-      downloadDataUrl(dataUrl, filename);
-    } catch (error) {
-      console.error('Error exporting map:', error);
-      alert('Failed to export the map. Please try again.');
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -94,18 +67,16 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         <div className="tooltip">
           <button 
             className={`tool-button ${isExportDisabled ? 'export-button-disabled' : 'export-button'}`}
-            onClick={isExportDisabled ? undefined : handleExport}
-            disabled={isExporting || isExportDisabled}
+            onClick={undefined}
+            disabled={true}
           >
             <span className="tool-icon">📤</span>
-            <span className="tool-label">{isExporting ? 'Exporting...' : 'Export as Image'}</span>
-            {isExportDisabled && <span className="maintenance-badge">!</span>}
+            <span className="tool-label">Export as Image</span>
+            <span className="maintenance-badge">!</span>
           </button>
-          {isExportDisabled && (
-            <span className="tooltip-text">
-              Export feature is temporarily unavailable due to an issue. We're working on it!
-            </span>
-          )}
+          <span className="tooltip-text">
+            Export feature is temporarily unavailable while being rebuilt
+          </span>
         </div>
         
         <button 
@@ -125,7 +96,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         </p>
         {isExportDisabled && (
           <p className="unsaved-warning">
-            ⚠️ The export feature is temporarily unavailable due to an issue.
+            ⚠️ The export feature is temporarily unavailable while being rebuilt
           </p>
         )}
         {isSaveLoadDisabled && (
@@ -139,18 +110,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
           </p>
         )}
       </div>
-      
-      {isExporting && (
-        <div className="loading-overlay">
-          <div className="loading-spinner" />
-          <div className="loading-text">
-            Generating forecast image...
-          </div>
-          <div className="loading-subtext">
-            Processing map layers and applying significant threat patterns
-          </div>
-        </div>
-      )}
     </div>
   );
 };
