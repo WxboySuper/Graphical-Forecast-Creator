@@ -54,7 +54,7 @@ jobs:
       - name: Build
         env:
           CI: ""  # Allow warnings in CI mode
-          REACT_APP_ENV: ${{ github.event_name == 'release' && 'production' || 'development' }}
+          REACT_APP_ENV: "${{ github.event_name == 'release' && 'production' || 'development' }}"
           REACT_APP_VERSION: ${{ steps.version.outputs.app_version }}
         run: npm run build
 
@@ -66,13 +66,16 @@ jobs:
           path: build
           retention-days: 1
 
-      # Also upload version information as an artifact for other jobs
+      # Create the version file first
+      - name: Create version file
+        run: echo "${{ steps.version.outputs.app_version }}" > version.txt
+
+      # Then upload it as an artifact
       - name: Upload version info
         uses: actions/upload-artifact@v4
         with:
           name: version-info
-          path: |
-            echo "${{ steps.version.outputs.app_version }}" > version.txt
+          path: version.txt
           retention-days: 1
 
   # Deploy to gh-pages (production) only on GitHub Release
