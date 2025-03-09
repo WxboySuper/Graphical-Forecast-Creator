@@ -46,12 +46,11 @@
 
 .leaflet-overlay-pane {
   z-index: 410;
-  visibility: visible !important;
 }
 
 /* SVG elements and patterns */
 .leaflet-overlay-pane svg {
-  position: absolute;
+  position: absolute !important;
   left: 0;
   top: 0;
 }
