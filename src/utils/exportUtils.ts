@@ -44,21 +44,24 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
       // Add the same tile layer as the original map
       map.eachLayer(layer => {
         if (layer instanceof L.TileLayer) {
-          L.tileLayer(layer.getUrl(), layer.options).addTo(tempMap);
+          const tileLayer = layer as L.TileLayer;
+          // Use the internal _url property and original options
+          L.tileLayer((tileLayer as any)._url || '', layer.options).addTo(tempMap);
         }
       });
 
       // Get all GeoJSON layers from the original map
       const geojsonLayers: Array<{
         feature: GeoJSON.Feature,
-        style: L.PathOptions & { className?: string }
+        style: L.PathOptions & { className?: string, zIndex?: number }
       }> = [];
 
       map.eachLayer(layer => {
-        if (layer instanceof L.Path && layer.feature) {
+        const geoJSONLayer = layer as any as L.GeoJSON;
+        if (layer instanceof L.Path && geoJSONLayer.feature && 'type' in geoJSONLayer.feature) {
           const style = layer.options;
           geojsonLayers.push({
-            feature: layer.feature,
+            feature: geoJSONLayer.feature as GeoJSON.Feature,
             style: style
           });
         }
