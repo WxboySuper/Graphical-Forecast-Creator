@@ -45,7 +45,7 @@ jobs:
             echo "app_version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
           else
             # For dev builds, use package.json version with DEV suffix and short SHA
-            echo "app_version=${PACKAGE_VERSION}-DEV-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "app_version=${PACKAGE_VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
 
       - name: Install dependencies
