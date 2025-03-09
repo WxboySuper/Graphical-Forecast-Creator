@@ -14,6 +14,7 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
       // Store original map state
       const originalBounds = map.getBounds();
       const originalZoom = map.getZoom();
+      const originalCenter = map.getCenter();
       
       // Get the map container
       const container = map.getContainer();
@@ -30,15 +31,16 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
 
       // Create a new temporary map for rendering
       const tempMap = L.map(tempContainer, {
-        center: originalBounds.getCenter(),
+        center: originalCenter,
         zoom: originalZoom,
+        crs: map.options.crs || L.CRS.EPSG3857,  // Explicitly copy the CRS
         zoomControl: false,
         attributionControl: false,
         dragging: false,
         touchZoom: false,
         scrollWheelZoom: false,
         doubleClickZoom: false,
-        boxZoom: false
+        boxZoom: false,
       });
 
       // Add the same tile layer as the original map
@@ -49,6 +51,13 @@ export const exportMapAsImage = async (map: L.Map, options: ExportOptions = {}):
           L.tileLayer((tileLayer as any)._url || '', layer.options).addTo(tempMap);
         }
       });
+
+      tempMap.fitBounds(originalBounds, {
+        animate: false,
+        padding: [0,0]
+      });
+
+      tempMap.invalidateSize({animate: false});
 
       // Get all GeoJSON layers from the original map
       const geojsonLayers: Array<{
