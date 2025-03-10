@@ -133,7 +133,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         titleDiv.style.fontSize = '18px';
         titleDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
         titleDiv.innerHTML = title;
-        container.appendChild(titleDiv);
+        tempContainer.appendChild(titleDiv);
       }
       
       // Add a footer with attribution
@@ -148,7 +148,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       footerDiv.style.fontSize = '12px';
       footerDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
       footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
-      container.appendChild(footerDiv);
+      tempContainer.appendChild(footerDiv);
       
       // Use html2canvas with improved settings for better quality
       const canvas = await html2canvas(container, {
@@ -157,8 +157,8 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         backgroundColor: '#fff',
         scale: 2, // Increased scale for better quality
         logging: false,
-        width: 1200,
-        height: 800
+        width: container.clientWidth,
+        height: container.clientHeight
       });
       
       // Convert canvas to data URL
