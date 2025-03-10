@@ -148,7 +148,20 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         };
 
         checkTiles();
-      })
+      });
+
+      const testCoord = originalBounds.getCenter();
+      const originalPixelPoint = map.latLngToContainerPoint(testCoord);
+      const tempPixelPoint = tempMap.latLngToContainerPoint(testCoord);
+      console.log('Position check:', {
+        latlng: testCoord,
+        originalPixel: originalPixelPoint,
+        tempPixel: tempPixelPoint,
+        difference: {
+          x: tempPixelPoint.x - originalPixelPoint.x,
+          y: tempPixelPoint.y - originalPixelPoint.y
+        }
+      });
 
       // If title is provided, add it to the map
       if (title) {
