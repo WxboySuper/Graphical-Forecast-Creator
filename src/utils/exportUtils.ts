@@ -42,6 +42,16 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         overflow: hidden;
         `;
       document.body.appendChild(tempContainer);
+
+      const tempRect = tempContainer.getBoundingClientRect();
+      console.log('Container dimensions:', {
+        clientWidth: container.clientWidth,
+        clientHeight: container.clientHeight,
+        boundingRect: {
+          width: tempRect.width,
+          height: tempRect.height
+        }
+      });
       
       // Create a temporary map for export with current view
       const tempMap = L.map(tempContainer, {
