@@ -41,7 +41,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       document.body.appendChild(tempContainer);
       
       // Create a temporary map for export with current view
-      const tempMap = L.map(container, {
+      const tempMap = L.map(tempContainer, {
         center: originalCenter,
         zoom: originalZoom,
         crs: map.options.crs || L.CRS.EPSG3857,
