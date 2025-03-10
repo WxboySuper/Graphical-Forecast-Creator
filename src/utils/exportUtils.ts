@@ -165,7 +165,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       const dataUrl = canvas.toDataURL('image/png');
       
       // Clean up
-      document.body.removeChild(container);
+      document.body.removeChild(tempContainer);
       tempMap.remove();
       
       resolve(dataUrl);
