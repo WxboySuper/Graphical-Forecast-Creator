@@ -151,7 +151,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       tempContainer.appendChild(footerDiv);
       
       // Use html2canvas with improved settings for better quality
-      const canvas = await html2canvas(container, {
+      const canvas = await html2canvas(tempContainer, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#fff',
