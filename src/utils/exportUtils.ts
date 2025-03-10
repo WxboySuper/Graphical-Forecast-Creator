@@ -35,8 +35,8 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       tempContainer.style.cssText = `
         position: absolute;
         left: -9999px;
-        width: &{container.clientWidth}px;
-        height: &{container.clientHeight}px;
+        width: ${container.clientWidth}px;
+        height: ${container.clientHeight}px;
         `;
       document.body.appendChild(tempContainer);
       
