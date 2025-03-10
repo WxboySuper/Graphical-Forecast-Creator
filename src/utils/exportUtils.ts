@@ -129,8 +129,26 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         }
       });
       
-      // Wait for all tiles to load
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise<void>(resolve => {
+        const maxWaitTime = 5000;
+        const startTime = Date.now();
+
+        const checkTiles = () => {
+          const loading = tempContainer.querySelectorAll('.leaflet-tile-loading').length;
+          const tilesPresent = tempContainer.querySelectorAll('.leaflet-tile-loaded').length > 0;
+          const elapsedTime = Date.now() - startTime;
+
+          if ((loading === 0 && tilesPresent) || elapsedTime > maxWaitTime) {
+            console.log(`Tiles ready: ${tempContainer.querySelectorAll('.leaflet-tile-loaded').length} tiles loaded`);
+            setTimeout(resolve, 200);
+          } else {
+            console.log(`Waiting for tiles: ${loading} still loading...`)
+            setTimeout(checkTiles, 100);
+          }
+        };
+
+        checkTiles();
+      })
 
       // If title is provided, add it to the map
       if (title) {
