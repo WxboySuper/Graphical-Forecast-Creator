@@ -38,10 +38,9 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         left: 0px;
         width: ${container.clientWidth}px;
         height: ${container.clientHeight}px;
-        visibility: hidden;
         z-index: -1000;
         overflow: hidden;
-      `;
+        `;
       document.body.appendChild(tempContainer);
       
       // Create a temporary map for export with current view
