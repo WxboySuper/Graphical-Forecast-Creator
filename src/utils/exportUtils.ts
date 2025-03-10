@@ -22,19 +22,29 @@ interface ExtendedLayer extends L.Layer {
 export const exportMapAsImage = async (map: L.Map, title?: string): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     try {
-      // Create a container to hold a copy of the map for export
-      const container = document.createElement('div');
-      container.style.width = '1200px';  // Higher resolution for better quality
-      container.style.height = '800px';
-      container.style.position = 'absolute';
-      container.style.top = '-9999px';
-      container.style.left = '-9999px';
-      document.body.appendChild(container);
+      // Store original map state
+      const originalBounds = map.getBounds();
+      const originalZoom = map.getZoom();
+      const originalCenter = map.getCenter();
+
+      // Get map container
+      const container = map.getContainer();
+
+      // Create an offscreen container for the new map
+      const tempContainer = document.createElement('div');
+      tempContainer.style.cssText = `
+        position: absolute;
+        left: -9999px;
+        width: ${container.clientWidth}px;
+        height: ${container.clientHeight}px;
+        `;
+      document.body.appendChild(tempContainer);
       
       // Create a temporary map for export with current view
-      const exportMap = L.map(container, {
-        center: map.getCenter(),
-        zoom: map.getZoom(),
+      const tempMap = L.map(tempContainer, {
+        center: originalCenter,
+        zoom: originalZoom,
+        crs: map.options.crs || L.CRS.EPSG3857,
         zoomControl: false,
         attributionControl: false,
         dragging: false,
@@ -49,9 +59,16 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       await new Promise<void>((resolve) => {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap contributors'
-        }).addTo(exportMap).on('load', () => resolve());
+        }).addTo(tempMap).on('load', () => resolve());
       });
       
+      tempMap.fitBounds(originalBounds, {
+        animate: false,
+        padding: [0, 0]
+      })
+      
+      tempMap.invalidateSize({animate: false});
+
       // First add non-significant layers
       map.eachLayer((layer) => {
         if (layer instanceof L.TileLayer) return; // Skip the base tile layer
@@ -71,7 +88,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
                 };
               }
             });
-            clonedLayer.addTo(exportMap);
+            clonedLayer.addTo(tempMap);
           }
         }
       });
@@ -94,7 +111,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
                 };
               }
             });
-            clonedLayer.addTo(exportMap);
+            clonedLayer.addTo(tempMap);
           }
         }
       });
@@ -116,7 +133,7 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
         titleDiv.style.fontSize = '18px';
         titleDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
         titleDiv.innerHTML = title;
-        container.appendChild(titleDiv);
+        tempContainer.appendChild(titleDiv);
       }
       
       // Add a footer with attribution
@@ -131,25 +148,25 @@ export const exportMapAsImage = async (map: L.Map, title?: string): Promise<stri
       footerDiv.style.fontSize = '12px';
       footerDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
       footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
-      container.appendChild(footerDiv);
+      tempContainer.appendChild(footerDiv);
       
       // Use html2canvas with improved settings for better quality
-      const canvas = await html2canvas(container, {
+      const canvas = await html2canvas(tempContainer, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#fff',
         scale: 2, // Increased scale for better quality
         logging: false,
-        width: 1200,
-        height: 800
+        width: container.clientWidth,
+        height: container.clientHeight
       });
       
       // Convert canvas to data URL
       const dataUrl = canvas.toDataURL('image/png');
       
       // Clean up
-      document.body.removeChild(container);
-      exportMap.remove();
+      document.body.removeChild(tempContainer);
+      tempMap.remove();
       
       resolve(dataUrl);
     } catch (err) {
