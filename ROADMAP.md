@@ -10,35 +10,11 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
   - **Major (X):** Fundamental changes to the platform's scope (e.g., Launching the Simulator Game).
   - **Minor (Y):** New modules or significant feature sets (increments often!).
   - **Patch (Z):** Bug fixes or polish.
+  - **Pre-release:** Suffix with `-alpha`, `-beta`, etc., for unstable versions (e.g., v0.2.0-alpha).
 - **Pre-1.0:** Use v0.Y.0 for the initial build of the **Outlook Creator**.
 - **Philosophy:** Release early, release often. Every checkmark is a victory.
 
 ---
-
-<details>
-<summary>🗂️ <strong>Milestone Progress Task List</strong></summary>
-
-- [x] Project Initialization (v0.1.0)
-- [ ] Drawing Library Fix (Leaflet-Geoman)
-- [ ] Outlook Data Schema
-- [ ] Save System (JSON Export)
-- [ ] Load System (JSON Import)
-- [ ] Map Overlays (Counties/States)
-- [ ] Categorical Logic (Outlook Colors)
-- [ ] Verification Tools (Storm Reports)
-- [ ] Forecast Discussion Editor
-- [ ] Image Export
-- [ ] **v1.0.0: The Outlook Creator**
-- [ ] Real-Time Radar Integration
-- [ ] WarnGen Interface
-- [ ] Outlook Layer Integration
-- [ ] Warning Polygons
-- [ ] The Timer & Status
-- [ ] Educational Text Generation
-- [ ] Warning Updates
-- [ ] **v2.0.0: The Simulator Game**
-
-</details>
 
 ## v0.1.0-alpha: The Foundation (Retroactive)
 
@@ -205,7 +181,7 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 - [ ] Implement points system for lead time and polygon accuracy (POD/FAR).
 - [ ] Add "Career Mode" to track performance across multiple sessions.
 
-## v3.0.0: Long Term Maintenance
+## v3.0.0: Long-Term Maintenance
 
 **Goal:** Stability and community content.
 
