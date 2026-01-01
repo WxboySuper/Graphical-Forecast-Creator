@@ -1,178 +1,184 @@
-import L from 'leaflet';
+// skipcq: JS-C1003
+import * as L from 'leaflet';
 import html2canvas from 'html2canvas';
-
-// Extended layer type with proper options
-interface ExtendedLayer extends L.Layer {
-  toGeoJSON(): GeoJSON.Feature;
-  options: L.PathOptions & {
-    className?: string;
-    color?: string;
-    fillColor?: string;
-    fillOpacity?: number;
-    weight?: number;
-    opacity?: number;
-  };
-}
+import { OutlookData, OutlookType } from '../types/outlooks';
+import { colorMappings } from './outlookUtils';
 
 /**
- * Exports the current map view as a PNG image
+ * Get the style for a feature based on outlook type and probability
+ */
+const getFeatureStyle = (outlookType: OutlookType, probability: string): L.PathOptions => {
+  // Use a lookup to avoid branching and reduce cyclomatic complexity
+  const palettes: Record<string, Record<string, string>> = {
+    categorical: colorMappings.categorical as Record<string, string>,
+    tornado: colorMappings.tornado as Record<string, string>,
+    wind: colorMappings.wind as Record<string, string>,
+    hail: colorMappings.wind as Record<string, string>
+  };
+
+  const color = palettes[outlookType]?.[probability] ?? '#FFFFFF';
+  const isSignificant = probability.includes('#');
+
+  return {
+    color: '#000000',
+    fillColor: color,
+    fillOpacity: 0.4,
+    weight: 2,
+    opacity: 1,
+    className: isSignificant ? 'significant-threat-pattern' : undefined
+  };
+};
+
+/**
+ * Helper function to get the current date formatted as YYYY-MM-DD HH:MM
+ */
+export const getFormattedDate = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+/**
+ * Exports the current map view as a PNG image.
+ * 
+ * Uses the ORIGINAL approach that was working: fitBounds instead of setView.
+ * The key is using fitBounds with the EXACT bounds from the original map.
+ * 
  * @param map The Leaflet map instance to export
+ * @param outlooks The outlook data from Redux store  
  * @param title Optional title to add to the image
  */
-export const exportMapAsImage = async (map: L.Map, title?: string): Promise<string> => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Store original map state
-      const originalBounds = map.getBounds();
-      const originalZoom = map.getZoom();
-      const originalCenter = map.getCenter();
+// Helper: create offscreen container sized like the original
+const createTempContainer = (width: number, height: number): HTMLDivElement => {
+  const temp = document.createElement('div');
+  temp.style.cssText = `position:absolute;left:-9999px;width:${width}px;height:${height}px;`;
+  document.body.appendChild(temp);
+  return temp;
+};
 
-      // Get map container
-      const container = map.getContainer();
-
-      // Create an offscreen container for the new map
-      const tempContainer = document.createElement('div');
-      tempContainer.style.cssText = `
-        position: absolute;
-        left: -9999px;
-        width: ${container.clientWidth}px;
-        height: ${container.clientHeight}px;
-        `;
-      document.body.appendChild(tempContainer);
-      
-      // Create a temporary map for export with current view
-      const tempMap = L.map(tempContainer, {
-        center: originalCenter,
-        zoom: originalZoom,
-        crs: map.options.crs || L.CRS.EPSG3857,
-        zoomControl: false,
-        attributionControl: false,
-        dragging: false,
-        touchZoom: false,
-        scrollWheelZoom: false,
-        doubleClickZoom: false,
-        boxZoom: false,
-        keyboard: false
-      });
-      
-      // Add the same tile layer
-      await new Promise<void>((resolve) => {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors'
-        }).addTo(tempMap).on('load', () => resolve());
-      });
-      
-      tempMap.fitBounds(originalBounds, {
-        animate: false,
-        padding: [0, 0]
-      })
-      
-      tempMap.invalidateSize({animate: false});
-
-      // First add non-significant layers
-      map.eachLayer((layer) => {
-        if (layer instanceof L.TileLayer) return; // Skip the base tile layer
-        
-        const pathLayer = layer as ExtendedLayer;
-        if ('toGeoJSON' in pathLayer) {
-          if (!pathLayer.options.className?.includes('significant-threat-pattern')) {
-            // Clone the path/polygon with its style
-            const clonedLayer = L.geoJSON((pathLayer).toGeoJSON(), {
-              style: function() {
-                return {
-                  color: pathLayer.options.color || '#000000',
-                  fillColor: pathLayer.options.fillColor || '#000000',
-                  fillOpacity: pathLayer.options.fillOpacity || 0.2,
-                  weight: pathLayer.options.weight || 2,
-                  opacity: pathLayer.options.opacity || 1
-                };
-              }
-            });
-            clonedLayer.addTo(tempMap);
-          }
-        }
-      });
-
-      // Then add significant layers with hatching on top
-      map.eachLayer((layer) => {
-        if ('toGeoJSON' in layer) {
-          const pathLayer = layer as ExtendedLayer;
-          if (pathLayer.options.className?.includes('significant-threat-pattern')) {
-            // Clone the path/polygon with its style plus hatching
-            const clonedLayer = L.geoJSON((pathLayer).toGeoJSON(), {
-              style: function() {
-                return {
-                  color: pathLayer.options.color || '#000000',
-                  fillColor: pathLayer.options.fillColor || '#000000',
-                  fillOpacity: pathLayer.options.fillOpacity || 0.2,
-                  weight: pathLayer.options.weight || 2,
-                  opacity: pathLayer.options.opacity || 1,
-                  className: 'significant-threat-pattern'
-                };
-              }
-            });
-            clonedLayer.addTo(tempMap);
-          }
-        }
-      });
-      
-      // Wait for all tiles to load
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // If title is provided, add it to the map
-      if (title) {
-        const titleDiv = document.createElement('div');
-        titleDiv.style.position = 'absolute';
-        titleDiv.style.top = '20px';
-        titleDiv.style.left = '20px';
-        titleDiv.style.zIndex = '1000';
-        titleDiv.style.backgroundColor = 'rgba(255,255,255,0.9)';
-        titleDiv.style.padding = '10px 20px';
-        titleDiv.style.borderRadius = '4px';
-        titleDiv.style.fontWeight = 'bold';
-        titleDiv.style.fontSize = '18px';
-        titleDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-        titleDiv.innerHTML = title;
-        tempContainer.appendChild(titleDiv);
-      }
-      
-      // Add a footer with attribution
-      const footerDiv = document.createElement('div');
-      footerDiv.style.position = 'absolute';
-      footerDiv.style.bottom = '20px';
-      footerDiv.style.right = '20px';
-      footerDiv.style.zIndex = '1000';
-      footerDiv.style.backgroundColor = 'rgba(255,255,255,0.9)';
-      footerDiv.style.padding = '8px 12px';
-      footerDiv.style.borderRadius = '4px';
-      footerDiv.style.fontSize = '12px';
-      footerDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-      footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
-      tempContainer.appendChild(footerDiv);
-      
-      // Use html2canvas with improved settings for better quality
-      const canvas = await html2canvas(tempContainer, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#fff',
-        scale: 2, // Increased scale for better quality
-        logging: false,
-        width: container.clientWidth,
-        height: container.clientHeight
-      });
-      
-      // Convert canvas to data URL
-      const dataUrl = canvas.toDataURL('image/png');
-      
-      // Clean up
-      document.body.removeChild(tempContainer);
-      tempMap.remove();
-      
-      resolve(dataUrl);
-    } catch (err) {
-      reject(err);
-    }
+// Helper: create a temporary Leaflet map instance
+const createTempMap = (container: HTMLElement, center: L.LatLng, zoom: number, crs: L.CRS): L.Map => {
+  return L.map(container, {
+    center,
+    zoom,
+    crs: crs || L.CRS.EPSG3857,
+    zoomControl: false,
+    attributionControl: false,
+    dragging: false,
+    touchZoom: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    keyboard: false
   });
+};
+
+// Helper: add tiles to map and wait for load or timeout
+const addTilesAndWait = (mapInstance: L.Map, timeout = 2000): Promise<void> => {
+  return new Promise((resolve) => {
+    const layer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 18 });
+    let loaded = false;
+    layer.on('load', () => { if (!loaded) { loaded = true; resolve(); } });
+    setTimeout(() => { if (!loaded) { loaded = true; resolve(); } }, timeout);
+    layer.addTo(mapInstance);
+  });
+};
+
+// Helper: sort probabilities (extracted)
+const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
+  return entries.sort((a, b) => {
+    const [probA, probB] = [a[0], b[0]];
+    if (probA === 'TSTM') return -1;
+    if (probB === 'TSTM') return 1;
+    const isSignificantA = probA.includes('#');
+    const isSignificantB = probB.includes('#');
+    if (isSignificantA !== isSignificantB) return isSignificantA ? 1 : -1;
+    const riskOrder: Record<string, number> = { 'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5 };
+    if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) return riskOrder[probA] - riskOrder[probB];
+    const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, '')) || 0;
+    return getPercentValue(probA) - getPercentValue(probB);  });
+};
+
+// Helper: render outlooks onto a map instance
+const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
+  const outlookOrder: OutlookType[] = ['categorical', 'tornado', 'wind', 'hail'];
+  outlookOrder.forEach((outlookType) => {
+    const outlookMap = outlooks[outlookType];
+    if (!outlookMap) return;
+    const entries = Array.from(outlookMap.entries()) as [string, GeoJSON.Feature[]][];
+    const sortedEntries = sortProbabilities(entries);
+    sortedEntries.forEach(([probability, features]) => {
+      const styleOptions = getFeatureStyle(outlookType, probability);
+      features.forEach(feature => {
+        L.geoJSON(feature, { style: () => styleOptions }).addTo(mapInstance);
+      });
+    });
+  });
+};
+
+// Helper: add title/footer overlays
+const addOverlays = (container: HTMLElement, title?: string) => {
+  if (title) {
+    const titleDiv = document.createElement('div');
+    titleDiv.style.cssText = 'position:absolute;top:20px;left:20px;z-index:1000;background-color:rgba(255,255,255,0.9);padding:10px 20px;border-radius:4px;font-weight:bold;font-size:18px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
+    titleDiv.textContent = title;    container.appendChild(titleDiv);
+  }
+  const footerDiv = document.createElement('div');
+  footerDiv.style.cssText = 'position:absolute;bottom:20px;right:20px;z-index:1000;background-color:rgba(255,255,255,0.9);padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
+  footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
+  container.appendChild(footerDiv);
+};
+
+// Helper: capture container to data URL
+const captureContainer = async (container: HTMLElement, width: number, height: number): Promise<string> => {
+  const canvas = await html2canvas(container, { useCORS: true, allowTaint: true, backgroundColor: '#fff', scale: 2, logging: false, width, height });
+  return canvas.toDataURL('image/png');
+};
+
+export const exportMapAsImage = async (
+  map: L.Map,
+  outlooks: OutlookData,
+  title?: string
+): Promise<string> => {
+  let tempContainer: HTMLDivElement | null = null;
+  let tempMap: L.Map | null = null;
+
+  try {
+    const originalBounds = map.getBounds();
+    const originalZoom = map.getZoom();
+    const container = map.getContainer();
+    tempContainer = createTempContainer(container.clientWidth, container.clientHeight);
+    tempMap = createTempMap(tempContainer, originalBounds.getCenter(), originalZoom, map.options.crs || L.CRS.EPSG3857);
+    await addTilesAndWait(tempMap);
+    tempMap.fitBounds(originalBounds, { animate: false, padding: [0, 0] });
+    tempMap.invalidateSize({ animate: false });
+    renderOutlooksToMap(tempMap, outlooks);
+    // small pause to allow layers to render
+    await new Promise((r) => setTimeout(r, 800));
+    addOverlays(tempContainer, title);
+    const dataUrl = await captureContainer(tempContainer, container.clientWidth, container.clientHeight);
+    return dataUrl;
+  } finally {
+    try {
+      if (tempContainer?.parentNode) {
+        document.body.removeChild(tempContainer);
+      }
+    } catch {
+      // ignore cleanup errors
+    }
+
+    try {
+      if (tempMap?.remove) {
+        tempMap.remove();
+      }
+    } catch {
+      // ignore cleanup errors
+    }
+  }
 };
 
 /**
@@ -185,17 +191,4 @@ export const downloadDataUrl = (dataUrl: string, filename: string) => {
   link.href = dataUrl;
   link.download = filename;
   link.click();
-};
-
-/**
- * Helper function to get the current date formatted as YYYY-MM-DD
- */
-export const getFormattedDate = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
 };

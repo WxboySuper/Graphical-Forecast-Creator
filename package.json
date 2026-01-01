@@ -1,9 +1,10 @@
 {
   "name": "graphical-forecast-creator",
-  "version": "0.1.1-DEV",
+  "version": "0.2.0-DEV",
   "private": true,
   "homepage": "https://wxboysuper.github.io/Graphical-Forecast-Creator/",
   "dependencies": {
+    "@geoman-io/leaflet-geoman-free": "^2.17.0",
     "@reduxjs/toolkit": "^2.6.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -11,18 +12,16 @@
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
     "@types/leaflet": "^1.9.16",
-    "@types/leaflet-draw": "^1.0.11",
     "@types/node": "^16.18.126",
     "@types/react": "18.2.51",
     "@types/react-dom": "18.2.18",
     "html2canvas": "^1.4.1",
     "immer": "^10.1.1",
     "leaflet": "^1.9.4",
-    "leaflet-draw": "^1.0.4",
+    "leaflet-easyprint": "^2.1.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
-    "react-leaflet-draw": "github:alex3165/react-leaflet-draw",
     "react-redux": "^9.2.0",
     "react-router-dom": "^6.22.0",
     "react-scripts": "^5.0.1",
@@ -62,11 +61,13 @@
     "gh-pages": "^6.3.0"
   },
   "overrides": {
+    "immer": "^10.1.1",
     "nth-check": "^2.1.1",
     "postcss": "^8.4.31",
     "serialize-javascript": "^6.0.1"
   },
   "resolutions": {
+    "immer": "^10.1.1",
     "nth-check": "^2.1.1",
     "postcss": "^8.4.31",
     "serialize-javascript": "^6.0.1"
