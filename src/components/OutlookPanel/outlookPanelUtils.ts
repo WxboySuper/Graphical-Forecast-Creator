@@ -35,8 +35,8 @@ export const canBeSignificant = (
 
 export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, activeProbability: string, prob: string) => {
   const isActive = activeProbability === prob;
-  let color = '#FFFFFF';
-  let textColor = '#000000';
+  let color: string;
+  let textColor: string;
 
   if (activeOutlookType === 'categorical') {
     color = colorMappings.categorical[prob as keyof typeof colorMappings.categorical] || '#FFFFFF';

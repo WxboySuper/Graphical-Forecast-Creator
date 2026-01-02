@@ -256,7 +256,7 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void
   return (e: L.LeafletEvent & { shape?: string; layer?: L.Layer }) => {
     const isPolygonShape = e.shape === 'Polygon' || e.shape === 'Rectangle';
       if (isPolygonShape && e.layer) {
-      const leafletId = (e.layer as L.Layer & { _leaflet_id?: number })._leaflet_id;
+      const leafletId = L.stamp(e.layer);
       // eslint-disable-next-line no-console
       console.log('[Geoman] Creating polygon', e.shape, 'Layer ID:', leafletId);
       onPolygonCreated(e.layer);

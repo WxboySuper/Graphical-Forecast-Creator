@@ -268,8 +268,8 @@ const AppContent = () => {
     const anyEnabled = isAnyOutlookEnabled(featureFlags);
     dispatch(setEmergencyMode(!anyEnabled));
 
-    // Use first available outlook type or fallback to categorical to avoid null/undefined
-    const firstEnabled = getFirstEnabledOutlookType(featureFlags) ?? 'categorical';
+    // Use the first available outlook type
+    const firstEnabled = getFirstEnabledOutlookType(featureFlags);
     dispatch(setActiveOutlookType(firstEnabled as OutlookType));
   }, [dispatch, featureFlags]);
 

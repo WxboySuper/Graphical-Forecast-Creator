@@ -92,7 +92,7 @@ const shouldReplaceRisk = (existing: CategoricalRiskLevel, newRisk: CategoricalR
 };
 
 // Extract processing of probabilistic outlooks into a helper to reduce cyclomatic complexity
-function processOutlooksToCategorical(outlooks: OutlookData) {
+export function processOutlooksToCategorical(outlooks: OutlookData) {
   const highestRiskFeatures = new Map<string, {
     risk: CategoricalRiskLevel;
     feature: GeoJSON.Feature;

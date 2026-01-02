@@ -4,7 +4,7 @@
   "private": true,
   "homepage": "https://wxboysuper.github.io/Graphical-Forecast-Creator/",
   "dependencies": {
-    "@geoman-io/leaflet-geoman-free": "^2.17.0",
+    "@geoman-io/leaflet-geoman-free": "^2.18.3",
     "@reduxjs/toolkit": "^2.6.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -18,7 +18,6 @@
     "html2canvas": "^1.4.1",
     "immer": "^10.1.1",
     "leaflet": "^1.9.4",
-    "leaflet-easyprint": "^2.1.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
