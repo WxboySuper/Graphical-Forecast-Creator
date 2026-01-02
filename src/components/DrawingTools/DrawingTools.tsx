@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// skipcq: JS-W1028
+import React, { useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetForecasts } from '../../store/forecastSlice';
 import { RootState } from '../../store';
@@ -14,7 +15,7 @@ interface DrawingToolsProps {
 
 const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) => {
   const dispatch = useDispatch();
-  const { isSaved } = useSelector((state: RootState) => state.forecast);
+  const { isSaved, outlooks } = useSelector((state: RootState) => state.forecast);
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const [isExporting, setIsExporting] = useState(false);
   
@@ -22,26 +23,30 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const isExportDisabled = !featureFlags.exportMapEnabled;
   const isSaveLoadDisabled = !featureFlags.saveLoadEnabled;
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
+    // skipcq: JS-0052
     if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
       dispatch(resetForecasts());
     }
-  };
+  }, [dispatch]);
 
   const handleExport = async () => {
     // Don't proceed if export is disabled
     if (isExportDisabled) {
+      // skipcq: JS-0052
       alert('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.');
       return;
     }
 
     if (!mapRef.current) {
+      // skipcq: JS-0052
       alert('Map reference not available. Cannot export.');
       return;
     }
 
     const map = mapRef.current.getMap();
     if (!map) {
+      // skipcq: JS-0052
       alert('Map not fully loaded. Please try again.');
       return;
     }
@@ -50,10 +55,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
       setIsExporting(true);
       
       // Show export options dialog
+      // skipcq: JS-0052
       const title = prompt('Enter a title for your forecast image (optional):');
       
-      // Generate the image
-      const dataUrl = await exportMapAsImage(map, title || undefined);
+      // Generate the image with Redux store data
+      const dataUrl = await exportMapAsImage(map, outlooks, title || undefined);
       
       // Download the image
       const filename = `forecast-outlook-${getFormattedDate()}.png`;
@@ -61,6 +67,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
       
     } catch (error) {
       console.error('Error exporting map:', error);
+      // skipcq: JS-0052
       alert('Failed to export the map. Please try again.');
     } finally {
       setIsExporting(false);
@@ -77,10 +84,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
             onClick={isSaveLoadDisabled ? undefined : onSave}
             disabled={isSaveLoadDisabled || isSaved}
           >
-            <span className="tool-icon">💾</span>
-            <span className="tool-label">Save Forecast</span>
-            {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
+            {'💾 Save Forecast'}
           </button>
+          {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
           {isSaveLoadDisabled && (
             <span className="tooltip-text">
               Save feature is temporarily unavailable
@@ -94,10 +100,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
             onClick={isSaveLoadDisabled ? undefined : onLoad}
             disabled={isSaveLoadDisabled}
           >
-            <span className="tool-icon">📂</span>
-            <span className="tool-label">Load Forecast</span>
-            {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
+            {'📂 Load Forecast'}
           </button>
+          {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
           {isSaveLoadDisabled && (
             <span className="tooltip-text">
               Load feature is temporarily unavailable
@@ -111,13 +116,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
             onClick={isExportDisabled ? undefined : handleExport}
             disabled={isExporting || isExportDisabled}
           >
-            <span className="tool-icon">📤</span>
-            <span className="tool-label">{isExporting ? 'Exporting...' : 'Export as Image'}</span>
-            {isExportDisabled && <span className="maintenance-badge">!</span>}
+            {isExporting ? '📤 Exporting...' : '📤 Export as Image'}
           </button>
+          {isExportDisabled && <span className="maintenance-badge">!</span>}
           {isExportDisabled && (
             <span className="tooltip-text">
-              Export feature is temporarily unavailable due to an issue. We're working on it!
+              Export feature is temporarily unavailable due to an issue. See <a href="https://github.com/wxboysuper/graphical-forecast-creator/issues/32" target="_blank" rel="noopener noreferrer">GitHub issue #32</a> for more information.
             </span>
           )}
         </div>
@@ -126,8 +130,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
           className="tool-button reset-button" 
           onClick={handleReset}
         >
-          <span className="tool-icon">🗑️</span>
-          <span className="tool-label">Reset All</span>
+          {'🗑️ Reset All'}
         </button>
       </div>
       <div className="tools-help">
@@ -139,7 +142,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         </p>
         {isExportDisabled && (
           <p className="unsaved-warning">
-            ⚠️ The export feature is temporarily unavailable due to an issue.
+            ⚠️ Export feature is temporarily unavailable due to an issue. See <a href="https://github.com/wxboysuper/graphical-forecast-creator/issues/32" target="_blank" rel="noopener noreferrer">GitHub issue #32</a> for more information.
           </p>
         )}
         {isSaveLoadDisabled && (

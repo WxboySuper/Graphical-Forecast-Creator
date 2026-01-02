@@ -1,4 +1,4 @@
-import React from 'react';
+import { useCallback, useEffect } from 'react';
 import './Toast.css';
 
 export interface ToastProps {
@@ -8,7 +8,7 @@ export interface ToastProps {
 }
 
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       onClose();
     }, 3000);
@@ -28,16 +28,20 @@ export interface ToastManagerProps {
   onDismiss: (id: string) => void;
 }
 
+// Small wrapper to avoid inline arrow functions in parent JSX
+const ToastItem: React.FC<{ toast: { id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }; onDismiss: (id: string) => void }> = ({ toast, onDismiss }) => {
+  const handleClose = useCallback(() => {
+    onDismiss(toast.id);
+  }, [onDismiss, toast.id]);
+
+  return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
+};
+
 export const ToastManager: React.FC<ToastManagerProps> = ({ toasts, onDismiss }) => {
   return (
     <div className="toast-container">
       {toasts.map(toast => (
-        <Toast 
-          key={toast.id} 
-          message={toast.message} 
-          type={toast.type} 
-          onClose={() => onDismiss(toast.id)} 
-        />
+        <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
     </div>
   );

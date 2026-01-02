@@ -27,10 +27,10 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Fix the broken map drawing by swapping the library.
 
-- [ ] Uninstall `react-leaflet-draw` (Legacy/Broken).
-- [ ] Install `@geoman-io/leaflet-geoman-free`.
-- [ ] Implement basic polygon drawing using Geoman controls.
-- [ ] Verify ability to "cut" holes in polygons (essential for doughnut-hole risks).
+- [x] Uninstall `react-leaflet-draw` (Legacy/Broken).
+- [x] Install `@geoman-io/leaflet-geoman-free`.
+- [x] Implement basic polygon drawing using Geoman controls.
+- [x] Verify ability to "cut" holes in polygons (essential for doughnut-hole risks).
 
 ## v0.3.0-alpha: Outlook Data Structure
 

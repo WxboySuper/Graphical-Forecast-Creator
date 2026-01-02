@@ -6,30 +6,28 @@
   border-radius: 4px;
 }
 
-/* Custom styling for the drawing controls */
-.leaflet-draw-toolbar {
+/* Custom styling for Geoman drawing controls */
+.leaflet-pm-toolbar {
   background-color: white;
   box-shadow: 0 1px 5px rgba(0,0,0,0.2);
   border-radius: 4px;
 }
 
-.leaflet-draw-toolbar a {
+.leaflet-pm-toolbar .leaflet-pm-icon-polygon,
+.leaflet-pm-toolbar .leaflet-pm-icon-rectangle,
+.leaflet-pm-toolbar .leaflet-pm-icon-cut {
   background-color: white;
   border: 1px solid #ccc;
-  width: 30px;
-  height: 30px;
-  line-height: 30px;
-  text-align: center;
 }
 
-.leaflet-draw-toolbar a:hover {
+.leaflet-pm-toolbar a:hover {
   background-color: #f4f4f4;
 }
 
-.leaflet-draw-draw-polygon,
-.leaflet-draw-draw-rectangle {
-  font-size: 16px;
-  font-weight: bold;
+.leaflet-pm-actions-container {
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
 }
 
 /* Override default Leaflet styles for better UI */
@@ -64,13 +62,13 @@
   background-clip: padding-box;
 }
 
-/* Draw controls visibility */
-.leaflet-draw-section {
+/* Geoman controls visibility */
+.leaflet-pm-toolbar-container {
   margin-bottom: 8px;
 }
 
-/* Draw error styling */
-.leaflet-draw-tooltip {
+/* Geoman tooltip styling */
+.leaflet-pm-tooltip {
   background: rgba(255, 0, 0, 0.7);
   border: none;
   color: white;
@@ -79,13 +77,25 @@
   border-radius: 4px;
 }
 
-.leaflet-draw-tooltip:before {
-  border-right-color: rgba(255, 0, 0, 0.7);
+/* Geoman control positioning */
+.leaflet-pm-toolbar {
+  z-index: 1000 !important;
+  display: block !important;
+  visibility: visible !important;
 }
 
-/* Draw control positioning */
-.leaflet-draw.leaflet-control {
-  z-index: 1000;
+/* Ensure Geoman control container is visible */
+.leaflet-top.leaflet-right {
+  z-index: 1001 !important;
+}
+
+.leaflet-pm-toolbar .button-container {
+  display: flex !important;
+}
+
+/* Geoman action buttons */
+.leaflet-pm-actions-container a {
+  display: block !important;
 }
 
 /* Feature tooltip styling */

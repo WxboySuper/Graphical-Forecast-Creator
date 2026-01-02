@@ -44,6 +44,9 @@ export type WindHailProbability =
 // Outlook types
 export type OutlookType = 'tornado' | 'wind' | 'hail' | 'categorical';
 
+// Combined probability type for use across the app
+export type Probability = TornadoProbability | WindHailProbability | CategoricalRiskLevel;
+
 // Full outlook data structure
 export interface OutlookData {
   tornado: Map<string, GeoJSON.Feature[]>; // Map of probability to GeoJSON features

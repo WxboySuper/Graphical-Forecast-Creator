@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './store';
 import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
@@ -7,18 +7,272 @@ import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
 import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode } from './store/forecastSlice';
 import { RootState } from './store';
-import { OutlookData } from './types/outlooks';
+import { OutlookData, OutlookType, Probability } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
 // Import required libraries 
-import L from 'leaflet';
+import { featureGroup, geoJSON, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet-draw/dist/leaflet.draw.css';
 import { ToastManager } from './components/Toast/Toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
+
+// hooks imported above
+
+// Helper to get probability list based on outlook type
+const getProbabilityList = (activeOutlookType: string) => {
+  switch (activeOutlookType) {
+    case 'categorical':
+      return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as readonly string[];
+    case 'tornado':
+      return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as readonly string[];
+    case 'wind':
+    case 'hail':
+      return ['5%', '15%', '30%', '45%', '60%'] as readonly string[];
+    default:
+      return [] as readonly string[];
+  }
+};
+
+// Helper to check if user is typing in an input
+const isTyping = (e: KeyboardEvent) => {
+  return e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+};
+
+// Helper to check for save shortcut
+const isSaveKey = (e: KeyboardEvent) => {
+  return (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's';
+};
+
+// Helper to check for any modifier keys
+const hasAnyModifier = (e: KeyboardEvent) => {
+  return e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
+};
+
+// Helper to handle general thunderstorm risk
+// App dispatch / toast types
+type AppDispatch = typeof store.dispatch;
+type AddToastFn = (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+
+const handleGeneralThunderstorm = (activeOutlookType: string, dispatch: AppDispatch, addToast: AddToastFn) => {
+  if (activeOutlookType === 'categorical') {
+    dispatch(setActiveProbability('TSTM'));
+    addToast('Added General Thunderstorm risk', 'info');
+  }
+};
+
+// Helper to switch outlook type
+const switchType = (dispatch: AppDispatch, currentType: string, targetType: string, addToast: AddToastFn) => {
+  if (currentType !== targetType) {
+    dispatch(setActiveOutlookType(targetType as OutlookType));
+    addToast(`Switched to ${targetType.charAt(0).toUpperCase() + targetType.slice(1)} outlook`, 'info');
+  }
+};
+
+// Helper to handle significant threat toggle
+const handleSignificantToggle = (params: {
+  activeOutlookType: string;
+  activeProbability: string;
+  isSignificant: boolean;
+  dispatch: AppDispatch;
+  addToast: AddToastFn;
+}) => {
+  const { activeOutlookType, activeProbability, isSignificant, dispatch, addToast } = params;
+
+  const canToggleSignificant = activeOutlookType !== 'categorical' &&
+    (activeOutlookType === 'tornado' ?
+      !['2%', '5%'].includes(activeProbability) :
+      !['5%'].includes(activeProbability));
+
+  if (canToggleSignificant) {
+    dispatch(toggleSignificant());
+    addToast(`${isSignificant ? 'Disabled' : 'Enabled'} significant threat`, 'info');
+  } else {
+    addToast('Significant threat not available for this probability', 'warning');
+  }
+};
+
+// Helper to handle probability navigation (accepts single params object to limit arg count)
+const handleProbNav = (params: {
+  key: string;
+  activeOutlookType: string;
+  activeProbability: string;
+  dispatch: AppDispatch;
+  addToast: AddToastFn;
+}) => {
+  const { key, activeOutlookType, activeProbability, dispatch, addToast } = params;
+  const probabilities = getProbabilityList(activeOutlookType);
+  const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
+  const isUp = key === 'arrowup' || key === 'arrowright';
+
+  if (isUp && currentIndex < probabilities.length - 1) {
+    const nextProb = probabilities[currentIndex + 1];
+    dispatch(setActiveProbability(nextProb as Probability));
+    addToast(`Increased to ${nextProb}`, 'info');
+  } else if (!isUp && currentIndex > 0) {
+    const prevProb = probabilities[currentIndex - 1];
+    dispatch(setActiveProbability(prevProb as Probability));
+    addToast(`Decreased to ${prevProb}`, 'info');
+  }
+};
+
+// Helper function to fit map to feature bounds
+const fitMapToFeatures = (map: LeafletMap, outlooks: OutlookData, dispatch: AppDispatch) => {
+  const allFeatures = featureGroup();
+
+  for (const outlookMap of Object.values(outlooks)) {
+    for (const features of Array.from(outlookMap.values())) {
+      for (const feature of (features as Feature<Geometry, GeoJsonProperties>[])) {
+        geoJSON(feature).addTo(allFeatures);
+      }
+    }
+  }
+
+  if (allFeatures.getLayers().length > 0) {
+    const bounds = allFeatures.getBounds();
+    map.fitBounds(bounds, { padding: [50, 50] });
+
+    const center = map.getCenter();
+    dispatch(setMapView({
+      center: [center.lat, center.lng],
+      zoom: map.getZoom()
+    }));
+  }
+};
+
+// Helper to perform save operation
+const mapToArray = (m?: Map<string, unknown>) => (m ? Array.from(m.entries()) : []);
+
+const serializeOutlooks = (o: OutlookData) => ({
+  tornado: mapToArray(o.tornado),
+  wind: mapToArray(o.wind),
+  hail: mapToArray(o.hail),
+  categorical: mapToArray(o.categorical)
+});
+
+const buildMapView = (ref: React.RefObject<ForecastMapHandle>) => {
+  const map = ref.current?.getMap();
+  const center = map?.getCenter();
+  return {
+    center: center ? [center.lat, center.lng] : [39.8283, -98.5795],
+    zoom: map?.getZoom() || 4
+  };
+};
+
+const performSave = (
+  outlooks: OutlookData,
+  mapRef: React.RefObject<ForecastMapHandle>,
+  dispatch: AppDispatch,
+  addToast: AddToastFn
+) => {
+  try {
+    const saveData = {
+      outlooks: serializeOutlooks(outlooks),
+      mapView: buildMapView(mapRef)
+    };
+
+    localStorage.setItem('forecastData', JSON.stringify(saveData));
+    dispatch(markAsSaved());
+    addToast('Forecast saved successfully!', 'success');
+  } catch (error) {
+    console.error('Error saving forecast:', error);
+    addToast('Error saving forecast. Please try again.', 'error');
+  }
+};
+
+// Helper to perform load operation
+const performLoad = (
+  dispatch: AppDispatch,
+  addToast: AddToastFn,
+  mapRef: React.RefObject<ForecastMapHandle>
+) => {
+  try {
+    const savedData = localStorage.getItem('forecastData');
+    if (!savedData) {
+      addToast('No saved forecast found.', 'warning');
+      return;
+    }
+    
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(savedData) as unknown;
+    } catch (err) {
+      addToast('Saved data is incomplete or corrupted.', 'error');
+      return;
+    }
+
+    // Basic validation of parsed data structure
+    if (typeof parsedData !== 'object' || parsedData === null) {
+      addToast('Saved data is incomplete or corrupted.', 'error');
+      return;
+    }
+
+    const pd = parsedData as { outlooks?: unknown; mapView?: unknown };
+    if (!pd.outlooks || typeof pd.outlooks !== 'object') {
+      addToast('Saved data is incomplete or corrupted.', 'error');
+      return;
+    }
+
+    const outlooksObj = pd.outlooks as Record<string, unknown>;
+    const requiredKeys = ['tornado', 'wind', 'hail', 'categorical'];
+    for (const key of requiredKeys) {
+      if (!Object.prototype.hasOwnProperty.call(outlooksObj, key) || !Array.isArray(outlooksObj[key])) {
+        addToast('Saved data is incomplete or corrupted.', 'error');
+        return;
+      }
+    }
+
+    const entries = outlooksObj as {
+      [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
+    };
+
+    const deserializedOutlooks: OutlookData = {
+      tornado: new Map(entries.tornado),
+      wind: new Map(entries.wind),
+      hail: new Map(entries.hail),
+      categorical: new Map(entries.categorical)
+    };
+    
+    dispatch(resetForecasts());
+    dispatch(importForecasts(deserializedOutlooks));
+    const map = mapRef.current?.getMap();
+    if (!map) {
+      addToast('Forecast loaded successfully!', 'success');
+      return;
+    }
+
+    if (pd.mapView) {
+      dispatch(setMapView(pd.mapView as { center: [number, number]; zoom: number }));
+    } else {
+      fitMapToFeatures(map, deserializedOutlooks, dispatch);
+    }
+    
+    addToast('Forecast loaded successfully!', 'success');
+  } catch (error) {
+    console.error('Error loading forecast:', error);
+    addToast('Error loading forecast. The saved data might be corrupted.', 'error');
+  }
+};
+
+// Component for emergency mode message
+const EmergencyModeMessage = () => (
+  <div className="emergency-mode-message">
+    <h2>⚠️ Application in Emergency Mode</h2>
+    <p>
+      All outlook types are currently disabled. This is typically done during critical maintenance 
+      or when addressing severe issues.
+    </p>
+    <p>
+      The application&apos;s drawing capabilities have been temporarily suspended. 
+      Please check back later or contact the administrator.
+    </p>
+    <p>
+      For more information visit the GitHub repository  <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues?q=is%3Aissue%20state%3Aopen%20label%3AEmergency">here</a>.
+    </p>
+  </div>
+);
 
 // App content component to access hooks
 const AppContent = () => {
@@ -34,271 +288,100 @@ const AppContent = () => {
   useAutoCategorical();
   
   // Initialize feature flags state
-  React.useEffect(() => {
+  useEffect(() => {
     // Check if any outlook types are enabled
     const anyEnabled = isAnyOutlookEnabled(featureFlags);
     dispatch(setEmergencyMode(!anyEnabled));
 
-    // If current outlook type is disabled, switch to first available
-    if (!anyEnabled) {
-      dispatch(setActiveOutlookType('categorical')); // Fallback when all disabled
-    } else {
-      const firstEnabled = getFirstEnabledOutlookType(featureFlags);
-      dispatch(setActiveOutlookType(firstEnabled));
-    }
+    // Use the first available outlook type
+    const firstEnabled = getFirstEnabledOutlookType(featureFlags);
+    dispatch(setActiveOutlookType(firstEnabled as OutlookType));
   }, [dispatch, featureFlags]);
+
+  // Toast management
+  const addToast = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    const id = uuidv4();
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
 
   // Save forecast data to localStorage
   const handleSave = useCallback(() => {
-    try {
-      // Convert Map objects to arrays for serialization
-      const serializedOutlooks = {
-        tornado: Array.from(outlooks.tornado.entries()),
-        wind: Array.from(outlooks.wind.entries()),
-        hail: Array.from(outlooks.hail.entries()),
-        categorical: Array.from(outlooks.categorical.entries())
-      };
-
-      // Save both outlooks and current map view
-      const saveData = {
-        outlooks: serializedOutlooks,
-        mapView: {
-          center: mapRef.current?.getMap()?.getCenter() 
-            ? [mapRef.current.getMap()!.getCenter().lat, mapRef.current.getMap()!.getCenter().lng]
-            : [39.8283, -98.5795],
-          zoom: mapRef.current?.getMap()?.getZoom() || 4
-        }
-      };
-      
-      localStorage.setItem('forecastData', JSON.stringify(saveData));
-      dispatch(markAsSaved());
-      alert('Forecast saved successfully!');
-    } catch (error) {
-      console.error('Error saving forecast:', error);
-      alert('Error saving forecast. Please try again.');
-    }
-  }, [outlooks, dispatch, mapRef]);
+    performSave(outlooks, mapRef, dispatch, addToast);
+  }, [outlooks, dispatch, mapRef, addToast]);
   
   // Load forecast data from localStorage
-  const handleLoad = () => {
-    try {
-      const savedData = localStorage.getItem('forecastData');
-      if (!savedData) {
-        alert('No saved forecast found.');
-        return;
-      }
-      
-      // Clear existing forecasts before loading new ones
-      dispatch(resetForecasts());
-      
-      const parsedData = JSON.parse(savedData);
-      
-      // Type check the loaded data
-      const entries = parsedData.outlooks as {
-        [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
-      };
-
-      const deserializedOutlooks: OutlookData = {
-        tornado: new Map(entries.tornado),
-        wind: new Map(entries.wind),
-        hail: new Map(entries.hail),
-        categorical: new Map(entries.categorical)
-      };
-      
-      // Restore the outlooks
-      dispatch(importForecasts(deserializedOutlooks));
-
-      // Restore map view if saved, otherwise fit to feature bounds
-      if (parsedData.mapView && mapRef.current?.getMap()) {
-        dispatch(setMapView(parsedData.mapView));
-      } else if (mapRef.current?.getMap()) {
-        // Create FeatureGroup with all features to get bounds
-        const map = mapRef.current.getMap();
-        if (map) {
-          const allFeatures = L.featureGroup();
-          
-          // Type-safe feature iteration
-          Object.values(deserializedOutlooks).forEach(outlookMap => {
-            Array.from(outlookMap.values()).forEach((features) => {
-              (features as Feature<Geometry, GeoJsonProperties>[]).forEach((feature: Feature<Geometry, GeoJsonProperties>) => {
-                L.geoJSON(feature).addTo(allFeatures);
-              });
-            });
-          });
-
-          // If there are features, fit the map to their bounds
-          if (allFeatures.getLayers().length > 0) {
-            const bounds = allFeatures.getBounds();
-            map.fitBounds(bounds, { padding: [50, 50] });
-            
-            // Update the store with new view
-            const center = map.getCenter();
-            dispatch(setMapView({
-              center: [center.lat, center.lng],
-              zoom: map.getZoom()
-            }));
-          }
-        }
-      }
-      
-      alert('Forecast loaded successfully!');
-    } catch (error) {
-      console.error('Error loading forecast:', error);
-      alert('Error loading forecast. The saved data might be corrupted.');
-    }
-  };
+  const handleLoad = useCallback(() => {
+    performLoad(dispatch, addToast, mapRef);
+  }, [dispatch, addToast, mapRef]);
   
   // Toggle documentation visibility
-  const toggleDocumentation = () => {
-    setShowDocumentation(!showDocumentation);
-  };
+  const toggleDocumentation = useCallback(() => {
+    setShowDocumentation(prev => !prev);
+  }, []);
   
   // Warn before closing/refreshing if there are unsaved changes
-  React.useEffect(() => {
+  useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!isSaved) {
         const message = 'You have unsaved changes. Are you sure you want to leave?';
         e.returnValue = message;
         return message;
       }
+      return undefined;
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isSaved]);
 
-  const addToast = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
-    const id = uuidv4();
-    setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
-
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
-
   // Add keyboard shortcuts
-  React.useEffect(() => {
+  useEffect(() => {
     const { activeOutlookType, activeProbability, isSignificant } = drawingState;
+    // Small named handlers reduce cyclomatic complexity of this effect
+    const handleToggleDocumentation = () => {
+      setShowDocumentation(prev => !prev);
+      addToast('Documentation toggled', 'info');
+    };
+
+    const makeSwitchHandler = (target: string) => () => switchType(dispatch, activeOutlookType, target, addToast);
+
+    const handleSignificant = () => handleSignificantToggle({ activeOutlookType, activeProbability, isSignificant, dispatch, addToast });
+
+    const keyHandlers: Record<string, () => void> = {
+      h: handleToggleDocumentation,
+      t: makeSwitchHandler('tornado'),
+      w: makeSwitchHandler('wind'),
+      l: makeSwitchHandler('hail'),
+      c: makeSwitchHandler('categorical'),
+      g: () => handleGeneralThunderstorm(activeOutlookType, dispatch, addToast),
+      s: handleSignificant,
+    };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
+      if (isTyping(e)) return;
 
-      // Handle Ctrl/Cmd + S first
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      if (isSaveKey(e)) {
         e.preventDefault();
         if (!isSaved) handleSave();
         return;
       }
 
-      // Don't trigger other shortcuts if modifiers are pressed
-      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) {
+      if (hasAnyModifier(e)) return;
+
+      const key = e.key.toLowerCase();
+
+      const handler = keyHandlers[key];
+      if (handler) {
+        handler();
         return;
       }
 
-      const getProbabilityList = () => {
-        switch (activeOutlookType) {
-          case 'categorical':
-            return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as readonly string[];
-          case 'tornado':
-            return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as readonly string[];
-          case 'wind':
-          case 'hail':
-            return ['5%', '15%', '30%', '45%', '60%'] as readonly string[];
-          default:
-            return [] as readonly string[];
-        }
-      };
-
-      switch (e.key.toLowerCase()) {
-        // Toggle documentation with 'h' (help)
-        case 'h':
-          setShowDocumentation(prev => !prev);
-          addToast('Documentation toggled', 'info');
-          break;
-
-        // Switch between outlook types
-        case 't':
-          if (activeOutlookType !== 'tornado') {
-            dispatch(setActiveOutlookType('tornado'));
-            addToast('Switched to Tornado outlook', 'info');
-          }
-          break;
-        case 'w':
-          if (activeOutlookType !== 'wind') {
-            dispatch(setActiveOutlookType('wind'));
-            addToast('Switched to Wind outlook', 'info');
-          }
-          break;
-        case 'l':
-          if (activeOutlookType !== 'hail') {
-            dispatch(setActiveOutlookType('hail'));
-            addToast('Switched to Hail outlook', 'info');
-          }
-          break;
-        case 'c':
-          if (activeOutlookType !== 'categorical') {
-            dispatch(setActiveOutlookType('categorical'));
-            addToast('Switched to Categorical outlook', 'info');
-          }
-          break;
-
-        // Add General Thunderstorm risk with 'g'
-        case 'g':
-          if (activeOutlookType === 'categorical') {
-            dispatch(setActiveProbability('TSTM'));
-            addToast('Added General Thunderstorm risk', 'info');
-          }
-          break;
-
-        // Toggle significant threat with 's'
-        case 's':
-          const canToggleSignificant = activeOutlookType !== 'categorical' && 
-            (activeOutlookType === 'tornado' ? 
-              !['2%', '5%'].includes(activeProbability) :
-              !['5%'].includes(activeProbability));
-          if (canToggleSignificant) {
-            dispatch(toggleSignificant());
-            addToast(`${isSignificant ? 'Disabled' : 'Enabled'} significant threat`, 'info');
-          } else {
-            addToast('Significant threat not available for this probability', 'warning');
-          }
-          break;
-
-        // Navigate probabilities with arrow keys
-        case 'arrowup':
-        case 'arrowright':
-          {
-            const probabilities = getProbabilityList();
-            const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
-            if (currentIndex < probabilities.length - 1) {
-              const nextProb = probabilities[currentIndex + 1] as "TSTM" | "MRGL" | "SLGT" | "ENH" | "MDT" | "HIGH" | "2%" | "5%" | "10%" | "10#" | "15%" | "15#" | "30%" | "30#" | "45%" | "45#" | "60%" | "60#";
-              dispatch(setActiveProbability(nextProb));
-              addToast(`Increased to ${nextProb}`, 'info');
-            }
-          }
-          break;
-
-        case 'arrowdown':
-        case 'arrowleft':
-          {
-            const probabilities = getProbabilityList();
-            const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
-            if (currentIndex > 0) {
-              const prevProb = probabilities[currentIndex - 1] as "TSTM" | "MRGL" | "SLGT" | "ENH" | "MDT" | "HIGH" | "2%" | "5%" | "10%" | "10#" | "15%" | "15#" | "30%" | "30#" | "45%" | "45#" | "60%" | "60#";
-              dispatch(setActiveProbability(prevProb));
-              addToast(`Decreased to ${prevProb}`, 'info');
-            }
-          }
-          break;
-
-        // Delete selected feature with Delete key
-        case 'delete':
-        case 'backspace':
-          // TODO: Implement feature selection and deletion
-          break;
+      if (['arrowup', 'arrowright', 'arrowdown', 'arrowleft'].includes(key)) {
+        handleProbNav({ key, activeOutlookType, activeProbability, dispatch, addToast });
       }
     };
 
@@ -320,20 +403,7 @@ const AppContent = () => {
         {showDocumentation && <Documentation />}
         
         {emergencyMode ? (
-          <div className="emergency-mode-message">
-            <h2>⚠️ Application in Emergency Mode</h2>
-            <p>
-              All outlook types are currently disabled. This is typically done during critical maintenance 
-              or when addressing severe issues.
-            </p>
-            <p>
-              The application's drawing capabilities have been temporarily suspended. 
-              Please check back later or contact the administrator.
-            </p>
-            <p>
-              For more information visit the GitHub repository  <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues?q=is%3Aissue%20state%3Aopen%20label%3AEmergency">here</a>.
-            </p>
-          </div>
+          <EmergencyModeMessage />
         ) : (
           <>
             <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} />

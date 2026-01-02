@@ -17,10 +17,10 @@ export interface FeatureFlags {
 }
 
 const initialState: FeatureFlags = {
-  exportMapEnabled: false,
-  tornadoOutlookEnabled: false,
-  windOutlookEnabled: false,
-  hailOutlookEnabled: false,
+  exportMapEnabled: false, // Disabled due to Leaflet coordinate system limitations - see issue #32 for future work (server-side rendering or library migration)
+  tornadoOutlookEnabled: true,
+  windOutlookEnabled: true,
+  hailOutlookEnabled: true,
   categoricalOutlookEnabled: true,
   saveLoadEnabled: true,
   significantThreatsEnabled: true,
