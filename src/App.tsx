@@ -7,7 +7,7 @@ import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
 import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode } from './store/forecastSlice';
 import { RootState } from './store';
-import { OutlookData, OutlookType } from './types/outlooks';
+import { OutlookData, OutlookType, Probability } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
@@ -55,7 +55,6 @@ const hasAnyModifier = (e: KeyboardEvent) => {
 // App dispatch / toast types
 type AppDispatch = typeof store.dispatch;
 type AddToastFn = (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type Probability = "TSTM" | "MRGL" | "SLGT" | "ENH" | "MDT" | "HIGH" | "2%" | "5%" | "10%" | "10#" | "15%" | "15#" | "30%" | "30#" | "45%" | "45#" | "60%" | "60#";
 
 const handleGeneralThunderstorm = (activeOutlookType: string, dispatch: AppDispatch, addToast: AddToastFn) => {
   if (activeOutlookType === 'categorical') {
@@ -64,7 +63,6 @@ const handleGeneralThunderstorm = (activeOutlookType: string, dispatch: AppDispa
   }
 };
 
-// Helper to switch outlook type
 // Helper to switch outlook type
 const switchType = (dispatch: AppDispatch, currentType: string, targetType: string, addToast: AddToastFn) => {
   if (currentType !== targetType) {
@@ -197,9 +195,36 @@ const performLoad = (
       return;
     }
     
-    const parsedData = JSON.parse(savedData);
-    
-    const entries = parsedData.outlooks as {
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(savedData) as unknown;
+    } catch (err) {
+      addToast('Saved data is incomplete or corrupted.', 'error');
+      return;
+    }
+
+    // Basic validation of parsed data structure
+    if (typeof parsedData !== 'object' || parsedData === null) {
+      addToast('Saved data is incomplete or corrupted.', 'error');
+      return;
+    }
+
+    const pd = parsedData as { outlooks?: unknown; mapView?: unknown };
+    if (!pd.outlooks || typeof pd.outlooks !== 'object') {
+      addToast('Saved data is incomplete or corrupted.', 'error');
+      return;
+    }
+
+    const outlooksObj = pd.outlooks as Record<string, unknown>;
+    const requiredKeys = ['tornado', 'wind', 'hail', 'categorical'];
+    for (const key of requiredKeys) {
+      if (!Object.prototype.hasOwnProperty.call(outlooksObj, key) || !Array.isArray(outlooksObj[key])) {
+        addToast('Saved data is incomplete or corrupted.', 'error');
+        return;
+      }
+    }
+
+    const entries = outlooksObj as {
       [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
     };
 
@@ -218,8 +243,8 @@ const performLoad = (
       return;
     }
 
-    if (parsedData.mapView) {
-      dispatch(setMapView(parsedData.mapView));
+    if (pd.mapView) {
+      dispatch(setMapView(pd.mapView as { center: [number, number]; zoom: number }));
     } else {
       fitMapToFeatures(map, deserializedOutlooks, dispatch);
     }
