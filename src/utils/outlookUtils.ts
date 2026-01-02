@@ -62,28 +62,21 @@ export const colorMappings: ColorMappings = {
  * @returns Categorical risk level
  */
 export function tornadoToCategorical(probability: TornadoProbability): CategoricalRiskLevel {
-  // Conversion table based on Outlook_Info.md
-  switch (probability) {
-    case '2%':
-      return 'MRGL';
-    case '5%':
-      return 'SLGT';
-    case '10%':
-    case '10#':
-    case '15%':
-      return 'ENH';
-    case '15#':
-    case '30%':
-      return 'MDT';
-    case '30#':
-    case '45%':
-    case '45#':
-    case '60%':
-    case '60#':
-      return 'HIGH';
-    default:
-      return 'TSTM'; // Default to general thunderstorm
-  }
+  const mapping: Record<string, CategoricalRiskLevel> = {
+    '2%': 'MRGL',
+    '5%': 'SLGT',
+    '10%': 'ENH',
+    '10#': 'ENH',
+    '15%': 'ENH',
+    '15#': 'MDT',
+    '30%': 'MDT',
+    '30#': 'HIGH',
+    '45%': 'HIGH',
+    '45#': 'HIGH',
+    '60%': 'HIGH',
+    '60#': 'HIGH'
+  };
+  return mapping[probability] ?? 'TSTM';
 }
 
 /**
@@ -92,25 +85,18 @@ export function tornadoToCategorical(probability: TornadoProbability): Categoric
  * @returns Categorical risk level
  */
 export function windToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
-  // Conversion table based on Outlook_Info.md
-  switch (probability) {
-    case '5%':
-      return 'MRGL';
-    case '15%':
-    case '15#':
-      return 'SLGT';
-    case '30%':
-    case '30#':
-    case '45%':
-      return 'ENH';
-    case '45#':
-    case '60%':
-      return 'MDT';
-    case '60#':
-      return 'HIGH';
-    default:
-      return 'TSTM'; // Default to general thunderstorm
-  }
+  const mapping: Record<string, CategoricalRiskLevel> = {
+    '5%': 'MRGL',
+    '15%': 'SLGT',
+    '15#': 'SLGT',
+    '30%': 'ENH',
+    '30#': 'ENH',
+    '45%': 'ENH',
+    '45#': 'MDT',
+    '60%': 'MDT',
+    '60#': 'HIGH'
+  };
+  return mapping[probability] ?? 'TSTM';
 }
 
 /**
@@ -119,24 +105,18 @@ export function windToCategorical(probability: WindHailProbability): Categorical
  * @returns Categorical risk level
  */
 export function hailToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
-  // Conversion table based on Outlook_Info.md
-  switch (probability) {
-    case '5%':
-      return 'MRGL';
-    case '15%':
-    case '15#':
-      return 'SLGT';
-    case '30%':
-    case '30#':
-    case '45%':
-      return 'ENH';
-    case '45#':
-    case '60%':
-    case '60#':
-      return 'MDT';
-    default:
-      return 'TSTM'; // Default to general thunderstorm
-  }
+  const mapping: Record<string, CategoricalRiskLevel> = {
+    '5%': 'MRGL',
+    '15%': 'SLGT',
+    '15#': 'SLGT',
+    '30%': 'ENH',
+    '30#': 'ENH',
+    '45%': 'ENH',
+    '45#': 'MDT',
+    '60%': 'MDT',
+    '60#': 'MDT'
+  };
+  return mapping[probability] ?? 'TSTM';
 }
 
 /**
@@ -161,38 +141,24 @@ export function getHighestCategoricalRisk(
   hailProb?: WindHailProbability
 ): CategoricalRiskLevel {
   const riskValues: { [key in CategoricalRiskLevel]: number } = {
-    'TSTM': 0,
-    'MRGL': 1,
-    'SLGT': 2,
-    'ENH': 3,
-    'MDT': 4,
-    'HIGH': 5
+    TSTM: 0,
+    MRGL: 1,
+    SLGT: 2,
+    ENH: 3,
+    MDT: 4,
+    HIGH: 5
   };
-  
-  let highestRisk: CategoricalRiskLevel = 'TSTM';
-  
-  if (tornadoProb) {
-    const tornadoRisk = tornadoToCategorical(tornadoProb);
-    if (riskValues[tornadoRisk] > riskValues[highestRisk]) {
-      highestRisk = tornadoRisk;
-    }
-  }
-  
-  if (windProb) {
-    const windRisk = windToCategorical(windProb);
-    if (riskValues[windRisk] > riskValues[highestRisk]) {
-      highestRisk = windRisk;
-    }
-  }
-  
-  if (hailProb) {
-    const hailRisk = hailToCategorical(hailProb);
-    if (riskValues[hailRisk] > riskValues[highestRisk]) {
-      highestRisk = hailRisk;
-    }
-  }
-  
-  return highestRisk;
+
+  const candidates: CategoricalRiskLevel[] = [];
+  if (tornadoProb) candidates.push(tornadoToCategorical(tornadoProb));
+  if (windProb) candidates.push(windToCategorical(windProb));
+  if (hailProb) candidates.push(hailToCategorical(hailProb));
+
+  if (candidates.length === 0) return 'TSTM';
+
+  return candidates.reduce((best, current) => (
+    riskValues[current] > riskValues[best] ? current : best
+  ), candidates[0]);
 }
 
 /**

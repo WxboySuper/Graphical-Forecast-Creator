@@ -35,6 +35,43 @@ const initialState: ForecastState = {
   emergencyMode: false
 };
 
+// Helpers to keep reducers small and testable
+const computeOutlookType = (feature: GeoJSON.Feature, state: ForecastState): OutlookType => {
+  return (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
+};
+
+const computeProbability = (feature: GeoJSON.Feature, state: ForecastState): string => {
+  const fallback = state.drawingState.activeProbability;
+  const base = (feature.properties?.probability ?? fallback) as string;
+
+  // If the current outlook type is categorical, return categorical labels unchanged
+  if (state.drawingState.activeOutlookType === 'categorical') {
+    return base;
+  }
+
+  // Otherwise treat as numeric probability: strip any existing '%' or '#' and append correct suffix
+  const normalized = String(base).replace(/[%#]/g, '');
+  return state.drawingState.isSignificant ? `${normalized}#` : `${normalized}%`;
+};
+const buildFeatureWithProps = (
+  feature: GeoJSON.Feature,
+  outlookType: OutlookType,
+  probability: string,
+  isSignificant: boolean
+): GeoJSON.Feature => {
+  return {
+    ...feature,
+    properties: {
+      ...feature.properties,
+      outlookType,
+      probability,
+      isSignificant,
+      derivedFrom: feature.properties?.derivedFrom || outlookType,
+      originalProbability: feature.properties?.originalProbability || probability
+    }
+  } as GeoJSON.Feature;
+};
+
 export const forecastSlice = createSlice({
   name: 'forecast',
   initialState,
@@ -69,12 +106,17 @@ export const forecastSlice = createSlice({
     // Toggle significant status
     toggleSignificant: (state) => {
       const currentProb = state.drawingState.activeProbability;
-      
-      // Only toggle if we're not in categorical mode and the probability supports significant variants
-      if (state.drawingState.activeOutlookType !== 'categorical' && 
-          !(state.drawingState.activeOutlookType === 'tornado' && ['2%', '5%'].includes(currentProb)) &&
-          !((['wind', 'hail'].includes(state.drawingState.activeOutlookType)) && ['5%'].includes(currentProb))) {
-        // Toggle the significant state
+
+      // Break complex conditional into clear boolean checks
+      const activeType = state.drawingState.activeOutlookType;
+      const isCategorical = activeType === 'categorical';
+      const unsupportedForTornado = activeType === 'tornado' && (currentProb === '2%' || currentProb === '5%');
+      const unsupportedForWindHail = (activeType === 'wind' || activeType === 'hail') && currentProb === '5%';
+
+      // Only allow toggling when not categorical and not one of the unsupported combinations
+      const canToggle = !isCategorical && !unsupportedForTornado && !unsupportedForWindHail;
+
+      if (canToggle) {
         state.drawingState.isSignificant = !state.drawingState.isSignificant;
         state.isSaved = false;
       }
@@ -83,34 +125,20 @@ export const forecastSlice = createSlice({
     // Add a drawn feature to the appropriate outlook
     addFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
       const feature = action.payload.feature;
-      const outlookType = feature.properties?.outlookType || state.drawingState.activeOutlookType;
-      let probability = feature.properties?.probability || state.drawingState.activeProbability;
+      const outlookType = computeOutlookType(feature, state);
+      const probability = computeProbability(feature, state);
 
-      // If the feature is significant, add it on top of existing layers
-      if (state.drawingState.isSignificant) {
-        probability = `${probability.replace('%', '')}#`;
-      }
-
-      // Get existing features for this probability or create new array
       const outlookMap = state.outlooks[outlookType as keyof OutlookData];
       const existingFeatures = outlookMap.get(probability) || [];
 
-      // Ensure the feature has all required properties
-      const featureWithProps = {
-        ...feature,
-        properties: {
-          ...feature.properties,
-          outlookType,
-          probability,
-          isSignificant: state.drawingState.isSignificant,
-          derivedFrom: feature.properties?.derivedFrom || outlookType,
-          originalProbability: feature.properties?.originalProbability || probability
-        }
-      };
+      const featureWithProps = buildFeatureWithProps(
+        feature,
+        outlookType,
+        probability,
+        state.drawingState.isSignificant
+      );
 
-      // Add new feature
       outlookMap.set(probability, [...existingFeatures, featureWithProps]);
-
       state.isSaved = false;
     },
     

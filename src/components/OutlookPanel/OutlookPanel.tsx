@@ -1,319 +1,290 @@
-import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../../store';
-import { 
-  setActiveOutlookType, 
-  setActiveProbability, 
-  toggleSignificant 
-} from '../../store/forecastSlice';
-import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindHailProbability } from '../../types/outlooks';
-import { colorMappings, getCategoricalRiskDisplayName } from '../../utils/outlookUtils';
+// skipcq: JS-W1028
+import React, { memo } from 'react';
+import { OutlookType, CategoricalRiskLevel } from '../../types/outlooks';
+import { getCategoricalRiskDisplayName } from '../../utils/outlookUtils';
+import {
+  canBeSignificant,
+  getProbabilityButtonStyle,
+  getCurrentColor,
+} from './outlookPanelUtils';
+import useOutlookPanelLogic from './useOutlookPanelLogic';
 import './OutlookPanel.css';
+import { FeatureFlags } from '../../store/featureFlagsSlice';
+
+interface OutlookButtonProps {
+  label: string;
+  enabled: boolean;
+  active: boolean;
+  onClick: () => void;
+  tooltip?: string;
+  ariaLabel?: string;
+}
+
+const OutlookButton: React.FC<OutlookButtonProps> = memo(({ label, enabled, active, onClick, tooltip, ariaLabel }) => (
+  <div className="tooltip">
+    <button
+      className={`${active ? 'active' : ''} ${!enabled ? 'button-disabled' : ''}`}
+      onClick={onClick}
+      disabled={!enabled}
+      aria-pressed={active}
+      aria-label={ariaLabel}
+    >
+      {label}
+      {!enabled && <span className="maintenance-badge">!</span>}
+    </button>
+    {!enabled && tooltip && <span className="tooltip-text">{tooltip}</span>}
+  </div>
+));
+
+
+  const FeatureStatus: React.FC<{ featureFlags: FeatureFlags }> = memo(({ featureFlags }) => {
+    const items = [
+      { ok: featureFlags.tornadoOutlookEnabled, text: '⚠️ Tornado outlooks temporarily unavailable' },
+      { ok: featureFlags.windOutlookEnabled, text: '⚠️ Wind outlooks temporarily unavailable' },
+      { ok: featureFlags.hailOutlookEnabled, text: '⚠️ Hail outlooks temporarily unavailable' },
+      { ok: featureFlags.categoricalOutlookEnabled, text: '⚠️ Categorical outlooks temporarily unavailable' },
+      { ok: featureFlags.significantThreatsEnabled, text: '⚠️ Significant threats temporarily unavailable' },
+    ];
+    const disabled = items.filter(i => !i.ok);
+    if (disabled.length === 0) return null;
+    return (
+      <div className="outlook-section feature-flags-info">
+        <h3>Feature Status</h3>
+        <ul className="feature-status-list">
+          {disabled.map((d) => <li key={d.text}>{d.text}</li>)}
+        </ul>
+      </div>
+    );
+  });
+
+  const CurrentSelection: React.FC<{
+    activeOutlookType: OutlookType;
+    activeProbability: string;
+    isSignificant: boolean;
+    significantThreatsEnabled: boolean;
+  }> = memo(({ activeOutlookType, activeProbability, isSignificant, significantThreatsEnabled }) => (
+    <div className="outlook-section">
+      <h3>Current Selection</h3>
+      <div
+        className={`color-preview ${isSignificant && significantThreatsEnabled ? 'significant' : ''}`}
+        style={{ backgroundColor: getCurrentColor(activeOutlookType, activeProbability) }}
+      >
+        {activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)} - {activeProbability}
+        {isSignificant && significantThreatsEnabled && ' (Significant)'}
+      </div>
+    </div>
+  ));
+interface OutlookTypeSectionProps {
+  activeOutlookType: OutlookType;
+  outlookTypeHandlers: Record<OutlookType, () => void>;
+  emergencyMode: boolean;
+  getOutlookTypeEnabled: (t: OutlookType) => boolean;
+}
+
+export const OutlookTypeSectionTop: React.FC<OutlookTypeSectionProps> = memo(({
+  activeOutlookType,
+  outlookTypeHandlers,
+  emergencyMode,
+  getOutlookTypeEnabled
+}) => (
+  <div className="outlook-section">
+    <h3>Outlook Type</h3>
+    <div className="outlook-buttons" aria-label="Outlook type selection">
+      <OutlookButton
+        label="Tornado"
+        enabled={getOutlookTypeEnabled('tornado')}
+        active={activeOutlookType === 'tornado'}
+        onClick={outlookTypeHandlers.tornado}
+        tooltip="Tornado outlook temporarily unavailable"
+        ariaLabel="Tornado outlook (T)"
+      />
+      <OutlookButton
+        label="Wind"
+        enabled={getOutlookTypeEnabled('wind')}
+        active={activeOutlookType === 'wind'}
+        onClick={outlookTypeHandlers.wind}
+        tooltip="Wind outlook temporarily unavailable"
+        ariaLabel="Wind outlook (W)"
+      />
+      <OutlookButton
+        label="Hail"
+        enabled={getOutlookTypeEnabled('hail')}
+        active={activeOutlookType === 'hail'}
+        onClick={outlookTypeHandlers.hail}
+        tooltip="Hail outlook temporarily unavailable"
+        ariaLabel="Hail outlook (L)"
+      />
+      <OutlookButton
+        label="Categorical"
+        enabled={getOutlookTypeEnabled('categorical')}
+        active={activeOutlookType === 'categorical'}
+        onClick={outlookTypeHandlers.categorical}
+        tooltip="Categorical outlook temporarily unavailable"
+        ariaLabel="Categorical outlook (C)"
+      />
+    </div>
+    {emergencyMode && (
+      <div className="emergency-warning">
+        <h4>⚠️ Emergency Mode - All Outlooks Disabled</h4>
+        <p>
+          All outlook types are currently disabled. This is typically done during critical maintenance 
+          or when addressing severe issues. Please check back later or contact the administrator.
+        </p>
+        <p>
+          You can still view existing forecasts, but creating new ones is temporarily unavailable.
+        </p>
+      </div>
+    )}
+    {!getOutlookTypeEnabled(activeOutlookType) && (
+      <div className="warning-notice">
+        <p>⚠️ You are viewing a disabled outlook type. Please select an available outlook type to continue.</p>
+      </div>
+    )}
+  </div>
+));
+
+interface ProbabilitySectionProps {
+  activeOutlookType: OutlookType;
+  probabilities: string[];
+  activeProbability: string;
+  probabilityHandlers: Record<string, () => void>;
+  getProbabilityButtonStyle: (o: OutlookType, a: string, p: string) => React.CSSProperties;
+  getCategoricalRiskDisplayName: (p: CategoricalRiskLevel) => string;
+  getOutlookTypeEnabled: (t: OutlookType) => boolean;
+}
+
+export const ProbabilitySectionTop: React.FC<ProbabilitySectionProps> = memo(({
+  activeOutlookType,
+  probabilities,
+  activeProbability,
+  probabilityHandlers,
+  getProbabilityButtonStyle,
+  getCategoricalRiskDisplayName,
+  getOutlookTypeEnabled
+}) => (
+  <div className="outlook-section">
+    <h3>{activeOutlookType === 'categorical' ? 'Risk Level' : 'Probability'}</h3>
+    <div className="probability-selector" aria-label="Risk level or probability selection">
+      {probabilities.map(prob => (
+        <button 
+          key={prob} 
+          className={activeProbability === prob ? 'active' : ''} 
+          onClick={probabilityHandlers[prob]}
+          style={getProbabilityButtonStyle(activeOutlookType, activeProbability, prob)}
+          aria-pressed={activeProbability === prob}
+          aria-label={activeOutlookType === 'categorical' ? `${prob} (${getCategoricalRiskDisplayName(prob as CategoricalRiskLevel)})` : prob}
+          title={activeOutlookType === 'categorical' ? getCategoricalRiskDisplayName(prob as CategoricalRiskLevel) : undefined}
+          disabled={!getOutlookTypeEnabled(activeOutlookType)}
+        >
+          {prob}
+        </button>
+      ))}
+    </div>
+  </div>
+));
+
+interface SignificantSectionProps {
+  isSignificant: boolean;
+  handleToggleSignificant: () => void;
+  significantThreatsEnabled: boolean;
+  activeProbability: string;
+}
+
+export const SignificantSectionTop: React.FC<SignificantSectionProps> = memo(({
+  isSignificant,
+  handleToggleSignificant,
+  significantThreatsEnabled,
+  activeProbability
+}) => (
+  <div className="outlook-section">
+    <h3>Significant Threat</h3>
+    <div className="tooltip">
+      <label className="switch">
+        <input 
+          type="checkbox" 
+          checked={isSignificant} 
+          onChange={handleToggleSignificant} 
+          disabled={!significantThreatsEnabled}
+          aria-label="Significant threat toggle"
+        />
+        <span className={`slider round ${!significantThreatsEnabled ? 'disabled' : ''}`}></span>
+      </label>
+      <span className="switch-label">
+        {isSignificant ? 'Enabled' : 'Disabled'}
+        {isSignificant && (
+          <div className="probability-note">
+            Current: {activeProbability}
+          </div>
+        )}
+      </span>
+      {!significantThreatsEnabled && (
+        <span className="tooltip-text">
+          Significant threats temporarily unavailable
+        </span>
+      )}
+    </div>
+    {!significantThreatsEnabled && isSignificant && (
+      <div className="warning-notice">
+        <p>⚠️ Significant threats are currently disabled. Your significant markings will not be applied.</p>
+      </div>
+    )}
+  </div>
+));
 
 const OutlookPanel: React.FC = () => {
-  const dispatch = useDispatch();
-  const { drawingState, emergencyMode } = useSelector((state: RootState) => state.forecast);
-  const featureFlags = useSelector((state: RootState) => state.featureFlags);
-  const { activeOutlookType, activeProbability, isSignificant } = drawingState;
-  
-  // Check if significant threats are enabled via feature flags
-  const significantThreatsEnabled = featureFlags.significantThreatsEnabled;
-  
-  // Handler for changing the outlook type
-  const handleOutlookTypeChange = (type: OutlookType) => {
-    // Check if the requested outlook type is enabled before changing
-    const isEnabled = getOutlookTypeEnabled(type);
-    if (!isEnabled) {
-      alert(`The ${type} outlook is temporarily unavailable due to maintenance or an issue.`);
-      return;
-    }
-    
-    dispatch(setActiveOutlookType(type));
-  };
-  
-  // Helper to check if an outlook type is enabled
-  const getOutlookTypeEnabled = (type: OutlookType): boolean => {
-    switch (type) {
-      case 'tornado': return featureFlags.tornadoOutlookEnabled;
-      case 'wind': return featureFlags.windOutlookEnabled;
-      case 'hail': return featureFlags.hailOutlookEnabled;
-      case 'categorical': return featureFlags.categoricalOutlookEnabled;
-      default: return false;
-    }
-  };
-  
-  // Handler for changing the probability/risk level
-  const handleProbabilityChange = (probability: TornadoProbability | WindHailProbability | CategoricalRiskLevel) => {
-    dispatch(setActiveProbability(probability));
-  };
-  
-  // Handler for toggling significant status
-  const handleToggleSignificant = () => {
-    // Don't allow toggling if significant threats are disabled
-    if (!significantThreatsEnabled) {
-      alert('Significant threats are temporarily unavailable due to an issue.');
-      return;
-    }
-    
-    // Just dispatch the toggle action once - the reducer will handle the logic
-    dispatch(toggleSignificant());
-  };
-  
-  // Get available probabilities based on active outlook type
-  const getAvailableProbabilities = () => {
-    switch (activeOutlookType) {
-      case 'categorical':
-        return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as CategoricalRiskLevel[];
-      case 'tornado':
-        return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as TornadoProbability[];
-      case 'wind':
-      case 'hail':
-        return ['5%', '15%', '30%', '45%', '60%'] as WindHailProbability[];
-      default:
-        return [];
-    }
-  };
-  
-  // Check if current probability allows significant variants
-  const canBeSignificant = () => {
-    // First check if significant threats are globally enabled
-    if (!significantThreatsEnabled || activeOutlookType === 'categorical') return false;
-    
-    const probability = activeProbability.replace('#', '');
-    switch (activeOutlookType) {
-      case 'tornado':
-        // Tornado probabilities of 10% and higher can be significant
-        return !['2%', '5%'].includes(probability);
-      case 'wind':
-      case 'hail':
-        // Wind and hail probabilities of 15% and higher can be significant
-        return !['5%'].includes(probability);
-      default:
-        return false;
-    }
-  };
+  const {
+    featureFlags,
+    emergencyMode,
+    activeOutlookType,
+    activeProbability,
+    isSignificant,
+    significantThreatsEnabled,
+    getOutlookTypeEnabled,
+    outlookTypeHandlers,
+    probabilities,
+    probabilityHandlers,
+    handleToggleSignificant,
+  } = useOutlookPanelLogic();
 
-  // Get button style for probability selector
-  const getProbabilityButtonStyle = (prob: string) => {
-    const isActive = activeProbability === prob;
-    let color = '#FFFFFF';
-    let textColor = '#000000';
-
-    // Get the appropriate color based on outlook type and probability
-    if (activeOutlookType === 'categorical') {
-      color = colorMappings.categorical[prob as keyof typeof colorMappings.categorical];
-      // Light background colors need dark text
-      if (['TSTM', 'MRGL', 'SLGT'].includes(prob)) {
-        textColor = '#000000';
-      } else {
-        textColor = '#FFFFFF';
-      }
-    } else {
-      const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
-      color = colorMap[prob as keyof typeof colorMap];
-      // Most probability colors need white text
-      textColor = '#FFFFFF';
-    }
-
-    return {
-      backgroundColor: color,
-      color: textColor,
-      boxShadow: isActive ? '0 0 0 2px white, 0 0 0 4px #3f51b5' : undefined
-    };
-  };
-
-  // Get the current color based on outlook type and probability
-  const getCurrentColor = () => {
-    if (activeOutlookType === 'categorical') {
-      return colorMappings.categorical[activeProbability as keyof typeof colorMappings.categorical] || '#FFFFFF';
-    } else {
-      const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
-      return colorMap[activeProbability as keyof typeof colorMap] || '#FFFFFF';
-    }
-  };
-  
   return (
     <div className="outlook-panel">
       <h2>Outlook Configuration</h2>
       
-      <div className="outlook-section">
-        <h3>Outlook Type</h3>
-        <div className="outlook-buttons" role="radiogroup" aria-label="Outlook type selection">
-          {/* Tornado outlook button with feature flag */}
-          <div className="tooltip">
-            <button 
-              className={`${activeOutlookType === 'tornado' ? 'active' : ''} ${!featureFlags.tornadoOutlookEnabled ? 'button-disabled' : ''}`} 
-              onClick={() => handleOutlookTypeChange('tornado')}
-              disabled={!featureFlags.tornadoOutlookEnabled}
-              aria-pressed={activeOutlookType === 'tornado'}
-              aria-label="Tornado outlook (T)"
-            >
-              Tornado
-              {!featureFlags.tornadoOutlookEnabled && <span className="maintenance-badge">!</span>}
-            </button>
-            {!featureFlags.tornadoOutlookEnabled && (
-              <span className="tooltip-text">Tornado outlook temporarily unavailable</span>
-            )}
-          </div>
-          
-          {/* Wind outlook button with feature flag */}
-          <div className="tooltip">
-            <button 
-              className={`${activeOutlookType === 'wind' ? 'active' : ''} ${!featureFlags.windOutlookEnabled ? 'button-disabled' : ''}`} 
-              onClick={() => handleOutlookTypeChange('wind')}
-              disabled={!featureFlags.windOutlookEnabled}
-              aria-pressed={activeOutlookType === 'wind'}
-              aria-label="Wind outlook (W)"
-            >
-              Wind
-              {!featureFlags.windOutlookEnabled && <span className="maintenance-badge">!</span>}
-            </button>
-            {!featureFlags.windOutlookEnabled && (
-              <span className="tooltip-text">Wind outlook temporarily unavailable</span>
-            )}
-          </div>
-          
-          {/* Hail outlook button with feature flag */}
-          <div className="tooltip">
-            <button 
-              className={`${activeOutlookType === 'hail' ? 'active' : ''} ${!featureFlags.hailOutlookEnabled ? 'button-disabled' : ''}`}
-              onClick={() => handleOutlookTypeChange('hail')}
-              disabled={!featureFlags.hailOutlookEnabled}
-              aria-pressed={activeOutlookType === 'hail'}
-              aria-label="Hail outlook (L)"
-            >
-              Hail
-              {!featureFlags.hailOutlookEnabled && <span className="maintenance-badge">!</span>}
-            </button>
-            {!featureFlags.hailOutlookEnabled && (
-              <span className="tooltip-text">Hail outlook temporarily unavailable</span>
-            )}
-          </div>
-          
-          {/* Categorical outlook button with feature flag */}
-          <div className="tooltip">
-            <button 
-              className={`${activeOutlookType === 'categorical' ? 'active' : ''} ${!featureFlags.categoricalOutlookEnabled ? 'button-disabled' : ''}`}
-              onClick={() => handleOutlookTypeChange('categorical')}
-              disabled={!featureFlags.categoricalOutlookEnabled}
-              aria-pressed={activeOutlookType === 'categorical'}
-              aria-label="Categorical outlook (C)"
-            >
-              Categorical
-              {!featureFlags.categoricalOutlookEnabled && <span className="maintenance-badge">!</span>}
-            </button>
-            {!featureFlags.categoricalOutlookEnabled && (
-              <span className="tooltip-text">Categorical outlook temporarily unavailable</span>
-            )}
-          </div>
-        </div>
-        
-        {/* Emergency mode warning */}
-        {emergencyMode && (
-          <div className="emergency-warning">
-            <h4>⚠️ Emergency Mode - All Outlooks Disabled</h4>
-            <p>
-              All outlook types are currently disabled. This is typically done during critical maintenance 
-              or when addressing severe issues. Please check back later or contact the administrator.
-            </p>
-            <p>
-              You can still view existing forecasts, but creating new ones is temporarily unavailable.
-            </p>
-          </div>
-        )}
-        
-        {/* Warning if current outlook type is disabled */}
-        {!getOutlookTypeEnabled(activeOutlookType) && (
-          <div className="warning-notice">
-            <p>⚠️ You are viewing a disabled outlook type. Please select an available outlook type to continue.</p>
-          </div>
-        )}
-      </div>
+      <OutlookTypeSectionTop
+        activeOutlookType={activeOutlookType}
+        outlookTypeHandlers={outlookTypeHandlers}
+        emergencyMode={emergencyMode}
+        getOutlookTypeEnabled={getOutlookTypeEnabled}
+      />
       
-      <div className="outlook-section">
-        <h3>{activeOutlookType === 'categorical' ? 'Risk Level' : 'Probability'}</h3>
-        <div className="probability-selector" role="radiogroup" aria-label="Risk level or probability selection">
-          {getAvailableProbabilities().map(prob => (
-            <button 
-              key={prob} 
-              className={activeProbability === prob ? 'active' : ''} 
-              onClick={() => handleProbabilityChange(prob)}
-              style={getProbabilityButtonStyle(prob)}
-              aria-pressed={activeProbability === prob}
-              aria-label={`${prob}${activeOutlookType === 'categorical' ? ` (${getCategoricalRiskDisplayName(prob as CategoricalRiskLevel)})` : ''}`}
-              title={activeOutlookType === 'categorical' ? getCategoricalRiskDisplayName(prob as CategoricalRiskLevel) : undefined}
-              disabled={!getOutlookTypeEnabled(activeOutlookType)}
-            >
-              {prob}
-            </button>
-          ))}
-        </div>
-      </div>
+      <ProbabilitySectionTop
+        activeOutlookType={activeOutlookType}
+        probabilities={probabilities}
+        activeProbability={activeProbability}
+        probabilityHandlers={probabilityHandlers}
+        getProbabilityButtonStyle={getProbabilityButtonStyle}
+        getCategoricalRiskDisplayName={getCategoricalRiskDisplayName}
+        getOutlookTypeEnabled={getOutlookTypeEnabled}
+      />
       
-      {canBeSignificant() && (
-        <div className="outlook-section">
-          <h3>Significant Threat</h3>
-          <div className="tooltip">
-            <label className="switch">
-              <input 
-                type="checkbox" 
-                checked={isSignificant} 
-                onChange={handleToggleSignificant} 
-                disabled={!significantThreatsEnabled}
-              />
-              <span className={`slider round ${!significantThreatsEnabled ? 'disabled' : ''}`}></span>
-            </label>
-            <span className="switch-label">
-              {isSignificant ? 'Enabled' : 'Disabled'}
-              {isSignificant && (
-                <div className="probability-note">
-                  Current: {activeProbability}
-                </div>
-              )}
-            </span>
-            {!significantThreatsEnabled && (
-              <span className="tooltip-text">
-                Significant threats temporarily unavailable
-              </span>
-            )}
-          </div>
-          
-          {!significantThreatsEnabled && isSignificant && (
-            <div className="warning-notice">
-              <p>⚠️ Significant threats are currently disabled. Your significant markings will not be applied.</p>
-            </div>
-          )}
-        </div>
+      {canBeSignificant(activeOutlookType, activeProbability, significantThreatsEnabled) && (
+        <SignificantSectionTop
+          isSignificant={isSignificant}
+          handleToggleSignificant={handleToggleSignificant}
+          significantThreatsEnabled={significantThreatsEnabled}
+          activeProbability={activeProbability}
+        />
       )}
       
-      <div className="outlook-section">
-        <h3>Current Selection</h3>
-        <div 
-          className={`color-preview ${drawingState.isSignificant && significantThreatsEnabled ? 'significant' : ''}`} 
-          style={{ backgroundColor: getCurrentColor() }}
-        >
-          {activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)} - {activeProbability}
-          {isSignificant && significantThreatsEnabled && ' (Significant)'}
-        </div>
-      </div>
+      <CurrentSelection
+        activeOutlookType={activeOutlookType}
+        activeProbability={activeProbability}
+        isSignificant={isSignificant}
+        significantThreatsEnabled={significantThreatsEnabled}
+      />
       
       {/* Feature flags status information */}
-      {(!featureFlags.tornadoOutlookEnabled || 
-        !featureFlags.windOutlookEnabled || 
-        !featureFlags.hailOutlookEnabled || 
-        !featureFlags.categoricalOutlookEnabled || 
-        !featureFlags.significantThreatsEnabled) && (
-        <div className="outlook-section feature-flags-info">
-          <h3>Feature Status</h3>
-          <ul className="feature-status-list">
-            {!featureFlags.tornadoOutlookEnabled && <li>⚠️ Tornado outlooks temporarily unavailable</li>}
-            {!featureFlags.windOutlookEnabled && <li>⚠️ Wind outlooks temporarily unavailable</li>}
-            {!featureFlags.hailOutlookEnabled && <li>⚠️ Hail outlooks temporarily unavailable</li>}
-            {!featureFlags.categoricalOutlookEnabled && <li>⚠️ Categorical outlooks temporarily unavailable</li>}
-            {!featureFlags.significantThreatsEnabled && <li>⚠️ Significant threats temporarily unavailable</li>}
-          </ul>
-        </div>
-      )}
+      <FeatureStatus featureFlags={featureFlags} />
     </div>
   );
 };

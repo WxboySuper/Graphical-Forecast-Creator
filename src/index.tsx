@@ -1,5 +1,7 @@
 import './immerSetup';
+// skipcq: JS-W1028
 import React from 'react';
+// skipcq: JS-C1003
 import * as ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
