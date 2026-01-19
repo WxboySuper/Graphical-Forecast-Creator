@@ -80,9 +80,6 @@ const MapController: React.FC<{
 
   // Initialize Geoman controls - runs once when map is ready
   React.useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[MapController] initializeGeoman effect running');
-    
     // Narrowly typed guard for Geoman presence
     const pmMap = map as PMMap;
     if (!pmMap.pm) {
@@ -91,36 +88,22 @@ const MapController: React.FC<{
       return undefined;
     }
 
-    // eslint-disable-next-line no-console
-    console.log('[MapController] Geoman pm object found:', pmMap.pm);
-
     // Apply controls and options via helpers
     addGeomanControls(pmMap.pm);
     setGeomanGlobalOptions(pmMap.pm);
-
-    // eslint-disable-next-line no-console
-    console.log('[MapController] Controls and options applied');
 
     // Create handlers via factories (keeps logic small inside the effect)
     const handleCreate = makeHandleCreate(map, onPolygonCreated);
     const handleCut = makeHandleCut(map, onPolygonCreated);
 
-    // eslint-disable-next-line no-console
-    console.log('[MapController] Attaching event handlers...');
-
     // Listen on the map object directly (this is what works with Geoman)
     map.on('pm:create', handleCreate);
     map.on('pm:cut', handleCut);
-
-    // eslint-disable-next-line no-console
-    console.log('[MapController] Event handlers attached successfully');
 
     // Cleanup function to remove event listeners
     return () => {
       map.off('pm:create', handleCreate);
       map.off('pm:cut', handleCut);
-      // eslint-disable-next-line no-console
-      console.log('[MapController] Cleaned up event handlers');
     };
   }, [map, onPolygonCreated]);
 
@@ -213,12 +196,6 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
   };
 };
 
-// Log helper to track GeoJSON rendering
-function logGeoJSONRender(outlookType: OutlookType, probability: string, featureId: string) {
-  // eslint-disable-next-line no-console
-  console.log('[GeoJSON Render]', { outlookType, probability, featureId });
-}
-
 // Geoman helpers: add controls and options, and factories for event handlers
 function addGeomanControls(pm: PMMap['pm']) {
   pm.addControls?.({
@@ -256,16 +233,11 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void
   return (e: L.LeafletEvent & { shape?: string; layer?: L.Layer }) => {
     const isPolygonShape = e.shape === 'Polygon' || e.shape === 'Rectangle';
       if (isPolygonShape && e.layer) {
-      const leafletId = L.stamp(e.layer);
-      // eslint-disable-next-line no-console
-      console.log('[Geoman] Creating polygon', e.shape, 'Layer ID:', leafletId);
       onPolygonCreated(e.layer);
       
       // Aggressively remove the temp layer
       try {
         map.removeLayer(e.layer);
-        // eslint-disable-next-line no-console
-        console.log('[Geoman] Removed temp layer');
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('[Geoman] Failed to remove temp layer:', err);
@@ -277,8 +249,6 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void
 function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
   return (e: L.LeafletEvent & { layer?: L.Layer }) => {
     if (e.layer) {
-      // eslint-disable-next-line no-console
-      console.log('[Geoman] Cutting polygon');
       onPolygonCreated(e.layer);
       map.removeLayer(e.layer);
     }
@@ -287,21 +257,15 @@ function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
 
 const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: OutlookType, probability: string, featureId: string) => {
   const handleClick = () => {
-    // eslint-disable-next-line no-console
-    console.log('[Handler] Click on feature', { outlookType, probability, featureId });
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
     const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${probability}${probability.includes('#') ? ' (Significant)' : ''}`;
     // eslint-disable-next-line no-restricted-globals, no-alert
     if (confirm(message)) {
-      // eslint-disable-next-line no-console
-      console.log('[Handler] Deleting feature', { outlookType, probability, featureId });
       dispatch(removeFeature({ outlookType, probability, featureId }));
     }
   };
 
   const handleMouseOver = (e: L.LeafletEvent) => {
-    // eslint-disable-next-line no-console
-    console.log('[Handler] Mouseover on feature', { outlookType, probability, featureId });
     const layer = e.target as L.Layer;
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
     const tooltipContent = `<div>${outlookName} Outlook<br/>Risk Level: ${probability}${probability.includes('#') ? ' (Significant)' : ''}<br/>Click to delete</div>`;
@@ -358,13 +322,9 @@ function createOnEachFeature(
     // Attach event handlers directly to the layer to ensure they bind
     const layerWithOn = layer as L.Layer & { on?: (event: string, fn: (...args: unknown[]) => void) => void };
     try {
-      // eslint-disable-next-line no-console
-      console.log('[onEachFeature] Attaching handlers:', Object.keys(handlers), 'to feature', feature.id);
       Object.entries(handlers).forEach(([evt, fn]) => {
         if (typeof layerWithOn.on === 'function') {
           layerWithOn.on(evt, fn as (...args: unknown[]) => void);
-          // eslint-disable-next-line no-console
-          console.log('[onEachFeature] Attached', evt, 'handler');
         }
       });
     } catch (err) {
@@ -400,7 +360,6 @@ const renderOutlookFeatures = (
       <FeatureGroup key={`${ot}-${probability}`}>
         {features.map(feature => {
           const fid = feature.id as string;
-          logGeoJSONRender(ot, probability, fid);
           const handlers = handlerFactory(ot, probability, fid);
           const styleObj = styleFn(ot, probability);
           const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: L.LeafletEvent) => void>);
@@ -425,23 +384,7 @@ const OutlookLayers: React.FC = () => {
   const { outlooks, drawingState } = useSelector((state: RootState) => state.forecast);
   const { activeOutlookType } = drawingState;
 
-  // Debug: Check what's in Redux store
-  // eslint-disable-next-line no-console
-  console.log('[OutlookLayers] Redux store outlooks:', {
-    tornado: outlooks.tornado.size,
-    wind: outlooks.wind.size,
-    hail: outlooks.hail.size,
-    categorical: outlooks.categorical.size,
-    activeOutlookType
-  });
-  
-  // eslint-disable-next-line no-console
-  console.log('[OutlookLayers] All features:', outlooks);
-
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, getFeatureStyle, activeOutlookType);
-
-  // eslint-disable-next-line no-console
-  console.log('[OutlookLayers] Rendering', elements.length, 'element groups');
 
   if (elements.length === 0) return null;
   if (elements.length === 1) return elements[0];
@@ -520,13 +463,6 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
       probability: currentDrawingState.activeProbability,
       isSignificant: currentDrawingState.isSignificant
     };
-    
-    // eslint-disable-next-line no-console
-    console.log('[handlePolygonCreated]', {
-      outlookType: currentDrawingState.activeOutlookType,
-      probability: currentDrawingState.activeProbability,
-      featureId: geoJson.id
-    });
     
     // Dispatch to store
     dispatch(addFeature({ feature: geoJson }));
