@@ -1,0 +1,7 @@
+npm verbose cli /home/jules/.nvm/versions/node/v22.21.1/bin/node /home/jules/.nvm/versions/node/v22.21.1/bin/npm
+npm info using npm@11.6.2
+npm info using node@v22.21.1
+npm verbose title npm install
+npm verbose argv "install" "--loglevel" "verbose"
+npm verbose logfile logs-max:10 dir:/home/jules/.npm/_logs/2026-01-19T18_20_26_597Z-
+npm verbose logfile /home/jules/.npm/_logs/2026-01-19T18_20_26_597Z-debug-0.log
