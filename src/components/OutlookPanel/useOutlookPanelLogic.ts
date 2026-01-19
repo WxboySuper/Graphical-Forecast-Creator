@@ -16,7 +16,8 @@ import { getAvailableProbabilities } from './outlookPanelUtils';
 
 export function useOutlookPanelLogic() {
   const dispatch = useDispatch();
-  const { drawingState, emergencyMode } = useSelector((s: RootState) => s.forecast);
+  const drawingState = useSelector((s: RootState) => s.forecast.drawingState);
+  const emergencyMode = useSelector((s: RootState) => s.forecast.emergencyMode);
   const featureFlags = useSelector((s: RootState) => s.featureFlags);
   const { activeOutlookType, activeProbability, isSignificant } = drawingState;
 
