@@ -365,7 +365,6 @@ const renderOutlookFeatures = (
       <FeatureGroup key={`${ot}-${probability}`}>
         {features.map(feature => {
           const fid = feature.id as string;
-          logGeoJSONRender(ot, probability, fid);
           const handlers = handlerFactory(ot, probability, fid);
           const styleObj = styleFn(ot, probability);
           const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: L.LeafletEvent) => void>);
