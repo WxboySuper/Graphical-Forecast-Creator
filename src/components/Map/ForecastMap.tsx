@@ -425,19 +425,6 @@ const OutlookLayers: React.FC = () => {
   const { outlooks, drawingState } = useSelector((state: RootState) => state.forecast);
   const { activeOutlookType } = drawingState;
 
-  // Debug: Check what's in Redux store
-  // eslint-disable-next-line no-console
-  console.log('[OutlookLayers] Redux store outlooks:', {
-    tornado: outlooks.tornado.size,
-    wind: outlooks.wind.size,
-    hail: outlooks.hail.size,
-    categorical: outlooks.categorical.size,
-    activeOutlookType
-  });
-  
-  // eslint-disable-next-line no-console
-  console.log('[OutlookLayers] All features:', outlooks);
-
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, getFeatureStyle, activeOutlookType);
 
   // eslint-disable-next-line no-console
