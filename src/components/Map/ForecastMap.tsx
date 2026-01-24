@@ -16,6 +16,7 @@ import { RootState } from '../../store';
 import { addFeature, setMapView, removeFeature } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { colorMappings } from '../../utils/outlookUtils';
+import { createTooltipContent } from '../../utils/domUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
@@ -267,8 +268,7 @@ const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: Outlo
 
   const handleMouseOver = (e: L.LeafletEvent) => {
     const layer = e.target as L.Layer;
-    const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
-    const tooltipContent = `<div>${outlookName} Outlook<br/>Risk Level: ${probability}${probability.includes('#') ? ' (Significant)' : ''}<br/>Click to delete</div>`;
+    const tooltipContent = createTooltipContent(outlookType, probability);
 
     if ('bindTooltip' in layer && typeof layer.bindTooltip === 'function') {
       layer.bindTooltip(tooltipContent, {
