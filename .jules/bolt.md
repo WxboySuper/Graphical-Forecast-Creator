@@ -25,3 +25,6 @@
 ## 2024-05-23 - Jest Mock Verification
 **Learning:** When testing for 'no re-renders', always verify that the component *did* render initially (render count > 0) to avoid false positives where the component wasn't rendered at all.
 **Action:** Add `expect(count).toBeGreaterThan(0)` before the action that triggers the potential re-render.
+## 2024-05-23 - Component Ordering
+**Learning:** React components using helper functions must have those helpers defined *before* the component definition in the file to avoid 'used before defined' linter warnings, even if function hoisting allows it at runtime.
+**Action:** Move all helper functions and sub-components to the top of the file, above the main exported component.

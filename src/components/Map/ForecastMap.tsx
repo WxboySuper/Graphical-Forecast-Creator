@@ -48,6 +48,74 @@ type PMMap = L.Map & {
   };
 };
 
+// Strongly-typed shapes for outlooks and feature style objects
+type OutlooksMap = Record<OutlookType, Map<string, GeoJSON.Feature[]>>;
+type FeatureStyle = L.PathOptions & {
+  className?: string;
+  zIndex?: number;
+  fillColor?: string;
+  fillOpacity?: number;
+};
+
+// Geoman helpers: add controls and options, and factories for event handlers
+function addGeomanControls(pm: PMMap['pm']) {
+  pm.addControls?.({
+    position: 'topright',
+    drawMarker: false,
+    drawCircleMarker: false,
+    drawPolyline: false,
+    drawCircle: false,
+    drawText: false,
+    editMode: false,
+    dragMode: false,
+    rotateMode: false,
+    removalMode: false,
+    cutPolygon: true,
+    drawPolygon: true,
+    drawRectangle: true,
+  });
+}
+
+function setGeomanGlobalOptions(pm: PMMap['pm']) {
+  pm.setGlobalOptions?.({
+    pathOptions: {
+      color: '#97009c',
+      fillColor: '#97009c',
+      fillOpacity: 0.6,
+      weight: 2,
+    },
+    snappable: true,
+    snapDistance: 20,
+    allowSelfIntersection: false,
+  });
+}
+
+function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
+  return (e: L.LeafletEvent & { shape?: string; layer?: L.Layer }) => {
+    const isPolygonShape = e.shape === 'Polygon' || e.shape === 'Rectangle';
+      if (isPolygonShape && e.layer) {
+      onPolygonCreated(e.layer);
+
+      // Aggressively remove the temp layer
+      try {
+        map.removeLayer(e.layer);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[Geoman] Failed to remove temp layer:', err);
+      }
+    }
+  };
+}
+
+function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
+  return (e: L.LeafletEvent & { layer?: L.Layer }) => {
+    if (e.layer) {
+      onPolygonCreated(e.layer);
+      map.removeLayer(e.layer);
+    }
+  };
+}
+
 // Helper component to sync map with Redux state, store map reference, and initialize Geoman
 const MapController: React.FC<{
   setMapInstance: (map: L.Map) => void;
@@ -111,7 +179,6 @@ const MapController: React.FC<{
 };
 
 // Component to render the outlook polygons
-// NOTE: `OutlookLayers` is declared after helpers to avoid "used before defined" analyzer warnings.
 
 // Top-level helpers extracted to reduce component size and complexity
 const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
@@ -137,15 +204,6 @@ const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, Geo
     const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, ''));
     return getPercentValue(probA) - getPercentValue(probB);
   });
-};
-
-// Strongly-typed shapes for outlooks and feature style objects
-type OutlooksMap = Record<OutlookType, Map<string, GeoJSON.Feature[]>>;
-type FeatureStyle = L.PathOptions & {
-  className?: string;
-  zIndex?: number;
-  fillColor?: string;
-  fillOpacity?: number;
 };
 
 const RISK_ORDER: Record<string, number> = {
@@ -195,65 +253,6 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
     className: significant ? 'significant-threat-pattern' : undefined
   };
 };
-
-// Geoman helpers: add controls and options, and factories for event handlers
-function addGeomanControls(pm: PMMap['pm']) {
-  pm.addControls?.({
-    position: 'topright',
-    drawMarker: false,
-    drawCircleMarker: false,
-    drawPolyline: false,
-    drawCircle: false,
-    drawText: false,
-    editMode: false,
-    dragMode: false,
-    rotateMode: false,
-    removalMode: false,
-    cutPolygon: true,
-    drawPolygon: true,
-    drawRectangle: true,
-  });
-}
-
-function setGeomanGlobalOptions(pm: PMMap['pm']) {
-  pm.setGlobalOptions?.({
-    pathOptions: {
-      color: '#97009c',
-      fillColor: '#97009c',
-      fillOpacity: 0.6,
-      weight: 2,
-    },
-    snappable: true,
-    snapDistance: 20,
-    allowSelfIntersection: false,
-  });
-}
-
-function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
-  return (e: L.LeafletEvent & { shape?: string; layer?: L.Layer }) => {
-    const isPolygonShape = e.shape === 'Polygon' || e.shape === 'Rectangle';
-      if (isPolygonShape && e.layer) {
-      onPolygonCreated(e.layer);
-      
-      // Aggressively remove the temp layer
-      try {
-        map.removeLayer(e.layer);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('[Geoman] Failed to remove temp layer:', err);
-      }
-    }
-  };
-}
-
-function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
-  return (e: L.LeafletEvent & { layer?: L.Layer }) => {
-    if (e.layer) {
-      onPolygonCreated(e.layer);
-      map.removeLayer(e.layer);
-    }
-  };
-}
 
 const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: OutlookType, probability: string, featureId: string) => {
   const handleClick = () => {
