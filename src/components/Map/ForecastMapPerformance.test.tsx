@@ -34,7 +34,7 @@ jest.mock('leaflet', () => {
         getZoom() { return 0; }
     },
     LeafletEvent: class {
-        // skipcq: JS-0019
+        // skipcq: JS-0323
         target: any;
         // skipcq: JS-0323
         constructor() { this.target = {}; }

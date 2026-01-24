@@ -19,3 +19,6 @@
 - `JS-0359`: Use this code to suppress strict mode violations for `require` statements inside `jest.mock` factories. `JS-C1003` is incorrect/deprecated for this specific linter rule.
 - `JS-0019`: Use this code to suppress warnings for usage of the `any` type.
 **Action:** Always verify the exact DeepSource code (e.g., from the dashboard or error message) before applying suppressions.
+## 2024-05-23 - DeepSource Any Suppression
+**Learning:** The correct suppression code for 'unexpected any' (`JS-0323`) differs from standard or expected codes. Always verify against specific linter output.
+**Action:** Use `// skipcq: JS-0323` for suppressing usages of the `any` type when explicitly flagged.
