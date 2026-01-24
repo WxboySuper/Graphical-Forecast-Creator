@@ -12,7 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
  */
 const useAutoCategorical = () => {
   const dispatch = useDispatch();
-  const { outlooks, drawingState } = useSelector((state: RootState) => state.forecast);
+  const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
+  const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const processingRef = useRef(false);
   const lastProcessedRef = useRef<string>('');
 
