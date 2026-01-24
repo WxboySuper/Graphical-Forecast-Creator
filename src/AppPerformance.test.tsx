@@ -11,7 +11,7 @@ import { AppContent } from './App';
 const mockForecastMap = jest.fn();
 
 jest.mock('./components/Map/ForecastMap', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // skipcq: JS-C1003
   const React = require('react');
   return React.forwardRef((props: Record<string, unknown>, _ref: unknown) => {
     mockForecastMap(props);

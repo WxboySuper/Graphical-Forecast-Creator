@@ -6,6 +6,12 @@ import { configureStore, EnhancedStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView, setActiveProbability } from '../../store/forecastSlice';
 import { GeoJSON } from 'leaflet';
 
+// Import component AFTER mocks
+import ForecastMap from './ForecastMap';
+// Use import for types
+import { FeatureGroup } from 'react-leaflet';
+import Legend from './Legend';
+
 // Mocks must be defined before imports
 jest.mock('leaflet', () => {
   return {
@@ -16,9 +22,9 @@ jest.mock('leaflet', () => {
       }
     },
     Map: class {
-        on() {}
-        off() {}
-        removeLayer() {}
+        on() { /* mock */ }
+        off() { /* mock */ }
+        removeLayer() { /* mock */ }
         getCenter() { return { lat: 0, lng: 0 }; }
         getZoom() { return 0; }
     },
@@ -32,6 +38,7 @@ jest.mock('leaflet/dist/leaflet.css', () => ({}));
 
 // Mock Legend
 jest.mock('./Legend', () => {
+    // skipcq: JS-C1003
     const React = require('react');
     return {
         __esModule: true,
@@ -52,11 +59,12 @@ const mockMapInstance = {
 };
 
 jest.mock('react-leaflet', () => {
+  // skipcq: JS-C1003
   const React = require('react');
   return {
-    MapContainer: ({ children }: any) => <div data-testid="map-container">{children}</div>,
+    MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="map-container">{children}</div>,
     TileLayer: () => <div data-testid="tile-layer">TileLayer</div>,
-    FeatureGroup: jest.fn(({ children }: any) => <div data-testid="feature-group">{children}</div>),
+    FeatureGroup: jest.fn(({ children }: { children: React.ReactNode }) => <div data-testid="feature-group">{children}</div>),
     GeoJSON: jest.fn(() => <div data-testid="geojson">GeoJSON</div>),
     useMap: () => mockMapInstance,
   };
@@ -67,14 +75,12 @@ jest.mock('uuid', () => ({
   v4: () => 'test-uuid'
 }));
 
-// Import component AFTER mocks
-import ForecastMap from './ForecastMap';
-
 describe('ForecastMap Performance', () => {
   let store: EnhancedStore;
-  // Get mocks
-  const { FeatureGroup } = require('react-leaflet');
-  const Legend = require('./Legend').default;
+
+  // Cast mocks to Jest mock types
+  const MockFeatureGroup = FeatureGroup as unknown as jest.Mock;
+  const MockLegend = Legend as unknown as jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -115,7 +121,7 @@ describe('ForecastMap Performance', () => {
       </Provider>
     );
 
-    const initialRenderCount = FeatureGroup.mock.calls.length;
+    const initialRenderCount = MockFeatureGroup.mock.calls.length;
 
     // NOTE: If initialRenderCount > 1, it might mean we still have some re-renders on mount,
     // but as long as it stabilizes, we are good.
@@ -125,7 +131,7 @@ describe('ForecastMap Performance', () => {
       store.dispatch(setMapView({ center: [40, -100], zoom: 5 }));
     });
 
-    const afterMapMoveCount = FeatureGroup.mock.calls.length;
+    const afterMapMoveCount = MockFeatureGroup.mock.calls.length;
 
     // Expect failure currently
     expect(afterMapMoveCount).toBe(initialRenderCount);
@@ -138,13 +144,13 @@ describe('ForecastMap Performance', () => {
         </Provider>
       );
 
-      const initialLegendCount = Legend.mock.calls.length;
+      const initialLegendCount = MockLegend.mock.calls.length;
 
       act(() => {
           store.dispatch(setActiveProbability('10%'));
       });
 
-      const afterChangeCount = Legend.mock.calls.length;
+      const afterChangeCount = MockLegend.mock.calls.length;
 
       expect(afterChangeCount).toBe(initialLegendCount);
   });
