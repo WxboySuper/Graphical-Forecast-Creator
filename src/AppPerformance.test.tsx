@@ -11,6 +11,7 @@ import { AppContent } from './App';
 const mockForecastMap = jest.fn();
 
 jest.mock('./components/Map/ForecastMap', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const React = require('react');
   return React.forwardRef((props: Record<string, unknown>, _ref: unknown) => {
     mockForecastMap(props);
@@ -28,11 +29,11 @@ jest.mock('./components/Toast/Toast', () => ({
 // Mock leaflet
 jest.mock('leaflet', () => ({
   featureGroup: () => ({
-    getLayers: () => [],
-    getBounds: () => {},
+    getLayers: jest.fn(() => []),
+    getBounds: jest.fn(),
   }),
   geoJSON: () => ({
-    addTo: () => {},
+    addTo: jest.fn(),
   }),
   Map: class {},
 }));

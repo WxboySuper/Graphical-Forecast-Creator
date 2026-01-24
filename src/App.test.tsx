@@ -3,6 +3,7 @@ import App from './App';
 
 // Mock ForecastMap to avoid Leaflet/Geoman issues
 jest.mock('./components/Map/ForecastMap', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const React = require('react');
   return React.forwardRef(() => <div>ForecastMap Mock</div>);
 });
