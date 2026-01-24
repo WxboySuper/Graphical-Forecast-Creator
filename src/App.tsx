@@ -275,11 +275,13 @@ const EmergencyModeMessage = () => (
 );
 
 // App content component to access hooks
-const AppContent = () => {
+export const AppContent = () => {
   const dispatch = useDispatch();
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
-  const { outlooks, isSaved, emergencyMode } = useSelector((state: RootState) => state.forecast);
-  const { drawingState } = useSelector((state: RootState) => state.forecast);
+  const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
+  const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const emergencyMode = useSelector((state: RootState) => state.forecast.emergencyMode);
+  const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }>>([]);

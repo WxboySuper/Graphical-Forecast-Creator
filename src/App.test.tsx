@@ -1,8 +1,20 @@
 import { render, screen } from '@testing-library/react';
+
+// Mock ForecastMap to avoid Leaflet/Geoman issues
+jest.mock('./components/Map/ForecastMap', () => {
+  const React = require('react');
+  return React.forwardRef(() => <div>ForecastMap Mock</div>);
+});
+
+// Mock other components if necessary (good practice to isolate App testing)
+jest.mock('./components/OutlookPanel/OutlookPanel', () => () => <div>OutlookPanel Mock</div>);
+jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
+jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
+
 import App from './App';
 
-test('renders learn react link', () => {
+test('renders Graphical Forecast Creator title', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  const titleElement = screen.getByText(/Graphical Forecast Creator/i);
+  expect(titleElement).toBeInTheDocument();
 });
