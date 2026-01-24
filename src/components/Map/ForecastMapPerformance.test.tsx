@@ -133,6 +133,9 @@ describe('ForecastMap Performance', () => {
 
     const initialRenderCount = MockFeatureGroup.mock.calls.length;
 
+    // Verify initial render occurred
+    expect(initialRenderCount).toBeGreaterThan(0);
+
     // NOTE: If initialRenderCount > 1, it might mean we still have some re-renders on mount,
     // but as long as it stabilizes, we are good.
     // 1 render expected.
@@ -143,7 +146,7 @@ describe('ForecastMap Performance', () => {
 
     const afterMapMoveCount = MockFeatureGroup.mock.calls.length;
 
-    // Expect failure currently
+    // Assert no re-renders occurred
     expect(afterMapMoveCount).toBe(initialRenderCount);
   });
 

@@ -22,3 +22,6 @@
 ## 2024-05-23 - DeepSource Any Suppression
 **Learning:** The correct suppression code for 'unexpected any' (`JS-0323`) differs from standard or expected codes. Always verify against specific linter output.
 **Action:** Use `// skipcq: JS-0323` for suppressing usages of the `any` type when explicitly flagged.
+## 2024-05-23 - Jest Mock Verification
+**Learning:** When testing for 'no re-renders', always verify that the component *did* render initially (render count > 0) to avoid false positives where the component wasn't rendered at all.
+**Action:** Add `expect(count).toBeGreaterThan(0)` before the action that triggers the potential re-render.
