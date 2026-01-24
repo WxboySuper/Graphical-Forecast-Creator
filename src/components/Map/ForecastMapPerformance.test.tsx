@@ -34,6 +34,7 @@ jest.mock('leaflet', () => {
         getZoom() { return 0; }
     },
     LeafletEvent: class {
+        // skipcq: JS-0019
         target: any;
         // skipcq: JS-0323
         constructor() { this.target = {}; }
@@ -47,7 +48,7 @@ jest.mock('leaflet/dist/leaflet.css', () => ({}));
 
 // Mock Legend
 jest.mock('./Legend', () => {
-    // skipcq: JS-C1003
+    // skipcq: JS-0359
     const React = require('react');
     return {
         __esModule: true,
@@ -68,7 +69,7 @@ const mockMapInstance = {
 };
 
 jest.mock('react-leaflet', () => {
-  // skipcq: JS-C1003
+  // skipcq: JS-0359
   const React = require('react');
   return {
     MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="map-container">{children}</div>,

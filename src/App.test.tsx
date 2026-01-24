@@ -3,7 +3,7 @@ import App from './App';
 
 // Mock ForecastMap to avoid Leaflet/Geoman issues
 jest.mock('./components/Map/ForecastMap', () => {
-  // skipcq: JS-C1003
+  // skipcq: JS-0359
   const React = require('react');
   return React.forwardRef(() => <div>ForecastMap Mock</div>);
 });

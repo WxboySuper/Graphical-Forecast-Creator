@@ -14,3 +14,8 @@
 ## 2024-05-23 - Linting Mock Classes
 **Learning:** Suppressing linter warnings for empty mock classes or methods requires specific codes (e.g., `JS-0105` for missing `this`, `JS-0327` for empty class). Returning `this` in mock methods is a cleaner fix than suppression for fluent interfaces.
 **Action:** Always prefer implementing minimal mock logic (like returning `this`) over suppression when possible.
+## 2024-05-23 - DeepSource Correct Suppression Codes
+**Learning:**
+- `JS-0359`: Use this code to suppress strict mode violations for `require` statements inside `jest.mock` factories. `JS-C1003` is incorrect/deprecated for this specific linter rule.
+- `JS-0019`: Use this code to suppress warnings for usage of the `any` type.
+**Action:** Always verify the exact DeepSource code (e.g., from the dashboard or error message) before applying suppressions.
