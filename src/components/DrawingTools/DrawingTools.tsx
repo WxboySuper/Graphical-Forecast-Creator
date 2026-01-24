@@ -1,5 +1,5 @@
 // skipcq: JS-W1028
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetForecasts } from '../../store/forecastSlice';
 import { RootState } from '../../store';
@@ -9,6 +9,7 @@ import { useExportMap } from './useExportMap';
 import DrawingToolsHelp from './DrawingToolsHelp';
 import DrawingToolsToolbar from './DrawingToolsToolbar';
 import ExportModal from './ExportModal';
+import ConfirmationModal from './ConfirmationModal';
 
 interface DrawingToolsProps {
   onSave: () => void;
@@ -26,6 +27,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
   const isExportDisabled = !featureFlags.exportMapEnabled;
   const isSaveLoadDisabled = !featureFlags.saveLoadEnabled;
 
+  // Reset confirmation state
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+
   const {
     isExporting,
     isModalOpen,
@@ -39,12 +43,19 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
     addToast
   });
 
-  const handleReset = useCallback(() => {
-    // skipcq: JS-0052
-    if (window.confirm('Are you sure you want to reset all forecasts? This action cannot be undone.')) {
-      dispatch(resetForecasts());
-    }
-  }, [dispatch]);
+  const handleResetClick = useCallback(() => {
+    setIsResetModalOpen(true);
+  }, []);
+
+  const handleConfirmReset = useCallback(() => {
+    dispatch(resetForecasts());
+    setIsResetModalOpen(false);
+    addToast('Forecasts reset successfully.', 'info');
+  }, [dispatch, addToast]);
+
+  const handleCancelReset = useCallback(() => {
+    setIsResetModalOpen(false);
+  }, []);
 
   const exportTooltip = useMemo(() => isExportDisabled ? (
     <>
@@ -59,7 +70,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
         onSave={onSave}
         onLoad={onLoad}
         handleExport={initiateExport}
-        handleReset={handleReset}
+        handleReset={handleResetClick}
         isSaveLoadDisabled={isSaveLoadDisabled}
         isSaved={isSaved}
         isExportDisabled={isExportDisabled}
@@ -77,6 +88,15 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
         isOpen={isModalOpen}
         onConfirm={confirmExport}
         onCancel={cancelExport}
+      />
+
+      <ConfirmationModal
+        isOpen={isResetModalOpen}
+        title="Reset All Forecasts?"
+        message="Are you sure you want to reset all forecasts? This action cannot be undone."
+        confirmLabel="Reset"
+        onConfirm={handleConfirmReset}
+        onCancel={handleCancelReset}
       />
       
       {isExporting && (
