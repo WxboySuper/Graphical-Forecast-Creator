@@ -6,8 +6,10 @@ import { colorMappings, getCategoricalRiskDisplayName } from '../../utils/outloo
 import { CategoricalRiskLevel, TornadoProbability, WindHailProbability } from '../../types/outlooks';
 import './Legend.css';
 
-const Legend: React.FC = () => {
-  const { activeOutlookType } = useSelector((state: RootState) => state.forecast.drawingState);
+// Optimized: Memoized to prevent re-renders when parent re-renders
+const Legend: React.FC = React.memo(() => {
+  // Optimized: Select only activeOutlookType to avoid re-rendering on other drawing state changes (like activeProbability)
+  const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
   const renderCategoricalLegend = () => (
     <>
@@ -73,6 +75,6 @@ const Legend: React.FC = () => {
       {activeOutlookType === 'categorical' ? renderCategoricalLegend() : renderProbabilisticLegend()}
     </div>
   );
-};
+});
 
 export default Legend;

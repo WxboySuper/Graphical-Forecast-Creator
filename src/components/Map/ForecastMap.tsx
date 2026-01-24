@@ -379,20 +379,22 @@ const renderOutlookFeatures = (
 };
 
 // Now declare OutlookLayers (after helpers)
-const OutlookLayers: React.FC = () => {
+// Optimized: Memoized to prevent re-renders when map view or unrelated state changes
+const OutlookLayers: React.FC = React.memo(() => {
   const dispatch = useDispatch();
-  const { outlooks, drawingState } = useSelector((state: RootState) => state.forecast);
-  const { activeOutlookType } = drawingState;
+  const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
+  const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, getFeatureStyle, activeOutlookType);
 
   if (elements.length === 0) return null;
   if (elements.length === 1) return elements[0];
   return React.createElement(React.Fragment, null, ...elements);
-};
+});
 
 // Extract deeper JSX children into a small component to reduce nesting
-const MapInner: React.FC = () => (
+// Optimized: Memoized to prevent re-renders when parent re-renders
+const MapInner: React.FC = React.memo(() => (
   <>
     <TileLayer
       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -411,7 +413,7 @@ const MapInner: React.FC = () => (
 
     <Legend />
   </>
-);
+));
 
 // Geoman layer interface
 interface GeomanLayer extends L.Layer {
@@ -430,7 +432,8 @@ type MapWithPM = L.Map & {
 
 const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
-  const { drawingState } = useSelector((state: RootState) => state.forecast);
+  // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
+  const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
   
   // Store drawingState in a ref so our callback always has latest values
