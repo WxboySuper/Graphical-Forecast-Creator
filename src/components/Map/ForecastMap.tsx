@@ -391,6 +391,8 @@ const OutlookLayers: React.FC = React.memo(() => {
   return React.createElement(React.Fragment, null, ...elements);
 });
 
+OutlookLayers.displayName = 'OutlookLayers';
+
 // Extract deeper JSX children into a small component to reduce nesting
 // Optimized: Memoized to prevent re-renders when parent re-renders
 const MapInner: React.FC = React.memo(() => (
@@ -413,6 +415,8 @@ const MapInner: React.FC = React.memo(() => (
     <Legend />
   </>
 ));
+
+MapInner.displayName = 'MapInner';
 
 // Geoman layer interface
 interface GeomanLayer extends L.Layer {

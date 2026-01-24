@@ -28,3 +28,6 @@
 ## 2024-05-23 - Component Ordering
 **Learning:** React components using helper functions must have those helpers defined *before* the component definition in the file to avoid 'used before defined' linter warnings, even if function hoisting allows it at runtime.
 **Action:** Move all helper functions and sub-components to the top of the file, above the main exported component.
+## 2024-05-23 - React Display Name
+**Learning:** Components defined via HOCs like `React.memo` or `forwardRef` lose their implicit name. Always manually set `Component.displayName = 'Component'` to ensure they are identifiable in DevTools and logs.
+**Action:** Add `displayName` immediately after component definition.

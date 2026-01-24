@@ -77,4 +77,6 @@ const Legend: React.FC = React.memo(() => {
   );
 });
 
+Legend.displayName = 'Legend';
+
 export default Legend;
