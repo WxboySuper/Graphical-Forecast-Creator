@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
 import { OutlookData } from '../../types/outlooks';
 import { ForecastMapHandle } from '../Map/ForecastMap';
-import React from 'react';
+import type React from 'react';
 
 interface UseExportMapParams {
   mapRef: React.RefObject<ForecastMapHandle | null>;
