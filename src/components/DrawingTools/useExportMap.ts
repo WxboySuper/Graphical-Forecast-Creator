@@ -13,8 +13,9 @@ interface UseExportMapParams {
 
 export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: UseExportMapParams) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleExport = useCallback(async () => {
+  const initiateExport = useCallback(() => {
     // Don't proceed if export is disabled
     if (isExportDisabled) {
       addToast('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.', 'warning');
@@ -32,12 +33,19 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
       return;
     }
 
+    // Open modal to get title
+    setIsModalOpen(true);
+  }, [addToast, isExportDisabled, mapRef]);
+
+  const confirmExport = useCallback(async (title: string) => {
+    setIsModalOpen(false); // Close modal
+
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    if (!map) return;
+
     try {
       setIsExporting(true);
-
-      // Show export options dialog
-      // skipcq: JS-0052
-      const title = prompt('Enter a title for your forecast image (optional):');
 
       // Generate the image with Redux store data
       const dataUrl = await exportMapAsImage(map, outlooks, title || undefined);
@@ -53,7 +61,11 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
     } finally {
       setIsExporting(false);
     }
-  }, [addToast, isExportDisabled, mapRef, outlooks]);
+  }, [addToast, mapRef, outlooks]);
 
-  return { isExporting, handleExport };
+  const cancelExport = useCallback(() => {
+    setIsModalOpen(false);
+  }, []);
+
+  return { isExporting, isModalOpen, initiateExport, confirmExport, cancelExport };
 };

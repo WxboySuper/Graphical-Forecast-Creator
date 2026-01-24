@@ -8,6 +8,7 @@ import './DrawingTools.css';
 import { useExportMap } from './useExportMap';
 import DrawingToolsHelp from './DrawingToolsHelp';
 import DrawingToolsToolbar from './DrawingToolsToolbar';
+import ExportModal from './ExportModal';
 
 interface DrawingToolsProps {
   onSave: () => void;
@@ -25,7 +26,13 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
   const isExportDisabled = !featureFlags.exportMapEnabled;
   const isSaveLoadDisabled = !featureFlags.saveLoadEnabled;
 
-  const { isExporting, handleExport } = useExportMap({
+  const {
+    isExporting,
+    isModalOpen,
+    initiateExport,
+    confirmExport,
+    cancelExport
+  } = useExportMap({
     mapRef,
     outlooks,
     isExportDisabled,
@@ -51,7 +58,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
       <DrawingToolsToolbar
         onSave={onSave}
         onLoad={onLoad}
-        handleExport={handleExport}
+        handleExport={initiateExport}
         handleReset={handleReset}
         isSaveLoadDisabled={isSaveLoadDisabled}
         isSaved={isSaved}
@@ -64,6 +71,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
         isExportDisabled={isExportDisabled}
         isSaveLoadDisabled={isSaveLoadDisabled}
         isSaved={isSaved}
+      />
+
+      <ExportModal
+        isOpen={isModalOpen}
+        onConfirm={confirmExport}
+        onCancel={cancelExport}
       />
       
       {isExporting && (

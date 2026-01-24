@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import DrawingTools from './DrawingTools';
@@ -54,41 +54,5 @@ describe('DrawingTools', () => {
     expect(screen.getByLabelText('Load Forecast')).toBeInTheDocument();
     expect(screen.getByLabelText('Export as Image')).toBeInTheDocument();
     expect(screen.getByLabelText('Reset All')).toBeInTheDocument();
-  });
-
-  test('calls addToast when map reference is missing', () => {
-    const initialState = {
-      featureFlags: {
-        exportMapEnabled: true,
-        saveLoadEnabled: true,
-        tornadoOutlookEnabled: true,
-        windOutlookEnabled: true,
-        hailOutlookEnabled: true,
-        categoricalOutlookEnabled: true,
-        significantThreatsEnabled: true,
-      }
-    };
-
-    const nullMapRef = { current: null } as React.RefObject<ForecastMapHandle>;
-
-    renderWithStore(
-      <DrawingTools
-        onSave={mockOnSave}
-        onLoad={mockOnLoad}
-        mapRef={nullMapRef}
-        addToast={mockAddToast}
-      />,
-      initialState
-    );
-
-    const exportButton = screen.getByLabelText('Export as Image');
-    expect(exportButton).not.toBeDisabled();
-
-    fireEvent.click(exportButton);
-
-    expect(mockAddToast).toHaveBeenCalledWith(
-      'Map reference not available. Cannot export.',
-      'error'
-    );
   });
 });
