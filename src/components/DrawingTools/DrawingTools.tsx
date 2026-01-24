@@ -68,7 +68,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
     }
   }, [dispatch]);
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     // Don't proceed if export is disabled
     if (isExportDisabled) {
       addToast('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.', 'warning');
@@ -107,7 +107,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
     } finally {
       setIsExporting(false);
     }
-  };
+  }, [addToast, isExportDisabled, mapRef, outlooks]);
 
   const exportTooltip = useMemo(() => isExportDisabled ? (
     <>
