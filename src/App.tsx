@@ -408,7 +408,7 @@ export const AppContent = () => {
           <EmergencyModeMessage />
         ) : (
           <>
-            <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} />
+            <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} addToast={addToast} />
             <OutlookPanel />
             <ForecastMap ref={mapRef} />
           </>

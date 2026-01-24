@@ -11,9 +11,10 @@ interface DrawingToolsProps {
   onSave: () => void;
   onLoad: () => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
+  addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
-const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) => {
+const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, addToast }) => {
   const dispatch = useDispatch();
   const { isSaved, outlooks } = useSelector((state: RootState) => state.forecast);
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
@@ -33,21 +34,18 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
   const handleExport = async () => {
     // Don't proceed if export is disabled
     if (isExportDisabled) {
-      // skipcq: JS-0052
-      alert('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.');
+      addToast('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.', 'warning');
       return;
     }
 
     if (!mapRef.current) {
-      // skipcq: JS-0052
-      alert('Map reference not available. Cannot export.');
+      addToast('Map reference not available. Cannot export.', 'error');
       return;
     }
 
     const map = mapRef.current.getMap();
     if (!map) {
-      // skipcq: JS-0052
-      alert('Map not fully loaded. Please try again.');
+      addToast('Map not fully loaded. Please try again.', 'error');
       return;
     }
 
@@ -64,11 +62,11 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
       // Download the image
       const filename = `forecast-outlook-${getFormattedDate()}.png`;
       downloadDataUrl(dataUrl, filename);
+      addToast('Forecast exported successfully!', 'success');
       
     } catch (error) {
       console.error('Error exporting map:', error);
-      // skipcq: JS-0052
-      alert('Failed to export the map. Please try again.');
+      addToast('Failed to export the map. Please try again.', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -83,8 +81,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
             className={`tool-button ${isSaveLoadDisabled ? 'button-disabled' : 'save-button'}`}
             onClick={isSaveLoadDisabled ? undefined : onSave}
             disabled={isSaveLoadDisabled || isSaved}
+            aria-label="Save Forecast"
           >
-            {'💾 Save Forecast'}
+            <span role="img" aria-hidden="true">💾</span> Save Forecast
           </button>
           {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
           {isSaveLoadDisabled && (
@@ -99,8 +98,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
             className={`tool-button ${isSaveLoadDisabled ? 'button-disabled' : 'load-button'}`}
             onClick={isSaveLoadDisabled ? undefined : onLoad}
             disabled={isSaveLoadDisabled}
+            aria-label="Load Forecast"
           >
-            {'📂 Load Forecast'}
+            <span role="img" aria-hidden="true">📂</span> Load Forecast
           </button>
           {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
           {isSaveLoadDisabled && (
@@ -115,8 +115,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
             className={`tool-button ${isExportDisabled ? 'export-button-disabled' : 'export-button'}`}
             onClick={isExportDisabled ? undefined : handleExport}
             disabled={isExporting || isExportDisabled}
+            aria-label={isExporting ? 'Exporting...' : 'Export as Image'}
           >
-            {isExporting ? '📤 Exporting...' : '📤 Export as Image'}
+            <span role="img" aria-hidden="true">📤</span> {isExporting ? 'Exporting...' : 'Export as Image'}
           </button>
           {isExportDisabled && <span className="maintenance-badge">!</span>}
           {isExportDisabled && (
@@ -129,8 +130,9 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef }) =
         <button 
           className="tool-button reset-button" 
           onClick={handleReset}
+          aria-label="Reset All"
         >
-          {'🗑️ Reset All'}
+          <span role="img" aria-hidden="true">🗑️</span> Reset All
         </button>
       </div>
       <div className="tools-help">
