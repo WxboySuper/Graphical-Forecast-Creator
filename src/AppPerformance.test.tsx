@@ -11,7 +11,7 @@ import { AppContent } from './App';
 const mockForecastMap = jest.fn();
 
 jest.mock('./components/Map/ForecastMap', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // skipcq: JS-0359
   const React = require('react');
   return React.forwardRef((props: Record<string, unknown>, _ref: unknown) => {
     mockForecastMap(props);
@@ -36,6 +36,7 @@ jest.mock('leaflet', () => ({
     addTo: jest.fn(),
   }),
   Map: class {
+    // skipcq: JS-0323
     removeLayer() {
       // mock
     }
