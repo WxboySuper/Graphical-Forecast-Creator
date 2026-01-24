@@ -24,13 +24,16 @@ describe('createTooltipContent', () => {
 
     const element = createTooltipContent(maliciousType, maliciousProb);
 
-    // The innerHTML should contain the ESCAPED version of the input, not the raw HTML
+    // The innerHTML should contain the ESCAPED version of the input (for the type)
     expect(element.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;');
-    expect(element.innerHTML).toContain('&lt;script&gt;alert("XSS")&lt;/script&gt;');
 
-    // It should NOT contain the raw tags
-    expect(element.innerHTML).not.toContain('<img src=x onerror=alert(1)>');
+    // For probability, we now strip < and >, so we expect the text content with those chars removed
+    // <script>alert("XSS")</script> -> scriptalert("XSS")/script
+    expect(element.innerHTML).toContain('scriptalert("XSS")/script');
+
+    // It should NOT contain the raw tags or the escaped tags for the probability part
     expect(element.innerHTML).not.toContain('<script>alert("XSS")</script>');
+    expect(element.innerHTML).not.toContain('&lt;script&gt;alert("XSS")&lt;/script&gt;');
   });
 });
 

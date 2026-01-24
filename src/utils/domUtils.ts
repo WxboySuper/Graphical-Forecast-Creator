@@ -18,7 +18,7 @@ export const createTooltipContent = (outlookType: string, probability: string): 
   // Create risk level text
   const safeProbability = probability.replace(/[<>]/g, '');
   const isSignificant = safeProbability.includes('#');
-  const riskText = `Risk Level: ${probability}${isSignificant ? ' (Significant)' : ''}`;
+  const riskText = `Risk Level: ${safeProbability}${isSignificant ? ' (Significant)' : ''}`;
   container.appendChild(document.createTextNode(riskText));
   container.appendChild(document.createElement('br'));
 
