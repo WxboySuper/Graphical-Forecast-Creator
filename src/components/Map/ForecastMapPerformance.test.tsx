@@ -22,20 +22,21 @@ jest.mock('leaflet', () => {
       }
     },
     Map: class {
-        // skipcq: JS-0323
-        on() { /* mock */ }
-        // skipcq: JS-0323
-        off() { /* mock */ }
-        // skipcq: JS-0323
-        removeLayer() { /* mock */ }
-        // skipcq: JS-0323
+        // skipcq: JS-0105
+        on() { return this; }
+        // skipcq: JS-0105
+        off() { return this; }
+        // skipcq: JS-0105
+        removeLayer() { return this; }
+        // skipcq: JS-0105
         getCenter() { return { lat: 0, lng: 0 }; }
-        // skipcq: JS-0323
+        // skipcq: JS-0105
         getZoom() { return 0; }
     },
     LeafletEvent: class {
+        target: any;
         // skipcq: JS-0323
-        constructor() { /* mock */ }
+        constructor() { this.target = {}; }
     },
   };
 });
@@ -50,7 +51,7 @@ jest.mock('./Legend', () => {
     const React = require('react');
     return {
         __esModule: true,
-        default: jest.fn(() => <div>Legend</div>)
+        default: jest.fn(() => React.createElement('div', null, 'Legend'))
     };
 });
 

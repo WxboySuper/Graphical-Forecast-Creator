@@ -11,3 +11,6 @@
 ## 2024-05-23 - Mock Class Linting
 **Learning:** Mock classes often trigger 'empty class' or 'method not using this' linter rules.
 **Action:** Use `// skipcq: JS-0323` (no this) and ensure classes have at least one constructor or member to satisfy `JS-0045`.
+## 2024-05-23 - Linting Mock Classes
+**Learning:** Suppressing linter warnings for empty mock classes or methods requires specific codes (e.g., `JS-0105` for missing `this`, `JS-0327` for empty class). Returning `this` in mock methods is a cleaner fix than suppression for fluent interfaces.
+**Action:** Always prefer implementing minimal mock logic (like returning `this`) over suppression when possible.
