@@ -1,48 +1,12 @@
 // skipcq: JS-W1028
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetForecasts } from '../../store/forecastSlice';
 import { RootState } from '../../store';
-import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import './DrawingTools.css';
-
-interface ToolButtonProps {
-  onClick?: () => void;
-  disabled: boolean;
-  className: string;
-  label: string;
-  icon: string;
-  maintenance?: boolean;
-  tooltipText?: React.ReactNode;
-}
-
-const ToolButton: React.FC<ToolButtonProps> = ({
-  onClick,
-  disabled,
-  className,
-  label,
-  icon,
-  maintenance,
-  tooltipText
-}) => (
-  <div className="tooltip">
-    <button
-      className={`tool-button ${className}`}
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      aria-label={label}
-    >
-      <span role="img" aria-hidden="true">{icon}</span> {label}
-    </button>
-    {maintenance && <span className="maintenance-badge">!</span>}
-    {tooltipText && (
-      <span className="tooltip-text">
-        {tooltipText}
-      </span>
-    )}
-  </div>
-);
+import ToolButton from './ToolButton';
+import { useExportMap } from './useExportMap';
 
 interface DrawingToolsProps {
   onSave: () => void;
@@ -55,11 +19,17 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
   const dispatch = useDispatch();
   const { isSaved, outlooks } = useSelector((state: RootState) => state.forecast);
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
-  const [isExporting, setIsExporting] = useState(false);
   
   // Use feature flags instead of hardcoded disabled state
   const isExportDisabled = !featureFlags.exportMapEnabled;
   const isSaveLoadDisabled = !featureFlags.saveLoadEnabled;
+
+  const { isExporting, handleExport } = useExportMap({
+    mapRef,
+    outlooks,
+    isExportDisabled,
+    addToast
+  });
 
   const handleReset = useCallback(() => {
     // skipcq: JS-0052
@@ -67,47 +37,6 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
       dispatch(resetForecasts());
     }
   }, [dispatch]);
-
-  const handleExport = useCallback(async () => {
-    // Don't proceed if export is disabled
-    if (isExportDisabled) {
-      addToast('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.', 'warning');
-      return;
-    }
-
-    if (!mapRef.current) {
-      addToast('Map reference not available. Cannot export.', 'error');
-      return;
-    }
-
-    const map = mapRef.current.getMap();
-    if (!map) {
-      addToast('Map not fully loaded. Please try again.', 'error');
-      return;
-    }
-
-    try {
-      setIsExporting(true);
-      
-      // Show export options dialog
-      // skipcq: JS-0052
-      const title = prompt('Enter a title for your forecast image (optional):');
-      
-      // Generate the image with Redux store data
-      const dataUrl = await exportMapAsImage(map, outlooks, title || undefined);
-      
-      // Download the image
-      const filename = `forecast-outlook-${getFormattedDate()}.png`;
-      downloadDataUrl(dataUrl, filename);
-      addToast('Forecast exported successfully!', 'success');
-      
-    } catch (error) {
-      console.error('Error exporting map:', error);
-      addToast('Failed to export the map. Please try again.', 'error');
-    } finally {
-      setIsExporting(false);
-    }
-  }, [addToast, isExportDisabled, mapRef, outlooks]);
 
   const exportTooltip = useMemo(() => isExportDisabled ? (
     <>
