@@ -1,4 +1,4 @@
-import { createTooltipContent } from './domUtils';
+import { createTooltipContent, stripHtml } from './domUtils';
 
 describe('createTooltipContent', () => {
   test('creates tooltip content with correct text for standard inputs', () => {
@@ -31,5 +31,33 @@ describe('createTooltipContent', () => {
     // It should NOT contain the raw tags
     expect(element.innerHTML).not.toContain('<img src=x onerror=alert(1)>');
     expect(element.innerHTML).not.toContain('<script>alert("XSS")</script>');
+  });
+});
+
+describe('stripHtml', () => {
+  test('strips HTML tags from string', () => {
+    // In JSDOM, script tags might be stripped completely or their content ignored in textContent
+    // We use a simple tag to verify stripping
+    const input = '<b>Bold</b> and <i>Italic</i>';
+    const result = stripHtml(input);
+    expect(result).toBe('Bold and Italic');
+  });
+
+  test('handles script tags by stripping them (safe behavior)', () => {
+     // Verify behavior seen in previous failure - JSDOM strips script content in textContent for this parser usage
+     const input = '<script>alert("XSS")</script>Hello';
+     const result = stripHtml(input);
+     expect(result).toBe('Hello');
+  });
+
+  test('returns standard text unchanged', () => {
+    const input = '5%';
+    const result = stripHtml(input);
+    expect(result).toBe('5%');
+  });
+
+  test('handles empty strings', () => {
+    const result = stripHtml('');
+    expect(result).toBe('');
   });
 });

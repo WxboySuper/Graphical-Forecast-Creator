@@ -16,7 +16,7 @@ import { RootState } from '../../store';
 import { addFeature, setMapView, removeFeature } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { colorMappings } from '../../utils/outlookUtils';
-import { createTooltipContent } from '../../utils/domUtils';
+import { createTooltipContent, stripHtml } from '../../utils/domUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
@@ -259,7 +259,8 @@ function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
 const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: OutlookType, probability: string, featureId: string) => {
   const handleClick = () => {
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${probability}${probability.includes('#') ? ' (Significant)' : ''}`;
+    const safeProbability = stripHtml(probability);
+    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${probability.includes('#') ? ' (Significant)' : ''}`;
     // eslint-disable-next-line no-restricted-globals, no-alert
     if (confirm(message)) {
       dispatch(removeFeature({ outlookType, probability, featureId }));

@@ -26,3 +26,14 @@ export const createTooltipContent = (outlookType: string, probability: string): 
 
   return container;
 };
+
+/**
+ * Strips HTML tags from a string to ensure it is safe for display in dialogs.
+ *
+ * @param html The input string potentially containing HTML
+ * @returns A string with HTML tags removed
+ */
+export const stripHtml = (html: string): string => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
+};
