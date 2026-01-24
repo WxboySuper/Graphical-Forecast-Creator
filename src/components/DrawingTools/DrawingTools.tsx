@@ -1,5 +1,5 @@
 // skipcq: JS-W1028
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resetForecasts } from '../../store/forecastSlice';
 import { RootState } from '../../store';
@@ -109,6 +109,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
     }
   };
 
+  const exportTooltip = useMemo(() => isExportDisabled ? (
+    <>
+      Export feature is temporarily unavailable due to an issue. See <a href="https://github.com/wxboysuper/graphical-forecast-creator/issues/32" target="_blank" rel="noopener noreferrer">GitHub issue #32</a> for more information.
+    </>
+  ) : null, [isExportDisabled]);
+
   return (
     <div className="drawing-tools">
       <h3>Drawing Tools</h3>
@@ -140,11 +146,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
           label={isExporting ? 'Exporting...' : 'Export as Image'}
           icon="📤"
           maintenance={isExportDisabled}
-          tooltipText={isExportDisabled ? (
-            <>
-              Export feature is temporarily unavailable due to an issue. See <a href="https://github.com/wxboysuper/graphical-forecast-creator/issues/32" target="_blank" rel="noopener noreferrer">GitHub issue #32</a> for more information.
-            </>
-          ) : null}
+          tooltipText={exportTooltip}
         />
         
         <button 
