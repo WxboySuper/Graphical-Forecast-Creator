@@ -35,7 +35,11 @@ jest.mock('leaflet', () => ({
   geoJSON: () => ({
     addTo: jest.fn(),
   }),
-  Map: class {},
+  Map: class {
+    removeLayer() {
+      // mock
+    }
+  },
 }));
 
 describe('AppContent Performance', () => {
