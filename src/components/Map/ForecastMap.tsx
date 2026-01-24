@@ -16,6 +16,7 @@ import { RootState } from '../../store';
 import { addFeature, setMapView, removeFeature } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { colorMappings } from '../../utils/outlookUtils';
+import { createTooltipContent, stripHtml } from '../../utils/domUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
@@ -258,7 +259,8 @@ function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
 const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: OutlookType, probability: string, featureId: string) => {
   const handleClick = () => {
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${probability}${probability.includes('#') ? ' (Significant)' : ''}`;
+    const safeProbability = stripHtml(probability);
+    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
     // eslint-disable-next-line no-restricted-globals, no-alert
     if (confirm(message)) {
       dispatch(removeFeature({ outlookType, probability, featureId }));
@@ -267,8 +269,7 @@ const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: Outlo
 
   const handleMouseOver = (e: L.LeafletEvent) => {
     const layer = e.target as L.Layer;
-    const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
-    const tooltipContent = `<div>${outlookName} Outlook<br/>Risk Level: ${probability}${probability.includes('#') ? ' (Significant)' : ''}<br/>Click to delete</div>`;
+    const tooltipContent = createTooltipContent(outlookType, probability);
 
     if ('bindTooltip' in layer && typeof layer.bindTooltip === 'function') {
       layer.bindTooltip(tooltipContent, {
@@ -350,6 +351,9 @@ const renderOutlookFeatures = (
   const handlerFactory = createFeatureHandlersFactory(dispatch);
 
   return Object.keys(outlooks).flatMap(outlookType => {
+    const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
+    if (!validOutlookTypes.includes(outlookType)) return [];
+
     const ot = outlookType as OutlookType;
     if (!shouldShowLayer(ot)) return [];
 
