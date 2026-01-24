@@ -7,6 +7,43 @@ import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import './DrawingTools.css';
 
+interface ToolButtonProps {
+  onClick?: () => void;
+  disabled: boolean;
+  className: string;
+  label: string;
+  icon: string;
+  maintenance?: boolean;
+  tooltipText?: React.ReactNode;
+}
+
+const ToolButton: React.FC<ToolButtonProps> = ({
+  onClick,
+  disabled,
+  className,
+  label,
+  icon,
+  maintenance,
+  tooltipText
+}) => (
+  <div className="tooltip">
+    <button
+      className={`tool-button ${className}`}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-label={label}
+    >
+      <span role="img" aria-hidden="true">{icon}</span> {label}
+    </button>
+    {maintenance && <span className="maintenance-badge">!</span>}
+    {tooltipText && (
+      <span className="tooltip-text">
+        {tooltipText}
+      </span>
+    )}
+  </div>
+);
+
 interface DrawingToolsProps {
   onSave: () => void;
   onLoad: () => void;
@@ -76,56 +113,39 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
     <div className="drawing-tools">
       <h3>Drawing Tools</h3>
       <div className="tools-container">
-        <div className="tooltip">
-          <button 
-            className={`tool-button ${isSaveLoadDisabled ? 'button-disabled' : 'save-button'}`}
-            onClick={isSaveLoadDisabled ? undefined : onSave}
-            disabled={isSaveLoadDisabled || isSaved}
-            aria-label="Save Forecast"
-          >
-            <span role="img" aria-hidden="true">💾</span> Save Forecast
-          </button>
-          {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
-          {isSaveLoadDisabled && (
-            <span className="tooltip-text">
-              Save feature is temporarily unavailable
-            </span>
-          )}
-        </div>
+        <ToolButton
+          className={isSaveLoadDisabled ? 'button-disabled' : 'save-button'}
+          onClick={onSave}
+          disabled={isSaveLoadDisabled || isSaved}
+          label="Save Forecast"
+          icon="💾"
+          maintenance={isSaveLoadDisabled}
+          tooltipText={isSaveLoadDisabled ? "Save feature is temporarily unavailable" : null}
+        />
         
-        <div className="tooltip">
-          <button 
-            className={`tool-button ${isSaveLoadDisabled ? 'button-disabled' : 'load-button'}`}
-            onClick={isSaveLoadDisabled ? undefined : onLoad}
-            disabled={isSaveLoadDisabled}
-            aria-label="Load Forecast"
-          >
-            <span role="img" aria-hidden="true">📂</span> Load Forecast
-          </button>
-          {isSaveLoadDisabled && <span className="maintenance-badge">!</span>}
-          {isSaveLoadDisabled && (
-            <span className="tooltip-text">
-              Load feature is temporarily unavailable
-            </span>
-          )}
-        </div>
+        <ToolButton
+          className={isSaveLoadDisabled ? 'button-disabled' : 'load-button'}
+          onClick={onLoad}
+          disabled={isSaveLoadDisabled}
+          label="Load Forecast"
+          icon="📂"
+          maintenance={isSaveLoadDisabled}
+          tooltipText={isSaveLoadDisabled ? "Load feature is temporarily unavailable" : null}
+        />
         
-        <div className="tooltip">
-          <button 
-            className={`tool-button ${isExportDisabled ? 'export-button-disabled' : 'export-button'}`}
-            onClick={isExportDisabled ? undefined : handleExport}
-            disabled={isExporting || isExportDisabled}
-            aria-label={isExporting ? 'Exporting...' : 'Export as Image'}
-          >
-            <span role="img" aria-hidden="true">📤</span> {isExporting ? 'Exporting...' : 'Export as Image'}
-          </button>
-          {isExportDisabled && <span className="maintenance-badge">!</span>}
-          {isExportDisabled && (
-            <span className="tooltip-text">
+        <ToolButton
+          className={isExportDisabled ? 'export-button-disabled' : 'export-button'}
+          onClick={handleExport}
+          disabled={isExporting || isExportDisabled}
+          label={isExporting ? 'Exporting...' : 'Export as Image'}
+          icon="📤"
+          maintenance={isExportDisabled}
+          tooltipText={isExportDisabled ? (
+            <>
               Export feature is temporarily unavailable due to an issue. See <a href="https://github.com/wxboysuper/graphical-forecast-creator/issues/32" target="_blank" rel="noopener noreferrer">GitHub issue #32</a> for more information.
-            </span>
-          )}
-        </div>
+            </>
+          ) : null}
+        />
         
         <button 
           className="tool-button reset-button" 
