@@ -7,6 +7,7 @@ import { ForecastMapHandle } from '../Map/ForecastMap';
 import './DrawingTools.css';
 import ToolButton from './ToolButton';
 import { useExportMap } from './useExportMap';
+import DrawingToolsHelp from './DrawingToolsHelp';
 
 interface DrawingToolsProps {
   onSave: () => void;
@@ -86,29 +87,12 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
           <span role="img" aria-hidden="true">🗑️</span> Reset All
         </button>
       </div>
-      <div className="tools-help">
-        <p>
-          <strong>Drawing Instructions:</strong> Select an outlook type and probability, then use the drawing tools on the map to create your forecast areas.
-        </p>
-        <p>
-          <strong>Click on any drawn area to delete it.</strong>
-        </p>
-        {isExportDisabled && (
-          <p className="unsaved-warning">
-            ⚠️ Export feature is temporarily unavailable due to an issue. See <a href="https://github.com/wxboysuper/graphical-forecast-creator/issues/32" target="_blank" rel="noopener noreferrer">GitHub issue #32</a> for more information.
-          </p>
-        )}
-        {isSaveLoadDisabled && (
-          <p className="unsaved-warning">
-            ⚠️ The save/load features are temporarily unavailable due to an issue.
-          </p>
-        )}
-        {!isSaved && (
-          <p className="unsaved-warning">
-            ⚠️ You have unsaved changes
-          </p>
-        )}
-      </div>
+
+      <DrawingToolsHelp
+        isExportDisabled={isExportDisabled}
+        isSaveLoadDisabled={isSaveLoadDisabled}
+        isSaved={isSaved}
+      />
       
       {isExporting && (
         <div className="loading-overlay">
