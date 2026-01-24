@@ -260,7 +260,7 @@ const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: Outlo
   const handleClick = () => {
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
     const safeProbability = stripHtml(probability);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${probability.includes('#') ? ' (Significant)' : ''}`;
+    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
     // eslint-disable-next-line no-restricted-globals, no-alert
     if (confirm(message)) {
       dispatch(removeFeature({ outlookType, probability, featureId }));
