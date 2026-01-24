@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import App from './App';
 
 // Mock ForecastMap to avoid Leaflet/Geoman issues
 jest.mock('./components/Map/ForecastMap', () => {
@@ -10,8 +11,6 @@ jest.mock('./components/Map/ForecastMap', () => {
 jest.mock('./components/OutlookPanel/OutlookPanel', () => () => <div>OutlookPanel Mock</div>);
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
-
-import App from './App';
 
 test('renders Graphical Forecast Creator title', () => {
   render(<App />);

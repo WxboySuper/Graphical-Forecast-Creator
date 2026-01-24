@@ -2,7 +2,7 @@
 import React from 'react';
 import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, EnhancedStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView } from './store/forecastSlice';
 import featureFlagsReducer from './store/featureFlagsSlice';
 import { AppContent } from './App';
@@ -12,7 +12,7 @@ const mockForecastMap = jest.fn();
 
 jest.mock('./components/Map/ForecastMap', () => {
   const React = require('react');
-  return React.forwardRef((props: any, ref: any) => {
+  return React.forwardRef((props: Record<string, unknown>, _ref: unknown) => {
     mockForecastMap(props);
     return React.createElement('div', { 'data-testid': 'forecast-map' }, 'ForecastMap');
   });
@@ -38,7 +38,7 @@ jest.mock('leaflet', () => ({
 }));
 
 describe('AppContent Performance', () => {
-  let store: any;
+  let store: EnhancedStore;
 
   beforeEach(() => {
     mockForecastMap.mockClear();
