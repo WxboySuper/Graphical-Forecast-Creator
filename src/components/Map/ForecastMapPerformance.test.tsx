@@ -22,13 +22,21 @@ jest.mock('leaflet', () => {
       }
     },
     Map: class {
+        // skipcq: JS-0323
         on() { /* mock */ }
+        // skipcq: JS-0323
         off() { /* mock */ }
+        // skipcq: JS-0323
         removeLayer() { /* mock */ }
+        // skipcq: JS-0323
         getCenter() { return { lat: 0, lng: 0 }; }
+        // skipcq: JS-0323
         getZoom() { return 0; }
     },
-    LeafletEvent: class {},
+    LeafletEvent: class {
+        // skipcq: JS-0323
+        constructor() { /* mock */ }
+    },
   };
 });
 

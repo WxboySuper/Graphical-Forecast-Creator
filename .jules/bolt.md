@@ -8,3 +8,6 @@
 ## 2024-05-23 - DeepSource Mocking
 **Learning:** `jest.mock` factories are hoisted above imports, so `require` is necessary to load modules like `react`. DeepSource flags this as a violation (`JS-C1003`).
 **Action:** Use `// skipcq: JS-C1003` inside mock factories to suppress this specific warning instead of rewriting mocks unnecessarily.
+## 2024-05-23 - Mock Class Linting
+**Learning:** Mock classes often trigger 'empty class' or 'method not using this' linter rules.
+**Action:** Use `// skipcq: JS-0323` (no this) and ensure classes have at least one constructor or member to satisfy `JS-0045`.

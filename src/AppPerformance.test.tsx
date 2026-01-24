@@ -36,6 +36,7 @@ jest.mock('leaflet', () => ({
     addTo: jest.fn(),
   }),
   Map: class {
+    // skipcq: JS-0323
     removeLayer() {
       // mock
     }
