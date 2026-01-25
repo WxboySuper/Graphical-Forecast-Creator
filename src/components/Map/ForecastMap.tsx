@@ -46,6 +46,7 @@ type PMMap = L.Map & {
     addControls?: (opts: Record<string, unknown>) => void;
     setGlobalOptions?: (opts: Record<string, unknown>) => void;
     on?: (event: string, handler: (...args: unknown[]) => void) => void;
+    globalDrawModeEnabled?: () => boolean;
   };
 };
 
@@ -255,8 +256,14 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
   };
 };
 
-const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: OutlookType, probability: string, featureId: string) => {
+const createFeatureHandlersFactory = (dispatch: Dispatch, map: L.Map) => (outlookType: OutlookType, probability: string, featureId: string) => {
   const handleClick = () => {
+    // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
+    const pmMap = map as PMMap;
+    if (pmMap.pm && pmMap.pm.globalDrawModeEnabled && pmMap.pm.globalDrawModeEnabled()) {
+      return;
+    }
+
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
     const safeProbability = stripHtml(probability);
     const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
@@ -338,7 +345,8 @@ const renderOutlookFeatures = (
   outlooks: OutlooksMap,
   dispatch: Dispatch,
   styleFn: (o: OutlookType, p: string) => FeatureStyle,
-  activeOutlookType: OutlookType
+  activeOutlookType: OutlookType,
+  map: L.Map
 ): React.ReactElement[] => {
   const shouldShowLayer = (outlookType: OutlookType) => {
     if (activeOutlookType === 'categorical') {
@@ -347,7 +355,7 @@ const renderOutlookFeatures = (
     return outlookType === activeOutlookType;
   };
 
-  const handlerFactory = createFeatureHandlersFactory(dispatch);
+  const handlerFactory = createFeatureHandlersFactory(dispatch, map);
 
   return Object.keys(outlooks).flatMap(outlookType => {
     const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
@@ -385,10 +393,11 @@ const renderOutlookFeatures = (
 // Optimized: Memoized to prevent re-renders when map view or unrelated state changes
 const OutlookLayers: React.FC = React.memo(() => {
   const dispatch = useDispatch();
+  const map = useMap();
   const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
-  const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, getFeatureStyle, activeOutlookType);
+  const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, getFeatureStyle, activeOutlookType, map);
 
   if (elements.length === 0) return null;
   if (elements.length === 1) return elements[0];
