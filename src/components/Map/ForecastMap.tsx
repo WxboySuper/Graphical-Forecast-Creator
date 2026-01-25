@@ -256,11 +256,26 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
   };
 };
 
-const createFeatureHandlersFactory = (dispatch: Dispatch, map: L.Map) => (outlookType: OutlookType, probability: string, featureId: string) => {
+// Helper to check if drawing mode is active (safe with optional chaining)
+const isDrawingMode = (map: L.Map): boolean => {
+  const pmMap = map as PMMap;
+  return !!pmMap.pm?.globalDrawModeEnabled?.();
+};
+
+// Interface for context needed to render outlooks (consolidates arguments)
+interface OutlookRenderContext {
+  dispatch: Dispatch;
+  map: L.Map;
+  activeOutlookType: OutlookType;
+  styleFn: (o: OutlookType, p: string) => FeatureStyle;
+}
+
+const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlookType: OutlookType, probability: string, featureId: string) => {
+  const { dispatch, map } = context;
+
   const handleClick = () => {
     // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
-    const pmMap = map as PMMap;
-    if (pmMap.pm && pmMap.pm.globalDrawModeEnabled && pmMap.pm.globalDrawModeEnabled()) {
+    if (isDrawingMode(map)) {
       return;
     }
 
@@ -343,11 +358,10 @@ function createOnEachFeature(
 
 const renderOutlookFeatures = (
   outlooks: OutlooksMap,
-  dispatch: Dispatch,
-  styleFn: (o: OutlookType, p: string) => FeatureStyle,
-  activeOutlookType: OutlookType,
-  map: L.Map
+  context: OutlookRenderContext
 ): React.ReactElement[] => {
+  const { activeOutlookType, styleFn } = context;
+
   const shouldShowLayer = (outlookType: OutlookType) => {
     if (activeOutlookType === 'categorical') {
       return outlookType === 'categorical';
@@ -355,7 +369,7 @@ const renderOutlookFeatures = (
     return outlookType === activeOutlookType;
   };
 
-  const handlerFactory = createFeatureHandlersFactory(dispatch, map);
+  const handlerFactory = createFeatureHandlersFactory(context);
 
   return Object.keys(outlooks).flatMap(outlookType => {
     const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
@@ -397,7 +411,14 @@ const OutlookLayers: React.FC = React.memo(() => {
   const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
-  const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, getFeatureStyle, activeOutlookType, map);
+  const context: OutlookRenderContext = {
+    dispatch,
+    map,
+    activeOutlookType,
+    styleFn: getFeatureStyle
+  };
+
+  const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
 
   if (elements.length === 0) return null;
   if (elements.length === 1) return elements[0];
