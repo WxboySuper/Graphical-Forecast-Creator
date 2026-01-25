@@ -71,7 +71,7 @@ function addGeomanControls(pm: PMMap['pm']) {
     dragMode: false,
     rotateMode: false,
     removalMode: false,
-    cutPolygon: true,
+    cutPolygon: false,
     drawPolygon: true,
     drawRectangle: true,
   });
@@ -104,15 +104,6 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void
         // eslint-disable-next-line no-console
         console.error('[Geoman] Failed to remove temp layer:', err);
       }
-    }
-  };
-}
-
-function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
-  return (e: L.LeafletEvent & { layer?: L.Layer }) => {
-    if (e.layer) {
-      onPolygonCreated(e.layer);
-      map.removeLayer(e.layer);
     }
   };
 }
@@ -163,16 +154,13 @@ const MapController: React.FC<{
 
     // Create handlers via factories (keeps logic small inside the effect)
     const handleCreate = makeHandleCreate(map, onPolygonCreated);
-    const handleCut = makeHandleCut(map, onPolygonCreated);
 
     // Listen on the map object directly (this is what works with Geoman)
     map.on('pm:create', handleCreate);
-    map.on('pm:cut', handleCut);
 
     // Cleanup function to remove event listeners
     return () => {
       map.off('pm:create', handleCreate);
-      map.off('pm:cut', handleCut);
     };
   }, [map, onPolygonCreated]);
 
