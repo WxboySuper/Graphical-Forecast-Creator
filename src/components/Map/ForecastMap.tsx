@@ -259,7 +259,7 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
 // Helper to check if drawing mode is active (safe with optional chaining)
 const isDrawingMode = (map: L.Map): boolean => {
   const pmMap = map as PMMap;
-  return !!pmMap.pm?.globalDrawModeEnabled?.();
+  return Boolean(pmMap.pm?.globalDrawModeEnabled?.());
 };
 
 // Interface for context needed to render outlooks (consolidates arguments)
