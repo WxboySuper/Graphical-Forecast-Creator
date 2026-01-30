@@ -18,6 +18,7 @@ import { ToastManager } from './components/Toast/Toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
+import { validateForecastData } from './utils/validationUtils';
 
 // hooks imported above
 
@@ -204,35 +205,16 @@ const performLoad = (
     }
 
     // Basic validation of parsed data structure
-    if (typeof parsedData !== 'object' || parsedData === null) {
+    if (!validateForecastData(parsedData)) {
       addToast('Saved data is incomplete or corrupted.', 'error');
       return;
     }
-
-    const pd = parsedData as { outlooks?: unknown; mapView?: unknown };
-    if (!pd.outlooks || typeof pd.outlooks !== 'object') {
-      addToast('Saved data is incomplete or corrupted.', 'error');
-      return;
-    }
-
-    const outlooksObj = pd.outlooks as Record<string, unknown>;
-    const requiredKeys = ['tornado', 'wind', 'hail', 'categorical'];
-    for (const key of requiredKeys) {
-      if (!Object.prototype.hasOwnProperty.call(outlooksObj, key) || !Array.isArray(outlooksObj[key])) {
-        addToast('Saved data is incomplete or corrupted.', 'error');
-        return;
-      }
-    }
-
-    const entries = outlooksObj as {
-      [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
-    };
 
     const deserializedOutlooks: OutlookData = {
-      tornado: new Map(entries.tornado),
-      wind: new Map(entries.wind),
-      hail: new Map(entries.hail),
-      categorical: new Map(entries.categorical)
+      tornado: new Map(parsedData.outlooks.tornado),
+      wind: new Map(parsedData.outlooks.wind),
+      hail: new Map(parsedData.outlooks.hail),
+      categorical: new Map(parsedData.outlooks.categorical)
     };
     
     dispatch(resetForecasts());
@@ -243,8 +225,8 @@ const performLoad = (
       return;
     }
 
-    if (pd.mapView) {
-      dispatch(setMapView(pd.mapView as { center: [number, number]; zoom: number }));
+    if (parsedData.mapView) {
+      dispatch(setMapView(parsedData.mapView));
     } else {
       fitMapToFeatures(map, deserializedOutlooks, dispatch);
     }
