@@ -13,13 +13,14 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 // Now import react-leaflet components (they depend on L being ready)
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature } from '../../store/forecastSlice';
+import { addFeature, setMapView } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
-import { colorMappings } from '../../utils/outlookUtils';
-import { createTooltipContent, stripHtml } from '../../utils/domUtils';
+import { sortProbabilities } from '../../utils/outlookUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
+import OutlookFeature from './OutlookFeature';
+import { PMMap } from '../../types/map';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -40,24 +41,8 @@ export type ForecastMapHandle = {
   getMap: () => L.Map | null;
 };
 
-// Narrow type for Leaflet map with Geoman `pm` helpers (used in MapController)
-type PMMap = L.Map & {
-  pm?: {
-    addControls?: (opts: Record<string, unknown>) => void;
-    setGlobalOptions?: (opts: Record<string, unknown>) => void;
-    on?: (event: string, handler: (...args: unknown[]) => void) => void;
-    globalDrawModeEnabled?: () => boolean;
-  };
-};
-
-// Strongly-typed shapes for outlooks and feature style objects
+// Strongly-typed shapes for outlooks
 type OutlooksMap = Record<OutlookType, Map<string, GeoJSON.Feature[]>>;
-type FeatureStyle = L.PathOptions & {
-  className?: string;
-  zIndex?: number;
-  fillColor?: string;
-  fillOpacity?: number;
-};
 
 // Geoman helpers: add controls and options, and factories for event handlers
 function addGeomanControls(pm: PMMap['pm']) {
@@ -168,201 +153,11 @@ const MapController: React.FC<{
   return null;
 };
 
-// Component to render the outlook polygons
-
-// Top-level helpers extracted to reduce component size and complexity
-const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
-  return entries.sort((a, b) => {
-    const [probA, probB] = [a[0], b[0]];
-
-    if (probA === 'TSTM') return -1;
-    if (probB === 'TSTM') return 1;
-
-    const isSignificantA = probA.includes('#');
-    const isSignificantB = probB.includes('#');
-    if (isSignificantA !== isSignificantB) {
-      return isSignificantA ? 1 : -1;
-    }
-
-    const riskOrder: Record<string, number> = {
-      'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
-    };
-    if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) {
-      return riskOrder[probA] - riskOrder[probB];
-    }
-
-    const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, ''));
-    return getPercentValue(probA) - getPercentValue(probB);
-  });
-};
-
-const RISK_ORDER: Record<string, number> = {
-  TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 4, HIGH: 5
-};
-
-const lookupColor = (outlookType: OutlookType, probability: string) => {
-  switch (outlookType) {
-    case 'categorical':
-      return colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
-    case 'tornado':
-      return colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
-    case 'wind':
-    case 'hail':
-      return colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
-    default:
-      return '#FFFFFF';
-  }
-};
-
-const computeZIndex = (outlookType: OutlookType, probability: string) => {
-  let baseZIndex = 400;
-  if (outlookType === 'categorical') {
-    baseZIndex += (RISK_ORDER[probability] || 0) * 10;
-  } else if (['tornado', 'wind', 'hail'].includes(outlookType)) {
-    baseZIndex += parseInt(probability) || 0;
-  }
-
-  if (probability.includes('#')) baseZIndex += 5;
-  return baseZIndex;
-};
-
-const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
-  const color = lookupColor(outlookType, probability);
-  const significant = probability.includes('#');
-  const fillColor = significant ? 'url(#hatchPattern)' : color;
-  const fillOpacity = significant ? 1 : 0.6;
-  const zIndex = computeZIndex(outlookType, probability);
-
-  return {
-    color: significant ? 'transparent' : color,
-    weight: 2,
-    opacity: 1,
-    fillColor,
-    fillOpacity,
-    zIndex,
-    className: significant ? 'significant-threat-pattern' : undefined
-  };
-};
-
-// Helper to check if drawing mode is active (safe with optional chaining)
-const isDrawingMode = (map: L.Map): boolean => {
-  const pmMap = map as PMMap;
-  return Boolean(pmMap.pm?.globalDrawModeEnabled?.());
-};
-
 // Interface for context needed to render outlooks (consolidates arguments)
 interface OutlookRenderContext {
   dispatch: Dispatch;
   map: L.Map;
   activeOutlookType: OutlookType;
-}
-
-// Optimized: Memoized component for individual features to prevent unnecessary re-renders
-const OutlookFeature: React.FC<{
-  feature: GeoJSON.Feature;
-  outlookType: OutlookType;
-  probability: string;
-  dispatch: Dispatch;
-  map: L.Map;
-}> = React.memo(({ feature, outlookType, probability, dispatch, map }) => {
-  const featureId = feature.id as string;
-
-  const handleClick = React.useCallback(() => {
-    // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
-    if (isDrawingMode(map)) {
-      return;
-    }
-
-    const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
-    const safeProbability = stripHtml(probability);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
-    // eslint-disable-next-line no-restricted-globals, no-alert
-    if (confirm(message)) {
-      dispatch(removeFeature({ outlookType, probability, featureId }));
-    }
-  }, [dispatch, map, outlookType, probability, featureId]);
-
-  const handleMouseOver = React.useCallback((e: L.LeafletEvent) => {
-    const layer = e.target as L.Layer;
-    const tooltipContent = createTooltipContent(outlookType, probability);
-
-    if ('bindTooltip' in layer && typeof layer.bindTooltip === 'function') {
-      layer.bindTooltip(tooltipContent, {
-        direction: 'top',
-        sticky: true,
-        opacity: 0.9,
-        className: 'feature-tooltip'
-      }).openTooltip();
-    }
-  }, [outlookType, probability]);
-
-  const handlers = React.useMemo(() => ({
-    click: handleClick,
-    mouseover: handleMouseOver
-  }), [handleClick, handleMouseOver]);
-
-  const styleObj = React.useMemo(() => getFeatureStyle(outlookType, probability), [outlookType, probability]);
-
-  // Create stable onEachFeature callback
-  const onEach = React.useMemo(() => createOnEachFeature(styleObj, handlers), [styleObj, handlers]);
-
-  return (
-    <GeoJSON
-      data={feature}
-      pathOptions={styleObj as L.PathOptions}
-      onEachFeature={onEach}
-    />
-  );
-});
-
-OutlookFeature.displayName = 'OutlookFeature';
-
-// Create an onEachFeature factory that forces the Leaflet layer style and attaches handlers
-function createOnEachFeature(
-  styleObj: FeatureStyle,
-  handlers: Record<string, (e: L.LeafletEvent) => void>
-) {
-  return function onEach(feature: GeoJSON.Feature, layer: L.Layer) {
-    // Force the style on the created layer (in case global Geoman styles persist)
-    const layerWithStyle = layer as L.Path & { setStyle?: (opts: L.PathOptions) => void };
-    if (typeof layerWithStyle.setStyle === 'function') {
-      try {
-        layerWithStyle.setStyle(styleObj as L.PathOptions);
-      } catch {
-        // ignore
-      }
-    }
-
-    // Also force underlying SVG attributes if available to override external styles
-    try {
-      const layerWithPath = layer as L.Layer & { _path?: SVGElement };
-      const pathEl = layerWithPath._path;
-      if (pathEl) {
-        const fc = styleObj.fillColor;
-        if (typeof fc === 'string' && !fc.startsWith('url(')) {
-          pathEl.setAttribute('fill', fc);
-        }
-        pathEl.setAttribute('fill-opacity', String(styleObj.fillOpacity ?? 1));
-        if (styleObj.color) pathEl.setAttribute('stroke', String(styleObj.color));
-        pathEl.setAttribute('stroke-width', String(styleObj.weight ?? 1));
-      }
-    } catch {
-      // ignore DOM write errors in server env
-    }
-
-    // Attach event handlers directly to the layer to ensure they bind
-    const layerWithOn = layer as L.Layer & { on?: (event: string, fn: (...args: unknown[]) => void) => void };
-    try {
-      Object.entries(handlers).forEach(([evt, fn]) => {
-        if (typeof layerWithOn.on === 'function') {
-          layerWithOn.on(evt, fn as (...args: unknown[]) => void);
-        }
-      });
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[onEachFeature] Failed to attach handlers:', err);
-    }
-  };
 }
 
 const renderOutlookFeatures = (
@@ -458,16 +253,6 @@ interface GeomanLayer extends L.Layer {
   toGeoJSON(): GeoJSON.Feature;
 }
 
-// Map type that includes optional Geoman `pm` helpers (narrowly typed)
-type MapWithPM = L.Map & {
-  pm?: {
-    disableDraw?: () => void;
-    addControls?: (opts: Record<string, unknown>) => void;
-    setGlobalOptions?: (opts: Record<string, unknown>) => void;
-    on?: (event: string, handler: (...args: unknown[]) => void) => void;
-  };
-};
-
 const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
@@ -524,7 +309,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
           // Cancel current drawing mode
           // Narrowly typed guard for Geoman `pm` to avoid `any`
           if (!mapInstance) return;
-          const gmMap = mapInstance as MapWithPM;
+          const gmMap = mapInstance as PMMap;
           if (gmMap.pm && typeof gmMap.pm.disableDraw === 'function') {
             gmMap.pm.disableDraw();
           }

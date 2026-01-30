@@ -1,6 +1,9 @@
+import { PathOptions } from 'leaflet';
+import { GeoJSON } from 'leaflet';
 import { 
   CategoricalRiskLevel, 
   ColorMappings, 
+  OutlookType,
   TornadoProbability, 
   WindHailProbability 
 } from '../types/outlooks';
@@ -184,3 +187,82 @@ export function getCategoricalRiskDisplayName(risk: CategoricalRiskLevel): strin
       return 'Unknown';
   }
 }
+
+// ---- Map Styling and Rendering Helpers ----
+
+export const RISK_ORDER: Record<string, number> = {
+  'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
+};
+
+export const lookupColor = (outlookType: OutlookType, probability: string): string => {
+  switch (outlookType) {
+    case 'categorical':
+      return colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
+    case 'tornado':
+      return colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
+    case 'wind':
+    case 'hail':
+      return colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
+    default:
+      return '#FFFFFF';
+  }
+};
+
+export const computeZIndex = (outlookType: OutlookType, probability: string): number => {
+  let baseZIndex = 400;
+  if (outlookType === 'categorical') {
+    baseZIndex += (RISK_ORDER[probability] || 0) * 10;
+  } else if (['tornado', 'wind', 'hail'].includes(outlookType)) {
+    baseZIndex += parseInt(probability) || 0;
+  }
+
+  if (probability.includes('#')) baseZIndex += 5;
+  return baseZIndex;
+};
+
+export type FeatureStyle = PathOptions & {
+  className?: string;
+  zIndex?: number;
+  fillColor?: string;
+  fillOpacity?: number;
+};
+
+export const getFeatureStyle = (outlookType: OutlookType, probability: string): FeatureStyle => {
+  const color = lookupColor(outlookType, probability);
+  const significant = probability.includes('#');
+  const fillColor = significant ? 'url(#hatchPattern)' : color;
+  const fillOpacity = significant ? 1 : 0.6;
+  const zIndex = computeZIndex(outlookType, probability);
+
+  return {
+    color: significant ? 'transparent' : color,
+    weight: 2,
+    opacity: 1,
+    fillColor,
+    fillOpacity,
+    zIndex,
+    className: significant ? 'significant-threat-pattern' : undefined
+  };
+};
+
+export const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
+  return entries.sort((a, b) => {
+    const [probA, probB] = [a[0], b[0]];
+
+    if (probA === 'TSTM') return -1;
+    if (probB === 'TSTM') return 1;
+
+    const isSignificantA = probA.includes('#');
+    const isSignificantB = probB.includes('#');
+    if (isSignificantA !== isSignificantB) {
+      return isSignificantA ? 1 : -1;
+    }
+
+    if (RISK_ORDER[probA] !== undefined && RISK_ORDER[probB] !== undefined) {
+      return RISK_ORDER[probA] - RISK_ORDER[probB];
+    }
+
+    const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, ''));
+    return getPercentValue(probA) - getPercentValue(probB);
+  });
+};
