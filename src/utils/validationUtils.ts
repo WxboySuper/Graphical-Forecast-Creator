@@ -24,7 +24,7 @@ const isValidFeature = (value: unknown): value is Feature<Geometry, GeoJsonPrope
 
   if (feature.type !== 'Feature') return false;
 
-  // geometry must be object or null (though typically object for us)
+  // geometry must be object or null
   if (!Object.prototype.hasOwnProperty.call(feature, 'geometry')) return false;
   if (feature.geometry !== null && typeof feature.geometry !== 'object') return false;
 
@@ -58,6 +58,41 @@ const isValidOutlookEntries = (value: unknown): value is [string, Feature<Geomet
 };
 
 /**
+ * Validates the outlooks object structure
+ */
+const isValidOutlooksObject = (outlooks: unknown): boolean => {
+  if (typeof outlooks !== 'object' || outlooks === null) return false;
+
+  const outlooksRecord = outlooks as Record<string, unknown>;
+  const requiredOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
+
+  for (const type of requiredOutlookTypes) {
+    if (!Object.prototype.hasOwnProperty.call(outlooksRecord, type)) return false;
+    if (!isValidOutlookEntries(outlooksRecord[type])) return false;
+  }
+
+  return true;
+};
+
+/**
+ * Validates the mapView object structure
+ */
+const isValidMapView = (mapView: unknown): boolean => {
+  if (typeof mapView !== 'object' || mapView === null) return false;
+
+  const view = mapView as { center?: unknown; zoom?: unknown };
+
+  // Validate center
+  if (!Array.isArray(view.center) || view.center.length !== 2) return false;
+  if (typeof view.center[0] !== 'number' || typeof view.center[1] !== 'number') return false;
+
+  // Validate zoom
+  if (typeof view.zoom !== 'number') return false;
+
+  return true;
+};
+
+/**
  * Validates the full forecast data structure from localStorage or file
  */
 export const validateForecastData = (data: unknown): data is SavedData => {
@@ -65,27 +100,10 @@ export const validateForecastData = (data: unknown): data is SavedData => {
 
   const savedData = data as Record<string, unknown>;
 
-  // Validate outlooks
-  if (typeof savedData.outlooks !== 'object' || savedData.outlooks === null) return false;
+  if (!isValidOutlooksObject(savedData.outlooks)) return false;
 
-  const outlooks = savedData.outlooks as Record<string, unknown>;
-  const requiredOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
-
-  for (const type of requiredOutlookTypes) {
-    if (!Object.prototype.hasOwnProperty.call(outlooks, type)) return false;
-    if (!isValidOutlookEntries(outlooks[type])) return false;
-  }
-
-  // Validate mapView if present (it's optional)
   if (Object.prototype.hasOwnProperty.call(savedData, 'mapView')) {
-    const mapView = savedData.mapView as Record<string, unknown>;
-
-    if (typeof mapView !== 'object' || mapView === null) return false;
-
-    if (!Array.isArray(mapView.center) || mapView.center.length !== 2) return false;
-    if (typeof mapView.center[0] !== 'number' || typeof mapView.center[1] !== 'number') return false;
-
-    if (typeof mapView.zoom !== 'number') return false;
+    if (!isValidMapView(savedData.mapView)) return false;
   }
 
   return true;
