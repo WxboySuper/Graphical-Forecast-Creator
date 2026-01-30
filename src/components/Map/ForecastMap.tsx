@@ -255,13 +255,19 @@ interface OutlookRenderContext {
   dispatch: Dispatch;
   map: L.Map;
   activeOutlookType: OutlookType;
-  styleFn: (o: OutlookType, p: string) => FeatureStyle;
 }
 
-const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlookType: OutlookType, probability: string, featureId: string) => {
-  const { dispatch, map } = context;
+// Optimized: Memoized component for individual features to prevent unnecessary re-renders
+const OutlookFeature: React.FC<{
+  feature: GeoJSON.Feature;
+  outlookType: OutlookType;
+  probability: string;
+  dispatch: Dispatch;
+  map: L.Map;
+}> = React.memo(({ feature, outlookType, probability, dispatch, map }) => {
+  const featureId = feature.id as string;
 
-  const handleClick = () => {
+  const handleClick = React.useCallback(() => {
     // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
     if (isDrawingMode(map)) {
       return;
@@ -274,9 +280,9 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
     if (confirm(message)) {
       dispatch(removeFeature({ outlookType, probability, featureId }));
     }
-  };
+  }, [dispatch, map, outlookType, probability, featureId]);
 
-  const handleMouseOver = (e: L.LeafletEvent) => {
+  const handleMouseOver = React.useCallback((e: L.LeafletEvent) => {
     const layer = e.target as L.Layer;
     const tooltipContent = createTooltipContent(outlookType, probability);
 
@@ -288,13 +294,28 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
         className: 'feature-tooltip'
       }).openTooltip();
     }
-  };
+  }, [outlookType, probability]);
 
-  return {
+  const handlers = React.useMemo(() => ({
     click: handleClick,
     mouseover: handleMouseOver
-  };
-};
+  }), [handleClick, handleMouseOver]);
+
+  const styleObj = React.useMemo(() => getFeatureStyle(outlookType, probability), [outlookType, probability]);
+
+  // Create stable onEachFeature callback
+  const onEach = React.useMemo(() => createOnEachFeature(styleObj, handlers), [styleObj, handlers]);
+
+  return (
+    <GeoJSON
+      data={feature}
+      pathOptions={styleObj as L.PathOptions}
+      onEachFeature={onEach}
+    />
+  );
+});
+
+OutlookFeature.displayName = 'OutlookFeature';
 
 // Create an onEachFeature factory that forces the Leaflet layer style and attaches handlers
 function createOnEachFeature(
@@ -348,7 +369,7 @@ const renderOutlookFeatures = (
   outlooks: OutlooksMap,
   context: OutlookRenderContext
 ): React.ReactElement[] => {
-  const { activeOutlookType, styleFn } = context;
+  const { activeOutlookType } = context;
 
   const shouldShowLayer = (outlookType: OutlookType) => {
     if (activeOutlookType === 'categorical') {
@@ -356,8 +377,6 @@ const renderOutlookFeatures = (
     }
     return outlookType === activeOutlookType;
   };
-
-  const handlerFactory = createFeatureHandlersFactory(context);
 
   return Object.keys(outlooks).flatMap(outlookType => {
     const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
@@ -371,21 +390,16 @@ const renderOutlookFeatures = (
 
     return sortedEntries.map(([probability, features]) => (
       <FeatureGroup key={`${ot}-${probability}`}>
-        {features.map(feature => {
-          const fid = feature.id as string;
-          const handlers = handlerFactory(ot, probability, fid);
-          const styleObj = styleFn(ot, probability);
-          const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: L.LeafletEvent) => void>);
-          // Use PathOptions directly - Leaflet applies these automatically
-          return (
-            <GeoJSON
-              key={`${ot}-${probability}-${fid}`}
-              data={feature}
-              pathOptions={styleObj as L.PathOptions}
-              onEachFeature={onEach}
-            />
-          );
-        })}
+        {features.map(feature => (
+          <OutlookFeature
+            key={`${ot}-${probability}-${feature.id}`}
+            feature={feature}
+            outlookType={ot}
+            probability={probability}
+            dispatch={context.dispatch}
+            map={context.map}
+          />
+        ))}
       </FeatureGroup>
     ));
   });
@@ -402,8 +416,7 @@ const OutlookLayers: React.FC = React.memo(() => {
   const context: OutlookRenderContext = {
     dispatch,
     map,
-    activeOutlookType,
-    styleFn: getFeatureStyle
+    activeOutlookType
   };
 
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);

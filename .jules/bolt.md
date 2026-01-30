@@ -31,3 +31,7 @@
 ## 2024-05-23 - React Display Name
 **Learning:** Components defined via HOCs like `React.memo` or `forwardRef` lose their implicit name. Always manually set `Component.displayName = 'Component'` to ensure they are identifiable in DevTools and logs.
 **Action:** Add `displayName` immediately after component definition.
+
+## 2024-05-23 - Memoizing Leaflet Components
+**Learning:** `react-leaflet` components like `GeoJSON` are standard React components and will re-render if their parent (`OutlookLayers` in this case) re-renders, even if props are conceptually similar. This is O(N) for adding features to a map layer.
+**Action:** Always wrap expensive map layer logic (rendering lists of features) in a `React.memo` component (`OutlookFeature`) to ensure only the changed/new feature renders, not the entire list.
