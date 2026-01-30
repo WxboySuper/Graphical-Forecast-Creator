@@ -10,7 +10,9 @@ import {
   OutlookType,
   CategoricalRiskLevel,
   TornadoProbability,
-  WindHailProbability,
+  WindProbability,
+  HailProbability,
+  CIGLevel
 } from '../../types/outlooks';
 import { getAvailableProbabilities } from './outlookPanelUtils';
 
@@ -42,25 +44,21 @@ export function useOutlookPanelLogic() {
   );
 
   const handleProbabilityChange = useCallback(
-    (probability: TornadoProbability | WindHailProbability | CategoricalRiskLevel) => {
+    (probability: TornadoProbability | WindProbability | HailProbability | CategoricalRiskLevel | CIGLevel | any) => {
       dispatch(setActiveProbability(probability));
     },
     [dispatch]
   );
 
   const handleToggleSignificant = useCallback(() => {
-    if (!significantThreatsEnabled) {
-      console.warn('Significant threats are temporarily unavailable due to an issue.');
-      return;
-    }
-    dispatch(toggleSignificant());
-  }, [dispatch, significantThreatsEnabled]);
+    // Legacy support removed/disabled
+  }, []);
 
   const probabilities = getAvailableProbabilities(activeOutlookType);
 
   const probabilityHandlers = useMemo(
     () => Object.fromEntries(
-      probabilities.map((p) => [p, () => handleProbabilityChange(p as (TornadoProbability | WindHailProbability | CategoricalRiskLevel))])
+      probabilities.map((p) => [p, () => handleProbabilityChange(p)])
     ),
     [probabilities, handleProbabilityChange]
   ) as Record<string, () => void>;

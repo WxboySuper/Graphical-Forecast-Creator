@@ -175,15 +175,24 @@ const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, Geo
   return entries.sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
 
+    // CIG levels come after numeric probabilities (render on top)
+    const isCigA = probA.startsWith('CIG');
+    const isCigB = probB.startsWith('CIG');
+    
+    if (isCigA !== isCigB) {
+      return isCigA ? 1 : -1;
+    }
+    
+    if (isCigA && isCigB) {
+      // Sort CIG1 < CIG2 < CIG3
+      return probA.localeCompare(probB);
+    }
+
     if (probA === 'TSTM') return -1;
     if (probB === 'TSTM') return 1;
 
-    const isSignificantA = probA.includes('#');
-    const isSignificantB = probB.includes('#');
-    if (isSignificantA !== isSignificantB) {
-      return isSignificantA ? 1 : -1;
-    }
-
+    // Legacy significant sort removal or keep for backward compatibility?
+    // Let's just treat as strings if we don't care, but numeric sort is better.
     const riskOrder: Record<string, number> = {
       'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
     };
@@ -218,29 +227,54 @@ const computeZIndex = (outlookType: OutlookType, probability: string) => {
   let baseZIndex = 400;
   if (outlookType === 'categorical') {
     baseZIndex += (RISK_ORDER[probability] || 0) * 10;
-  } else if (['tornado', 'wind', 'hail'].includes(outlookType)) {
-    baseZIndex += parseInt(probability) || 0;
+  } else {
+    // Check for CIG
+    if (probability.startsWith('CIG')) {
+      baseZIndex = 600; // CIGs are overlays
+      // CIG1=601, CIG2=602, CIG3=603
+      baseZIndex += parseInt(probability.replace('CIG', '')) || 0;
+    } else {
+      // Numeric probabilities
+      baseZIndex += parseInt(probability) || 0;
+    }
   }
 
-  if (probability.includes('#')) baseZIndex += 5;
+  // Legacy '#' check removed
   return baseZIndex;
 };
 
 const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
-  const color = lookupColor(outlookType, probability);
-  const significant = probability.includes('#');
-  const fillColor = significant ? 'url(#hatchPattern)' : color;
-  const fillOpacity = significant ? 1 : 0.6;
-  const zIndex = computeZIndex(outlookType, probability);
+  if (probability.startsWith('CIG')) {
+    // Map CIG levels to pattern IDs
+    const patternMap: Record<string, string> = {
+      'CIG1': 'url(#pattern-cig1)',
+      'CIG2': 'url(#pattern-cig2)',
+      'CIG3': 'url(#pattern-cig3)',
+      'CIG0': 'none'
+    };
+    const fill = patternMap[probability] || 'none';
+    return {
+      color: '#000000', // Black outline for hatching areas
+      weight: 1,
+      opacity: 1,
+      fillColor: fill,
+      fillOpacity: 1, // Pattern needs full opacity
+      zIndex: computeZIndex(outlookType, probability),
+      className: 'hatching-layer'
+    };
+  }
 
+  const color = lookupColor(outlookType, probability);
+  // Legacy significant check removed from style logic
+  
+  // Base style
   return {
-    color: significant ? 'transparent' : color,
+    color: color, // Outline matches fill
     weight: 2,
     opacity: 1,
-    fillColor,
-    fillOpacity,
-    zIndex,
-    className: significant ? 'significant-threat-pattern' : undefined
+    fillColor: color,
+    fillOpacity: 0.6,
+    zIndex: computeZIndex(outlookType, probability)
   };
 };
 
@@ -335,10 +369,18 @@ function createOnEachFeature(
         const fc = styleObj.fillColor;
         if (typeof fc === 'string' && !fc.startsWith('url(')) {
           pathEl.setAttribute('fill', fc);
+        } else if (typeof fc === 'string' && fc.startsWith('url(')) {
+             pathEl.setAttribute('fill', fc);
         }
+        
         pathEl.setAttribute('fill-opacity', String(styleObj.fillOpacity ?? 1));
         if (styleObj.color) pathEl.setAttribute('stroke', String(styleObj.color));
         pathEl.setAttribute('stroke-width', String(styleObj.weight ?? 1));
+        
+        // Fix for pointer-events on transparent overlay
+        if (styleObj.interactive === false) {
+             pathEl.setAttribute('pointer-events', 'none');
+        }
       }
     } catch {
       // ignore DOM write errors in server env
@@ -389,9 +431,10 @@ const renderOutlookFeatures = (
         {features.map(feature => {
           const fid = feature.id as string;
           const handlers = handlerFactory(ot, probability, fid);
+          
           const styleObj = styleFn(ot, probability);
           const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: L.LeafletEvent) => void>);
-          // Use PathOptions directly - Leaflet applies these automatically
+          
           return (
             <GeoJSON
               key={`${ot}-${probability}-${fid}`}
@@ -439,8 +482,25 @@ const MapInner: React.FC = React.memo(() => (
       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
     />
 
-    <svg>
+    <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
+        {/* CIG1: Old Hatching Style - Top right to bottom left broken diagonal lines */}
+        <pattern id="pattern-cig1" patternUnits="userSpaceOnUse" width="10" height="10">
+          <path d="M10,0 L0,10" stroke="black" strokeWidth="2" strokeDasharray="4,2" />
+        </pattern>
+
+        {/* CIG2: New - Diagonal Line from Top-Left to Bottom-Right (Solid) */}
+        <pattern id="pattern-cig2" patternUnits="userSpaceOnUse" width="10" height="10">
+           <path d="M0,0 L10,10" stroke="black" strokeWidth="2" />
+        </pattern>
+
+        {/* CIG3: New - Crosshatch (Both Diagonal Directions) */}
+        <pattern id="pattern-cig3" patternUnits="userSpaceOnUse" width="10" height="10">
+          <path d="M0,0 L10,10" stroke="black" strokeWidth="2" />
+          <path d="M10,0 L0,10" stroke="black" strokeWidth="2" />
+        </pattern>
+        
+        {/* Legacy Pattern for backward compatibility if needed, aliased to CIG1 or kept as is */}
         <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="10" height="10">
           <path d="M0,0 L10,10 M10,0 L0,10" stroke="black" strokeWidth="2" />
         </pattern>

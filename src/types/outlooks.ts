@@ -29,23 +29,46 @@ export type TornadoProbability =
   | '60%'
   | '60#'; // Significant tornado - 60%
 
-// Probabilistic risk levels for Wind and Hail (they share the same percentages)
-export type WindHailProbability = 
+// Wind Probability
+export type WindProbability = 
   | '5%'
   | '15%'
-  | '15#'  // Significant threat - 15%
+  | '15#'
   | '30%'
-  | '30#'  // Significant threat - 30%
+  | '30#'
   | '45%'
-  | '45#'  // Significant threat - 45%
+  | '45#'
   | '60%'
-  | '60#'; // Significant threat - 60%
+  | '60#'
+  | '75%'
+  | '75#'
+  | '90%'
+  | '90#';
+
+// Hail Probability
+export type HailProbability = 
+  | '5%'
+  | '15%'
+  | '15#'
+  | '30%'
+  | '30#'
+  | '45%'
+  | '45#'
+  | '60%'
+  | '60#';
+
+// CIG (Hatching) Levels
+export type CIGLevel = 
+  | 'CIG0' // No hatching
+  | 'CIG1' // Old Hatching Style (Broken diagonal)
+  | 'CIG2' // Solid diagonal (Top-Left to Bottom-Right)
+  | 'CIG3'; // Crosshatch
 
 // Outlook types
 export type OutlookType = 'tornado' | 'wind' | 'hail' | 'categorical';
 
 // Combined probability type for use across the app
-export type Probability = TornadoProbability | WindHailProbability | CategoricalRiskLevel;
+export type Probability = TornadoProbability | WindProbability | HailProbability | CategoricalRiskLevel | CIGLevel;
 
 export type Hazard = OutlookType;
 
@@ -77,15 +100,16 @@ export interface OutlookData {
 // Color mappings for the different outlook types
 export interface ColorMappings {
   tornado: Record<TornadoProbability, string>;
-  wind: Record<WindHailProbability, string>;
-  hail: Record<WindHailProbability, string>;
+  wind: Record<WindProbability, string>;
+  hail: Record<HailProbability, string>;
   categorical: Record<CategoricalRiskLevel, string>;
   significant: string; // For the hatched pattern
+  hatching: Record<CIGLevel, string>; // Pattern defs or colors (transparent usually)
 }
 
 // Drawing tool state
 export interface DrawingState {
   activeOutlookType: OutlookType;
-  activeProbability: TornadoProbability | WindHailProbability | CategoricalRiskLevel;
-  isSignificant: boolean; // Whether the current drawing should be hatched
+  activeProbability: Probability;
+  isSignificant: boolean; // Whether the current drawing should be hatched (Legacy)
 }

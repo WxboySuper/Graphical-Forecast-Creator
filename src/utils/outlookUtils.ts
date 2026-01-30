@@ -1,8 +1,10 @@
-import { 
+import {
   CategoricalRiskLevel, 
   ColorMappings, 
   TornadoProbability, 
-  WindHailProbability 
+  WindProbability,
+  HailProbability,
+  CIGLevel
 } from '../types/outlooks';
 
 /**
@@ -40,7 +42,11 @@ export const colorMappings: ColorMappings = {
     '45%': '#fe00fe',
     '45#': '#fe00fe',
     '60%': '#912bee',
-    '60#': '#912bee'
+    '60#': '#912bee',
+    '75%': '#cd00cd',
+    '75#': '#cd00cd',
+    '90%': '#0000cd',
+    '90#': '#0000cd'
   },
   hail: {
     '5%': '#894826',
@@ -53,70 +59,122 @@ export const colorMappings: ColorMappings = {
     '60%': '#912bee',
     '60#': '#912bee'
   },
-  significant: '#000000' // Black hatch for significant threat areas
+  significant: '#000000', // Black hatch for significant threat areas
+  hatching: {
+    'CIG0': 'none',
+    'CIG1': 'url(#pattern-cig1)',
+    'CIG2': 'url(#pattern-cig2)',
+    'CIG3': 'url(#pattern-cig3)'
+  }
 };
-
 /**
  * Convert tornado probability to categorical risk level
- * @param probability Tornado probability
- * @returns Categorical risk level
  */
-export function tornadoToCategorical(probability: TornadoProbability): CategoricalRiskLevel {
-  const mapping: Record<string, CategoricalRiskLevel> = {
-    '2%': 'MRGL',
-    '5%': 'SLGT',
-    '10%': 'ENH',
-    '10#': 'ENH',
-    '15%': 'ENH',
-    '15#': 'MDT',
-    '30%': 'MDT',
-    '30#': 'HIGH',
-    '45%': 'HIGH',
-    '45#': 'HIGH',
-    '60%': 'HIGH',
-    '60#': 'HIGH'
-  };
-  return mapping[probability] ?? 'TSTM';
+export function tornadoToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
+  // Clean probability string
+  const p = probability.replace(/[#]/g, '%') as TornadoProbability;
+  
+  // Logic based on New Outlook Format Prompt
+  // MRGL
+  if (p === '2%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
+  
+  // SLGT
+  if (p === '2%' && cig === 'CIG2') return 'SLGT';
+  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
+  if (p === '10%' && cig === 'CIG0') return 'SLGT';
+
+  // ENH
+  if (p === '5%' && cig === 'CIG2') return 'ENH'; // Prompt says 5% CIG2 -> ENH? Wait, checking table. "ENH... 5%: CIG 2". Yes.
+  if (p === '10%' && (cig === 'CIG1' || cig === 'CIG2' || cig === 'CIG3')) return 'ENH';
+  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH';
+  if ((p === '30%' || p === '45%' || p === '60%') && cig === 'CIG0') return 'ENH';
+
+  // MDT
+  if (p === '15%' && (cig === 'CIG2' || cig === 'CIG3')) return 'MDT';
+  if ((p === '30%' || p === '45%') && cig === 'CIG1') return 'MDT';
+
+  // HIGH
+  if ((p === '30%' || p === '45%') && (cig === 'CIG2' || cig === 'CIG3')) return 'HIGH';
+  if (p === '60%' && (cig === 'CIG1' || cig === 'CIG2' || cig === 'CIG3')) return 'HIGH';
+
+  // Fallback for combinations not listed (usually lower or invalid)
+  // Assuming default behavior or legacy mapping if strict matching fails?
+  // Let's stick strictly to the prompt. If not matched, maybe TSTM?
+  // But wait, 2% is minimum for Tornado.
+  
+  // Safety fallbacks for legacy codes (e.g. # sig)
+  // If probability has # (legacy), we assume CIG1/Significant equivalent?
+  // But the prompt wants precise mapping.
+  
+  return 'TSTM';
 }
 
 /**
  * Convert wind probability to categorical risk level
- * @param probability Wind probability
- * @returns Categorical risk level
  */
-export function windToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
-  const mapping: Record<string, CategoricalRiskLevel> = {
-    '5%': 'MRGL',
-    '15%': 'SLGT',
-    '15#': 'SLGT',
-    '30%': 'ENH',
-    '30#': 'ENH',
-    '45%': 'ENH',
-    '45#': 'MDT',
-    '60%': 'MDT',
-    '60#': 'HIGH'
-  };
-  return mapping[probability] ?? 'TSTM';
+export function windToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
+  const p = probability.replace(/[#]/g, '%') as WindProbability;
+
+  // MRGL
+  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
+
+  // SLGT
+  if (p === '5%' && cig === 'CIG2') return 'SLGT';
+  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
+  if (p === '30%' && cig === 'CIG0') return 'SLGT';
+
+  // ENH
+  if (p === '15%' && cig === 'CIG2') return 'ENH';
+  if (p === '30%' && (cig === 'CIG1' || cig === 'CIG2')) return 'ENH';
+  if ((p === '45%' || p === '60%' || p === '75%' || p === '90%') && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH'; // Prompt says 45,60,75,90 CIG0 -> ENH. Table: "45%: CIG 0, 1". "60%: CIG 0". "75%: CIG 0". "90%: CIG 0".
+  // Correction from prompt:
+  // ENH: 45%: CIG 0, 1. 
+  // ENH: 60%: CIG 0.
+  // ENH: 75%: CIG 0.
+  // ENH: 90%: CIG 0.
+  if (p === '45%' && cig === 'CIG1') return 'ENH';
+  if (['45%', '60%', '75%', '90%'].includes(p) && cig === 'CIG0') return 'ENH';
+
+  // MDT
+  if (p === '45%' && cig === 'CIG2') return 'MDT';
+  if (['60%', '75%', '90%'].includes(p) && cig === 'CIG1') return 'MDT';
+
+  // HIGH
+  if (p === '45%' && cig === 'CIG3') return 'HIGH';
+  if (['60%', '75%', '90%'].includes(p) && (cig === 'CIG2' || cig === 'CIG3')) return 'HIGH';
+
+  return 'TSTM';
 }
 
 /**
  * Convert hail probability to categorical risk level
- * @param probability Hail probability
- * @returns Categorical risk level
  */
-export function hailToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
-  const mapping: Record<string, CategoricalRiskLevel> = {
-    '5%': 'MRGL',
-    '15%': 'SLGT',
-    '15#': 'SLGT',
-    '30%': 'ENH',
-    '30#': 'ENH',
-    '45%': 'ENH',
-    '45#': 'MDT',
-    '60%': 'MDT',
-    '60#': 'MDT'
-  };
-  return mapping[probability] ?? 'TSTM';
+export function hailToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
+  const p = probability.replace(/[#]/g, '%') as HailProbability;
+
+  // MRGL
+  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
+
+  // SLGT
+  if (p === '5%' && cig === 'CIG2') return 'SLGT';
+  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
+  if (p === '30%' && cig === 'CIG0') return 'SLGT';
+
+  // ENH
+  if (p === '15%' && cig === 'CIG2') return 'ENH';
+  if (p === '30%' && (cig === 'CIG1' || cig === 'CIG2')) return 'ENH';
+  if (p === '45%' && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH';
+  if (p === '60%' && cig === 'CIG0') return 'ENH';
+
+  // MDT
+  if (p === '45%' && cig === 'CIG2') return 'MDT';
+  if (p === '60%' && (cig === 'CIG1' || cig === 'CIG2')) return 'MDT';
+
+  // Hail doesn't seem to go to HIGH in the prompt provided?
+  // "MDT... 60%: CIG 1, 2".
+  // Prompt ends there for Hail. No HIGH listed.
+
+  return 'TSTM';
 }
 
 /**
@@ -137,8 +195,8 @@ export function isSignificantThreat(probability: string): boolean {
  */
 export function getHighestCategoricalRisk(
   tornadoProb?: TornadoProbability,
-  windProb?: WindHailProbability,
-  hailProb?: WindHailProbability
+  windProb?: WindProbability,
+  hailProb?: HailProbability
 ): CategoricalRiskLevel {
   const riskValues: { [key in CategoricalRiskLevel]: number } = {
     TSTM: 0,

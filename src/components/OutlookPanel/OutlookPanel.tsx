@@ -267,15 +267,6 @@ const OutlookPanel: React.FC = () => {
         getOutlookTypeEnabled={getOutlookTypeEnabled}
       />
       
-      {canBeSignificant(activeOutlookType, activeProbability, significantThreatsEnabled) && (
-        <SignificantSectionTop
-          isSignificant={isSignificant}
-          handleToggleSignificant={handleToggleSignificant}
-          significantThreatsEnabled={significantThreatsEnabled}
-          activeProbability={activeProbability}
-        />
-      )}
-      
       <CurrentSelection
         activeOutlookType={activeOutlookType}
         activeProbability={activeProbability}

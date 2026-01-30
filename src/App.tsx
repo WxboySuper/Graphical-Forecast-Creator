@@ -225,7 +225,7 @@ const performLoad = (
     }
 
     const entries = outlooksObj as {
-      [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
+      [K in keyof OutlookData]?: [string, Feature<Geometry, GeoJsonProperties>[]][]
     };
 
     const deserializedOutlooks: OutlookData = {

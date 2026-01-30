@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { addFeature, resetCategorical, setOutlookMap } from '../store/forecastSlice';
-import { getHighestCategoricalRisk } from '../utils/outlookUtils';
-import { TornadoProbability, WindHailProbability, CategoricalRiskLevel, OutlookData } from '../types/outlooks';
+import { tornadoToCategorical, windToCategorical, hailToCategorical } from '../utils/outlookUtils';
+import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { v4 as uuidv4 } from 'uuid';
+import * as turf from '@turf/turf';
+import { Feature, Geometry, Polygon, MultiPolygon } from 'geojson';
 
 /**
  * Hook that automatically generates categorical outlooks based on probabilistic outlooks.
@@ -33,6 +35,7 @@ const useAutoCategorical = () => {
     const tornadoIds = Array.from(outlooks.tornado.values()).flat().map(f => f.id).sort().join(',');
     const windIds = Array.from(outlooks.wind.values()).flat().map(f => f.id).sort().join(',');
     const hailIds = Array.from(outlooks.hail.values()).flat().map(f => f.id).sort().join(',');
+    // Hatching is now integrated into these maps
     const currentHash = `${tornadoIds}|${windIds}|${hailIds}`;
 
     // Skip if nothing has changed since last processing
@@ -65,91 +68,150 @@ const useAutoCategorical = () => {
       }
 
       // Delegate processing to helper
-      const highestRiskFeatures = processOutlooksToCategorical(outlooks);
+      const generatedFeatures = processOutlooksToCategorical(outlooks);
 
-      // Add all generated categorical features (if any)
-      highestRiskFeatures.forEach(({ feature }) => {
+      // Add all generated categorical features
+      generatedFeatures.forEach((feature) => {
         dispatch(addFeature({ feature }));
       });
     } finally {
       processingRef.current = false;
     }
-  }, [dispatch, outlooks, drawingState.activeOutlookType]); // Add drawingState dependency
+  }, [dispatch, outlooks, drawingState.activeOutlookType]);
 
   return null;
 };
 
-// Helper function to determine if a new risk level should replace the existing one
-const shouldReplaceRisk = (existing: CategoricalRiskLevel, newRisk: CategoricalRiskLevel): boolean => {
-  const riskOrder: Record<CategoricalRiskLevel, number> = {
-    'TSTM': 0,
-    'MRGL': 1,
-    'SLGT': 2,
-    'ENH': 3,
-    'MDT': 4,
-    'HIGH': 5
-  };
-  return riskOrder[newRisk] > riskOrder[existing];
+// Helper to safely union a list of polygons
+const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon | MultiPolygon> | null => {
+  if (features.length === 0) return null;
+  if (features.length === 1) return features[0];
+  
+  try {
+    // Turf v7: union takes a FeatureCollection
+    const fc = turf.featureCollection(features);
+    const result = turf.union(fc);
+    return result as Feature<Polygon | MultiPolygon>;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Error in union operation', e);
+    return features[0]; // Fallback
+  }
 };
 
-// Extract processing of probabilistic outlooks into a helper to reduce cyclomatic complexity
-export function processOutlooksToCategorical(outlooks: OutlookData) {
-  const highestRiskFeatures = new Map<string, {
-    risk: CategoricalRiskLevel;
-    feature: GeoJSON.Feature;
-    sources: { type: string; probability: string }[];
-  }>();
+// Helper to convert probability features to categorical pieces
+export function processOutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
+  const generatedFeatures: GeoJSON.Feature[] = [];
+  const riskPolygons = new Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>();
 
-  const tornadoFeatures = Array.from(outlooks.tornado.entries());
-  const windFeatures = Array.from(outlooks.wind.entries());
-  const hailFeatures = Array.from(outlooks.hail.entries());
+  // 2. Process each Probability Type
+  const types = ['tornado', 'wind', 'hail'] as const;
+  
+  types.forEach(type => {
+    const probMap = outlooks[type];
+    
+    // Split into Probability Polygons and Hatching Polygons
+    const probabilityFeatures = new Map<string, Feature<Polygon | MultiPolygon>[]>();
+    const hatchingFeatures = new Map<CIGLevel, Feature<Polygon | MultiPolygon>[]>();
+    
+    probMap.forEach((features, key) => {
+      // Cast to Polygon/MultiPolygon
+      const validFeatures = features.filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') as Feature<Polygon | MultiPolygon>[];
+      if (validFeatures.length === 0) return;
 
-  const buckets = [
-    { type: 'tornado', features: tornadoFeatures },
-    { type: 'wind', features: windFeatures },
-    { type: 'hail', features: hailFeatures }
-  ];
+      if (key.startsWith('CIG')) {
+        hatchingFeatures.set(key as CIGLevel, validFeatures);
+      } else {
+        probabilityFeatures.set(key, validFeatures);
+      }
+    });
 
-  buckets.forEach(({ type, features }) => {
-    features.forEach(([probability, featureList]: [string, GeoJSON.Feature[]]) => {
-      featureList.forEach((feature: GeoJSON.Feature) => {
-        // Get the categorical risk level based on the outlook type
-        const risk = getHighestCategoricalRisk(
-          type === 'tornado' ? (probability as TornadoProbability) : undefined,
-          type === 'wind' ? (probability as WindHailProbability) : undefined,
-          type === 'hail' ? (probability as WindHailProbability) : undefined
-        );
+    // Create Unioned Hatching Regions for this type
+    const hatchingRegions = new Map<CIGLevel, Feature<Polygon | MultiPolygon>>();
+    const cigLevels: CIGLevel[] = ['CIG3', 'CIG2', 'CIG1'];
+    
+    cigLevels.forEach(cig => {
+      const features = hatchingFeatures.get(cig);
+      if (features) {
+        const unioned = safeUnion(features);
+        if (unioned) hatchingRegions.set(cig, unioned);
+      }
+    });
 
-        // Skip TSTM risk level (should be drawn manually)
-        if (risk === 'TSTM') return;
+    // Process Probabilities against Hatching (of the same type)
+    probabilityFeatures.forEach((features, probStr) => {
+      features.forEach(poly => {
+        let remainingPoly: Feature<Polygon | MultiPolygon> | null = poly;
 
-        const featureId = String(feature.id ?? uuidv4());
-        const existingFeature = highestRiskFeatures.get(featureId);
-
-        if (!existingFeature || shouldReplaceRisk(existingFeature.risk, risk)) {
-          highestRiskFeatures.set(featureId, {
-            risk,
-            feature: {
-              ...feature,
-              id: featureId,
-              properties: {
-                ...feature.properties,
-                outlookType: 'categorical',
-                probability: risk,
-                derivedFrom: type,
-                originalProbability: probability
+        // Intersect with Hatching Layers
+        cigLevels.forEach(cig => {
+          if (!remainingPoly) return;
+          const hatchRegion = hatchingRegions.get(cig);
+          
+          if (hatchRegion) {
+            try {
+              // Turf v7: intersect takes FeatureCollection
+              const intersection = turf.intersect(turf.featureCollection([remainingPoly, hatchRegion]));
+              if (intersection) {
+                // We found a piece with this CIG level
+                addPieceToRiskMap(type, probStr, cig, intersection as Feature<Polygon | MultiPolygon>, riskPolygons);
+                
+                // Subtract this piece from the remaining polygon
+                // Turf v7: difference takes FeatureCollection
+                remainingPoly = turf.difference(turf.featureCollection([remainingPoly, intersection as Feature<Polygon | MultiPolygon>])) as Feature<Polygon | MultiPolygon> | null;
               }
-            },
-            sources: [{ type, probability }]
-          });
-        } else if (existingFeature.risk === risk) {
-          existingFeature.sources.push({ type, probability });
+            } catch (e) {
+                // Ignore topology errors
+            }
+          }
+        });
+
+        // Any remaining part is CIG0
+        if (remainingPoly) {
+             addPieceToRiskMap(type, probStr, 'CIG0', remainingPoly, riskPolygons);
         }
       });
     });
   });
 
-  return highestRiskFeatures;
+  // 3. Union polygons of the same Risk Level and create final features
+  riskPolygons.forEach((polys, risk) => {
+    if (risk === 'TSTM') return; // Skip TSTM (Manual only)
+    
+    const unioned = safeUnion(polys);
+    if (unioned) {
+      generatedFeatures.push({
+        ...unioned,
+        id: uuidv4(),
+        properties: {
+          outlookType: 'categorical',
+          probability: risk,
+          derivedFrom: 'auto-generated'
+        }
+      });
+    }
+  });
+
+  return generatedFeatures;
 };
+
+function addPieceToRiskMap(
+  type: 'tornado' | 'wind' | 'hail', 
+  prob: string, 
+  cig: CIGLevel, 
+  poly: Feature<Polygon | MultiPolygon>,
+  riskMap: Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>
+) {
+    let risk: CategoricalRiskLevel = 'TSTM';
+    if (type === 'tornado') risk = tornadoToCategorical(prob, cig);
+    if (type === 'wind') risk = windToCategorical(prob, cig);
+    if (type === 'hail') risk = hailToCategorical(prob, cig);
+
+    if (risk !== 'TSTM') {
+        const current = riskMap.get(risk) || [];
+        current.push(poly);
+        riskMap.set(risk, current);
+    }
+}
 
 export default useAutoCategorical;

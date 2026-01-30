@@ -43,15 +43,23 @@ const computeOutlookType = (feature: GeoJSON.Feature, state: ForecastState): Out
 const computeProbability = (feature: GeoJSON.Feature, state: ForecastState): string => {
   const fallback = state.drawingState.activeProbability;
   const base = (feature.properties?.probability ?? fallback) as string;
+  const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
 
-  // If the current outlook type is categorical, return categorical labels unchanged
-  if (state.drawingState.activeOutlookType === 'categorical') {
+  // If the outlook type is categorical, return categorical labels unchanged
+  if (outlookType === 'categorical') {
+    return base;
+  }
+  
+  // If hatching or CIG level, return CIG label unchanged
+  // Check if base starts with CIG just in case
+  if (String(base).startsWith('CIG')) {
     return base;
   }
 
-  // Otherwise treat as numeric probability: strip any existing '%' or '#' and append correct suffix
+  // otherwise treat as numeric probability: strip any existing '%' or '#' and append correct suffix
   const normalized = String(base).replace(/[%#]/g, '');
-  return state.drawingState.isSignificant ? `${normalized}#` : `${normalized}%`;
+  // Legacy significance logic removed
+  return `${normalized}%`;
 };
 const buildFeatureWithProps = (
   feature: GeoJSON.Feature,
@@ -96,30 +104,19 @@ export const forecastSlice = createSlice({
     },
 
     // Set the active probability/risk level for drawing
-    setActiveProbability: (state, action: PayloadAction<"TSTM" | "MRGL" | "SLGT" | "ENH" | "MDT" | "HIGH" | "2%" | "5%" | "10%" | "10#" | "15%" | "15#" | "30%" | "30#" | "45%" | "45#" | "60%" | "60#">) => {
+    setActiveProbability: (state, action: PayloadAction<any>) => {
       state.drawingState.activeProbability = action.payload;
       // If probability contains '#', it's significant
-      state.drawingState.isSignificant = action.payload.includes('#');
+      if (typeof action.payload === 'string') {
+        state.drawingState.isSignificant = action.payload.includes('#');
+      }
       state.isSaved = false;
     },
 
-    // Toggle significant status
+    // Toggle significant status - No-op as legacy mode is removed
     toggleSignificant: (state) => {
-      const currentProb = state.drawingState.activeProbability;
-
-      // Break complex conditional into clear boolean checks
-      const activeType = state.drawingState.activeOutlookType;
-      const isCategorical = activeType === 'categorical';
-      const unsupportedForTornado = activeType === 'tornado' && (currentProb === '2%' || currentProb === '5%');
-      const unsupportedForWindHail = (activeType === 'wind' || activeType === 'hail') && currentProb === '5%';
-
-      // Only allow toggling when not categorical and not one of the unsupported combinations
-      const canToggle = !isCategorical && !unsupportedForTornado && !unsupportedForWindHail;
-
-      if (canToggle) {
-        state.drawingState.isSignificant = !state.drawingState.isSignificant;
-        state.isSaved = false;
-      }
+      // Legacy significance toggle removed
+      state.drawingState.isSignificant = false;
     },
 
     // Add a drawn feature to the appropriate outlook

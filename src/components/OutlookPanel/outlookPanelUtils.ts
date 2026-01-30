@@ -1,36 +1,31 @@
-import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindHailProbability } from '../../types/outlooks';
+import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindProbability, HailProbability, CIGLevel } from '../../types/outlooks';
 import { colorMappings } from '../../utils/outlookUtils';
 
 export const getAvailableProbabilities = (activeOutlookType: OutlookType) => {
+  const cigs: CIGLevel[] = ['CIG1', 'CIG2', 'CIG3']; // Available hatching options
+  
   switch (activeOutlookType) {
     case 'categorical':
-      return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as CategoricalRiskLevel[];
+      // Only TSTM is manually drawn. Others are converted.
+      return ['TSTM'] as CategoricalRiskLevel[];
     case 'tornado':
-      return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as TornadoProbability[];
+      return ['2%', '5%', '10%', '15%', '30%', '45%', '60%', ...cigs] as (TornadoProbability | CIGLevel)[];
     case 'wind':
+      return ['5%', '15%', '30%', '45%', '60%', '75%', '90%', ...cigs] as (WindProbability | CIGLevel)[];
     case 'hail':
-      return ['5%', '15%', '30%', '45%', '60%'] as WindHailProbability[];
+      return ['5%', '15%', '30%', '45%', '60%', ...cigs] as (HailProbability | CIGLevel)[];
     default:
       return [] as string[];
   }
 };
 
+// Legacy significance removed - always false
 export const canBeSignificant = (
   activeOutlookType: OutlookType,
   activeProbability: string,
   significantThreatsEnabled: boolean
 ) => {
-  if (!significantThreatsEnabled || activeOutlookType === 'categorical') return false;
-  const probability = activeProbability.replace('#', '');
-  switch (activeOutlookType) {
-    case 'tornado':
-      return !['2%', '5%'].includes(probability);
-    case 'wind':
-    case 'hail':
-      return !['5%'].includes(probability);
-    default:
-      return false;
-  }
+  return false;
 };
 
 export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, activeProbability: string, prob: string) => {
@@ -45,8 +40,17 @@ export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, active
     } else {
       textColor = '#FFFFFF';
     }
+  } else if (prob.startsWith('CIG')) {
+     // Hatching buttons
+     color = '#e0e0e0';
+     textColor = '#000000';
   } else {
-    const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
+    // Determine color map
+    let colorMap: any;
+    if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
+    else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
+    else colorMap = colorMappings.hail;
+
     color = colorMap[prob as keyof typeof colorMap] || '#FFFFFF';
     textColor = '#FFFFFF';
   }
@@ -62,6 +66,14 @@ export const getCurrentColor = (activeOutlookType: OutlookType, activeProbabilit
   if (activeOutlookType === 'categorical') {
     return colorMappings.categorical[activeProbability as keyof typeof colorMappings.categorical] || '#FFFFFF';
   }
-  const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
+  if (activeProbability.startsWith('CIG')) {
+      return '#e0e0e0'; // Placeholder for color preview
+  }
+  
+  let colorMap: any;
+  if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
+  else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
+  else colorMap = colorMappings.hail;
+  
   return colorMap[activeProbability as keyof typeof colorMap] || '#FFFFFF';
 };
