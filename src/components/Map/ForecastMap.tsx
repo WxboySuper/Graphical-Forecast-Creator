@@ -2,6 +2,7 @@
 import * as React from 'react';
 import type { Dispatch } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
+import { useState, useCallback } from 'react';
 
 // Import Leaflet first, then Geoman to extend it
 // skipcq: JS-C1003
@@ -20,6 +21,7 @@ import { createTooltipContent, stripHtml } from '../../utils/domUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
+import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -256,10 +258,11 @@ interface OutlookRenderContext {
   map: L.Map;
   activeOutlookType: OutlookType;
   styleFn: (o: OutlookType, p: string) => FeatureStyle;
+  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => void;
 }
 
 const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlookType: OutlookType, probability: string, featureId: string) => {
-  const { dispatch, map } = context;
+  const { map, onRequestDelete } = context;
 
   const handleClick = () => {
     // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
@@ -269,11 +272,16 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
 
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
     const safeProbability = stripHtml(probability);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
-    // eslint-disable-next-line no-restricted-globals, no-alert
-    if (confirm(message)) {
-      dispatch(removeFeature({ outlookType, probability, featureId }));
-    }
+    // Use a div with pre-wrap for newlines
+    const message = (
+      <div style={{ whiteSpace: 'pre-wrap' }}>
+        Delete this {outlookName} outlook area?
+        <br /><br />
+        Risk Level: {safeProbability}{safeProbability.includes('#') ? ' (Significant)' : ''}
+      </div>
+    );
+
+    onRequestDelete(outlookType, probability, featureId, message);
   };
 
   const handleMouseOver = (e: L.LeafletEvent) => {
@@ -391,9 +399,13 @@ const renderOutlookFeatures = (
   });
 };
 
+interface OutlookLayersProps {
+  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => void;
+}
+
 // Now declare OutlookLayers (after helpers)
 // Optimized: Memoized to prevent re-renders when map view or unrelated state changes
-const OutlookLayers: React.FC = React.memo(() => {
+const OutlookLayers: React.FC<OutlookLayersProps> = React.memo(({ onRequestDelete }) => {
   const dispatch = useDispatch();
   const map = useMap();
   const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
@@ -403,7 +415,8 @@ const OutlookLayers: React.FC = React.memo(() => {
     dispatch,
     map,
     activeOutlookType,
-    styleFn: getFeatureStyle
+    styleFn: getFeatureStyle,
+    onRequestDelete
   };
 
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
@@ -415,9 +428,13 @@ const OutlookLayers: React.FC = React.memo(() => {
 
 OutlookLayers.displayName = 'OutlookLayers';
 
+interface MapInnerProps {
+  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => void;
+}
+
 // Extract deeper JSX children into a small component to reduce nesting
 // Optimized: Memoized to prevent re-renders when parent re-renders
-const MapInner: React.FC = React.memo(() => (
+const MapInner: React.FC<MapInnerProps> = React.memo(({ onRequestDelete }) => (
   <>
     <TileLayer
       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -432,7 +449,7 @@ const MapInner: React.FC = React.memo(() => (
       </defs>
     </svg>
 
-    <OutlookLayers />
+    <OutlookLayers onRequestDelete={onRequestDelete} />
 
     <Legend />
   </>
@@ -460,6 +477,12 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
+  const [featureToDelete, setFeatureToDelete] = useState<{
+    outlookType: OutlookType;
+    probability: string;
+    featureId: string;
+    message: React.ReactNode;
+  } | null>(null);
   
   // Store drawingState in a ref so our callback always has latest values
   const drawingStateRef = React.useRef(drawingState);
@@ -495,6 +518,25 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
     // Dispatch to store
     dispatch(addFeature({ feature: geoJson }));
   }, [dispatch]);
+
+  const handleRequestDelete = useCallback((outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => {
+    setFeatureToDelete({ outlookType, probability, featureId, message });
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (featureToDelete) {
+      dispatch(removeFeature({
+        outlookType: featureToDelete.outlookType,
+        probability: featureToDelete.probability,
+        featureId: featureToDelete.featureId
+      }));
+      setFeatureToDelete(null);
+    }
+  }, [dispatch, featureToDelete]);
+
+  const handleCancelDelete = useCallback(() => {
+    setFeatureToDelete(null);
+  }, []);
 
   // Handle keyboard shortcuts for drawing
   React.useEffect(() => {
@@ -539,8 +581,18 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
             onPolygonCreated={handlePolygonCreated}
           />
 
-          <MapInner />
+          <MapInner onRequestDelete={handleRequestDelete} />
       </MapContainer>
+
+      <ConfirmationModal
+        isOpen={!!featureToDelete}
+        title="Confirm Deletion"
+        message={featureToDelete?.message}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+      />
     </div>
   );
 });
