@@ -8,6 +8,19 @@ import {
   WindHailProbability 
 } from '../types/outlooks';
 
+// Common colors for Wind and Hail since they share the same probability scale and colors
+const WIND_HAIL_COLORS: Record<WindHailProbability, string> = {
+  '5%': '#894826',
+  '15%': '#ffc703',
+  '15#': '#ffc703',
+  '30%': '#fd0100',
+  '30#': '#fd0100',
+  '45%': '#fe00fe',
+  '45#': '#fe00fe',
+  '60%': '#912bee',
+  '60#': '#912bee'
+};
+
 /**
  * Color mappings for all outlook types based on specifications in Outlook_Info.md
  */
@@ -34,30 +47,57 @@ export const colorMappings: ColorMappings = {
     '60%': '#114d8c',
     '60#': '#114d8c'
   },
-  wind: {
-    '5%': '#894826',
-    '15%': '#ffc703',
-    '15#': '#ffc703',
-    '30%': '#fd0100',
-    '30#': '#fd0100',
-    '45%': '#fe00fe',
-    '45#': '#fe00fe',
-    '60%': '#912bee',
-    '60#': '#912bee'
-  },
-  hail: {
-    '5%': '#894826',
-    '15%': '#ffc703',
-    '15#': '#ffc703',
-    '30%': '#fd0100',
-    '30#': '#fd0100',
-    '45%': '#fe00fe',
-    '45#': '#fe00fe',
-    '60%': '#912bee',
-    '60#': '#912bee'
-  },
+  wind: WIND_HAIL_COLORS,
+  hail: WIND_HAIL_COLORS,
   significant: '#000000' // Black hatch for significant threat areas
 };
+
+// Probability to Categorical Risk Mappings
+const TORNADO_MAPPING: Record<string, CategoricalRiskLevel> = {
+  '2%': 'MRGL',
+  '5%': 'SLGT',
+  '10%': 'ENH',
+  '10#': 'ENH',
+  '15%': 'ENH',
+  '15#': 'MDT',
+  '30%': 'MDT',
+  '30#': 'HIGH',
+  '45%': 'HIGH',
+  '45#': 'HIGH',
+  '60%': 'HIGH',
+  '60#': 'HIGH'
+};
+
+const WIND_MAPPING: Record<string, CategoricalRiskLevel> = {
+  '5%': 'MRGL',
+  '15%': 'SLGT',
+  '15#': 'SLGT',
+  '30%': 'ENH',
+  '30#': 'ENH',
+  '45%': 'ENH',
+  '45#': 'MDT',
+  '60%': 'MDT',
+  '60#': 'HIGH'
+};
+
+const HAIL_MAPPING: Record<string, CategoricalRiskLevel> = {
+  '5%': 'MRGL',
+  '15%': 'SLGT',
+  '15#': 'SLGT',
+  '30%': 'ENH',
+  '30#': 'ENH',
+  '45%': 'ENH',
+  '45#': 'MDT',
+  '60%': 'MDT',
+  '60#': 'MDT'
+};
+
+/**
+ * Helper to lookup risk level from a mapping
+ */
+function getRiskFromMapping(mapping: Record<string, CategoricalRiskLevel>, probability: string): CategoricalRiskLevel {
+  return mapping[probability] ?? 'TSTM';
+}
 
 /**
  * Convert tornado probability to categorical risk level
@@ -65,21 +105,7 @@ export const colorMappings: ColorMappings = {
  * @returns Categorical risk level
  */
 export function tornadoToCategorical(probability: TornadoProbability): CategoricalRiskLevel {
-  const mapping: Record<string, CategoricalRiskLevel> = {
-    '2%': 'MRGL',
-    '5%': 'SLGT',
-    '10%': 'ENH',
-    '10#': 'ENH',
-    '15%': 'ENH',
-    '15#': 'MDT',
-    '30%': 'MDT',
-    '30#': 'HIGH',
-    '45%': 'HIGH',
-    '45#': 'HIGH',
-    '60%': 'HIGH',
-    '60#': 'HIGH'
-  };
-  return mapping[probability] ?? 'TSTM';
+  return getRiskFromMapping(TORNADO_MAPPING, probability);
 }
 
 /**
@@ -88,18 +114,7 @@ export function tornadoToCategorical(probability: TornadoProbability): Categoric
  * @returns Categorical risk level
  */
 export function windToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
-  const mapping: Record<string, CategoricalRiskLevel> = {
-    '5%': 'MRGL',
-    '15%': 'SLGT',
-    '15#': 'SLGT',
-    '30%': 'ENH',
-    '30#': 'ENH',
-    '45%': 'ENH',
-    '45#': 'MDT',
-    '60%': 'MDT',
-    '60#': 'HIGH'
-  };
-  return mapping[probability] ?? 'TSTM';
+  return getRiskFromMapping(WIND_MAPPING, probability);
 }
 
 /**
@@ -108,18 +123,7 @@ export function windToCategorical(probability: WindHailProbability): Categorical
  * @returns Categorical risk level
  */
 export function hailToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
-  const mapping: Record<string, CategoricalRiskLevel> = {
-    '5%': 'MRGL',
-    '15%': 'SLGT',
-    '15#': 'SLGT',
-    '30%': 'ENH',
-    '30#': 'ENH',
-    '45%': 'ENH',
-    '45#': 'MDT',
-    '60%': 'MDT',
-    '60#': 'MDT'
-  };
-  return mapping[probability] ?? 'TSTM';
+  return getRiskFromMapping(HAIL_MAPPING, probability);
 }
 
 /**
