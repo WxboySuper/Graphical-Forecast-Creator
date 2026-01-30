@@ -142,6 +142,39 @@ export const forecastSlice = createSlice({
       state.isSaved = false;
     },
     
+    // Update an existing feature (e.g. after geometry edit)
+    updateFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
+      const feature = action.payload.feature;
+      // We assume the feature properties are preserved from the original
+      const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
+      const probability = (feature.properties?.probability as string) || state.drawingState.activeProbability;
+      
+      const outlookMap = state.outlooks[outlookType];
+      // Normalize probability key access just in case
+      // (The map keys are strings like "5%", "TSTM")
+      // If the feature came from the store, it should have the correct probability in properties.
+      
+      const features = outlookMap.get(probability);
+      
+      if (features) {
+        const index = features.findIndex(f => f.id === feature.id);
+        if (index !== -1) {
+          // Update the feature while preserving properties that might not be in the payload if strictly geometry
+          // But usually we pass the whole feature back.
+          features[index] = {
+            ...features[index],
+            geometry: feature.geometry,
+            // Update properties if they changed, but ensure core tracking props stay
+            properties: {
+              ...features[index].properties,
+              ...feature.properties
+            }
+          };
+          state.isSaved = false;
+        }
+      }
+    },
+    
     // Remove a feature by ID
     removeFeature: (state, action: PayloadAction<{ 
       outlookType: OutlookType, 
@@ -239,6 +272,7 @@ export const {
   setActiveProbability,
   toggleSignificant,
   addFeature,
+  updateFeature,
   removeFeature,
   resetCategorical,
   setOutlookMap,

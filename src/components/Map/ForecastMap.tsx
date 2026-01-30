@@ -13,7 +13,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 // Now import react-leaflet components (they depend on L being ready)
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature } from '../../store/forecastSlice';
+import { addFeature, setMapView, removeFeature, updateFeature } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { colorMappings } from '../../utils/outlookUtils';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
@@ -67,10 +67,10 @@ function addGeomanControls(pm: PMMap['pm']) {
     drawPolyline: false,
     drawCircle: false,
     drawText: false,
-    editMode: false,
-    dragMode: false,
+    editMode: true,
+    dragMode: true,
     rotateMode: false,
-    removalMode: false,
+    removalMode: true,
     cutPolygon: true,
     drawPolygon: true,
     drawRectangle: true,
@@ -91,7 +91,7 @@ function setGeomanGlobalOptions(pm: PMMap['pm']) {
   });
 }
 
-function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
+function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void) {
   return (e: L.LeafletEvent & { shape?: string; layer?: L.Layer }) => {
     const isPolygonShape = e.shape === 'Polygon' || e.shape === 'Rectangle';
       if (isPolygonShape && e.layer) {
@@ -108,10 +108,10 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void
   };
 }
 
-function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
-  return (e: L.LeafletEvent & { layer?: L.Layer }) => {
+function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void) {
+  return (e: L.LeafletEvent & { layer?: L.Layer; originalLayer?: L.Layer }) => {
     if (e.layer) {
-      onPolygonCreated(e.layer);
+      onPolygonCreated(e.layer, e.originalLayer);
       map.removeLayer(e.layer);
     }
   };
@@ -120,7 +120,7 @@ function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
 // Helper component to sync map with Redux state, store map reference, and initialize Geoman
 const MapController: React.FC<{
   setMapInstance: (map: L.Map) => void;
-  onPolygonCreated: (layer: L.Layer) => void;
+  onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void;
 }> = ({ setMapInstance, onPolygonCreated }) => {
   const dispatch = useDispatch();
   const map = useMap();
@@ -279,10 +279,25 @@ const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: Outlo
       }).openTooltip();
     }
   };
+  
+  const handleEdit = (e: L.LeafletEvent) => {
+    const layer = e.target as GeomanLayer;
+    const geoJson = layer.toGeoJSON();
+    geoJson.id = featureId;
+    dispatch(updateFeature({ feature: geoJson }));
+  };
+
+  const handleRemove = () => {
+    dispatch(removeFeature({ outlookType, probability, featureId }));
+  };
 
   return {
     click: handleClick,
-    mouseover: handleMouseOver
+    mouseover: handleMouseOver,
+    'pm:edit': handleEdit,
+    'pm:dragend': handleEdit,
+    'pm:markerdragend': handleEdit,
+    'pm:remove': handleRemove
   };
 };
 
@@ -455,24 +470,47 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   }), [mapInstance]);
   
   // Drawing creation handler for Geoman
-  const handlePolygonCreated = React.useCallback((layer: L.Layer) => {
+  const handlePolygonCreated = React.useCallback((layer: L.Layer, originalLayer?: L.Layer) => {
     const geomanLayer = layer as GeomanLayer;
 
     // Convert to GeoJSON
     const geoJson = geomanLayer.toGeoJSON();
-    // Add a unique ID
-    geoJson.id = uuidv4();
-
+    
     // Get current drawing state from ref
     const currentDrawingState = drawingStateRef.current;
 
-    // Add metadata about the outlook type
-    geoJson.properties = {
-      ...geoJson.properties,
-      outlookType: currentDrawingState.activeOutlookType,
-      probability: currentDrawingState.activeProbability,
-      isSignificant: currentDrawingState.isSignificant
-    };
+    if (originalLayer) {
+      // If originalLayer exists, this is a cut/edit operation resulting in a new shape
+      // We need to remove the original and add the new one, inheriting properties
+      const originalGeoJson = (originalLayer as GeomanLayer).toGeoJSON();
+      const originalId = originalGeoJson.id as string;
+      const originalType = originalGeoJson.properties?.outlookType as OutlookType;
+      const originalProb = originalGeoJson.properties?.probability as string;
+
+      if (originalId && originalType && originalProb) {
+        dispatch(removeFeature({ outlookType: originalType, probability: originalProb, featureId: originalId }));
+      }
+      
+      // Inherit properties
+      geoJson.properties = {
+        ...geoJson.properties,
+        ...originalGeoJson.properties
+      };
+      
+      // Assign new ID for the new shape
+      geoJson.id = uuidv4();
+    } else {
+      // Completely new drawing
+      geoJson.id = uuidv4();
+
+      // Add metadata about the outlook type
+      geoJson.properties = {
+        ...geoJson.properties,
+        outlookType: currentDrawingState.activeOutlookType,
+        probability: currentDrawingState.activeProbability,
+        isSignificant: currentDrawingState.isSignificant
+      };
+    }
     
     // Dispatch to store
     dispatch(addFeature({ feature: geoJson }));

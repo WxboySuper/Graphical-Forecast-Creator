@@ -36,9 +36,9 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Teach the app what an "Outlook" is.
 
-- [ ] Define TypeScript interfaces for `Outlook`, `RiskArea`, and `Hazard`.
-- [ ] Update Redux store to hold the current outlook state.
-- [ ] Connect drawn polygons to the Redux store (updating coordinates in state).
+- [x] Define TypeScript interfaces for `Outlook`, `RiskArea`, and `Hazard`.
+- [x] Update Redux store to hold the current outlook state.
+- [x] Connect drawn polygons to the Redux store (updating coordinates in state).
 
 ## v0.4.0-alpha: The Save System
 
