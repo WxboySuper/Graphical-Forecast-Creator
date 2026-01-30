@@ -46,6 +46,7 @@ type PMMap = L.Map & {
     addControls?: (opts: Record<string, unknown>) => void;
     setGlobalOptions?: (opts: Record<string, unknown>) => void;
     on?: (event: string, handler: (...args: unknown[]) => void) => void;
+    globalDrawModeEnabled?: () => boolean;
   };
 };
 
@@ -70,8 +71,8 @@ function addGeomanControls(pm: PMMap['pm']) {
     editMode: true,
     dragMode: true,
     rotateMode: false,
-    removalMode: true,
-    cutPolygon: true,
+    removalMode: false,
+    cutPolygon: false,
     drawPolygon: true,
     drawRectangle: true,
   });
@@ -104,15 +105,6 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer, origina
         // eslint-disable-next-line no-console
         console.error('[Geoman] Failed to remove temp layer:', err);
       }
-    }
-  };
-}
-
-function makeHandleCut(map: L.Map, onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void) {
-  return (e: L.LeafletEvent & { layer?: L.Layer; originalLayer?: L.Layer }) => {
-    if (e.layer) {
-      onPolygonCreated(e.layer, e.originalLayer);
-      map.removeLayer(e.layer);
     }
   };
 }
@@ -163,16 +155,13 @@ const MapController: React.FC<{
 
     // Create handlers via factories (keeps logic small inside the effect)
     const handleCreate = makeHandleCreate(map, onPolygonCreated);
-    const handleCut = makeHandleCut(map, onPolygonCreated);
 
     // Listen on the map object directly (this is what works with Geoman)
     map.on('pm:create', handleCreate);
-    map.on('pm:cut', handleCut);
 
     // Cleanup function to remove event listeners
     return () => {
       map.off('pm:create', handleCreate);
-      map.off('pm:cut', handleCut);
     };
   }, [map, onPolygonCreated]);
 
@@ -255,8 +244,29 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
   };
 };
 
-const createFeatureHandlersFactory = (dispatch: Dispatch) => (outlookType: OutlookType, probability: string, featureId: string) => {
+// Helper to check if drawing mode is active (safe with optional chaining)
+const isDrawingMode = (map: L.Map): boolean => {
+  const pmMap = map as PMMap;
+  return Boolean(pmMap.pm?.globalDrawModeEnabled?.());
+};
+
+// Interface for context needed to render outlooks (consolidates arguments)
+interface OutlookRenderContext {
+  dispatch: Dispatch;
+  map: L.Map;
+  activeOutlookType: OutlookType;
+  styleFn: (o: OutlookType, p: string) => FeatureStyle;
+}
+
+const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlookType: OutlookType, probability: string, featureId: string) => {
+  const { dispatch, map } = context;
+
   const handleClick = () => {
+    // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
+    if (isDrawingMode(map)) {
+      return;
+    }
+
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
     const safeProbability = stripHtml(probability);
     const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
@@ -351,10 +361,10 @@ function createOnEachFeature(
 
 const renderOutlookFeatures = (
   outlooks: OutlooksMap,
-  dispatch: Dispatch,
-  styleFn: (o: OutlookType, p: string) => FeatureStyle,
-  activeOutlookType: OutlookType
+  context: OutlookRenderContext
 ): React.ReactElement[] => {
+  const { activeOutlookType, styleFn } = context;
+
   const shouldShowLayer = (outlookType: OutlookType) => {
     if (activeOutlookType === 'categorical') {
       return outlookType === 'categorical';
@@ -362,7 +372,7 @@ const renderOutlookFeatures = (
     return outlookType === activeOutlookType;
   };
 
-  const handlerFactory = createFeatureHandlersFactory(dispatch);
+  const handlerFactory = createFeatureHandlersFactory(context);
 
   return Object.keys(outlooks).flatMap(outlookType => {
     const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
@@ -400,10 +410,18 @@ const renderOutlookFeatures = (
 // Optimized: Memoized to prevent re-renders when map view or unrelated state changes
 const OutlookLayers: React.FC = React.memo(() => {
   const dispatch = useDispatch();
+  const map = useMap();
   const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
-  const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, getFeatureStyle, activeOutlookType);
+  const context: OutlookRenderContext = {
+    dispatch,
+    map,
+    activeOutlookType,
+    styleFn: getFeatureStyle
+  };
+
+  const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
 
   if (elements.length === 0) return null;
   if (elements.length === 1) return elements[0];

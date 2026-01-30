@@ -36,14 +36,6 @@
 }
 
 /* Custom styling for layers */
-.leaflet-pane {
-  z-index: 400;
-}
-
-.leaflet-overlay-pane {
-  z-index: 410;
-}
-
 .leaflet-pane .significant-threat-pattern {
   z-index: 420 !important;
 }
