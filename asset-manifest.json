@@ -1,16 +1,15 @@
 {
   "files": {
-    "main.css": "/Graphical-Forecast-Creator/static/css/main.e1aa134b.css",
-    "main.js": "/Graphical-Forecast-Creator/static/js/main.a436f955.js",
-    "static/js/453.38c09663.chunk.js": "/Graphical-Forecast-Creator/static/js/453.38c09663.chunk.js",
-    "static/media/spritesheet.svg": "/Graphical-Forecast-Creator/static/media/spritesheet.a4e0eb7ad904a4858361.svg",
+    "main.css": "/Graphical-Forecast-Creator/static/css/main.3e01c78a.css",
+    "main.js": "/Graphical-Forecast-Creator/static/js/main.f2f5b803.js",
+    "static/js/453.071e88c4.chunk.js": "/Graphical-Forecast-Creator/static/js/453.071e88c4.chunk.js",
     "index.html": "/Graphical-Forecast-Creator/index.html",
-    "main.e1aa134b.css.map": "/Graphical-Forecast-Creator/static/css/main.e1aa134b.css.map",
-    "main.a436f955.js.map": "/Graphical-Forecast-Creator/static/js/main.a436f955.js.map",
-    "453.38c09663.chunk.js.map": "/Graphical-Forecast-Creator/static/js/453.38c09663.chunk.js.map"
+    "main.3e01c78a.css.map": "/Graphical-Forecast-Creator/static/css/main.3e01c78a.css.map",
+    "main.f2f5b803.js.map": "/Graphical-Forecast-Creator/static/js/main.f2f5b803.js.map",
+    "453.071e88c4.chunk.js.map": "/Graphical-Forecast-Creator/static/js/453.071e88c4.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.e1aa134b.css",
-    "static/js/main.a436f955.js"
+    "static/css/main.3e01c78a.css",
+    "static/js/main.f2f5b803.js"
   ]
 }
