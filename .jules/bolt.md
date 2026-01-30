@@ -31,3 +31,11 @@
 ## 2024-05-23 - React Display Name
 **Learning:** Components defined via HOCs like `React.memo` or `forwardRef` lose their implicit name. Always manually set `Component.displayName = 'Component'` to ensure they are identifiable in DevTools and logs.
 **Action:** Add `displayName` immediately after component definition.
+
+## 2024-05-23 - Memoizing Leaflet Components
+**Learning:** `react-leaflet` components like `GeoJSON` are standard React components and will re-render if their parent (`OutlookLayers` in this case) re-renders, even if props are conceptually similar. This is O(N) for adding features to a map layer.
+**Action:** Always wrap expensive map layer logic (rendering lists of features) in a `React.memo` component (`OutlookFeature`) to ensure only the changed/new feature renders, not the entire list.
+
+## 2024-05-23 - CodeScene Code Duplication
+**Learning:** CodeScene is sensitive to block duplication, even in utility files. Defining similar mapping objects or switch cases in multiple functions (e.g., probability lookups) will trigger "Advisory Code Health" warnings.
+**Action:** Extract repeated configuration objects to top-level constants and use a shared generic helper function for lookup logic to eliminate structural duplication.
