@@ -15,24 +15,25 @@ interface SavedData {
 }
 
 /**
+ * Validates existence and type (object or null) of a property for GeoJSON
+ */
+const isValidGeoJSONProperty = (obj: Record<string, unknown>, key: string): boolean => {
+  if (!Object.prototype.hasOwnProperty.call(obj, key)) return false;
+  const value = obj[key];
+  // In JSON, objects and null are both 'object' type
+  return typeof value === 'object';
+};
+
+/**
  * Validates if a value is a valid GeoJSON Feature
  */
 const isValidFeature = (value: unknown): value is Feature<Geometry, GeoJsonProperties> => {
   if (typeof value !== 'object' || value === null) return false;
-
   const feature = value as Record<string, unknown>;
 
-  if (feature.type !== 'Feature') return false;
-
-  // geometry must be object or null
-  if (!Object.prototype.hasOwnProperty.call(feature, 'geometry')) return false;
-  if (feature.geometry !== null && typeof feature.geometry !== 'object') return false;
-
-  // properties must be object or null
-  if (!Object.prototype.hasOwnProperty.call(feature, 'properties')) return false;
-  if (feature.properties !== null && typeof feature.properties !== 'object') return false;
-
-  return true;
+  return feature.type === 'Feature' &&
+         isValidGeoJSONProperty(feature, 'geometry') &&
+         isValidGeoJSONProperty(feature, 'properties');
 };
 
 /**
