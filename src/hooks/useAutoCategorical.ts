@@ -6,7 +6,7 @@ import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevere
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { v4 as uuidv4 } from 'uuid';
 import * as turf from '@turf/turf';
-import { Feature, Geometry, Polygon, MultiPolygon } from 'geojson';
+import { Feature, Polygon, MultiPolygon } from 'geojson';
 
 /**
  * Hook that automatically generates categorical outlooks based on probabilistic outlooks.

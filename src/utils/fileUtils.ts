@@ -1,4 +1,4 @@
-import { OutlookData, SerializedOutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay } from '../types/outlooks';
+import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay } from '../types/outlooks';
 
 const CURRENT_VERSION = '0.5.0';
 

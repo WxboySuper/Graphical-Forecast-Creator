@@ -5,7 +5,6 @@ import {
   WindProbability,
   HailProbability,
   TotalSevereProbability,
-  Day48Probability,
   CIGLevel,
   DayType
 } from '../types/outlooks';
@@ -345,4 +344,20 @@ export function getCategoricalRiskDisplayName(risk: CategoricalRiskLevel): strin
     default:
       return 'Unknown';
   }
+}
+
+/**
+ * Gets the color for an outlook type and probability/risk level
+ * @param outlookType The type of outlook (tornado, wind, hail, categorical, etc.)
+ * @param probability The probability or risk level
+ * @returns The hex color code
+ */
+export function getOutlookColor(outlookType: string, probability: string): string {
+  if (outlookType in colorMappings) {
+    const typeColors = colorMappings[outlookType as keyof typeof colorMappings];
+    if (typeof typeColors === 'object' && probability in typeColors) {
+      return typeColors[probability as keyof typeof typeColors] || '#808080';
+    }
+  }
+  return '#808080'; // Default gray
 }

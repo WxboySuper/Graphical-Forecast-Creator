@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectSavedCycles, selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';
-import { DayType } from '../../types/outlooks';
+import { selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';
+import { DayType, ForecastCycle } from '../../types/outlooks';
+import { deserializeForecast } from '../../utils/fileUtils';
 import './CopyFromPreviousModal.css';
 
 interface CopyFromPreviousModalProps {
@@ -13,28 +14,54 @@ const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
-  const savedCycles = useSelector(selectSavedCycles);
   const currentDay = useSelector(selectCurrentDay);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [selectedCycleId, setSelectedCycleId] = useState<string>('');
+  const [loadedCycle, setLoadedCycle] = useState<ForecastCycle | null>(null);
+  const [loadedFileName, setLoadedFileName] = useState<string>('');
   const [sourceDay, setSourceDay] = useState<DayType>(1);
   const [targetDay, setTargetDay] = useState<DayType>(currentDay);
 
   if (!isOpen) return null;
 
+  const handleFileLoad = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+        const cycle = deserializeForecast(parsed);
+        setLoadedCycle(cycle);
+        setLoadedFileName(file.name);
+      } catch (error) {
+        alert('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.');
+        console.error('File load error:', error);
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleCopy = () => {
-    if (!selectedCycleId) {
-      alert('Please select a source cycle');
+    if (!loadedCycle) {
+      alert('Please load a forecast file first');
       return;
     }
 
     dispatch(copyFeaturesFromPrevious({
-      sourceCycleId: selectedCycleId,
+      sourceCycle: loadedCycle,
       sourceDay,
       targetDay
     }));
 
-    alert(`Copied features from ${new Date(savedCycles.find(c => c.id === selectedCycleId)?.cycleDate || '').toLocaleDateString()} Day ${sourceDay} to current cycle Day ${targetDay}`);
+    alert(`Copied features from ${loadedFileName} Day ${sourceDay} to current cycle Day ${targetDay}`);
     onClose();
   };
 
@@ -48,31 +75,22 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
         </div>
 
         <div className="copy-modal-body">
-          {savedCycles.length === 0 ? (
-            <div className="copy-empty-state">
-              <p>No saved cycles available.</p>
-              <p>Save your current cycle first using the "Cycle History" menu.</p>
+          <>
+            <div className="copy-form-group">
+              <label>Load Forecast File:</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileLoad}
+                className="copy-file-input"
+              />
+              {loadedCycle && (
+                <div className="copy-loaded-info">
+                  ✓ Loaded: {loadedFileName} (Cycle Date: {new Date(loadedCycle.cycleDate).toLocaleDateString()})
+                </div>
+              )}
             </div>
-          ) : (
-            <>
-              <div className="copy-form-group">
-                <label htmlFor="source-cycle">Source Cycle:</label>
-                <select
-                  id="source-cycle"
-                  value={selectedCycleId}
-                  onChange={(e) => setSelectedCycleId(e.target.value)}
-                  className="copy-select"
-                >
-                  <option value="">-- Select a cycle --</option>
-                  {savedCycles.map((cycle) => (
-                    <option key={cycle.id} value={cycle.id}>
-                      {new Date(cycle.cycleDate).toLocaleDateString()}
-                      {cycle.label ? ` - ${cycle.label}` : ''}
-                      {' '}(Saved: {new Date(cycle.timestamp).toLocaleString()})
-                    </option>
-                  ))}
-                </select>
-              </div>
 
               <div className="copy-days-row">
                 <div className="copy-form-group">
@@ -110,28 +128,25 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
                 </div>
               </div>
 
-              <div className="copy-info-box">
-                <strong>Note:</strong> This will copy all outlook features (tornado, wind, hail, categorical, etc.) 
-                from the selected source to the target day in your current cycle. 
-                Existing features on the target day will be replaced.
-              </div>
-            </>
-          )}
+            <div className="copy-info-box">
+              <strong>Note:</strong> This will copy outlook features from the loaded file to your current cycle.
+              The system will automatically convert outlook types when copying between days with different formats
+              (e.g., Day 4-8 → Day 3, Day 3 → Day 2). Existing features on the target day will be replaced.
+            </div>
+          </>
         </div>
 
         <div className="copy-modal-footer">
           <button className="copy-btn-cancel" onClick={onClose}>
             Cancel
           </button>
-          {savedCycles.length > 0 && (
-            <button 
-              className="copy-btn-copy" 
-              onClick={handleCopy}
-              disabled={!selectedCycleId}
-            >
-              Copy Features
-            </button>
-          )}
+          <button 
+            className="copy-btn-copy" 
+            onClick={handleCopy}
+            disabled={!loadedCycle}
+          >
+            Copy Features
+          </button>
         </div>
       </div>
     </>

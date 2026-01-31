@@ -4,7 +4,6 @@ import { RootState } from '../../store';
 import {
   setActiveOutlookType,
   setActiveProbability,
-  toggleSignificant,
   selectCurrentDay,
 } from '../../store/forecastSlice';
 import {

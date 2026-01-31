@@ -7,7 +7,6 @@ import './index.css';
 import './darkMode.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { HashRouter as Router } from 'react-router-dom';
 import { store } from './store';
 import { setupCycleHistoryListener } from './utils/cycleHistoryPersistence';
 
@@ -19,9 +18,7 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <Router>
-      <App />
-    </Router>
+    <App />
   </React.StrictMode>
 );
 

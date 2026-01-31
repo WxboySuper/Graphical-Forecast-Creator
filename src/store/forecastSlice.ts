@@ -395,19 +395,13 @@ export const forecastSlice = createSlice({
 
     // Copy features from one cycle/day to current cycle/day
     copyFeaturesFromPrevious: (state, action: PayloadAction<{ 
-      sourceCycleId: string; 
+      sourceCycle: ForecastCycle; 
       sourceDay: DayType; 
       targetDay: DayType;
     }>) => {
-      const { sourceCycleId, sourceDay, targetDay } = action.payload;
-      const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
+      const { sourceCycle, sourceDay, targetDay } = action.payload;
       
-      if (!sourceCycle) {
-        console.warn(`Source cycle ${sourceCycleId} not found`);
-        return;
-      }
-
-      const sourceDayData = sourceCycle.forecastCycle.days[sourceDay];
+      const sourceDayData = sourceCycle.days[sourceDay];
       if (!sourceDayData) {
         console.warn(`Source day ${sourceDay} not found in cycle`);
         return;
@@ -420,17 +414,94 @@ export const forecastSlice = createSlice({
 
       const targetDayData = state.forecastCycle.days[targetDay]!;
       
-      // Deep copy the outlook data from source to target
-      // Handle each outlook type that exists in the source
-      Object.keys(sourceDayData.data).forEach((outlookTypeKey) => {
-        const outlookType = outlookTypeKey as OutlookType;
-        const sourceMap = sourceDayData.data[outlookType];
-        
-        if (sourceMap && targetDayData.data[outlookType] !== undefined) {
-          // @ts-ignore - Dynamic property access
-          targetDayData.data[outlookType] = new Map(JSON.parse(JSON.stringify(Array.from(sourceMap))));
-        }
+      // Determine source and target day types
+      const isSourceDay12 = sourceDay === 1 || sourceDay === 2;
+      const isSourceDay3 = sourceDay === 3;
+      const isSourceDay48 = sourceDay >= 4 && sourceDay <= 8;
+      
+      const isTargetDay12 = targetDay === 1 || targetDay === 2;
+      const isTargetDay3 = targetDay === 3;
+      const isTargetDay48 = targetDay >= 4 && targetDay <= 8;
+      
+      // Clear target day data first
+      Object.keys(targetDayData.data).forEach((key) => {
+        const outlookType = key as OutlookType;
+        // @ts-ignore
+        targetDayData.data[outlookType]?.clear();
       });
+      
+      // Conversion logic based on day types
+      if (isSourceDay12 && isTargetDay12) {
+        // Day 1/2 → Day 1/2: Direct copy of tornado, wind, hail, categorical
+        ['tornado', 'wind', 'hail', 'categorical'].forEach(type => {
+          const sourceMap = sourceDayData.data[type as OutlookType];
+          if (sourceMap) {
+            // @ts-ignore
+            targetDayData.data[type] = new Map(Array.from(sourceMap).map(([prob, features]) => 
+              [prob, features.map(f => ({...f}))]
+            ));
+          }
+        });
+      } else if (isSourceDay12 && isTargetDay3) {
+        // Day 1/2 → Day 3: Only copy categorical (can't convert tornado/wind/hail to totalSevere)
+        const categoricalMap = sourceDayData.data.categorical;
+        if (categoricalMap && targetDayData.data.categorical) {
+          targetDayData.data.categorical = new Map(Array.from(categoricalMap).map(([prob, features]) => 
+            [prob, features.map(f => ({...f}))]
+          ));
+        }
+      } else if (isSourceDay12 && isTargetDay48) {
+        // Day 1/2 → Day 4-8: Skip all (Day 4-8 has no compatible outlook types)
+        console.warn('Cannot copy Day 1/2 outlooks to Day 4-8 - incompatible outlook types');
+      } else if (isSourceDay3 && isTargetDay12) {
+        // Day 3 → Day 1/2: Only copy categorical
+        const categoricalMap = sourceDayData.data.categorical;
+        if (categoricalMap && targetDayData.data.categorical) {
+          targetDayData.data.categorical = new Map(Array.from(categoricalMap).map(([prob, features]) => 
+            [prob, features.map(f => ({...f}))]
+          ));
+        }
+      } else if (isSourceDay3 && isTargetDay3) {
+        // Day 3 → Day 3: Direct copy of totalSevere and categorical
+        const totalSevereMap = sourceDayData.data.totalSevere;
+        const categoricalMap = sourceDayData.data.categorical;
+        
+        if (totalSevereMap && targetDayData.data.totalSevere) {
+          targetDayData.data.totalSevere = new Map(Array.from(totalSevereMap).map(([prob, features]) => 
+            [prob, features.map(f => ({...f}))]
+          ));
+        }
+        
+        if (categoricalMap && targetDayData.data.categorical) {
+          targetDayData.data.categorical = new Map(Array.from(categoricalMap).map(([prob, features]) => 
+            [prob, features.map(f => ({...f}))]
+          ));
+        }
+      } else if (isSourceDay3 && isTargetDay48) {
+        // Day 3 → Day 4-8: Skip all (incompatible)
+        console.warn('Cannot copy Day 3 outlooks to Day 4-8 - incompatible outlook types');
+      } else if (isSourceDay48 && isTargetDay12) {
+        // Day 4-8 → Day 1/2: Skip all (incompatible)
+        console.warn('Cannot copy Day 4-8 outlooks to Day 1/2 - incompatible outlook types');
+      } else if (isSourceDay48 && isTargetDay3) {
+        // Day 4-8 → Day 3: Convert day4-8 to totalSevere (both use 15% and 30%)
+        const day48Map = sourceDayData.data['day4-8'];
+        
+        if (day48Map && targetDayData.data.totalSevere) {
+          targetDayData.data.totalSevere = new Map(Array.from(day48Map).map(([prob, features]) => 
+            [prob, features.map(f => ({...f}))]
+          ));
+        }
+      } else if (isSourceDay48 && isTargetDay48) {
+        // Day 4-8 → Day 4-8: Direct copy of day4-8
+        const day48Map = sourceDayData.data['day4-8'];
+        
+        if (day48Map && targetDayData.data['day4-8']) {
+          targetDayData.data['day4-8'] = new Map(Array.from(day48Map).map(([prob, features]) => 
+            [prob, features.map(f => ({...f}))]
+          ));
+        }
+      }
 
       targetDayData.metadata.lastModified = new Date().toISOString();
       state.isSaved = false;

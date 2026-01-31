@@ -113,7 +113,7 @@ function setGeomanGlobalOptions(pm: PMMap['pm']) {
     pathOptions: {
       color: '#97009c',
       fillColor: '#97009c',
-      fillOpacity: 0.6,
+      fillOpacity: 0.2,
       weight: 2,
     },
     snappable: true,
@@ -303,7 +303,7 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
     weight: 2,
     opacity: 1,
     fillColor: color,
-    fillOpacity: 0.6,
+    fillOpacity: 0.2,
     zIndex: computeZIndex(outlookType, probability)
   };
 };
@@ -526,25 +526,25 @@ const MapInner: React.FC<{ darkMode: boolean }> = React.memo(({ darkMode }) => {
 
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
-        {/* CIG1: Old Hatching Style - Top right to bottom left broken diagonal lines */}
-        <pattern id="pattern-cig1" patternUnits="userSpaceOnUse" width="10" height="10">
-          <path d="M10,0 L0,10" stroke="black" strokeWidth="2" strokeDasharray="4,2" />
+        {/* CIG1: Broken diagonal - Bottom-left to top-right - Thinnest */}
+        <pattern id="pattern-cig1" patternUnits="userSpaceOnUse" width="15" height="15">
+          <path d="M0,15 L15,0" stroke="black" strokeWidth="1.5" strokeDasharray="6,3" />
         </pattern>
 
-        {/* CIG2: New - Diagonal Line from Top-Left to Bottom-Right (Solid) */}
-        <pattern id="pattern-cig2" patternUnits="userSpaceOnUse" width="10" height="10">
-           <path d="M0,0 L10,10" stroke="black" strokeWidth="2" />
+        {/* CIG2: Solid diagonal - Bottom-left to top-right (same direction as CIG1) - Medium */}
+        <pattern id="pattern-cig2" patternUnits="userSpaceOnUse" width="15" height="15">
+           <path d="M0,15 L15,0" stroke="black" strokeWidth="2" />
         </pattern>
 
-        {/* CIG3: New - Crosshatch (Both Diagonal Directions) */}
-        <pattern id="pattern-cig3" patternUnits="userSpaceOnUse" width="10" height="10">
-          <path d="M0,0 L10,10" stroke="black" strokeWidth="2" />
-          <path d="M10,0 L0,10" stroke="black" strokeWidth="2" />
+        {/* CIG3: Crosshatch - Both diagonal directions - Thickest */}
+        <pattern id="pattern-cig3" patternUnits="userSpaceOnUse" width="15" height="15">
+          <path d="M0,15 L15,0" stroke="black" strokeWidth="2.5" />
+          <path d="M0,0 L15,15" stroke="black" strokeWidth="2.5" />
         </pattern>
         
-        {/* Legacy Pattern for backward compatibility if needed, aliased to CIG1 or kept as is */}
-        <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="10" height="10">
-          <path d="M0,0 L10,10 M10,0 L0,10" stroke="black" strokeWidth="2" />
+        {/* Legacy Pattern for backward compatibility */}
+        <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="15" height="15">
+          <path d="M0,15 L15,0 M0,0 L15,15" stroke="black" strokeWidth="2" />
         </pattern>
       </defs>
     </svg>

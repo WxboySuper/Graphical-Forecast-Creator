@@ -38,22 +38,16 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
   const handleH1 = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const start = textarea.selectionStart;
-    const lineStart = content.lastIndexOf('\n', start - 1) + 1;
     insertFormatting('\n# ', '');
   };
   const handleH2 = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const start = textarea.selectionStart;
-    const lineStart = content.lastIndexOf('\n', start - 1) + 1;
     insertFormatting('\n## ', '');
   };
   const handleH3 = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const start = textarea.selectionStart;
-    const lineStart = content.lastIndexOf('\n', start - 1) + 1;
     insertFormatting('\n### ', '');
   };
 

@@ -103,6 +103,41 @@
   box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
 }
 
+.copy-file-input {
+  width: 100%;
+  padding: 10px;
+  border: 2px dashed #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-file-input:hover {
+  border-color: #3498db;
+  background-color: #f0f8ff;
+}
+
+.copy-file-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+}
+
+.copy-loaded-info {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  color: #155724;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .copy-days-row {
   display: flex;
   align-items: flex-end;
@@ -214,6 +249,23 @@
 
 .dark-mode .copy-select:focus {
   border-color: #3498db;
+}
+
+.dark-mode .copy-file-input {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+}
+
+.dark-mode .copy-file-input:hover {
+  border-color: #3498db;
+  background-color: var(--bg-tertiary);
+}
+
+.dark-mode .copy-loaded-info {
+  background-color: rgba(40, 167, 69, 0.15);
+  border-color: rgba(40, 167, 69, 0.3);
+  color: #6fd18a;
 }
 
 .dark-mode .copy-info-box {

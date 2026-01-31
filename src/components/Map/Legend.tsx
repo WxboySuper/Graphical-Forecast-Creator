@@ -3,7 +3,7 @@ import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { colorMappings, getCategoricalRiskDisplayName } from '../../utils/outlookUtils';
-import { CategoricalRiskLevel, TornadoProbability, WindProbability, HailProbability } from '../../types/outlooks';
+import { CategoricalRiskLevel } from '../../types/outlooks';
 import './Legend.css';
 
 // Optimized: Memoized to prevent re-renders when parent re-renders
