@@ -374,5 +374,9 @@ export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
   return cycle.days[cycle.currentDay]?.data || createEmptyOutlook(cycle.currentDay).data;
 };
+export const selectOutlooksForDay = (state: RootState, day: DayType) => {
+  const cycle = state.forecast.forecastCycle;
+  return cycle.days[day]?.data || createEmptyOutlook(day).data;
+};
 
 export default forecastSlice.reducer;

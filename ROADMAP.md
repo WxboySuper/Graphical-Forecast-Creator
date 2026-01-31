@@ -82,9 +82,9 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** "How did I do?"
 
-- [ ] Implement "Storm Report Upload" (CSV/JSON import from SPC archive).
-- [ ] Plot Tornado/Wind/Hail reports as distinct icons over the user's outlook.
-- [ ] Basic "Hit/Miss" visual check.
+- [x] Implement "Storm Report Upload" (CSV/JSON import from SPC archive).
+- [x] Plot Tornado/Wind/Hail reports as distinct icons over the user's outlook.
+- [x] Basic "Hit/Miss" visual check.
 
 ## v0.9.0-alpha: Discussion Editor
 

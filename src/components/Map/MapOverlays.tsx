@@ -28,6 +28,7 @@ const StateBordersOverlay: React.FC = () => {
         opacity: 0.7,
       }}
       interactive={false}
+      pmIgnore={true}
     />
   );
 };
@@ -58,6 +59,7 @@ const CountiesOverlay: React.FC = () => {
         opacity: 0.4,
       }}
       interactive={false}
+      pmIgnore={true}
     />
   );
 };

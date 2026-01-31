@@ -1,0 +1,324 @@
+/* Dark Mode Variables and Styles */
+
+:root {
+  /* Light mode colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --text-primary: #212529;
+  --text-secondary: #495057;
+  --text-tertiary: #6c757d;
+  --border-color: #dee2e6;
+  --border-color-light: #e9ecef;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --input-bg: #ffffff;
+  --input-border: #ced4da;
+  --button-bg: #007bff;
+  --button-hover: #0056b3;
+  --success-bg: #d4edda;
+  --success-border: #c3e6cb;
+  --success-text: #155724;
+  --error-bg: #f8d7da;
+  --error-border: #f5c6cb;
+  --error-text: #721c24;
+  --warning-bg: #fff3cd;
+  --warning-border: #ffeaa7;
+  --warning-text: #856404;
+  --panel-bg: #f5f5f5;
+  --checkbox-hover: #e9ecef;
+  --metric-bg: #f8f9fa;
+}
+
+.dark-mode {
+  /* Dark mode colors */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3a3a3a;
+  --text-primary: #e4e4e4;
+  --text-secondary: #b8b8b8;
+  --text-tertiary: #8a8a8a;
+  --border-color: #404040;
+  --border-color-light: #4a4a4a;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --input-bg: #2d2d2d;
+  --input-border: #404040;
+  --button-bg: #0d6efd;
+  --button-hover: #0b5ed7;
+  --success-bg: #1a3328;
+  --success-border: #2d5a3f;
+  --success-text: #75b798;
+  --error-bg: #3a1f1f;
+  --error-border: #5a2f2f;
+  --error-text: #e89898;
+  --warning-bg: #3a3420;
+  --warning-border: #5a5030;
+  --warning-text: #e8d898;
+  --panel-bg: #252525;
+  --checkbox-hover: #3a3a3a;
+  --metric-bg: #2d2d2d;
+}
+
+/* Apply dark mode to body */
+.dark-mode {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Global dark mode styles */
+.dark-mode body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.dark-mode .App {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Inputs and form elements */
+.dark-mode input[type="text"],
+.dark-mode input[type="date"],
+.dark-mode input[type="number"],
+.dark-mode select,
+.dark-mode textarea {
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+
+.dark-mode input[type="text"]:focus,
+.dark-mode input[type="date"]:focus,
+.dark-mode input[type="number"]:focus,
+.dark-mode select:focus,
+.dark-mode textarea:focus {
+  border-color: var(--button-bg);
+  outline: none;
+}
+
+/* Buttons */
+.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn) {
+  background-color: var(--button-bg);
+  color: white;
+}
+
+.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):hover:not(:disabled) {
+  background-color: var(--button-hover);
+}
+
+/* Panels and containers */
+.dark-mode .verification-panel,
+.dark-mode .outlook-panel,
+.dark-mode .drawing-tools-panel {
+  background-color: var(--panel-bg);
+  border-color: var(--border-color);
+}
+
+.dark-mode .forecast-loader-section,
+.dark-mode .reports-section,
+.dark-mode .verification-section {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .verification-sidebar {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+/* Verification Mode */
+.dark-mode .verification-mode {
+  background-color: var(--bg-secondary);
+}
+
+/* Status messages */
+.dark-mode .error-message {
+  background-color: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-text);
+}
+
+.dark-mode .forecast-loaded {
+  background-color: var(--bg-secondary);
+  border-color: var(--success-border);
+}
+
+.dark-mode .loaded-indicator strong {
+  color: var(--text-primary);
+}
+
+.dark-mode .verification-note {
+  background-color: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+/* Checkboxes and labels */
+.dark-mode .checkbox-label:hover {
+  background-color: var(--checkbox-hover);
+}
+
+/* Metrics and stats */
+.dark-mode .metric,
+.dark-mode .risk-level-stat {
+  background-color: var(--metric-bg);
+}
+
+.dark-mode .verification-results,
+.dark-mode .report-summary {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .verification-summary {
+  background-color: var(--bg-tertiary);
+}
+
+/* Documentation */
+.dark-mode .documentation-panel {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .documentation-content {
+  background-color: var(--bg-secondary);
+}
+
+/* Leaflet map controls in dark mode */
+.dark-mode .leaflet-control-layers {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .leaflet-control-layers-list {
+  color: var(--text-primary);
+}
+
+.dark-mode .leaflet-control-zoom a {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .leaflet-control-zoom a:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Legend in dark mode */
+.dark-mode .legend {
+  background-color: rgba(29, 29, 29, 0.95);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .legend h4 {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+/* Tooltips */
+.dark-mode .feature-tooltip {
+  background-color: rgba(29, 29, 29, 0.95) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Code blocks */
+.dark-mode pre,
+.dark-mode code {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Scrollbars (webkit browsers) */
+.dark-mode ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.dark-mode ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Export Modal */
+.dark-mode .export-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.dark-mode .export-modal {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+/* Waiting message */
+.dark-mode .waiting-message {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+/* File upload */
+.dark-mode .file-upload-label {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .file-upload-label:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--button-bg);
+}
+
+.dark-mode .file-upload-label span {
+  color: var(--text-primary);
+}
+
+.dark-mode .upload-hint {
+  color: var(--text-tertiary);
+}
+
+/* Tables */
+.dark-mode table {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.dark-mode table th {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode table td {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+/* Toast notifications */
+.dark-mode .toast {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.dark-mode .toast.success {
+  background-color: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+
+.dark-mode .toast.error {
+  background-color: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-text);
+}

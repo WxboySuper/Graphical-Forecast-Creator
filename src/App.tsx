@@ -6,7 +6,10 @@ import OutlookPanel from './components/OutlookPanel/OutlookPanel';
 import OutlookDaySelector from './components/OutlookDaySelector/OutlookDaySelector';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
+import VerificationMode from './components/VerificationMode/VerificationMode';
 import { importForecastCycle, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode, selectCurrentOutlooks, selectForecastCycle } from './store/forecastSlice';
+import { setAppMode } from './store/appModeSlice';
+import { toggleDarkMode } from './store/themeSlice';
 import { RootState } from './store';
 import { OutlookData, OutlookType, Probability, ForecastCycle } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
@@ -269,6 +272,8 @@ export const AppContent = () => {
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const emergencyMode = useSelector((state: RootState) => state.forecast.emergencyMode);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+  const appMode = useSelector((state: RootState) => state.appMode.mode);
+  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }>>([]);
@@ -316,6 +321,18 @@ export const AppContent = () => {
   const toggleDocumentation = useCallback(() => {
     setShowDocumentation(prev => !prev);
   }, []);
+  
+  // Toggle between forecast and verification modes
+  const toggleMode = useCallback(() => {
+    const newMode = appMode === 'forecast' ? 'verification' : 'forecast';
+    dispatch(setAppMode(newMode));
+    addToast(`Switched to ${newMode} mode`, 'info');
+  }, [appMode, dispatch, addToast]);
+  
+  // Toggle dark mode
+  const handleToggleDarkMode = useCallback(() => {
+    dispatch(toggleDarkMode());
+  }, [dispatch]);
   
   // Warn before closing/refreshing if there are unsaved changes
   useEffect(() => {
@@ -387,15 +404,25 @@ export const AppContent = () => {
       <header className="App-header">
         <h1>Graphical Forecast Creator</h1>
         <p className="App-subtitle">Create graphical severe weather forecasts on a CONUS map</p>
-        <button className="doc-toggle-btn" onClick={toggleDocumentation}>
-          {showDocumentation ? 'Hide Documentation' : 'Show Documentation'}
-        </button>
+        <div className="header-buttons">
+          <button className="mode-toggle-btn" onClick={toggleMode}>
+            {appMode === 'forecast' ? '📊 Switch to Verification' : '🎨 Switch to Forecast'}
+          </button>
+          <button className="dark-mode-toggle-btn" onClick={handleToggleDarkMode}>
+            {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+          </button>
+          <button className="doc-toggle-btn" onClick={toggleDocumentation}>
+            {showDocumentation ? 'Hide Documentation' : 'Show Documentation'}
+          </button>
+        </div>
       </header>
       
       <main className={`App-main ${emergencyMode ? 'emergency-mode' : ''}`}>
         {showDocumentation && <Documentation />}
         
-        {emergencyMode ? (
+        {appMode === 'verification' ? (
+          <VerificationMode />
+        ) : emergencyMode ? (
           <EmergencyModeMessage />
         ) : (
           <>

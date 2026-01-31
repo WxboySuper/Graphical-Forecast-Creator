@@ -117,7 +117,7 @@ function setGeomanGlobalOptions(pm: PMMap['pm']) {
       weight: 2,
     },
     snappable: true,
-    snapDistance: 20,
+    snapDistance: 8,
     allowSelfIntersection: false,
   });
 }
