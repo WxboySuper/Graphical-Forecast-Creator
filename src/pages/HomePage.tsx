@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -49,6 +49,15 @@ export const HomePage: React.FC = () => {
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Debug: Log when forecastCycle changes
+  useEffect(() => {
+    console.log('HomePage - forecastCycle updated:', {
+      cycleDate: forecastCycle.cycleDate,
+      currentDay: forecastCycle.currentDay,
+      daysCount: Object.keys(forecastCycle.days).length
+    });
+  }, [forecastCycle]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -144,12 +153,18 @@ export const HomePage: React.FC = () => {
     e.target.value = '';
   };
 
-  const formattedDate = new Date(forecastCycle.cycleDate).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const formattedDate = useMemo(() => {
+    console.log('Computing formattedDate for cycleDate:', forecastCycle.cycleDate);
+    // Parse as local date to avoid timezone conversion issues
+    const [year, month, day] = forecastCycle.cycleDate.split('-').map(Number);
+    const localDate = new Date(year, month - 1, day); // month is 0-indexed
+    return localDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }, [forecastCycle.cycleDate]);
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">

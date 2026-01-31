@@ -313,10 +313,31 @@ export const forecastSlice = createSlice({
     },
     
     resetForecasts: (state) => {
-      // Resets ONLY the current day's forecast
-      const day = state.forecastCycle.currentDay;
-      state.forecastCycle.days[day] = createEmptyOutlook(day);
+      // Clear localStorage first
+      try {
+        localStorage.removeItem('forecastData');
+        console.log('Cleared localStorage');
+      } catch (e) {
+        console.error('Failed to clear localStorage:', e);
+      }
+      
+      // Generate today's date
+      const today = new Date().toISOString().split('T')[0];
+      console.log('Resetting to new cycle with date:', today);
+      
+      // Completely replace forecastCycle to force re-render
+      const newCycle: ForecastCycle = {
+        days: {
+          1: createEmptyOutlook(1)
+        },
+        currentDay: 1,
+        cycleDate: today
+      };
+      
+      state.forecastCycle = newCycle;
       state.isSaved = false;
+      
+      console.log('State after reset:', JSON.stringify(state.forecastCycle));
     },
     
     markAsSaved: (state) => {
