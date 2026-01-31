@@ -4,7 +4,10 @@ import {
   TornadoProbability, 
   WindProbability,
   HailProbability,
-  CIGLevel
+  TotalSevereProbability,
+  Day48Probability,
+  CIGLevel,
+  DayType
 } from '../types/outlooks';
 
 /**
@@ -59,6 +62,17 @@ export const colorMappings: ColorMappings = {
     '60%': '#912bee',
     '60#': '#912bee'
   },
+  totalSevere: {
+    '5%': '#008b02',
+    '15%': '#fdc900',
+    '30%': '#fe0000',
+    '45%': '#fe00ff',
+    '60%': '#114d8c'
+  },
+  'day4-8': {
+    '15%': '#FFFF00', // Yellow
+    '30%': '#FF8C00'  // Orange
+  },
   significant: '#000000', // Black hatch for significant threat areas
   hatching: {
     'CIG0': 'none',
@@ -67,6 +81,65 @@ export const colorMappings: ColorMappings = {
     'CIG3': 'url(#pattern-cig3)'
   }
 };
+
+/**
+ * Get constraints for a specific outlook day
+ */
+export function getOutlookConstraints(day: DayType) {
+  switch (day) {
+    case 1:
+    case 2:
+      return {
+        outlookTypes: ['tornado', 'wind', 'hail', 'categorical'] as const,
+        allowsProbabilities: true,
+        allowedCIG: ['CIG0', 'CIG1', 'CIG2', 'CIG3'],
+        allowedCategorical: ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'],
+        requiresConversion: true,
+        probabilities: {
+          tornado: ['2%', '5%', '10%', '15%', '30%', '45%', '60%'],
+          wind: ['5%', '15%', '30%', '45%', '60%', '75%', '90%'],
+          hail: ['5%', '15%', '30%', '45%', '60%']
+        }
+      };
+    case 3:
+      return {
+        outlookTypes: ['totalSevere', 'categorical'] as const,
+        allowsProbabilities: true,
+        allowedCIG: ['CIG0', 'CIG1', 'CIG2'],
+        allowedCategorical: ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT'], // No HIGH
+        requiresConversion: true,
+        probabilities: {
+          totalSevere: ['5%', '15%', '30%', '45%', '60%']
+        }
+      };
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+      return {
+        outlookTypes: ['day4-8'] as const,
+        allowsProbabilities: true, // Day 4-8 is probabilistic, not categorical
+        allowedCIG: [],
+        allowedCategorical: [], // No categorical conversion
+        requiresConversion: false,
+        probabilities: {
+          'day4-8': ['15%', '30%']
+        }
+      };
+    default:
+      // Fallback for unexpected values
+      return {
+        outlookTypes: [] as const,
+        allowsProbabilities: false,
+        allowedCIG: [],
+        allowedCategorical: [],
+        requiresConversion: false,
+        probabilities: {}
+      };
+  }
+}
+
 /**
  * Convert tornado probability to categorical risk level
  */
@@ -174,6 +247,37 @@ export function hailToCategorical(probability: string, cig: CIGLevel = 'CIG0'): 
   // "MDT... 60%: CIG 1, 2".
   // Prompt ends there for Hail. No HIGH listed.
 
+  return 'TSTM';
+}
+
+/**
+ * Convert Day 3 Total Severe probability to categorical risk level
+ * Day 3 uses a combined threat model, not separate tornado/wind/hail
+ */
+export function totalSevereToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
+  const p = probability.replace(/[#]/g, '%') as TotalSevereProbability;
+  
+  // Day 3 Categorical Conversion from prompt:
+  // MRGL: 5%: CIG 0, 1
+  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
+  
+  // SLGT: 5%: CIG 2; 15%: CIG 0, 1; 30%: CIG 0
+  if (p === '5%' && cig === 'CIG2') return 'SLGT';
+  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
+  if (p === '30%' && cig === 'CIG0') return 'SLGT';
+  
+  // ENH: 15%: CIG 2; 30%: CIG 1, 2; 45%: CIG 0, 1; 60%: CIG 0
+  if (p === '15%' && cig === 'CIG2') return 'ENH';
+  if (p === '30%' && (cig === 'CIG1' || cig === 'CIG2')) return 'ENH';
+  if (p === '45%' && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH';
+  if (p === '60%' && cig === 'CIG0') return 'ENH';
+  
+  // MDT: 45%: CIG 2; 60%: CIG 1, 2
+  if (p === '45%' && cig === 'CIG2') return 'MDT';
+  if (p === '60%' && (cig === 'CIG1' || cig === 'CIG2')) return 'MDT';
+  
+  // Note: Day 3 does not have HIGH risk level
+  
   return 'TSTM';
 }
 

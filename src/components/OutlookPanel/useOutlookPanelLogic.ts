@@ -5,6 +5,7 @@ import {
   setActiveOutlookType,
   setActiveProbability,
   toggleSignificant,
+  selectCurrentDay,
 } from '../../store/forecastSlice';
 import {
   OutlookType,
@@ -15,22 +16,39 @@ import {
   CIGLevel
 } from '../../types/outlooks';
 import { getAvailableProbabilities } from './outlookPanelUtils';
+import { getOutlookConstraints } from '../../utils/outlookUtils';
 
 export function useOutlookPanelLogic() {
   const dispatch = useDispatch();
   const drawingState = useSelector((s: RootState) => s.forecast.drawingState);
   const emergencyMode = useSelector((s: RootState) => s.forecast.emergencyMode);
   const featureFlags = useSelector((s: RootState) => s.featureFlags);
+  const currentDay = useSelector(selectCurrentDay);
   const { activeOutlookType, activeProbability, isSignificant } = drawingState;
 
   const significantThreatsEnabled = featureFlags.significantThreatsEnabled;
 
-  const getOutlookTypeEnabled = useCallback((type: OutlookType) => ({
-    tornado: featureFlags.tornadoOutlookEnabled,
-    wind: featureFlags.windOutlookEnabled,
-    hail: featureFlags.hailOutlookEnabled,
-    categorical: featureFlags.categoricalOutlookEnabled,
-  }[type] ?? false), [featureFlags]);
+  const getOutlookTypeEnabled = useCallback((type: OutlookType) => {
+    // Check against current day's constraints
+    const constraints = getOutlookConstraints(currentDay);
+    const isTypeAllowedForDay = (constraints.outlookTypes as readonly OutlookType[]).includes(type);
+    
+    if (!isTypeAllowedForDay) {
+      return false;
+    }
+    
+    // Check feature flags for Day 1/2 outlook types
+    const featureFlagMap: Record<string, boolean> = {
+      tornado: featureFlags.tornadoOutlookEnabled,
+      wind: featureFlags.windOutlookEnabled,
+      hail: featureFlags.hailOutlookEnabled,
+      categorical: featureFlags.categoricalOutlookEnabled,
+      totalSevere: true, // Day 3 - always enabled
+      'day4-8': true, // Day 4-8 - always enabled
+    };
+    
+    return featureFlagMap[type] ?? false;
+  }, [featureFlags, currentDay]);
 
   const handleOutlookTypeChange = useCallback(
     (type: OutlookType) => {
@@ -54,7 +72,7 @@ export function useOutlookPanelLogic() {
     // Legacy support removed/disabled
   }, []);
 
-  const probabilities = getAvailableProbabilities(activeOutlookType);
+  const probabilities = getAvailableProbabilities(activeOutlookType, currentDay);
 
   const probabilityHandlers = useMemo(
     () => Object.fromEntries(
@@ -69,6 +87,8 @@ export function useOutlookPanelLogic() {
       wind: () => handleOutlookTypeChange('wind'),
       hail: () => handleOutlookTypeChange('hail'),
       categorical: () => handleOutlookTypeChange('categorical'),
+      totalSevere: () => handleOutlookTypeChange('totalSevere'),
+      'day4-8': () => handleOutlookTypeChange('day4-8'),
     }),
     [handleOutlookTypeChange]
   );

@@ -43,11 +43,21 @@ const Legend: React.FC = React.memo(() => {
     } else if (activeOutlookType === 'hail') {
       probabilities = ['5%', '15%', '30%', '45%', '60%', 'CIG1', 'CIG2', 'CIG3'];
       colorMap = colorMappings.hail;
+    } else if (activeOutlookType === 'totalSevere') {
+      probabilities = ['5%', '15%', '30%', '45%', '60%', 'CIG1', 'CIG2'];
+      colorMap = colorMappings.totalSevere;
+    } else if (activeOutlookType === 'day4-8') {
+      probabilities = ['15%', '30%'];
+      colorMap = colorMappings['day4-8'];
     }
 
     return (
       <>
-        <h4 id="legend-title">{activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)} Probabilities</h4>
+        <h4 id="legend-title">
+          {activeOutlookType === 'totalSevere' ? 'TotalSevere' : 
+           activeOutlookType === 'day4-8' ? 'Day4-8' :
+           activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)} Probabilities
+        </h4>
         <div className="legend-items" role="list" aria-labelledby="legend-title">
           {probabilities.map(prob => {
             const isCig = prob.startsWith('CIG');

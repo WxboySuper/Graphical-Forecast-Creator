@@ -1,7 +1,7 @@
 // skipcq: JS-W1028
 import React, { useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { resetForecasts } from '../../store/forecastSlice';
+import { resetForecasts, selectCurrentOutlooks } from '../../store/forecastSlice';
 import { RootState } from '../../store';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import './DrawingTools.css';
@@ -20,7 +20,8 @@ interface DrawingToolsProps {
 
 const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, addToast }) => {
   const dispatch = useDispatch();
-  const { isSaved, outlooks } = useSelector((state: RootState) => state.forecast);
+  const outlooks = useSelector(selectCurrentOutlooks);
+  const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   

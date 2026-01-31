@@ -13,7 +13,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 // Now import react-leaflet components (they depend on L being ready)
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON, LayersControl } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature, updateFeature } from '../../store/forecastSlice';
+import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { colorMappings } from '../../utils/outlookUtils';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
@@ -483,7 +483,7 @@ const renderOutlookFeatures = (
 const OutlookLayers: React.FC = React.memo(() => {
   const dispatch = useDispatch();
   const map = useMap();
-  const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
+  const outlooks = useSelector(selectCurrentOutlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
   const context: OutlookRenderContext = {

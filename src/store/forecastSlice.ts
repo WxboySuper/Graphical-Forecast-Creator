@@ -1,10 +1,11 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { OutlookData, OutlookType, DrawingState } from '../types/outlooks';
+import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay } from '../types/outlooks';
 import { GeoJSON } from 'leaflet';
+import { RootState } from './index'; // Need RootState for selectors
 
 interface ForecastState {
-  outlooks: OutlookData;
+  forecastCycle: ForecastCycle;
   drawingState: DrawingState;
   currentMapView: {
     center: [number, number]; // [latitude, longitude]
@@ -14,17 +15,49 @@ interface ForecastState {
   emergencyMode: boolean;
 }
 
+const createEmptyOutlook = (day: DayType): OutlookDay => {
+  const baseData: OutlookData = {};
+  
+  if (day === 1 || day === 2) {
+    // Day 1/2: tornado, wind, hail, categorical
+    baseData.tornado = new Map();
+    baseData.wind = new Map();
+    baseData.hail = new Map();
+    baseData.categorical = new Map();
+  } else if (day === 3) {
+    // Day 3: totalSevere, categorical
+    baseData.totalSevere = new Map();
+    baseData.categorical = new Map();
+  } else {
+    // Day 4-8: only day4-8 outlook type
+    baseData['day4-8'] = new Map();
+  }
+  
+  return {
+    day,
+    data: baseData,
+    metadata: {
+      issueDate: new Date().toISOString(),
+      validDate: new Date().toISOString(),
+      issuanceTime: '0600',
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString()
+    }
+  };
+};
+
 const initialState: ForecastState = {
-  outlooks: {
-    tornado: new Map(),
-    wind: new Map(),
-    hail: new Map(),
-    categorical: new Map()
+  forecastCycle: {
+    days: {
+      1: createEmptyOutlook(1)
+    },
+    currentDay: 1,
+    cycleDate: new Date().toISOString().split('T')[0]
   },
   drawingState: {
-    // Start with wind as default since it's enabled in feature flags
+    // Start with tornado for Day 1/2 (default day)
     activeOutlookType: 'tornado',
-    activeProbability: '5%',
+    activeProbability: '2%',
     isSignificant: false
   },
   currentMapView: {
@@ -51,16 +84,14 @@ const computeProbability = (feature: GeoJSON.Feature, state: ForecastState): str
   }
   
   // If hatching or CIG level, return CIG label unchanged
-  // Check if base starts with CIG just in case
   if (String(base).startsWith('CIG')) {
     return base;
   }
 
-  // otherwise treat as numeric probability: strip any existing '%' or '#' and append correct suffix
   const normalized = String(base).replace(/[%#]/g, '');
-  // Legacy significance logic removed
   return `${normalized}%`;
 };
+
 const buildFeatureWithProps = (
   feature: GeoJSON.Feature,
   outlookType: OutlookType,
@@ -80,52 +111,86 @@ const buildFeatureWithProps = (
   } as GeoJSON.Feature;
 };
 
+// Helper to get current outlook data safely
+const getCurrentOutlook = (state: ForecastState): OutlookData => {
+  const day = state.forecastCycle.days[state.forecastCycle.currentDay];
+  if (!day) {
+    // Should not happen if logic is correct, but safe fallback
+    return createEmptyOutlook(state.forecastCycle.currentDay).data;
+  }
+  return day.data;
+};
+
 export const forecastSlice = createSlice({
   name: 'forecast',
   initialState,
   reducers: {
-    // Set the active outlook type for drawing (tornado, wind, hail, categorical)
+    // Set active day
+    setForecastDay: (state, action: PayloadAction<DayType>) => {
+      const newDay = action.payload;
+      if (!state.forecastCycle.days[newDay]) {
+        state.forecastCycle.days[newDay] = createEmptyOutlook(newDay);
+      }
+      state.forecastCycle.currentDay = newDay;
+      state.isSaved = false;
+    },
+
+    // Update cycle date
+    setCycleDate: (state, action: PayloadAction<string>) => {
+      state.forecastCycle.cycleDate = action.payload;
+      state.isSaved = false;
+    },
+
+    // Set the active outlook type for drawing
     setActiveOutlookType: (state, action: PayloadAction<OutlookType>) => {
         state.drawingState.activeOutlookType = action.payload;
-        // Reset probability when changing outlook type
+        
+        // Set default probability based on outlook type
         if (action.payload === 'tornado') {
           state.drawingState.activeProbability = '2%';
         } else if (action.payload === 'wind' || action.payload === 'hail') {
           state.drawingState.activeProbability = '5%';
-        } else {
+        } else if (action.payload === 'totalSevere') {
+          state.drawingState.activeProbability = '5%';
+        } else if (action.payload === 'day4-8') {
+          state.drawingState.activeProbability = '15%';
+        } else if (action.payload === 'categorical') {
           state.drawingState.activeProbability = 'MRGL';
         }
+        
         state.isSaved = false;
       },
 
-      // Update emergency mode status
       setEmergencyMode: (state, action: PayloadAction<boolean>) => {
         state.emergencyMode = action.payload;
     },
 
-    // Set the active probability/risk level for drawing
     setActiveProbability: (state, action: PayloadAction<any>) => {
       state.drawingState.activeProbability = action.payload;
-      // If probability contains '#', it's significant
       if (typeof action.payload === 'string') {
         state.drawingState.isSignificant = action.payload.includes('#');
       }
       state.isSaved = false;
     },
 
-    // Toggle significant status - No-op as legacy mode is removed
     toggleSignificant: (state) => {
-      // Legacy significance toggle removed
       state.drawingState.isSignificant = false;
     },
 
-    // Add a drawn feature to the appropriate outlook
     addFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
       const feature = action.payload.feature;
       const outlookType = computeOutlookType(feature, state);
       const probability = computeProbability(feature, state);
 
-      const outlookMap = state.outlooks[outlookType as keyof OutlookData];
+      const outlookData = getCurrentOutlook(state);
+      const outlookMap = outlookData[outlookType];
+      
+      if (!outlookMap) {
+        // Outlook type not supported for this day, skip
+        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
+        return;
+      }
+      
       const existingFeatures = outlookMap.get(probability) || [];
 
       const featureWithProps = buildFeatureWithProps(
@@ -139,29 +204,27 @@ export const forecastSlice = createSlice({
       state.isSaved = false;
     },
     
-    // Update an existing feature (e.g. after geometry edit)
     updateFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
       const feature = action.payload.feature;
-      // We assume the feature properties are preserved from the original
       const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
       const probability = (feature.properties?.probability as string) || state.drawingState.activeProbability;
       
-      const outlookMap = state.outlooks[outlookType];
-      // Normalize probability key access just in case
-      // (The map keys are strings like "5%", "TSTM")
-      // If the feature came from the store, it should have the correct probability in properties.
+      const outlookData = getCurrentOutlook(state);
+      const outlookMap = outlookData[outlookType];
+      
+      if (!outlookMap) {
+        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
+        return;
+      }
       
       const features = outlookMap.get(probability);
       
       if (features) {
         const index = features.findIndex(f => f.id === feature.id);
         if (index !== -1) {
-          // Update the feature while preserving properties that might not be in the payload if strictly geometry
-          // But usually we pass the whole feature back.
           features[index] = {
             ...features[index],
             geometry: feature.geometry,
-            // Update properties if they changed, but ensure core tracking props stay
             properties: {
               ...features[index].properties,
               ...feature.properties
@@ -172,14 +235,21 @@ export const forecastSlice = createSlice({
       }
     },
     
-    // Remove a feature by ID
     removeFeature: (state, action: PayloadAction<{ 
       outlookType: OutlookType, 
       probability: string, 
       featureId: string 
     }>) => {
       const { outlookType, probability, featureId } = action.payload;
-      const features = state.outlooks[outlookType].get(probability);
+      const outlookData = getCurrentOutlook(state);
+      const outlookMap = outlookData[outlookType];
+      
+      if (!outlookMap) {
+        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
+        return;
+      }
+      
+      const features = outlookMap.get(probability);
       
       if (features) {
         const updatedFeatures = features.filter(feature => 
@@ -187,78 +257,91 @@ export const forecastSlice = createSlice({
         );
         
         if (updatedFeatures.length > 0) {
-          state.outlooks[outlookType].set(probability, updatedFeatures);
+          outlookMap.set(probability, updatedFeatures);
         } else {
-          state.outlooks[outlookType].delete(probability);
+          outlookMap.delete(probability);
         }
         
         state.isSaved = false;
       }
     },
     
-    // Reset just the categorical outlooks (used by useAutoCategorical)
     resetCategorical: (state) => {
-      // Store TSTM features before resetting
-      const tstmFeatures = state.outlooks.categorical.get('TSTM') || [];
-      
-      // Clear all categorical outlooks
-      state.outlooks.categorical = new Map();
-      
-      // Restore TSTM features if they exist
-      if (tstmFeatures.length > 0) {
-        state.outlooks.categorical.set('TSTM', tstmFeatures);
+      const outlooks = getCurrentOutlook(state);
+      if (!outlooks.categorical) {
+        return; // No categorical map for this day (e.g., Day 4-8)
       }
-      
+      const tstmFeatures = outlooks.categorical.get('TSTM') || [];
+      outlooks.categorical = new Map();
+      if (tstmFeatures.length > 0) {
+        outlooks.categorical.set('TSTM', tstmFeatures);
+      }
       state.isSaved = false;
     },
 
-    // Set a specific outlook map (used for preserving TSTM areas)
     setOutlookMap: (state, action: PayloadAction<{ 
       outlookType: OutlookType, 
       map: Map<string, GeoJSON.Feature[]> 
     }>) => {
       const { outlookType, map } = action.payload;
-      state.outlooks[outlookType] = map;
-      state.isSaved = false;
+      const outlookData = getCurrentOutlook(state);
+      
+      // Check if outlook type is supported for current day
+      if (outlookData[outlookType] !== undefined || outlookType === 'categorical' || 
+          outlookType === 'tornado' || outlookType === 'wind' || outlookType === 'hail' ||
+          outlookType === 'totalSevere' || outlookType === 'day4-8') {
+        // @ts-ignore - Dynamic property assignment
+        outlookData[outlookType] = map;
+        state.isSaved = false;
+      } else {
+        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
+      }
     },
     
-    // Set map view (center and zoom)
     setMapView: (state, action: PayloadAction<{ center: [number, number], zoom: number }>) => {
       state.currentMapView = action.payload;
     },
     
-    // Reset all outlook data
     resetForecasts: (state) => {
-      state.outlooks = {
-        tornado: new Map(),
-        wind: new Map(),
-        hail: new Map(),
-        categorical: new Map()
-      };
+      // Resets ONLY the current day's forecast
+      const day = state.forecastCycle.currentDay;
+      state.forecastCycle.days[day] = createEmptyOutlook(day);
       state.isSaved = false;
     },
     
-    // Mark the forecast as saved
     markAsSaved: (state) => {
       state.isSaved = true;
     },
 
-    // Import forecast data with TSTM preservation
+    // Import forecast data: Now handles Cycle
+    importForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
+      state.forecastCycle = action.payload;
+      state.isSaved = true;
+    },
+
+    // Legacy import support (Single day) -> Import into CURRENT day
     importForecasts: (state, action: PayloadAction<OutlookData>) => {
-      // Store existing TSTM features before importing
-      const existingTstm = state.outlooks.categorical.get('TSTM') || [];
-      
-      // Import new data
-      state.outlooks = action.payload;
-      
-      // Merge existing TSTM features with imported ones
-      const importedTstm = state.outlooks.categorical.get('TSTM') || [];
-      const mergedTstm = [...existingTstm, ...importedTstm];
-      
-      if (mergedTstm.length > 0) {
-        state.outlooks.categorical.set('TSTM', mergedTstm);
+      const currentDay = state.forecastCycle.currentDay;
+      const dayData = state.forecastCycle.days[currentDay];
+      if (dayData) {
+        // Preserve existing TSTM features if categorical exists
+        const existingTstm = dayData.data.categorical?.get('TSTM') || [];
+        
+        // Replace current day data with imported data
+        dayData.data = action.payload;
+        
+        // Merge TSTM features if categorical map exists
+        if (dayData.data.categorical) {
+          const importedTstm = dayData.data.categorical.get('TSTM') || [];
+          const mergedTstm = [...existingTstm, ...importedTstm];
+          if (mergedTstm.length > 0) {
+            dayData.data.categorical.set('TSTM', mergedTstm);
+          }
+        }
+        
+        // Update metadata
+        dayData.metadata.lastModified = new Date().toISOString();
       }
-      
       state.isSaved = true;
     }
   }
@@ -277,7 +360,19 @@ export const {
   resetForecasts,
   markAsSaved,
   importForecasts,
+  importForecastCycle,
+  setForecastDay,
+  setCycleDate,
   setEmergencyMode
 } = forecastSlice.actions;
+
+// Selectors
+export const selectForecast = (state: RootState) => state.forecast;
+export const selectForecastCycle = (state: RootState) => state.forecast.forecastCycle;
+export const selectCurrentDay = (state: RootState) => state.forecast.forecastCycle.currentDay;
+export const selectCurrentOutlooks = (state: RootState) => {
+  const cycle = state.forecast.forecastCycle;
+  return cycle.days[cycle.currentDay]?.data || createEmptyOutlook(cycle.currentDay).data;
+};
 
 export default forecastSlice.reducer;

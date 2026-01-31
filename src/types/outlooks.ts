@@ -57,6 +57,19 @@ export type HailProbability =
   | '60%'
   | '60#';
 
+// Day 3 Total Severe Probability (combined threat, not separate tornado/wind/hail)
+export type TotalSevereProbability =
+  | '5%'
+  | '15%'
+  | '30%'
+  | '45%'
+  | '60%';
+
+// Day 4-8 Probability (special outlook type with only 15% and 30%)
+export type Day48Probability =
+  | '15%' // Yellow
+  | '30%'; // Orange
+
 // CIG (Hatching) Levels
 export type CIGLevel = 
   | 'CIG0' // No hatching
@@ -64,11 +77,14 @@ export type CIGLevel =
   | 'CIG2' // Solid diagonal (Top-Left to Bottom-Right)
   | 'CIG3'; // Crosshatch
 
-// Outlook types
-export type OutlookType = 'tornado' | 'wind' | 'hail' | 'categorical';
+// Outlook types - varies by day
+// Day 1/2: tornado, wind, hail, categorical
+// Day 3: totalSevere, categorical  
+// Day 4-8: day4-8
+export type OutlookType = 'tornado' | 'wind' | 'hail' | 'categorical' | 'totalSevere' | 'day4-8';
 
 // Combined probability type for use across the app
-export type Probability = TornadoProbability | WindProbability | HailProbability | CategoricalRiskLevel | CIGLevel;
+export type Probability = TornadoProbability | WindProbability | HailProbability | TotalSevereProbability | Day48Probability | CategoricalRiskLevel | CIGLevel;
 
 export type Hazard = OutlookType;
 
@@ -89,12 +105,24 @@ export interface Outlook {
   riskAreas: RiskArea[];
 }
 
-// Full outlook data structure
+// Full outlook data structure - adapts based on day
+// Day 1/2: tornado, wind, hail, categorical
+// Day 3: totalSevere, categorical
+// Day 4-8: day4-8 only
 export interface OutlookData {
-  tornado: Map<string, GeoJSON.Feature[]>; // Map of probability to GeoJSON features
-  wind: Map<string, GeoJSON.Feature[]>;    // Map of probability to GeoJSON features
-  hail: Map<string, GeoJSON.Feature[]>;    // Map of probability to GeoJSON features
-  categorical: Map<string, GeoJSON.Feature[]>; // Map of risk level to GeoJSON features
+  // Day 1 & 2 fields
+  tornado?: Map<string, GeoJSON.Feature[]>;
+  wind?: Map<string, GeoJSON.Feature[]>;
+  hail?: Map<string, GeoJSON.Feature[]>;
+  
+  // Day 3 field
+  totalSevere?: Map<string, GeoJSON.Feature[]>;
+  
+  // Day 1, 2, 3 field (with categorical conversion)
+  categorical?: Map<string, GeoJSON.Feature[]>;
+  
+  // Day 4-8 field (15% and 30% only, no categorical)
+  'day4-8'?: Map<string, GeoJSON.Feature[]>;
 }
 
 // Color mappings for the different outlook types
@@ -102,6 +130,8 @@ export interface ColorMappings {
   tornado: Record<TornadoProbability, string>;
   wind: Record<WindProbability, string>;
   hail: Record<HailProbability, string>;
+  totalSevere: Record<TotalSevereProbability, string>;
+  'day4-8': Record<Day48Probability, string>;
   categorical: Record<CategoricalRiskLevel, string>;
   significant: string; // For the hatched pattern
   hatching: Record<CIGLevel, string>; // Pattern defs or colors (transparent usually)
@@ -116,18 +146,61 @@ export interface DrawingState {
 
 // Serialization types for JSON storage
 export interface SerializedOutlookData {
-  tornado: [string, GeoJSON.Feature[]][];
-  wind: [string, GeoJSON.Feature[]][];
-  hail: [string, GeoJSON.Feature[]][];
-  categorical: [string, GeoJSON.Feature[]][];
+  tornado?: [string, GeoJSON.Feature[]][];
+  wind?: [string, GeoJSON.Feature[]][];
+  hail?: [string, GeoJSON.Feature[]][];
+  totalSevere?: [string, GeoJSON.Feature[]][];
+  'day4-8'?: [string, GeoJSON.Feature[]][];
+  categorical?: [string, GeoJSON.Feature[]][];
 }
 
+// Forecast Cycle Types
+// Individual days instead of merged '4-8'
+export type DayType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export interface OutlookDay {
+  day: DayType;
+  data: OutlookData; // The actual polygon data
+  metadata: {
+    issueDate: string;
+    validDate: string;
+    issuanceTime: string;
+    createdAt: string;
+    lastModified: string;
+  };
+}
+
+export interface ForecastCycle {
+  days: Partial<Record<DayType, OutlookDay>>;
+  currentDay: DayType;
+  cycleDate: string;
+}
+
+// Updated Save Data Interface
 export interface GFCForecastSaveData {
   version: string;
+  type: 'single-day' | 'forecast-cycle';
   timestamp: string;
-  outlooks: SerializedOutlookData;
-  mapView: {
+  
+  // Single day format (backward compatible / single export)
+  outlooks?: SerializedOutlookData;
+  mapView?: {
     center: [number, number];
     zoom: number;
+  };
+
+  // Multi-day format (new)
+  forecastCycle?: {
+    days: Partial<Record<DayType, {
+      day: DayType;
+      data: SerializedOutlookData;
+      metadata: {
+        issueDate: string;
+        validDate: string;
+        issuanceTime: string;
+      };
+    }>>;
+    currentDay: DayType;
+    cycleDate: string;
   };
 }

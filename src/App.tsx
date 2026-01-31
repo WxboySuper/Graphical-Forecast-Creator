@@ -3,11 +3,12 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './store';
 import ForecastMap, { ForecastMapHandle } from './components/Map/ForecastMap';
 import OutlookPanel from './components/OutlookPanel/OutlookPanel';
+import OutlookDaySelector from './components/OutlookDaySelector/OutlookDaySelector';
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
-import { importForecasts, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode } from './store/forecastSlice';
+import { importForecastCycle, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode, selectCurrentOutlooks, selectForecastCycle } from './store/forecastSlice';
 import { RootState } from './store';
-import { OutlookData, OutlookType, Probability } from './types/outlooks';
+import { OutlookData, OutlookType, Probability, ForecastCycle } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
@@ -18,8 +19,6 @@ import { ToastManager } from './components/Toast/Toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
-
-// hooks imported above
 
 import { deserializeForecast, validateForecastData, exportForecastToJson } from './utils/fileUtils';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -169,17 +168,18 @@ const loadStateFromData = (
     return;
   }
 
-  const deserializedOutlooks = deserializeForecast(data);
+  const deserializedCycle = deserializeForecast(data);
   
-  dispatch(resetForecasts());
-  dispatch(importForecasts(deserializedOutlooks));
+  dispatch(importForecastCycle(deserializedCycle));
   
   const map = mapRef.current?.getMap();
+  const currentOutlooks = deserializedCycle.days[deserializedCycle.currentDay]?.data;
+
   // Restore Map View if available
   if (data.mapView) {
     dispatch(setMapView(data.mapView));
-  } else if (map) {
-    fitMapToFeatures(map, deserializedOutlooks, dispatch);
+  } else if (map && currentOutlooks) {
+    fitMapToFeatures(map, currentOutlooks, dispatch);
   }
   
   addToast(successMessage, 'success');
@@ -187,13 +187,13 @@ const loadStateFromData = (
 
 // Save action = Export to File
 const performSave = (
-  outlooks: OutlookData,
+  forecastCycle: ForecastCycle,
   mapRef: React.RefObject<ForecastMapHandle>,
   dispatch: AppDispatch,
   addToast: AddToastFn
 ) => {
   try {
-    exportForecastToJson(outlooks, buildMapView(mapRef));
+    exportForecastToJson(forecastCycle, buildMapView(mapRef));
     dispatch(markAsSaved());
     addToast('Forecast exported to JSON!', 'success');
   } catch (error) {
@@ -235,14 +235,10 @@ const loadFromLocalStorage = (
     const savedData = localStorage.getItem('forecastData');
     if (savedData) {
       const data = JSON.parse(savedData);
-      // We don't show success toast on auto-load to avoid annoyance on refresh, 
-      // or maybe we do? "Session restored"?
-      // Let's pass null for silent, or a message.
       loadStateFromData(data, dispatch, mapRef, addToast, 'Session restored from auto-save.');
     }
   } catch (error) {
     console.error('Error auto-loading:', error);
-    // Silent fail on auto-load
   }
 };
 
@@ -268,7 +264,8 @@ const EmergencyModeMessage = () => (
 export const AppContent = () => {
   const dispatch = useDispatch();
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
-  const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
+  const forecastCycle = useSelector(selectForecastCycle);
+  const currentOutlooks = useSelector(selectCurrentOutlooks);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const emergencyMode = useSelector((state: RootState) => state.forecast.emergencyMode);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
@@ -294,28 +291,21 @@ export const AppContent = () => {
   
   // Auto-load session from LocalStorage on startup
   useEffect(() => {
-    // Small delay to ensure map is ready or just load state
-    // Actually mapRef might not be ready but state loading doesn't need map immediately
-    // except for fitBounds. setMapView handles state.
-    // We can just load state.
     loadFromLocalStorage(dispatch, mapRef, addToast);
-  }, [dispatch, addToast]); // mapRef is stable ref
+  }, [dispatch, addToast]);
 
   // Initialize feature flags state
   useEffect(() => {
-    // Check if any outlook types are enabled
     const anyEnabled = isAnyOutlookEnabled(featureFlags);
     dispatch(setEmergencyMode(!anyEnabled));
-
-    // Use the first available outlook type
     const firstEnabled = getFirstEnabledOutlookType(featureFlags);
     dispatch(setActiveOutlookType(firstEnabled as OutlookType));
   }, [dispatch, featureFlags]);
 
   // Save (Export) forecast
   const handleSave = useCallback(() => {
-    performSave(outlooks, mapRef, dispatch, addToast);
-  }, [outlooks, mapRef, dispatch, addToast]);
+    performSave(forecastCycle, mapRef, dispatch, addToast);
+  }, [forecastCycle, mapRef, dispatch, addToast]);
 
   // Load (Import) forecast
   const handleLoad = useCallback((file: File) => {
@@ -345,7 +335,6 @@ export const AppContent = () => {
   // Add keyboard shortcuts
   useEffect(() => {
     const { activeOutlookType, activeProbability, isSignificant } = drawingState;
-    // Small named handlers reduce cyclomatic complexity of this effect
     const handleToggleDocumentation = () => {
       setShowDocumentation(prev => !prev);
       addToast('Documentation toggled', 'info');
@@ -410,6 +399,7 @@ export const AppContent = () => {
           <EmergencyModeMessage />
         ) : (
           <>
+            <OutlookDaySelector />
             <DrawingTools 
               onSave={handleSave} 
               onLoad={handleLoad} 

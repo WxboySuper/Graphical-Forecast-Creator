@@ -51,11 +51,16 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 ## v0.5.0-alpha: The Load System
 
-**Goal:** The "Forecast Cycle" workflow (Edit yesterday's outlook).
+**Goal:** The "Forecast Cycle" workflow.
+**Description:** We develop a forcast cycle workflow of handling multiple days of outlooks.
 
-- [ ] Implement `Import JSON` functionality.
-- [ ] Allow re-uploading a saved file to populate the map with editable polygons.
-- [ ] Handle version migration (if schema changes).
+- [x] Add Day 3 Outlook Support.
+- [x] Add Day 4-8 Outlook Support.
+- [x] Add navigation between multiple outlook day styles.
+- [x] Update schema to support different outlook days and importing older day schema to newer day schema (importing day 4 outlook to update in the day 3 style.)
+- [x] Implement `Import JSON` functionality.
+- [x] Allow re-uploading a saved file to populate the map with editable polygons.
+- [x] Handle version migration (if schema changes).
 
 ## v0.6.0-alpha: Map Overlays & Context
 
@@ -69,9 +74,9 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Implementing the SPC style guide.
 
-- [ ] Add "Risk Category" selector (TSTM, MRGL, SLGT, ENH, MDT, HIGH).
-- [ ] Implement dynamic polygon styling based on category (Green, Yellow, Orange, Red, Magenta).
-- [ ] Add standard labels/tooltips to polygons.
+- [x] Add "Risk Category" selector (TSTM, MRGL, SLGT, ENH, MDT, HIGH).
+- [x] Implement dynamic polygon styling based on category (Green, Yellow, Orange, Red, Magenta).
+- [x] Add standard labels/tooltips to polygons.
 
 ## v0.8.0-alpha: Verification Tools
 
