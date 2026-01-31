@@ -29,6 +29,8 @@
   --panel-bg: #f5f5f5;
   --checkbox-hover: #e9ecef;
   --metric-bg: #f8f9fa;
+  --overlay-control-bg: #ffffff;
+  --overlay-control-hover: #f5f5f5;
 }
 
 .dark-mode {
@@ -60,6 +62,8 @@
   --panel-bg: #252525;
   --checkbox-hover: #3a3a3a;
   --metric-bg: #2d2d2d;
+  --overlay-control-bg: #2d2d2d;
+  --overlay-control-hover: #3a3a3a;
 }
 
 /* Apply dark mode to body */
@@ -79,10 +83,20 @@
   color: var(--text-primary);
 }
 
+.dark-mode .App-footer {
+  border-top-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.dark-mode .App-footer a {
+  color: var(--button-bg);
+}
+
 /* Inputs and form elements */
 .dark-mode input[type="text"],
 .dark-mode input[type="date"],
 .dark-mode input[type="number"],
+.dark-mode input[type="file"],
 .dark-mode select,
 .dark-mode textarea {
   background-color: var(--input-bg);
@@ -99,27 +113,42 @@
   outline: none;
 }
 
+.dark-mode input:disabled,
+.dark-mode select:disabled,
+.dark-mode textarea:disabled {
+  background-color: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  opacity: 0.6;
+}
+
 /* Buttons */
-.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn) {
+.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):not(.dark-mode-toggle-btn):not(.day-btn):not(.day-tab) {
   background-color: var(--button-bg);
   color: white;
 }
 
-.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):hover:not(:disabled) {
+.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):not(.dark-mode-toggle-btn):not(.day-btn):not(.day-tab):hover:not(:disabled) {
   background-color: var(--button-hover);
+}
+
+.dark-mode button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Panels and containers */
 .dark-mode .verification-panel,
 .dark-mode .outlook-panel,
-.dark-mode .drawing-tools-panel {
+.dark-mode .drawing-tools-panel,
+.dark-mode .drawing-tools {
   background-color: var(--panel-bg);
   border-color: var(--border-color);
 }
 
 .dark-mode .forecast-loader-section,
 .dark-mode .reports-section,
-.dark-mode .verification-section {
+.dark-mode .verification-section,
+.dark-mode .outlook-section {
   background-color: var(--bg-secondary);
   border-color: var(--border-color);
 }
@@ -132,6 +161,16 @@
 /* Verification Mode */
 .dark-mode .verification-mode {
   background-color: var(--bg-secondary);
+}
+
+.dark-mode .verification-header {
+  background: linear-gradient(135deg, #5568d3 0%, #65408a 100%);
+}
+
+.dark-mode .day-selector-section,
+.dark-mode .outlook-type-selector {
+  background-color: var(--bg-secondary);
+  border-bottom-color: var(--border-color);
 }
 
 /* Status messages */
@@ -150,6 +189,11 @@
   color: var(--text-primary);
 }
 
+.dark-mode .checkmark {
+  background-color: #2d7a3f;
+  color: white;
+}
+
 .dark-mode .verification-note {
   background-color: var(--warning-bg);
   border-color: var(--warning-border);
@@ -161,10 +205,24 @@
   background-color: var(--checkbox-hover);
 }
 
+.dark-mode label {
+  color: var(--text-primary);
+}
+
 /* Metrics and stats */
 .dark-mode .metric,
 .dark-mode .risk-level-stat {
   background-color: var(--metric-bg);
+}
+
+.dark-mode .metric-label,
+.dark-mode .risk-level-name {
+  color: var(--text-secondary);
+}
+
+.dark-mode .metric-value,
+.dark-mode .risk-level-value {
+  color: var(--text-primary);
 }
 
 .dark-mode .verification-results,
@@ -175,6 +233,7 @@
 
 .dark-mode .verification-summary {
   background-color: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 /* Documentation */
@@ -185,6 +244,148 @@
 
 .dark-mode .documentation-content {
   background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Outlook Panel */
+.dark-mode .outlook-panel h3 {
+  color: var(--text-primary);
+}
+
+.dark-mode .outlook-buttons button {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .outlook-buttons button:hover:not(:disabled) {
+  background-color: var(--bg-secondary);
+}
+
+.dark-mode .outlook-buttons button.active {
+  background-color: #3f51b5;
+  color: white;
+}
+
+.dark-mode .outlook-buttons button.button-disabled {
+  background-color: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+.dark-mode .probability-selector {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .probability-selector label {
+  color: var(--text-primary);
+}
+
+.dark-mode .probability-note,
+.dark-mode .warning-notice {
+  background-color: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.dark-mode .emergency-warning {
+  background-color: #8b1e2f;
+  border-color: #5a0f1e;
+}
+
+/* Drawing Tools */
+.dark-mode .drawing-tools h3 {
+  color: var(--text-primary);
+}
+
+.dark-mode .tool-button {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.dark-mode .tool-button:hover:not(:disabled) {
+  background-color: var(--bg-secondary);
+}
+
+.dark-mode .tool-button:disabled,
+.dark-mode .button-disabled {
+  background-color: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.dark-mode .save-button:not(:disabled) {
+  background-color: #2d7a3f;
+}
+
+.dark-mode .load-button:not(:disabled) {
+  background-color: #0d6efd;
+}
+
+.dark-mode .clear-button {
+  background-color: #dc3545;
+}
+
+.dark-mode .clear-button:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+/* Outlook Day Selector */
+.dark-mode .day-selector-container {
+  background-color: #1f2d3d;
+  border-bottom-color: #2c3e50;
+}
+
+.dark-mode .day-selector-label {
+  color: #95a5a6;
+}
+
+.dark-mode .day-tab {
+  background-color: #2c3e50;
+  color: #ecf0f1;
+}
+
+.dark-mode .day-tab:hover {
+  background-color: #34495e;
+}
+
+.dark-mode .day-tab.active {
+  background-color: #2980b9;
+}
+
+.dark-mode .day-info-text {
+  color: var(--text-secondary);
+}
+
+/* Overlay Controls */
+.dark-mode .overlay-controls {
+  background-color: var(--overlay-control-bg);
+  border-color: var(--border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode .overlay-controls-header {
+  color: var(--text-primary);
+}
+
+.dark-mode .overlay-control-item:hover {
+  background-color: var(--overlay-control-hover);
+}
+
+.dark-mode .overlay-control-label {
+  color: var(--text-secondary);
+}
+
+.dark-mode .overlay-control-item input[type="checkbox"]:checked + .overlay-control-label {
+  color: var(--text-primary);
+}
+
+.dark-mode .overlay-controls-divider {
+  background-color: var(--border-color);
+}
+
+.dark-mode .overlay-control-section-title {
+  color: var(--text-tertiary);
 }
 
 /* Leaflet map controls in dark mode */
@@ -198,6 +399,16 @@
   color: var(--text-primary);
 }
 
+.dark-mode .leaflet-control-layers-base label,
+.dark-mode .leaflet-control-layers-overlays label {
+  color: var(--text-primary);
+}
+
+.dark-mode .leaflet-control-layers-expanded {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
 .dark-mode .leaflet-control-zoom a {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
@@ -208,16 +419,47 @@
   background-color: var(--bg-tertiary);
 }
 
+.dark-mode .leaflet-bar {
+  border-color: var(--border-color);
+}
+
+.dark-mode .leaflet-bar a {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+.dark-mode .leaflet-bar a:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Leaflet PM Toolbar */
+.dark-mode .leaflet-pm-toolbar {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .leaflet-pm-actions-container {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
 /* Legend in dark mode */
-.dark-mode .legend {
+.dark-mode .legend,
+.dark-mode .map-legend {
   background-color: rgba(29, 29, 29, 0.95);
   color: var(--text-primary);
   border-color: var(--border-color);
 }
 
-.dark-mode .legend h4 {
+.dark-mode .legend h4,
+.dark-mode .map-legend h4 {
   color: var(--text-primary);
   border-bottom-color: var(--border-color);
+}
+
+.dark-mode .legend-item {
+  color: var(--text-primary);
 }
 
 /* Tooltips */
@@ -226,11 +468,32 @@
   color: var(--text-primary) !important;
 }
 
+.dark-mode .leaflet-tooltip {
+  background-color: rgba(29, 29, 29, 0.95);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
 /* Code blocks */
 .dark-mode pre,
 .dark-mode code {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+/* Details/Summary */
+.dark-mode details {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode summary {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.dark-mode summary:hover {
+  background-color: var(--bg-secondary);
 }
 
 /* Scrollbars (webkit browsers) */
@@ -260,6 +523,34 @@
 .dark-mode .export-modal {
   background-color: var(--bg-primary);
   border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.dark-mode .export-modal h2 {
+  color: var(--text-primary);
+}
+
+.dark-mode .export-modal-input {
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+
+.dark-mode .export-modal-cancel {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.dark-mode .export-modal-cancel:hover {
+  background-color: var(--bg-secondary);
+}
+
+.dark-mode .export-modal-confirm {
+  background-color: var(--button-bg);
+}
+
+.dark-mode .export-modal-confirm:hover {
+  background-color: var(--button-hover);
 }
 
 /* Waiting message */
@@ -288,6 +579,10 @@
   color: var(--text-tertiary);
 }
 
+.dark-mode .file-name {
+  color: var(--text-secondary);
+}
+
 /* Tables */
 .dark-mode table {
   color: var(--text-primary);
@@ -297,6 +592,7 @@
 .dark-mode table th {
   background-color: var(--bg-secondary);
   border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 .dark-mode table td {
@@ -311,14 +607,213 @@
   color: var(--text-primary);
 }
 
-.dark-mode .toast.success {
+.dark-mode .toast.toast-success,
+.dark-mode .toast-success {
   background-color: var(--success-bg);
   border-color: var(--success-border);
   color: var(--success-text);
 }
 
-.dark-mode .toast.error {
+.dark-mode .toast.toast-error,
+.dark-mode .toast-error {
   background-color: var(--error-bg);
   border-color: var(--error-border);
   color: var(--error-text);
+}
+
+.dark-mode .toast.toast-warning,
+.dark-mode .toast-warning {
+  background-color: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.dark-mode .toast.toast-info,
+.dark-mode .toast-info {
+  background-color: #1a2a3a;
+  border-color: #2d4a5a;
+  color: #88b8d8;
+}
+
+/* Confirmation Modal */
+.dark-mode .confirmation-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.dark-mode .confirmation-modal {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.dark-mode .confirmation-modal h3 {
+  color: var(--text-primary);
+}
+
+/* Links */
+.dark-mode a {
+  color: #5DADE2;
+}
+
+.dark-mode a:hover {
+  color: #85C1E9;
+}
+
+/* HR dividers */
+.dark-mode hr {
+  border-color: var(--border-color);
+}
+
+/* Additional headings */
+.dark-mode h1,
+.dark-mode h2,
+.dark-mode h3,
+.dark-mode h4,
+.dark-mode h5,
+.dark-mode h6 {
+  color: var(--text-primary);
+}
+
+/* Badges and tags */
+.dark-mode .badge,
+.dark-mode .tag,
+.dark-mode .maintenance-badge {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+/* Form groups */
+.dark-mode .form-group,
+.dark-mode .input-group {
+  color: var(--text-primary);
+}
+
+/* Lists */
+.dark-mode ul,
+.dark-mode ol {
+  color: var(--text-primary);
+}
+
+.dark-mode ul li,
+.dark-mode ol li {
+  color: var(--text-primary);
+}
+
+/* Small text */
+.dark-mode small {
+  color: var(--text-secondary);
+}
+
+/* Placeholder text */
+.dark-mode ::placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.dark-mode ::-webkit-input-placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.dark-mode ::-moz-placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+/* Focus states */
+.dark-mode :focus {
+  outline-color: var(--button-bg);
+}
+
+.dark-mode :focus-visible {
+  outline-color: var(--button-bg);
+  box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.3);
+}
+
+/* Switch/Toggle */
+.dark-mode .switch {
+  background-color: var(--bg-tertiary);
+}
+
+.dark-mode .slider {
+  background-color: var(--bg-tertiary);
+}
+
+.dark-mode input:checked + .slider {
+  background-color: var(--button-bg);
+}
+
+/* Color preview */
+.dark-mode .color-preview {
+  border-color: var(--border-color);
+}
+
+/* Hatch preview */
+.dark-mode .hatch-preview {
+  border-color: var(--border-color);
+}
+
+/* Feature flags info */
+.dark-mode .feature-flags-info {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Load button */
+.dark-mode .load-button {
+  background-color: var(--button-bg);
+}
+
+.dark-mode .load-button:hover:not(:disabled) {
+  background-color: var(--button-hover);
+}
+
+/* Display controls */
+.dark-mode .display-controls {
+  color: var(--text-primary);
+}
+
+/* Filter controls */
+.dark-mode .filter-controls {
+  color: var(--text-primary);
+}
+
+/* Verification info */
+.dark-mode .verification-info {
+  color: var(--text-secondary);
+}
+
+/* Date selector */
+.dark-mode .date-selector label {
+  color: var(--text-primary);
+}
+
+/* Storm report markers - preserve their colors but adjust opacity */
+.dark-mode .tornado-marker {
+  opacity: 0.9;
+}
+
+.dark-mode .wind-marker {
+  opacity: 0.9;
+}
+
+.dark-mode .hail-marker {
+  opacity: 0.9;
+}
+
+/* Emergency mode message */
+.dark-mode .emergency-mode-message {
+  background-color: #8b1e2f;
+  border-color: #5a0f1e;
+}
+
+/* Emergency contact links */
+.dark-mode .emergency-contact a {
+  color: #e8d898;
+}
+
+.dark-mode .emergency-contact a:hover {
+  color: #f8f9fa;
 }

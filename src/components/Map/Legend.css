@@ -41,3 +41,16 @@
   font-size: 0.85rem;
   color: #333;
 }
+
+/* Dark mode overrides for legend */
+.dark-mode .map-legend h4 {
+  color: #e4e4e4;
+}
+
+.dark-mode .legend-item span {
+  color: #e4e4e4;
+}
+
+.dark-mode .legend-color {
+  border-color: rgba(255, 255, 255, 0.3);
+}

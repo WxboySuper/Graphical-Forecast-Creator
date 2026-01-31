@@ -505,20 +505,24 @@ OutlookLayers.displayName = 'OutlookLayers';
 
 // Extract deeper JSX children into a small component to reduce nesting
 // Optimized: Memoized to prevent re-renders when parent re-renders
-const MapInner: React.FC = React.memo(() => (
-  <>
-    <LayersControl position="topright">
-      {MAP_STYLES.map((style) => (
-        <LayersControl.BaseLayer checked={style.name === 'Standard'} name={style.name} key={style.name}>
-          <TileLayer
-            attribution={style.attribution}
-            url={style.url}
-          />
-        </LayersControl.BaseLayer>
-      ))}
-      
-      <MapOverlays />
-    </LayersControl>
+const MapInner: React.FC<{ darkMode: boolean }> = React.memo(({ darkMode }) => {
+  // Auto-select Dark map style when dark mode is enabled
+  const defaultStyle = darkMode ? 'Dark' : 'Standard';
+  
+  return (
+    <>
+      <LayersControl position="topright">
+        {MAP_STYLES.map((style) => (
+          <LayersControl.BaseLayer checked={style.name === defaultStyle} name={style.name} key={style.name}>
+            <TileLayer
+              attribution={style.attribution}
+              url={style.url}
+            />
+          </LayersControl.BaseLayer>
+        ))}
+        
+        <MapOverlays />
+      </LayersControl>
 
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
@@ -545,11 +549,12 @@ const MapInner: React.FC = React.memo(() => (
       </defs>
     </svg>
 
-    <OutlookLayers />
+      <OutlookLayers />
 
-    <Legend />
-  </>
-));
+      <Legend />
+    </>
+  );
+});
 
 MapInner.displayName = 'MapInner';
 
@@ -572,6 +577,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
   
   // Store drawingState in a ref so our callback always has latest values
@@ -675,7 +681,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
             onPolygonCreated={handlePolygonCreated}
           />
 
-          <MapInner />
+          <MapInner darkMode={darkMode} />
       </MapContainer>
     </div>
   );

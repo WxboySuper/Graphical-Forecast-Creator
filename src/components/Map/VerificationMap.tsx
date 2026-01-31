@@ -83,6 +83,10 @@ const VerificationMap = forwardRef<VerificationMapHandle, VerificationMapProps>(
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
+  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
+
+  // Auto-select Dark map style when dark mode is enabled
+  const defaultStyle = darkMode ? 'Dark' : 'Standard';
 
   useImperativeHandle(ref, () => ({
     getMap: () => mapInstance,
@@ -145,7 +149,7 @@ const VerificationMap = forwardRef<VerificationMapHandle, VerificationMapProps>(
         <MapController setMapInstance={setMapInstance} />
         <LayersControl position="topright">
           {MAP_STYLES.map((style) => (
-            <LayersControl.BaseLayer checked={style.name === 'Standard'} name={style.name} key={style.name}>
+            <LayersControl.BaseLayer checked={style.name === defaultStyle} name={style.name} key={style.name}>
               <TileLayer
                 attribution={style.attribution}
                 url={style.url}
