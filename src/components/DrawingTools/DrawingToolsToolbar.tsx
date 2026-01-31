@@ -4,6 +4,7 @@ import ToolButton from './ToolButton';
 interface DrawingToolsToolbarProps {
   onSave: () => void;
   onLoad: () => void;
+  onOpenDiscussion: () => void;
   handleExport: () => void;
   handleReset: () => void;
   isSaveLoadDisabled: boolean;
@@ -16,6 +17,7 @@ interface DrawingToolsToolbarProps {
 const DrawingToolsToolbar: React.FC<DrawingToolsToolbarProps> = ({
   onSave,
   onLoad,
+  onOpenDiscussion,
   handleExport,
   handleReset,
   isSaveLoadDisabled,
@@ -44,6 +46,16 @@ const DrawingToolsToolbar: React.FC<DrawingToolsToolbarProps> = ({
         icon="📂"
         maintenance={isSaveLoadDisabled}
         tooltipText={isSaveLoadDisabled ? "Load feature is temporarily unavailable" : null}
+      />
+
+      <ToolButton
+        className="discussion-button"
+        onClick={onOpenDiscussion}
+        disabled={false}
+        label="Forecast Discussion"
+        icon="📝"
+        maintenance={false}
+        tooltipText={null}
       />
 
       <ToolButton

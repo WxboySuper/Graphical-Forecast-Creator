@@ -1,6 +1,6 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay } from '../types/outlooks';
+import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData } from '../types/outlooks';
 import { GeoJSON } from 'leaflet';
 import { RootState } from './index'; // Need RootState for selectors
 
@@ -343,6 +343,17 @@ export const forecastSlice = createSlice({
         dayData.metadata.lastModified = new Date().toISOString();
       }
       state.isSaved = true;
+    },
+
+    // Update discussion for a specific day
+    updateDiscussion: (state, action: PayloadAction<{ day: DayType; discussion: DiscussionData }>) => {
+      const { day, discussion } = action.payload;
+      const dayData = state.forecastCycle.days[day];
+      if (dayData) {
+        dayData.discussion = discussion;
+        dayData.metadata.lastModified = new Date().toISOString();
+        state.isSaved = false;
+      }
     }
   }
 });
@@ -363,7 +374,8 @@ export const {
   importForecastCycle,
   setForecastDay,
   setCycleDate,
-  setEmergencyMode
+  setEmergencyMode,
+  updateDiscussion
 } = forecastSlice.actions;
 
 // Selectors

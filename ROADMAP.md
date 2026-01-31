@@ -90,8 +90,8 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Explaining the forecast.
 
-- [ ] Add "Forecast Discussion" text editor (Markdown support?).
-- [ ] Add simple text formatting tools.
+- [x] Add "Forecast Discussion" text editor (Markdown support?).
+- [x] Add simple text formatting tools.
 
 ## v0.10.0-alpha: Sharing & Export
 

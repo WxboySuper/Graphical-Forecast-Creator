@@ -158,6 +158,33 @@ export interface SerializedOutlookData {
 // Individual days instead of merged '4-8'
 export type DayType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+// Discussion Editor Types
+export type DiscussionMode = 'diy' | 'guided';
+
+export interface GuidedDiscussionData {
+  synopsis: string;
+  meteorologicalSetup: string;
+  severeWeatherExpectations: string;
+  timing: string;
+  regionalBreakdown: string;
+  additionalConsiderations: string;
+}
+
+export interface DiscussionData {
+  mode: DiscussionMode;
+  validStart: string; // ISO date-time
+  validEnd: string; // ISO date-time
+  forecasterName: string;
+  
+  // DIY mode - simple text editor
+  diyContent?: string;
+  
+  // Guided mode - structured questions
+  guidedContent?: GuidedDiscussionData;
+  
+  lastModified: string;
+}
+
 export interface OutlookDay {
   day: DayType;
   data: OutlookData; // The actual polygon data
@@ -168,6 +195,7 @@ export interface OutlookDay {
     createdAt: string;
     lastModified: string;
   };
+  discussion?: DiscussionData; // Optional discussion for this day
 }
 
 export interface ForecastCycle {

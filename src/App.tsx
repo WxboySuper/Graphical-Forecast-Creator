@@ -7,6 +7,7 @@ import OutlookDaySelector from './components/OutlookDaySelector/OutlookDaySelect
 import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
 import VerificationMode from './components/VerificationMode/VerificationMode';
+import DiscussionEditor from './components/DiscussionEditor/DiscussionEditor';
 import { importForecastCycle, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode, selectCurrentOutlooks, selectForecastCycle } from './store/forecastSlice';
 import { setAppMode } from './store/appModeSlice';
 import { toggleDarkMode } from './store/themeSlice';
@@ -275,6 +276,7 @@ export const AppContent = () => {
   const appMode = useSelector((state: RootState) => state.appMode.mode);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [showDocumentation, setShowDocumentation] = useState(false);
+  const [showDiscussionEditor, setShowDiscussionEditor] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }>>([]);
   
@@ -320,6 +322,11 @@ export const AppContent = () => {
   // Toggle documentation visibility
   const toggleDocumentation = useCallback(() => {
     setShowDocumentation(prev => !prev);
+  }, []);
+  
+  // Toggle discussion editor visibility
+  const toggleDiscussionEditor = useCallback(() => {
+    setShowDiscussionEditor(prev => !prev);
   }, []);
   
   // Toggle between forecast and verification modes
@@ -430,6 +437,7 @@ export const AppContent = () => {
             <DrawingTools 
               onSave={handleSave} 
               onLoad={handleLoad} 
+              onOpenDiscussion={toggleDiscussionEditor}
               mapRef={mapRef} 
               addToast={addToast} 
             />
@@ -438,6 +446,7 @@ export const AppContent = () => {
           </>
         )}
       </main>
+      {showDiscussionEditor && <DiscussionEditor onClose={toggleDiscussionEditor} />}
       <ToastManager toasts={toasts} onDismiss={removeToast} />
     </div>
   );

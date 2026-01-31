@@ -65,7 +65,8 @@ export const serializeForecast = (
       serializedDays[day] = {
         day: outlookDay.day,
         metadata: outlookDay.metadata,
-        data: serializedData
+        data: serializedData,
+        discussion: outlookDay.discussion
       };
     }
   });
@@ -115,7 +116,8 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
             createdAt: (savedDay.metadata as any).createdAt || new Date().toISOString(),
             lastModified: (savedDay.metadata as any).lastModified || new Date().toISOString()
           },
-          data: outlookData
+          data: outlookData,
+          discussion: (savedDay as any).discussion
         };
       }
     });

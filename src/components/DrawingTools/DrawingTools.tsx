@@ -14,11 +14,12 @@ import ConfirmationModal from './ConfirmationModal';
 interface DrawingToolsProps {
   onSave: () => void;
   onLoad: (file: File) => void;
+  onOpenDiscussion: () => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
-const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, addToast }) => {
+const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, onOpenDiscussion, mapRef, addToast }) => {
   const dispatch = useDispatch();
   const outlooks = useSelector(selectCurrentOutlooks);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
@@ -94,6 +95,7 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, mapRef, add
       <DrawingToolsToolbar
         onSave={onSave}
         onLoad={handleLoadClick}
+        onOpenDiscussion={onOpenDiscussion}
         handleExport={initiateExport}
         handleReset={handleResetClick}
         isSaveLoadDisabled={isSaveLoadDisabled}
