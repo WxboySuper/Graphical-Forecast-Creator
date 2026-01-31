@@ -4,6 +4,14 @@ import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, Outlook
 import { GeoJSON } from 'leaflet';
 import { RootState } from './index'; // Need RootState for selectors
 
+export interface SavedCycle {
+  id: string;
+  timestamp: string;
+  cycleDate: string;
+  label?: string;
+  forecastCycle: ForecastCycle;
+}
+
 interface ForecastState {
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
@@ -13,6 +21,7 @@ interface ForecastState {
   };
   isSaved: boolean;
   emergencyMode: boolean;
+  savedCycles: SavedCycle[];
 }
 
 const createEmptyOutlook = (day: DayType): OutlookDay => {
@@ -65,7 +74,8 @@ const initialState: ForecastState = {
     zoom: 4
   },
   isSaved: true,
-  emergencyMode: false
+  emergencyMode: false,
+  savedCycles: []
 };
 
 // Helpers to keep reducers small and testable
@@ -354,6 +364,81 @@ export const forecastSlice = createSlice({
         dayData.metadata.lastModified = new Date().toISOString();
         state.isSaved = false;
       }
+    },
+
+    // Cycle History Management
+    saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {
+      const savedCycle: SavedCycle = {
+        id: `${Date.now()}-${Math.random()}`,
+        timestamp: new Date().toISOString(),
+        cycleDate: state.forecastCycle.cycleDate,
+        label: action.payload.label,
+        forecastCycle: JSON.parse(JSON.stringify(state.forecastCycle))
+      };
+      state.savedCycles.push(savedCycle);
+      state.isSaved = true;
+    },
+
+    loadSavedCycle: (state, action: PayloadAction<string>) => {
+      const cycleId = action.payload;
+      const savedCycle = state.savedCycles.find(c => c.id === cycleId);
+      if (savedCycle) {
+        state.forecastCycle = JSON.parse(JSON.stringify(savedCycle.forecastCycle));
+        state.isSaved = true;
+      }
+    },
+
+    deleteSavedCycle: (state, action: PayloadAction<string>) => {
+      const cycleId = action.payload;
+      state.savedCycles = state.savedCycles.filter(c => c.id !== cycleId);
+    },
+
+    // Copy features from one cycle/day to current cycle/day
+    copyFeaturesFromPrevious: (state, action: PayloadAction<{ 
+      sourceCycleId: string; 
+      sourceDay: DayType; 
+      targetDay: DayType;
+    }>) => {
+      const { sourceCycleId, sourceDay, targetDay } = action.payload;
+      const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
+      
+      if (!sourceCycle) {
+        console.warn(`Source cycle ${sourceCycleId} not found`);
+        return;
+      }
+
+      const sourceDayData = sourceCycle.forecastCycle.days[sourceDay];
+      if (!sourceDayData) {
+        console.warn(`Source day ${sourceDay} not found in cycle`);
+        return;
+      }
+
+      // Ensure target day exists
+      if (!state.forecastCycle.days[targetDay]) {
+        state.forecastCycle.days[targetDay] = createEmptyOutlook(targetDay);
+      }
+
+      const targetDayData = state.forecastCycle.days[targetDay]!;
+      
+      // Deep copy the outlook data from source to target
+      // Handle each outlook type that exists in the source
+      Object.keys(sourceDayData.data).forEach((outlookTypeKey) => {
+        const outlookType = outlookTypeKey as OutlookType;
+        const sourceMap = sourceDayData.data[outlookType];
+        
+        if (sourceMap && targetDayData.data[outlookType] !== undefined) {
+          // @ts-ignore - Dynamic property access
+          targetDayData.data[outlookType] = new Map(JSON.parse(JSON.stringify(Array.from(sourceMap))));
+        }
+      });
+
+      targetDayData.metadata.lastModified = new Date().toISOString();
+      state.isSaved = false;
+    },
+
+    // Load cycles from storage (for hydration)
+    loadCycleHistory: (state, action: PayloadAction<SavedCycle[]>) => {
+      state.savedCycles = action.payload;
     }
   }
 });
@@ -375,7 +460,12 @@ export const {
   setForecastDay,
   setCycleDate,
   setEmergencyMode,
-  updateDiscussion
+  updateDiscussion,
+  saveCurrentCycle,
+  loadSavedCycle,
+  deleteSavedCycle,
+  copyFeaturesFromPrevious,
+  loadCycleHistory
 } = forecastSlice.actions;
 
 // Selectors
@@ -390,5 +480,6 @@ export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
   return cycle.days[day]?.data || createEmptyOutlook(day).data;
 };
+export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;
 
 export default forecastSlice.reducer;

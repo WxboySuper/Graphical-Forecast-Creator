@@ -17,9 +17,13 @@ If you need information, USE THE TOOLS. Don't make assumptions about file struct
 - **Dark mode completion (Jan 2026)**: Started with partial dark mode, maintained focus until ALL 14 CSS files had complete coverage. No stopping at "good enough."
 - **Verification statistics (Jan 2026)**: Found the bug (reports counted multiple times), traced through the entire logic chain (verificationUtils.ts), fixed the algorithm AND display format in one session.
 - **State separation (Jan 2026)**: Created verificationSlice to prevent forecast/verification cross-contamination. Didn't just patch the symptoms - restructured the architecture.
+- **Discussion Editor v0.9.0 (Jan 2026)**: Two-tab system (Edit/Preview), DIY + Guided modes, custom GFC format (not SPC imitation). Learned: Don't mimic official products - create familiar but distinctly GFC style.
+- **Cycle Management v0.10.0 (Jan 2026)**: Full reference system - save/load cycles, copy features day-to-day, localStorage persistence. Real-world workflow: Load yesterday's Day 2 → tweak for today's Day 1. Button color consistency (variety, not monotone) in both light and dark modes.
 
 ## Project Overview
-A React/TypeScript web app for creating Storm Prediction Center-style severe weather outlooks. Users draw polygons on a Leaflet map, manage multi-day forecast cycles (Days 1-8), and verify forecasts against storm reports.
+A React/TypeScript web app for creating Storm Prediction Center-style severe weather outlooks. Users draw polygons on a Leaflet map, manage multi-day forecast cycles (Days 1-8), verify forecasts against storm reports, and write forecast discussions.
+
+**Design Philosophy**: GFC creates its own professional style - familiar to weather enthusiasts but NOT imitating official products. SPC is a reference for structure, not something to duplicate. Think "weather blog" professional, not "government memo" official.
 
 ## Critical Architecture Patterns
 
@@ -93,6 +97,17 @@ All colors use CSS custom properties:
 
 **Never hardcode colors** in component CSS - use variables or add dark mode overrides.
 
+### CSS Box Model Best Practice
+Always use `box-sizing: border-box` on form inputs and textareas to prevent overflow:
+```css
+textarea {
+  width: 100%;
+  padding: 16px;
+  box-sizing: border-box;  /* Includes padding in width calculation */
+}
+```
+Without this, width + padding causes elements to extend beyond containers.
+
 ## Verification Workflow
 
 ### State Isolation Pattern
@@ -137,9 +152,63 @@ Uses Turf.js `booleanPointInPolygon` for spatial analysis.
 
 ### Utilities
 - `src/utils/fileUtils.ts`: JSON export/import, forecast serialization/deserialization
-- `src/utils/outlookUtils.ts`: Color mappings, categorical conversion logic
-- `src/utils/verificationUtils.ts`: Statistics calculation, report counting
-- `src/utils/exportUtils.ts`: Map export to PNG (html2canvas integration)
+- `src/utils/outlookUtils.ts`: Color mappings, categorical conversion log
+- `src/utils/discussionUtils.ts`: Discussion text compilation, export to .txt
+
+### Discussion Editor (v0.9.0)
+- `src/components/DiscussionEditor/DiscussionEditor.tsx`: Main modal with Edit/Preview tabs
+- `src/components/DiscussionEditor/DIYDiscussionEditor.tsx`: Simple text editor with formatting toolbar
+- `src/components/DiscussionEditor/GuidedDiscussionEditor.tsx`: Question-based discussion builder
+
+**Discussion Format** (GFC style, NOT SPC imitation):
+- Forecaster name at BOTTOM (not top)
+- Readable times (not DDHHMMZ aviation jargon)
+- System timezone (not forced Central)
+- Clean headers ("Synopsis:" not "...SYNOPSIS...")
+- No official terminators (no $$ at end)
+
+**Guided Questions Philosophy**:
+- Generic enough for ANY weather scenario (low-end, high-end, conditional, unconditional)
+- NOT copied from specific outlook events
+- Teach forecasting thought process, not event-specific facts
+- Include uncertainties, upgrades/downgrades, conditional language in examples
+
+### Cycle Management (v0.10.0)
+- `src/components/CycleManager/CycleHistoryModal.tsx`: Save/load/delete cycles, view cycle metadata
+- `src/components/CycleManager/CopyFromPreviousModal.tsx`: Copy features from source cycle/day to target day
+- `src/utils/cycleHistoryPersistence.ts`: localStorage persistence for cycle history
+
+**Cycle Reference Workflow**:
+- Save current cycle with optional label (e.g., "Morning", "00Z", "Afternoon")
+- View cycle history with date, timestamp, day summary
+- Copy features between cycles: yesterday's Day 2 → today's Day 1, or morning Day 1 → afternoon Day 1 update
+- Cycles persist in localStorage (gfc-cycle-history), hydrated on app load
+- Real-world use cases: Load old outlook, tweak borders for new cycle. SPC workflow: Use previous day as starting point.
+
+**Redux State Structure**:
+```typescript
+interface SavedCycle {
+  id: string;
+  timestamp: string;
+  cycleDate: string;
+  label?: string;
+  forecastCycle: ForecastCycle;
+}
+// State: savedCycles: SavedCycle[]
+// Actions: saveCurrentCycle, loadSavedCycle, deleteSavedCycle, copyFeaturesFromPrevious, loadCycleHistory
+```
+
+**Button Color Philosophy**:
+- Light AND dark modes use color variety to distinguish functions
+- NOT monotone (not all blue in dark mode)
+- Consistent palette: Save=green, Load=blue, Cycle History=cyan, Copy Previous=teal, Discussion=purple, Export=orange
+- Dark mode overrides with `!important` to prevent generic blue button rule from overriding
+
+### Utilities
+- `src/utils/fileUtils.ts`: JSON export/import, forecast serialization/deserialization
+- `src/utils/outlookUtils.ts`: Color mappings, categorical conversion log
+- `src/utils/discussionUtils.ts`: Discussion text compilation, export to .txt
+- `src/utils/cycleHistoryPersistence.ts`: Cycle history localStorage save/load, Redux hydration hook
 
 ## Development Workflow
 
@@ -193,6 +262,8 @@ All features use `uuid.v4()` for IDs. Critical for Redux updates/deletes.
 - `G`: Add General Thunderstorm (TSTM) risk
 - `Ctrl+S`: Save to JSON
 - `Ctrl+D`: Toggle dark mode
+9. **Imitating official products**: GFC has its own style. Don't copy SPC format elements ($$, DDHHMMZ times, ...ELLIPSIS... headers, forced Central timezone). Be familiar, not identical.
+10. **Event-specific examples**: Guided questions and examples should work for ANY scenario, not copied from one specific outlook. Teach thought process, not event facts.
 
 ## Common Pitfalls
 
@@ -204,6 +275,9 @@ All features use `uuid.v4()` for IDs. Critical for Redux updates/deletes.
 6. **Day-specific outlook types**: Day 3 has totalSevere, Day 4-8 has day4-8 - don't assume all days identical.
 7. **Stopping mid-feature**: If implementing dark mode, ALL components need it. If fixing verification, fix the entire workflow. Don't deliver half-solutions.
 8. **Asking before acting**: User reported broken borders → fix with pmIgnore immediately. Don't ask "should I fix this?" Just fix it and report completion.
+9. **Imitating official products**: GFC has its own style. Don't copy SPC format elements ($$, DDHHMMZ times, ...ELLIPSIS... headers, forced Central timezone). Be familiar, not identical.
+10. **Event-specific examples**: Guided questions and examples should work for ANY scenario, not copied from one specific outlook. Teach thought process, not event facts.
+11. **Button color inconsistency**: Both light AND dark modes need color variety. Don't make all buttons blue in dark mode - use specific overrides with `!important` to maintain functional distinction.
 
 ## Task Execution Patterns
 

@@ -131,6 +131,55 @@
   background-color: var(--button-hover);
 }
 
+/* Toolbar Button Colors - Maintain variety in dark mode */
+.dark-mode .save-button {
+  background-color: #27ae60 !important;
+}
+
+.dark-mode .save-button:hover:not(:disabled) {
+  background-color: #229954 !important;
+}
+
+.dark-mode .load-button {
+  background-color: #2196f3 !important;
+}
+
+.dark-mode .load-button:hover:not(:disabled) {
+  background-color: #1976d2 !important;
+}
+
+.dark-mode .cycle-history-button {
+  background-color: #00bcd4 !important;
+}
+
+.dark-mode .cycle-history-button:hover:not(:disabled) {
+  background-color: #0097a7 !important;
+}
+
+.dark-mode .copy-previous-button {
+  background-color: #009688 !important;
+}
+
+.dark-mode .copy-previous-button:hover:not(:disabled) {
+  background-color: #00796b !important;
+}
+
+.dark-mode .discussion-button {
+  background-color: #9c27b0 !important;
+}
+
+.dark-mode .discussion-button:hover:not(:disabled) {
+  background-color: #7b1fa2 !important;
+}
+
+.dark-mode .export-button {
+  background-color: #ff9800 !important;
+}
+
+.dark-mode .export-button:hover:not(:disabled) {
+  background-color: #f57c00 !important;
+}
+
 .dark-mode button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

@@ -14,6 +14,73 @@
   color: #bdc3c7;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cycle-date-edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.cycle-date-edit-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.cycle-date-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cycle-date-input {
+  background-color: #34495e;
+  border: 1px solid #4a6278;
+  color: #ecf0f1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.cycle-date-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.cycle-date-btn {
+  background-color: #34495e;
+  border: none;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.cycle-date-btn.save {
+  background-color: #27ae60;
+}
+
+.cycle-date-btn.save:hover {
+  background-color: #2ecc71;
+}
+
+.cycle-date-btn.cancel {
+  background-color: #c0392b;
+}
+
+.cycle-date-btn.cancel:hover {
+  background-color: #e74c3c;
 }
 
 .day-tabs {

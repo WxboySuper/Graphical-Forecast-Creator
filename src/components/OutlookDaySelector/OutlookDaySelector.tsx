@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectForecastCycle, setForecastDay } from '../../store/forecastSlice';
+import { selectForecastCycle, setForecastDay, setCycleDate } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 import './OutlookDaySelector.css';
 
@@ -10,9 +10,26 @@ const OutlookDaySelector: React.FC = () => {
   const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days } = forecastCycle;
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [tempDate, setTempDate] = useState(forecastCycle.cycleDate);
 
   const handleDayChange = (day: DayType) => {
     dispatch(setForecastDay(day));
+  };
+
+  const handleDateEdit = () => {
+    setTempDate(forecastCycle.cycleDate);
+    setIsEditingDate(true);
+  };
+
+  const handleDateSave = () => {
+    dispatch(setCycleDate(tempDate));
+    setIsEditingDate(false);
+  };
+
+  const handleDateCancel = () => {
+    setTempDate(forecastCycle.cycleDate);
+    setIsEditingDate(false);
   };
 
   // Helper to check if day has actual data (polygons)
@@ -46,7 +63,29 @@ const OutlookDaySelector: React.FC = () => {
   return (
     <div className="day-selector-container">
       <div className="day-selector-label">
-        Forecast Cycle: {new Date(forecastCycle.cycleDate).toLocaleDateString()}
+        {isEditingDate ? (
+          <div className="cycle-date-editor">
+            <input
+              type="date"
+              value={tempDate}
+              onChange={(e) => setTempDate(e.target.value)}
+              className="cycle-date-input"
+            />
+            <button onClick={handleDateSave} className="cycle-date-btn save" title="Save">
+              ✓
+            </button>
+            <button onClick={handleDateCancel} className="cycle-date-btn cancel" title="Cancel">
+              ✕
+            </button>
+          </div>
+        ) : (
+          <>
+            Forecast Cycle: {new Date(forecastCycle.cycleDate).toLocaleDateString()}
+            <button onClick={handleDateEdit} className="cycle-date-edit-btn" title="Change cycle date">
+              📅
+            </button>
+          </>
+        )}
       </div>
       <div className="day-tabs" role="tablist">
         {DAYS.map((day) => {

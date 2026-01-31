@@ -8,6 +8,11 @@ import './darkMode.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { HashRouter as Router } from 'react-router-dom';
+import { store } from './store';
+import { setupCycleHistoryListener } from './utils/cycleHistoryPersistence';
+
+// Setup cycle history persistence
+setupCycleHistoryListener(store);
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

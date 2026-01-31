@@ -8,7 +8,7 @@ import DrawingTools from './components/DrawingTools/DrawingTools';
 import Documentation from './components/Documentation/Documentation';
 import VerificationMode from './components/VerificationMode/VerificationMode';
 import DiscussionEditor from './components/DiscussionEditor/DiscussionEditor';
-import { importForecastCycle, markAsSaved, resetForecasts, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode, selectCurrentOutlooks, selectForecastCycle } from './store/forecastSlice';
+import { importForecastCycle, markAsSaved, setMapView, setActiveOutlookType, setActiveProbability, toggleSignificant, setEmergencyMode, selectCurrentOutlooks, selectForecastCycle } from './store/forecastSlice';
 import { setAppMode } from './store/appModeSlice';
 import { toggleDarkMode } from './store/themeSlice';
 import { RootState } from './store';
@@ -26,6 +26,7 @@ import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/feature
 
 import { deserializeForecast, validateForecastData, exportForecastToJson } from './utils/fileUtils';
 import { useAutoSave } from './hooks/useAutoSave';
+import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 
 // hooks imported above
 
@@ -295,6 +296,9 @@ export const AppContent = () => {
   
   // Enable Auto-Save
   useAutoSave();
+  
+  // Load cycle history from localStorage
+  useCycleHistoryPersistence();
   
   // Auto-load session from LocalStorage on startup
   useEffect(() => {

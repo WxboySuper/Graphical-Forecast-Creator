@@ -7,6 +7,8 @@ interface DrawingToolsToolbarProps {
   onOpenDiscussion: () => void;
   handleExport: () => void;
   handleReset: () => void;
+  handleOpenCopyModal: () => void;
+  handleOpenHistoryModal: () => void;
   isSaveLoadDisabled: boolean;
   isSaved: boolean;
   isExportDisabled: boolean;
@@ -20,6 +22,8 @@ const DrawingToolsToolbar: React.FC<DrawingToolsToolbarProps> = ({
   onOpenDiscussion,
   handleExport,
   handleReset,
+  handleOpenCopyModal,
+  handleOpenHistoryModal,
   isSaveLoadDisabled,
   isSaved,
   isExportDisabled,
@@ -46,6 +50,26 @@ const DrawingToolsToolbar: React.FC<DrawingToolsToolbarProps> = ({
         icon="📂"
         maintenance={isSaveLoadDisabled}
         tooltipText={isSaveLoadDisabled ? "Load feature is temporarily unavailable" : null}
+      />
+
+      <ToolButton
+        className="cycle-history-button"
+        onClick={handleOpenHistoryModal}
+        disabled={false}
+        label="Cycle History"
+        icon="📚"
+        maintenance={false}
+        tooltipText="Manage saved forecast cycles"
+      />
+
+      <ToolButton
+        className="copy-previous-button"
+        onClick={handleOpenCopyModal}
+        disabled={false}
+        label="Copy from Previous"
+        icon="📋"
+        maintenance={false}
+        tooltipText="Copy features from a previous cycle"
       />
 
       <ToolButton

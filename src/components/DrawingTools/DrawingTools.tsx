@@ -10,6 +10,8 @@ import DrawingToolsHelp from './DrawingToolsHelp';
 import DrawingToolsToolbar from './DrawingToolsToolbar';
 import ExportModal from './ExportModal';
 import ConfirmationModal from './ConfirmationModal';
+import CopyFromPreviousModal from '../CycleManager/CopyFromPreviousModal';
+import CycleHistoryModal from '../CycleManager/CycleHistoryModal';
 
 interface DrawingToolsProps {
   onSave: () => void;
@@ -32,6 +34,8 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, onOpenDiscu
 
   // Reset confirmation state
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   const {
     isExporting,
@@ -58,6 +62,22 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, onOpenDiscu
 
   const handleCancelReset = useCallback(() => {
     setIsResetModalOpen(false);
+  }, []);
+
+  const handleOpenCopyModal = useCallback(() => {
+    setIsCopyModalOpen(true);
+  }, []);
+
+  const handleCloseCopyModal = useCallback(() => {
+    setIsCopyModalOpen(false);
+  }, []);
+
+  const handleOpenHistoryModal = useCallback(() => {
+    setIsHistoryModalOpen(true);
+  }, []);
+
+  const handleCloseHistoryModal = useCallback(() => {
+    setIsHistoryModalOpen(false);
   }, []);
 
   const handleLoadClick = useCallback(() => {
@@ -98,6 +118,8 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, onOpenDiscu
         onOpenDiscussion={onOpenDiscussion}
         handleExport={initiateExport}
         handleReset={handleResetClick}
+        handleOpenCopyModal={handleOpenCopyModal}
+        handleOpenHistoryModal={handleOpenHistoryModal}
         isSaveLoadDisabled={isSaveLoadDisabled}
         isSaved={isSaved}
         isExportDisabled={isExportDisabled}
@@ -124,6 +146,16 @@ const DrawingTools: React.FC<DrawingToolsProps> = ({ onSave, onLoad, onOpenDiscu
         confirmLabel="Reset"
         onConfirm={handleConfirmReset}
         onCancel={handleCancelReset}
+      />
+
+      <CopyFromPreviousModal
+        isOpen={isCopyModalOpen}
+        onClose={handleCloseCopyModal}
+      />
+
+      <CycleHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={handleCloseHistoryModal}
       />
       
       {isExporting && (
