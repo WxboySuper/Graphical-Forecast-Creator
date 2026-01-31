@@ -11,7 +11,7 @@ import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
 // Now import react-leaflet components (they depend on L being ready)
-import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON, LayersControl } from 'react-leaflet';
 import { RootState } from '../../store';
 import { addFeature, setMapView, removeFeature, updateFeature } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
@@ -34,6 +34,35 @@ const DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+// Map Styles Configuration
+const MAP_STYLES = [
+  {
+    name: 'Standard',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  },
+  {
+    name: 'Light',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  {
+    name: 'Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  {
+    name: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+  },
+  {
+    name: 'Terrain',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+  }
+];
 
 // Define a handle type that exposes the map instance
 export type ForecastMapHandle = {
@@ -477,10 +506,16 @@ OutlookLayers.displayName = 'OutlookLayers';
 // Optimized: Memoized to prevent re-renders when parent re-renders
 const MapInner: React.FC = React.memo(() => (
   <>
-    <TileLayer
-      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    />
+    <LayersControl position="topright">
+      {MAP_STYLES.map((style) => (
+        <LayersControl.BaseLayer checked={style.name === 'Standard'} name={style.name} key={style.name}>
+          <TileLayer
+            attribution={style.attribution}
+            url={style.url}
+          />
+        </LayersControl.BaseLayer>
+      ))}
+    </LayersControl>
 
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>

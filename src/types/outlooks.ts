@@ -113,3 +113,21 @@ export interface DrawingState {
   activeProbability: Probability;
   isSignificant: boolean; // Whether the current drawing should be hatched (Legacy)
 }
+
+// Serialization types for JSON storage
+export interface SerializedOutlookData {
+  tornado: [string, GeoJSON.Feature[]][];
+  wind: [string, GeoJSON.Feature[]][];
+  hail: [string, GeoJSON.Feature[]][];
+  categorical: [string, GeoJSON.Feature[]][];
+}
+
+export interface GFCForecastSaveData {
+  version: string;
+  timestamp: string;
+  outlooks: SerializedOutlookData;
+  mapView: {
+    center: [number, number];
+    zoom: number;
+  };
+}

@@ -44,9 +44,10 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Never lose a forecast.
 
-- [ ] Implement `Export to JSON` functionality.
-- [ ] Schema validation (ensure the JSON is valid GFC data).
-- [ ] Add "Auto-save" to LocalStorage (prevent data loss on refresh).
+- [x] Design a unique JSON schema for saving and loading GFC outlook data.
+- [x] Implement `Export to JSON` functionality.
+- [x] Schema validation (ensure the JSON is valid GFC data).
+- [x] Add "Auto-save" to LocalStorage (prevent data loss on refresh).
 
 ## v0.5.0-alpha: The Load System
 

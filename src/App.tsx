@@ -21,6 +21,11 @@ import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/feature
 
 // hooks imported above
 
+import { deserializeForecast, validateForecastData, exportForecastToJson } from './utils/fileUtils';
+import { useAutoSave } from './hooks/useAutoSave';
+
+// hooks imported above
+
 // Helper to get probability list based on outlook type
 const getProbabilityList = (activeOutlookType: string) => {
   switch (activeOutlookType) {
@@ -142,25 +147,45 @@ const fitMapToFeatures = (map: LeafletMap, outlooks: OutlookData, dispatch: AppD
   }
 };
 
-// Helper to perform save operation
-const mapToArray = (m?: Map<string, unknown>) => (m ? Array.from(m.entries()) : []);
-
-const serializeOutlooks = (o: OutlookData) => ({
-  tornado: mapToArray(o.tornado),
-  wind: mapToArray(o.wind),
-  hail: mapToArray(o.hail),
-  categorical: mapToArray(o.categorical)
-});
-
 const buildMapView = (ref: React.RefObject<ForecastMapHandle>) => {
   const map = ref.current?.getMap();
   const center = map?.getCenter();
   return {
-    center: center ? [center.lat, center.lng] : [39.8283, -98.5795],
+    center: (center ? [center.lat, center.lng] : [39.8283, -98.5795]) as [number, number],
     zoom: map?.getZoom() || 4
   };
 };
 
+// Logic to load state from a parsed data object
+const loadStateFromData = (
+  data: any,
+  dispatch: AppDispatch,
+  mapRef: React.RefObject<ForecastMapHandle>,
+  addToast: AddToastFn,
+  successMessage: string = 'Forecast loaded successfully!'
+) => {
+  if (!validateForecastData(data)) {
+    addToast('Invalid forecast data format.', 'error');
+    return;
+  }
+
+  const deserializedOutlooks = deserializeForecast(data);
+  
+  dispatch(resetForecasts());
+  dispatch(importForecasts(deserializedOutlooks));
+  
+  const map = mapRef.current?.getMap();
+  // Restore Map View if available
+  if (data.mapView) {
+    dispatch(setMapView(data.mapView));
+  } else if (map) {
+    fitMapToFeatures(map, deserializedOutlooks, dispatch);
+  }
+  
+  addToast(successMessage, 'success');
+};
+
+// Save action = Export to File
 const performSave = (
   outlooks: OutlookData,
   mapRef: React.RefObject<ForecastMapHandle>,
@@ -168,91 +193,56 @@ const performSave = (
   addToast: AddToastFn
 ) => {
   try {
-    const saveData = {
-      outlooks: serializeOutlooks(outlooks),
-      mapView: buildMapView(mapRef)
-    };
-
-    localStorage.setItem('forecastData', JSON.stringify(saveData));
+    exportForecastToJson(outlooks, buildMapView(mapRef));
     dispatch(markAsSaved());
-    addToast('Forecast saved successfully!', 'success');
+    addToast('Forecast exported to JSON!', 'success');
   } catch (error) {
-    console.error('Error saving forecast:', error);
-    addToast('Error saving forecast. Please try again.', 'error');
+    console.error('Error exporting forecast:', error);
+    addToast('Error exporting forecast.', 'error');
   }
 };
 
-// Helper to perform load operation
-const performLoad = (
+// Load action = Import from File
+const performLoadFromFile = async (
+  file: File,
   dispatch: AppDispatch,
-  addToast: AddToastFn,
-  mapRef: React.RefObject<ForecastMapHandle>
+  mapRef: React.RefObject<ForecastMapHandle>,
+  addToast: AddToastFn
+) => {
+  try {
+    const text = await file.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      addToast('File is not valid JSON.', 'error');
+      return;
+    }
+    loadStateFromData(data, dispatch, mapRef, addToast);
+  } catch (error) {
+    console.error('Error loading file:', error);
+    addToast('Error reading file.', 'error');
+  }
+};
+
+// Auto-load from LocalStorage
+const loadFromLocalStorage = (
+  dispatch: AppDispatch,
+  mapRef: React.RefObject<ForecastMapHandle>,
+  addToast: AddToastFn
 ) => {
   try {
     const savedData = localStorage.getItem('forecastData');
-    if (!savedData) {
-      addToast('No saved forecast found.', 'warning');
-      return;
+    if (savedData) {
+      const data = JSON.parse(savedData);
+      // We don't show success toast on auto-load to avoid annoyance on refresh, 
+      // or maybe we do? "Session restored"?
+      // Let's pass null for silent, or a message.
+      loadStateFromData(data, dispatch, mapRef, addToast, 'Session restored from auto-save.');
     }
-    
-    let parsedData: unknown;
-    try {
-      parsedData = JSON.parse(savedData) as unknown;
-    } catch (err) {
-      addToast('Saved data is incomplete or corrupted.', 'error');
-      return;
-    }
-
-    // Basic validation of parsed data structure
-    if (typeof parsedData !== 'object' || parsedData === null) {
-      addToast('Saved data is incomplete or corrupted.', 'error');
-      return;
-    }
-
-    const pd = parsedData as { outlooks?: unknown; mapView?: unknown };
-    if (!pd.outlooks || typeof pd.outlooks !== 'object') {
-      addToast('Saved data is incomplete or corrupted.', 'error');
-      return;
-    }
-
-    const outlooksObj = pd.outlooks as Record<string, unknown>;
-    const requiredKeys = ['tornado', 'wind', 'hail', 'categorical'];
-    for (const key of requiredKeys) {
-      if (!Object.prototype.hasOwnProperty.call(outlooksObj, key) || !Array.isArray(outlooksObj[key])) {
-        addToast('Saved data is incomplete or corrupted.', 'error');
-        return;
-      }
-    }
-
-    const entries = outlooksObj as {
-      [K in keyof OutlookData]?: [string, Feature<Geometry, GeoJsonProperties>[]][]
-    };
-
-    const deserializedOutlooks: OutlookData = {
-      tornado: new Map(entries.tornado),
-      wind: new Map(entries.wind),
-      hail: new Map(entries.hail),
-      categorical: new Map(entries.categorical)
-    };
-    
-    dispatch(resetForecasts());
-    dispatch(importForecasts(deserializedOutlooks));
-    const map = mapRef.current?.getMap();
-    if (!map) {
-      addToast('Forecast loaded successfully!', 'success');
-      return;
-    }
-
-    if (pd.mapView) {
-      dispatch(setMapView(pd.mapView as { center: [number, number]; zoom: number }));
-    } else {
-      fitMapToFeatures(map, deserializedOutlooks, dispatch);
-    }
-    
-    addToast('Forecast loaded successfully!', 'success');
   } catch (error) {
-    console.error('Error loading forecast:', error);
-    addToast('Error loading forecast. The saved data might be corrupted.', 'error');
+    console.error('Error auto-loading:', error);
+    // Silent fail on auto-load
   }
 };
 
@@ -286,9 +276,31 @@ export const AppContent = () => {
   const mapRef = useRef<ForecastMapHandle>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }>>([]);
   
+  // Toast management
+  const addToast = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    const id = uuidv4();
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
   
+  // Enable Auto-Save
+  useAutoSave();
+  
+  // Auto-load session from LocalStorage on startup
+  useEffect(() => {
+    // Small delay to ensure map is ready or just load state
+    // Actually mapRef might not be ready but state loading doesn't need map immediately
+    // except for fitBounds. setMapView handles state.
+    // We can just load state.
+    loadFromLocalStorage(dispatch, mapRef, addToast);
+  }, [dispatch, addToast]); // mapRef is stable ref
+
   // Initialize feature flags state
   useEffect(() => {
     // Check if any outlook types are enabled
@@ -300,24 +312,14 @@ export const AppContent = () => {
     dispatch(setActiveOutlookType(firstEnabled as OutlookType));
   }, [dispatch, featureFlags]);
 
-  // Toast management
-  const addToast = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
-    const id = uuidv4();
-    setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
-
-  // Save forecast data to localStorage
+  // Save (Export) forecast
   const handleSave = useCallback(() => {
     performSave(outlooks, mapRef, dispatch, addToast);
-  }, [outlooks, dispatch, mapRef, addToast]);
-  
-  // Load forecast data from localStorage
-  const handleLoad = useCallback(() => {
-    performLoad(dispatch, addToast, mapRef);
+  }, [outlooks, mapRef, dispatch, addToast]);
+
+  // Load (Import) forecast
+  const handleLoad = useCallback((file: File) => {
+    performLoadFromFile(file, dispatch, mapRef, addToast);
   }, [dispatch, addToast, mapRef]);
   
   // Toggle documentation visibility
@@ -408,7 +410,12 @@ export const AppContent = () => {
           <EmergencyModeMessage />
         ) : (
           <>
-            <DrawingTools onSave={handleSave} onLoad={handleLoad} mapRef={mapRef} addToast={addToast} />
+            <DrawingTools 
+              onSave={handleSave} 
+              onLoad={handleLoad} 
+              mapRef={mapRef} 
+              addToast={addToast} 
+            />
             <OutlookPanel />
             <ForecastMap ref={mapRef} />
           </>
