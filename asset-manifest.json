@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/Graphical-Forecast-Creator/static/css/main.12e520f6.css",
+    "main.css": "/Graphical-Forecast-Creator/static/css/main.a4bbaab8.css",
     "main.js": "/Graphical-Forecast-Creator/static/js/main.51762c66.js",
     "static/js/453.071e88c4.chunk.js": "/Graphical-Forecast-Creator/static/js/453.071e88c4.chunk.js",
     "index.html": "/Graphical-Forecast-Creator/index.html",
-    "main.12e520f6.css.map": "/Graphical-Forecast-Creator/static/css/main.12e520f6.css.map",
+    "main.a4bbaab8.css.map": "/Graphical-Forecast-Creator/static/css/main.a4bbaab8.css.map",
     "main.51762c66.js.map": "/Graphical-Forecast-Creator/static/js/main.51762c66.js.map",
     "453.071e88c4.chunk.js.map": "/Graphical-Forecast-Creator/static/js/453.071e88c4.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.12e520f6.css",
+    "static/css/main.a4bbaab8.css",
     "static/js/main.51762c66.js"
   ]
 }
