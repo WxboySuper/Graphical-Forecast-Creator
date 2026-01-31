@@ -66,9 +66,9 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Make it look like professional software.
 
-- [ ] Add "State Borders" overlay (GeoJSON).
-- [ ] Add "County/CWA Boundaries" overlay (GeoJSON).
-- [ ] Add "Highways/Cities" toggle for reference.
+- [x] Add "State Borders" overlay (GeoJSON).
+- [x] Add "County/CWA Boundaries" overlay (GeoJSON).
+- [x] Add "Highways/Cities" toggle for reference.
 
 ## v0.7.0-alpha: Categorical Logic
 

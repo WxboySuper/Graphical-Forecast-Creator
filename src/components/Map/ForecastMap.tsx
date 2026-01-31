@@ -20,6 +20,7 @@ import { createTooltipContent, stripHtml } from '../../utils/domUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
+import MapOverlays from './MapOverlays';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -515,6 +516,8 @@ const MapInner: React.FC = React.memo(() => (
           />
         </LayersControl.BaseLayer>
       ))}
+      
+      <MapOverlays />
     </LayersControl>
 
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>

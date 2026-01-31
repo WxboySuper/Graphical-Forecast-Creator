@@ -92,7 +92,7 @@ export function getOutlookConstraints(day: DayType) {
       return {
         outlookTypes: ['tornado', 'wind', 'hail', 'categorical'] as const,
         allowsProbabilities: true,
-        allowedCIG: ['CIG0', 'CIG1', 'CIG2', 'CIG3'],
+        allowedCIG: ['CIG1', 'CIG2', 'CIG3'],
         allowedCategorical: ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'],
         requiresConversion: true,
         probabilities: {
@@ -105,7 +105,7 @@ export function getOutlookConstraints(day: DayType) {
       return {
         outlookTypes: ['totalSevere', 'categorical'] as const,
         allowsProbabilities: true,
-        allowedCIG: ['CIG0', 'CIG1', 'CIG2'],
+        allowedCIG: ['CIG1', 'CIG2'],
         allowedCategorical: ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT'], // No HIGH
         requiresConversion: true,
         probabilities: {
