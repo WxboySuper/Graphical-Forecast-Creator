@@ -4,7 +4,7 @@ import './ExportModal.css'; // Reuse modal styles
 interface ConfirmationModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
   confirmLabel?: string;
@@ -26,7 +26,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     <div className="export-modal-overlay">
       <div className="export-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
         <h3 id="confirm-title">{title}</h3>
-        <p id="confirm-desc">{message}</p>
+        <div id="confirm-desc">{message}</div>
         <div className="export-modal-actions">
           <button
             type="button"

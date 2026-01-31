@@ -5,3 +5,7 @@
 ## 2024-05-24 - Map Interaction and Layering
 **Learning:** Overriding global Leaflet classes like `.leaflet-pane` with `z-index` can disrupt the internal stacking order of map panes (e.g., placing tooltips behind overlays).
 **Action:** Avoid global overrides for library-managed styles. Rely on Leaflet's built-in pane management or use specific pane targeting for z-index adjustments.
+
+## 2024-10-27 - Consistent Deletion Confirmation
+**Learning:** Native `window.confirm` dialogs break the application's visual consistency and are blocking. The custom `ConfirmationModal` component provides a more accessible and integrated experience for destructive actions.
+**Action:** Replace `window.confirm` with `ConfirmationModal` for all deletion or destructive actions, ensuring state is lifted to manage the modal's visibility.
