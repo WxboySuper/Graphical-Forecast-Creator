@@ -9,7 +9,7 @@ export type ProbabilityRisk =
   | '75%' | '90%';
 
 // Use (string & {}) to preserve autocomplete for the literals while allowing any string
-export type RiskLevel = CategoricalRisk | ProbabilityRisk | (string & {});
+export type RiskLevel = CategoricalRisk | ProbabilityRisk;
 
 export interface RiskArea extends Feature<Polygon | MultiPolygon> {
   properties: {
@@ -17,7 +17,7 @@ export interface RiskArea extends Feature<Polygon | MultiPolygon> {
     hazard: Hazard;
     isSignificant?: boolean;
     label?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   id?: string | number;
 }
