@@ -11,15 +11,16 @@ import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
 // Now import react-leaflet components (they depend on L being ready)
-import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON, LayersControl } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature } from '../../store/forecastSlice';
+import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { colorMappings } from '../../utils/outlookUtils';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
+import MapOverlays from './MapOverlays';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -34,6 +35,35 @@ const DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+// Map Styles Configuration
+const MAP_STYLES = [
+  {
+    name: 'Standard',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  },
+  {
+    name: 'Light',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  {
+    name: 'Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  {
+    name: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+  },
+  {
+    name: 'Terrain',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+  }
+];
 
 // Define a handle type that exposes the map instance
 export type ForecastMapHandle = {
@@ -68,8 +98,8 @@ function addGeomanControls(pm: PMMap['pm']) {
     drawPolyline: false,
     drawCircle: false,
     drawText: false,
-    editMode: false,
-    dragMode: false,
+    editMode: true,
+    dragMode: true,
     rotateMode: false,
     removalMode: false,
     cutPolygon: false,
@@ -83,16 +113,16 @@ function setGeomanGlobalOptions(pm: PMMap['pm']) {
     pathOptions: {
       color: '#97009c',
       fillColor: '#97009c',
-      fillOpacity: 0.6,
+      fillOpacity: 0.2,
       weight: 2,
     },
     snappable: true,
-    snapDistance: 20,
+    snapDistance: 8,
     allowSelfIntersection: false,
   });
 }
 
-function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
+function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void) {
   return (e: L.LeafletEvent & { shape?: string; layer?: L.Layer }) => {
     const isPolygonShape = e.shape === 'Polygon' || e.shape === 'Rectangle';
       if (isPolygonShape && e.layer) {
@@ -112,7 +142,7 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void
 // Helper component to sync map with Redux state, store map reference, and initialize Geoman
 const MapController: React.FC<{
   setMapInstance: (map: L.Map) => void;
-  onPolygonCreated: (layer: L.Layer) => void;
+  onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void;
 }> = ({ setMapInstance, onPolygonCreated }) => {
   const dispatch = useDispatch();
   const map = useMap();
@@ -175,15 +205,24 @@ const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, Geo
   return entries.sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
 
+    // CIG levels come after numeric probabilities (render on top)
+    const isCigA = probA.startsWith('CIG');
+    const isCigB = probB.startsWith('CIG');
+    
+    if (isCigA !== isCigB) {
+      return isCigA ? 1 : -1;
+    }
+    
+    if (isCigA && isCigB) {
+      // Sort CIG1 < CIG2 < CIG3
+      return probA.localeCompare(probB);
+    }
+
     if (probA === 'TSTM') return -1;
     if (probB === 'TSTM') return 1;
 
-    const isSignificantA = probA.includes('#');
-    const isSignificantB = probB.includes('#');
-    if (isSignificantA !== isSignificantB) {
-      return isSignificantA ? 1 : -1;
-    }
-
+    // Legacy significant sort removal or keep for backward compatibility?
+    // Let's just treat as strings if we don't care, but numeric sort is better.
     const riskOrder: Record<string, number> = {
       'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
     };
@@ -218,29 +257,54 @@ const computeZIndex = (outlookType: OutlookType, probability: string) => {
   let baseZIndex = 400;
   if (outlookType === 'categorical') {
     baseZIndex += (RISK_ORDER[probability] || 0) * 10;
-  } else if (['tornado', 'wind', 'hail'].includes(outlookType)) {
-    baseZIndex += parseInt(probability) || 0;
+  } else {
+    // Check for CIG
+    if (probability.startsWith('CIG')) {
+      baseZIndex = 600; // CIGs are overlays
+      // CIG1=601, CIG2=602, CIG3=603
+      baseZIndex += parseInt(probability.replace('CIG', '')) || 0;
+    } else {
+      // Numeric probabilities
+      baseZIndex += parseInt(probability) || 0;
+    }
   }
 
-  if (probability.includes('#')) baseZIndex += 5;
+  // Legacy '#' check removed
   return baseZIndex;
 };
 
 const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
-  const color = lookupColor(outlookType, probability);
-  const significant = probability.includes('#');
-  const fillColor = significant ? 'url(#hatchPattern)' : color;
-  const fillOpacity = significant ? 1 : 0.6;
-  const zIndex = computeZIndex(outlookType, probability);
+  if (probability.startsWith('CIG')) {
+    // Map CIG levels to pattern IDs
+    const patternMap: Record<string, string> = {
+      'CIG1': 'url(#pattern-cig1)',
+      'CIG2': 'url(#pattern-cig2)',
+      'CIG3': 'url(#pattern-cig3)',
+      'CIG0': 'none'
+    };
+    const fill = patternMap[probability] || 'none';
+    return {
+      color: '#000000', // Black outline for hatching areas
+      weight: 1,
+      opacity: 1,
+      fillColor: fill,
+      fillOpacity: 1, // Pattern needs full opacity
+      zIndex: computeZIndex(outlookType, probability),
+      className: 'hatching-layer'
+    };
+  }
 
+  const color = lookupColor(outlookType, probability);
+  // Legacy significant check removed from style logic
+  
+  // Base style
   return {
-    color: significant ? 'transparent' : color,
+    color: color, // Outline matches fill
     weight: 2,
     opacity: 1,
-    fillColor,
-    fillOpacity,
-    zIndex,
-    className: significant ? 'significant-threat-pattern' : undefined
+    fillColor: color,
+    fillOpacity: 0.2,
+    zIndex: computeZIndex(outlookType, probability)
   };
 };
 
@@ -289,10 +353,25 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
       }).openTooltip();
     }
   };
+  
+  const handleEdit = (e: L.LeafletEvent) => {
+    const layer = e.target as GeomanLayer;
+    const geoJson = layer.toGeoJSON();
+    geoJson.id = featureId;
+    dispatch(updateFeature({ feature: geoJson }));
+  };
+
+  const handleRemove = () => {
+    dispatch(removeFeature({ outlookType, probability, featureId }));
+  };
 
   return {
     click: handleClick,
-    mouseover: handleMouseOver
+    mouseover: handleMouseOver,
+    'pm:edit': handleEdit,
+    'pm:dragend': handleEdit,
+    'pm:markerdragend': handleEdit,
+    'pm:remove': handleRemove
   };
 };
 
@@ -320,10 +399,18 @@ function createOnEachFeature(
         const fc = styleObj.fillColor;
         if (typeof fc === 'string' && !fc.startsWith('url(')) {
           pathEl.setAttribute('fill', fc);
+        } else if (typeof fc === 'string' && fc.startsWith('url(')) {
+             pathEl.setAttribute('fill', fc);
         }
+        
         pathEl.setAttribute('fill-opacity', String(styleObj.fillOpacity ?? 1));
         if (styleObj.color) pathEl.setAttribute('stroke', String(styleObj.color));
         pathEl.setAttribute('stroke-width', String(styleObj.weight ?? 1));
+        
+        // Fix for pointer-events on transparent overlay
+        if (styleObj.interactive === false) {
+             pathEl.setAttribute('pointer-events', 'none');
+        }
       }
     } catch {
       // ignore DOM write errors in server env
@@ -374,9 +461,10 @@ const renderOutlookFeatures = (
         {features.map(feature => {
           const fid = feature.id as string;
           const handlers = handlerFactory(ot, probability, fid);
+          
           const styleObj = styleFn(ot, probability);
           const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: L.LeafletEvent) => void>);
-          // Use PathOptions directly - Leaflet applies these automatically
+          
           return (
             <GeoJSON
               key={`${ot}-${probability}-${fid}`}
@@ -396,7 +484,7 @@ const renderOutlookFeatures = (
 const OutlookLayers: React.FC = React.memo(() => {
   const dispatch = useDispatch();
   const map = useMap();
-  const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
+  const outlooks = useSelector(selectCurrentOutlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
   const context: OutlookRenderContext = {
@@ -417,26 +505,56 @@ OutlookLayers.displayName = 'OutlookLayers';
 
 // Extract deeper JSX children into a small component to reduce nesting
 // Optimized: Memoized to prevent re-renders when parent re-renders
-const MapInner: React.FC = React.memo(() => (
-  <>
-    <TileLayer
-      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    />
+const MapInner: React.FC<{ darkMode: boolean }> = React.memo(({ darkMode }) => {
+  // Auto-select Dark map style when dark mode is enabled
+  const defaultStyle = darkMode ? 'Dark' : 'Standard';
+  
+  return (
+    <>
+      <LayersControl position="topright">
+        {MAP_STYLES.map((style) => (
+          <LayersControl.BaseLayer checked={style.name === defaultStyle} name={style.name} key={style.name}>
+            <TileLayer
+              attribution={style.attribution}
+              url={style.url}
+            />
+          </LayersControl.BaseLayer>
+        ))}
+        
+        <MapOverlays />
+      </LayersControl>
 
-    <svg>
+    <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
-        <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="10" height="10">
-          <path d="M0,0 L10,10 M10,0 L0,10" stroke="black" strokeWidth="2" />
+        {/* CIG1: Broken diagonal - Bottom-left to top-right - Thinnest */}
+        <pattern id="pattern-cig1" patternUnits="userSpaceOnUse" width="15" height="15">
+          <path d="M0,15 L15,0" stroke="black" strokeWidth="1.5" strokeDasharray="6,3" />
+        </pattern>
+
+        {/* CIG2: Solid diagonal - Bottom-left to top-right (same direction as CIG1) - Medium */}
+        <pattern id="pattern-cig2" patternUnits="userSpaceOnUse" width="15" height="15">
+           <path d="M0,15 L15,0" stroke="black" strokeWidth="2" />
+        </pattern>
+
+        {/* CIG3: Crosshatch - Both diagonal directions - Thickest */}
+        <pattern id="pattern-cig3" patternUnits="userSpaceOnUse" width="15" height="15">
+          <path d="M0,15 L15,0" stroke="black" strokeWidth="2.5" />
+          <path d="M0,0 L15,15" stroke="black" strokeWidth="2.5" />
+        </pattern>
+        
+        {/* Legacy Pattern for backward compatibility */}
+        <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="15" height="15">
+          <path d="M0,15 L15,0 M0,0 L15,15" stroke="black" strokeWidth="2" />
         </pattern>
       </defs>
     </svg>
 
-    <OutlookLayers />
+      <OutlookLayers />
 
-    <Legend />
-  </>
-));
+      <Legend />
+    </>
+  );
+});
 
 MapInner.displayName = 'MapInner';
 
@@ -459,6 +577,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
   
   // Store drawingState in a ref so our callback always has latest values
@@ -473,24 +592,47 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   }), [mapInstance]);
   
   // Drawing creation handler for Geoman
-  const handlePolygonCreated = React.useCallback((layer: L.Layer) => {
+  const handlePolygonCreated = React.useCallback((layer: L.Layer, originalLayer?: L.Layer) => {
     const geomanLayer = layer as GeomanLayer;
 
     // Convert to GeoJSON
     const geoJson = geomanLayer.toGeoJSON();
-    // Add a unique ID
-    geoJson.id = uuidv4();
-
+    
     // Get current drawing state from ref
     const currentDrawingState = drawingStateRef.current;
 
-    // Add metadata about the outlook type
-    geoJson.properties = {
-      ...geoJson.properties,
-      outlookType: currentDrawingState.activeOutlookType,
-      probability: currentDrawingState.activeProbability,
-      isSignificant: currentDrawingState.isSignificant
-    };
+    if (originalLayer) {
+      // If originalLayer exists, this is a cut/edit operation resulting in a new shape
+      // We need to remove the original and add the new one, inheriting properties
+      const originalGeoJson = (originalLayer as GeomanLayer).toGeoJSON();
+      const originalId = originalGeoJson.id as string;
+      const originalType = originalGeoJson.properties?.outlookType as OutlookType;
+      const originalProb = originalGeoJson.properties?.probability as string;
+
+      if (originalId && originalType && originalProb) {
+        dispatch(removeFeature({ outlookType: originalType, probability: originalProb, featureId: originalId }));
+      }
+      
+      // Inherit properties
+      geoJson.properties = {
+        ...geoJson.properties,
+        ...originalGeoJson.properties
+      };
+      
+      // Assign new ID for the new shape
+      geoJson.id = uuidv4();
+    } else {
+      // Completely new drawing
+      geoJson.id = uuidv4();
+
+      // Add metadata about the outlook type
+      geoJson.properties = {
+        ...geoJson.properties,
+        outlookType: currentDrawingState.activeOutlookType,
+        probability: currentDrawingState.activeProbability,
+        isSignificant: currentDrawingState.isSignificant
+      };
+    }
     
     // Dispatch to store
     dispatch(addFeature({ feature: geoJson }));
@@ -539,7 +681,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
             onPolygonCreated={handlePolygonCreated}
           />
 
-          <MapInner />
+          <MapInner darkMode={darkMode} />
       </MapContainer>
     </div>
   );

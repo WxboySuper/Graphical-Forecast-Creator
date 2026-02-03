@@ -17,15 +17,31 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string): L.PathO
   };
 
   const color = palettes[outlookType]?.[probability] ?? '#FFFFFF';
-  const isSignificant = probability.includes('#');
+  
+  // Check for CIG (Hatching)
+  if (probability.startsWith('CIG')) {
+      // In export, we might just use transparency or a placeholder if patterns aren't supported.
+      // But we should try to support them if possible.
+      // Since html2canvas captures the DOM, if we use the same URL patterns, they might work
+      // if the definitions are available in the document.
+      const patternUrl = colorMappings.hatching[probability as keyof typeof colorMappings.hatching];
+      return {
+          color: '#000000',
+          weight: 1,
+          opacity: 1,
+          fillColor: patternUrl || 'none',
+          fillOpacity: 1,
+          className: 'hatching-layer'
+      };
+  }
 
+  // Legacy significance check removed
   return {
     color: '#000000',
     fillColor: color,
     fillOpacity: 0.4,
     weight: 2,
-    opacity: 1,
-    className: isSignificant ? 'significant-threat-pattern' : undefined
+    opacity: 1
   };
 };
 
@@ -88,15 +104,26 @@ const addTilesAndWait = (mapInstance: L.Map, timeout = 2000): Promise<void> => {
   });
 };
 
-// Helper: sort probabilities (extracted)
+// Helper to sort probabilities (extracted)
 const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
   return entries.sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
+
+    // CIG levels come after numeric probabilities (render on top)
+    const isCigA = probA.startsWith('CIG');
+    const isCigB = probB.startsWith('CIG');
+    
+    if (isCigA !== isCigB) {
+      return isCigA ? 1 : -1;
+    }
+    
+    if (isCigA && isCigB) {
+      return probA.localeCompare(probB);
+    }
+
     if (probA === 'TSTM') return -1;
     if (probB === 'TSTM') return 1;
-    const isSignificantA = probA.includes('#');
-    const isSignificantB = probB.includes('#');
-    if (isSignificantA !== isSignificantB) return isSignificantA ? 1 : -1;
+
     const riskOrder: Record<string, number> = { 'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5 };
     if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) return riskOrder[probA] - riskOrder[probB];
     const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, '')) || 0;

@@ -1,39 +1,46 @@
 import { Feature, Geometry, GeoJsonProperties } from 'geojson';
-
-// Define the shape of the data we expect to load
-interface SavedData {
-  outlooks: {
-    tornado: [string, Feature<Geometry, GeoJsonProperties>[]][];
-    wind: [string, Feature<Geometry, GeoJsonProperties>[]][];
-    hail: [string, Feature<Geometry, GeoJsonProperties>[]][];
-    categorical: [string, Feature<Geometry, GeoJsonProperties>[]][];
-  };
-  mapView?: {
-    center: [number, number];
-    zoom: number;
-  };
-}
+import { GFCForecastSaveData } from '../types/outlooks';
 
 /**
- * Validates existence and type (object or null) of a property for GeoJSON
+ * Validates if a value is a plain object
  */
-const isValidGeoJSONProperty = (obj: Record<string, unknown>, key: string): boolean => {
-  if (!Object.prototype.hasOwnProperty.call(obj, key)) return false;
-  const value = obj[key];
-  // In JSON, objects and null are both 'object' type
-  return typeof value === 'object';
+const isObject = (val: unknown): val is Record<string, unknown> => 
+  typeof val === 'object' && val !== null && !Array.isArray(val);
+
+/**
+ * Validates GeoJSON Geometry
+ */
+const isValidGeometry = (geometry: unknown): geometry is Geometry => {
+  if (geometry === null) return true;
+  if (!isObject(geometry)) return false;
+
+  const type = geometry.type as string;
+  const validTypes = [
+    'Point', 'MultiPoint', 'LineString', 'MultiLineString', 
+    'Polygon', 'MultiPolygon', 'GeometryCollection'
+  ];
+
+  if (!validTypes.includes(type)) return false;
+
+  if (type === 'GeometryCollection') {
+    const geometries = geometry.geometries;
+    return Array.isArray(geometries) && geometries.every(isValidGeometry);
+  }
+
+  // Most geometries should have coordinates
+  const coordinates = geometry.coordinates;
+  return Array.isArray(coordinates);
 };
 
 /**
  * Validates if a value is a valid GeoJSON Feature
  */
 const isValidFeature = (value: unknown): value is Feature<Geometry, GeoJsonProperties> => {
-  if (typeof value !== 'object' || value === null) return false;
-  const feature = value as Record<string, unknown>;
+  if (!isObject(value)) return false;
 
-  return feature.type === 'Feature' &&
-         isValidGeoJSONProperty(feature, 'geometry') &&
-         isValidGeoJSONProperty(feature, 'properties');
+  return value.type === 'Feature' &&
+         isValidGeometry(value.geometry) &&
+         isObject(value.properties);
 };
 
 /**
@@ -43,15 +50,13 @@ const isValidOutlookEntries = (value: unknown): value is [string, Feature<Geomet
   if (!Array.isArray(value)) return false;
 
   return value.every(entry => {
-    // Must be array of length 2
     if (!Array.isArray(entry) || entry.length !== 2) return false;
 
     const [probability, features] = entry;
 
-    // First element must be string (probability/risk)
-    if (typeof probability !== 'string') return false;
+    // Reject empty or non-string probabilities
+    if (typeof probability !== 'string' || probability.trim() === '') return false;
 
-    // Second element must be array of features
     if (!Array.isArray(features)) return false;
 
     return features.every(isValidFeature);
@@ -59,17 +64,36 @@ const isValidOutlookEntries = (value: unknown): value is [string, Feature<Geomet
 };
 
 /**
- * Validates the outlooks object structure
+ * Validates the legacy outlooks object structure (v0.4.0)
  */
-const isValidOutlooksObject = (outlooks: unknown): boolean => {
-  if (typeof outlooks !== 'object' || outlooks === null) return false;
+const isValidLegacyOutlooks = (outlooks: unknown): boolean => {
+  if (!isObject(outlooks)) return false;
 
-  const outlooksRecord = outlooks as Record<string, unknown>;
-  const requiredOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
+  const types = ['tornado', 'wind', 'hail', 'categorical'];
+  for (const t of types) {
+    if (outlooks[t] !== undefined && !isValidOutlookEntries(outlooks[t])) return false;
+  }
+  return true;
+};
 
-  for (const type of requiredOutlookTypes) {
-    if (!Object.prototype.hasOwnProperty.call(outlooksRecord, type)) return false;
-    if (!isValidOutlookEntries(outlooksRecord[type])) return false;
+/**
+ * Validates the new forecastCycle structure (v0.5.0)
+ */
+const isValidForecastCycle = (cycle: unknown): boolean => {
+  if (!isObject(cycle)) return false;
+
+  if (typeof cycle.currentDay !== 'number') return false;
+  if (!isObject(cycle.days)) return false;
+
+  const days = cycle.days as Record<string, unknown>;
+  for (const day of Object.values(days)) {
+    if (!isObject(day)) return false;
+    if (!isObject(day.data)) return false;
+    
+    // Validate each outlook map in the day's data
+    for (const outlookEntries of Object.values(day.data as Record<string, unknown>)) {
+      if (!isValidOutlookEntries(outlookEntries)) return false;
+    }
   }
 
   return true;
@@ -79,33 +103,30 @@ const isValidOutlooksObject = (outlooks: unknown): boolean => {
  * Validates the mapView object structure
  */
 const isValidMapView = (mapView: unknown): boolean => {
-  if (typeof mapView !== 'object' || mapView === null) return false;
+  if (!isObject(mapView)) return false;
 
-  const view = mapView as { center?: unknown; zoom?: unknown };
-
-  // Validate center
-  if (!Array.isArray(view.center) || view.center.length !== 2) return false;
-  if (typeof view.center[0] !== 'number' || typeof view.center[1] !== 'number') return false;
-
-  // Validate zoom
-  if (typeof view.zoom !== 'number') return false;
+  if (!Array.isArray(mapView.center) || mapView.center.length !== 2) return false;
+  if (typeof mapView.center[0] !== 'number' || typeof mapView.center[1] !== 'number') return false;
+  if (typeof mapView.zoom !== 'number') return false;
 
   return true;
 };
 
 /**
- * Validates the full forecast data structure from localStorage or file
+ * Validates the full forecast data structure
  */
-export const validateForecastData = (data: unknown): data is SavedData => {
-  if (typeof data !== 'object' || data === null) return false;
+export const validateForecastData = (data: unknown): data is GFCForecastSaveData => {
+  if (!isObject(data)) return false;
 
-  const savedData = data as Record<string, unknown>;
+  const d = data as Record<string, unknown>;
 
-  if (!isValidOutlooksObject(savedData.outlooks)) return false;
+  // Must have either forecastCycle or outlooks
+  if (!d.forecastCycle && !d.outlooks) return false;
 
-  if (Object.prototype.hasOwnProperty.call(savedData, 'mapView')) {
-    if (!isValidMapView(savedData.mapView)) return false;
-  }
+  if (d.forecastCycle && !isValidForecastCycle(d.forecastCycle)) return false;
+  if (d.outlooks && !isValidLegacyOutlooks(d.outlooks)) return false;
+
+  if (d.mapView !== undefined && !isValidMapView(d.mapView)) return false;
 
   return true;
 };
