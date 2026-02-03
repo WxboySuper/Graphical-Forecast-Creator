@@ -36,62 +36,56 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Teach the app what an "Outlook" is.
 
-- [x] Define TypeScript interfaces for `Outlook`, `RiskArea`, and `Hazard`.
-- [x] Update Redux store to hold the current outlook state.
-- [x] Connect drawn polygons to the Redux store (updating coordinates in state).
+- [ ] Define TypeScript interfaces for `Outlook`, `RiskArea`, and `Hazard`.
+- [ ] Update Redux store to hold the current outlook state.
+- [ ] Connect drawn polygons to the Redux store (updating coordinates in state).
 
 ## v0.4.0-alpha: The Save System
 
 **Goal:** Never lose a forecast.
 
-- [x] Design a unique JSON schema for saving and loading GFC outlook data.
-- [x] Implement `Export to JSON` functionality.
-- [x] Schema validation (ensure the JSON is valid GFC data).
-- [x] Add "Auto-save" to LocalStorage (prevent data loss on refresh).
+- [ ] Implement `Export to JSON` functionality.
+- [ ] Schema validation (ensure the JSON is valid GFC data).
+- [ ] Add "Auto-save" to LocalStorage (prevent data loss on refresh).
 
 ## v0.5.0-alpha: The Load System
 
-**Goal:** The "Forecast Cycle" workflow.
-**Description:** We develop a forcast cycle workflow of handling multiple days of outlooks.
+**Goal:** The "Forecast Cycle" workflow (Edit yesterday's outlook).
 
-- [x] Add Day 3 Outlook Support.
-- [x] Add Day 4-8 Outlook Support.
-- [x] Add navigation between multiple outlook day styles.
-- [x] Update schema to support different outlook days and importing older day schema to newer day schema (importing day 4 outlook to update in the day 3 style.)
-- [x] Implement `Import JSON` functionality.
-- [x] Allow re-uploading a saved file to populate the map with editable polygons.
-- [x] Handle version migration (if schema changes).
+- [ ] Implement `Import JSON` functionality.
+- [ ] Allow re-uploading a saved file to populate the map with editable polygons.
+- [ ] Handle version migration (if schema changes).
 
 ## v0.6.0-alpha: Map Overlays & Context
 
 **Goal:** Make it look like professional software.
 
-- [x] Add "State Borders" overlay (GeoJSON).
-- [x] Add "County/CWA Boundaries" overlay (GeoJSON).
-- [x] Add "Highways/Cities" toggle for reference.
+- [ ] Add "State Borders" overlay (GeoJSON).
+- [ ] Add "County/CWA Boundaries" overlay (GeoJSON).
+- [ ] Add "Highways/Cities" toggle for reference.
 
 ## v0.7.0-alpha: Categorical Logic
 
 **Goal:** Implementing the SPC style guide.
 
-- [x] Add "Risk Category" selector (TSTM, MRGL, SLGT, ENH, MDT, HIGH).
-- [x] Implement dynamic polygon styling based on category (Green, Yellow, Orange, Red, Magenta).
-- [x] Add standard labels/tooltips to polygons.
+- [ ] Add "Risk Category" selector (TSTM, MRGL, SLGT, ENH, MDT, HIGH).
+- [ ] Implement dynamic polygon styling based on category (Green, Yellow, Orange, Red, Magenta).
+- [ ] Add standard labels/tooltips to polygons.
 
 ## v0.8.0-alpha: Verification Tools
 
 **Goal:** "How did I do?"
 
-- [x] Implement "Storm Report Upload" (CSV/JSON import from SPC archive).
-- [x] Plot Tornado/Wind/Hail reports as distinct icons over the user's outlook.
-- [x] Basic "Hit/Miss" visual check.
+- [ ] Implement "Storm Report Upload" (CSV/JSON import from SPC archive).
+- [ ] Plot Tornado/Wind/Hail reports as distinct icons over the user's outlook.
+- [ ] Basic "Hit/Miss" visual check.
 
 ## v0.9.0-alpha: Discussion Editor
 
 **Goal:** Explaining the forecast.
 
-- [x] Add "Forecast Discussion" text editor (Markdown support?).
-- [x] Add simple text formatting tools.
+- [ ] Add "Forecast Discussion" text editor (Markdown support?).
+- [ ] Add simple text formatting tools.
 
 ## v0.10.0-alpha: Sharing & Export
 

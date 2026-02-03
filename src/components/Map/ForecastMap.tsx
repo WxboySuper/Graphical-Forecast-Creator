@@ -2,7 +2,6 @@
 import * as React from 'react';
 import type { Dispatch } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
-import { useState, useCallback } from 'react';
 
 // Import Leaflet first, then Geoman to extend it
 // skipcq: JS-C1003
@@ -12,18 +11,16 @@ import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
 // Now import react-leaflet components (they depend on L being ready)
-import { MapContainer, TileLayer, FeatureGroup, useMap, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature, selectCurrentOutlooks } from '../../store/forecastSlice';
+import { addFeature, setMapView } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { sortProbabilities } from '../../utils/outlookUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
-import MapOverlays from './MapOverlays';
 import OutlookFeature from './OutlookFeature';
 import { PMMap } from '../../types/map';
-import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -38,35 +35,6 @@ const DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
-
-// Map Styles Configuration
-const MAP_STYLES = [
-  {
-    name: 'Standard',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  },
-  {
-    name: 'Light',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  },
-  {
-    name: 'Dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  },
-  {
-    name: 'Satellite',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-  },
-  {
-    name: 'Terrain',
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
-  }
-];
 
 // Define a handle type that exposes the map instance
 export type ForecastMapHandle = {
@@ -85,8 +53,8 @@ function addGeomanControls(pm: PMMap['pm']) {
     drawPolyline: false,
     drawCircle: false,
     drawText: false,
-    editMode: true,
-    dragMode: true,
+    editMode: false,
+    dragMode: false,
     rotateMode: false,
     removalMode: false,
     cutPolygon: false,
@@ -100,16 +68,16 @@ function setGeomanGlobalOptions(pm: PMMap['pm']) {
     pathOptions: {
       color: '#97009c',
       fillColor: '#97009c',
-      fillOpacity: 0.2,
+      fillOpacity: 0.6,
       weight: 2,
     },
     snappable: true,
-    snapDistance: 8,
+    snapDistance: 20,
     allowSelfIntersection: false,
   });
 }
 
-function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void) {
+function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer) => void) {
   return (e: L.LeafletEvent & { shape?: string; layer?: L.Layer }) => {
     const isPolygonShape = e.shape === 'Polygon' || e.shape === 'Rectangle';
       if (isPolygonShape && e.layer) {
@@ -129,7 +97,7 @@ function makeHandleCreate(map: L.Map, onPolygonCreated: (layer: L.Layer, origina
 // Helper component to sync map with Redux state, store map reference, and initialize Geoman
 const MapController: React.FC<{
   setMapInstance: (map: L.Map) => void;
-  onPolygonCreated: (layer: L.Layer, originalLayer?: L.Layer) => void;
+  onPolygonCreated: (layer: L.Layer) => void;
 }> = ({ setMapInstance, onPolygonCreated }) => {
   const dispatch = useDispatch();
   const map = useMap();
@@ -185,17 +153,19 @@ const MapController: React.FC<{
   return null;
 };
 
-interface OutlookLayersProps {
-  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => void;
+// Interface for context needed to render outlooks (consolidates arguments)
+interface OutlookRenderContext {
+  dispatch: Dispatch;
+  map: L.Map;
+  activeOutlookType: OutlookType;
 }
 
 const renderOutlookFeatures = (
   outlooks: OutlooksMap,
-  dispatch: Dispatch,
-  map: L.Map,
-  activeOutlookType: OutlookType,
-  onRequestDelete: OutlookLayersProps['onRequestDelete']
+  context: OutlookRenderContext
 ): React.ReactElement[] => {
+  const { activeOutlookType } = context;
+
   const shouldShowLayer = (outlookType: OutlookType) => {
     if (activeOutlookType === 'categorical') {
       return outlookType === 'categorical';
@@ -204,7 +174,7 @@ const renderOutlookFeatures = (
   };
 
   return Object.keys(outlooks).flatMap(outlookType => {
-    const validOutlookTypes = ['tornado', 'wind', 'hail', 'totalSevere', 'day4-8', 'categorical'];
+    const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
     if (!validOutlookTypes.includes(outlookType)) return [];
 
     const ot = outlookType as OutlookType;
@@ -221,9 +191,8 @@ const renderOutlookFeatures = (
             feature={feature}
             outlookType={ot}
             probability={probability}
-            dispatch={dispatch}
-            map={map}
-            onRequestDelete={onRequestDelete}
+            dispatch={context.dispatch}
+            map={context.map}
           />
         ))}
       </FeatureGroup>
@@ -233,13 +202,19 @@ const renderOutlookFeatures = (
 
 // Now declare OutlookLayers (after helpers)
 // Optimized: Memoized to prevent re-renders when map view or unrelated state changes
-const OutlookLayers: React.FC<OutlookLayersProps> = React.memo(({ onRequestDelete }) => {
+const OutlookLayers: React.FC = React.memo(() => {
   const dispatch = useDispatch();
   const map = useMap();
-  const outlooks = useSelector(selectCurrentOutlooks);
+  const outlooks = useSelector((state: RootState) => state.forecast.outlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
-  const elements = renderOutlookFeatures(outlooks as OutlooksMap, dispatch, map, activeOutlookType, onRequestDelete);
+  const context: OutlookRenderContext = {
+    dispatch,
+    map,
+    activeOutlookType
+  };
+
+  const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
 
   if (elements.length === 0) return null;
   if (elements.length === 1) return elements[0];
@@ -248,63 +223,28 @@ const OutlookLayers: React.FC<OutlookLayersProps> = React.memo(({ onRequestDelet
 
 OutlookLayers.displayName = 'OutlookLayers';
 
-interface MapInnerProps {
-  darkMode: boolean;
-  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => void;
-}
-
 // Extract deeper JSX children into a small component to reduce nesting
 // Optimized: Memoized to prevent re-renders when parent re-renders
-const MapInner: React.FC<MapInnerProps> = React.memo(({ darkMode, onRequestDelete }) => {
-  // Auto-select Dark map style when dark mode is enabled
-  const defaultStyle = darkMode ? 'Dark' : 'Standard';
-  
-  return (
-    <>
-      <LayersControl position="topright">
-        {MAP_STYLES.map((style) => (
-          <LayersControl.BaseLayer checked={style.name === defaultStyle} name={style.name} key={style.name}>
-            <TileLayer
-              attribution={style.attribution}
-              url={style.url}
-            />
-          </LayersControl.BaseLayer>
-        ))}
-        
-        <MapOverlays />
-      </LayersControl>
+const MapInner: React.FC = React.memo(() => (
+  <>
+    <TileLayer
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    />
 
-    <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+    <svg>
       <defs>
-        {/* CIG1: Broken diagonal - Bottom-left to top-right - Thinnest */}
-        <pattern id="pattern-cig1" patternUnits="userSpaceOnUse" width="15" height="15">
-          <path d="M0,15 L15,0" stroke="black" strokeWidth="1.5" strokeDasharray="6,3" />
-        </pattern>
-
-        {/* CIG2: Solid diagonal - Bottom-left to top-right (same direction as CIG1) - Medium */}
-        <pattern id="pattern-cig2" patternUnits="userSpaceOnUse" width="15" height="15">
-           <path d="M0,15 L15,0" stroke="black" strokeWidth="2" />
-        </pattern>
-
-        {/* CIG3: Crosshatch - Both diagonal directions - Thickest */}
-        <pattern id="pattern-cig3" patternUnits="userSpaceOnUse" width="15" height="15">
-          <path d="M0,15 L15,0" stroke="black" strokeWidth="2.5" />
-          <path d="M0,0 L15,15" stroke="black" strokeWidth="2.5" />
-        </pattern>
-        
-        {/* Legacy Pattern for backward compatibility */}
-        <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="15" height="15">
-          <path d="M0,15 L15,0 M0,0 L15,15" stroke="black" strokeWidth="2" />
+        <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="10" height="10">
+          <path d="M0,0 L10,10 M10,0 L0,10" stroke="black" strokeWidth="2" />
         </pattern>
       </defs>
     </svg>
 
-    <OutlookLayers onRequestDelete={onRequestDelete} />
+    <OutlookLayers />
 
-      <Legend />
-    </>
-  );
-});
+    <Legend />
+  </>
+));
 
 MapInner.displayName = 'MapInner';
 
@@ -317,14 +257,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
-  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
-  const [featureToDelete, setFeatureToDelete] = useState<{
-    outlookType: OutlookType;
-    probability: string;
-    featureId: string;
-    message: React.ReactNode;
-  } | null>(null);
   
   // Store drawingState in a ref so our callback always has latest values
   const drawingStateRef = React.useRef(drawingState);
@@ -338,70 +271,28 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   }), [mapInstance]);
   
   // Drawing creation handler for Geoman
-  const handlePolygonCreated = React.useCallback((layer: L.Layer, originalLayer?: L.Layer) => {
+  const handlePolygonCreated = React.useCallback((layer: L.Layer) => {
     const geomanLayer = layer as GeomanLayer;
 
     // Convert to GeoJSON
     const geoJson = geomanLayer.toGeoJSON();
-    
+    // Add a unique ID
+    geoJson.id = uuidv4();
+
     // Get current drawing state from ref
     const currentDrawingState = drawingStateRef.current;
 
-    if (originalLayer) {
-      // If originalLayer exists, this is a cut/edit operation resulting in a new shape
-      // We need to remove the original and add the new one, inheriting properties
-      const originalGeoJson = (originalLayer as GeomanLayer).toGeoJSON();
-      const originalId = originalGeoJson.id as string;
-      const originalType = originalGeoJson.properties?.outlookType as OutlookType;
-      const originalProb = originalGeoJson.properties?.probability as string;
-
-      if (originalId && originalType && originalProb) {
-        dispatch(removeFeature({ outlookType: originalType, probability: originalProb, featureId: originalId }));
-      }
-      
-      // Inherit properties
-      geoJson.properties = {
-        ...geoJson.properties,
-        ...originalGeoJson.properties
-      };
-      
-      // Assign new ID for the new shape
-      geoJson.id = uuidv4();
-    } else {
-      // Completely new drawing
-      geoJson.id = uuidv4();
-
-      // Add metadata about the outlook type
-      geoJson.properties = {
-        ...geoJson.properties,
-        outlookType: currentDrawingState.activeOutlookType,
-        probability: currentDrawingState.activeProbability,
-        isSignificant: currentDrawingState.isSignificant
-      };
-    }
+    // Add metadata about the outlook type
+    geoJson.properties = {
+      ...geoJson.properties,
+      outlookType: currentDrawingState.activeOutlookType,
+      probability: currentDrawingState.activeProbability,
+      isSignificant: currentDrawingState.isSignificant
+    };
     
     // Dispatch to store
     dispatch(addFeature({ feature: geoJson }));
   }, [dispatch]);
-
-  const handleRequestDelete = useCallback((outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => {
-    setFeatureToDelete({ outlookType, probability, featureId, message });
-  }, []);
-
-  const handleConfirmDelete = useCallback(() => {
-    if (featureToDelete) {
-      dispatch(removeFeature({
-        outlookType: featureToDelete.outlookType,
-        probability: featureToDelete.probability,
-        featureId: featureToDelete.featureId
-      }));
-      setFeatureToDelete(null);
-    }
-  }, [dispatch, featureToDelete]);
-
-  const handleCancelDelete = useCallback(() => {
-    setFeatureToDelete(null);
-  }, []);
 
   // Handle keyboard shortcuts for drawing
   React.useEffect(() => {
@@ -418,7 +309,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
           // Cancel current drawing mode
           // Narrowly typed guard for Geoman `pm` to avoid `any`
           if (!mapInstance) return;
-          const gmMap = mapInstance as any;
+          const gmMap = mapInstance as PMMap;
           if (gmMap.pm && typeof gmMap.pm.disableDraw === 'function') {
             gmMap.pm.disableDraw();
           }
@@ -446,18 +337,8 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
             onPolygonCreated={handlePolygonCreated}
           />
 
-          <MapInner darkMode={darkMode} onRequestDelete={handleRequestDelete} />
+          <MapInner />
       </MapContainer>
-
-      <ConfirmationModal
-        isOpen={!!featureToDelete}
-        title="Confirm Deletion"
-        message={featureToDelete?.message}
-        onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-      />
     </div>
   );
 });

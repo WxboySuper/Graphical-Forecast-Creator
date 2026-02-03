@@ -3,15 +3,9 @@ import React from 'react';
 import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore, EnhancedStore } from '@reduxjs/toolkit';
-import { BrowserRouter } from 'react-router-dom';
 import forecastReducer, { setMapView } from './store/forecastSlice';
 import featureFlagsReducer from './store/featureFlagsSlice';
-import themeReducer from './store/themeSlice';
-import appModeReducer from './store/appModeSlice';
-import overlaysReducer from './store/overlaysSlice';
-import stormReportsReducer from './store/stormReportsSlice';
-import verificationReducer from './store/verificationSlice';
-import { ForecastPage } from './pages';
+import { AppContent } from './App';
 
 // Mock child components
 const mockForecastMap = jest.fn();
@@ -32,12 +26,6 @@ jest.mock('./components/Toast/Toast', () => ({
   ToastManager: () => <div>ToastManager</div>
 }));
 
-// Mock router outlet context
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useOutletContext: () => ({ addToast: jest.fn() }),
-}));
-
 // Mock leaflet
 jest.mock('leaflet', () => ({
   featureGroup: () => ({
@@ -55,7 +43,7 @@ jest.mock('leaflet', () => ({
   },
 }));
 
-describe('ForecastPage Performance', () => {
+describe('AppContent Performance', () => {
   let store: EnhancedStore;
 
   beforeEach(() => {
@@ -64,11 +52,6 @@ describe('ForecastPage Performance', () => {
       reducer: {
         forecast: forecastReducer,
         featureFlags: featureFlagsReducer,
-        theme: themeReducer,
-        appMode: appModeReducer,
-        overlays: overlaysReducer,
-        stormReports: stormReportsReducer,
-        verification: verificationReducer,
       },
       middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
@@ -80,22 +63,20 @@ describe('ForecastPage Performance', () => {
   it('does NOT re-render children when unrelated state changes (Optimized)', () => {
     render(
       <Provider store={store}>
-        <BrowserRouter>
-          <ForecastPage />
-        </BrowserRouter>
+        <AppContent />
       </Provider>
     );
 
-    // Initial render(s)
-    const initialCalls = mockForecastMap.mock.calls.length;
+    // Initial render: 2 times (Mount + useEffect dispatch)
+    expect(mockForecastMap).toHaveBeenCalledTimes(2);
 
-    // Dispatch an action that changes `forecast` slice but NOT the data used by ForecastPage
+    // Dispatch an action that changes `forecast` slice but NOT the data used by AppContent
     // setMapView changes state.forecast.currentMapView
     act(() => {
       store.dispatch(setMapView({ center: [40, -100], zoom: 5 }));
     });
 
-    // With optimized selector: should not cause additional re-renders
-    expect(mockForecastMap.mock.calls.length).toBeLessThanOrEqual(initialCalls + 1);
+    // With optimized selector: should remain 2
+    expect(mockForecastMap).toHaveBeenCalledTimes(2);
   });
 });
