@@ -5,7 +5,7 @@ import type { Dispatch } from 'redux';
 import * as L from 'leaflet';
 import { GeoJSON } from 'react-leaflet';
 import { Feature } from 'geojson';
-import { removeFeature } from '../../store/forecastSlice';
+import { updateFeature } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { PMMap } from '../../types/map';
 import { FeatureStyle, getFeatureStyle } from '../../utils/outlookUtils';
@@ -41,10 +41,18 @@ function createOnEachFeature(
         const fc = styleObj.fillColor;
         if (typeof fc === 'string' && !fc.startsWith('url(')) {
           pathEl.setAttribute('fill', fc);
+        } else if (typeof fc === 'string' && fc.startsWith('url(')) {
+           pathEl.setAttribute('fill', fc);
         }
+        
         pathEl.setAttribute('fill-opacity', String(styleObj.fillOpacity ?? 1));
         if (styleObj.color) pathEl.setAttribute('stroke', String(styleObj.color));
         pathEl.setAttribute('stroke-width', String(styleObj.weight ?? 1));
+        
+        // Fix for pointer-events on transparent overlay
+        if (styleObj.interactive === false) {
+             pathEl.setAttribute('pointer-events', 'none');
+        }
       }
     } catch {
       // ignore DOM write errors in server env
@@ -65,14 +73,24 @@ function createOnEachFeature(
   };
 }
 
-// Optimized: Memoized component for individual features to prevent unnecessary re-renders
-const OutlookFeature: React.FC<{
+interface OutlookFeatureProps {
   feature: Feature;
   outlookType: OutlookType;
   probability: string;
   dispatch: Dispatch;
   map: L.Map;
-}> = React.memo(({ feature, outlookType, probability, dispatch, map }) => {
+  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string, message: React.ReactNode) => void;
+}
+
+// Optimized: Memoized component for individual features to prevent unnecessary re-renders
+const OutlookFeature: React.FC<OutlookFeatureProps> = React.memo(({ 
+  feature, 
+  outlookType, 
+  probability, 
+  dispatch, 
+  map,
+  onRequestDelete
+}) => {
   const featureId = feature.id as string;
 
   const handleClick = React.useCallback(() => {
@@ -83,12 +101,18 @@ const OutlookFeature: React.FC<{
 
     const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
     const safeProbability = stripHtml(probability);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
-    // eslint-disable-next-line no-restricted-globals, no-alert
-    if (confirm(message)) {
-      dispatch(removeFeature({ outlookType, probability, featureId }));
-    }
-  }, [dispatch, map, outlookType, probability, featureId]);
+    
+    // Use a div with pre-wrap for newlines (consistent with PR 49)
+    const message = (
+      <div style={{ whiteSpace: 'pre-wrap' }}>
+        Delete this {outlookName} outlook area?
+        <br /><br />
+        Risk Level: {safeProbability}{safeProbability.includes('#') ? ' (Significant)' : ''}
+      </div>
+    );
+
+    onRequestDelete(outlookType, probability, featureId, message);
+  }, [map, outlookType, probability, featureId, onRequestDelete]);
 
   const handleMouseOver = React.useCallback((e: L.LeafletEvent) => {
     const layer = e.target as L.Layer;
@@ -104,10 +128,22 @@ const OutlookFeature: React.FC<{
     }
   }, [outlookType, probability]);
 
+  const handleEdit = React.useCallback((e: L.LeafletEvent) => {
+    const layer = e.target as any;
+    if (typeof layer.toGeoJSON !== 'function') return;
+    
+    const geoJson = layer.toGeoJSON();
+    geoJson.id = featureId;
+    dispatch(updateFeature({ feature: geoJson }));
+  }, [dispatch, featureId]);
+
   const handlers = React.useMemo(() => ({
     click: handleClick,
-    mouseover: handleMouseOver
-  }), [handleClick, handleMouseOver]);
+    mouseover: handleMouseOver,
+    'pm:edit': handleEdit,
+    'pm:dragend': handleEdit,
+    'pm:markerdragend': handleEdit
+  }), [handleClick, handleMouseOver, handleEdit]);
 
   const styleObj = React.useMemo(() => getFeatureStyle(outlookType, probability), [outlookType, probability]);
 

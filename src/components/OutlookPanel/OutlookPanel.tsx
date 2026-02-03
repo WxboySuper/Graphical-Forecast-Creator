@@ -86,62 +86,100 @@ export const OutlookTypeSectionTop: React.FC<OutlookTypeSectionProps> = memo(({
   outlookTypeHandlers,
   emergencyMode,
   getOutlookTypeEnabled
-}) => (
-  <div className="outlook-section">
-    <h3>Outlook Type</h3>
-    <div className="outlook-buttons" aria-label="Outlook type selection">
-      <OutlookButton
-        label="Tornado"
-        enabled={getOutlookTypeEnabled('tornado')}
-        active={activeOutlookType === 'tornado'}
-        onClick={outlookTypeHandlers.tornado}
-        tooltip="Tornado outlook temporarily unavailable"
-        ariaLabel="Tornado outlook (T)"
-      />
-      <OutlookButton
-        label="Wind"
-        enabled={getOutlookTypeEnabled('wind')}
-        active={activeOutlookType === 'wind'}
-        onClick={outlookTypeHandlers.wind}
-        tooltip="Wind outlook temporarily unavailable"
-        ariaLabel="Wind outlook (W)"
-      />
-      <OutlookButton
-        label="Hail"
-        enabled={getOutlookTypeEnabled('hail')}
-        active={activeOutlookType === 'hail'}
-        onClick={outlookTypeHandlers.hail}
-        tooltip="Hail outlook temporarily unavailable"
-        ariaLabel="Hail outlook (L)"
-      />
-      <OutlookButton
-        label="Categorical"
-        enabled={getOutlookTypeEnabled('categorical')}
-        active={activeOutlookType === 'categorical'}
-        onClick={outlookTypeHandlers.categorical}
-        tooltip="Categorical outlook temporarily unavailable"
-        ariaLabel="Categorical outlook (C)"
-      />
+}) => {
+  // Determine which outlook types to show based on enabled types
+  const showTornado = getOutlookTypeEnabled('tornado');
+  const showWind = getOutlookTypeEnabled('wind');
+  const showHail = getOutlookTypeEnabled('hail');
+  const showCategorical = getOutlookTypeEnabled('categorical');
+  const showTotalSevere = getOutlookTypeEnabled('totalSevere');
+  const showDay48 = getOutlookTypeEnabled('day4-8');
+  
+  return (
+    <div className="outlook-section">
+      <h3>Outlook Type</h3>
+      <div className="outlook-buttons" aria-label="Outlook type selection">
+        {showTornado && (
+          <OutlookButton
+            label="Tornado"
+            enabled={true}
+            active={activeOutlookType === 'tornado'}
+            onClick={outlookTypeHandlers.tornado}
+            tooltip="Tornado outlook"
+            ariaLabel="Tornado outlook (T)"
+          />
+        )}
+        {showWind && (
+          <OutlookButton
+            label="Wind"
+            enabled={true}
+            active={activeOutlookType === 'wind'}
+            onClick={outlookTypeHandlers.wind}
+            tooltip="Wind outlook"
+            ariaLabel="Wind outlook (W)"
+          />
+        )}
+        {showHail && (
+          <OutlookButton
+            label="Hail"
+            enabled={true}
+            active={activeOutlookType === 'hail'}
+            onClick={outlookTypeHandlers.hail}
+            tooltip="Hail outlook"
+            ariaLabel="Hail outlook (L)"
+          />
+        )}
+        {showTotalSevere && (
+          <OutlookButton
+            label="Total Severe"
+            enabled={true}
+            active={activeOutlookType === 'totalSevere'}
+            onClick={outlookTypeHandlers.totalSevere}
+            tooltip="Day 3 combined severe threat"
+            ariaLabel="Total Severe outlook (S)"
+          />
+        )}
+        {showDay48 && (
+          <OutlookButton
+            label="Day 4-8"
+            enabled={true}
+            active={activeOutlookType === 'day4-8'}
+            onClick={outlookTypeHandlers['day4-8']}
+            tooltip="Day 4-8 outlook (15% and 30% only)"
+            ariaLabel="Day 4-8 outlook (D)"
+          />
+        )}
+        {showCategorical && (
+          <OutlookButton
+            label="Categorical"
+            enabled={true}
+            active={activeOutlookType === 'categorical'}
+            onClick={outlookTypeHandlers.categorical}
+            tooltip="Categorical outlook"
+            ariaLabel="Categorical outlook (C)"
+          />
+        )}
+      </div>
+      {emergencyMode && (
+        <div className="emergency-warning">
+          <h4>⚠️ Emergency Mode - All Outlooks Disabled</h4>
+          <p>
+            All outlook types are currently disabled. This is typically done during critical maintenance 
+            or when addressing severe issues. Please check back later or contact the administrator.
+          </p>
+          <p>
+            You can still view existing forecasts, but creating new ones is temporarily unavailable.
+          </p>
+        </div>
+      )}
+      {!getOutlookTypeEnabled(activeOutlookType) && (
+        <div className="warning-notice">
+          <p>⚠️ You are viewing an outlook type not available for this day. Please select an available outlook type.</p>
+        </div>
+      )}
     </div>
-    {emergencyMode && (
-      <div className="emergency-warning">
-        <h4>⚠️ Emergency Mode - All Outlooks Disabled</h4>
-        <p>
-          All outlook types are currently disabled. This is typically done during critical maintenance 
-          or when addressing severe issues. Please check back later or contact the administrator.
-        </p>
-        <p>
-          You can still view existing forecasts, but creating new ones is temporarily unavailable.
-        </p>
-      </div>
-    )}
-    {!getOutlookTypeEnabled(activeOutlookType) && (
-      <div className="warning-notice">
-        <p>⚠️ You are viewing a disabled outlook type. Please select an available outlook type to continue.</p>
-      </div>
-    )}
-  </div>
-));
+  );
+});
 
 interface ProbabilitySectionProps {
   activeOutlookType: OutlookType;
@@ -266,15 +304,6 @@ const OutlookPanel: React.FC = () => {
         getCategoricalRiskDisplayName={getCategoricalRiskDisplayName}
         getOutlookTypeEnabled={getOutlookTypeEnabled}
       />
-      
-      {canBeSignificant(activeOutlookType, activeProbability, significantThreatsEnabled) && (
-        <SignificantSectionTop
-          isSignificant={isSignificant}
-          handleToggleSignificant={handleToggleSignificant}
-          significantThreatsEnabled={significantThreatsEnabled}
-          activeProbability={activeProbability}
-        />
-      )}
       
       <CurrentSelection
         activeOutlookType={activeOutlookType}

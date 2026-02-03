@@ -116,3 +116,46 @@
     justify-content: center;
   }
 }
+
+/* Dark mode support */
+.dark-mode .documentation {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .documentation h2 {
+  color: var(--text-primary);
+}
+
+.dark-mode .doc-tabs {
+  border-bottom-color: var(--border-color);
+}
+
+.dark-mode .doc-tabs button {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.dark-mode .doc-tabs button.active {
+  background-color: #3f51b5;
+  color: white;
+  border-color: #3f51b5;
+}
+
+.dark-mode .doc-tabs button:hover:not(.active) {
+  background-color: var(--bg-tertiary);
+}
+
+.dark-mode .doc-section h3 {
+  color: var(--text-primary);
+}
+
+.dark-mode .doc-section h4 {
+  color: var(--text-secondary);
+}
+
+.dark-mode .doc-section p,
+.dark-mode .doc-section li {
+  color: var(--text-primary);
+}
