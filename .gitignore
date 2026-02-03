@@ -28,5 +28,3 @@ yarn-error.log*
 /.idea
 
 .vscode
-
-.playwright-mcp

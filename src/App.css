@@ -27,16 +27,7 @@
   margin-bottom: 15px;
 }
 
-.header-buttons {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  align-items: center;
-}
-
-.doc-toggle-btn,
-.mode-toggle-btn,
-.dark-mode-toggle-btn {
+.doc-toggle-btn {
   background-color: #3f51b5;
   color: white;
   border: none;
@@ -45,43 +36,10 @@
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
-  font-size: 0.95rem;
 }
 
-.doc-toggle-btn:hover,
-.mode-toggle-btn:hover,
-.dark-mode-toggle-btn:hover {
+.doc-toggle-btn:hover {
   background-color: #303f9f;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(63, 81, 181, 0.3);
-}
-
-.mode-toggle-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.mode-toggle-btn:hover {
-  background: linear-gradient(135deg, #5568d3 0%, #65408a 100%);
-}
-
-.dark-mode-toggle-btn {
-  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-}
-
-.dark-mode-toggle-btn:hover {
-  background: linear-gradient(135deg, #e08e0b 0%, #cf6d17 100%);
-}
-
-.dark-mode .App-header {
-  background-color: var(--bg-secondary);
-}
-
-.dark-mode .App-header h1 {
-  color: var(--text-primary);
-}
-
-.dark-mode .App-subtitle {
-  color: var(--text-secondary);
 }
 
 .App-main {
@@ -155,17 +113,6 @@ button:focus {
   
   .App-subtitle {
     font-size: 1rem;
-  }
-  
-  .header-buttons {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .doc-toggle-btn,
-  .mode-toggle-btn {
-    width: 100%;
-    max-width: 250px;
   }
 }
 
