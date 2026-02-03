@@ -1,36 +1,62 @@
-import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindHailProbability } from '../../types/outlooks';
-import { colorMappings } from '../../utils/outlookUtils';
+import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindProbability, HailProbability, TotalSevereProbability,Day48Probability, CIGLevel, DayType } from '../../types/outlooks';
+import { colorMappings, getOutlookConstraints } from '../../utils/outlookUtils';
 
-export const getAvailableProbabilities = (activeOutlookType: OutlookType) => {
+export const getAvailableProbabilities = (activeOutlookType: OutlookType, currentDay: DayType = 1) => {
+  const constraints = getOutlookConstraints(currentDay);
+  const cigs = constraints.allowedCIG as CIGLevel[]; // Available hatching options based on day
+  
   switch (activeOutlookType) {
     case 'categorical':
-      return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as CategoricalRiskLevel[];
+      // If conversion is required (Day 1-3), only TSTM is manually drawn.
+      // If manual drawing is allowed (Day 4-8), return empty (no categorical for Day 4-8).
+      if (constraints.requiresConversion) {
+        return ['TSTM'] as CategoricalRiskLevel[];
+      } else {
+        // Day 4-8 doesn't have categorical
+        return [];
+      }
     case 'tornado':
-      return ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] as TornadoProbability[];
+      // Day 1/2 only
+      if (constraints.probabilities.tornado) {
+        return [...constraints.probabilities.tornado, ...cigs] as (TornadoProbability | CIGLevel)[];
+      }
+      return [];
     case 'wind':
+      // Day 1/2 only
+      if (constraints.probabilities.wind) {
+        return [...constraints.probabilities.wind, ...cigs] as (WindProbability | CIGLevel)[];
+      }
+      return [];
     case 'hail':
-      return ['5%', '15%', '30%', '45%', '60%'] as WindHailProbability[];
+      // Day 1/2 only
+      if (constraints.probabilities.hail) {
+        return [...constraints.probabilities.hail, ...cigs] as (HailProbability | CIGLevel)[];
+      }
+      return [];
+    case 'totalSevere':
+      // Day 3 only
+      if (constraints.probabilities.totalSevere) {
+        return [...constraints.probabilities.totalSevere, ...cigs] as (TotalSevereProbability | CIGLevel)[];
+      }
+      return [];
+    case 'day4-8':
+      // Day 4-8 only (no CIG)
+      if (constraints.probabilities['day4-8']) {
+        return constraints.probabilities['day4-8'] as Day48Probability[];
+      }
+      return [];
     default:
       return [] as string[];
   }
 };
 
+// Legacy significance removed - always false
 export const canBeSignificant = (
   activeOutlookType: OutlookType,
   activeProbability: string,
   significantThreatsEnabled: boolean
 ) => {
-  if (!significantThreatsEnabled || activeOutlookType === 'categorical') return false;
-  const probability = activeProbability.replace('#', '');
-  switch (activeOutlookType) {
-    case 'tornado':
-      return !['2%', '5%'].includes(probability);
-    case 'wind':
-    case 'hail':
-      return !['5%'].includes(probability);
-    default:
-      return false;
-  }
+  return false;
 };
 
 export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, activeProbability: string, prob: string) => {
@@ -45,10 +71,28 @@ export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, active
     } else {
       textColor = '#FFFFFF';
     }
+  } else if (prob.startsWith('CIG')) {
+     // Hatching buttons
+     color = '#e0e0e0';
+     textColor = '#000000';
   } else {
-    const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
+    // Determine color map
+    let colorMap: any;
+    if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
+    else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
+    else if (activeOutlookType === 'hail') colorMap = colorMappings.hail;
+    else if (activeOutlookType === 'totalSevere') colorMap = colorMappings.totalSevere;
+    else if (activeOutlookType === 'day4-8') colorMap = colorMappings['day4-8'];
+    else colorMap = {};
+
     color = colorMap[prob as keyof typeof colorMap] || '#FFFFFF';
-    textColor = '#FFFFFF';
+    
+    // Yellow (15% for day4-8) gets black text
+    if (activeOutlookType === 'day4-8' && prob === '15%') {
+      textColor = '#000000';
+    } else {
+      textColor = '#FFFFFF';
+    }
   }
 
   return {
@@ -62,6 +106,17 @@ export const getCurrentColor = (activeOutlookType: OutlookType, activeProbabilit
   if (activeOutlookType === 'categorical') {
     return colorMappings.categorical[activeProbability as keyof typeof colorMappings.categorical] || '#FFFFFF';
   }
-  const colorMap = activeOutlookType === 'tornado' ? colorMappings.tornado : colorMappings.wind;
+  if (activeProbability.startsWith('CIG')) {
+      return '#e0e0e0'; // Placeholder for color preview
+  }
+  
+  let colorMap: any;
+  if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
+  else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
+  else if (activeOutlookType === 'hail') colorMap = colorMappings.hail;
+  else if (activeOutlookType === 'totalSevere') colorMap = colorMappings.totalSevere;
+  else if (activeOutlookType === 'day4-8') colorMap = colorMappings['day4-8'];
+  else colorMap = {};
+  
   return colorMap[activeProbability as keyof typeof colorMap] || '#FFFFFF';
 };

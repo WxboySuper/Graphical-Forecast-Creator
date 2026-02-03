@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import './ExportModal.css'; // Reuse modal styles
 
 interface ConfirmationModalProps {
@@ -20,6 +20,19 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel"
 }) => {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Small timeout to ensure the element is in the DOM
+      const timer = setTimeout(() => {
+        cancelButtonRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -29,6 +42,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <div id="confirm-desc">{message}</div>
         <div className="export-modal-actions">
           <button
+            ref={cancelButtonRef}
             type="button"
             className="export-modal-btn export-modal-cancel"
             onClick={onCancel}
