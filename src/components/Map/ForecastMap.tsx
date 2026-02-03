@@ -13,13 +13,21 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 // Now import react-leaflet components (they depend on L being ready)
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON } from 'react-leaflet';
 import { RootState } from '../../store';
+<<<<<<< HEAD
 import { addFeature, setMapView, removeFeature } from '../../store/forecastSlice';
+=======
+import { addFeature, setMapView } from '../../store/forecastSlice';
+>>>>>>> perf/memoize-map-features-17887681089476540773
 import { OutlookType } from '../../types/outlooks';
-import { colorMappings } from '../../utils/outlookUtils';
-import { createTooltipContent, stripHtml } from '../../utils/domUtils';
+import { sortProbabilities } from '../../utils/outlookUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
+<<<<<<< HEAD
+=======
+import OutlookFeature from './OutlookFeature';
+import { PMMap } from '../../types/map';
+>>>>>>> perf/memoize-map-features-17887681089476540773
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -40,24 +48,8 @@ export type ForecastMapHandle = {
   getMap: () => L.Map | null;
 };
 
-// Narrow type for Leaflet map with Geoman `pm` helpers (used in MapController)
-type PMMap = L.Map & {
-  pm?: {
-    addControls?: (opts: Record<string, unknown>) => void;
-    setGlobalOptions?: (opts: Record<string, unknown>) => void;
-    on?: (event: string, handler: (...args: unknown[]) => void) => void;
-    globalDrawModeEnabled?: () => boolean;
-  };
-};
-
-// Strongly-typed shapes for outlooks and feature style objects
+// Strongly-typed shapes for outlooks
 type OutlooksMap = Record<OutlookType, Map<string, GeoJSON.Feature[]>>;
-type FeatureStyle = L.PathOptions & {
-  className?: string;
-  zIndex?: number;
-  fillColor?: string;
-  fillOpacity?: number;
-};
 
 // Geoman helpers: add controls and options, and factories for event handlers
 function addGeomanControls(pm: PMMap['pm']) {
@@ -168,6 +160,7 @@ const MapController: React.FC<{
   return null;
 };
 
+<<<<<<< HEAD
 // Component to render the outlook polygons
 
 // Top-level helpers extracted to reduce component size and complexity
@@ -250,11 +243,14 @@ const isDrawingMode = (map: L.Map): boolean => {
   return Boolean(pmMap.pm?.globalDrawModeEnabled?.());
 };
 
+=======
+>>>>>>> perf/memoize-map-features-17887681089476540773
 // Interface for context needed to render outlooks (consolidates arguments)
 interface OutlookRenderContext {
   dispatch: Dispatch;
   map: L.Map;
   activeOutlookType: OutlookType;
+<<<<<<< HEAD
   styleFn: (o: OutlookType, p: string) => FeatureStyle;
 }
 
@@ -342,13 +338,15 @@ function createOnEachFeature(
       console.error('[onEachFeature] Failed to attach handlers:', err);
     }
   };
+=======
+>>>>>>> perf/memoize-map-features-17887681089476540773
 }
 
 const renderOutlookFeatures = (
   outlooks: OutlooksMap,
   context: OutlookRenderContext
 ): React.ReactElement[] => {
-  const { activeOutlookType, styleFn } = context;
+  const { activeOutlookType } = context;
 
   const shouldShowLayer = (outlookType: OutlookType) => {
     if (activeOutlookType === 'categorical') {
@@ -356,8 +354,6 @@ const renderOutlookFeatures = (
     }
     return outlookType === activeOutlookType;
   };
-
-  const handlerFactory = createFeatureHandlersFactory(context);
 
   return Object.keys(outlooks).flatMap(outlookType => {
     const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
@@ -371,6 +367,7 @@ const renderOutlookFeatures = (
 
     return sortedEntries.map(([probability, features]) => (
       <FeatureGroup key={`${ot}-${probability}`}>
+<<<<<<< HEAD
         {features.map(feature => {
           const fid = feature.id as string;
           const handlers = handlerFactory(ot, probability, fid);
@@ -386,6 +383,18 @@ const renderOutlookFeatures = (
             />
           );
         })}
+=======
+        {features.map(feature => (
+          <OutlookFeature
+            key={`${ot}-${probability}-${feature.id}`}
+            feature={feature}
+            outlookType={ot}
+            probability={probability}
+            dispatch={context.dispatch}
+            map={context.map}
+          />
+        ))}
+>>>>>>> perf/memoize-map-features-17887681089476540773
       </FeatureGroup>
     ));
   });
@@ -402,8 +411,7 @@ const OutlookLayers: React.FC = React.memo(() => {
   const context: OutlookRenderContext = {
     dispatch,
     map,
-    activeOutlookType,
-    styleFn: getFeatureStyle
+    activeOutlookType
   };
 
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
@@ -444,16 +452,6 @@ MapInner.displayName = 'MapInner';
 interface GeomanLayer extends L.Layer {
   toGeoJSON(): GeoJSON.Feature;
 }
-
-// Map type that includes optional Geoman `pm` helpers (narrowly typed)
-type MapWithPM = L.Map & {
-  pm?: {
-    disableDraw?: () => void;
-    addControls?: (opts: Record<string, unknown>) => void;
-    setGlobalOptions?: (opts: Record<string, unknown>) => void;
-    on?: (event: string, handler: (...args: unknown[]) => void) => void;
-  };
-};
 
 const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
@@ -511,7 +509,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
           // Cancel current drawing mode
           // Narrowly typed guard for Geoman `pm` to avoid `any`
           if (!mapInstance) return;
-          const gmMap = mapInstance as MapWithPM;
+          const gmMap = mapInstance as PMMap;
           if (gmMap.pm && typeof gmMap.pm.disableDraw === 'function') {
             gmMap.pm.disableDraw();
           }

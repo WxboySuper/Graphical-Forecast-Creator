@@ -31,3 +31,27 @@
 ## 2024-05-23 - React Display Name
 **Learning:** Components defined via HOCs like `React.memo` or `forwardRef` lose their implicit name. Always manually set `Component.displayName = 'Component'` to ensure they are identifiable in DevTools and logs.
 **Action:** Add `displayName` immediately after component definition.
+
+## 2024-05-23 - Memoizing Leaflet Components
+**Learning:** `react-leaflet` components like `GeoJSON` are standard React components and will re-render if their parent (`OutlookLayers` in this case) re-renders, even if props are conceptually similar. This is O(N) for adding features to a map layer.
+**Action:** Always wrap expensive map layer logic (rendering lists of features) in a `React.memo` component (`OutlookFeature`) to ensure only the changed/new feature renders, not the entire list.
+
+## 2024-05-23 - CodeScene Code Duplication
+**Learning:** CodeScene is sensitive to block duplication, even in utility files. Defining similar mapping objects or switch cases in multiple functions (e.g., probability lookups) will trigger "Advisory Code Health" warnings.
+**Action:** Extract repeated configuration objects to top-level constants and use a shared generic helper function for lookup logic to eliminate structural duplication.
+
+## 2024-05-23 - CodeScene Complexity
+**Learning:** CodeScene's "Complex Method" metric is sensitive to  statements and nested  blocks.
+**Action:** Replace  statements with constant mapping objects and extract nested  blocks into small, single-purpose helper functions to satisfy complexity gates.
+
+## 2024-05-23 - CodeScene Complexity
+**Learning:** CodeScene's "Complex Method" metric is sensitive to `switch` statements and nested `try-catch` blocks.
+**Action:** Replace `switch` statements with constant mapping objects and extract nested `try-catch` blocks into small, single-purpose helper functions to satisfy complexity gates.
+
+## 2024-05-23 - CodeQL Security
+**Learning:** CodeQL is strict about  on strings where the pattern might appear multiple times, flagging it as a potential security risk (incomplete sanitization).
+**Action:** Always use  or  when the intent is to replace all occurrences, even if the domain logic suggests only one occurrence is likely.
+
+## 2024-05-23 - CodeQL Security
+**Learning:** CodeQL is strict about `.replace()` on strings where the pattern might appear multiple times, flagging it as a potential security risk (incomplete sanitization).
+**Action:** Always use `.replace(/pattern/g, replacement)` or `.replaceAll()` when the intent is to replace all occurrences, even if the domain logic suggests only one occurrence is likely.

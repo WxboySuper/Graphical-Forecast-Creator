@@ -183,6 +183,45 @@ const performSave = (
   }
 };
 
+// Refactored Load Helpers
+
+function parseSavedData(data: string): { outlooks?: unknown; mapView?: unknown } | null {
+  try {
+    const parsed = JSON.parse(data) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    return parsed as { outlooks?: unknown; mapView?: unknown };
+  } catch {
+    return null;
+  }
+}
+
+function validateOutlooksObject(outlooksObj: unknown): outlooksObj is Record<string, unknown> {
+  if (!outlooksObj || typeof outlooksObj !== 'object') return false;
+
+  const requiredKeys = ['tornado', 'wind', 'hail', 'categorical'];
+  const obj = outlooksObj as Record<string, unknown>;
+
+  for (const key of requiredKeys) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key) || !Array.isArray(obj[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function deserializeOutlooks(outlooksObj: Record<string, unknown>): OutlookData {
+  const entries = outlooksObj as {
+    [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
+  };
+
+  return {
+    tornado: new Map(entries.tornado),
+    wind: new Map(entries.wind),
+    hail: new Map(entries.hail),
+    categorical: new Map(entries.categorical)
+  };
+}
+
 // Helper to perform load operation
 const performLoad = (
   dispatch: AppDispatch,
@@ -195,28 +234,20 @@ const performLoad = (
       addToast('No saved forecast found.', 'warning');
       return;
     }
-    
-    let parsedData: unknown;
-    try {
-      parsedData = JSON.parse(savedData) as unknown;
-    } catch (err) {
+
+    const parsedData = parseSavedData(savedData);
+    if (!parsedData) {
       addToast('Saved data is incomplete or corrupted.', 'error');
       return;
     }
 
-    // Basic validation of parsed data structure
-    if (!validateForecastData(parsedData)) {
+    if (!validateOutlooksObject(parsedData.outlooks)) {
       addToast('Saved data is incomplete or corrupted.', 'error');
       return;
     }
 
-    const deserializedOutlooks: OutlookData = {
-      tornado: new Map(parsedData.outlooks.tornado),
-      wind: new Map(parsedData.outlooks.wind),
-      hail: new Map(parsedData.outlooks.hail),
-      categorical: new Map(parsedData.outlooks.categorical)
-    };
-    
+    const deserializedOutlooks = deserializeOutlooks(parsedData.outlooks as Record<string, unknown>);
+
     dispatch(resetForecasts());
     dispatch(importForecasts(deserializedOutlooks));
     const map = mapRef.current?.getMap();
@@ -226,11 +257,11 @@ const performLoad = (
     }
 
     if (parsedData.mapView) {
-      dispatch(setMapView(parsedData.mapView));
+      dispatch(setMapView(parsedData.mapView as { center: [number, number]; zoom: number }));
     } else {
       fitMapToFeatures(map, deserializedOutlooks, dispatch);
     }
-    
+
     addToast('Forecast loaded successfully!', 'success');
   } catch (error) {
     console.error('Error loading forecast:', error);
@@ -243,11 +274,11 @@ const EmergencyModeMessage = () => (
   <div className="emergency-mode-message">
     <h2>⚠️ Application in Emergency Mode</h2>
     <p>
-      All outlook types are currently disabled. This is typically done during critical maintenance 
+      All outlook types are currently disabled. This is typically done during critical maintenance
       or when addressing severe issues.
     </p>
     <p>
-      The application&apos;s drawing capabilities have been temporarily suspended. 
+      The application&apos;s drawing capabilities have been temporarily suspended.
       Please check back later or contact the administrator.
     </p>
     <p>
@@ -267,7 +298,7 @@ export const AppContent = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
   const mapRef = useRef<ForecastMapHandle>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }>>([]);
-  
+
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
   
@@ -296,17 +327,17 @@ export const AppContent = () => {
   const handleSave = useCallback(() => {
     performSave(outlooks, mapRef, dispatch, addToast);
   }, [outlooks, dispatch, mapRef, addToast]);
-  
+
   // Load forecast data from localStorage
   const handleLoad = useCallback(() => {
     performLoad(dispatch, addToast, mapRef);
   }, [dispatch, addToast, mapRef]);
-  
+
   // Toggle documentation visibility
   const toggleDocumentation = useCallback(() => {
     setShowDocumentation(prev => !prev);
   }, []);
-  
+
   // Warn before closing/refreshing if there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -317,7 +348,7 @@ export const AppContent = () => {
       }
       return undefined;
     };
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isSaved]);
@@ -372,7 +403,7 @@ export const AppContent = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [dispatch, isSaved, drawingState, handleSave, addToast]);
-  
+
   return (
     <div className="App">
       <header className="App-header">
@@ -382,10 +413,9 @@ export const AppContent = () => {
           {showDocumentation ? 'Hide Documentation' : 'Show Documentation'}
         </button>
       </header>
-      
+
       <main className={`App-main ${emergencyMode ? 'emergency-mode' : ''}`}>
         {showDocumentation && <Documentation />}
-        
         {emergencyMode ? (
           <EmergencyModeMessage />
         ) : (
