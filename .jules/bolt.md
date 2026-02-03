@@ -47,3 +47,11 @@
 ## 2024-05-23 - CodeScene Complexity
 **Learning:** CodeScene's "Complex Method" metric is sensitive to `switch` statements and nested `try-catch` blocks.
 **Action:** Replace `switch` statements with constant mapping objects and extract nested `try-catch` blocks into small, single-purpose helper functions to satisfy complexity gates.
+
+## 2024-05-23 - CodeQL Security
+**Learning:** CodeQL is strict about  on strings where the pattern might appear multiple times, flagging it as a potential security risk (incomplete sanitization).
+**Action:** Always use  or  when the intent is to replace all occurrences, even if the domain logic suggests only one occurrence is likely.
+
+## 2024-05-23 - CodeQL Security
+**Learning:** CodeQL is strict about `.replace()` on strings where the pattern might appear multiple times, flagging it as a potential security risk (incomplete sanitization).
+**Action:** Always use `.replace(/pattern/g, replacement)` or `.replaceAll()` when the intent is to replace all occurrences, even if the domain logic suggests only one occurrence is likely.

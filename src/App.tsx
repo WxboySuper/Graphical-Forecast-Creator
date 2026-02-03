@@ -182,6 +182,45 @@ const performSave = (
   }
 };
 
+// --- Refactored Load Helpers ---
+
+function parseSavedData(data: string): { outlooks?: unknown; mapView?: unknown } | null {
+  try {
+    const parsed = JSON.parse(data) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    return parsed as { outlooks?: unknown; mapView?: unknown };
+  } catch {
+    return null;
+  }
+}
+
+function validateOutlooksObject(outlooksObj: unknown): outlooksObj is Record<string, unknown> {
+  if (!outlooksObj || typeof outlooksObj !== 'object') return false;
+
+  const requiredKeys = ['tornado', 'wind', 'hail', 'categorical'];
+  const obj = outlooksObj as Record<string, unknown>;
+
+  for (const key of requiredKeys) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key) || !Array.isArray(obj[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function deserializeOutlooks(outlooksObj: Record<string, unknown>): OutlookData {
+  const entries = outlooksObj as {
+    [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
+  };
+
+  return {
+    tornado: new Map(entries.tornado),
+    wind: new Map(entries.wind),
+    hail: new Map(entries.hail),
+    categorical: new Map(entries.categorical)
+  };
+}
+
 // Helper to perform load operation
 const performLoad = (
   dispatch: AppDispatch,
@@ -195,45 +234,18 @@ const performLoad = (
       return;
     }
 
-    let parsedData: unknown;
-    try {
-      parsedData = JSON.parse(savedData) as unknown;
-    } catch (err) {
+    const parsedData = parseSavedData(savedData);
+    if (!parsedData) {
       addToast('Saved data is incomplete or corrupted.', 'error');
       return;
     }
 
-    // Basic validation of parsed data structure
-    if (typeof parsedData !== 'object' || parsedData === null) {
+    if (!validateOutlooksObject(parsedData.outlooks)) {
       addToast('Saved data is incomplete or corrupted.', 'error');
       return;
     }
 
-    const pd = parsedData as { outlooks?: unknown; mapView?: unknown };
-    if (!pd.outlooks || typeof pd.outlooks !== 'object') {
-      addToast('Saved data is incomplete or corrupted.', 'error');
-      return;
-    }
-
-    const outlooksObj = pd.outlooks as Record<string, unknown>;
-    const requiredKeys = ['tornado', 'wind', 'hail', 'categorical'];
-    for (const key of requiredKeys) {
-      if (!Object.prototype.hasOwnProperty.call(outlooksObj, key) || !Array.isArray(outlooksObj[key])) {
-        addToast('Saved data is incomplete or corrupted.', 'error');
-        return;
-      }
-    }
-
-    const entries = outlooksObj as {
-      [K in keyof OutlookData]: [string, Feature<Geometry, GeoJsonProperties>[]][]
-    };
-
-    const deserializedOutlooks: OutlookData = {
-      tornado: new Map(entries.tornado),
-      wind: new Map(entries.wind),
-      hail: new Map(entries.hail),
-      categorical: new Map(entries.categorical)
-    };
+    const deserializedOutlooks = deserializeOutlooks(parsedData.outlooks as Record<string, unknown>);
 
     dispatch(resetForecasts());
     dispatch(importForecasts(deserializedOutlooks));
@@ -243,8 +255,8 @@ const performLoad = (
       return;
     }
 
-    if (pd.mapView) {
-      dispatch(setMapView(pd.mapView as { center: [number, number]; zoom: number }));
+    if (parsedData.mapView) {
+      dispatch(setMapView(parsedData.mapView as { center: [number, number]; zoom: number }));
     } else {
       fitMapToFeatures(map, deserializedOutlooks, dispatch);
     }

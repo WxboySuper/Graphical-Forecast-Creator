@@ -58,9 +58,9 @@ const Legend: React.FC = React.memo(() => {
                     className="legend-color significant-threat-pattern"
                     style={{ backgroundColor: activeOutlookType === 'tornado' ? colorMappings.tornado[prob as TornadoProbability] : colorMappings.wind[prob as WindHailProbability] }}
                     role="img"
-                    aria-label={`Color for ${prob.replace('%', '#')} significant threat probability`}
+                    aria-label={`Color for ${prob.replace(/%/g, '#')} significant threat probability`}
                   />
-                  <span>{prob.replace('%', '#')} (Significant)</span>
+                  <span>{prob.replace(/%/g, '#')} (Significant)</span>
                 </div>
               )}
             </React.Fragment>
