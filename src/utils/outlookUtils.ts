@@ -246,7 +246,7 @@ export const getFeatureStyle = (outlookType: OutlookType, probability: string): 
 };
 
 export const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
-  return entries.sort((a, b) => {
+  return [...entries].sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
 
     if (probA === 'TSTM') return -1;
