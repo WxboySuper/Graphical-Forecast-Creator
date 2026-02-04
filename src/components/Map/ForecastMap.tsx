@@ -339,7 +339,10 @@ const renderOutlookFeatures = (
     const ot = outlookType as OutlookType;
     if (!shouldShowLayer(ot)) return [];
 
-    const entries = Array.from((outlooks[ot] as Map<string, GeoJSON.Feature[]>).entries());
+    const outlookMap = outlooks[ot];
+    if (!(outlookMap instanceof Map)) return [];
+
+    const entries = Array.from(outlookMap.entries());
     const sortedEntries = sortProbabilities(entries);
 
     return sortedEntries.map(([probability, features]) => (

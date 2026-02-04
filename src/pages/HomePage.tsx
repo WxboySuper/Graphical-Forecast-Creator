@@ -75,7 +75,7 @@ export const HomePage: React.FC = () => {
       }
 
       Object.values(dayData.data).forEach((outlookMap) => {
-        if (outlookMap && outlookMap.size > 0) {
+        if (outlookMap instanceof Map && outlookMap.size > 0) {
           dayHasData = true;
           totalOutlooks++;
           outlookMap.forEach((features: GeoJSON.Feature[]) => {

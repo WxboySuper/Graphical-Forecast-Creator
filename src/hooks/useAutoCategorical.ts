@@ -46,13 +46,13 @@ const useAutoCategorical = () => {
     
     if (currentDay === 1 || currentDay === 2) {
       // Day 1/2: Hash tornado, wind, hail
-      const tornadoIds = outlooks.tornado ? Array.from(outlooks.tornado.values()).flat().map(f => f.id).sort().join(',') : '';
-      const windIds = outlooks.wind ? Array.from(outlooks.wind.values()).flat().map(f => f.id).sort().join(',') : '';
-      const hailIds = outlooks.hail ? Array.from(outlooks.hail.values()).flat().map(f => f.id).sort().join(',') : '';
+      const tornadoIds = (outlooks.tornado instanceof Map) ? Array.from(outlooks.tornado.values()).flat().map(f => f.id).sort().join(',') : '';
+      const windIds = (outlooks.wind instanceof Map) ? Array.from(outlooks.wind.values()).flat().map(f => f.id).sort().join(',') : '';
+      const hailIds = (outlooks.hail instanceof Map) ? Array.from(outlooks.hail.values()).flat().map(f => f.id).sort().join(',') : '';
       currentHash = `${tornadoIds}|${windIds}|${hailIds}`;
     } else if (currentDay === 3) {
       // Day 3: Hash totalSevere
-      const totalSevereIds = outlooks.totalSevere ? Array.from(outlooks.totalSevere.values()).flat().map(f => f.id).sort().join(',') : '';
+      const totalSevereIds = (outlooks.totalSevere instanceof Map) ? Array.from(outlooks.totalSevere.values()).flat().map(f => f.id).sort().join(',') : '';
       currentHash = totalSevereIds;
     }
 
@@ -66,10 +66,10 @@ const useAutoCategorical = () => {
     if (currentDay === 1 || currentDay === 2) {
       hasChanges = ['tornado', 'wind', 'hail'].some(type => {
         const map = outlooks[type as keyof typeof outlooks];
-        return map && (map as Map<string, any>).size > 0;
+        return map instanceof Map && map.size > 0;
       });
     } else if (currentDay === 3) {
-      hasChanges = outlooks.totalSevere ? outlooks.totalSevere.size > 0 : false;
+      hasChanges = outlooks.totalSevere instanceof Map ? outlooks.totalSevere.size > 0 : false;
     }
     
     if (!hasChanges) {
@@ -81,7 +81,7 @@ const useAutoCategorical = () => {
 
     try {
       // Store existing TSTM areas before clearing categoricals
-      const tstmFeatures = outlooks.categorical ? (outlooks.categorical.get('TSTM') || []) : [];
+      const tstmFeatures = (outlooks.categorical instanceof Map) ? (outlooks.categorical.get('TSTM') || []) : [];
       const tstmMap = new Map([['TSTM', tstmFeatures]]);
 
       // Clear categorical outlooks except TSTM
