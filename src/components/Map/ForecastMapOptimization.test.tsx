@@ -65,12 +65,17 @@ const mockMapInstance = {
 jest.mock('react-leaflet', () => {
   // skipcq: JS-0359
   const React = require('react');
+  const LayersControl = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  LayersControl.BaseLayer = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  LayersControl.Overlay = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+
   return {
     MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="map-container">{children}</div>,
     TileLayer: () => <div data-testid="tile-layer">TileLayer</div>,
     FeatureGroup: ({ children }: { children: React.ReactNode }) => <div data-testid="feature-group">{children}</div>,
     GeoJSON: jest.fn(() => <div data-testid="geojson">GeoJSON</div>),
     useMap: () => mockMapInstance,
+    LayersControl: LayersControl,
   };
 });
 
