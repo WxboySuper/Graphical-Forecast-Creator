@@ -1,6 +1,6 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData } from '../types/outlooks';
+import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
 import { GeoJSON } from 'leaflet';
 import { RootState } from './index'; // Need RootState for selectors
 
@@ -177,7 +177,7 @@ export const forecastSlice = createSlice({
         state.emergencyMode = action.payload;
     },
 
-    setActiveProbability: (state, action: PayloadAction<any>) => {
+    setActiveProbability: (state, action: PayloadAction<Probability>) => {
       state.drawingState.activeProbability = action.payload;
       if (typeof action.payload === 'string') {
         state.drawingState.isSignificant = action.payload.includes('#');

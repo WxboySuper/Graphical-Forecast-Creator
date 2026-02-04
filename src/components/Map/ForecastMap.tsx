@@ -332,7 +332,7 @@ interface OutlookRenderContext {
 }
 
 const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlookType: OutlookType, probability: string, featureId: string) => {
-  const { map, onRequestDelete } = context;
+  const { dispatch, map, onRequestDelete } = context;
 
   const handleClick = () => {
     // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
@@ -482,14 +482,42 @@ const renderOutlookFeatures = (
   });
 };
 
-// Now declare OutlookLayers (after helpers)
-// Optimized: Memoized to prevent re-renders when map view or unrelated state changes
-const OutlookLayers: React.FC = React.memo(() => {
-  const dispatch = useDispatch();
-  const map = useMap();
-  const outlooks = useSelector(selectCurrentOutlooks);
-  const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
+interface DeleteConfirmationProps {
+  modalState: {
+    isOpen: boolean;
+    outlookType?: OutlookType;
+    probability?: string;
+    featureId?: string;
+  };
+  onConfirm: () => void;
+  onCancel: () => void;
+}
 
+const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ modalState, onConfirm, onCancel }) => {
+  const { isOpen, outlookType, probability } = modalState;
+  
+  if (!isOpen) return null;
+
+  const outlookName = outlookType 
+    ? outlookType.charAt(0).toUpperCase() + outlookType.slice(1)
+    : '';
+  const safeProb = probability ? stripHtml(probability) : '';
+
+  return (
+    <ConfirmationModal
+      isOpen={isOpen}
+      title={`Delete ${outlookName} Area`}
+      message={`Are you sure you want to delete this ${outlookName} outlook area (${safeProb})?`}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      confirmLabel="Delete"
+      cancelLabel="Keep"
+    />
+  );
+};
+
+const useOutlookLayersState = () => {
+  const dispatch = useDispatch();
   const [deleteModal, setDeleteModal] = React.useState<{
     isOpen: boolean;
     outlookType?: OutlookType;
@@ -506,7 +534,7 @@ const OutlookLayers: React.FC = React.memo(() => {
     });
   }, []);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = React.useCallback(() => {
     if (deleteModal.outlookType && deleteModal.probability && deleteModal.featureId) {
       dispatch(removeFeature({
         outlookType: deleteModal.outlookType,
@@ -515,7 +543,34 @@ const OutlookLayers: React.FC = React.memo(() => {
       }));
     }
     setDeleteModal({ isOpen: false });
+  }, [dispatch, deleteModal]);
+
+  const handleCancelDelete = React.useCallback(() => {
+    setDeleteModal({ isOpen: false });
+  }, []);
+
+  return {
+    deleteModal,
+    handleRequestDelete,
+    handleConfirmDelete,
+    handleCancelDelete
   };
+};
+
+// Now declare OutlookLayers (after helpers)
+// Optimized: Memoized to prevent re-renders when map view or unrelated state changes
+const OutlookLayers: React.FC = React.memo(() => {
+  const dispatch = useDispatch();
+  const map = useMap();
+  const outlooks = useSelector(selectCurrentOutlooks);
+  const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
+
+  const { 
+    deleteModal, 
+    handleRequestDelete, 
+    handleConfirmDelete, 
+    handleCancelDelete 
+  } = useOutlookLayersState();
 
   const context: OutlookRenderContext = {
     dispatch,
@@ -527,25 +582,13 @@ const OutlookLayers: React.FC = React.memo(() => {
 
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
 
-  const outlookName = deleteModal.outlookType 
-    ? deleteModal.outlookType.charAt(0).toUpperCase() + deleteModal.outlookType.slice(1)
-    : '';
-  const safeProb = deleteModal.probability ? stripHtml(deleteModal.probability) : '';
-
-  if (elements.length === 0 && !deleteModal.isOpen) return null;
-
   return (
     <>
-      {elements.length > 0 && elements}
-      
-      <ConfirmationModal
-        isOpen={deleteModal.isOpen}
-        title={`Delete ${outlookName} Area`}
-        message={`Are you sure you want to delete this ${outlookName} outlook area (${safeProb})?`}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleteModal({ isOpen: false })}
-        confirmLabel="Delete"
-        cancelLabel="Keep"
+      {elements}
+      <DeleteConfirmation 
+        modalState={deleteModal} 
+        onConfirm={handleConfirmDelete} 
+        onCancel={handleCancelDelete} 
       />
     </>
   );
