@@ -21,7 +21,6 @@ import './ForecastMap.css';
 import Legend from './Legend';
 import MapOverlays from './MapOverlays';
 import StatusOverlay from './StatusOverlay';
-import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 import DeleteConfirmation from './DeleteConfirmation';
 import { useOutlookLayersState } from './useOutlookLayersState';
 

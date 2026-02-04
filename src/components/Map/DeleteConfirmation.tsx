@@ -17,12 +17,9 @@ interface DeleteConfirmationProps {
 const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ modalState, onConfirm, onCancel }) => {
   const { isOpen, outlookType, probability } = modalState;
   
-  const canRender = React.useMemo(
-    () => Boolean(isOpen && outlookType && probability),
-    [isOpen, outlookType, probability]
-  );
-
-  if (!canRender) return null;
+  if (!isOpen || outlookType === undefined || probability === undefined) {
+    return null;
+  }
 
   const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
   const safeProb = stripHtml(probability);
