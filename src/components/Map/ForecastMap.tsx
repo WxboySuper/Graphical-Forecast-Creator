@@ -15,8 +15,8 @@ import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON, LayersControl }
 import { RootState } from '../../store';
 import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
-import { colorMappings } from '../../utils/outlookUtils';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
+import { getFeatureStyle, sortProbabilities, FeatureStyle } from '../../utils/mapStyleUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
@@ -92,12 +92,6 @@ type PMMap = L.Map & {
 
 // Strongly-typed shapes for outlooks and feature style objects
 type OutlooksMap = Record<OutlookType, Map<string, GeoJSON.Feature[]>>;
-type FeatureStyle = L.PathOptions & {
-  className?: string;
-  zIndex?: number;
-  fillColor?: string;
-  fillOpacity?: number;
-};
 
 // Geoman helpers: add controls and options, and factories for event handlers
 function addGeomanControls(pm: PMMap['pm']) {
@@ -206,116 +200,6 @@ const MapController: React.FC<{
   }, [map, onPolygonCreated]);
 
   return null;
-};
-
-// Component to render the outlook polygons
-
-// Top-level helpers extracted to reduce component size and complexity
-const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
-  return entries.sort((a, b) => {
-    const [probA, probB] = [a[0], b[0]];
-
-    // CIG levels come after numeric probabilities (render on top)
-    const isCigA = probA.startsWith('CIG');
-    const isCigB = probB.startsWith('CIG');
-    
-    if (isCigA !== isCigB) {
-      return isCigA ? 1 : -1;
-    }
-    
-    if (isCigA && isCigB) {
-      // Sort CIG1 < CIG2 < CIG3
-      return probA.localeCompare(probB);
-    }
-
-    if (probA === 'TSTM') return -1;
-    if (probB === 'TSTM') return 1;
-
-    // Legacy significant sort removal or keep for backward compatibility?
-    // Let's just treat as strings if we don't care, but numeric sort is better.
-    const riskOrder: Record<string, number> = {
-      'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
-    };
-    if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) {
-      return riskOrder[probA] - riskOrder[probB];
-    }
-
-    const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, ''));
-    return getPercentValue(probA) - getPercentValue(probB);
-  });
-};
-
-const RISK_ORDER: Record<string, number> = {
-  TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 4, HIGH: 5
-};
-
-const lookupColor = (outlookType: OutlookType, probability: string) => {
-  switch (outlookType) {
-    case 'categorical':
-      return colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
-    case 'tornado':
-      return colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
-    case 'wind':
-    case 'hail':
-      return colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
-    default:
-      return '#FFFFFF';
-  }
-};
-
-const computeZIndex = (outlookType: OutlookType, probability: string) => {
-  let baseZIndex = 400;
-  if (outlookType === 'categorical') {
-    baseZIndex += (RISK_ORDER[probability] || 0) * 10;
-  } else {
-    // Check for CIG
-    if (probability.startsWith('CIG')) {
-      baseZIndex = 600; // CIGs are overlays
-      // CIG1=601, CIG2=602, CIG3=603
-      baseZIndex += parseInt(probability.replace('CIG', '')) || 0;
-    } else {
-      // Numeric probabilities
-      baseZIndex += parseInt(probability) || 0;
-    }
-  }
-
-  // Legacy '#' check removed
-  return baseZIndex;
-};
-
-const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
-  if (probability.startsWith('CIG')) {
-    // Map CIG levels to pattern IDs
-    const patternMap: Record<string, string> = {
-      'CIG1': 'url(#pattern-cig1)',
-      'CIG2': 'url(#pattern-cig2)',
-      'CIG3': 'url(#pattern-cig3)',
-      'CIG0': 'none'
-    };
-    const fill = patternMap[probability] || 'none';
-    return {
-      color: '#000000', // Black outline for hatching areas
-      weight: 1,
-      opacity: 1,
-      fillColor: fill,
-      fillOpacity: 1, // Pattern needs full opacity
-      zIndex: computeZIndex(outlookType, probability),
-      className: 'hatching-layer'
-    };
-  }
-
-  const color = lookupColor(outlookType, probability);
-  // Legacy significant check removed from style logic
-  
-  // Base style
-  return {
-    color: color, // Outline matches fill
-    weight: 2,
-    opacity: 1,
-    fillColor: color,
-    fillOpacity: 0.2,
-    zIndex: computeZIndex(outlookType, probability)
-  };
 };
 
 // Helper to check if drawing mode is active (safe with optional chaining)
