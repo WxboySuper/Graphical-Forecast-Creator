@@ -14,7 +14,7 @@ import { RootState } from '../../store';
 import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks, toggleLowProbability } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
-import { getFeatureStyle, sortProbabilities } from '../../utils/mapStyleUtils';
+import { getFeatureStyle, sortProbabilities, FeatureStyle } from '../../utils/mapStyleUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { Feature } from 'geojson';
 import './ForecastMap.css';
