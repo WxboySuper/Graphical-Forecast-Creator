@@ -1,0 +1,26 @@
+.gfc-status-overlay {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 1400;
+}
+
+.gfc-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(34,34,34,0.75);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+  pointer-events: auto;
+}
+
+.gfc-status-text {
+  white-space: nowrap;
+}
