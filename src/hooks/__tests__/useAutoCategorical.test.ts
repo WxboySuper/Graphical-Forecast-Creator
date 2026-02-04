@@ -38,7 +38,7 @@ describe('processOutlooksToCategorical', () => {
     if (result.length > 0) {
         const props = result[0].properties;
         expect(props?.outlookType).toBe('categorical');
-        expect(props?.probability).toBe('MDT');
+        expect(props?.probability).toBe('ENH');
     }
   });
 

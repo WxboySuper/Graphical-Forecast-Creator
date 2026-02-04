@@ -57,6 +57,15 @@
       "react-app/jest"
     ]
   },
+  "jest": {
+    "transformIgnorePatterns": [
+      "[/\\\\]node_modules[/\\\\](?!(@turf|polyclip|splaytree|geokdbush|tinyqueue|d3-.+|internmap|delaunator|robust-predicates|leaflet|react-leaflet|@react-leaflet|sweepline-intersections|kdbush|rbush|quickselect|bignumber\\.js))"
+    ],
+    "moduleNameMapper": {
+      "\\.(css|less|sass|scss)$": "identity-obj-proxy",
+      "\\.(gif|ttf|eot|svg|png)$": "<rootDir>/src/__mocks__/fileMock.js"
+    }
+  },
   "browserslist": {
     "production": [
       ">0.2%",

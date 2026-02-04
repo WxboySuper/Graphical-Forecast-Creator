@@ -38,23 +38,6 @@ jest.mock('react-router-dom', () => ({
   useOutletContext: () => ({ addToast: jest.fn() }),
 }));
 
-// Mock leaflet
-jest.mock('leaflet', () => ({
-  featureGroup: () => ({
-    getLayers: jest.fn(() => []),
-    getBounds: jest.fn(),
-  }),
-  geoJSON: () => ({
-    addTo: jest.fn(),
-  }),
-  Map: class {
-    // skipcq: JS-0323
-    removeLayer() {
-      // mock
-    }
-  },
-}));
-
 describe('ForecastPage Performance', () => {
   let store: EnhancedStore;
 

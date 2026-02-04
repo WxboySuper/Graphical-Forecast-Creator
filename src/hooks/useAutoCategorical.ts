@@ -112,6 +112,19 @@ const useAutoCategorical = () => {
   return null;
 };
 
+/**
+ * Entry point for tests and manual processing.
+ * Converts probabilistic outlooks to categorical features.
+ */
+export function processOutlooksToCategorical(outlooks: OutlookData, day: number = 1): GeoJSON.Feature[] {
+  if (day === 1 || day === 2) {
+    return processDay12OutlooksToCategorical(outlooks);
+  } else if (day === 3) {
+    return processDay3OutlooksToCategorical(outlooks);
+  }
+  return [];
+}
+
 // Helper to safely union a list of polygons
 const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon | MultiPolygon> | null => {
   if (features.length === 0) return null;

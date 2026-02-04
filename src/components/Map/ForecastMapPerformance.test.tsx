@@ -4,6 +4,7 @@ import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore, EnhancedStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView, setActiveProbability } from '../../store/forecastSlice';
+import themeReducer from '../../store/themeSlice';
 import { GeoJSON } from 'leaflet';
 
 // Import component AFTER mocks
@@ -11,36 +12,6 @@ import ForecastMap from './ForecastMap';
 // Use import for types
 import { FeatureGroup } from 'react-leaflet';
 import Legend from './Legend';
-
-// Mocks must be defined before imports
-jest.mock('leaflet', () => {
-  return {
-    icon: jest.fn(),
-    Marker: {
-      prototype: {
-        options: {}
-      }
-    },
-    Map: class {
-        // skipcq: JS-0105
-        on() { return this; }
-        // skipcq: JS-0105
-        off() { return this; }
-        // skipcq: JS-0105
-        removeLayer() { return this; }
-        // skipcq: JS-0105
-        getCenter() { return { lat: 0, lng: 0 }; }
-        // skipcq: JS-0105
-        getZoom() { return 0; }
-    },
-    LeafletEvent: class {
-        // skipcq: JS-0323
-        target: any;
-        // skipcq: JS-0323
-        constructor() { this.target = {}; }
-    },
-  };
-});
 
 jest.mock('@geoman-io/leaflet-geoman-free', () => ({}));
 jest.mock('@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css', () => ({}));
@@ -71,12 +42,17 @@ const mockMapInstance = {
 jest.mock('react-leaflet', () => {
   // skipcq: JS-0359
   const React = require('react');
+  const LayersControlMock = ({ children }: { children: React.ReactNode }) => <div data-testid="layers-control">{children}</div>;
+  LayersControlMock.BaseLayer = ({ children }: { children: React.ReactNode }) => <div data-testid="base-layer">{children}</div>;
+  LayersControlMock.Overlay = ({ children }: { children: React.ReactNode }) => <div data-testid="overlay">{children}</div>;
+
   return {
     MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="map-container">{children}</div>,
     TileLayer: () => <div data-testid="tile-layer">TileLayer</div>,
     FeatureGroup: jest.fn(({ children }: { children: React.ReactNode }) => <div data-testid="feature-group">{children}</div>),
     GeoJSON: jest.fn(() => <div data-testid="geojson">GeoJSON</div>),
     useMap: () => mockMapInstance,
+    LayersControl: LayersControlMock,
   };
 });
 
@@ -97,6 +73,7 @@ describe('ForecastMap Performance', () => {
     store = configureStore({
       reducer: {
         forecast: forecastReducer,
+        theme: themeReducer,
       },
       middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
