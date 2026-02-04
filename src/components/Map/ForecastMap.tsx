@@ -1,26 +1,29 @@
-// skipcq: JS-C1003
-import * as React from 'react';
+import React, { memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { Dispatch } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
 
 // Import Leaflet first, then Geoman to extend it
-// skipcq: JS-C1003
-import * as L from 'leaflet';
+import L, { LeafletEvent, Layer, Path, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
 // Now import react-leaflet components (they depend on L being ready)
-import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON as GeoJSONComponent, LayersControl } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks } from '../../store/forecastSlice';
+import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks, toggleLowProbability } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
-import { colorMappings } from '../../utils/outlookUtils';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
+import { getFeatureStyle, sortProbabilities } from '../../utils/mapStyleUtils';
 import { v4 as uuidv4 } from 'uuid';
+import { Feature } from 'geojson';
 import './ForecastMap.css';
 import Legend from './Legend';
 import MapOverlays from './MapOverlays';
+import StatusOverlay from './StatusOverlay';
+import ConfirmationModal from '../DrawingTools/ConfirmationModal';
+import DeleteConfirmation from './DeleteConfirmation';
+import { useOutlookLayersState } from './useOutlookLayersState';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -86,13 +89,7 @@ type PMMap = L.Map & {
 };
 
 // Strongly-typed shapes for outlooks and feature style objects
-type OutlooksMap = Record<OutlookType, Map<string, GeoJSON.Feature[]>>;
-type FeatureStyle = L.PathOptions & {
-  className?: string;
-  zIndex?: number;
-  fillColor?: string;
-  fillOpacity?: number;
-};
+type OutlooksMap = Record<OutlookType, Map<string, Feature[]>>;
 
 // Geoman helpers: add controls and options, and factories for event handlers
 function addGeomanControls(pm: PMMap['pm']) {
@@ -153,12 +150,12 @@ const MapController: React.FC<{
   const map = useMap();
 
   // Store map instance once on mount
-  React.useEffect(() => {
+  useEffect(() => {
     setMapInstance(map);
   }, [map, setMapInstance]);
 
   // Listen for user-initiated map moves (no Redux subscription needed)
-  React.useEffect(() => {
+  useEffect(() => {
     const onMoveEnd = () => {
       const center = map.getCenter();
       dispatch(setMapView({
@@ -175,7 +172,7 @@ const MapController: React.FC<{
   }, [map, dispatch]);
 
   // Initialize Geoman controls - runs once when map is ready
-  React.useEffect(() => {
+  useEffect(() => {
     // Narrowly typed guard for Geoman presence
     const pmMap = map as PMMap;
     if (!pmMap.pm) {
@@ -203,116 +200,6 @@ const MapController: React.FC<{
   return null;
 };
 
-// Component to render the outlook polygons
-
-// Top-level helpers extracted to reduce component size and complexity
-const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
-  return entries.sort((a, b) => {
-    const [probA, probB] = [a[0], b[0]];
-
-    // CIG levels come after numeric probabilities (render on top)
-    const isCigA = probA.startsWith('CIG');
-    const isCigB = probB.startsWith('CIG');
-    
-    if (isCigA !== isCigB) {
-      return isCigA ? 1 : -1;
-    }
-    
-    if (isCigA && isCigB) {
-      // Sort CIG1 < CIG2 < CIG3
-      return probA.localeCompare(probB);
-    }
-
-    if (probA === 'TSTM') return -1;
-    if (probB === 'TSTM') return 1;
-
-    // Legacy significant sort removal or keep for backward compatibility?
-    // Let's just treat as strings if we don't care, but numeric sort is better.
-    const riskOrder: Record<string, number> = {
-      'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
-    };
-    if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) {
-      return riskOrder[probA] - riskOrder[probB];
-    }
-
-    const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, ''));
-    return getPercentValue(probA) - getPercentValue(probB);
-  });
-};
-
-const RISK_ORDER: Record<string, number> = {
-  TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 4, HIGH: 5
-};
-
-const lookupColor = (outlookType: OutlookType, probability: string) => {
-  switch (outlookType) {
-    case 'categorical':
-      return colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
-    case 'tornado':
-      return colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
-    case 'wind':
-    case 'hail':
-      return colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
-    default:
-      return '#FFFFFF';
-  }
-};
-
-const computeZIndex = (outlookType: OutlookType, probability: string) => {
-  let baseZIndex = 400;
-  if (outlookType === 'categorical') {
-    baseZIndex += (RISK_ORDER[probability] || 0) * 10;
-  } else {
-    // Check for CIG
-    if (probability.startsWith('CIG')) {
-      baseZIndex = 600; // CIGs are overlays
-      // CIG1=601, CIG2=602, CIG3=603
-      baseZIndex += parseInt(probability.replace('CIG', '')) || 0;
-    } else {
-      // Numeric probabilities
-      baseZIndex += parseInt(probability) || 0;
-    }
-  }
-
-  // Legacy '#' check removed
-  return baseZIndex;
-};
-
-const getFeatureStyle = (outlookType: OutlookType, probability: string) => {
-  if (probability.startsWith('CIG')) {
-    // Map CIG levels to pattern IDs
-    const patternMap: Record<string, string> = {
-      'CIG1': 'url(#pattern-cig1)',
-      'CIG2': 'url(#pattern-cig2)',
-      'CIG3': 'url(#pattern-cig3)',
-      'CIG0': 'none'
-    };
-    const fill = patternMap[probability] || 'none';
-    return {
-      color: '#000000', // Black outline for hatching areas
-      weight: 1,
-      opacity: 1,
-      fillColor: fill,
-      fillOpacity: 1, // Pattern needs full opacity
-      zIndex: computeZIndex(outlookType, probability),
-      className: 'hatching-layer'
-    };
-  }
-
-  const color = lookupColor(outlookType, probability);
-  // Legacy significant check removed from style logic
-  
-  // Base style
-  return {
-    color: color, // Outline matches fill
-    weight: 2,
-    opacity: 1,
-    fillColor: color,
-    fillOpacity: 0.2,
-    zIndex: computeZIndex(outlookType, probability)
-  };
-};
-
 // Helper to check if drawing mode is active (safe with optional chaining)
 const isDrawingMode = (map: L.Map): boolean => {
   const pmMap = map as PMMap;
@@ -325,10 +212,11 @@ interface OutlookRenderContext {
   map: L.Map;
   activeOutlookType: OutlookType;
   styleFn: (o: OutlookType, p: string) => FeatureStyle;
+  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string) => void;
 }
 
 const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlookType: OutlookType, probability: string, featureId: string) => {
-  const { dispatch, map } = context;
+  const { dispatch, map, onRequestDelete } = context;
 
   const handleClick = () => {
     // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
@@ -336,17 +224,11 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
       return;
     }
 
-    const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
-    const safeProbability = stripHtml(probability);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
-    // eslint-disable-next-line no-restricted-globals, no-alert
-    if (confirm(message)) {
-      dispatch(removeFeature({ outlookType, probability, featureId }));
-    }
+    onRequestDelete(outlookType, probability, featureId);
   };
 
-  const handleMouseOver = (e: L.LeafletEvent) => {
-    const layer = e.target as L.Layer;
+  const handleMouseOver = (e: LeafletEvent) => {
+    const layer = e.target as Layer;
     const tooltipContent = createTooltipContent(outlookType, probability);
 
     if ('bindTooltip' in layer && typeof layer.bindTooltip === 'function') {
@@ -359,7 +241,7 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
     }
   };
   
-  const handleEdit = (e: L.LeafletEvent) => {
+  const handleEdit = (e: LeafletEvent) => {
     const layer = e.target as GeomanLayer;
     const geoJson = layer.toGeoJSON();
     geoJson.id = featureId;
@@ -383,11 +265,11 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
 // Create an onEachFeature factory that forces the Leaflet layer style and attaches handlers
 function createOnEachFeature(
   styleObj: FeatureStyle,
-  handlers: Record<string, (e: L.LeafletEvent) => void>
+  handlers: Record<string, (e: LeafletEvent) => void>
 ) {
-  return function onEach(feature: GeoJSON.Feature, layer: L.Layer) {
+  return function onEach(feature: Feature, layer: Layer) {
     // Force the style on the created layer (in case global Geoman styles persist)
-    const layerWithStyle = layer as L.Path & { setStyle?: (opts: L.PathOptions) => void };
+    const layerWithStyle = layer as Path & { setStyle?: (opts: L.PathOptions) => void };
     if (typeof layerWithStyle.setStyle === 'function') {
       try {
         layerWithStyle.setStyle(styleObj as L.PathOptions);
@@ -398,7 +280,7 @@ function createOnEachFeature(
 
     // Also force underlying SVG attributes if available to override external styles
     try {
-      const layerWithPath = layer as L.Layer & { _path?: SVGElement };
+      const layerWithPath = layer as Layer & { _path?: SVGElement };
       const pathEl = layerWithPath._path;
       if (pathEl) {
         const fc = styleObj.fillColor;
@@ -422,7 +304,7 @@ function createOnEachFeature(
     }
 
     // Attach event handlers directly to the layer to ensure they bind
-    const layerWithOn = layer as L.Layer & { on?: (event: string, fn: (...args: unknown[]) => void) => void };
+    const layerWithOn = layer as Layer & { on?: (event: string, fn: (...args: unknown[]) => void) => void };
     try {
       Object.entries(handlers).forEach(([evt, fn]) => {
         if (typeof layerWithOn.on === 'function') {
@@ -468,10 +350,10 @@ const renderOutlookFeatures = (
           const handlers = handlerFactory(ot, probability, fid);
           
           const styleObj = styleFn(ot, probability);
-          const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: L.LeafletEvent) => void>);
+          const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: LeafletEvent) => void>);
           
           return (
-            <GeoJSON
+            <GeoJSONComponent
               key={`${ot}-${probability}-${fid}`}
               data={feature}
               pathOptions={styleObj as L.PathOptions}
@@ -486,31 +368,46 @@ const renderOutlookFeatures = (
 
 // Now declare OutlookLayers (after helpers)
 // Optimized: Memoized to prevent re-renders when map view or unrelated state changes
-const OutlookLayers: React.FC = React.memo(() => {
+const OutlookLayers: React.FC = memo(() => {
   const dispatch = useDispatch();
   const map = useMap();
   const outlooks = useSelector(selectCurrentOutlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
+  const { 
+    deleteModal, 
+    handleRequestDelete, 
+    handleConfirmDelete, 
+    handleCancelDelete 
+  } = useOutlookLayersState();
+
   const context: OutlookRenderContext = {
     dispatch,
     map,
     activeOutlookType,
-    styleFn: getFeatureStyle
+    styleFn: getFeatureStyle,
+    onRequestDelete: handleRequestDelete
   };
 
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
 
-  if (elements.length === 0) return null;
-  if (elements.length === 1) return elements[0];
-  return React.createElement(React.Fragment, null, ...elements);
+  return (
+    <>
+      {elements}
+      <DeleteConfirmation 
+        modalState={deleteModal} 
+        onConfirm={handleConfirmDelete} 
+        onCancel={handleCancelDelete} 
+      />
+    </>
+  );
 });
 
 OutlookLayers.displayName = 'OutlookLayers';
 
 // Extract deeper JSX children into a small component to reduce nesting
 // Optimized: Memoized to prevent re-renders when parent re-renders
-const MapInner: React.FC<{ darkMode: boolean }> = React.memo(({ darkMode }) => {
+const MapInner: React.FC<{ darkMode: boolean }> = memo(({ darkMode }) => {
   // Auto-select Dark map style when dark mode is enabled
   const defaultStyle = darkMode ? 'Dark' : 'Standard';
   
@@ -564,12 +461,12 @@ const MapInner: React.FC<{ darkMode: boolean }> = React.memo(({ darkMode }) => {
 MapInner.displayName = 'MapInner';
 
 // Geoman layer interface
-interface GeomanLayer extends L.Layer {
-  toGeoJSON(): GeoJSON.Feature;
+interface GeomanLayer extends Layer {
+  toGeoJSON(): Feature;
 }
 
 // Map type that includes optional Geoman `pm` helpers (narrowly typed)
-type MapWithPM = L.Map & {
+type MapWithPM = LeafletMap & {
   pm?: {
     disableDraw?: () => void;
     addControls?: (opts: Record<string, unknown>) => void;
@@ -583,21 +480,21 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
-  const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<LeafletMap | null>(null);
   
   // Store drawingState in a ref so our callback always has latest values
-  const drawingStateRef = React.useRef(drawingState);
-  React.useEffect(() => {
+  const drawingStateRef = useRef(drawingState);
+  useEffect(() => {
     drawingStateRef.current = drawingState;
   }, [drawingState]);
   
   // Expose the map instance through the ref
-  React.useImperativeHandle(ref, () => ({
+  useImperativeHandle(ref, () => ({
     getMap: () => mapInstance
   }), [mapInstance]);
   
   // Drawing creation handler for Geoman
-  const handlePolygonCreated = React.useCallback((layer: L.Layer, originalLayer?: L.Layer) => {
+  const handlePolygonCreated = useCallback((layer: Layer, originalLayer?: Layer) => {
     const geomanLayer = layer as GeomanLayer;
 
     // Convert to GeoJSON
@@ -644,7 +541,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   }, [dispatch]);
 
   // Handle keyboard shortcuts for drawing
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!mapInstance) return;
 
@@ -687,6 +584,22 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
           />
 
           <MapInner darkMode={darkMode} />
+
+          <div className="map-toolbar-bottom-right">
+            <button 
+              className="map-toolbar-button"
+              onClick={() => dispatch(toggleLowProbability())}
+              title="Toggle Low Probability / No Thunderstorms"
+              aria-label="Toggle Low Probability Overlay"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+              </svg>
+            </button>
+          </div>
+
+          <StatusOverlay />
       </MapContainer>
     </div>
   );

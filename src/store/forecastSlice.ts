@@ -1,6 +1,6 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData } from '../types/outlooks';
+import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
 import { GeoJSON } from 'leaflet';
 import { RootState } from './index'; // Need RootState for selectors
 
@@ -12,7 +12,7 @@ export interface SavedCycle {
   forecastCycle: ForecastCycle;
 }
 
-interface ForecastState {
+export interface ForecastState {
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
   currentMapView: {
@@ -22,6 +22,7 @@ interface ForecastState {
   isSaved: boolean;
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
+  isLowProbability: boolean;
 }
 
 const createEmptyOutlook = (day: DayType): OutlookDay => {
@@ -75,7 +76,8 @@ const initialState: ForecastState = {
   },
   isSaved: true,
   emergencyMode: false,
-  savedCycles: []
+  savedCycles: [],
+  isLowProbability: false
 };
 
 // Helpers to keep reducers small and testable
@@ -175,7 +177,7 @@ export const forecastSlice = createSlice({
         state.emergencyMode = action.payload;
     },
 
-    setActiveProbability: (state, action: PayloadAction<any>) => {
+    setActiveProbability: (state, action: PayloadAction<Probability>) => {
       state.drawingState.activeProbability = action.payload;
       if (typeof action.payload === 'string') {
         state.drawingState.isSignificant = action.payload.includes('#');
@@ -531,6 +533,14 @@ export const forecastSlice = createSlice({
     // Load cycles from storage (for hydration)
     loadCycleHistory: (state, action: PayloadAction<SavedCycle[]>) => {
       state.savedCycles = action.payload;
+    },
+
+    setLowProbability: (state, action: PayloadAction<boolean>) => {
+      state.isLowProbability = action.payload;
+    },
+
+    toggleLowProbability: (state) => {
+      state.isLowProbability = !state.isLowProbability;
     }
   }
 });
@@ -557,7 +567,9 @@ export const {
   loadSavedCycle,
   deleteSavedCycle,
   copyFeaturesFromPrevious,
-  loadCycleHistory
+  loadCycleHistory,
+  setLowProbability,
+  toggleLowProbability
 } = forecastSlice.actions;
 
 // Selectors
