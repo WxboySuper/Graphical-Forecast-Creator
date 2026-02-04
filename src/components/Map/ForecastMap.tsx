@@ -21,6 +21,9 @@ import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
 import MapOverlays from './MapOverlays';
+import StatusOverlay from './StatusOverlay';
+import ConfirmationModal from '../DrawingTools/ConfirmationModal';
+import { toggleLowProbability } from '../../store/forecastSlice';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -325,10 +328,11 @@ interface OutlookRenderContext {
   map: L.Map;
   activeOutlookType: OutlookType;
   styleFn: (o: OutlookType, p: string) => FeatureStyle;
+  onRequestDelete: (outlookType: OutlookType, probability: string, featureId: string) => void;
 }
 
 const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlookType: OutlookType, probability: string, featureId: string) => {
-  const { dispatch, map } = context;
+  const { map, onRequestDelete } = context;
 
   const handleClick = () => {
     // Check if drawing is active to prevent accidental deletion when clicking inside an existing polygon
@@ -336,13 +340,7 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
       return;
     }
 
-    const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
-    const safeProbability = stripHtml(probability);
-    const message = `Delete this ${outlookName} outlook area?\n\nRisk Level: ${safeProbability}${safeProbability.includes('#') ? ' (Significant)' : ''}`;
-    // eslint-disable-next-line no-restricted-globals, no-alert
-    if (confirm(message)) {
-      dispatch(removeFeature({ outlookType, probability, featureId }));
-    }
+    onRequestDelete(outlookType, probability, featureId);
   };
 
   const handleMouseOver = (e: L.LeafletEvent) => {
@@ -492,18 +490,65 @@ const OutlookLayers: React.FC = React.memo(() => {
   const outlooks = useSelector(selectCurrentOutlooks);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
+  const [deleteModal, setDeleteModal] = React.useState<{
+    isOpen: boolean;
+    outlookType?: OutlookType;
+    probability?: string;
+    featureId?: string;
+  }>({ isOpen: false });
+
+  const handleRequestDelete = React.useCallback((ot: OutlookType, prob: string, fid: string) => {
+    setDeleteModal({
+      isOpen: true,
+      outlookType: ot,
+      probability: prob,
+      featureId: fid
+    });
+  }, []);
+
+  const handleConfirmDelete = () => {
+    if (deleteModal.outlookType && deleteModal.probability && deleteModal.featureId) {
+      dispatch(removeFeature({
+        outlookType: deleteModal.outlookType,
+        probability: deleteModal.probability,
+        featureId: deleteModal.featureId
+      }));
+    }
+    setDeleteModal({ isOpen: false });
+  };
+
   const context: OutlookRenderContext = {
     dispatch,
     map,
     activeOutlookType,
-    styleFn: getFeatureStyle
+    styleFn: getFeatureStyle,
+    onRequestDelete: handleRequestDelete
   };
 
   const elements = renderOutlookFeatures(outlooks as OutlooksMap, context);
 
-  if (elements.length === 0) return null;
-  if (elements.length === 1) return elements[0];
-  return React.createElement(React.Fragment, null, ...elements);
+  const outlookName = deleteModal.outlookType 
+    ? deleteModal.outlookType.charAt(0).toUpperCase() + deleteModal.outlookType.slice(1)
+    : '';
+  const safeProb = deleteModal.probability ? stripHtml(deleteModal.probability) : '';
+
+  if (elements.length === 0 && !deleteModal.isOpen) return null;
+
+  return (
+    <>
+      {elements.length > 0 && elements}
+      
+      <ConfirmationModal
+        isOpen={deleteModal.isOpen}
+        title={`Delete ${outlookName} Area`}
+        message={`Are you sure you want to delete this ${outlookName} outlook area (${safeProb})?`}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteModal({ isOpen: false })}
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+      />
+    </>
+  );
 });
 
 OutlookLayers.displayName = 'OutlookLayers';
@@ -687,6 +732,22 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
           />
 
           <MapInner darkMode={darkMode} />
+
+          <div className="map-toolbar-bottom-right">
+            <button 
+              className="map-toolbar-button"
+              onClick={() => dispatch(toggleLowProbability())}
+              title="Toggle Low Probability / No Thunderstorms"
+              aria-label="Toggle Low Probability Overlay"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+              </svg>
+            </button>
+          </div>
+
+          <StatusOverlay />
       </MapContainer>
     </div>
   );

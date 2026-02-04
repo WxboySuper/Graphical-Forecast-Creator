@@ -12,7 +12,7 @@ export interface SavedCycle {
   forecastCycle: ForecastCycle;
 }
 
-interface ForecastState {
+export interface ForecastState {
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
   currentMapView: {
@@ -22,6 +22,7 @@ interface ForecastState {
   isSaved: boolean;
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
+  isLowProbability: boolean;
 }
 
 const createEmptyOutlook = (day: DayType): OutlookDay => {
@@ -75,7 +76,8 @@ const initialState: ForecastState = {
   },
   isSaved: true,
   emergencyMode: false,
-  savedCycles: []
+  savedCycles: [],
+  isLowProbability: false
 };
 
 // Helpers to keep reducers small and testable
@@ -531,6 +533,14 @@ export const forecastSlice = createSlice({
     // Load cycles from storage (for hydration)
     loadCycleHistory: (state, action: PayloadAction<SavedCycle[]>) => {
       state.savedCycles = action.payload;
+    },
+
+    setLowProbability: (state, action: PayloadAction<boolean>) => {
+      state.isLowProbability = action.payload;
+    },
+
+    toggleLowProbability: (state) => {
+      state.isLowProbability = !state.isLowProbability;
     }
   }
 });
@@ -557,7 +567,9 @@ export const {
   loadSavedCycle,
   deleteSavedCycle,
   copyFeaturesFromPrevious,
-  loadCycleHistory
+  loadCycleHistory,
+  setLowProbability,
+  toggleLowProbability
 } = forecastSlice.actions;
 
 // Selectors
