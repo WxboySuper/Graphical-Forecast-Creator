@@ -21,7 +21,6 @@ import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
-import MapOverlays from './MapOverlays';
 import OutlookFeature from './OutlookFeature';
 import { PMMap } from '../../types/map';
 
@@ -280,7 +279,6 @@ const MapInner: React.FC<MapInnerProps> = React.memo(({ darkMode, onRequestDelet
           </LayersControl.BaseLayer>
         ))}
         
-        <MapOverlays />
       </LayersControl>
 
       <svg>
