@@ -14,6 +14,7 @@ import {
   Copy,
   Image as ImageIcon,
   Trash2,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -41,6 +42,7 @@ import {
   setForecastDay, 
   setCycleDate,
   resetForecasts,
+  toggleLowProbability,
 } from '../../store/forecastSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import CycleHistoryModal from '../CycleManager/CycleHistoryModal';
@@ -102,6 +104,9 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days, cycleDate } = forecastCycle;
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const lowProbabilityOutlooks = useSelector((state: RootState) => 
+    state.forecast.forecastCycle.days[currentDay]?.metadata?.lowProbabilityOutlooks || []
+  );
   const outlooks = useSelector((state: RootState) => 
     state.forecast.forecastCycle.days[currentDay]?.data || {}
   );
@@ -119,6 +124,8 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
     probabilities,
     probabilityHandlers,
   } = useOutlookPanelLogic();
+
+  const isLowProb = lowProbabilityOutlooks.includes(activeOutlookType);
 
   // Export hook
   const { isModalOpen, initiateExport, confirmExport, cancelExport } = useExportMap({
@@ -406,13 +413,19 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                         <Button
                           variant={activeOutlookType === type ? 'default' : 'secondary'}
                           size="sm"
-                          className="h-full w-[110px]"
+                          className={cn(
+                            "h-full w-[110px] relative",
+                            lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
+                          )}
                           onClick={outlookTypeHandlers[type]}
                         >
                           <div className="flex flex-col items-center gap-1">
                             {outlookIcons[type]}
                             <span className="text-sm">{outlookLabels[type]}</span>
                           </div>
+                          {lowProbabilityOutlooks.includes(type) && (
+                            <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 text-success-foreground bg-background rounded-full" />
+                          )}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -430,13 +443,19 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                         <Button
                           variant={activeOutlookType === type ? 'default' : 'secondary'}
                           size="sm"
-                          className="h-[66px] w-[110px]"
+                          className={cn(
+                            "h-[66px] w-[110px] relative",
+                            lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
+                          )}
                           onClick={outlookTypeHandlers[type]}
                         >
                           <div className="flex items-center gap-1">
                             {outlookIcons[type]}
                             <span className="text-sm">{outlookLabels[type]}</span>
                           </div>
+                          {lowProbabilityOutlooks.includes(type) && (
+                            <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 text-success-foreground bg-background rounded-full" />
+                          )}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -454,11 +473,17 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                         <Button
                           variant={activeOutlookType === type ? 'default' : 'secondary'}
                           size="sm"
-                          className="h-16 w-[110px]"
+                          className={cn(
+                            "h-16 w-[110px] relative",
+                            lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
+                          )}
                           onClick={outlookTypeHandlers[type]}
                         >
                           {outlookIcons[type]}
                           <span className="ml-1 text-sm">{outlookLabels[type]}</span>
+                          {lowProbabilityOutlooks.includes(type) && (
+                            <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 text-success-foreground bg-background rounded-full" />
+                          )}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -536,9 +561,23 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
               </label>
               <div className="flex flex-col gap-1 justify-center" style={{ height: '140px' }}>
                 <div 
-                  className="flex items-center justify-center px-6 py-3 rounded-lg w-[220px] h-[72px]"
+                  className={cn(
+                    "flex flex-col items-center justify-center px-4 py-2 rounded-lg w-[220px] h-[72px] transition-all",
+                    isLowProb && "opacity-40 grayscale"
+                  )}
                   style={{ backgroundColor: currentColor }}
                 >
+                  <span 
+                    className={cn(
+                      "text-sm font-bold whitespace-nowrap",
+                      activeOutlookType === 'categorical' && 
+                        ['TSTM', 'MRGL', 'SLGT'].includes(activeProbability)
+                        ? 'text-black'
+                        : 'text-white'
+                    )}
+                  >
+                    {outlookLabels[activeOutlookType]}
+                  </span>
                   <span 
                     className={cn(
                       "text-base font-bold whitespace-nowrap",
@@ -548,11 +587,24 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                         : 'text-white'
                     )}
                   >
-                    {outlookLabels[activeOutlookType]} - {activeProbability}
+                    {activeProbability}
                     {isSignificant && significantThreatsEnabled && ' (Sig)'}
                   </span>
                 </div>
-                <div className="text-xs text-center text-muted-foreground/70">
+                
+                <Button
+                  variant={isLowProb ? 'success' : 'outline'}
+                  size="sm"
+                  className="w-full h-8 gap-2"
+                  onClick={() => dispatch(toggleLowProbability())}
+                >
+                  <CheckCircle2 className={cn("h-4 w-4", isLowProb ? "text-white" : "text-muted-foreground")} />
+                  <span className="text-xs">
+                    {activeOutlookType === 'categorical' ? 'No T-Storms' : 'Low Probability'}
+                  </span>
+                </Button>
+
+                <div className="text-[10px] text-center text-muted-foreground/50">
                   T/W/L/C • ↑↓
                 </div>
               </div>

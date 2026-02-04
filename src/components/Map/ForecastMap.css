@@ -204,6 +204,15 @@
   background-color: #e0e0e0;
 }
 
+.map-toolbar-button.active {
+  background-color: #ff4d4d;
+  color: white;
+}
+
+.map-toolbar-button.active:hover {
+  background-color: #ff3333;
+}
+
 /* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   .map-toolbar-bottom-right {

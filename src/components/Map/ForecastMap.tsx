@@ -11,7 +11,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 // Now import react-leaflet components (they depend on L being ready)
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON as GeoJSONComponent, LayersControl } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks, toggleLowProbability } from '../../store/forecastSlice';
+import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks, toggleLowProbability, selectIsLowProbability } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
 import { getFeatureStyle, sortProbabilities } from '../../utils/mapStyleUtils';
@@ -479,6 +479,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   const dispatch = useDispatch();
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+  const isLowProb = useSelector(selectIsLowProbability);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [mapInstance, setMapInstance] = useState<LeafletMap | null>(null);
   
@@ -587,9 +588,9 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
 
           <div className="map-toolbar-bottom-right">
             <button 
-              className="map-toolbar-button"
+              className={`map-toolbar-button ${isLowProb ? 'active' : ''}`}
               onClick={() => dispatch(toggleLowProbability())}
-              title="Toggle Low Probability / No Thunderstorms"
+              title={drawingState.activeOutlookType === 'categorical' ? "Toggle No Thunderstorms" : "Toggle Low Probability"}
               aria-label="Toggle Low Probability Overlay"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

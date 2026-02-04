@@ -194,6 +194,7 @@ export interface OutlookDay {
     issuanceTime: string;
     createdAt: string;
     lastModified: string;
+    lowProbabilityOutlooks?: OutlookType[];
   };
   discussion?: DiscussionData; // Optional discussion for this day
 }
@@ -226,6 +227,7 @@ export interface GFCForecastSaveData {
         issueDate: string;
         validDate: string;
         issuanceTime: string;
+        lowProbabilityOutlooks?: OutlookType[];
       };
     }>>;
     currentDay: DayType;

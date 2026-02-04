@@ -1,10 +1,11 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import { selectIsLowProbability } from '../../store/forecastSlice';
 import './StatusOverlay.css';
 
 const StatusOverlay: React.FC = () => {
-  const isLow = useSelector((state: RootState) => state.forecast.isLowProbability);
+  const isLow = useSelector(selectIsLowProbability);
   const activeOutlook = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
 
   if (!isLow) return null;
