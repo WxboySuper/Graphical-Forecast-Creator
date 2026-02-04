@@ -22,7 +22,6 @@ export interface ForecastState {
   isSaved: boolean;
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
-  isLowProbability: boolean;
 }
 
 const createEmptyOutlook = (day: DayType): OutlookDay => {
@@ -51,7 +50,8 @@ const createEmptyOutlook = (day: DayType): OutlookDay => {
       validDate: new Date().toISOString(),
       issuanceTime: '0600',
       createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
+      lowProbabilityOutlooks: []
     }
   };
 };
@@ -76,8 +76,7 @@ const initialState: ForecastState = {
   },
   isSaved: true,
   emergencyMode: false,
-  savedCycles: [],
-  isLowProbability: false
+  savedCycles: []
 };
 
 // Helpers to keep reducers small and testable
@@ -194,13 +193,23 @@ export const forecastSlice = createSlice({
       const outlookType = computeOutlookType(feature, state);
       const probability = computeProbability(feature, state);
 
-      const outlookData = getCurrentOutlook(state);
+      const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
+      if (!dayData) return;
+      
+      const outlookData = dayData.data;
       const outlookMap = outlookData[outlookType];
       
       if (!outlookMap) {
         // Outlook type not supported for this day, skip
         console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
         return;
+      }
+      
+      // If we're adding a feature, this outlook is no longer "Low Probability"
+      if (dayData.metadata.lowProbabilityOutlooks) {
+        dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
+          t => t !== outlookType
+        );
       }
       
       const existingFeatures = outlookMap.get(probability) || [];
@@ -372,6 +381,17 @@ export const forecastSlice = createSlice({
           }
         }
         
+        // Reset low probability flags for types that now have data
+        if (dayData.metadata.lowProbabilityOutlooks) {
+          const typesWithData = Object.entries(dayData.data)
+            .filter(([_, map]) => map && map.size > 0)
+            .map(([type]) => type as OutlookType);
+          
+          dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
+            t => !typesWithData.includes(t)
+          );
+        }
+        
         // Update metadata
         dayData.metadata.lastModified = new Date().toISOString();
       }
@@ -535,12 +555,62 @@ export const forecastSlice = createSlice({
       state.savedCycles = action.payload;
     },
 
-    setLowProbability: (state, action: PayloadAction<boolean>) => {
-      state.isLowProbability = action.payload;
+    setLowProbability: (state, action: PayloadAction<{ outlookType: OutlookType, isLow: boolean }>) => {
+      const { outlookType, isLow } = action.payload;
+      const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
+      
+      if (dayData) {
+        if (!dayData.metadata.lowProbabilityOutlooks) {
+          dayData.metadata.lowProbabilityOutlooks = [];
+        }
+        
+        if (isLow) {
+          if (!dayData.metadata.lowProbabilityOutlooks.includes(outlookType)) {
+            dayData.metadata.lowProbabilityOutlooks.push(outlookType);
+            
+            // "Finalize" logic: Clear any existing features of this type
+            const outlookData = dayData.data;
+            const outlookMap = outlookData[outlookType];
+            if (outlookMap) {
+              outlookMap.clear();
+            }
+          }
+        } else {
+          dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
+            t => t !== outlookType
+          );
+        }
+        state.isSaved = false;
+      }
     },
 
     toggleLowProbability: (state) => {
-      state.isLowProbability = !state.isLowProbability;
+      const outlookType = state.drawingState.activeOutlookType;
+      const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
+      
+      if (dayData) {
+        if (!dayData.metadata.lowProbabilityOutlooks) {
+          dayData.metadata.lowProbabilityOutlooks = [];
+        }
+        
+        const isCurrentlyLow = dayData.metadata.lowProbabilityOutlooks.includes(outlookType);
+        
+        if (!isCurrentlyLow) {
+          dayData.metadata.lowProbabilityOutlooks.push(outlookType);
+          
+          // "Finalize" logic: Clear any existing features of this type
+          const outlookData = dayData.data;
+          const outlookMap = outlookData[outlookType];
+          if (outlookMap) {
+            outlookMap.clear();
+          }
+        } else {
+          dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
+            t => t !== outlookType
+          );
+        }
+        state.isSaved = false;
+      }
     }
   }
 });
@@ -585,5 +655,12 @@ export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   return cycle.days[day]?.data || createEmptyOutlook(day).data;
 };
 export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;
+
+export const selectIsLowProbability = (state: RootState) => {
+  const cycle = state.forecast.forecastCycle;
+  const day = cycle.days[cycle.currentDay];
+  const activeType = state.forecast.drawingState.activeOutlookType;
+  return day?.metadata?.lowProbabilityOutlooks?.includes(activeType) || false;
+};
 
 export default forecastSlice.reducer;

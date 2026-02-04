@@ -15,6 +15,6 @@ jest.mock('./components/Documentation/Documentation', () => () => <div>Documenta
 
 test('renders Graphical Forecast Creator title', () => {
   render(<App />);
-  const titleElement = screen.getByText(/Graphical Forecast Creator/i);
-  expect(titleElement).toBeInTheDocument();
+  const titleElements = screen.getAllByText(/Graphical Forecast Creator/i);
+  expect(titleElements[0]).toBeInTheDocument();
 });

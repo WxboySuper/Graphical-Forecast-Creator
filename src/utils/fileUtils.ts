@@ -35,7 +35,8 @@ const createEmptyOutlook = (day: DayType): OutlookDay => {
       validDate: new Date().toISOString(),
       issuanceTime: '0600',
       createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
+      lowProbabilityOutlooks: []
     }
   };
 };
@@ -64,7 +65,10 @@ export const serializeForecast = (
       
       serializedDays[day] = {
         day: outlookDay.day,
-        metadata: outlookDay.metadata,
+        metadata: {
+          ...outlookDay.metadata,
+          lowProbabilityOutlooks: outlookDay.metadata.lowProbabilityOutlooks || []
+        },
         data: serializedData,
         discussion: outlookDay.discussion
       };
@@ -113,6 +117,7 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
             issueDate: savedDay.metadata.issueDate,
             validDate: savedDay.metadata.validDate,
             issuanceTime: savedDay.metadata.issuanceTime,
+            lowProbabilityOutlooks: savedDay.metadata.lowProbabilityOutlooks || [],
             createdAt: (savedDay.metadata as any).createdAt || new Date().toISOString(),
             lastModified: (savedDay.metadata as any).lastModified || new Date().toISOString()
           },

@@ -21,14 +21,9 @@ export const useOutlookLayersState = () => {
     });
   }, []);
 
-  const hasValidDeleteModal = React.useCallback(() => {
-    const { outlookType, probability, featureId } = deleteModal;
-    return !!(outlookType && probability && featureId);
-  }, [deleteModal]);
-
   const handleConfirmDelete = React.useCallback(() => {
-    if (hasValidDeleteModal()) {
-      const { outlookType, probability, featureId } = deleteModal;
+    const { outlookType, probability, featureId } = deleteModal;
+    if (outlookType && probability && featureId) {
       dispatch(removeFeature({
         outlookType,
         probability,
@@ -36,7 +31,7 @@ export const useOutlookLayersState = () => {
       }));
     }
     setDeleteModal({ isOpen: false });
-  }, [dispatch, deleteModal, hasValidDeleteModal]);
+  }, [dispatch, deleteModal]);
 
   const handleCancelDelete = React.useCallback(() => {
     setDeleteModal({ isOpen: false });

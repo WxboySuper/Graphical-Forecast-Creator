@@ -69,8 +69,13 @@ export const HomePage: React.FC = () => {
       const day = parseInt(dayStr) as DayType;
       let dayHasData = false;
 
+      // Check for low probability outlooks in metadata
+      if (dayData.metadata.lowProbabilityOutlooks && dayData.metadata.lowProbabilityOutlooks.length > 0) {
+        dayHasData = true;
+      }
+
       Object.values(dayData.data).forEach((outlookMap) => {
-        if (outlookMap && outlookMap.size > 0) {
+        if (outlookMap instanceof Map && outlookMap.size > 0) {
           dayHasData = true;
           totalOutlooks++;
           outlookMap.forEach((features: GeoJSON.Feature[]) => {
