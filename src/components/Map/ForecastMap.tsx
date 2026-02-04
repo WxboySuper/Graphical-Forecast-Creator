@@ -23,6 +23,8 @@ import Legend from './Legend';
 import MapOverlays from './MapOverlays';
 import StatusOverlay from './StatusOverlay';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
+import DeleteConfirmation from './DeleteConfirmation';
+import { useOutlookLayersState } from './useOutlookLayersState';
 import { toggleLowProbability } from '../../store/forecastSlice';
 
 // Need to manually set up Leaflet icon paths
@@ -480,81 +482,6 @@ const renderOutlookFeatures = (
       </FeatureGroup>
     ));
   });
-};
-
-interface DeleteConfirmationProps {
-  modalState: {
-    isOpen: boolean;
-    outlookType?: OutlookType;
-    probability?: string;
-    featureId?: string;
-  };
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ modalState, onConfirm, onCancel }) => {
-  const { isOpen, outlookType, probability } = modalState;
-  
-  if (!isOpen) return null;
-
-  const outlookName = outlookType 
-    ? outlookType.charAt(0).toUpperCase() + outlookType.slice(1)
-    : '';
-  const safeProb = probability ? stripHtml(probability) : '';
-
-  return (
-    <ConfirmationModal
-      isOpen={isOpen}
-      title={`Delete ${outlookName} Area`}
-      message={`Are you sure you want to delete this ${outlookName} outlook area (${safeProb})?`}
-      onConfirm={onConfirm}
-      onCancel={onCancel}
-      confirmLabel="Delete"
-      cancelLabel="Keep"
-    />
-  );
-};
-
-const useOutlookLayersState = () => {
-  const dispatch = useDispatch();
-  const [deleteModal, setDeleteModal] = React.useState<{
-    isOpen: boolean;
-    outlookType?: OutlookType;
-    probability?: string;
-    featureId?: string;
-  }>({ isOpen: false });
-
-  const handleRequestDelete = React.useCallback((ot: OutlookType, prob: string, fid: string) => {
-    setDeleteModal({
-      isOpen: true,
-      outlookType: ot,
-      probability: prob,
-      featureId: fid
-    });
-  }, []);
-
-  const handleConfirmDelete = React.useCallback(() => {
-    if (deleteModal.outlookType && deleteModal.probability && deleteModal.featureId) {
-      dispatch(removeFeature({
-        outlookType: deleteModal.outlookType,
-        probability: deleteModal.probability,
-        featureId: deleteModal.featureId
-      }));
-    }
-    setDeleteModal({ isOpen: false });
-  }, [dispatch, deleteModal]);
-
-  const handleCancelDelete = React.useCallback(() => {
-    setDeleteModal({ isOpen: false });
-  }, []);
-
-  return {
-    deleteModal,
-    handleRequestDelete,
-    handleConfirmDelete,
-    handleCancelDelete
-  };
 };
 
 // Now declare OutlookLayers (after helpers)
