@@ -1,8 +1,8 @@
-import * as L from 'leaflet';
+import L, { PathOptions } from 'leaflet';
 import { OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
 
-export type FeatureStyle = L.PathOptions & {
+export type FeatureStyle = PathOptions & {
   className?: string;
   zIndex?: number;
   fillColor?: string;

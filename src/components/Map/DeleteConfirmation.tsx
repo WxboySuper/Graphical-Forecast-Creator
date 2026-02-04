@@ -17,12 +17,10 @@ interface DeleteConfirmationProps {
 const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ modalState, onConfirm, onCancel }) => {
   const { isOpen, outlookType, probability } = modalState;
   
-  if (!isOpen) return null;
+  if (!isOpen || !outlookType || !probability) return null;
 
-  const outlookName = outlookType 
-    ? outlookType.charAt(0).toUpperCase() + outlookType.slice(1)
-    : '';
-  const safeProb = probability ? stripHtml(probability) : '';
+  const outlookName = outlookType.charAt(0).toUpperCase() + outlookType.slice(1);
+  const safeProb = stripHtml(probability);
 
   return (
     <ConfirmationModal

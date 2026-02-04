@@ -22,11 +22,12 @@ export const useOutlookLayersState = () => {
   }, []);
 
   const handleConfirmDelete = React.useCallback(() => {
-    if (deleteModal.outlookType && deleteModal.probability && deleteModal.featureId) {
+    const { outlookType, probability, featureId } = deleteModal;
+    if (outlookType && probability && featureId) {
       dispatch(removeFeature({
-        outlookType: deleteModal.outlookType,
-        probability: deleteModal.probability,
-        featureId: deleteModal.featureId
+        outlookType,
+        probability,
+        featureId
       }));
     }
     setDeleteModal({ isOpen: false });
