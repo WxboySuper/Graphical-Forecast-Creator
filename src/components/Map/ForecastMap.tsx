@@ -9,13 +9,14 @@ import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
 // Now import react-leaflet components (they depend on L being ready)
-import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON as GeoJSONComponent, LayersControl } from 'react-leaflet';
 import { RootState } from '../../store';
 import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks, toggleLowProbability } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
 import { getFeatureStyle, sortProbabilities } from '../../utils/mapStyleUtils';
 import { v4 as uuidv4 } from 'uuid';
+import { Feature } from 'geojson';
 import './ForecastMap.css';
 import Legend from './Legend';
 import MapOverlays from './MapOverlays';
@@ -88,7 +89,7 @@ type PMMap = L.Map & {
 };
 
 // Strongly-typed shapes for outlooks and feature style objects
-type OutlooksMap = Record<OutlookType, Map<string, GeoJSON.Feature[]>>;
+type OutlooksMap = Record<OutlookType, Map<string, Feature[]>>;
 
 // Geoman helpers: add controls and options, and factories for event handlers
 function addGeomanControls(pm: PMMap['pm']) {
@@ -266,7 +267,7 @@ function createOnEachFeature(
   styleObj: FeatureStyle,
   handlers: Record<string, (e: LeafletEvent) => void>
 ) {
-  return function onEach(feature: GeoJSON.Feature, layer: Layer) {
+  return function onEach(feature: Feature, layer: Layer) {
     // Force the style on the created layer (in case global Geoman styles persist)
     const layerWithStyle = layer as Path & { setStyle?: (opts: L.PathOptions) => void };
     if (typeof layerWithStyle.setStyle === 'function') {
@@ -352,7 +353,7 @@ const renderOutlookFeatures = (
           const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: LeafletEvent) => void>);
           
           return (
-            <GeoJSON
+            <GeoJSONComponent
               key={`${ot}-${probability}-${fid}`}
               data={feature}
               pathOptions={styleObj as L.PathOptions}
@@ -461,7 +462,7 @@ MapInner.displayName = 'MapInner';
 
 // Geoman layer interface
 interface GeomanLayer extends Layer {
-  toGeoJSON(): GeoJSON.Feature;
+  toGeoJSON(): Feature;
 }
 
 // Map type that includes optional Geoman `pm` helpers (narrowly typed)

@@ -1,6 +1,7 @@
-import L, { PathOptions } from 'leaflet';
+import { PathOptions } from 'leaflet';
 import { OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
+import { Feature } from 'geojson';
 
 export type FeatureStyle = PathOptions & {
   className?: string;
@@ -13,7 +14,7 @@ const RISK_ORDER: Record<string, number> = {
   TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 4, HIGH: 5
 };
 
-export const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
+export const sortProbabilities = (entries: [string, Feature[]][]): [string, Feature[]][] => {
   return [...entries].sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
 
