@@ -1,11 +1,9 @@
-// skipcq: JS-C1003
-import * as React from 'react';
+import React, { memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { Dispatch } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
 
 // Import Leaflet first, then Geoman to extend it
-// skipcq: JS-C1003
-import * as L from 'leaflet';
+import L, { LeafletEvent, Layer, Path, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
@@ -13,10 +11,10 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 // Now import react-leaflet components (they depend on L being ready)
 import { MapContainer, TileLayer, FeatureGroup, useMap, GeoJSON, LayersControl } from 'react-leaflet';
 import { RootState } from '../../store';
-import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks } from '../../store/forecastSlice';
+import { addFeature, setMapView, removeFeature, updateFeature, selectCurrentOutlooks, toggleLowProbability } from '../../store/forecastSlice';
 import { OutlookType } from '../../types/outlooks';
 import { createTooltipContent, stripHtml } from '../../utils/domUtils';
-import { getFeatureStyle, sortProbabilities, FeatureStyle } from '../../utils/mapStyleUtils';
+import { getFeatureStyle, sortProbabilities } from '../../utils/mapStyleUtils';
 import { v4 as uuidv4 } from 'uuid';
 import './ForecastMap.css';
 import Legend from './Legend';
@@ -25,7 +23,6 @@ import StatusOverlay from './StatusOverlay';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 import DeleteConfirmation from './DeleteConfirmation';
 import { useOutlookLayersState } from './useOutlookLayersState';
-import { toggleLowProbability } from '../../store/forecastSlice';
 
 // Need to manually set up Leaflet icon paths
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -152,12 +149,12 @@ const MapController: React.FC<{
   const map = useMap();
 
   // Store map instance once on mount
-  React.useEffect(() => {
+  useEffect(() => {
     setMapInstance(map);
   }, [map, setMapInstance]);
 
   // Listen for user-initiated map moves (no Redux subscription needed)
-  React.useEffect(() => {
+  useEffect(() => {
     const onMoveEnd = () => {
       const center = map.getCenter();
       dispatch(setMapView({
@@ -174,7 +171,7 @@ const MapController: React.FC<{
   }, [map, dispatch]);
 
   // Initialize Geoman controls - runs once when map is ready
-  React.useEffect(() => {
+  useEffect(() => {
     // Narrowly typed guard for Geoman presence
     const pmMap = map as PMMap;
     if (!pmMap.pm) {
@@ -229,8 +226,8 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
     onRequestDelete(outlookType, probability, featureId);
   };
 
-  const handleMouseOver = (e: L.LeafletEvent) => {
-    const layer = e.target as L.Layer;
+  const handleMouseOver = (e: LeafletEvent) => {
+    const layer = e.target as Layer;
     const tooltipContent = createTooltipContent(outlookType, probability);
 
     if ('bindTooltip' in layer && typeof layer.bindTooltip === 'function') {
@@ -243,7 +240,7 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
     }
   };
   
-  const handleEdit = (e: L.LeafletEvent) => {
+  const handleEdit = (e: LeafletEvent) => {
     const layer = e.target as GeomanLayer;
     const geoJson = layer.toGeoJSON();
     geoJson.id = featureId;
@@ -267,11 +264,11 @@ const createFeatureHandlersFactory = (context: OutlookRenderContext) => (outlook
 // Create an onEachFeature factory that forces the Leaflet layer style and attaches handlers
 function createOnEachFeature(
   styleObj: FeatureStyle,
-  handlers: Record<string, (e: L.LeafletEvent) => void>
+  handlers: Record<string, (e: LeafletEvent) => void>
 ) {
-  return function onEach(feature: GeoJSON.Feature, layer: L.Layer) {
+  return function onEach(feature: GeoJSON.Feature, layer: Layer) {
     // Force the style on the created layer (in case global Geoman styles persist)
-    const layerWithStyle = layer as L.Path & { setStyle?: (opts: L.PathOptions) => void };
+    const layerWithStyle = layer as Path & { setStyle?: (opts: L.PathOptions) => void };
     if (typeof layerWithStyle.setStyle === 'function') {
       try {
         layerWithStyle.setStyle(styleObj as L.PathOptions);
@@ -282,7 +279,7 @@ function createOnEachFeature(
 
     // Also force underlying SVG attributes if available to override external styles
     try {
-      const layerWithPath = layer as L.Layer & { _path?: SVGElement };
+      const layerWithPath = layer as Layer & { _path?: SVGElement };
       const pathEl = layerWithPath._path;
       if (pathEl) {
         const fc = styleObj.fillColor;
@@ -306,7 +303,7 @@ function createOnEachFeature(
     }
 
     // Attach event handlers directly to the layer to ensure they bind
-    const layerWithOn = layer as L.Layer & { on?: (event: string, fn: (...args: unknown[]) => void) => void };
+    const layerWithOn = layer as Layer & { on?: (event: string, fn: (...args: unknown[]) => void) => void };
     try {
       Object.entries(handlers).forEach(([evt, fn]) => {
         if (typeof layerWithOn.on === 'function') {
@@ -352,7 +349,7 @@ const renderOutlookFeatures = (
           const handlers = handlerFactory(ot, probability, fid);
           
           const styleObj = styleFn(ot, probability);
-          const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: L.LeafletEvent) => void>);
+          const onEach = createOnEachFeature(styleObj, handlers as Record<string, (e: LeafletEvent) => void>);
           
           return (
             <GeoJSON
@@ -370,7 +367,7 @@ const renderOutlookFeatures = (
 
 // Now declare OutlookLayers (after helpers)
 // Optimized: Memoized to prevent re-renders when map view or unrelated state changes
-const OutlookLayers: React.FC = React.memo(() => {
+const OutlookLayers: React.FC = memo(() => {
   const dispatch = useDispatch();
   const map = useMap();
   const outlooks = useSelector(selectCurrentOutlooks);
@@ -409,7 +406,7 @@ OutlookLayers.displayName = 'OutlookLayers';
 
 // Extract deeper JSX children into a small component to reduce nesting
 // Optimized: Memoized to prevent re-renders when parent re-renders
-const MapInner: React.FC<{ darkMode: boolean }> = React.memo(({ darkMode }) => {
+const MapInner: React.FC<{ darkMode: boolean }> = memo(({ darkMode }) => {
   // Auto-select Dark map style when dark mode is enabled
   const defaultStyle = darkMode ? 'Dark' : 'Standard';
   
@@ -463,12 +460,12 @@ const MapInner: React.FC<{ darkMode: boolean }> = React.memo(({ darkMode }) => {
 MapInner.displayName = 'MapInner';
 
 // Geoman layer interface
-interface GeomanLayer extends L.Layer {
+interface GeomanLayer extends Layer {
   toGeoJSON(): GeoJSON.Feature;
 }
 
 // Map type that includes optional Geoman `pm` helpers (narrowly typed)
-type MapWithPM = L.Map & {
+type MapWithPM = LeafletMap & {
   pm?: {
     disableDraw?: () => void;
     addControls?: (opts: Record<string, unknown>) => void;
@@ -482,21 +479,21 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   // Optimized: Select only drawingState to avoid re-rendering on other forecast changes (like map view)
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
-  const [mapInstance, setMapInstance] = React.useState<L.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<LeafletMap | null>(null);
   
   // Store drawingState in a ref so our callback always has latest values
-  const drawingStateRef = React.useRef(drawingState);
-  React.useEffect(() => {
+  const drawingStateRef = useRef(drawingState);
+  useEffect(() => {
     drawingStateRef.current = drawingState;
   }, [drawingState]);
   
   // Expose the map instance through the ref
-  React.useImperativeHandle(ref, () => ({
+  useImperativeHandle(ref, () => ({
     getMap: () => mapInstance
   }), [mapInstance]);
   
   // Drawing creation handler for Geoman
-  const handlePolygonCreated = React.useCallback((layer: L.Layer, originalLayer?: L.Layer) => {
+  const handlePolygonCreated = useCallback((layer: Layer, originalLayer?: Layer) => {
     const geomanLayer = layer as GeomanLayer;
 
     // Convert to GeoJSON
@@ -543,7 +540,7 @@ const ForecastMap = React.forwardRef<ForecastMapHandle>((_, ref) => {
   }, [dispatch]);
 
   // Handle keyboard shortcuts for drawing
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!mapInstance) return;
 
