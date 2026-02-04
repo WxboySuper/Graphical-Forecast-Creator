@@ -1,16 +1,15 @@
 import { processOutlooksToCategorical } from '../useAutoCategorical';
 import { OutlookData } from '../../types/outlooks';
-import { Feature, Polygon } from 'geojson';
 
-const makeFeature = (id: string): Feature<Polygon> => ({
+const makeFeature = (id: string) => ({
   type: 'Feature',
   id,
   geometry: { type: 'Polygon', coordinates: [[[0,0],[1,0],[1,1],[0,1],[0,0]]] },
   properties: {}
-});
+} as unknown as GeoJSON.Feature);
 
 describe('processOutlooksToCategorical', () => {
-  test('returns empty array for empty outlooks', () => {
+  test('returns empty map for empty outlooks', () => {
     const outlooks: OutlookData = {
       tornado: new Map(),
       wind: new Map(),
@@ -19,7 +18,7 @@ describe('processOutlooksToCategorical', () => {
     };
 
     const result = processOutlooksToCategorical(outlooks);
-    expect(result.length).toBe(0);
+    expect(result.size).toBe(0);
   });
 
   test('converts single tornado probability to categorical feature', () => {
@@ -32,16 +31,45 @@ describe('processOutlooksToCategorical', () => {
     };
 
     const result = processOutlooksToCategorical(outlooks);
-    // Might return 1 feature if successful
-    // result is Array<Feature>
-    // We expect at least one feature if geometry valid
-    if (result.length > 0) {
-        const props = result[0].properties;
-        expect(props?.outlookType).toBe('categorical');
-        expect(props?.probability).toBe('MDT');
-    }
+    expect(result.size).toBe(1);
+    const entry = Array.from(result.values())[0];
+    const props = entry.feature.properties as unknown as { outlookType?: string; probability?: string; derivedFrom?: string };
+    expect(props.outlookType).toBe('categorical');
+    expect(props.probability).toBe('MDT');
+    expect(props.derivedFrom).toBe('tornado');
+    expect(entry.sources).toEqual([{ type: 'tornado', probability: '30%' }]);
   });
 
-  // Since we use turf intersection, robust testing requires valid geometries and turf mocking or integration.
-  // The simple object identity checks are no longer valid as new features are created.
+  test('merges sources when same feature has equal highest risk across types', () => {
+    const f1 = makeFeature('o1');
+    const f2 = makeFeature('o1'); // same id to simulate overlap
+
+    const outlooks: OutlookData = {
+      tornado: new Map([['30%', [f1]]]), // tornado -> MDT
+      wind: new Map([['45#', [f2]]]),    // wind -> MDT (same as tornado in risk ordering)
+      hail: new Map(),
+      categorical: new Map()
+    };
+
+    const result = processOutlooksToCategorical(outlooks);
+    expect(result.size).toBe(1);
+    const value = Array.from(result.values())[0];
+    expect(value.risk).toBe('MDT');
+    // sources should contain both tornado and wind
+    const types = value.sources.map(s => s.type).sort();
+    expect(types).toEqual(['tornado', 'wind']);
+  });
+
+  test('skips TSTM risk levels (unknown/0% inputs)', () => {
+    const feature = makeFeature('skip1');
+    const outlooks: OutlookData = {
+      tornado: new Map([['0%', [feature]]]), // maps to TSTM via default
+      wind: new Map(),
+      hail: new Map(),
+      categorical: new Map()
+    };
+
+    const result = processOutlooksToCategorical(outlooks);
+    expect(result.size).toBe(0);
+  });
 });

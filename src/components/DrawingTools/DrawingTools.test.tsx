@@ -33,7 +33,6 @@ const renderWithStore = (
 describe('DrawingTools', () => {
   const mockOnSave = jest.fn();
   const mockOnLoad = jest.fn();
-  const mockOnOpenDiscussion = jest.fn();
   const mockAddToast = jest.fn();
   const mockMapRef = { current: mockMap } as unknown as React.RefObject<ForecastMapHandle>;
 
@@ -46,7 +45,6 @@ describe('DrawingTools', () => {
       <DrawingTools
         onSave={mockOnSave}
         onLoad={mockOnLoad}
-        onOpenDiscussion={mockOnOpenDiscussion}
         mapRef={mockMapRef}
         addToast={mockAddToast}
       />
@@ -54,7 +52,6 @@ describe('DrawingTools', () => {
 
     expect(screen.getByLabelText('Save Forecast')).toBeInTheDocument();
     expect(screen.getByLabelText('Load Forecast')).toBeInTheDocument();
-    expect(screen.getByLabelText('Forecast Discussion')).toBeInTheDocument();
     expect(screen.getByLabelText('Export as Image')).toBeInTheDocument();
     expect(screen.getByLabelText('Reset All')).toBeInTheDocument();
   });

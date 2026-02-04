@@ -4,21 +4,18 @@ import React from 'react';
 // skipcq: JS-C1003
 import * as ReactDOM from 'react-dom/client';
 import './index.css';
-import './darkMode.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { store } from './store';
-import { setupCycleHistoryListener } from './utils/cycleHistoryPersistence';
-
-// Setup cycle history persistence
-setupCycleHistoryListener(store);
+import { HashRouter as Router } from 'react-router-dom';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 root.render(
   <React.StrictMode>
-    <App />
+    <Router>
+      <App />
+    </Router>
   </React.StrictMode>
 );
 

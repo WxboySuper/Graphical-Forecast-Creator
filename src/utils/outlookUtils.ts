@@ -1,13 +1,25 @@
+import { PathOptions } from 'leaflet';
+import { GeoJSON } from 'leaflet';
 import {
   CategoricalRiskLevel, 
   ColorMappings, 
+  OutlookType,
   TornadoProbability, 
-  WindProbability,
-  HailProbability,
-  TotalSevereProbability,
-  CIGLevel,
-  DayType
+  WindHailProbability
 } from '../types/outlooks';
+
+// Common colors for Wind and Hail since they share the same probability scale and colors
+const WIND_HAIL_COLORS: Record<WindHailProbability, string> = {
+  '5%': '#894826',
+  '15%': '#ffc703',
+  '15#': '#ffc703',
+  '30%': '#fd0100',
+  '30#': '#fd0100',
+  '45%': '#fe00fe',
+  '45#': '#fe00fe',
+  '60%': '#912bee',
+  '60#': '#912bee'
+};
 
 /**
  * Color mappings for all outlook types based on specifications in Outlook_Info.md
@@ -35,249 +47,83 @@ export const colorMappings: ColorMappings = {
     '60%': '#114d8c',
     '60#': '#114d8c'
   },
-  wind: {
-    '5%': '#894826',
-    '15%': '#ffc703',
-    '15#': '#ffc703',
-    '30%': '#fd0100',
-    '30#': '#fd0100',
-    '45%': '#fe00fe',
-    '45#': '#fe00fe',
-    '60%': '#912bee',
-    '60#': '#912bee',
-    '75%': '#cd00cd',
-    '75#': '#cd00cd',
-    '90%': '#0000cd',
-    '90#': '#0000cd'
-  },
-  hail: {
-    '5%': '#894826',
-    '15%': '#ffc703',
-    '15#': '#ffc703',
-    '30%': '#fd0100',
-    '30#': '#fd0100',
-    '45%': '#fe00fe',
-    '45#': '#fe00fe',
-    '60%': '#912bee',
-    '60#': '#912bee'
-  },
-  totalSevere: {
-    '5%': '#008b02',
-    '15%': '#fdc900',
-    '30%': '#fe0000',
-    '45%': '#fe00ff',
-    '60%': '#114d8c'
-  },
-  'day4-8': {
-    '15%': '#FFFF00', // Yellow
-    '30%': '#FF8C00'  // Orange
-  },
-  significant: '#000000', // Black hatch for significant threat areas
-  hatching: {
-    'CIG0': 'none',
-    'CIG1': 'url(#pattern-cig1)',
-    'CIG2': 'url(#pattern-cig2)',
-    'CIG3': 'url(#pattern-cig3)'
-  }
+  wind: WIND_HAIL_COLORS,
+  hail: WIND_HAIL_COLORS,
+  significant: '#000000' // Black hatch for significant threat areas
+};
+
+// Probability to Categorical Risk Mappings
+const TORNADO_MAPPING: Record<string, CategoricalRiskLevel> = {
+  '2%': 'MRGL',
+  '5%': 'SLGT',
+  '10%': 'ENH',
+  '10#': 'ENH',
+  '15%': 'ENH',
+  '15#': 'MDT',
+  '30%': 'MDT',
+  '30#': 'HIGH',
+  '45%': 'HIGH',
+  '45#': 'HIGH',
+  '60%': 'HIGH',
+  '60#': 'HIGH'
+};
+
+const WIND_MAPPING: Record<string, CategoricalRiskLevel> = {
+  '5%': 'MRGL',
+  '15%': 'SLGT',
+  '15#': 'SLGT',
+  '30%': 'ENH',
+  '30#': 'ENH',
+  '45%': 'ENH',
+  '45#': 'MDT',
+  '60%': 'MDT',
+  '60#': 'HIGH'
+};
+
+const HAIL_MAPPING: Record<string, CategoricalRiskLevel> = {
+  '5%': 'MRGL',
+  '15%': 'SLGT',
+  '15#': 'SLGT',
+  '30%': 'ENH',
+  '30#': 'ENH',
+  '45%': 'ENH',
+  '45#': 'MDT',
+  '60%': 'MDT',
+  '60#': 'MDT'
 };
 
 /**
- * Get constraints for a specific outlook day
+ * Helper to lookup risk level from a mapping
  */
-export function getOutlookConstraints(day: DayType) {
-  switch (day) {
-    case 1:
-    case 2:
-      return {
-        outlookTypes: ['tornado', 'wind', 'hail', 'categorical'] as const,
-        allowsProbabilities: true,
-        allowedCIG: ['CIG1', 'CIG2', 'CIG3'],
-        allowedCategorical: ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'],
-        requiresConversion: true,
-        probabilities: {
-          tornado: ['2%', '5%', '10%', '15%', '30%', '45%', '60%'],
-          wind: ['5%', '15%', '30%', '45%', '60%', '75%', '90%'],
-          hail: ['5%', '15%', '30%', '45%', '60%']
-        }
-      };
-    case 3:
-      return {
-        outlookTypes: ['totalSevere', 'categorical'] as const,
-        allowsProbabilities: true,
-        allowedCIG: ['CIG1', 'CIG2'],
-        allowedCategorical: ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT'], // No HIGH
-        requiresConversion: true,
-        probabilities: {
-          totalSevere: ['5%', '15%', '30%', '45%', '60%']
-        }
-      };
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case 8:
-      return {
-        outlookTypes: ['day4-8'] as const,
-        allowsProbabilities: true, // Day 4-8 is probabilistic, not categorical
-        allowedCIG: [],
-        allowedCategorical: [], // No categorical conversion
-        requiresConversion: false,
-        probabilities: {
-          'day4-8': ['15%', '30%']
-        }
-      };
-    default:
-      // Fallback for unexpected values
-      return {
-        outlookTypes: [] as const,
-        allowsProbabilities: false,
-        allowedCIG: [],
-        allowedCategorical: [],
-        requiresConversion: false,
-        probabilities: {}
-      };
-  }
+function getRiskFromMapping(mapping: Record<string, CategoricalRiskLevel>, probability: string): CategoricalRiskLevel {
+  return mapping[probability] ?? 'TSTM';
 }
 
 /**
  * Convert tornado probability to categorical risk level
+ * @param probability Tornado probability
+ * @returns Categorical risk level
  */
-export function tornadoToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
-  // Clean probability string
-  const p = probability.replace(/[#]/g, '%') as TornadoProbability;
-  
-  // Logic based on New Outlook Format Prompt
-  // MRGL
-  if (p === '2%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
-  
-  // SLGT
-  if (p === '2%' && cig === 'CIG2') return 'SLGT';
-  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
-  if (p === '10%' && cig === 'CIG0') return 'SLGT';
-
-  // ENH
-  if (p === '5%' && cig === 'CIG2') return 'ENH'; // Prompt says 5% CIG2 -> ENH? Wait, checking table. "ENH... 5%: CIG 2". Yes.
-  if (p === '10%' && (cig === 'CIG1' || cig === 'CIG2' || cig === 'CIG3')) return 'ENH';
-  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH';
-  if ((p === '30%' || p === '45%' || p === '60%') && cig === 'CIG0') return 'ENH';
-
-  // MDT
-  if (p === '15%' && (cig === 'CIG2' || cig === 'CIG3')) return 'MDT';
-  if ((p === '30%' || p === '45%') && cig === 'CIG1') return 'MDT';
-
-  // HIGH
-  if ((p === '30%' || p === '45%') && (cig === 'CIG2' || cig === 'CIG3')) return 'HIGH';
-  if (p === '60%' && (cig === 'CIG1' || cig === 'CIG2' || cig === 'CIG3')) return 'HIGH';
-
-  // Fallback for combinations not listed (usually lower or invalid)
-  // Assuming default behavior or legacy mapping if strict matching fails?
-  // Let's stick strictly to the prompt. If not matched, maybe TSTM?
-  // But wait, 2% is minimum for Tornado.
-  
-  // Safety fallbacks for legacy codes (e.g. # sig)
-  // If probability has # (legacy), we assume CIG1/Significant equivalent?
-  // But the prompt wants precise mapping.
-  
-  return 'TSTM';
+export function tornadoToCategorical(probability: TornadoProbability): CategoricalRiskLevel {
+  return getRiskFromMapping(TORNADO_MAPPING, probability);
 }
 
 /**
  * Convert wind probability to categorical risk level
+ * @param probability Wind probability
+ * @returns Categorical risk level
  */
-export function windToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
-  const p = probability.replace(/[#]/g, '%') as WindProbability;
-
-  // MRGL
-  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
-
-  // SLGT
-  if (p === '5%' && cig === 'CIG2') return 'SLGT';
-  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
-  if (p === '30%' && cig === 'CIG0') return 'SLGT';
-
-  // ENH
-  if (p === '15%' && cig === 'CIG2') return 'ENH';
-  if (p === '30%' && (cig === 'CIG1' || cig === 'CIG2')) return 'ENH';
-  if ((p === '45%' || p === '60%' || p === '75%' || p === '90%') && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH'; // Prompt says 45,60,75,90 CIG0 -> ENH. Table: "45%: CIG 0, 1". "60%: CIG 0". "75%: CIG 0". "90%: CIG 0".
-  // Correction from prompt:
-  // ENH: 45%: CIG 0, 1. 
-  // ENH: 60%: CIG 0.
-  // ENH: 75%: CIG 0.
-  // ENH: 90%: CIG 0.
-  if (p === '45%' && cig === 'CIG1') return 'ENH';
-  if (['45%', '60%', '75%', '90%'].includes(p) && cig === 'CIG0') return 'ENH';
-
-  // MDT
-  if (p === '45%' && cig === 'CIG2') return 'MDT';
-  if (['60%', '75%', '90%'].includes(p) && cig === 'CIG1') return 'MDT';
-
-  // HIGH
-  if (p === '45%' && cig === 'CIG3') return 'HIGH';
-  if (['60%', '75%', '90%'].includes(p) && (cig === 'CIG2' || cig === 'CIG3')) return 'HIGH';
-
-  return 'TSTM';
+export function windToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
+  return getRiskFromMapping(WIND_MAPPING, probability);
 }
 
 /**
  * Convert hail probability to categorical risk level
+ * @param probability Hail probability
+ * @returns Categorical risk level
  */
-export function hailToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
-  const p = probability.replace(/[#]/g, '%') as HailProbability;
-
-  // MRGL
-  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
-
-  // SLGT
-  if (p === '5%' && cig === 'CIG2') return 'SLGT';
-  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
-  if (p === '30%' && cig === 'CIG0') return 'SLGT';
-
-  // ENH
-  if (p === '15%' && cig === 'CIG2') return 'ENH';
-  if (p === '30%' && (cig === 'CIG1' || cig === 'CIG2')) return 'ENH';
-  if (p === '45%' && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH';
-  if (p === '60%' && cig === 'CIG0') return 'ENH';
-
-  // MDT
-  if (p === '45%' && cig === 'CIG2') return 'MDT';
-  if (p === '60%' && (cig === 'CIG1' || cig === 'CIG2')) return 'MDT';
-
-  // Hail doesn't seem to go to HIGH in the prompt provided?
-  // "MDT... 60%: CIG 1, 2".
-  // Prompt ends there for Hail. No HIGH listed.
-
-  return 'TSTM';
-}
-
-/**
- * Convert Day 3 Total Severe probability to categorical risk level
- * Day 3 uses a combined threat model, not separate tornado/wind/hail
- */
-export function totalSevereToCategorical(probability: string, cig: CIGLevel = 'CIG0'): CategoricalRiskLevel {
-  const p = probability.replace(/[#]/g, '%') as TotalSevereProbability;
-  
-  // Day 3 Categorical Conversion from prompt:
-  // MRGL: 5%: CIG 0, 1
-  if (p === '5%' && (cig === 'CIG0' || cig === 'CIG1')) return 'MRGL';
-  
-  // SLGT: 5%: CIG 2; 15%: CIG 0, 1; 30%: CIG 0
-  if (p === '5%' && cig === 'CIG2') return 'SLGT';
-  if (p === '15%' && (cig === 'CIG0' || cig === 'CIG1')) return 'SLGT';
-  if (p === '30%' && cig === 'CIG0') return 'SLGT';
-  
-  // ENH: 15%: CIG 2; 30%: CIG 1, 2; 45%: CIG 0, 1; 60%: CIG 0
-  if (p === '15%' && cig === 'CIG2') return 'ENH';
-  if (p === '30%' && (cig === 'CIG1' || cig === 'CIG2')) return 'ENH';
-  if (p === '45%' && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH';
-  if (p === '60%' && cig === 'CIG0') return 'ENH';
-  
-  // MDT: 45%: CIG 2; 60%: CIG 1, 2
-  if (p === '45%' && cig === 'CIG2') return 'MDT';
-  if (p === '60%' && (cig === 'CIG1' || cig === 'CIG2')) return 'MDT';
-  
-  // Note: Day 3 does not have HIGH risk level
-  
-  return 'TSTM';
+export function hailToCategorical(probability: WindHailProbability): CategoricalRiskLevel {
+  return getRiskFromMapping(HAIL_MAPPING, probability);
 }
 
 /**
@@ -298,8 +144,8 @@ export function isSignificantThreat(probability: string): boolean {
  */
 export function getHighestCategoricalRisk(
   tornadoProb?: TornadoProbability,
-  windProb?: WindProbability,
-  hailProb?: HailProbability
+  windProb?: WindHailProbability,
+  hailProb?: WindHailProbability
 ): CategoricalRiskLevel {
   const riskValues: { [key in CategoricalRiskLevel]: number } = {
     TSTM: 0,
@@ -322,42 +168,101 @@ export function getHighestCategoricalRisk(
   ), candidates[0]);
 }
 
+// Display Name Mapping
+const RISK_DISPLAY_NAMES: Record<CategoricalRiskLevel, string> = {
+  'TSTM': 'General Thunder (0/5)',
+  'MRGL': 'Marginal Risk (1/5)',
+  'SLGT': 'Slight Risk (2/5)',
+  'ENH': 'Enhanced Risk (3/5)',
+  'MDT': 'Moderate Risk (4/5)',
+  'HIGH': 'High Risk (5/5)'
+};
+
 /**
  * Gets the display name for a categorical risk level
  * @param risk The categorical risk level
  * @returns The display name with numerical rating
  */
 export function getCategoricalRiskDisplayName(risk: CategoricalRiskLevel): string {
-  switch (risk) {
-    case 'TSTM':
-      return 'General Thunder (0/5)';
-    case 'MRGL':
-      return 'Marginal Risk (1/5)';
-    case 'SLGT':
-      return 'Slight Risk (2/5)';
-    case 'ENH':
-      return 'Enhanced Risk (3/5)';
-    case 'MDT':
-      return 'Moderate Risk (4/5)';
-    case 'HIGH':
-      return 'High Risk (5/5)';
-    default:
-      return 'Unknown';
-  }
+  return RISK_DISPLAY_NAMES[risk] || 'Unknown';
 }
 
-/**
- * Gets the color for an outlook type and probability/risk level
- * @param outlookType The type of outlook (tornado, wind, hail, categorical, etc.)
- * @param probability The probability or risk level
- * @returns The hex color code
- */
-export function getOutlookColor(outlookType: string, probability: string): string {
-  if (outlookType in colorMappings) {
-    const typeColors = colorMappings[outlookType as keyof typeof colorMappings];
-    if (typeof typeColors === 'object' && probability in typeColors) {
-      return typeColors[probability as keyof typeof typeColors] || '#808080';
-    }
+// ---- Map Styling and Rendering Helpers ----
+
+export const RISK_ORDER: Record<string, number> = {
+  'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5
+};
+
+export const lookupColor = (outlookType: OutlookType, probability: string): string => {
+  // Use a map to handle the lookup to avoid complex switch statements
+  const colorMap: Record<OutlookType, Record<string, string>> = {
+    'categorical': colorMappings.categorical,
+    'tornado': colorMappings.tornado,
+    'wind': colorMappings.wind,
+    'hail': colorMappings.hail
+  };
+
+  const outlookColors = colorMap[outlookType];
+  if (!outlookColors) return '#FFFFFF';
+
+  return outlookColors[probability as keyof typeof outlookColors] || '#FFFFFF';
+};
+
+export const computeZIndex = (outlookType: OutlookType, probability: string): number => {
+  let baseZIndex = 400;
+  if (outlookType === 'categorical') {
+    baseZIndex += (RISK_ORDER[probability] || 0) * 10;
+  } else if (['tornado', 'wind', 'hail'].includes(outlookType)) {
+    baseZIndex += parseInt(probability) || 0;
   }
-  return '#808080'; // Default gray
-}
+
+  if (probability.includes('#')) baseZIndex += 5;
+  return baseZIndex;
+};
+
+export type FeatureStyle = PathOptions & {
+  className?: string;
+  zIndex?: number;
+  fillColor?: string;
+  fillOpacity?: number;
+};
+
+export const getFeatureStyle = (outlookType: OutlookType, probability: string): FeatureStyle => {
+  const color = lookupColor(outlookType, probability);
+  const significant = probability.includes('#');
+  const fillColor = significant ? 'url(#hatchPattern)' : color;
+  const fillOpacity = significant ? 1 : 0.6;
+  const zIndex = computeZIndex(outlookType, probability);
+
+  return {
+    color: significant ? 'transparent' : color,
+    weight: 2,
+    opacity: 1,
+    fillColor,
+    fillOpacity,
+    zIndex,
+    className: significant ? 'significant-threat-pattern' : undefined
+  };
+};
+
+export const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
+  return [...entries].sort((a, b) => {
+    const [probA, probB] = [a[0], b[0]];
+
+    if (probA === 'TSTM') return -1;
+    if (probB === 'TSTM') return 1;
+
+    const isSignificantA = probA.includes('#');
+    const isSignificantB = probB.includes('#');
+    if (isSignificantA !== isSignificantB) {
+      return isSignificantA ? 1 : -1;
+    }
+
+    if (RISK_ORDER[probA] !== undefined && RISK_ORDER[probB] !== undefined) {
+      return RISK_ORDER[probA] - RISK_ORDER[probB];
+    }
+
+    const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, ''));
+    return getPercentValue(probA) - getPercentValue(probB);
+  });
+};
