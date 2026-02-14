@@ -257,6 +257,22 @@ const captureContainer = async (
   return canvas.toDataURL('image/png');
 };
 
+const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
+  return new Promise((resolve) => {
+    let resolved = false;
+
+    const finish = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+
+    map.once('moveend', finish);
+    setTimeout(finish, timeout);
+  });
+};
+
 export const exportMapAsImage = async (
   map: L.Map,
   outlooks: OutlookData,
@@ -274,16 +290,16 @@ export const exportMapAsImage = async (
 
   try {
     const originalBounds = map.getBounds();
-    const originalZoom = map.getZoom();
     const container = map.getContainer();
     tempContainer = createTempContainer(container.clientWidth, container.clientHeight);
-    tempMap = createTempMap(tempContainer, originalBounds.getCenter(), originalZoom, map.options.crs || L.CRS.EPSG3857);
-    await addTilesAndWait(tempMap, map);
+    tempMap = createTempMap(tempContainer, map.getCenter(), map.getZoom(), map.options.crs || L.CRS.EPSG3857);
     tempMap.fitBounds(originalBounds, { animate: false, padding: [0, 0] });
     tempMap.invalidateSize({ animate: false });
+    await waitForMapSettle(tempMap);
+    await addTilesAndWait(tempMap, map);
     renderOutlooksToMap(tempMap, outlooks);
     // small pause to allow layers to render
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 300));
     if (includeLegendAndStatus) {
       cloneLegendAndStatusOverlays(map, tempContainer);
     }
