@@ -197,17 +197,18 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="fixed bottom-0 left-0 right-0 z-panel bg-background border-t border-border shadow-lg h-[200px]">
-        <div className="flex items-center justify-center gap-3 px-4 h-full">
+      <div className="fixed bottom-0 left-0 right-0 z-panel bg-background border-t border-border shadow-lg h-[200px] overflow-hidden">
+        <div className="h-full overflow-x-auto overflow-y-hidden">
+          <div className="flex items-center justify-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 h-full min-w-max">
           {/* Tools Section - Always Visible */}
-          <div className="flex flex-col gap-3 border-r border-border pr-4">
+          <div className="flex flex-col gap-2 lg:gap-3 border-r border-border pr-2 lg:pr-4">
             <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
                     variant="outline" 
                     size="icon"
-                    className="h-16 w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400"
+                    className="h-14 w-14 lg:h-16 lg:w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400"
                     onClick={onSave}
                     disabled={isSaved}
                   >
@@ -224,7 +225,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                   <Button 
                     variant="outline" 
                     size="icon"
-                    className="h-16 w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400"
+                    className="h-14 w-14 lg:h-16 lg:w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400"
                     onClick={handleLoadClick}
                   >
                     <Upload className="h-6 w-6" />
@@ -240,7 +241,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                   <Button 
                     variant="outline" 
                     size="icon"
-                    className="h-16 w-16 bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-700 dark:!bg-orange-500/20 dark:hover:!bg-orange-500/30 dark:border-orange-500/50 dark:text-orange-400"
+                    className="h-14 w-14 lg:h-16 lg:w-16 bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-700 dark:!bg-orange-500/20 dark:hover:!bg-orange-500/30 dark:border-orange-500/50 dark:text-orange-400"
                     onClick={initiateExport}
                   >
                     <ImageIcon className="h-6 w-6" />
@@ -258,7 +259,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                   <Button 
                     variant="outline" 
                     size="icon"
-                    className="h-16 w-16 bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-700 dark:!bg-cyan-500/20 dark:hover:!bg-cyan-500/30 dark:border-cyan-500/50 dark:text-cyan-400"
+                    className="h-14 w-14 lg:h-16 lg:w-16 bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-700 dark:!bg-cyan-500/20 dark:hover:!bg-cyan-500/30 dark:border-cyan-500/50 dark:text-cyan-400"
                     onClick={() => setShowHistoryModal(true)}
                   >
                     <History className="h-6 w-6" />
@@ -274,7 +275,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                   <Button 
                     variant="outline" 
                     size="icon"
-                    className="h-16 w-16 bg-teal-500/20 hover:bg-teal-500/30 border-teal-500/50 text-teal-700 dark:!bg-teal-500/20 dark:hover:!bg-teal-500/30 dark:border-teal-500/50 dark:text-teal-400"
+                    className="h-14 w-14 lg:h-16 lg:w-16 bg-teal-500/20 hover:bg-teal-500/30 border-teal-500/50 text-teal-700 dark:!bg-teal-500/20 dark:hover:!bg-teal-500/30 dark:border-teal-500/50 dark:text-teal-400"
                     onClick={() => setShowCopyModal(true)}
                   >
                     <Copy className="h-6 w-6" />
@@ -290,7 +291,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                   <Button 
                     variant="outline" 
                     size="icon"
-                    className="h-16 w-16 bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-700 dark:!bg-red-500/20 dark:hover:!bg-red-500/30 dark:border-red-500/50 dark:text-red-400"
+                    className="h-14 w-14 lg:h-16 lg:w-16 bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-700 dark:!bg-red-500/20 dark:hover:!bg-red-500/30 dark:border-red-500/50 dark:text-red-400"
                     onClick={() => setShowResetConfirm(true)}
                   >
                     <Trash2 className="h-6 w-6" />
@@ -304,7 +305,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
           </div>
 
           {/* Forecast Day Section - 2 Rows */}
-          <div className="border-r border-border pr-3">
+          <div className="border-r border-border pr-2 lg:pr-3">
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Cycle</span>
@@ -345,14 +346,14 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-[140px] w-10"
+                  className="h-[124px] lg:h-[140px] w-9 lg:w-10"
                   onClick={handlePrevDay}
                   disabled={currentDay === 1}
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </Button>
 
-                <div className="grid grid-cols-4 grid-rows-2 gap-2">
+                <div className="grid grid-cols-4 grid-rows-2 gap-1.5 lg:gap-2">
                   {DAYS.map((day) => {
                     const hasData = hasDataForDay(day);
                     const isActive = currentDay === day;
@@ -364,6 +365,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                             onClick={() => handleDayChange(day)}
                             className={cn(
                               'relative h-16 w-16 text-base font-semibold rounded-md transition-all',
+                              'lg:h-16 lg:w-16 h-14 w-14',
                               'hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring',
                               isActive
                                 ? 'bg-primary text-primary-foreground'
@@ -387,7 +389,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-[140px] w-10"
+                  className="h-[124px] lg:h-[140px] w-9 lg:w-10"
                   onClick={handleNextDay}
                   disabled={currentDay === 8}
                 >
@@ -398,7 +400,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
           </div>
 
           {/* Outlook Type Section */}
-          <div className="border-r border-border pr-4">
+          <div className="border-r border-border pr-2 lg:pr-4">
             <div className="flex flex-col gap-3">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Type
@@ -406,7 +408,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
               {/* Dynamic layout based on number of outlook types */}
               {availableTypes.length === 1 ? (
                 // Day 4-8: Single button fills entire space
-                <div className="h-[140px]">
+                <div className="h-[124px] lg:h-[140px]">
                   {availableTypes.map((type) => (
                     <Tooltip key={type}>
                       <TooltipTrigger asChild>
@@ -414,7 +416,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                           variant={activeOutlookType === type ? 'default' : 'secondary'}
                           size="sm"
                           className={cn(
-                            "h-full w-[110px] relative",
+                            "h-full w-[96px] lg:w-[110px] relative",
                             lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
                           )}
                           onClick={outlookTypeHandlers[type]}
@@ -436,7 +438,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                 </div>
               ) : availableTypes.length === 2 ? (
                 // Day 3: Stack vertically (Categorical on top, Total Severe on bottom)
-                <div className="flex flex-col gap-2 h-[140px]">
+                <div className="flex flex-col gap-2 h-[124px] lg:h-[140px]">
                   {availableTypes.map((type) => (
                     <Tooltip key={type}>
                       <TooltipTrigger asChild>
@@ -444,7 +446,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                           variant={activeOutlookType === type ? 'default' : 'secondary'}
                           size="sm"
                           className={cn(
-                            "h-[66px] w-[110px] relative",
+                            "h-[58px] lg:h-[66px] w-[96px] lg:w-[110px] relative",
                             lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
                           )}
                           onClick={outlookTypeHandlers[type]}
@@ -474,7 +476,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                           variant={activeOutlookType === type ? 'default' : 'secondary'}
                           size="sm"
                           className={cn(
-                            "h-16 w-[110px] relative",
+                            "h-14 lg:h-16 w-[96px] lg:w-[110px] relative",
                             lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
                           )}
                           onClick={outlookTypeHandlers[type]}
@@ -497,7 +499,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
           </div>
 
           {/* Probability Section - Flexible */}
-          <div className="flex-1 px-3">
+          <div className="flex-1 px-2 lg:px-3">
             <div className="flex flex-col gap-3">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {activeOutlookType === 'categorical' ? 'Risk' : 'Probability'}
@@ -554,15 +556,15 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
           </div>
 
           {/* Current Selection */}
-          <div className="border-l border-border pl-4">
+          <div className="border-l border-border pl-2 lg:pl-4">
             <div className="flex flex-col gap-3">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                 Current
               </label>
-              <div className="flex flex-col gap-1 justify-center" style={{ height: '140px' }}>
+              <div className="flex flex-col gap-1 justify-center" style={{ height: '124px' }}>
                 <div 
                   className={cn(
-                    "flex flex-col items-center justify-center px-4 py-2 rounded-lg w-[220px] h-[72px] transition-all",
+                    "flex flex-col items-center justify-center px-3 lg:px-4 py-2 rounded-lg w-[190px] lg:w-[220px] h-[64px] lg:h-[72px] transition-all",
                     isLowProb && "opacity-40 grayscale"
                   )}
                   style={{ backgroundColor: currentColor }}
@@ -609,6 +611,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>
