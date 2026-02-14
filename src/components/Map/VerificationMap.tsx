@@ -10,6 +10,7 @@ import { colorMappings } from '../../utils/outlookUtils';
 import { DayType } from '../../types/outlooks';
 import Legend from './Legend';
 import StormReportsLayer from './StormReportsLayer';
+import SolidLegacyBaseLayer from './SolidLegacyBaseLayer';
 import './ForecastMap.css';
 
 // Fix for Leaflet default icon issue in production
@@ -25,32 +26,55 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
+type TileMapStyle = {
+  name: string;
+  renderer: 'tile';
+  url: string;
+  attribution: string;
+};
+
+type SolidMapStyle = {
+  name: string;
+  renderer: 'solid';
+};
+
+type MapStyle = TileMapStyle | SolidMapStyle;
+
 // Map Styles Configuration
-const MAP_STYLES = [
+const MAP_STYLES: MapStyle[] = [
   {
     name: 'Standard',
+    renderer: 'tile',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   },
   {
     name: 'Light',
+    renderer: 'tile',
     url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   {
     name: 'Dark',
+    renderer: 'tile',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   {
     name: 'Satellite',
+    renderer: 'tile',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
   },
   {
     name: 'Terrain',
+    renderer: 'tile',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+  },
+  {
+    name: 'Solid (Legacy)',
+    renderer: 'solid'
   }
 ];
 
@@ -150,10 +174,14 @@ const VerificationMap = forwardRef<VerificationMapHandle, VerificationMapProps>(
         <LayersControl position="topright">
           {MAP_STYLES.map((style) => (
             <LayersControl.BaseLayer checked={style.name === defaultStyle} name={style.name} key={style.name}>
-              <TileLayer
-                attribution={style.attribution}
-                url={style.url}
-              />
+              {style.renderer === 'tile' ? (
+                <TileLayer
+                  attribution={style.attribution}
+                  url={style.url}
+                />
+              ) : (
+                <SolidLegacyBaseLayer />
+              )}
             </LayersControl.BaseLayer>
           ))}
         </LayersControl>
