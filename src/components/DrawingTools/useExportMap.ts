@@ -48,10 +48,15 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
       setIsExporting(true);
 
       // Generate the image with Redux store data
-      const dataUrl = await exportMapAsImage(map, outlooks, title || undefined);
+      const dataUrl = await exportMapAsImage(map, outlooks, {
+        title: title || undefined,
+        format: 'jpeg',
+        quality: 0.92,
+        includeLegendAndStatus: true
+      });
 
       // Download the image
-      const filename = `forecast-outlook-${getFormattedDate()}.png`;
+      const filename = `forecast-outlook-${getFormattedDate()}.jpg`;
       downloadDataUrl(dataUrl, filename);
       addToast('Forecast exported successfully!', 'success');
 

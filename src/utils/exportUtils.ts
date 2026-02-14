@@ -4,6 +4,15 @@ import html2canvas from 'html2canvas';
 import { OutlookData, OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
 
+export type ExportImageFormat = 'png' | 'jpeg';
+
+export interface ExportImageOptions {
+  title?: string;
+  format?: ExportImageFormat;
+  quality?: number;
+  includeLegendAndStatus?: boolean;
+}
+
 /**
  * Get the style for a feature based on outlook type and probability
  */
@@ -13,7 +22,9 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string): L.PathO
     categorical: colorMappings.categorical as Record<string, string>,
     tornado: colorMappings.tornado as Record<string, string>,
     wind: colorMappings.wind as Record<string, string>,
-    hail: colorMappings.wind as Record<string, string>
+    hail: colorMappings.hail as Record<string, string>,
+    totalSevere: colorMappings.totalSevere as Record<string, string>,
+    'day4-8': colorMappings['day4-8'] as Record<string, string>
   };
 
   const color = palettes[outlookType]?.[probability] ?? '#FFFFFF';
@@ -94,12 +105,56 @@ const createTempMap = (container: HTMLElement, center: L.LatLng, zoom: number, c
 };
 
 // Helper: add tiles to map and wait for load or timeout
-const addTilesAndWait = (mapInstance: L.Map, timeout = 2000): Promise<void> => {
+const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): Promise<void> => {
   return new Promise((resolve) => {
-    const layer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 18 });
-    let loaded = false;
-    layer.on('load', () => { if (!loaded) { loaded = true; resolve(); } });
-    setTimeout(() => { if (!loaded) { loaded = true; resolve(); } }, timeout);
+    let activeTileLayer: L.TileLayer | undefined;
+    sourceMap.eachLayer((layer) => {
+      if (!activeTileLayer && layer instanceof L.TileLayer) {
+        activeTileLayer = layer;
+      }
+    });
+    const tileUrl = activeTileLayer?.getTileUrl
+      ? (activeTileLayer as unknown as { _url?: string })._url
+      : undefined;
+    const attribution = (activeTileLayer?.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
+    const maxZoom = activeTileLayer?.options?.maxZoom ?? 19;
+
+    const layer = L.tileLayer(tileUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution,
+      maxZoom,
+      crossOrigin: 'anonymous'
+    });
+
+    let resolved = false;
+    let pendingTiles = 0;
+
+    const finish = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+
+    layer.on('tileloadstart', () => {
+      pendingTiles += 1;
+    });
+
+    layer.on('tileload', () => {
+      pendingTiles = Math.max(0, pendingTiles - 1);
+      if (pendingTiles === 0) {
+        finish();
+      }
+    });
+
+    layer.on('tileerror', () => {
+      pendingTiles = Math.max(0, pendingTiles - 1);
+      if (pendingTiles === 0) {
+        finish();
+      }
+    });
+
+    layer.on('load', finish);
+    setTimeout(finish, timeout);
     layer.addTo(mapInstance);
   });
 };
@@ -132,7 +187,7 @@ const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, Geo
 
 // Helper: render outlooks onto a map instance
 const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
-  const outlookOrder: OutlookType[] = ['categorical', 'tornado', 'wind', 'hail'];
+  const outlookOrder: OutlookType[] = ['categorical', 'tornado', 'wind', 'hail', 'totalSevere', 'day4-8'];
   outlookOrder.forEach((outlookType) => {
     const outlookMap = outlooks[outlookType];
     if (!outlookMap) return;
@@ -160,19 +215,62 @@ const addOverlays = (container: HTMLElement, title?: string) => {
   container.appendChild(footerDiv);
 };
 
+const cloneLegendAndStatusOverlays = (sourceMap: L.Map, exportContainer: HTMLElement) => {
+  const sourceContainer = sourceMap.getContainer();
+  const sourceRoot = sourceContainer.closest('.map-container, .forecast-map-container') || sourceContainer;
+  const overlaySelectors = ['.map-legend', '.gfc-status-overlay'];
+
+  overlaySelectors.forEach((selector) => {
+    const element = sourceRoot.querySelector(selector);
+    if (!element) {
+      return;
+    }
+
+    const clone = element.cloneNode(true) as HTMLElement;
+    clone.style.pointerEvents = 'none';
+    exportContainer.appendChild(clone);
+  });
+};
+
 // Helper: capture container to data URL
-const captureContainer = async (container: HTMLElement, width: number, height: number): Promise<string> => {
-  const canvas = await html2canvas(container, { useCORS: true, allowTaint: true, backgroundColor: '#fff', scale: 2, logging: false, width, height });
+const captureContainer = async (
+  container: HTMLElement,
+  width: number,
+  height: number,
+  format: ExportImageFormat,
+  quality: number
+): Promise<string> => {
+  const canvas = await html2canvas(container, {
+    useCORS: true,
+    allowTaint: false,
+    backgroundColor: '#ffffff',
+    scale: 2,
+    logging: false,
+    width,
+    height
+  });
+
+  if (format === 'jpeg') {
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
   return canvas.toDataURL('image/png');
 };
 
 export const exportMapAsImage = async (
   map: L.Map,
   outlooks: OutlookData,
-  title?: string
+  options: ExportImageOptions = {}
 ): Promise<string> => {
   let tempContainer: HTMLDivElement | null = null;
   let tempMap: L.Map | null = null;
+
+  const {
+    title,
+    format = 'png',
+    quality = 0.92,
+    includeLegendAndStatus = false
+  } = options;
 
   try {
     const originalBounds = map.getBounds();
@@ -180,14 +278,17 @@ export const exportMapAsImage = async (
     const container = map.getContainer();
     tempContainer = createTempContainer(container.clientWidth, container.clientHeight);
     tempMap = createTempMap(tempContainer, originalBounds.getCenter(), originalZoom, map.options.crs || L.CRS.EPSG3857);
-    await addTilesAndWait(tempMap);
+    await addTilesAndWait(tempMap, map);
     tempMap.fitBounds(originalBounds, { animate: false, padding: [0, 0] });
     tempMap.invalidateSize({ animate: false });
     renderOutlooksToMap(tempMap, outlooks);
     // small pause to allow layers to render
     await new Promise((r) => setTimeout(r, 800));
+    if (includeLegendAndStatus) {
+      cloneLegendAndStatusOverlays(map, tempContainer);
+    }
     addOverlays(tempContainer, title);
-    const dataUrl = await captureContainer(tempContainer, container.clientWidth, container.clientHeight);
+    const dataUrl = await captureContainer(tempContainer, container.clientWidth, container.clientHeight, format, quality);
     return dataUrl;
   } finally {
     try {
