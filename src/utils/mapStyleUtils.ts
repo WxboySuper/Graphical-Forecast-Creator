@@ -50,6 +50,10 @@ export const lookupColor = (outlookType: OutlookType, probability: string) => {
     case 'wind':
     case 'hail':
       return colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
+    case 'totalSevere':
+      return colorMappings.totalSevere[probability as keyof typeof colorMappings.totalSevere] || '#FFFFFF';
+    case 'day4-8':
+      return colorMappings['day4-8'][probability as keyof typeof colorMappings['day4-8']] || '#FFFFFF';
     default:
       return '#FFFFFF';
   }
