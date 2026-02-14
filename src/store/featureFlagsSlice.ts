@@ -17,7 +17,7 @@ export interface FeatureFlags {
 }
 
 const initialState: FeatureFlags = {
-  exportMapEnabled: false, // Disabled due to Leaflet coordinate system limitations - see issue #32 for future work (server-side rendering or library migration)
+  exportMapEnabled: true,
   tornadoOutlookEnabled: true,
   windOutlookEnabled: true,
   hailOutlookEnabled: true,
