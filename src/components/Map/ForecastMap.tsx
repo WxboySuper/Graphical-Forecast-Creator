@@ -333,7 +333,7 @@ const renderOutlookFeatures = (
   const handlerFactory = createFeatureHandlersFactory(context);
 
   return Object.keys(outlooks).flatMap(outlookType => {
-    const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical'];
+    const validOutlookTypes = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
     if (!validOutlookTypes.includes(outlookType)) return [];
 
     const ot = outlookType as OutlookType;
