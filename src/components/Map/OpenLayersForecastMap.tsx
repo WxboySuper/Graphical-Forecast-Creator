@@ -54,7 +54,47 @@ const toRgbaColor = (color: string, alpha: number): string => {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 };
 
-const toOlStyle = (outlookType: string, probability: string) => {
+// Create canvas pattern for CIG hatching
+const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
+  const canvas = document.createElement('canvas');
+  const size = 10;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) return null;
+  
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1;
+  
+  if (cigLevel === 'CIG1') {
+    // Broken diagonal lines
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(3, 3);
+    ctx.moveTo(5, 5);
+    ctx.lineTo(10, 10);
+    ctx.stroke();
+  } else if (cigLevel === 'CIG2') {
+    // Solid diagonal
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(size, size);
+    ctx.stroke();
+  } else if (cigLevel === 'CIG3') {
+    // Crosshatch
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(size, size);
+    ctx.moveTo(0, size);
+    ctx.lineTo(size, 0);
+    ctx.stroke();
+  }
+  
+  return ctx.createPattern(canvas, 'repeat');
+};
+
+const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean = false) => {
   const style = getFeatureStyle(outlookType as any, probability);
   const fillColor = style.fillColor || '#ffffff';
   const fillOpacity = typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.25;
@@ -62,15 +102,27 @@ const toOlStyle = (outlookType: string, probability: string) => {
   const strokeColor = style.color || '#000000';
   const zIndex = computeZIndex(outlookType as any, probability);
 
+  // Handle CIG hatching patterns
+  let fill: Fill;
+  if (probability.startsWith('CIG')) {
+    const pattern = createHatchPattern(probability);
+    if (pattern) {
+      fill = new Fill({ color: pattern as any });
+    } else {
+      // Fallback to transparent
+      fill = new Fill({ color: 'rgba(0, 0, 0, 0)' });
+    }
+  } else {
+    fill = new Fill({
+      color: toRgbaColor(String(fillColor), fillOpacity)
+    });
+  }
+
   const olStyle = new Style({
-    fill: new Fill({
-      color: typeof fillColor === 'string' && fillColor.startsWith('url(')
-        ? toRgbaColor('#ffffff', fillOpacity)
-        : toRgbaColor(String(fillColor), fillOpacity)
-    }),
+    fill: fill,
     stroke: new Stroke({
       color: toRgbaColor(String(strokeColor), strokeOpacity),
-      width: style.weight || 2
+      width: isTopLayer ? 3 : (style.weight || 2)
     }),
     zIndex: zIndex
   });
@@ -381,15 +433,28 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     source.clear();
     const format = new GeoJSON();
 
+    // Find the maximum z-index for bold styling
+    let maxZIndex = -Infinity;
+    serializedFeatures.forEach(({ outlookType, probability }) => {
+      const zIndex = computeZIndex(outlookType as any, probability);
+      if (zIndex > maxZIndex) {
+        maxZIndex = zIndex;
+      }
+    });
+
     serializedFeatures.forEach(({ outlookType, probability, feature }) => {
       const olFeature = format.readFeature(feature, {
         dataProjection: 'EPSG:4326',
         featureProjection: 'EPSG:3857'
       });
+      
+      const zIndex = computeZIndex(outlookType as any, probability);
+      const isTopLayer = zIndex === maxZIndex;
+      
       if (Array.isArray(olFeature)) {
         olFeature.forEach((item: FeatureLike) => {
           if ('setStyle' in item && typeof item.setStyle === 'function') {
-            item.setStyle(toOlStyle(outlookType, probability));
+            item.setStyle(toOlStyle(outlookType, probability, isTopLayer));
           }
           if ('set' in item && typeof item.set === 'function') {
             item.set('featureId', feature.id as string);
@@ -402,7 +467,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         return;
       }
 
-      olFeature.setStyle(toOlStyle(outlookType, probability));
+      olFeature.setStyle(toOlStyle(outlookType, probability, isTopLayer));
       olFeature.set('featureId', feature.id as string);
       olFeature.set('outlookType', outlookType);
       olFeature.set('probability', probability);
