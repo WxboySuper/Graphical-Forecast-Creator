@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
@@ -14,6 +14,7 @@ import { fromLonLat, toLonLat } from 'ol/proj';
 import type { FeatureLike } from 'ol/Feature';
 import { click } from 'ol/events/condition';
 import { v4 as uuidv4 } from 'uuid';
+import { cn } from '../../lib/utils';
 import { RootState } from '../../store';
 import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
 import { getFeatureStyle } from '../../utils/mapStyleUtils';
@@ -35,6 +36,7 @@ const toOlStyle = (outlookType: string, probability: string) => {
 
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const dispatch = useDispatch();
+  const [interactionMode, setInteractionMode] = useState<'draw' | 'delete'>('draw');
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
@@ -159,6 +161,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     modifyRef.current = modify;
 
     const select = new Select({ condition: click });
+    select.setActive(false);
     select.on('select', (event) => {
       const selected = event.selected[0];
       if (!selected) {
@@ -198,6 +201,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   }, [dispatch]);
 
   useEffect(() => {
+    if (!selectRef.current) {
+      return;
+    }
+
+    selectRef.current.setActive(interactionMode === 'delete');
+    if (interactionMode === 'draw') {
+      selectRef.current.getFeatures().clear();
+    }
+  }, [interactionMode]);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -230,6 +244,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       drawRef.current = null;
     }
 
+    if (interactionMode !== 'draw') {
+      return;
+    }
+
     if (drawingState.activeOutlookType === 'categorical' || drawingState.activeOutlookType === 'tornado' || drawingState.activeOutlookType === 'wind' || drawingState.activeOutlookType === 'hail' || drawingState.activeOutlookType === 'totalSevere' || drawingState.activeOutlookType === 'day4-8') {
       const draw = new Draw({ source: vectorSourceRef.current, type: 'Polygon' });
       draw.on('drawend', (event) => {
@@ -258,7 +276,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       map.addInteraction(draw);
       drawRef.current = draw;
     }
-  }, [dispatch, drawingState.activeOutlookType, drawingState.activeProbability, drawingState.isSignificant]);
+  }, [dispatch, drawingState.activeOutlookType, drawingState.activeProbability, drawingState.isSignificant, interactionMode]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;
@@ -298,6 +316,39 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   return (
     <div className="map-container">
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
+      <div className="absolute top-3 right-3 z-[850] flex flex-col gap-2">
+        <div className="flex items-center rounded-md border border-border bg-background/95 p-1 shadow-md">
+          <button
+            type="button"
+            onClick={() => setInteractionMode('draw')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-semibold rounded transition-colors',
+              interactionMode === 'draw'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            )}
+          >
+            Draw
+          </button>
+          <button
+            type="button"
+            onClick={() => setInteractionMode('delete')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-semibold rounded transition-colors',
+              interactionMode === 'delete'
+                ? 'bg-destructive text-destructive-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            )}
+          >
+            Delete
+          </button>
+        </div>
+        <div className="max-w-[240px] rounded-md border border-border bg-background/95 px-3 py-2 text-xs text-foreground shadow-md">
+          {interactionMode === 'draw'
+            ? 'Draw mode: click to place points and double-click to finish polygon.'
+            : 'Delete mode: click any polygon to remove it.'}
+        </div>
+      </div>
       <Legend />
       <StatusOverlay />
     </div>
