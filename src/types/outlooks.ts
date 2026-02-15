@@ -1,4 +1,4 @@
-import { GeoJSON } from 'leaflet';
+import type { Feature } from 'geojson';
 
 /**
  * Defines the types for the Storm Prediction Center's severe weather outlook system
@@ -88,7 +88,7 @@ export type Probability = TornadoProbability | WindProbability | HailProbability
 
 export type Hazard = OutlookType;
 
-export interface RiskArea extends GeoJSON.Feature {
+export interface RiskArea extends Feature {
   properties: {
     outlookType: OutlookType;
     probability: Probability;
@@ -111,18 +111,18 @@ export interface Outlook {
 // Day 4-8: day4-8 only
 export interface OutlookData {
   // Day 1 & 2 fields
-  tornado?: Map<string, GeoJSON.Feature[]>;
-  wind?: Map<string, GeoJSON.Feature[]>;
-  hail?: Map<string, GeoJSON.Feature[]>;
+  tornado?: Map<string, Feature[]>;
+  wind?: Map<string, Feature[]>;
+  hail?: Map<string, Feature[]>;
   
   // Day 3 field
-  totalSevere?: Map<string, GeoJSON.Feature[]>;
+  totalSevere?: Map<string, Feature[]>;
   
   // Day 1, 2, 3 field (with categorical conversion)
-  categorical?: Map<string, GeoJSON.Feature[]>;
+  categorical?: Map<string, Feature[]>;
   
   // Day 4-8 field (15% and 30% only, no categorical)
-  'day4-8'?: Map<string, GeoJSON.Feature[]>;
+  'day4-8'?: Map<string, Feature[]>;
 }
 
 // Color mappings for the different outlook types
@@ -146,12 +146,12 @@ export interface DrawingState {
 
 // Serialization types for JSON storage
 export interface SerializedOutlookData {
-  tornado?: [string, GeoJSON.Feature[]][];
-  wind?: [string, GeoJSON.Feature[]][];
-  hail?: [string, GeoJSON.Feature[]][];
-  totalSevere?: [string, GeoJSON.Feature[]][];
-  'day4-8'?: [string, GeoJSON.Feature[]][];
-  categorical?: [string, GeoJSON.Feature[]][];
+  tornado?: [string, Feature[]][];
+  wind?: [string, Feature[]][];
+  hail?: [string, Feature[]][];
+  totalSevere?: [string, Feature[]][];
+  'day4-8'?: [string, Feature[]][];
+  categorical?: [string, Feature[]][];
 }
 
 // Forecast Cycle Types

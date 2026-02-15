@@ -1,7 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
-import { GeoJSON } from 'leaflet';
+import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
 
 export interface SavedCycle {
@@ -80,11 +80,11 @@ const initialState: ForecastState = {
 };
 
 // Helpers to keep reducers small and testable
-const computeOutlookType = (feature: GeoJSON.Feature, state: ForecastState): OutlookType => {
+const computeOutlookType = (feature: Feature, state: ForecastState): OutlookType => {
   return (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
 };
 
-const computeProbability = (feature: GeoJSON.Feature, state: ForecastState): string => {
+const computeProbability = (feature: Feature, state: ForecastState): string => {
   const fallback = state.drawingState.activeProbability;
   const base = (feature.properties?.probability ?? fallback) as string;
   const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
@@ -104,11 +104,11 @@ const computeProbability = (feature: GeoJSON.Feature, state: ForecastState): str
 };
 
 const buildFeatureWithProps = (
-  feature: GeoJSON.Feature,
+  feature: Feature,
   outlookType: OutlookType,
   probability: string,
   isSignificant: boolean
-): GeoJSON.Feature => {
+): Feature => {
   return {
     ...feature,
     properties: {
@@ -119,7 +119,7 @@ const buildFeatureWithProps = (
       derivedFrom: feature.properties?.derivedFrom || outlookType,
       originalProbability: feature.properties?.originalProbability || probability
     }
-  } as GeoJSON.Feature;
+  } as Feature;
 };
 
 // Helper to get current outlook data safely
@@ -188,7 +188,7 @@ export const forecastSlice = createSlice({
       state.drawingState.isSignificant = false;
     },
 
-    addFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
+    addFeature: (state, action: PayloadAction<{ feature: Feature }>) => {
       const feature = action.payload.feature;
       const outlookType = computeOutlookType(feature, state);
       const probability = computeProbability(feature, state);
@@ -225,7 +225,7 @@ export const forecastSlice = createSlice({
       state.isSaved = false;
     },
     
-    updateFeature: (state, action: PayloadAction<{ feature: GeoJSON.Feature }>) => {
+    updateFeature: (state, action: PayloadAction<{ feature: Feature }>) => {
       const feature = action.payload.feature;
       const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
       const probability = (feature.properties?.probability as string) || state.drawingState.activeProbability;
@@ -302,7 +302,7 @@ export const forecastSlice = createSlice({
 
     setOutlookMap: (state, action: PayloadAction<{ 
       outlookType: OutlookType, 
-      map: Map<string, GeoJSON.Feature[]> 
+      map: Map<string, Feature[]> 
     }>) => {
       const { outlookType, map } = action.payload;
       const outlookData = getCurrentOutlook(state);
