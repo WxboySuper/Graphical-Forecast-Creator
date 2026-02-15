@@ -11,12 +11,13 @@ import GeoJSON from 'ol/format/GeoJSON';
 import { Draw, Modify, Select } from 'ol/interaction';
 import { Fill, Stroke, Style } from 'ol/style';
 import { fromLonLat, toLonLat } from 'ol/proj';
+import Overlay from 'ol/Overlay';
 import type { FeatureLike } from 'ol/Feature';
 import { click } from 'ol/events/condition';
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from '../../store';
 import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
-import { getFeatureStyle } from '../../utils/mapStyleUtils';
+import { getFeatureStyle, computeZIndex } from '../../utils/mapStyleUtils';
 import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature, GeoJsonProperties, Polygon } from 'geojson';
 import Legend from './Legend';
@@ -59,8 +60,9 @@ const toOlStyle = (outlookType: string, probability: string) => {
   const fillOpacity = typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.25;
   const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
   const strokeColor = style.color || '#000000';
+  const zIndex = computeZIndex(outlookType as any, probability);
 
-  return new Style({
+  const olStyle = new Style({
     fill: new Fill({
       color: typeof fillColor === 'string' && fillColor.startsWith('url(')
         ? toRgbaColor('#ffffff', fillOpacity)
@@ -69,18 +71,29 @@ const toOlStyle = (outlookType: string, probability: string) => {
     stroke: new Stroke({
       color: toRgbaColor(String(strokeColor), strokeOpacity),
       width: style.weight || 2
-    })
+    }),
+    zIndex: zIndex
   });
+  
+  return olStyle;
 };
 
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const dispatch = useDispatch();
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
+  const [popupInfo, setPopupInfo] = useState<{ outlookType: string; probability: string; isSignificant: boolean } | null>(null);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
   const initialMapViewRef = useRef(currentMapView);
   const currentMapViewRef = useRef(currentMapView);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<Overlay | null>(null);
+  const interactionModeRef = useRef(interactionMode);
+
+  useEffect(() => {
+    interactionModeRef.current = interactionMode;
+  }, [interactionMode]);
 
   useEffect(() => {
     currentMapViewRef.current = currentMapView;
@@ -164,6 +177,40 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     });
 
     mapRef.current = map;
+
+    // Create popup overlay
+    if (popupRef.current) {
+      const overlay = new Overlay({
+        element: popupRef.current,
+        autoPan: {
+          animation: {
+            duration: 250,
+          },
+        },
+      });
+      map.addOverlay(overlay);
+      overlayRef.current = overlay;
+    }
+
+    // Add click handler for pan mode
+    map.on('click', (evt) => {
+      if (interactionModeRef.current !== 'pan') {
+        return;
+      }
+
+      const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f);
+      if (feature && overlayRef.current) {
+        const outlookType = feature.get('outlookType') as string;
+        const probability = feature.get('probability') as string;
+        const isSignificant = feature.get('isSignificant') as boolean;
+        
+        setPopupInfo({ outlookType, probability, isSignificant });
+        overlayRef.current.setPosition(evt.coordinate);
+      } else if (overlayRef.current) {
+        overlayRef.current.setPosition(undefined);
+        setPopupInfo(null);
+      }
+    });
 
     const modify = new Modify({ source: vectorSourceRef.current });
     modify.on('modifyend', (event) => {
@@ -251,6 +298,14 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     selectRef.current.setActive(interactionMode === 'delete');
     if (interactionMode !== 'delete') {
       selectRef.current.getFeatures().clear();
+    }
+
+    // Hide popup when not in pan mode
+    if (interactionMode !== 'pan') {
+      if (overlayRef.current) {
+        overlayRef.current.setPosition(undefined);
+      }
+      setPopupInfo(null);
     }
   }, [interactionMode]);
 
@@ -359,6 +414,22 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   return (
     <div className="map-container">
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
+      <div
+        ref={popupRef}
+        className="ol-popup"
+        style={{
+          display: popupInfo ? 'block' : 'none',
+        }}
+      >
+        {popupInfo && (
+          <div className="ol-popup-content">
+            <div className="text-sm font-semibold capitalize">{popupInfo.outlookType}</div>
+            <div className="text-xs">
+              {popupInfo.probability}{popupInfo.isSignificant ? ' (Significant)' : ''}
+            </div>
+          </div>
+        )}
+      </div>
       <div className="map-toolbar-bottom-right">
         <div className="flex items-center gap-1 rounded-md bg-white dark:bg-gray-800 p-1 shadow-md border border-gray-300 dark:border-gray-600">
           <button
@@ -392,7 +463,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         <div className="max-w-[260px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-md">
           {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}
           {interactionMode === 'delete' && 'Delete mode: click any polygon to remove it.'}
-          {interactionMode === 'pan' && 'Pan mode: drag map to move, use scroll wheel to zoom.'}
+          {interactionMode === 'pan' && 'Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.'}
         </div>
       </div>
       <Legend />
