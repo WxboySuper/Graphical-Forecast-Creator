@@ -137,7 +137,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           return;
         }
 
-        const geoJsonGeometry = format.writeGeometryObject(geometry);
+        const geoJsonGeometry = format.writeGeometryObject(geometry, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857'
+        });
         const updatedFeature: GeoJsonFeature = {
           type: 'Feature',
           id: featureId,
@@ -236,7 +239,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           return;
         }
 
-        const geometry = format.writeGeometryObject(olGeometry);
+        const geometry = format.writeGeometryObject(olGeometry, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857'
+        });
         const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
           type: 'Feature',
           id: uuidv4(),
