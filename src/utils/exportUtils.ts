@@ -204,12 +204,13 @@ const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
 
 // Helper: add title/footer overlays
 const addOverlays = (container: HTMLElement, title?: string) => {
+  const doc = container.ownerDocument;
   if (title) {
-    const titleDiv = document.createElement('div');
+    const titleDiv = doc.createElement('div');
     titleDiv.style.cssText = 'position:absolute;top:20px;left:20px;z-index:1000;background-color:rgba(255,255,255,0.9);padding:10px 20px;border-radius:4px;font-weight:bold;font-size:18px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
     titleDiv.textContent = title;    container.appendChild(titleDiv);
   }
-  const footerDiv = document.createElement('div');
+  const footerDiv = doc.createElement('div');
   footerDiv.style.cssText = 'position:absolute;bottom:20px;right:20px;z-index:1000;background-color:rgba(255,255,255,0.9);padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
   footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
   container.appendChild(footerDiv);
@@ -238,8 +239,12 @@ const captureContainer = async (
   width: number,
   height: number,
   format: ExportImageFormat,
-  quality: number
+  quality: number,
+  onClone?: (clonedContainer: HTMLElement) => void
 ): Promise<string> => {
+  const captureId = `gfc-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  container.setAttribute('data-gfc-export-capture-id', captureId);
+
   const canvas = await html2canvas(container, {
     useCORS: true,
     allowTaint: false,
@@ -247,8 +252,16 @@ const captureContainer = async (
     scale: 2,
     logging: false,
     width,
-    height
+    height,
+    onclone: (clonedDocument) => {
+      const clonedContainer = clonedDocument.querySelector(`[data-gfc-export-capture-id="${captureId}"]`) as HTMLElement | null;
+      if (clonedContainer && onClone) {
+        onClone(clonedContainer);
+      }
+    }
   });
+
+  container.removeAttribute('data-gfc-export-capture-id');
 
   if (format === 'jpeg') {
     return canvas.toDataURL('image/jpeg', quality);
@@ -273,10 +286,52 @@ const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   });
 };
 
-export const exportMapAsImage = async (
+const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
+  selectors.forEach((selector) => {
+    root.querySelectorAll(selector).forEach((el) => {
+      (el as HTMLElement).style.display = 'none';
+    });
+  });
+};
+
+const exportLiveMapAsImage = async (
+  map: L.Map,
+  options: ExportImageOptions
+): Promise<string> => {
+  const {
+    title,
+    format = 'png',
+    quality = 0.92,
+    includeLegendAndStatus = false
+  } = options;
+
+  const mapContainer = map.getContainer();
+  const exportRoot = (mapContainer.closest('.map-container, .forecast-map-container') as HTMLElement | null) || mapContainer;
+  const width = exportRoot.clientWidth;
+  const height = exportRoot.clientHeight;
+
+  await waitForMapSettle(map, 400);
+
+  return captureContainer(exportRoot, width, height, format, quality, (clonedRoot) => {
+    hideElementsInClone(clonedRoot, [
+      '.leaflet-control-container',
+      '.map-toolbar-bottom-right',
+      '.leaflet-pm-toolbar-container',
+      '.leaflet-pm-actions-container'
+    ]);
+
+    if (!includeLegendAndStatus) {
+      hideElementsInClone(clonedRoot, ['.map-legend', '.gfc-status-overlay']);
+    }
+
+    addOverlays(clonedRoot, title);
+  });
+};
+
+const exportViaTempMapAsImage = async (
   map: L.Map,
   outlooks: OutlookData,
-  options: ExportImageOptions = {}
+  options: ExportImageOptions
 ): Promise<string> => {
   let tempContainer: HTMLDivElement | null = null;
   let tempMap: L.Map | null = null;
@@ -298,14 +353,12 @@ export const exportMapAsImage = async (
     await waitForMapSettle(tempMap);
     await addTilesAndWait(tempMap, map);
     renderOutlooksToMap(tempMap, outlooks);
-    // small pause to allow layers to render
     await new Promise((r) => setTimeout(r, 300));
     if (includeLegendAndStatus) {
       cloneLegendAndStatusOverlays(map, tempContainer);
     }
     addOverlays(tempContainer, title);
-    const dataUrl = await captureContainer(tempContainer, container.clientWidth, container.clientHeight, format, quality);
-    return dataUrl;
+    return captureContainer(tempContainer, container.clientWidth, container.clientHeight, format, quality);
   } finally {
     try {
       if (tempContainer?.parentNode) {
@@ -322,6 +375,18 @@ export const exportMapAsImage = async (
     } catch {
       // ignore cleanup errors
     }
+  }
+};
+
+export const exportMapAsImage = async (
+  map: L.Map,
+  outlooks: OutlookData,
+  options: ExportImageOptions = {}
+): Promise<string> => {
+  try {
+    return await exportLiveMapAsImage(map, options);
+  } catch {
+    return exportViaTempMapAsImage(map, outlooks, options);
   }
 };
 
