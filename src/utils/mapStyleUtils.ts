@@ -96,11 +96,11 @@ export const getFeatureStyle = (outlookType: OutlookType, probability: string): 
 
   const color = lookupColor(outlookType, probability);
   return {
-    color: color,
+    color: '#000000',
     weight: 2,
     opacity: 1,
     fillColor: color,
-    fillOpacity: 0.2,
+    fillOpacity: 0.35,
     zIndex: computeZIndex(outlookType, probability)
   };
 };

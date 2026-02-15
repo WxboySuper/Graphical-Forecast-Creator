@@ -14,7 +14,6 @@ import { fromLonLat, toLonLat } from 'ol/proj';
 import type { FeatureLike } from 'ol/Feature';
 import { click } from 'ol/events/condition';
 import { v4 as uuidv4 } from 'uuid';
-import { cn } from '../../lib/utils';
 import { RootState } from '../../store';
 import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
 import { getFeatureStyle } from '../../utils/mapStyleUtils';
@@ -26,17 +25,57 @@ import './ForecastMap.css';
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
 
+const toRgbaColor = (color: string, alpha: number): string => {
+  if (!color) {
+    return `rgba(255, 255, 255, ${alpha})`;
+  }
+
+  if (color.startsWith('rgba(') || color.startsWith('hsla(')) {
+    return color;
+  }
+
+  if (color.startsWith('rgb(') || color.startsWith('hsl(')) {
+    return color;
+  }
+
+  const hex = color.replace('#', '');
+  const normalized = hex.length === 3
+    ? hex.split('').map((char) => `${char}${char}`).join('')
+    : hex;
+
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return color;
+  }
+
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
+
 const toOlStyle = (outlookType: string, probability: string) => {
   const style = getFeatureStyle(outlookType as any, probability);
+  const fillColor = style.fillColor || '#ffffff';
+  const fillOpacity = typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.3;
+  const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
+  const strokeColor = style.color || '#000000';
+
   return new Style({
-    fill: new Fill({ color: style.fillColor || 'rgba(255,255,255,0.4)' }),
-    stroke: new Stroke({ color: style.color || '#000', width: style.weight || 2 })
+    fill: new Fill({
+      color: typeof fillColor === 'string' && fillColor.startsWith('url(')
+        ? toRgbaColor('#ffffff', fillOpacity)
+        : toRgbaColor(String(fillColor), fillOpacity)
+    }),
+    stroke: new Stroke({
+      color: toRgbaColor(String(strokeColor), strokeOpacity),
+      width: style.weight || 2
+    })
   });
 };
 
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const dispatch = useDispatch();
-  const [interactionMode, setInteractionMode] = useState<'draw' | 'delete'>('draw');
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
@@ -58,6 +97,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const serializedFeatures = useMemo(() => {
     const items: Array<{ outlookType: string; probability: string; feature: GeoJsonFeature }> = [];
     Object.entries(outlooks).forEach(([outlookType, probs]) => {
+      if (outlookType !== drawingState.activeOutlookType) {
+        return;
+      }
+
       if (!(probs instanceof Map)) return;
       probs.forEach((features: GeoJsonFeature[], probability: string) => {
         features.forEach((feature: GeoJsonFeature) => {
@@ -66,7 +109,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       });
     });
     return items;
-  }, [outlooks]);
+  }, [outlooks, drawingState.activeOutlookType]);
 
   useImperativeHandle(ref, () => ({
     getMap: () => mapRef.current,
@@ -206,7 +249,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     }
 
     selectRef.current.setActive(interactionMode === 'delete');
-    if (interactionMode === 'draw') {
+    if (interactionMode !== 'delete') {
       selectRef.current.getFeatures().clear();
     }
   }, [interactionMode]);
@@ -316,37 +359,40 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   return (
     <div className="map-container">
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
-      <div className="absolute top-3 right-3 z-[850] flex flex-col gap-2">
-        <div className="flex items-center rounded-md border border-border bg-background/95 p-1 shadow-md">
+      <div className="map-toolbar-bottom-right">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className={`map-toolbar-button mode-pan ${interactionMode === 'pan' ? 'active' : ''}`}
+            onClick={() => setInteractionMode('pan')}
+            title="Pan map"
+            aria-label="Pan map"
+          >
+            Pan
+          </button>
           <button
             type="button"
             onClick={() => setInteractionMode('draw')}
-            className={cn(
-              'px-3 py-1.5 text-xs font-semibold rounded transition-colors',
-              interactionMode === 'draw'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            )}
+            className={`map-toolbar-button mode-draw ${interactionMode === 'draw' ? 'active' : ''}`}
+            title="Draw polygons"
+            aria-label="Draw polygons"
           >
             Draw
           </button>
           <button
             type="button"
             onClick={() => setInteractionMode('delete')}
-            className={cn(
-              'px-3 py-1.5 text-xs font-semibold rounded transition-colors',
-              interactionMode === 'delete'
-                ? 'bg-destructive text-destructive-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            )}
+            className={`map-toolbar-button mode-delete ${interactionMode === 'delete' ? 'active' : ''}`}
+            title="Delete polygons"
+            aria-label="Delete polygons"
           >
             Delete
           </button>
         </div>
-        <div className="max-w-[240px] rounded-md border border-border bg-background/95 px-3 py-2 text-xs text-foreground shadow-md">
-          {interactionMode === 'draw'
-            ? 'Draw mode: click to place points and double-click to finish polygon.'
-            : 'Delete mode: click any polygon to remove it.'}
+        <div className="max-w-[260px] rounded-md border border-border bg-background/95 px-3 py-2 text-xs text-foreground shadow-md">
+          {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}
+          {interactionMode === 'delete' && 'Delete mode: click any polygon to remove it.'}
+          {interactionMode === 'pan' && 'Pan mode: drag map to move, use scroll wheel to zoom.'}
         </div>
       </div>
       <Legend />

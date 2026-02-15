@@ -205,12 +205,28 @@
 }
 
 .map-toolbar-button.active {
-  background-color: #ff4d4d;
+  background-color: #2563eb;
   color: white;
 }
 
 .map-toolbar-button.active:hover {
-  background-color: #ff3333;
+  background-color: #1d4ed8;
+}
+
+.map-toolbar-button.mode-delete.active {
+  background-color: #dc2626;
+}
+
+.map-toolbar-button.mode-delete.active:hover {
+  background-color: #b91c1c;
+}
+
+.map-toolbar-button.mode-draw.active {
+  background-color: #059669;
+}
+
+.map-toolbar-button.mode-draw.active:hover {
+  background-color: #047857;
 }
 
 /* Dark mode overrides */
