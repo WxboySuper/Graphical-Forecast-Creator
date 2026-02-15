@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
@@ -49,6 +50,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const mapRef = useRef<OLMap | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
+  const initialMapViewRef = useRef(mapView);
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
 
   const activeFeatures = useMemo(() => {
@@ -86,8 +88,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
         new VectorLayer({ source: vectorSourceRef.current })
       ],
       view: new View({
-        center: fromLonLat([mapView.center[1], mapView.center[0]]),
-        zoom: mapView.zoom
+        center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
+        zoom: initialMapViewRef.current.zoom
       })
     });
 
@@ -97,14 +99,25 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       map.setTarget(undefined);
       mapRef.current = null;
     };
-  }, [mapView.center, mapView.zoom]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const view = map.getView();
-    view.setCenter(fromLonLat([mapView.center[1], mapView.center[0]]));
+    const targetCenter = fromLonLat([mapView.center[1], mapView.center[0]]);
+    const currentCenter = view.getCenter();
+    const currentZoom = view.getZoom() || 4;
+
+    const centerChanged = !currentCenter || Math.abs(currentCenter[0] - targetCenter[0]) > 0.01 || Math.abs(currentCenter[1] - targetCenter[1]) > 0.01;
+    const zoomChanged = Math.abs(currentZoom - mapView.zoom) > 0.000001;
+
+    if (!centerChanged && !zoomChanged) {
+      return;
+    }
+
+    view.setCenter(targetCenter);
     view.setZoom(mapView.zoom);
   }, [mapView.center, mapView.zoom]);
 

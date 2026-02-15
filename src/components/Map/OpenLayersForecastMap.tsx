@@ -38,6 +38,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
+  const initialMapViewRef = useRef(currentMapView);
+  const currentMapViewRef = useRef(currentMapView);
+
+  useEffect(() => {
+    currentMapViewRef.current = currentMapView;
+  }, [currentMapView]);
 
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
@@ -45,6 +51,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
   const selectRef = useRef<Select | null>(null);
+  const isApplyingExternalViewRef = useRef(false);
 
   const serializedFeatures = useMemo(() => {
     const items: Array<{ outlookType: string; probability: string; feature: GeoJsonFeature }> = [];
@@ -84,17 +91,31 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       target: mapElementRef.current,
       layers: [tileLayer, vectorLayer],
       view: new View({
-        center: fromLonLat([currentMapView.center[1], currentMapView.center[0]]),
-        zoom: currentMapView.zoom
+        center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
+        zoom: initialMapViewRef.current.zoom
       })
     });
 
     map.on('moveend', () => {
+      if (isApplyingExternalViewRef.current) {
+        return;
+      }
+
       const view = map.getView();
       const center = view.getCenter();
       if (!center) return;
       const [lon, lat] = toLonLat(center);
-      dispatch(setMapView({ center: [lat, lon], zoom: view.getZoom() || 4 }));
+      const nextCenter: [number, number] = [lat, lon];
+      const nextZoom = view.getZoom() || 4;
+      const [stateLat, stateLon] = currentMapViewRef.current.center;
+      const stateZoom = currentMapViewRef.current.zoom;
+
+      const centerChanged = Math.abs(stateLat - nextCenter[0]) > 0.000001 || Math.abs(stateLon - nextCenter[1]) > 0.000001;
+      const zoomChanged = Math.abs(stateZoom - nextZoom) > 0.000001;
+
+      if (centerChanged || zoomChanged) {
+        dispatch(setMapView({ center: nextCenter, zoom: nextZoom }));
+      }
     });
 
     mapRef.current = map;
@@ -171,15 +192,30 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       map.setTarget(undefined);
       mapRef.current = null;
     };
-  }, [dispatch, currentMapView.center, currentMapView.zoom]);
+  }, [dispatch]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const view = map.getView();
-    view.setCenter(fromLonLat([currentMapView.center[1], currentMapView.center[0]]));
+    const targetCenter = fromLonLat([currentMapView.center[1], currentMapView.center[0]]);
+    const currentCenter = view.getCenter();
+    const currentZoom = view.getZoom() || 4;
+
+    const centerChanged = !currentCenter || Math.abs(currentCenter[0] - targetCenter[0]) > 0.01 || Math.abs(currentCenter[1] - targetCenter[1]) > 0.01;
+    const zoomChanged = Math.abs(currentZoom - currentMapView.zoom) > 0.000001;
+
+    if (!centerChanged && !zoomChanged) {
+      return;
+    }
+
+    isApplyingExternalViewRef.current = true;
+    view.setCenter(targetCenter);
     view.setZoom(currentMapView.zoom);
+    setTimeout(() => {
+      isApplyingExternalViewRef.current = false;
+    }, 0);
   }, [currentMapView.center, currentMapView.zoom]);
 
   useEffect(() => {
