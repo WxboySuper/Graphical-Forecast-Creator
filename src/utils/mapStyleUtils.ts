@@ -100,7 +100,7 @@ export const getFeatureStyle = (outlookType: OutlookType, probability: string): 
     weight: 2,
     opacity: 1,
     fillColor: color,
-    fillOpacity: 0.35,
+    fillOpacity: 0.3,
     zIndex: computeZIndex(outlookType, probability)
   };
 };

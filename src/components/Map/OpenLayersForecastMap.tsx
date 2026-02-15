@@ -56,7 +56,7 @@ const toRgbaColor = (color: string, alpha: number): string => {
 const toOlStyle = (outlookType: string, probability: string) => {
   const style = getFeatureStyle(outlookType as any, probability);
   const fillColor = style.fillColor || '#ffffff';
-  const fillOpacity = typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.3;
+  const fillOpacity = typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.25;
   const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
   const strokeColor = style.color || '#000000';
 
@@ -360,7 +360,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     <div className="map-container">
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
       <div className="map-toolbar-bottom-right">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 rounded-md bg-white dark:bg-gray-800 p-1 shadow-md border border-gray-300 dark:border-gray-600">
           <button
             type="button"
             className={`map-toolbar-button mode-pan ${interactionMode === 'pan' ? 'active' : ''}`}
@@ -389,7 +389,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
             Delete
           </button>
         </div>
-        <div className="max-w-[260px] rounded-md border border-border bg-background/95 px-3 py-2 text-xs text-foreground shadow-md">
+        <div className="max-w-[260px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-md">
           {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}
           {interactionMode === 'delete' && 'Delete mode: click any polygon to remove it.'}
           {interactionMode === 'pan' && 'Pan mode: drag map to move, use scroll wheel to zoom.'}
