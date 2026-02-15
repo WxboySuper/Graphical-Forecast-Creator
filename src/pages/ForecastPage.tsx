@@ -15,15 +15,13 @@ import {
   selectForecastCycle,
   setForecastDay,
 } from '../store/forecastSlice';
-import { OutlookType, Probability, OutlookData, DayType } from '../types/outlooks';
+import { OutlookType, Probability, DayType } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson } from '../utils/fileUtils';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from '../utils/featureFlagsUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useCycleHistoryPersistence } from '../utils/cycleHistoryPersistence';
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import type { AddToastFn } from '../components/Layout';
-import { featureGroup, geoJSON, Map as LeafletMap } from 'leaflet';
-import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -72,37 +70,16 @@ const EmergencyModeMessage: React.FC = () => (
   </div>
 );
 
-// Helper function to fit map to feature bounds
-const fitMapToFeatures = (map: LeafletMap, outlooks: OutlookData, dispatch: ReturnType<typeof useDispatch>) => {
-  const allFeatures = featureGroup();
-
-  for (const outlookMap of Object.values(outlooks)) {
-    for (const features of Array.from(outlookMap.values())) {
-      for (const feature of (features as Feature<Geometry, GeoJsonProperties>[])) {
-        geoJSON(feature).addTo(allFeatures);
-      }
-    }
-  }
-
-  if (allFeatures.getLayers().length > 0) {
-    const bounds = allFeatures.getBounds();
-    map.fitBounds(bounds, { padding: [50, 50] });
-
-    const center = map.getCenter();
-    dispatch(setMapView({
-      center: [center.lat, center.lng],
-      zoom: map.getZoom()
-    }));
-  }
-};
-
 const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
-  const map = ref.current?.getMap();
-  const center = map?.getCenter();
-  return {
-    center: (center ? [center.lat, center.lng] : [39.8283, -98.5795]) as [number, number],
-    zoom: map?.getZoom() || 4
-  };
+  const adapter = ref.current;
+  if (!adapter) {
+    return {
+      center: [39.8283, -98.5795] as [number, number],
+      zoom: 4
+    };
+  }
+
+  return adapter.getView();
 };
 
 export const ForecastPage: React.FC = () => {
@@ -204,7 +181,13 @@ export const ForecastPage: React.FC = () => {
       if (dataObj.mapView) {
         dispatch(setMapView(dataObj.mapView));
       } else if (map && currentDayData) {
-        fitMapToFeatures(map, currentDayData, dispatch);
+        const hasAnyFeatures = Object.values(currentDayData).some((outlookMap) => (outlookMap?.size || 0) > 0);
+        if (hasAnyFeatures) {
+          dispatch(setMapView({
+            center: [39.8283, -98.5795],
+            zoom: 4
+          }));
+        }
       }
       
       addToast('Forecast loaded successfully!', 'success');

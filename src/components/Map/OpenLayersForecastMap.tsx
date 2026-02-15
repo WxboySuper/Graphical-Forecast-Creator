@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
@@ -7,16 +8,19 @@ import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import OSM from 'ol/source/OSM';
 import GeoJSON from 'ol/format/GeoJSON';
-import { Draw } from 'ol/interaction';
+import { Draw, Modify, Select } from 'ol/interaction';
 import { Fill, Stroke, Style } from 'ol/style';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import type { FeatureLike } from 'ol/Feature';
+import { click } from 'ol/events/condition';
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from '../../store';
-import { addFeature, selectCurrentOutlooks, setMapView } from '../../store/forecastSlice';
+import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
 import { getFeatureStyle } from '../../utils/mapStyleUtils';
 import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature, GeoJsonProperties, Polygon } from 'geojson';
+import Legend from './Legend';
+import StatusOverlay from './StatusOverlay';
 import './ForecastMap.css';
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
@@ -39,6 +43,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const mapRef = useRef<OLMap | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
   const drawRef = useRef<Draw | null>(null);
+  const modifyRef = useRef<Modify | null>(null);
+  const selectRef = useRef<Select | null>(null);
 
   const serializedFeatures = useMemo(() => {
     const items: Array<{ outlookType: string; probability: string; feature: GeoJsonFeature }> = [];
@@ -93,11 +99,88 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
     mapRef.current = map;
 
+    const modify = new Modify({ source: vectorSourceRef.current });
+    modify.on('modifyend', (event) => {
+      const format = new GeoJSON();
+      event.features.forEach((feature) => {
+        const geometry = feature.getGeometry();
+        if (!geometry) {
+          return;
+        }
+
+        const featureId = feature.get('featureId') as string | undefined;
+        const outlookType = feature.get('outlookType') as string | undefined;
+        const probability = feature.get('probability') as string | undefined;
+
+        if (!featureId || !outlookType || !probability) {
+          return;
+        }
+
+        const geoJsonGeometry = format.writeGeometryObject(geometry);
+        const updatedFeature: GeoJsonFeature = {
+          type: 'Feature',
+          id: featureId,
+          geometry: geoJsonGeometry as Polygon,
+          properties: {
+            outlookType,
+            probability,
+            isSignificant: Boolean(feature.get('isSignificant'))
+          }
+        };
+
+        dispatch(updateFeature({ feature: updatedFeature }));
+      });
+    });
+    map.addInteraction(modify);
+    modifyRef.current = modify;
+
+    const select = new Select({ condition: click });
+    select.on('select', (event) => {
+      const selected = event.selected[0];
+      if (!selected) {
+        return;
+      }
+
+      const featureId = selected.get('featureId') as string | undefined;
+      const outlookType = selected.get('outlookType') as string | undefined;
+      const probability = selected.get('probability') as string | undefined;
+
+      if (featureId && outlookType && probability) {
+        dispatch(removeFeature({
+          outlookType: outlookType as any,
+          probability,
+          featureId
+        }));
+      }
+
+      select.getFeatures().clear();
+    });
+    map.addInteraction(select);
+    selectRef.current = select;
+
     return () => {
+      if (drawRef.current) {
+        map.removeInteraction(drawRef.current);
+      }
+      if (modifyRef.current) {
+        map.removeInteraction(modifyRef.current);
+      }
+      if (selectRef.current) {
+        map.removeInteraction(selectRef.current);
+      }
       map.setTarget(undefined);
       mapRef.current = null;
     };
   }, [dispatch, currentMapView.center, currentMapView.zoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const view = map.getView();
+    view.setCenter(fromLonLat([currentMapView.center[1], currentMapView.center[0]]));
+    view.setZoom(currentMapView.zoom);
+  }, [currentMapView.center, currentMapView.zoom]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -150,12 +233,22 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           if ('setStyle' in item && typeof item.setStyle === 'function') {
             item.setStyle(toOlStyle(outlookType, probability));
           }
+          if ('set' in item && typeof item.set === 'function') {
+            item.set('featureId', feature.id as string);
+            item.set('outlookType', outlookType);
+            item.set('probability', probability);
+            item.set('isSignificant', Boolean(feature.properties?.isSignificant));
+          }
           source.addFeature(item as any);
         });
         return;
       }
 
       olFeature.setStyle(toOlStyle(outlookType, probability));
+      olFeature.set('featureId', feature.id as string);
+      olFeature.set('outlookType', outlookType);
+      olFeature.set('probability', probability);
+      olFeature.set('isSignificant', Boolean(feature.properties?.isSignificant));
       source.addFeature(olFeature);
     });
   }, [serializedFeatures]);
@@ -163,6 +256,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   return (
     <div className="map-container">
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
+      <Legend />
+      <StatusOverlay />
     </div>
   );
 });

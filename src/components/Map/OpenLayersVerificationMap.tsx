@@ -15,6 +15,7 @@ import { colorMappings } from '../../utils/outlookUtils';
 import { DayType } from '../../types/outlooks';
 import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature } from 'geojson';
+import Legend from './Legend';
 import './ForecastMap.css';
 
 interface OpenLayersVerificationMapProps {
@@ -99,6 +100,15 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   }, [mapView.center, mapView.zoom]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const view = map.getView();
+    view.setCenter(fromLonLat([mapView.center[1], mapView.center[0]]));
+    view.setZoom(mapView.zoom);
+  }, [mapView.center, mapView.zoom]);
+
+  useEffect(() => {
     const source = vectorSourceRef.current;
     source.clear();
 
@@ -126,6 +136,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   return (
     <div className="forecast-map-container">
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
+      <Legend />
     </div>
   );
 });

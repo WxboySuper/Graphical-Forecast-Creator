@@ -4,6 +4,27 @@ import html2canvas from 'html2canvas';
 import { OutlookData, OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
 
+type ExportMapLike = {
+  getContainer?: () => HTMLElement;
+  getTargetElement?: () => HTMLElement;
+};
+
+const isLeafletMap = (map: unknown): map is L.Map => {
+  return Boolean(map && typeof (map as L.Map).getContainer === 'function' && typeof (map as L.Map).getBounds === 'function');
+};
+
+const getExportContainer = (map: ExportMapLike): HTMLElement | null => {
+  if (map.getContainer) {
+    return map.getContainer();
+  }
+
+  if (map.getTargetElement) {
+    return map.getTargetElement();
+  }
+
+  return null;
+};
+
 export type ExportImageFormat = 'png' | 'jpeg';
 
 export interface ExportImageOptions {
@@ -286,6 +307,15 @@ const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   });
 };
 
+const waitForMapSettleGeneric = async (map: unknown, timeout = 500): Promise<void> => {
+  if (isLeafletMap(map)) {
+    await waitForMapSettle(map, timeout);
+    return;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, timeout));
+};
+
 const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
   selectors.forEach((selector) => {
     root.querySelectorAll(selector).forEach((el) => {
@@ -295,7 +325,7 @@ const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
 };
 
 const exportLiveMapAsImage = async (
-  map: L.Map,
+  map: ExportMapLike,
   options: ExportImageOptions
 ): Promise<string> => {
   const {
@@ -305,16 +335,21 @@ const exportLiveMapAsImage = async (
     includeLegendAndStatus = false
   } = options;
 
-  const mapContainer = map.getContainer();
+  const mapContainer = getExportContainer(map);
+  if (!mapContainer) {
+    throw new Error('Map container not available for export.');
+  }
+
   const exportRoot = (mapContainer.closest('.map-container, .forecast-map-container') as HTMLElement | null) || mapContainer;
   const width = exportRoot.clientWidth;
   const height = exportRoot.clientHeight;
 
-  await waitForMapSettle(map, 400);
+  await waitForMapSettleGeneric(map, 400);
 
   return captureContainer(exportRoot, width, height, format, quality, (clonedRoot) => {
     hideElementsInClone(clonedRoot, [
       '.leaflet-control-container',
+      '.ol-control',
       '.map-toolbar-bottom-right',
       '.leaflet-pm-toolbar-container',
       '.leaflet-pm-actions-container'
@@ -379,13 +414,18 @@ const exportViaTempMapAsImage = async (
 };
 
 export const exportMapAsImage = async (
-  map: L.Map,
+  map: unknown,
   outlooks: OutlookData,
   options: ExportImageOptions = {}
 ): Promise<string> => {
   try {
-    return await exportLiveMapAsImage(map, options);
-  } catch {
+    const exportMap = map as ExportMapLike;
+    return await exportLiveMapAsImage(exportMap, options);
+  } catch (error) {
+    if (!isLeafletMap(map)) {
+      throw error;
+    }
+
     return exportViaTempMapAsImage(map, outlooks, options);
   }
 };
