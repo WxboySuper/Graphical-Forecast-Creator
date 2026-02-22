@@ -16,13 +16,41 @@ import { colorMappings } from '../../utils/outlookUtils';
 import { DayType } from '../../types/outlooks';
 import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature } from 'geojson';
+import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
+import { Circle, Fill as StyleFill, Stroke as StyleStroke, Style as OlStyle } from 'ol/style';
 import Legend from './Legend';
 import './ForecastMap.css';
+import { ReportType } from '../../types/stormReports';
+
 
 interface OpenLayersVerificationMapProps {
   activeOutlookType?: 'categorical' | 'tornado' | 'wind' | 'hail';
   selectedDay?: DayType;
 }
+
+// Define specific colors for each report type
+const reportColors = {
+  tornado: '#FF0000', // Red for tornado
+  wind: '#0000FF',    // Blue for wind
+  hail: '#00FF00',    // Green for hail
+};
+
+// Style function for storm reports
+const buildReportStyle = (type: ReportType) => {
+  return new OlStyle({
+    image: new Circle({
+      radius: 6,
+      fill: new StyleFill({
+        color: reportColors[type] || '#888888', // Fallback to grey
+      }),
+      stroke: new StyleStroke({
+        color: '#FFFFFF', // White border
+        width: 1,
+      }),
+    }),
+  });
+};
 
 const buildStyle = (type: string, probability: string) => {
   const typeColors = colorMappings[type as keyof typeof colorMappings];
@@ -49,9 +77,13 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
+  const stormReportsSourceRef = useRef<VectorSource>(new VectorSource()); // New source for storm reports
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const initialMapViewRef = useRef(mapView);
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
+  const { reports, visible: reportsVisible, filterByType } = useSelector(
+    (state: RootState) => state.stormReports
+  ); // Select storm reports state
 
   const activeFeatures = useMemo(() => {
     const outlook = outlooks[activeOutlookType];
@@ -85,7 +117,11 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       target: mapElementRef.current,
       layers: [
         new TileLayer({ source: new OSM() }),
-        new VectorLayer({ source: vectorSourceRef.current })
+        new VectorLayer({ source: vectorSourceRef.current }),
+        new VectorLayer({
+          source: stormReportsSourceRef.current,
+          style: (feature) => buildReportStyle(feature.get('type') as ReportType),
+        }),
       ],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
@@ -145,6 +181,26 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       source.addFeature(olFeature);
     });
   }, [activeFeatures, activeOutlookType]);
+
+  useEffect(() => {
+    const source = stormReportsSourceRef.current;
+    source.clear();
+
+    if (reportsVisible) {
+      const filteredReports = reports.filter(report => filterByType[report.type]);
+
+      filteredReports.forEach(report => {
+        const geometry = new Point(fromLonLat([report.longitude, report.latitude]));
+        const feature = new Feature({
+          geometry,
+          type: report.type, // Store type for styling
+          reportId: report.id, // Store ID for potential future interactions
+        });
+        feature.setStyle(buildReportStyle(report.type));
+        source.addFeature(feature);
+      });
+    }
+  }, [reports, reportsVisible, filterByType]);
 
   return (
     <div className="forecast-map-container">
