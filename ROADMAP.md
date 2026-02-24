@@ -34,7 +34,7 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 ## v0.3.0-alpha: Outlook Data Structure
 
-**Goal:** Teach the app what an "Outlook" is.
+**Goal:** Teach the app what "Outlook" is.
 
 - [x] Define TypeScript interfaces for `Outlook`, `RiskArea`, and `Hazard`.
 - [x] Update Redux store to hold the current outlook state.
@@ -97,7 +97,7 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Sharing the product.
 
-- [ ] Implement "Snapshot" feature (Export Map View to PNG/JPG).
+- [x] Implement "Snapshot" feature (Export Map View to PNG/JPG).
 - [ ] Combine Map Image + Discussion text into a downloadable package.
 
 ## v1.0.0: The Outlook Creator (Stable Release) 🌪️
@@ -112,20 +112,23 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 ## Post-v1.0: The "WarnGen" Era
 
-## v1.1.0: Real-Time Data Integration
-
-- [ ] Integrate Iowa State Mesonet (IEM) WMS service.
-- [ ] Add "Base Reflectivity" (N0Q) layer.
-- [ ] Add "Velocity" (N0U) layer.
-- [ ] Add opacity sliders for radar layers.
-
-## v1.2.0: The WarnGen Interface
+## v1.1.0: The WarnGen Interface
 
 **Goal:** A dedicated "Operations" page, separate from the Outlook creator.
 
-- [ ] Create `WarnGenPage.tsx` (New Route).
-- [ ] Implement a split-screen UI (Map vs. Warning Controls).
-- [ ] Ensure map state is isolated from the Outlook Creator page.
+- [ ] Create `WarnGenPage.tsx` (New Route) — task: gfc-005
+- [ ] Implement a split-screen UI (Map vs. Warning Controls) — task: gfc-006
+- [ ] Isolate WarnGen map state (separate slice / instance) — task: gfc-007
+- [ ] Add WarnGen control skeleton (Warning Type selector, Issue/Expiration inputs) — task: gfc-008
+
+> Note: these are the interface/prerequisite tasks required before real-time data integration (v1.2.0).
+
+## v1.2.0: WarnGen - Real-Time Data Integration
+
+- [ ] Integrate Iowa State Mesonet (IEM) WMS service — related tasks: gfc-016
+- [ ] Add "Base Reflectivity" (N0Q) layer — related tasks: gfc-018
+- [ ] Add "Velocity" (N0U) layer — related tasks: gfc-019
+- [ ] Implement opacity sliders for radar layers (depends on interface + radar layers) — related task: gfc-020
 
 ## v1.3.0: Outlook Layer Integration
 
