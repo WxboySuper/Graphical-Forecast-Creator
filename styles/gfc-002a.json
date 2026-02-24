@@ -1,0 +1,14 @@
+{
+  "theme": "default",
+  "tokens": {
+    "map": {
+      "water": "#cfeeff",
+      "land": "#f7f7f2",
+      "stateStroke": "#666",
+      "countyStroke": "#bdbdbd",
+      "outlookFill": "#ffcccb",
+      "warningFill": "#ff8c00"
+    }
+  },
+  "variants": ["default","light","dark"]
+}
