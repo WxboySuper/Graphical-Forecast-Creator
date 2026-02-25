@@ -7,6 +7,7 @@ import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import OSM from 'ol/source/OSM';
+import XYZ from 'ol/source/XYZ';
 import GeoJSON from 'ol/format/GeoJSON';
 import { Draw, Modify, Select } from 'ol/interaction';
 import { Fill, Stroke, Style } from 'ol/style';
@@ -17,6 +18,8 @@ import { click } from 'ol/events/condition';
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from '../../store';
 import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
+import { setBaseMapStyle } from '../../store/overlaysSlice';
+import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { getFeatureStyle, computeZIndex } from '../../utils/mapStyleUtils';
 import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature, GeoJsonProperties, Polygon } from 'geojson';
@@ -130,13 +133,57 @@ const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean
   return olStyle;
 };
 
+// Cached GeoJSON for blank map style — fetched once, shared across re-renders
+let cachedUsStatesGeoJSON: any = null;
+let cachedWorldCountriesGeoJSON: any = null;
+
+// Gray style for world landmass (Canada, Mexico, etc.)
+const BLANK_WORLD_STYLE = new Style({
+  fill: new Fill({ color: '#808080' }),
+  stroke: new Stroke({ color: '#555555', width: 0.5 }),
+});
+
+// Cream style with crisp black borders for US states
+const BLANK_LAND_STYLE = new Style({
+  fill: new Fill({ color: '#f2ede2' }),
+  stroke: new Stroke({ color: '#333333', width: 1 }),
+});
+
+const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
+  switch (style) {
+    case 'carto-light':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      });
+    case 'carto-dark':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      });
+    case 'esri-satellite':
+      return new XYZ({
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attributions: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
+        maxZoom: 19,
+      });
+    case 'osm':
+    default:
+      return new OSM();
+  }
+};
+
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const dispatch = useDispatch();
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
+  const [showStylePicker, setShowStylePicker] = useState(false);
   const [popupInfo, setPopupInfo] = useState<{ outlookType: string; probability: string; isSignificant: boolean } | null>(null);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
+  const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
   const initialMapViewRef = useRef(currentMapView);
   const currentMapViewRef = useRef(currentMapView);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -153,6 +200,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
+  const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+  const worldSourceRef = useRef<VectorSource>(new VectorSource());
+  const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const landSourceRef = useRef<VectorSource>(new VectorSource());
+  const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
   const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
@@ -195,11 +247,24 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     if (!mapElementRef.current || mapRef.current) return;
 
     const tileLayer = new TileLayer({ source: new OSM() });
-    const vectorLayer = new VectorLayer({ source: vectorSourceRef.current });
+    tileLayerRef.current = tileLayer;
+    const worldLayer = new VectorLayer({
+      source: worldSourceRef.current,
+      visible: false,
+      zIndex: 1,
+    });
+    worldLayerRef.current = worldLayer;
+    const landLayer = new VectorLayer({
+      source: landSourceRef.current,
+      visible: false,
+      zIndex: 2,
+    });
+    landLayerRef.current = landLayer;
+    const vectorLayer = new VectorLayer({ source: vectorSourceRef.current, zIndex: 3 });
 
     const map = new OLMap({
       target: mapElementRef.current,
-      layers: [tileLayer, vectorLayer],
+      layers: [tileLayer, worldLayer, landLayer, vectorLayer],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
         zoom: initialMapViewRef.current.zoom
@@ -385,6 +450,73 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     }, 0);
   }, [currentMapView.center, currentMapView.zoom]);
 
+  // Swap base tile source / blank land layer when style changes
+  useEffect(() => {
+    const tile = tileLayerRef.current;
+    const world = worldLayerRef.current;
+    const land = landLayerRef.current;
+    const el = mapElementRef.current;
+    if (!tile || !world || !land || !el) return;
+
+    if (baseMapStyle === 'blank') {
+      tile.setVisible(false);
+      world.setVisible(true);
+      land.setVisible(true);
+      // Deeper SPC-style ocean blue
+      el.style.backgroundColor = '#7BA0C8';
+
+      // Load world countries layer (gray fill for Canada, Mexico, etc.)
+      if (worldSourceRef.current.getFeatures().length === 0) {
+        const loadWorld = async () => {
+          if (!cachedWorldCountriesGeoJSON) {
+            const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson');
+            cachedWorldCountriesGeoJSON = await res.json();
+          }
+          const format = new GeoJSON();
+          const features = format.readFeatures(cachedWorldCountriesGeoJSON, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857',
+          });
+          features.forEach((f) => {
+            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
+              (f as any).setStyle(BLANK_WORLD_STYLE);
+            }
+          });
+          worldSourceRef.current.addFeatures(features as any[]);
+        };
+        loadWorld().catch(() => {});
+      }
+
+      // Load US states layer (cream fill, black borders on top of world layer)
+      if (landSourceRef.current.getFeatures().length === 0) {
+        const loadStates = async () => {
+          if (!cachedUsStatesGeoJSON) {
+            const res = await fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json');
+            cachedUsStatesGeoJSON = await res.json();
+          }
+          const format = new GeoJSON();
+          const features = format.readFeatures(cachedUsStatesGeoJSON, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857',
+          });
+          features.forEach((f) => {
+            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
+              (f as any).setStyle(BLANK_LAND_STYLE);
+            }
+          });
+          landSourceRef.current.addFeatures(features as any[]);
+        };
+        loadStates().catch(() => {});
+      }
+    } else {
+      tile.setVisible(true);
+      world.setVisible(false);
+      land.setVisible(false);
+      el.style.backgroundColor = '';
+      tile.setSource(createTileSource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>));
+    }
+  }, [baseMapStyle]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -524,6 +656,41 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           >
             Delete
           </button>
+          <span className="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+          <div className="relative">
+            <button
+              type="button"
+              className="map-toolbar-button"
+              onClick={() => setShowStylePicker((v) => !v)}
+              title="Base map style"
+              aria-label="Base map style"
+            >
+              Map
+            </button>
+            {showStylePicker && (
+              <div className="absolute bottom-full mb-2 right-0 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-lg p-2 flex flex-col gap-1 min-w-[120px] z-50">
+                {([
+                  { value: 'blank', label: 'Blank (Weather)' },
+                  { value: 'osm', label: 'OpenStreetMap' },
+                  { value: 'carto-light', label: 'Light' },
+                  { value: 'carto-dark', label: 'Dark' },
+                  { value: 'esri-satellite', label: 'Satellite' },
+                ] as { value: BaseMapStyle; label: string }[]).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`text-left px-2 py-1 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${baseMapStyle === value ? 'font-bold bg-gray-100 dark:bg-gray-700' : ''}`}
+                    onClick={() => {
+                      dispatch(setBaseMapStyle(value));
+                      setShowStylePicker(false);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="max-w-[260px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-md">
           {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}

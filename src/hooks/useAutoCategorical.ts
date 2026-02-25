@@ -135,10 +135,8 @@ const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon
     const fc = turf.featureCollection(features);
     const result = turf.union(fc);
     return result as Feature<Polygon | MultiPolygon>;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error('Error in union operation', e);
-    return features[0]; // Fallback
+  } catch {
+    return features[0]; // Fallback on Turf union error
   }
 };
 

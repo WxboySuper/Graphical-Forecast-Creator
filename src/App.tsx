@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { store } from './store';
-import { setActiveOutlookType, setEmergencyMode, importForecastCycle } from './store/forecastSlice';
+import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
 import { RootState } from './store';
 import { OutlookType } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
@@ -14,7 +14,6 @@ import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/feature
 
 import { useAutoSave } from './hooks/useAutoSave';
 import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
-import { validateForecastData, deserializeForecast } from './utils/fileUtils';
 
 // New UI components
 import { AppLayout } from './components/Layout';
@@ -33,23 +32,6 @@ const AppHooks = () => {
   
   // Load cycle history from localStorage
   useCycleHistoryPersistence();
-
-  // Load last session data from localStorage
-  useEffect(() => {
-    const savedData = localStorage.getItem('forecastData');
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        if (validateForecastData(parsed)) {
-          const deserialized = deserializeForecast(parsed);
-          dispatch(importForecastCycle(deserialized));
-          console.log('AppHooks - Hydrated forecast from localStorage');
-        }
-      } catch (e) {
-        console.error('AppHooks - Failed to hydrate forecast from localStorage', e);
-      }
-    }
-  }, [dispatch]);
 
   // Initialize feature flags state
   useEffect(() => {

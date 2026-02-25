@@ -25,7 +25,9 @@ jest.mock('./components/Map/ForecastMap', () => {
   });
 });
 
-jest.mock('./components/OutlookPanel/OutlookPanel', () => () => <div>OutlookPanel</div>);
+jest.mock('./components/IntegratedToolbar/IntegratedToolbar', () => ({
+  IntegratedToolbar: () => require('react').createElement('div', null, 'IntegratedToolbar'),
+}));
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation</div>);
 jest.mock('./components/Toast/Toast', () => ({

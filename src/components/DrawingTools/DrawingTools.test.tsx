@@ -7,6 +7,10 @@ import forecastReducer from '../../store/forecastSlice';
 import featureFlagsReducer from '../../store/featureFlagsSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 
+// Mock modals that require AppLayout context
+jest.mock('../CycleManager/CycleHistoryModal', () => () => <div>CycleHistoryModal Mock</div>);
+jest.mock('../CycleManager/CopyFromPreviousModal', () => () => <div>CopyFromPreviousModal Mock</div>);
+
 // Mock Leaflet map
 const mockMap = {
   getMap: jest.fn(),

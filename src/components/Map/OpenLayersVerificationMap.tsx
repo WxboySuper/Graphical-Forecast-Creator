@@ -7,11 +7,13 @@ import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import OSM from 'ol/source/OSM';
+import XYZ from 'ol/source/XYZ';
 import GeoJSON from 'ol/format/GeoJSON';
 import { Fill, Stroke, Style } from 'ol/style';
 import { fromLonLat } from 'ol/proj';
 import { RootState } from '../../store';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
+import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { colorMappings } from '../../utils/outlookUtils';
 import { DayType } from '../../types/outlooks';
 import type { MapAdapterHandle } from '../../maps/contracts';
@@ -52,6 +54,40 @@ const buildReportStyle = (type: ReportType) => {
   });
 };
 
+// Cached US states GeoJSON for blank map style (fetched once per session)
+let cachedUsStatesGeoJSONVerif: any = null;
+
+const BLANK_LAND_STYLE_VERIF = new Style({
+  fill: new Fill({ color: '#f2ede2' }),
+  stroke: new Stroke({ color: '#9e9585', width: 1 }),
+});
+
+const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
+  switch (style) {
+    case 'carto-light':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      });
+    case 'carto-dark':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      });
+    case 'esri-satellite':
+      return new XYZ({
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attributions: 'Tiles &copy; Esri &mdash; Source: Esri i-cubed USDA USGS AEX GeoEye Getmapping Aerogrid IGN IGP UPR-EGP',
+        maxZoom: 19,
+      });
+    case 'osm':
+    default:
+      return new OSM();
+  }
+};
+
 const buildStyle = (type: string, probability: string) => {
   const typeColors = colorMappings[type as keyof typeof colorMappings];
   const defaultColor = '#999999';
@@ -76,11 +112,15 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 }, ref) => {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
+  const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+  const landSourceRef = useRef<VectorSource>(new VectorSource());
+  const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
   const stormReportsSourceRef = useRef<VectorSource>(new VectorSource()); // New source for storm reports
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const initialMapViewRef = useRef(mapView);
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
+  const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
   const { reports, visible: reportsVisible, filterByType } = useSelector(
     (state: RootState) => state.stormReports
   ); // Select storm reports state
@@ -113,10 +153,20 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) return;
 
+    const baseTileLayer = new TileLayer({ source: new OSM() });
+    tileLayerRef.current = baseTileLayer;
+    const landLayer = new VectorLayer({
+      source: landSourceRef.current,
+      visible: false,
+      zIndex: 1,
+    });
+    landLayerRef.current = landLayer;
+
     const map = new OLMap({
       target: mapElementRef.current,
       layers: [
-        new TileLayer({ source: new OSM() }),
+        baseTileLayer,
+        landLayer,
         new VectorLayer({ source: vectorSourceRef.current }),
         new VectorLayer({
           source: stormReportsSourceRef.current,
@@ -156,6 +206,48 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     view.setCenter(targetCenter);
     view.setZoom(mapView.zoom);
   }, [mapView.center, mapView.zoom]);
+
+  // Swap base tile source / blank land layer when style changes
+  useEffect(() => {
+    const tile = tileLayerRef.current;
+    const land = landLayerRef.current;
+    const el = mapElementRef.current;
+    if (!tile || !land || !el) return;
+
+    if (baseMapStyle === 'blank') {
+      tile.setVisible(false);
+      land.setVisible(true);
+      el.style.backgroundColor = '#b8d4e8';
+
+      if (landSourceRef.current.getFeatures().length === 0) {
+        const loadStates = async () => {
+          let geoData = cachedUsStatesGeoJSONVerif;
+          if (!geoData) {
+            const res = await fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json');
+            geoData = await res.json();
+            cachedUsStatesGeoJSONVerif = geoData;
+          }
+          const format = new GeoJSON();
+          const features = format.readFeatures(geoData, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857',
+          });
+          features.forEach((f) => {
+            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
+              (f as any).setStyle(BLANK_LAND_STYLE_VERIF);
+            }
+          });
+          landSourceRef.current.addFeatures(features as any[]);
+        };
+        loadStates().catch(() => {});
+      }
+    } else {
+      tile.setVisible(true);
+      land.setVisible(false);
+      el.style.backgroundColor = '';
+      tile.setSource(createVerifTileSource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>));
+    }
+  }, [baseMapStyle]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;

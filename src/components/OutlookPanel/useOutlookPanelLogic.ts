@@ -52,7 +52,6 @@ export function useOutlookPanelLogic() {
   const handleOutlookTypeChange = useCallback(
     (type: OutlookType) => {
       if (!getOutlookTypeEnabled(type)) {
-        console.warn(`The ${type} outlook is temporarily unavailable due to maintenance or an issue.`);
         return;
       }
       dispatch(setActiveOutlookType(type));

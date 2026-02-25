@@ -43,6 +43,10 @@
 }
 
 /* Dark mode overrides for legend */
+.dark-mode .map-legend {
+  background-color: rgba(26, 26, 26, 0.92);
+}
+
 .dark-mode .map-legend h4 {
   color: #e4e4e4;
 }

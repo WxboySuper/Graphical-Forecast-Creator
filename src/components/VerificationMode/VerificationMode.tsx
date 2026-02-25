@@ -5,16 +5,20 @@ import VerificationPanel from '../Verification/VerificationPanel';
 import { loadVerificationForecast, clearVerificationForecast } from '../../store/verificationSlice';
 import { deserializeForecast, validateForecastData } from '../../utils/fileUtils';
 import { DayType } from '../../types/outlooks';
+import { useAppLayout } from '../Layout/AppLayout';
 import './VerificationMode.css';
+import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
 const VerificationMode: React.FC = () => {
   const dispatch = useDispatch();
+  const { addToast } = useAppLayout();
   const mapRef = useRef<VerificationMapHandle>(null);
   const [forecastLoaded, setForecastLoaded] = useState(false);
   const [fileName, setFileName] = useState<string>('');
   const [activeOutlookType, setActiveOutlookType] = useState<'categorical' | 'tornado' | 'wind' | 'hail'>('categorical');
   const [selectedDay, setSelectedDay] = useState<DayType>(1);
   const [availableDays, setAvailableDays] = useState<DayType[]>([]);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const handleLoadForecast = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -30,7 +34,7 @@ const VerificationMode: React.FC = () => {
 
         // Validate the forecast data
         if (!validateForecastData(json)) {
-          alert('Invalid forecast file format. Please ensure it\'s a valid GFC forecast JSON.');
+          addToast('Invalid forecast file format. Please ensure it\'s a valid GFC forecast JSON.', 'error');
           return;
         }
 
@@ -53,24 +57,29 @@ const VerificationMode: React.FC = () => {
         setSelectedDay(daysWithData[0] || 1);
         setForecastLoaded(true);
 
-        alert('Forecast loaded successfully! You can now load storm reports to verify.');
-      } catch (error) {
-        console.error('Error loading forecast:', error);
-        alert('Failed to load forecast file. Please ensure it\'s a valid GFC forecast JSON.');
+        addToast('Forecast loaded! Load storm reports to begin verification.', 'success');
+      } catch {
+        addToast('Failed to load forecast file. Please ensure it\'s a valid GFC forecast JSON.', 'error');
       }
+    };
+    reader.onerror = () => {
+      addToast('Failed to read file. Please check file permissions and try again.', 'error');
     };
 
     reader.readAsText(file);
-  }, [dispatch]);
+  }, [dispatch, addToast]);
 
   const handleClearForecast = useCallback(() => {
-    if (window.confirm('Clear the loaded forecast? This will also clear any storm reports.')) {
-      dispatch(clearVerificationForecast());
-      setForecastLoaded(false);
-      setAvailableDays([]);
-      setSelectedDay(1);
-      setFileName('');
-    }
+    setConfirmClear(true);
+  }, []);
+
+  const handleConfirmClear = useCallback(() => {
+    dispatch(clearVerificationForecast());
+    setForecastLoaded(false);
+    setAvailableDays([]);
+    setSelectedDay(1);
+    setFileName('');
+    setConfirmClear(false);
   }, [dispatch]);
 
   return (
@@ -187,6 +196,14 @@ const VerificationMode: React.FC = () => {
           <VerificationMap ref={mapRef} activeOutlookType={activeOutlookType} selectedDay={selectedDay} />
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={confirmClear}
+        title="Clear Forecast"
+        message="Clear the loaded forecast? This will also clear any storm reports."
+        onConfirm={handleConfirmClear}
+        onCancel={() => setConfirmClear(false)}
+        confirmLabel="Clear"
+      />
     </div>
   );
 };

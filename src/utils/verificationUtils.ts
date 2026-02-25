@@ -80,8 +80,8 @@ function analyzeOutlookType(
                 riskLevelsContainingReport.push(riskLevel);
               }
             }
-          } catch (error) {
-            console.warn('Error checking polygon containment:', error);
+          } catch {
+            // Skip malformed polygon features
           }
         }
       }

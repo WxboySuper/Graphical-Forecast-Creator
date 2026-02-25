@@ -27,8 +27,8 @@ export const useAutoSave = () => {
       try {
         const data = serializeForecast(forecastCycle, mapView);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-      } catch (e) {
-        console.error('Auto-save failed', e);
+      } catch {
+        // Auto-save silently fails to avoid disrupting the user
       }
     }, AUTOSAVE_DELAY);
 

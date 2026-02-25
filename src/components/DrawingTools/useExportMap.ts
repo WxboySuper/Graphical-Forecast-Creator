@@ -60,8 +60,7 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
       downloadDataUrl(dataUrl, filename);
       addToast('Forecast exported successfully!', 'success');
 
-    } catch (error) {
-      console.error('Error exporting map:', error);
+    } catch {
       addToast('Failed to export the map. Please try again.', 'error');
     } finally {
       setIsExporting(false);

@@ -13,6 +13,7 @@ import {
   History,
   Copy,
   Image as ImageIcon,
+  Archive,
   Trash2,
   CheckCircle2,
 } from 'lucide-react';
@@ -49,6 +50,7 @@ import CycleHistoryModal from '../CycleManager/CycleHistoryModal';
 import CopyFromPreviousModal from '../CycleManager/CopyFromPreviousModal';
 import ExportModal from '../DrawingTools/ExportModal';
 import { useExportMap } from '../DrawingTools/useExportMap';
+import { downloadGfcPackage } from '../../utils/fileUtils';
 import type { AddToastFn } from '../Layout';
 
 const outlookIcons: Record<OutlookType, React.ReactNode> = {
@@ -98,6 +100,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isPackageDownloading, setIsPackageDownloading] = useState(false);
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState('');
 
@@ -127,8 +130,22 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
 
   const isLowProb = lowProbabilityOutlooks.includes(activeOutlookType);
 
+  // Package download handler
+  const handlePackageDownload = useCallback(async () => {
+    setIsPackageDownloading(true);
+    try {
+      const mapView = mapRef.current?.getView() ?? { center: [39.8283, -98.5795] as [number, number], zoom: 4 };
+      await downloadGfcPackage(forecastCycle, mapView);
+      addToast('Package downloaded!', 'success');
+    } catch {
+      addToast('Failed to create package.', 'error');
+    } finally {
+      setIsPackageDownloading(false);
+    }
+  }, [forecastCycle, mapRef, addToast]);
+
   // Export hook
-  const { isModalOpen, initiateExport, confirmExport, cancelExport } = useExportMap({
+  const { isExporting, isModalOpen, initiateExport, confirmExport, cancelExport } = useExportMap({
     mapRef,
     outlooks,
     isExportDisabled,
@@ -243,12 +260,34 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
                     size="icon"
                     className="h-14 w-14 lg:h-16 lg:w-16 bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-700 dark:!bg-orange-500/20 dark:hover:!bg-orange-500/30 dark:border-orange-500/50 dark:text-orange-400"
                     onClick={initiateExport}
+                    disabled={isExporting}
                   >
-                    <ImageIcon className="h-6 w-6" />
+                    {isExporting ? (
+                      <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" />
+                    ) : (
+                      <ImageIcon className="h-6 w-6" />
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Export Image <span className="text-muted-foreground">(⌃E)</span></p>
+                  <p>{isExporting ? 'Exporting...' : 'Export Image'} <span className="text-muted-foreground">(⌃E)</span></p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    className="h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400"
+                    onClick={handlePackageDownload}
+                    disabled={isPackageDownloading}
+                  >
+                    <Archive className="h-6 w-6" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p>
                 </TooltipContent>
               </Tooltip>
             </div>

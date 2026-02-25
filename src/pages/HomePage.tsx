@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -32,6 +32,7 @@ import { Card } from '../components/ui/card';
 import { cn } from '../lib/utils';
 import { DayType } from '../types/outlooks';
 import CycleHistoryModal from '../components/CycleManager/CycleHistoryModal';
+import ConfirmationModal from '../components/DrawingTools/ConfirmationModal';
 import { exportForecastToJson, deserializeForecast, validateForecastData } from '../utils/fileUtils';
 import type { AddToastFn } from '../components/Layout';
 import { useOutletContext } from 'react-router-dom';
@@ -48,16 +49,8 @@ export const HomePage: React.FC = () => {
   const savedCycles = useSelector((state: RootState) => state.forecast.savedCycles);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [confirmNewCycle, setConfirmNewCycle] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  // Debug: Log when forecastCycle changes
-  useEffect(() => {
-    console.log('HomePage - forecastCycle updated:', {
-      cycleDate: forecastCycle.cycleDate,
-      currentDay: forecastCycle.currentDay,
-      daysCount: Object.keys(forecastCycle.days).length
-    });
-  }, [forecastCycle]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -99,8 +92,8 @@ export const HomePage: React.FC = () => {
 
   const handleNewCycle = () => {
     if (!isSaved) {
-      const confirmed = window.confirm('You have unsaved changes. Start a new cycle anyway?');
-      if (!confirmed) return;
+      setConfirmNewCycle(true);
+      return;
     }
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
@@ -119,8 +112,7 @@ export const HomePage: React.FC = () => {
       });
       dispatch(markAsSaved());
       addToast('Forecast exported to JSON!', 'success');
-    } catch (error) {
-      console.error('Error exporting forecast:', error);
+    } catch {
       addToast('Error exporting forecast.', 'error');
     }
   };
@@ -144,8 +136,7 @@ export const HomePage: React.FC = () => {
       const deserializedCycle = deserializeForecast(data);
       dispatch(importForecastCycle(deserializedCycle));
       addToast('Forecast loaded successfully!', 'success');
-    } catch (error) {
-      console.error('Error loading file:', error);
+    } catch {
       addToast('Error reading file.', 'error');
     }
   };
@@ -159,7 +150,6 @@ export const HomePage: React.FC = () => {
   };
 
   const formattedDate = useMemo(() => {
-    console.log('Computing formattedDate for cycleDate:', forecastCycle.cycleDate);
     // Parse as local date to avoid timezone conversion issues
     const [year, month, day] = forecastCycle.cycleDate.split('-').map(Number);
     const localDate = new Date(year, month - 1, day); // month is 0-indexed
@@ -188,6 +178,40 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Welcome section for first-time users */}
+        {stats.daysWithData.length === 0 && stats.savedCyclesCount === 0 && (
+          <Card className="p-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/30">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+              <div className="p-4 bg-primary/10 rounded-2xl shrink-0">
+                <Cloud className="h-12 w-12 text-primary" />
+              </div>
+              <div className="space-y-3 flex-1">
+                <h2 className="text-2xl font-bold text-foreground">Welcome to Graphical Forecast Creator</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Draw SPC-style severe weather outlooks for Days 1–8, write forecast discussions, and verify your forecasts against storm reports. 
+                  Your work auto-saves every 5 seconds and persists between sessions.
+                </p>
+                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">🌪 Tornado</span>
+                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">💨 Wind</span>
+                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">🌨 Hail</span>
+                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">📊 Categorical</span>
+                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">✍️ Discussion Editor</span>
+                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">✅ Verification</span>
+                </div>
+              </div>
+              <Button
+                size="lg"
+                className="shrink-0"
+                onClick={() => navigate('/forecast')}
+              >
+                Start Drawing
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -503,6 +527,18 @@ export const HomePage: React.FC = () => {
       <CycleHistoryModal 
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
+      />
+      <ConfirmationModal
+        isOpen={confirmNewCycle}
+        title="Start New Cycle"
+        message="You have unsaved changes. Start a new cycle anyway?"
+        onConfirm={() => {
+          dispatch(resetForecasts());
+          addToast('Started new forecast cycle', 'success');
+          setConfirmNewCycle(false);
+        }}
+        onCancel={() => setConfirmNewCycle(false)}
+        confirmLabel="Start New Cycle"
       />
     </div>
   );

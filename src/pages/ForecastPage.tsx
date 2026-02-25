@@ -122,8 +122,8 @@ export const ForecastPage: React.FC = () => {
           addToast('Session restored from auto-save.', 'success');
         }
       }
-    } catch (error) {
-      console.error('Error auto-loading:', error);
+    } catch {
+      // Silently skip auto-load errors to avoid disrupting initial render
     }
   }, [dispatch, addToast]);
 
@@ -148,8 +148,7 @@ export const ForecastPage: React.FC = () => {
       exportForecastToJson(forecastCycle, buildMapView(mapRef));
       dispatch(markAsSaved());
       addToast('Forecast exported to JSON!', 'success');
-    } catch (error) {
-      console.error('Error exporting forecast:', error);
+    } catch {
       addToast('Error exporting forecast.', 'error');
     }
   }, [forecastCycle, dispatch, addToast]);
@@ -191,8 +190,7 @@ export const ForecastPage: React.FC = () => {
       }
       
       addToast('Forecast loaded successfully!', 'success');
-    } catch (error) {
-      console.error('Error loading file:', error);
+    } catch {
       addToast('Error reading file.', 'error');
     }
   }, [dispatch, addToast]);

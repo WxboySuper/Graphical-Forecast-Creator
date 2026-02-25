@@ -12,8 +12,8 @@ export const saveCycleHistoryToStorage = (cycles: SavedCycle[]): void => {
   try {
     const serialized = JSON.stringify(cycles);
     localStorage.setItem(CYCLE_HISTORY_KEY, serialized);
-  } catch (error) {
-    console.error('Failed to save cycle history to localStorage:', error);
+  } catch {
+    // Silently ignore localStorage write failures
   }
 };
 
@@ -27,8 +27,7 @@ export const loadCycleHistoryFromStorage = (): SavedCycle[] => {
     
     const parsed = JSON.parse(serialized);
     return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error('Failed to load cycle history from localStorage:', error);
+  } catch {
     return [];
   }
 };

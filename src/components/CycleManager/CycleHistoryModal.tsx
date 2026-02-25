@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   selectSavedCycles, 
@@ -7,7 +7,9 @@ import {
   loadSavedCycle, 
   deleteSavedCycle 
 } from '../../store/forecastSlice';
+import { useAppLayout } from '../Layout/AppLayout';
 import './CycleHistoryModal.css';
+import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
 interface CycleHistoryModalProps {
   isOpen: boolean;
@@ -16,11 +18,61 @@ interface CycleHistoryModalProps {
 
 const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
+  const { addToast } = useAppLayout();
   const savedCycles = useSelector(selectSavedCycles);
   const currentCycle = useSelector(selectForecastCycle);
   
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [newLabel, setNewLabel] = useState('');
+  const modalRef = useRef<HTMLDivElement>(null);
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (confirmAction) {
+          setConfirmAction(null);
+        } else {
+          onClose();
+        }
+        return;
+      }
+      if (event.key === 'Tab' && modalRef.current && !confirmAction) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey) {
+          if (document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose, confirmAction]);
+
+  useEffect(() => {
+    if (!isOpen || !modalRef.current) return;
+    const first = modalRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )[0];
+    first?.focus();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -28,21 +80,31 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     dispatch(saveCurrentCycle({ label: newLabel.trim() || undefined }));
     setNewLabel('');
     setShowSaveForm(false);
-    alert('Current cycle saved successfully!');
+    addToast('Cycle saved successfully!', 'success');
   };
 
   const handleLoadCycle = (cycleId: string) => {
-    if (window.confirm('Load this cycle? Unsaved changes to your current cycle will be lost.')) {
-      dispatch(loadSavedCycle(cycleId));
-      alert('Cycle loaded successfully!');
-      onClose();
-    }
+    setConfirmAction({
+      title: 'Load Cycle',
+      message: 'Load this cycle? Unsaved changes to your current cycle will be lost.',
+      onConfirm: () => {
+        dispatch(loadSavedCycle(cycleId));
+        addToast('Cycle loaded!', 'success');
+        setConfirmAction(null);
+        onClose();
+      }
+    });
   };
 
   const handleDeleteCycle = (cycleId: string) => {
-    if (window.confirm('Delete this saved cycle permanently?')) {
-      dispatch(deleteSavedCycle(cycleId));
-    }
+    setConfirmAction({
+      title: 'Delete Cycle',
+      message: 'Delete this saved cycle permanently?',
+      onConfirm: () => {
+        dispatch(deleteSavedCycle(cycleId));
+        setConfirmAction(null);
+      }
+    });
   };
 
   const getDaySummary = (cycle: any) => {
@@ -68,10 +130,16 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   return (
     <>
       <div className="history-modal-overlay" onClick={onClose}></div>
-      <div className="history-modal">
+      <div
+        className="history-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cycle-history-title"
+        ref={modalRef}
+      >
         <div className="history-modal-header">
-          <h2>Forecast Cycle History</h2>
-          <button className="history-modal-close" onClick={onClose}>✕</button>
+          <h2 id="cycle-history-title">Forecast Cycle History</h2>
+          <button className="history-modal-close" onClick={onClose} aria-label="Close cycle history modal">✕</button>
         </div>
 
         <div className="history-modal-body">
@@ -178,6 +246,17 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
           </button>
         </div>
       </div>
+      {confirmAction && (
+        <ConfirmationModal
+          isOpen={true}
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+          confirmLabel="Confirm"
+          cancelLabel="Cancel"
+        />
+      )}
     </>
   );
 };

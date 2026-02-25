@@ -59,3 +59,20 @@
     opacity: 0;
   }
 }
+
+/* Dark mode overrides — tones down brightness on dark backgrounds */
+.dark-mode .toast-info {
+  background-color: #303f9f;
+}
+
+.dark-mode .toast-success {
+  background-color: #388e3c;
+}
+
+.dark-mode .toast-warning {
+  background-color: #f57c00;
+}
+
+.dark-mode .toast-error {
+  background-color: #d32f2f;
+}

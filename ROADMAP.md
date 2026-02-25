@@ -23,7 +23,7 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 - [x] Implement basic Leaflet Map container.
 - [x] Basic layer toggling logic.
 
-## v0.2.0-alpha: The "Geoman" Fix (Current Focus)
+## v0.2.0-alpha: The "Geoman" Fix
 
 **Goal:** Fix the broken map drawing by swapping the library.
 
@@ -97,16 +97,29 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** Sharing the product.
 
-- [ ] Implement "Snapshot" feature (Export Map View to PNG/JPG).
-- [ ] Combine Map Image + Discussion text into a downloadable package.
+- [x] Implement "Snapshot" feature (Export Map View to PNG/JPG).
+- [x] Combine Forecast JSON + Discussion text into a downloadable package.
+  - This could be a ZIP file or it could be a single JSON file with both data and text.
+- [x] Re-implement different map styles with a selector
+- [x] Migrate documentation from Leaflet to OpenLayers
 
-## v1.0.0: The Outlook Creator (Stable Release) 🌪️
+## v0.11.0-beta: Release Hardening
+
+**Goal:** Close final quality gaps before the stable v1.0.0 release.
+
+- [x] Complete dark-mode coverage across core workflow panels and modals.
+- [x] Add cycle history and copy-from-previous workflow polish.
+- [x] Add export loading feedback and verification UX improvements.
+- [x] Final accessibility pass for modal dialogs and keyboard focus states.
+- [x] Final release documentation pass (README/CHANGELOG/How-to).
+
+## v1.0.0: The Outlook Creator (Stable Release) 🌪️ — Released 2026-03-01
 
 **Goal:** A complete, standalone tool for creating, saving, and verifying weather outlooks.
 
-- [ ] Final UI Polish (Sidebar cleanup, Help modal).
-- [ ] Deployment to GitHub Pages / Vercel.
-- [ ] Public documentation on "How to create an Outlook."
+- [x] Final UI Polish (Sidebar cleanup, Help modal).
+- [x] Deployment to GitHub Pages / Vercel.
+- [x] Public documentation on "How to create an Outlook."
 
 ---
 

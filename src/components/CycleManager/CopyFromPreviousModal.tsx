@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';
 import { DayType, ForecastCycle } from '../../types/outlooks';
 import { deserializeForecast } from '../../utils/fileUtils';
+import { useAppLayout } from '../Layout/AppLayout';
 import './CopyFromPreviousModal.css';
 
 interface CopyFromPreviousModalProps {
@@ -14,13 +15,58 @@ const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
+  const { addToast } = useAppLayout();
   const currentDay = useSelector(selectCurrentDay);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const [loadedCycle, setLoadedCycle] = useState<ForecastCycle | null>(null);
   const [loadedFileName, setLoadedFileName] = useState<string>('');
   const [sourceDay, setSourceDay] = useState<DayType>(1);
   const [targetDay, setTargetDay] = useState<DayType>(currentDay);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key === 'Tab' && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey) {
+          if (document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !modalRef.current) return;
+    const first = modalRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )[0];
+    first?.focus();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -36,10 +82,12 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
         const cycle = deserializeForecast(parsed);
         setLoadedCycle(cycle);
         setLoadedFileName(file.name);
-      } catch (error) {
-        alert('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.');
-        console.error('File load error:', error);
+      } catch {
+        addToast('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.', 'error');
       }
+    };
+    reader.onerror = () => {
+      addToast('Failed to read file. Please check file permissions and try again.', 'error');
     };
     reader.readAsText(file);
     
@@ -51,7 +99,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
 
   const handleCopy = () => {
     if (!loadedCycle) {
-      alert('Please load a forecast file first');
+      addToast('Please load a forecast file first.', 'warning');
       return;
     }
 
@@ -61,17 +109,23 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
       targetDay
     }));
 
-    alert(`Copied features from ${loadedFileName} Day ${sourceDay} to current cycle Day ${targetDay}`);
+    addToast(`Copied Day ${sourceDay} features to current cycle Day ${targetDay}.`, 'success');
     onClose();
   };
 
   return (
     <>
       <div className="copy-modal-overlay" onClick={onClose}></div>
-      <div className="copy-modal">
+      <div
+        className="copy-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="copy-previous-title"
+        ref={modalRef}
+      >
         <div className="copy-modal-header">
-          <h2>Copy from Previous Cycle</h2>
-          <button className="copy-modal-close" onClick={onClose}>✕</button>
+          <h2 id="copy-previous-title">Copy from Previous Cycle</h2>
+          <button className="copy-modal-close" onClick={onClose} aria-label="Close copy from previous modal">✕</button>
         </div>
 
         <div className="copy-modal-body">

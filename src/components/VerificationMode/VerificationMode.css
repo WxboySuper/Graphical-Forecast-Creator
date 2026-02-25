@@ -306,3 +306,117 @@
     height: 50vh;
   }
 }
+
+/* Dark mode overrides */
+.dark-mode .verification-mode {
+  background-color: var(--bg-primary, #1a1a1a);
+}
+
+.dark-mode .verification-header {
+  background: linear-gradient(135deg, #3949ab 0%, #512da8 100%);
+}
+
+.dark-mode .day-selector-section {
+  background-color: var(--bg-secondary, #2a2a2a);
+  border-bottom-color: var(--border-color, #444);
+}
+
+.dark-mode .day-selector-section label {
+  color: var(--text-secondary, #c4c4c4);
+}
+
+.dark-mode .day-btn {
+  border-color: var(--border-color, #444);
+  background-color: var(--bg-secondary, #2a2a2a);
+  color: var(--text-primary, #e4e4e4);
+}
+
+.dark-mode .day-btn:hover {
+  border-color: #7986cb;
+  background-color: var(--bg-tertiary, #3a3a3a);
+}
+
+.dark-mode .day-btn.active {
+  border-color: #7986cb;
+  background: linear-gradient(135deg, #3949ab 0%, #512da8 100%);
+  color: white;
+}
+
+.dark-mode .outlook-type-selector {
+  background-color: var(--bg-secondary, #2a2a2a);
+  border-bottom-color: var(--border-color, #444);
+}
+
+.dark-mode .outlook-type-selector label {
+  color: var(--text-secondary, #c4c4c4);
+}
+
+.dark-mode .outlook-type-btn {
+  border-color: var(--border-color, #444);
+  background-color: var(--bg-secondary, #2a2a2a);
+  color: var(--text-primary, #e4e4e4);
+}
+
+.dark-mode .outlook-type-btn:hover {
+  border-color: #7986cb;
+  background-color: var(--bg-tertiary, #3a3a3a);
+}
+
+.dark-mode .outlook-type-btn.active {
+  border-color: #7986cb;
+  background: linear-gradient(135deg, #3949ab 0%, #512da8 100%);
+  color: white;
+}
+
+.dark-mode .verification-sidebar {
+  background-color: var(--bg-secondary, #2a2a2a);
+  border-right-color: var(--border-color, #444);
+}
+
+.dark-mode .forecast-loader-section,
+.dark-mode .reports-section {
+  background-color: var(--bg-tertiary, #333);
+  border-color: var(--border-color, #444);
+}
+
+.dark-mode .forecast-loader-section h3,
+.dark-mode .reports-section h3 {
+  color: var(--text-primary, #e4e4e4);
+}
+
+.dark-mode .file-upload-label {
+  background-color: var(--bg-secondary, #2a2a2a);
+  border-color: var(--border-color, #555);
+}
+
+.dark-mode .file-upload-label:hover {
+  border-color: #7986cb;
+  background-color: var(--bg-tertiary, #333);
+}
+
+.dark-mode .file-upload-label span {
+  color: var(--text-primary, #e4e4e4);
+}
+
+.dark-mode .upload-hint {
+  color: var(--text-muted, #888);
+}
+
+.dark-mode .forecast-loaded {
+  background-color: var(--bg-secondary, #2a2a2a);
+  border-color: #27ae60;
+}
+
+.dark-mode .loaded-indicator strong {
+  color: #2ecc71;
+}
+
+.dark-mode .file-name {
+  color: var(--text-muted, #888);
+}
+
+.dark-mode .waiting-message {
+  color: var(--text-secondary, #aaa);
+  background-color: var(--bg-secondary, #2a2a2a);
+  border-color: var(--border-color, #444);
+}

@@ -55,24 +55,20 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       const dateObj = new Date(year, month - 1, day); // month is 0-indexed
       const spcDate = formatDateForSPC(dateObj);
       
-      console.log('Selected date string:', selectedDate);
-      console.log('Date object created:', dateObj);
-      console.log('SPC date format:', spcDate);
-      
       const fetchedReports = await fetchStormReports(spcDate);
       
       dispatch(setReports(fetchedReports));
       dispatch(setDate(spcDate));
-      dispatch(setLoading(false));
       
       if (fetchedReports.length === 0) {
         dispatch(setError('No storm reports found for this date.'));
       }
     } catch (err) {
-      console.error('Error loading storm reports:', err);
       dispatch(setError(
         err instanceof Error ? err.message : 'Failed to load storm reports. The date may not have available data.'
       ));
+    } finally {
+      dispatch(setLoading(false));
     }
   };
   

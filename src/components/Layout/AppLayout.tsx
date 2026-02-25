@@ -62,6 +62,12 @@ export const AppLayout: React.FC = () => {
   // Keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes the documentation panel
+      if (e.key === 'Escape' && showDocumentation) {
+        setShowDocumentation(false);
+        return;
+      }
+
       // Check for Ctrl/Cmd + key shortcuts
       if (e.ctrlKey || e.metaKey) {
         switch (e.key.toLowerCase()) {
@@ -91,7 +97,7 @@ export const AppLayout: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate]);
+  }, [navigate, showDocumentation]);
 
   return (
     <AppLayoutContext.Provider value={{ addToast }}>

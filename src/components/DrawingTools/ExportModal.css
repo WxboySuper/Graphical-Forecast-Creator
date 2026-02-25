@@ -68,3 +68,28 @@
 .export-modal-confirm:hover {
   background-color: #45a049;
 }
+
+/* Dark mode overrides */
+.dark-mode .export-modal {
+  background-color: var(--bg-secondary, #2a2a2a);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .export-modal h3 {
+  color: var(--text-primary, #e4e4e4);
+}
+
+.dark-mode .export-modal-input {
+  background-color: var(--bg-primary, #1a1a1a);
+  border-color: var(--border-color, #444);
+  color: var(--text-primary, #e4e4e4);
+}
+
+.dark-mode .export-modal-cancel {
+  background-color: #3a3a3a;
+  color: var(--text-primary, #e4e4e4);
+}
+
+.dark-mode .export-modal-cancel:hover {
+  background-color: #4a4a4a;
+}

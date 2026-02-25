@@ -9,7 +9,6 @@ jest.mock('./components/Map/ForecastMap', () => {
 });
 
 // Mock other components if necessary (good practice to isolate App testing)
-jest.mock('./components/OutlookPanel/OutlookPanel', () => () => <div>OutlookPanel Mock</div>);
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
 

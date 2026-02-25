@@ -200,8 +200,6 @@ export const forecastSlice = createSlice({
       const outlookMap = outlookData[outlookType];
       
       if (!outlookMap) {
-        // Outlook type not supported for this day, skip
-        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
         return;
       }
       
@@ -234,7 +232,6 @@ export const forecastSlice = createSlice({
       const outlookMap = outlookData[outlookType];
       
       if (!outlookMap) {
-        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
         return;
       }
       
@@ -266,7 +263,6 @@ export const forecastSlice = createSlice({
       const outlookMap = outlookData[outlookType];
       
       if (!outlookMap) {
-        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
         return;
       }
       
@@ -314,8 +310,6 @@ export const forecastSlice = createSlice({
         // @ts-ignore - Dynamic property assignment
         outlookData[outlookType] = map;
         state.isSaved = false;
-      } else {
-        console.warn(`Outlook type ${outlookType} not supported for day ${state.forecastCycle.currentDay}`);
       }
     },
     
@@ -327,14 +321,12 @@ export const forecastSlice = createSlice({
       // Clear localStorage first
       try {
         localStorage.removeItem('forecastData');
-        console.log('Cleared localStorage');
-      } catch (e) {
-        console.error('Failed to clear localStorage:', e);
+      } catch {
+        // Ignore localStorage clear errors
       }
       
       // Generate today's date
       const today = new Date().toISOString().split('T')[0];
-      console.log('Resetting to new cycle with date:', today);
       
       // Completely replace forecastCycle to force re-render
       const newCycle: ForecastCycle = {
@@ -347,8 +339,6 @@ export const forecastSlice = createSlice({
       
       state.forecastCycle = newCycle;
       state.isSaved = false;
-      
-      console.log('State after reset:', JSON.stringify(state.forecastCycle));
     },
     
     markAsSaved: (state) => {
@@ -446,7 +436,6 @@ export const forecastSlice = createSlice({
       
       const sourceDayData = sourceCycle.days[sourceDay];
       if (!sourceDayData) {
-        console.warn(`Source day ${sourceDay} not found in cycle`);
         return;
       }
 
@@ -495,7 +484,6 @@ export const forecastSlice = createSlice({
         }
       } else if (isSourceDay12 && isTargetDay48) {
         // Day 1/2 → Day 4-8: Skip all (Day 4-8 has no compatible outlook types)
-        console.warn('Cannot copy Day 1/2 outlooks to Day 4-8 - incompatible outlook types');
       } else if (isSourceDay3 && isTargetDay12) {
         // Day 3 → Day 1/2: Only copy categorical
         const categoricalMap = sourceDayData.data.categorical;
@@ -522,10 +510,8 @@ export const forecastSlice = createSlice({
         }
       } else if (isSourceDay3 && isTargetDay48) {
         // Day 3 → Day 4-8: Skip all (incompatible)
-        console.warn('Cannot copy Day 3 outlooks to Day 4-8 - incompatible outlook types');
       } else if (isSourceDay48 && isTargetDay12) {
         // Day 4-8 → Day 1/2: Skip all (incompatible)
-        console.warn('Cannot copy Day 4-8 outlooks to Day 1/2 - incompatible outlook types');
       } else if (isSourceDay48 && isTargetDay3) {
         // Day 4-8 → Day 3: Convert day4-8 to totalSevere (both use 15% and 30%)
         const day48Map = sourceDayData.data['day4-8'];

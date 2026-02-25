@@ -1,4 +1,6 @@
+import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay } from '../types/outlooks';
+import { compileDiscussionToText } from './discussionUtils';
 
 const CURRENT_VERSION = '0.5.0';
 
@@ -181,6 +183,43 @@ export const exportForecastToJson = (
   const now = new Date();
   const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `gfc-forecast-${timestamp}.json`;
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * Bundles the forecast JSON and all day discussions into a single .zip package.
+ */
+export const downloadGfcPackage = async (
+  forecastCycle: ForecastCycle,
+  mapView: { center: [number, number]; zoom: number }
+): Promise<void> => {
+  const zip = new JSZip();
+
+  // 1. Forecast JSON
+  const data = serializeForecast(forecastCycle, mapView);
+  zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
+
+  // 2. Discussion text for each day that has content
+  (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach((day) => {
+    const outlookDay = forecastCycle.days[day];
+    if (outlookDay?.discussion) {
+      const text = compileDiscussionToText(outlookDay.discussion, day);
+      zip.file(`discussion_day${day}.txt`, text);
+    }
+  });
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = `gfc-package-${timestamp}.zip`;
 
   const link = document.createElement('a');
   link.href = url;
