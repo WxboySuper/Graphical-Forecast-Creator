@@ -1,10 +1,217 @@
+/* ── Documentation side-panel ─────────────────────────── */
 .documentation {
-  background-color: #fff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 20px;
-  margin-bottom: 30px;
+  padding: 20px 20px 32px;
+  background-color: var(--bg-primary, #fff);
+  min-height: 100%;
 }
+
+.doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.documentation h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+/* ── Section typography ───────────────────────────────── */
+.doc-section h3 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.doc-section h4 {
+  margin-top: 20px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #6b7280);
+}
+
+.doc-section p {
+  margin-bottom: 12px;
+  line-height: 1.55;
+  font-size: 0.9rem;
+  color: var(--text-primary, #374151);
+}
+
+.doc-section ul,
+.doc-section ol {
+  margin-bottom: 12px;
+  padding-left: 20px;
+}
+
+.doc-section li {
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-primary, #374151);
+}
+
+.doc-section em {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.85rem;
+}
+
+.item-title {
+  font-weight: 600;
+}
+
+/* ── Keyboard badge ───────────────────────────────────── */
+.doc-section kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  background-color: var(--bg-secondary, #f3f4f6);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 4px;
+  color: var(--text-primary, #111827);
+  line-height: 1.6;
+}
+
+/* ── Color swatch row ─────────────────────────────────── */
+.color-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+
+.color-item {
+  height: 28px;
+  min-width: 44px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: white;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+/* ── Conversion table ─────────────────────────────────── */
+.conversion-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 20px;
+  font-size: 0.83rem;
+}
+
+.conversion-table th,
+.conversion-table td {
+  padding: 5px 8px;
+  text-align: center;
+  border: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-primary, #374151);
+}
+
+.conversion-table th {
+  background-color: var(--bg-secondary, #f9fafb);
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+.conversion-table td:first-child {
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Categorical risk level color coding — faded outlook colors */
+.conversion-table .cat-mrgl { background-color: rgba(125, 197, 128, 0.35); }
+.conversion-table .cat-slgt { background-color: rgba(243, 246, 125, 0.55); color: #4a4a00; }
+.conversion-table .cat-enh  { background-color: rgba(229, 194, 127, 0.45); }
+.conversion-table .cat-mdt  { background-color: rgba(230, 127, 126, 0.4);  }
+.conversion-table .cat-high { background-color: rgba(254, 127, 254, 0.4);  }
+
+/* Dark mode — slightly higher opacity so color reads against dark background */
+.dark-mode .conversion-table .cat-mrgl { background-color: rgba(125, 197, 128, 0.25); }
+.dark-mode .conversion-table .cat-slgt { background-color: rgba(243, 246, 125, 0.25); color: var(--text-primary, #e5e7eb); }
+.dark-mode .conversion-table .cat-enh  { background-color: rgba(229, 194, 127, 0.3);  }
+.dark-mode .conversion-table .cat-mdt  { background-color: rgba(230, 127, 126, 0.3);  }
+.dark-mode .conversion-table .cat-high { background-color: rgba(254, 127, 254, 0.3);  }
+
+/* ── Dark mode ────────────────────────────────────────── */
+.dark-mode .documentation {
+  background-color: var(--bg-primary, #1a1a1a);
+}
+
+.dark-mode .doc-header {
+  border-bottom-color: var(--border-color, #374151);
+}
+
+.dark-mode .documentation h2 {
+  color: var(--text-primary, #f9fafb);
+}
+
+.dark-mode .doc-section h3 {
+  color: var(--text-primary, #f9fafb);
+}
+
+.dark-mode .doc-section h4 {
+  color: var(--text-secondary, #9ca3af);
+}
+
+.dark-mode .doc-section p,
+.dark-mode .doc-section li {
+  color: var(--text-primary, #e5e7eb);
+}
+
+.dark-mode .doc-section em {
+  color: var(--text-secondary, #9ca3af);
+}
+
+.dark-mode .doc-section kbd {
+  background-color: var(--bg-tertiary, #374151);
+  border-color: var(--border-color, #4b5563);
+  color: var(--text-primary, #f9fafb);
+}
+
+.dark-mode .conversion-table th,
+.dark-mode .conversion-table td {
+  border-color: var(--border-color, #374151);
+  color: var(--text-primary, #e5e7eb);
+}
+
+.dark-mode .conversion-table th {
+  background-color: var(--bg-secondary, #2a2a2a);
+  color: var(--text-secondary, #9ca3af);
+}
+
+@media (max-width: 480px) {
+  .documentation {
+    padding: 16px;
+  }
+
+  .conversion-table {
+    font-size: 0.75rem;
+  }
+
+  .conversion-table th,
+  .conversion-table td {
+    padding: 4px 5px;
+  }
+}
+
 
 .documentation h2 {
   margin-top: 0;

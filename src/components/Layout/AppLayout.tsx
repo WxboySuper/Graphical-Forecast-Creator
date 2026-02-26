@@ -107,13 +107,30 @@ export const AppLayout: React.FC = () => {
           showDocumentation={showDocumentation}
         />
         
+        {/* Documentation side-panel (right-side drawer) */}
+        {showDocumentation && (
+          <>
+            {/* Backdrop — click to close */}
+            <div
+              className="fixed inset-0 z-[900] bg-black/25"
+              style={{ top: '56px' }}
+              onClick={() => setShowDocumentation(false)}
+              aria-hidden="true"
+            />
+            {/* Panel */}
+            <div
+              className="fixed top-14 right-0 bottom-0 z-[901] w-[440px] max-w-[92vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
+              role="dialog"
+              aria-label="Documentation"
+              aria-modal="true"
+            >
+              <Documentation onClose={() => setShowDocumentation(false)} />
+            </div>
+          </>
+        )}
+
         {/* Main content area - below navbar */}
         <main className="pt-14 h-screen">
-          {showDocumentation && (
-            <div className="absolute top-14 left-0 right-0 z-panel bg-background border-b border-border">
-              <Documentation />
-            </div>
-          )}
           
           {/* Page content via router outlet */}
           <Outlet context={{ addToast }} />

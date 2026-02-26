@@ -28,9 +28,10 @@ export const getAvailableProbabilities = (activeOutlookType: OutlookType, curren
       }
       return [];
     case 'hail':
-      // Day 1/2 only
+      // Day 1/2 only; CIG3 (crosshatch) is not a valid hail hatching style
       if (constraints.probabilities.hail) {
-        return [...constraints.probabilities.hail, ...cigs] as (HailProbability | CIGLevel)[];
+        const hailCigs = cigs.filter(c => c !== 'CIG3');
+        return [...constraints.probabilities.hail, ...hailCigs] as (HailProbability | CIGLevel)[];
       }
       return [];
     case 'totalSevere':

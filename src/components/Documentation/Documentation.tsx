@@ -1,55 +1,53 @@
 // skipcq: JS-W1028
-import React, { useState, useCallback } from 'react';
-import './Documentation.css';
+import React from 'react';
+import { X } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { UsageSection, OverviewSection, OutlooksSection, CategoricalSection } from './DocumentationContent';
-const Documentation: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+import './Documentation.css';
 
-  const handleOverview = useCallback(() => setActiveTab('overview'), [setActiveTab]);
-  const handleUsage = useCallback(() => setActiveTab('usage'), [setActiveTab]);
-  const handleOutlooks = useCallback(() => setActiveTab('outlooks'), [setActiveTab]);
-  const handleCategorical = useCallback(() => setActiveTab('categorical'), [setActiveTab]);
+interface DocumentationProps {
+  onClose?: () => void;
+}
 
+const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
   return (
     <div className="documentation">
-      <h2>Documentation</h2>
-      
-      <div className="doc-tabs">
-        <button 
-          className={activeTab === 'overview' ? 'active' : ''} 
-          onClick={handleOverview}
-        >
-          Overview
-        </button>
-        <button 
-          className={activeTab === 'usage' ? 'active' : ''} 
-          onClick={handleUsage}
-        >
-          How to Use
-        </button>
-        <button 
-          className={activeTab === 'outlooks' ? 'active' : ''} 
-          onClick={handleOutlooks}
-        >
-          Outlook Types
-        </button>
-        <button 
-          className={activeTab === 'categorical' ? 'active' : ''} 
-          onClick={handleCategorical}
-        >
-          Categorical Conversion
-        </button>
+      <div className="doc-header">
+        <h2>Help &amp; Documentation</h2>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Close documentation panel"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
-      
-      <div className="doc-content">
-        {activeTab === 'overview' && <OverviewSection />}
-        
-        {activeTab === 'usage' && <UsageSection />}
-        
-        {activeTab === 'outlooks' && <OutlooksSection />}
-        
-        {activeTab === 'categorical' && <CategoricalSection />}
-      </div>
+
+      <Tabs defaultValue="overview">
+        <TabsList className="w-full grid grid-cols-4 mb-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="usage">Usage</TabsTrigger>
+          <TabsTrigger value="outlooks">Outlooks</TabsTrigger>
+          <TabsTrigger value="conversion">Conversion</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <OverviewSection />
+        </TabsContent>
+        <TabsContent value="usage">
+          <UsageSection />
+        </TabsContent>
+        <TabsContent value="outlooks">
+          <OutlooksSection />
+        </TabsContent>
+        <TabsContent value="conversion">
+          <CategoricalSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
