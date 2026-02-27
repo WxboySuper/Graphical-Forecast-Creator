@@ -1,12 +1,46 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../store';
 import { addFeature, resetCategorical, setOutlookMap, selectCurrentOutlooks, selectCurrentDay } from '../store/forecastSlice';
 import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevereToCategorical } from '../utils/outlookUtils';
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { v4 as uuidv4 } from 'uuid';
 import * as turf from '@turf/turf';
 import { Feature, Polygon, MultiPolygon } from 'geojson';
+
+const signatureFromFeatures = (features: GeoJSON.Feature[]): string => {
+  return features
+    .map((feature) => {
+      const probability = String(feature.properties?.probability || '');
+      return `${probability}:${JSON.stringify(feature.geometry)}`;
+    })
+    .sort()
+    .join('|');
+};
+
+const signatureFromCategoricalMap = (categoricalMap: OutlookData['categorical']): string => {
+  if (!(categoricalMap instanceof Map)) {
+    return '';
+  }
+
+  const items: GeoJSON.Feature[] = [];
+  categoricalMap.forEach((features, probability) => {
+    if (probability === 'TSTM') {
+      return;
+    }
+
+    features.forEach((feature) => {
+      items.push({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          probability
+        }
+      });
+    });
+  });
+
+  return signatureFromFeatures(items);
+};
 
 /**
  * Hook that automatically generates categorical outlooks based on probabilistic outlooks.
@@ -20,7 +54,6 @@ const useAutoCategorical = () => {
   const dispatch = useDispatch();
   const outlooks = useSelector(selectCurrentOutlooks);
   const currentDay = useSelector(selectCurrentDay);
-  const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const processingRef = useRef(false);
   const lastProcessedRef = useRef<string>('');
 
@@ -31,11 +64,6 @@ const useAutoCategorical = () => {
       return;
     }
     
-    // Don't auto-generate if user is actively drawing categorical features
-    if (drawingState.activeOutlookType === 'categorical') {
-      return;
-    }
-
     // Prevent recursive updates
     if (processingRef.current) {
       return;
@@ -56,11 +84,6 @@ const useAutoCategorical = () => {
       currentHash = totalSevereIds;
     }
 
-    // Skip if nothing has changed since last processing
-    if (currentHash === lastProcessedRef.current) {
-      return;
-    }
-    
     // Skip if there are no changes to process
     let hasChanges = false;
     if (currentDay === 1 || currentDay === 2) {
@@ -73,6 +96,25 @@ const useAutoCategorical = () => {
     }
     
     if (!hasChanges) {
+      return;
+    }
+
+    // Build the categorical geometry that *should* exist for current probabilistic data
+    // and compare to what is currently present. This catches imported stale/ring
+    // categorical geometry even when probabilistic IDs/hash are unchanged.
+    let generatedFeatures: GeoJSON.Feature[] = [];
+    if (currentDay === 1 || currentDay === 2) {
+      generatedFeatures = processDay12OutlooksToCategorical(outlooks);
+    } else if (currentDay === 3) {
+      generatedFeatures = processDay3OutlooksToCategorical(outlooks);
+    }
+
+    const expectedSignature = signatureFromFeatures(generatedFeatures);
+    const currentSignature = signatureFromCategoricalMap(outlooks.categorical);
+    const categoricalOutOfSync = expectedSignature !== currentSignature;
+
+    // Fast path: same probabilistic state and categorical already matches expected output.
+    if (currentHash === lastProcessedRef.current && !categoricalOutOfSync) {
       return;
     }
 
@@ -92,14 +134,6 @@ const useAutoCategorical = () => {
         dispatch(setOutlookMap({ outlookType: 'categorical', map: tstmMap }));
       }
 
-      // Delegate processing to helper
-      let generatedFeatures: GeoJSON.Feature[] = [];
-      if (currentDay === 1 || currentDay === 2) {
-        generatedFeatures = processDay12OutlooksToCategorical(outlooks);
-      } else if (currentDay === 3) {
-        generatedFeatures = processDay3OutlooksToCategorical(outlooks);
-      }
-
       // Add all generated categorical features
       generatedFeatures.forEach((feature) => {
         dispatch(addFeature({ feature }));
@@ -107,7 +141,7 @@ const useAutoCategorical = () => {
     } finally {
       processingRef.current = false;
     }
-  }, [dispatch, outlooks, drawingState.activeOutlookType, currentDay]);
+  }, [dispatch, outlooks, currentDay]);
 
   return null;
 };
@@ -140,9 +174,60 @@ const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon
   }
 };
 
+const buildCumulativeCategoricalFeatures = (
+  riskPolygons: Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>
+): GeoJSON.Feature[] => {
+  const generatedFeatures: GeoJSON.Feature[] = [];
+  const riskOrderHighToLow: CategoricalRiskLevel[] = ['HIGH', 'MDT', 'ENH', 'SLGT', 'MRGL'];
+  const cumulativeByRisk = new Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>>();
+
+  let higherAccumulated: Feature<Polygon | MultiPolygon> | null = null;
+
+  // Build cumulative geometry from highest -> lowest.
+  // Each lower risk includes its own geometry plus all higher-risk geometry.
+  riskOrderHighToLow.forEach((risk) => {
+    const polys = riskPolygons.get(risk) || [];
+    let current = safeUnion(polys);
+
+    if (!current && !higherAccumulated) {
+      return;
+    }
+
+    if (!current && higherAccumulated) {
+      current = higherAccumulated;
+    } else if (current && higherAccumulated) {
+      current = safeUnion([current, higherAccumulated]) || current;
+    }
+
+    if (current) {
+      cumulativeByRisk.set(risk, current);
+      higherAccumulated = current;
+    }
+  });
+
+  // Emit in draw order from lowest -> highest.
+  (['MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as CategoricalRiskLevel[]).forEach((risk) => {
+    const geom = cumulativeByRisk.get(risk);
+    if (!geom) {
+      return;
+    }
+
+    generatedFeatures.push({
+      ...geom,
+      id: uuidv4(),
+      properties: {
+        outlookType: 'categorical',
+        probability: risk,
+        derivedFrom: 'auto-generated'
+      }
+    });
+  });
+
+  return generatedFeatures;
+};
+
 // Helper to convert Day 1/2 probability features to categorical pieces
 export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
-  const generatedFeatures: GeoJSON.Feature[] = [];
   const riskPolygons = new Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>();
 
   // 2. Process each Probability Type
@@ -202,40 +287,22 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
                 // Turf v7: difference takes FeatureCollection
                 remainingPoly = turf.difference(turf.featureCollection([remainingPoly, intersection as Feature<Polygon | MultiPolygon>])) as Feature<Polygon | MultiPolygon> | null;
               }
-            } catch (e) {
-                // Ignore topology errors
+            } catch {
+              // Ignore topology errors
             }
           }
         });
 
         // Any remaining part is CIG0
         if (remainingPoly) {
-             addPieceToRiskMap(type, probStr, 'CIG0', remainingPoly, riskPolygons);
+          addPieceToRiskMap(type, probStr, 'CIG0', remainingPoly, riskPolygons);
         }
       });
     });
   });
 
-  // 3. Union polygons of the same Risk Level and create final features
-  riskPolygons.forEach((polys, risk) => {
-    if (risk === 'TSTM') return; // Skip TSTM (Manual only)
-    
-    const unioned = safeUnion(polys);
-    if (unioned) {
-      generatedFeatures.push({
-        ...unioned,
-        id: uuidv4(),
-        properties: {
-          outlookType: 'categorical',
-          probability: risk,
-          derivedFrom: 'auto-generated'
-        }
-      });
-    }
-  });
-
-  return generatedFeatures;
-};
+  return buildCumulativeCategoricalFeatures(riskPolygons);
+}
 
 function addPieceToRiskMap(
   type: 'tornado' | 'wind' | 'hail', 
@@ -258,12 +325,11 @@ function addPieceToRiskMap(
 
 // Helper to convert Day 3 Total Severe probability features to categorical pieces
 export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
-  const generatedFeatures: GeoJSON.Feature[] = [];
   const riskPolygons = new Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>();
 
   // Day 3 only has totalSevere
   const probMap = outlooks.totalSevere;
-  if (!probMap) return generatedFeatures; // No totalSevere data
+  if (!probMap) return []; // No totalSevere data
   
   // Split into Probability Polygons and Hatching Polygons
   const probabilityFeatures = new Map<string, Feature<Polygon | MultiPolygon>[]>();
@@ -335,25 +401,7 @@ export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON
     });
   });
 
-  // Union polygons of the same Risk Level and create final features
-  riskPolygons.forEach((polys, risk) => {
-    if (risk === 'TSTM') return; // Skip TSTM (Manual only)
-    
-    const unioned = safeUnion(polys);
-    if (unioned) {
-      generatedFeatures.push({
-        ...unioned,
-        id: uuidv4(),
-        properties: {
-          outlookType: 'categorical',
-          probability: risk,
-          derivedFrom: 'auto-generated'
-        }
-      });
-    }
-  });
-
-  return generatedFeatures;
+  return buildCumulativeCategoricalFeatures(riskPolygons);
 }
 
 export default useAutoCategorical;

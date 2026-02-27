@@ -15,11 +15,11 @@ import {
 export const colorMappings: ColorMappings = {
   categorical: {
     'TSTM': '#bfe7bc', // General Thunderstorm (0/5)
-    'MRGL': '#7dc580', // Marginal (1/5)
-    'SLGT': '#f3f67d', // Slight (2/5)
-    'ENH': '#e5c27f',  // Enhanced (3/5)
-    'MDT': '#e67f7e',  // Moderate (4/5)
-    'HIGH': '#fe7ffe'  // High (5/5)
+    'MRGL': '#008b02', // Marginal (1/5) - Darker green
+    'SLGT': '#ffc703', // Slight (2/5) - Golden yellow
+    'ENH': '#ff6600',  // Enhanced (3/5) - Bright orange
+    'MDT': '#e60000',  // Moderate (4/5) - Red
+    'HIGH': '#ff00ff'  // High (5/5) - Magenta
   },
   tornado: {
     '2%': '#008b02',

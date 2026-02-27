@@ -19,7 +19,7 @@ const Legend: React.FC = React.memo(() => {
           <div key={risk} className="legend-item" role="listitem">
             <div 
               className="legend-color" 
-              style={{ backgroundColor: colorMappings.categorical[risk] }}
+              style={{ backgroundColor: colorMappings.categorical[risk], opacity: 0.5 }}
               role="img"
               aria-label={`Color for ${getCategoricalRiskDisplayName(risk as CategoricalRiskLevel)}`}
             />

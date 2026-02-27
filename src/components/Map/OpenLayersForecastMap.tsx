@@ -97,10 +97,13 @@ const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   return ctx.createPattern(canvas, 'repeat');
 };
 
-const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean = false) => {
+const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean = false, forCategoricalLayer: boolean = false) => {
   const style = getFeatureStyle(outlookType as any, probability);
   const fillColor = style.fillColor || '#ffffff';
-  const fillOpacity = typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.25;
+  // For categorical features on the dedicated layer, use full opacity fill.
+  // The layer itself has reduced opacity, so colors won't blend with each other
+  // but the map will still show through.
+  const fillOpacity = forCategoricalLayer ? 1.0 : (typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.25);
   const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
   const strokeColor = style.color || '#000000';
   const zIndex = computeZIndex(outlookType as any, probability);
@@ -206,8 +209,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const landSourceRef = useRef<VectorSource>(new VectorSource());
   const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
+  const catSourceRef = useRef<VectorSource>(new VectorSource());
+  const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
+  const catModifyRef = useRef<Modify | null>(null);
   const selectRef = useRef<Select | null>(null);
   const isApplyingExternalViewRef = useRef(false);
 
@@ -260,11 +266,24 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       zIndex: 2,
     });
     landLayerRef.current = landLayer;
-    const vectorLayer = new VectorLayer({ source: vectorSourceRef.current, zIndex: 3 });
+    // Categorical layer: dedicated source with per-feature full-opacity fills.
+    // Layer-level opacity (0.5) makes the basemap visible while higher-risk
+    // polygons completely cover lower-risk ones (no color blending).
+    const catLayer = new VectorLayer({
+      source: catSourceRef.current,
+      zIndex: 3,
+      opacity: 0.5,
+    });
+    catLayerRef.current = catLayer;
+    // Probabilistic/other features layer: separate source, normal per-feature opacity
+    const vectorLayer = new VectorLayer({
+      source: vectorSourceRef.current,
+      zIndex: 4,
+    });
 
     const map = new OLMap({
       target: mapElementRef.current,
-      layers: [tileLayer, worldLayer, landLayer, vectorLayer],
+      layers: [tileLayer, worldLayer, landLayer, catLayer, vectorLayer],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
         zoom: initialMapViewRef.current.zoom
@@ -330,6 +349,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     });
 
     const modify = new Modify({ source: vectorSourceRef.current });
+
     modify.on('modifyend', (event) => {
       const format = new GeoJSON();
       event.features.forEach((feature) => {
@@ -338,6 +358,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           return;
         }
 
+        // Use the original feature ID
         const featureId = feature.get('featureId') as string | undefined;
         const outlookType = feature.get('outlookType') as string | undefined;
         const probability = feature.get('probability') as string | undefined;
@@ -367,6 +388,43 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     map.addInteraction(modify);
     modifyRef.current = modify;
 
+    const catModify = new Modify({ source: catSourceRef.current });
+    catModify.on('modifyend', (event) => {
+      const fmt = new GeoJSON();
+      event.features.forEach((feature) => {
+        const derivedFrom = feature.get('derivedFrom') as string | undefined;
+        if (derivedFrom === 'auto-generated') {
+          return;
+        }
+
+        const geometry = feature.getGeometry();
+        if (!geometry) return;
+        const featureId = feature.get('featureId') as string | undefined;
+        const outlookType = feature.get('outlookType') as string | undefined;
+        const probability = feature.get('probability') as string | undefined;
+        if (!featureId || !outlookType || !probability) return;
+        const geoJsonGeometry = fmt.writeGeometryObject(geometry, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857'
+        });
+        dispatch(updateFeature({
+          feature: {
+            type: 'Feature',
+            id: featureId,
+            geometry: geoJsonGeometry as Polygon,
+            properties: {
+              outlookType,
+              probability,
+              isSignificant: Boolean(feature.get('isSignificant')),
+              derivedFrom: feature.get('derivedFrom')
+            }
+          }
+        }));
+      });
+    });
+    map.addInteraction(catModify);
+    catModifyRef.current = catModify;
+
     const select = new Select({ condition: click });
     select.setActive(false);
     select.on('select', (event) => {
@@ -375,9 +433,19 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         return;
       }
 
+      // Use the original feature ID, not the potentially clipped one
       const featureId = selected.get('featureId') as string | undefined;
       const outlookType = selected.get('outlookType') as string | undefined;
       const probability = selected.get('probability') as string | undefined;
+      const derivedFrom = selected.get('derivedFrom') as string | undefined;
+
+      // Auto-generated categorical polygons are derived from probabilistic outlooks.
+      // Keep them read-only here; users should edit tornado/wind/hail/totalSevere
+      // (or draw/delete TSTM manually) and let auto-categorical regenerate.
+      if (outlookType === 'categorical' && derivedFrom === 'auto-generated') {
+        select.getFeatures().clear();
+        return;
+      }
 
       if (featureId && outlookType && probability) {
         dispatch(removeFeature({
@@ -398,6 +466,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       }
       if (modifyRef.current) {
         map.removeInteraction(modifyRef.current);
+      }
+      if (catModifyRef.current) {
+        map.removeInteraction(catModifyRef.current);
       }
       if (selectRef.current) {
         map.removeInteraction(selectRef.current);
@@ -531,7 +602,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     }
 
     if (drawingState.activeOutlookType === 'categorical' || drawingState.activeOutlookType === 'tornado' || drawingState.activeOutlookType === 'wind' || drawingState.activeOutlookType === 'hail' || drawingState.activeOutlookType === 'totalSevere' || drawingState.activeOutlookType === 'day4-8') {
-      const draw = new Draw({ source: vectorSourceRef.current, type: 'Polygon' });
+      const drawSource = drawingState.activeOutlookType === 'categorical' ? catSourceRef.current : vectorSourceRef.current;
+      const draw = new Draw({ source: drawSource, type: 'Polygon' });
       draw.on('drawend', (event) => {
         const format = new GeoJSON();
         const olGeometry = event.feature.getGeometry();
@@ -562,49 +634,45 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
   useEffect(() => {
     const source = vectorSourceRef.current;
+    const catSource = catSourceRef.current;
     source.clear();
+    catSource.clear();
     const format = new GeoJSON();
 
     // Find the maximum z-index for bold styling
     let maxZIndex = -Infinity;
     serializedFeatures.forEach(({ outlookType, probability }) => {
       const zIndex = computeZIndex(outlookType as any, probability);
-      if (zIndex > maxZIndex) {
-        maxZIndex = zIndex;
-      }
+      if (zIndex > maxZIndex) maxZIndex = zIndex;
     });
 
     serializedFeatures.forEach(({ outlookType, probability, feature }) => {
+      const isCategorical = outlookType === 'categorical';
+      const targetSource = isCategorical ? catSource : source;
+
       const olFeature = format.readFeature(feature, {
         dataProjection: 'EPSG:4326',
         featureProjection: 'EPSG:3857'
       });
-      
+
       const zIndex = computeZIndex(outlookType as any, probability);
       const isTopLayer = zIndex === maxZIndex;
-      
-      if (Array.isArray(olFeature)) {
-        olFeature.forEach((item: FeatureLike) => {
-          if ('setStyle' in item && typeof item.setStyle === 'function') {
-            item.setStyle(toOlStyle(outlookType, probability, isTopLayer));
-          }
-          if ('set' in item && typeof item.set === 'function') {
-            item.set('featureId', feature.id as string);
-            item.set('outlookType', outlookType);
-            item.set('probability', probability);
-            item.set('isSignificant', Boolean(feature.properties?.isSignificant));
-          }
-          source.addFeature(item as any);
-        });
-        return;
-      }
 
-      olFeature.setStyle(toOlStyle(outlookType, probability, isTopLayer));
-      olFeature.set('featureId', feature.id as string);
-      olFeature.set('outlookType', outlookType);
-      olFeature.set('probability', probability);
-      olFeature.set('isSignificant', Boolean(feature.properties?.isSignificant));
-      source.addFeature(olFeature);
+      const applyProps = (f: any) => {
+        f.setStyle(toOlStyle(outlookType, probability, isTopLayer, isCategorical));
+        f.set('featureId', feature.id as string);
+        f.set('outlookType', outlookType);
+        f.set('probability', probability);
+        f.set('isSignificant', Boolean(feature.properties?.isSignificant));
+        f.set('derivedFrom', feature.properties?.derivedFrom);
+        targetSource.addFeature(f);
+      };
+
+      if (Array.isArray(olFeature)) {
+        olFeature.forEach((item: FeatureLike) => applyProps(item));
+      } else {
+        applyProps(olFeature);
+      }
     });
   }, [serializedFeatures]);
 
