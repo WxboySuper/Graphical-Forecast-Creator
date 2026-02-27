@@ -93,7 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Right side actions */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground px-2 hidden sm:inline select-none">
-              v1.0.0
+              v1.0.0-beta.3
             </span>
             <Tooltip>
               <TooltipTrigger asChild>

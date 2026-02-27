@@ -95,12 +95,18 @@ export const getFeatureStyle = (outlookType: OutlookType, probability: string): 
   }
 
   const color = lookupColor(outlookType, probability);
+  // Categorical polygons are nested (MRGL contains SLGT contains ENH…).
+  // On the map, a dedicated categorical VectorLayer renders them at full
+  // fill opacity with layer-level 0.5 opacity, so higher-risk polygons
+  // completely cover lower-risk ones without color blending.
+  // This value is used as a fallback / for export utilities.
+  const fillOpacity = outlookType === 'categorical' ? 0.5 : 0.3;
   return {
     color: '#000000',
     weight: 2,
     opacity: 1,
     fillColor: color,
-    fillOpacity: 0.3,
+    fillOpacity,
     zIndex: computeZIndex(outlookType, probability)
   };
 };
