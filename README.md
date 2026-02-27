@@ -147,6 +147,13 @@ src/
 
 ---
 
+## Disclaimer
+
+- First and foremost, GFC is a creative and educational tool. It is NOT an official source of weather warnings, watches, or advisories. Always consult official sources (e.g., weather.gov) for accurate and authoritative weather information.
+- Second AI was used in the development of this project. The final product and code in this codebase has been reviewed by me (Alex/ WeatherboySuper) to ensure quality outputs and good code. However I am not perfect, and there may be issues or bugs that I missed or I caused. If you see any problems, please report them via GitHub Issues or the GFC Support Discord.
+
+---
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

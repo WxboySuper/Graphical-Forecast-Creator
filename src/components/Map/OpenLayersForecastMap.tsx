@@ -25,6 +25,7 @@ import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature, GeoJsonProperties, Polygon } from 'geojson';
 import Legend from './Legend';
 import StatusOverlay from './StatusOverlay';
+import UnofficialBadge from './UnofficialBadge';
 import './ForecastMap.css';
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
@@ -139,11 +140,18 @@ const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean
 // Cached GeoJSON for blank map style — fetched once, shared across re-renders
 let cachedUsStatesGeoJSON: any = null;
 let cachedWorldCountriesGeoJSON: any = null;
+let cachedLakesGeoJSON: any = null;
 
 // Gray style for world landmass (Canada, Mexico, etc.)
 const BLANK_WORLD_STYLE = new Style({
   fill: new Fill({ color: '#808080' }),
   stroke: new Stroke({ color: '#555555', width: 0.5 }),
+});
+
+// Blue style for lakes (Great Lakes, etc.) — renders above world, below US states
+const BLANK_LAKE_STYLE = new Style({
+  fill: new Fill({ color: '#7BA0C8' }),
+  stroke: new Stroke({ color: '#5585b5', width: 0.5 }),
 });
 
 // Cream style with crisp black borders for US states
@@ -206,6 +214,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
   const worldSourceRef = useRef<VectorSource>(new VectorSource());
   const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const lakesSourceRef = useRef<VectorSource>(new VectorSource());
+  const lakesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const landSourceRef = useRef<VectorSource>(new VectorSource());
   const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
@@ -260,6 +270,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       zIndex: 1,
     });
     worldLayerRef.current = worldLayer;
+    const lakesLayer = new VectorLayer({
+      source: lakesSourceRef.current,
+      visible: false,
+      zIndex: 1.5,
+    });
+    lakesLayerRef.current = lakesLayer;
     const landLayer = new VectorLayer({
       source: landSourceRef.current,
       visible: false,
@@ -283,7 +299,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
     const map = new OLMap({
       target: mapElementRef.current,
-      layers: [tileLayer, worldLayer, landLayer, catLayer, vectorLayer],
+      layers: [tileLayer, worldLayer, lakesLayer, landLayer, catLayer, vectorLayer],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
         zoom: initialMapViewRef.current.zoom
@@ -525,13 +541,15 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   useEffect(() => {
     const tile = tileLayerRef.current;
     const world = worldLayerRef.current;
+    const lakes = lakesLayerRef.current;
     const land = landLayerRef.current;
     const el = mapElementRef.current;
-    if (!tile || !world || !land || !el) return;
+    if (!tile || !world || !lakes || !land || !el) return;
 
     if (baseMapStyle === 'blank') {
       tile.setVisible(false);
       world.setVisible(true);
+      lakes.setVisible(true);
       land.setVisible(true);
       // Deeper ocean blue
       el.style.backgroundColor = '#7BA0C8';
@@ -558,6 +576,28 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         loadWorld().catch(() => {});
       }
 
+      // Load lakes layer (Great Lakes, etc.) — blue, sits between world and US states
+      if (lakesSourceRef.current.getFeatures().length === 0) {
+        const loadLakes = async () => {
+          if (!cachedLakesGeoJSON) {
+            const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_lakes.geojson');
+            cachedLakesGeoJSON = await res.json();
+          }
+          const format = new GeoJSON();
+          const features = format.readFeatures(cachedLakesGeoJSON, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857',
+          });
+          features.forEach((f) => {
+            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
+              (f as any).setStyle(BLANK_LAKE_STYLE);
+            }
+          });
+          lakesSourceRef.current.addFeatures(features as any[]);
+        };
+        loadLakes().catch(() => {});
+      }
+
       // Load US states layer (cream fill, black borders on top of world layer)
       if (landSourceRef.current.getFeatures().length === 0) {
         const loadStates = async () => {
@@ -582,6 +622,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     } else {
       tile.setVisible(true);
       world.setVisible(false);
+      lakes.setVisible(false);
       land.setVisible(false);
       el.style.backgroundColor = '';
       tile.setSource(createTileSource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>));
@@ -768,6 +809,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       </div>
       <Legend />
       <StatusOverlay />
+      <UnofficialBadge />
     </div>
   );
 });

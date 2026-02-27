@@ -18,6 +18,7 @@ import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 // New UI components
 import { AppLayout } from './components/Layout';
 import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage } from './pages';
+import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 
 // Launch gate: set REACT_APP_COMING_SOON=true in the public build to enable pre-launch mode.
 // The app auto-unlocks at the launch date/time regardless of the env var.
@@ -64,6 +65,8 @@ const AppHooks = () => {
 function App() {
   const isLaunched = useLaunchGate();
   const showComingSoon = COMING_SOON_MODE && !isLaunched;
+  // ToS gate: only shown after launch (not during coming-soon mode)
+  const [tosAccepted, setTosAccepted] = useState(() => showComingSoon || hasAcceptedToS());
 
   return (
     <Provider store={store}>
@@ -73,7 +76,10 @@ function App() {
           v7_relativeSplatPath: true,
         }}
       >
-        {!showComingSoon && <AppHooks />}
+        {!showComingSoon && !tosAccepted && (
+          <ToSModal onAccept={() => setTosAccepted(true)} />
+        )}
+        {(!showComingSoon && tosAccepted) && <AppHooks />}
         <Routes>
           {showComingSoon ? (
             <>

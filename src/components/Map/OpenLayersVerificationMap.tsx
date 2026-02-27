@@ -23,6 +23,7 @@ import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import { Circle, Fill as StyleFill, Stroke as StyleStroke, Style as OlStyle } from 'ol/style';
 import Legend from './Legend';
+import UnofficialBadge from './UnofficialBadge';
 import './ForecastMap.css';
 import { ReportType } from '../../types/stormReports';
 
@@ -443,6 +444,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
         </div>
       </div>
       <Legend activeOutlookType={activeOutlookType} />
+      <UnofficialBadge />
     </div>
   );
 });

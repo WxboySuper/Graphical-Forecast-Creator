@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { Navbar } from './Navbar';
 import Documentation from '../Documentation/Documentation';
 import { ToastManager } from '../Toast/Toast';
+import ToSModal from '../ToS/ToSModal';
 import { RootState } from '../../store';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '../../lib/utils';
@@ -32,6 +33,7 @@ export const useAppLayout = () => {
 
 export const AppLayout: React.FC = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
+  const [showTermsViewer, setShowTermsViewer] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const navigate = useNavigate();
@@ -105,6 +107,7 @@ export const AppLayout: React.FC = () => {
         <Navbar 
           onToggleDocumentation={toggleDocumentation}
           showDocumentation={showDocumentation}
+          onViewTerms={() => setShowTermsViewer(true)}
         />
         
         {/* Documentation side-panel (right-side drawer) */}
@@ -137,6 +140,14 @@ export const AppLayout: React.FC = () => {
         </main>
         
         <ToastManager toasts={toasts} onDismiss={removeToast} />
+
+        {showTermsViewer && (
+          <ToSModal
+            viewOnly
+            onClose={() => setShowTermsViewer(false)}
+            onAccept={() => {}}
+          />
+        )}
       </div>
     </AppLayoutContext.Provider>
   );

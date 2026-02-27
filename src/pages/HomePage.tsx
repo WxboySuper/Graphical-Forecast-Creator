@@ -21,6 +21,7 @@ import {
   PenTool,
   RefreshCw,
   BarChart2,
+  Bot,
 } from 'lucide-react';
 import { RootState } from '../store';
 import { 
@@ -558,6 +559,34 @@ export const HomePage: React.FC = () => {
             )}
           </Card>
         )}
+        {/* ── AI Disclaimer ── */}
+        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
+          <Bot className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground/70" />
+          <p className="leading-relaxed">
+            <span className="font-medium text-foreground">AI Development Disclosure:</span>{' '}
+            AI was used in the development of this project. All code has been reviewed by the maintainer
+            (Alex / WeatherboySuper) to ensure quality and correctness; however, bugs or issues may still
+            be present. If you encounter a problem, please report it via{' '}
+            <a
+              href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground transition-colors"
+            >
+              GitHub Issues
+            </a>
+            {' '}or the{' '}
+            <a
+              href="https://discord.gg/SGk37rg8sz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground transition-colors"
+            >
+              GFC Support Discord
+            </a>.
+          </p>
+        </div>
+
       </div>
 
       {/* Hidden file input */}
