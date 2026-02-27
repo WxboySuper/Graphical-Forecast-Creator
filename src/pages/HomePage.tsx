@@ -188,7 +188,7 @@ export const HomePage: React.FC = () => {
                   <span className="text-primary">severe weather outlooks.</span>
                 </h1>
                 <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
-                  Create SPC-style probabilistic outlooks for Days 1–8, write forecast discussions, 
+                  Create probabilistic severe weather outlooks for Days 1–8, write forecast discussions, 
                   and verify your predictions — right in your browser, no sign-in required.
                 </p>
               </div>

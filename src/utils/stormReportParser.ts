@@ -2,7 +2,7 @@ import { StormReport, ReportType } from '../types/stormReports';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Fetches storm reports from SPC for a given date
+ * Fetches storm reports from NOAA archives for a given date
  * @param date Date in YYMMDD format (e.g., "260130" for January 30, 2026)
  * @returns Promise with array of storm reports
  */
@@ -167,9 +167,9 @@ function parseCSVRow(line: string, type: ReportType, headers: string[]): StormRe
 }
 
 /**
- * Formats a date object to YYMMDD format for SPC API
+ * Formats a date object to YYMMDD format for NOAA storm report archives
  */
-export function formatDateForSPC(date: Date): string {
+export function formatReportDate(date: Date): string {
   const year = date.getFullYear().toString().slice(-2);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
@@ -179,7 +179,7 @@ export function formatDateForSPC(date: Date): string {
 /**
  * Parses YYMMDD format to Date object
  */
-export function parseSPCDate(dateStr: string): Date {
+export function parseReportDate(dateStr: string): Date {
   const year = 2000 + parseInt(dateStr.slice(0, 2));
   const month = parseInt(dateStr.slice(2, 4)) - 1;
   const day = parseInt(dateStr.slice(4, 6));

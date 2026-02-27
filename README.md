@@ -1,6 +1,6 @@
 # Graphical Forecast Creator
 
-**A web application for creating SPC-style severe weather outlooks, verifying forecasts, and writing forecast discussions.**
+**A web application for creating professional severe weather outlooks, verifying forecasts, and writing forecast discussions.**
 
 Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 
@@ -23,7 +23,7 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 - Auto-save to browser localStorage every 5 seconds; session restored on reload
 
 ### Verification
-- Load SPC storm reports (tornado, wind, hail) by date
+- Load NOAA storm reports (tornado, wind, hail) by date
 - Plot reports on top of your outlook for visual hit/miss analysis
 - Statistics: report counts per risk level (highest risk only, no double-counting)
 - Isolated verification state - reviewing old outlooks won't affect your active cycle
@@ -40,7 +40,7 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 - Copy cycle JSON to clipboard for sharing
 
 ### Map & UI
-- Multiple base map styles: Standard (OSM), Light (CartoDB), Dark (CartoDB), Satellite (Esri), **Blank (Weather)** (SPC-style flat map — cream US, gray neighbors, blue ocean)
+- Multiple base map styles: Standard (OSM), Light (CartoDB), Dark (CartoDB), Satellite (Esri), **Blank (Weather)** (classic weather-style flat map — cream US, gray neighbors, blue ocean)
 - Map auto-switches to dark tile set when dark mode is enabled
 - Overlay toggles: state borders, county/CWA boundaries
 - Full light/dark theme with persistent preference

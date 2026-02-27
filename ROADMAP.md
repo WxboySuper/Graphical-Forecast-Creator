@@ -72,7 +72,7 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 ## v0.7.0-alpha: Categorical Logic
 
-**Goal:** Implementing the SPC style guide.
+**Goal:** Implementing categorical risk levels and visual style.
 
 - [x] Add "Risk Category" selector (TSTM, MRGL, SLGT, ENH, MDT, HIGH).
 - [x] Implement dynamic polygon styling based on category (Green, Yellow, Orange, Red, Magenta).
@@ -82,7 +82,7 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 **Goal:** "How did I do?"
 
-- [x] Implement "Storm Report Upload" (CSV/JSON import from SPC archive).
+- [x] Implement "Storm Report Upload" (CSV/JSON import from NOAA storm report archive).
 - [x] Plot Tornado/Wind/Hail reports as distinct icons over the user's outlook.
 - [x] Basic "Hit/Miss" visual check.
 

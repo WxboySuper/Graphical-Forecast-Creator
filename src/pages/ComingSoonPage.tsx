@@ -67,7 +67,7 @@ export const ComingSoonPage: React.FC = () => {
           <p className="text-lg max-w-xl mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             GFC launches publicly on{' '}
             <strong style={{ color: 'var(--text-primary)' }}>March 1st at noon CST</strong>.
-            Full support for SPC-style probabilistic outlooks, forecast discussions, and verification — right in your browser.
+            Full support for probabilistic severe weather outlooks, forecast discussions, and verification — right in your browser.
           </p>
         </div>
 

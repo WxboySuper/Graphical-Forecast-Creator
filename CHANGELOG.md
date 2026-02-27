@@ -66,7 +66,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Verification Tools:**
-  - "Storm Report Upload" — import SPC CSV archive by date.
+  - "Storm Report Upload" — import NOAA storm report CSV archive by date.
   - Plot tornado (red triangles), wind (blue squares), and hail (green circles) reports over the outlook.
   - Visual hit/miss check against drawn risk areas.
 
@@ -75,7 +75,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **Categorical Logic:**
   - Risk category selector: TSTM, MRGL, SLGT, ENH, MDT, HIGH.
-  - Dynamic polygon colors and labels per category per the SPC style guide.
+  - Dynamic polygon colors and labels per category.
   - Auto-categorical logic: categorical risk derived from tornado/wind/hail probabilistic outlooks.
 
 ## [0.6.0-alpha] - 2026-01-30
@@ -129,7 +129,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **New Outlook Format:**
-  - Implemented support for the new SPC outlook format (effective March 2026).
+  - Implemented support for the updated convective outlook format (effective March 2026).
   - Added "Hatching" as a separate property/layer per probability type (Tornado, Wind, Hail).
   - Added CIG levels (CIG1, CIG2, CIG3) with specific hatching patterns.
   - Updated color mappings and categorical conversion logic (`useAutoCategorical`) to use geometric intersection with `@turf/turf`.

@@ -1,7 +1,7 @@
 import type { Feature } from 'geojson';
 
 /**
- * Defines the types for the Storm Prediction Center's severe weather outlook system
+ * Defines the types for GFC's severe weather outlook system
  * Based on the specifications in Outlook_Info.md
  */
 

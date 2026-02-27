@@ -1,5 +1,5 @@
 /**
- * Storm report types for SPC storm report data
+ * Storm report types for NOAA storm report data
  */
 
 export type ReportType = 'tornado' | 'wind' | 'hail';

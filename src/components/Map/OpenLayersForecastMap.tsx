@@ -533,7 +533,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       tile.setVisible(false);
       world.setVisible(true);
       land.setVisible(true);
-      // Deeper SPC-style ocean blue
+      // Deeper ocean blue
       el.style.backgroundColor = '#7BA0C8';
 
       // Load world countries layer (gray fill for Canada, Mexico, etc.)

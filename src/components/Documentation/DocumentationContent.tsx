@@ -16,7 +16,7 @@ export const OverviewSection: React.FC = () => (
   <div className="doc-section">
     <h3>Graphical Forecast Creator</h3>
     <p>
-      GFC is a tool for creating Storm Prediction Center-style severe weather outlook graphics.
+      GFC is a tool for creating professional severe weather outlook graphics.
       Draw probabilistic forecast areas on an interactive CONUS map, then export or share your work.
     </p>
 
@@ -35,7 +35,7 @@ export const OverviewSection: React.FC = () => (
       <li>Auto-generated categorical outlook from probabilistic inputs</li>
       <li>Cycle Manager — save, load, and copy forecasts between cycles</li>
       <li>Export as JSON (for reloading) or PNG image snapshot</li>
-      <li>Blank (Weather) map style — SPC-inspired cream/blue basemap</li>
+      <li>Blank (Weather) map style — classic weather-style cream/blue basemap</li>
       <li>Full dark mode support</li>
     </ul>
 

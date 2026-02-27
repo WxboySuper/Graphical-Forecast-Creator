@@ -11,7 +11,7 @@ import {
   clearReports
 } from '../../store/stormReportsSlice';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
-import { fetchStormReports, formatDateForSPC } from '../../utils/stormReportParser';
+import { fetchStormReports, formatReportDate } from '../../utils/stormReportParser';
 import { analyzeVerification, formatVerificationSummary } from '../../utils/verificationUtils';
 import { DayType } from '../../types/outlooks';
 import './VerificationPanel.css';
@@ -53,12 +53,12 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       // Parse YYYY-MM-DD string directly to avoid timezone issues
       const [year, month, day] = selectedDate.split('-').map(Number);
       const dateObj = new Date(year, month - 1, day); // month is 0-indexed
-      const spcDate = formatDateForSPC(dateObj);
+      const reportDate = formatReportDate(dateObj);
       
-      const fetchedReports = await fetchStormReports(spcDate);
+      const fetchedReports = await fetchStormReports(reportDate);
       
       dispatch(setReports(fetchedReports));
-      dispatch(setDate(spcDate));
+      dispatch(setDate(reportDate));
       
       if (fetchedReports.length === 0) {
         dispatch(setError('No storm reports found for this date.'));
@@ -260,7 +260,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       
       <div className="verification-info">
         <p><small>
-          Storm reports are loaded from the Storm Prediction Center (SPC) archives.
+          Storm reports are loaded from the NOAA Storm Prediction Center archives.
           Data may not be available for all dates.
         </small></p>
       </div>
