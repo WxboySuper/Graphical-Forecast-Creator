@@ -31,7 +31,7 @@ jobs:
         run: pnpm run build
         env:
           # Override the homepage so asset paths target the beta domain
-          PUBLIC_URL: https://gfc-beta.weatherboysuper.com
+          PUBLIC_URL: https://beta-gfc.weatherboysuper.com
           # Prevent ESLint warnings from failing the build (arc source-map noise etc.)
           CI: false
 
