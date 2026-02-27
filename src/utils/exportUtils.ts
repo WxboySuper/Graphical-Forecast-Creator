@@ -232,7 +232,7 @@ const addOverlays = (container: HTMLElement, title?: string) => {
     titleDiv.textContent = title;    container.appendChild(titleDiv);
   }
   const footerDiv = doc.createElement('div');
-  footerDiv.style.cssText = 'position:absolute;bottom:20px;right:20px;z-index:1000;background-color:rgba(0, 0, 0, 0.9);padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
+  footerDiv.style.cssText = 'position:absolute;bottom:20px;right:20px;z-index:1000;background-color:rgba(255,255,255,0.9);padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
   footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
   container.appendChild(footerDiv);
 };
