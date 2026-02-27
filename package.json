@@ -1,6 +1,6 @@
 {
   "name": "graphical-forecast-creator",
-  "version": "1.0.0-dev",
+  "version": "1.0.0",
   "private": true,
   "homepage": "https://gfc.weatherboysuper.com/",
   "dependencies": {
