@@ -1,0 +1,49 @@
+name: Deploy Beta
+
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:   # lets you trigger manually from the GitHub Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+        env:
+          # Override the homepage so asset paths target the beta domain
+          PUBLIC_URL: https://gfc-beta.weatherboysuper.com
+          # Prevent ESLint warnings from failing the build (arc source-map noise etc.)
+          CI: false
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BETA_SSH_KEY }}
+
+      - name: Trust VPS host key
+        run: ssh-keyscan -H ${{ secrets.BETA_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via rsync
+        run: |
+          rsync -avz --delete \
+            build/ root@${{ secrets.BETA_SSH_HOST }}:/var/www/gfc-beta/

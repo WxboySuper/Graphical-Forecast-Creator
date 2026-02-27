@@ -18,6 +18,9 @@ import {
   Wind,
   CloudRain,
   AlertTriangle,
+  PenTool,
+  RefreshCw,
+  BarChart2,
 } from 'lucide-react';
 import { RootState } from '../store';
 import { 
@@ -163,57 +166,141 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-7xl mx-auto p-8 space-y-8">
-        {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <Cloud className="h-10 w-10 text-primary" />
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight text-foreground">
+      <div className="max-w-7xl mx-auto p-8 space-y-10">
+
+        {/* ── Hero ── */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 p-10 md:p-14">
+          {/* Background accent blobs */}
+          <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-primary/5 blur-2xl pointer-events-none" />
+
+          <div className="relative flex flex-col md:flex-row items-start md:items-center gap-8">
+            <div className="space-y-5 flex-1">
+              {/* Brand pill */}
+              <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/25 rounded-full px-4 py-1.5 text-sm font-medium text-primary">
+                <Cloud className="h-4 w-4" />
                 Graphical Forecast Creator
-              </h1>
-              <p className="text-muted-foreground">
-                Professional severe weather outlook graphics
-              </p>
+              </div>
+
+              <div className="space-y-3">
+                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
+                  Draw professional<br />
+                  <span className="text-primary">severe weather outlooks.</span>
+                </h1>
+                <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
+                  Create SPC-style probabilistic outlooks for Days 1–8, write forecast discussions, 
+                  and verify your predictions — right in your browser, no sign-in required.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button size="lg" onClick={() => navigate('/forecast')}>
+                  Start Drawing
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => navigate('/discussion')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Write a Discussion
+                </Button>
+              </div>
+            </div>
+
+            {/* Risk level badges — visual accent */}
+            <div className="hidden lg:flex flex-col gap-2 shrink-0 select-none">
+              {[
+                { label: 'HIGH', bg: 'bg-[#fe7ffe]/30', border: 'border-[#fe7ffe]/60', text: 'text-foreground' },
+                { label: 'MDT',  bg: 'bg-[#e67f7e]/30', border: 'border-[#e67f7e]/60', text: 'text-foreground' },
+                { label: 'ENH',  bg: 'bg-[#e5c27f]/30', border: 'border-[#e5c27f]/60', text: 'text-foreground' },
+                { label: 'SLGT', bg: 'bg-[#f3f67d]/30', border: 'border-[#f3f67d]/60', text: 'text-foreground' },
+                { label: 'MRGL', bg: 'bg-[#7dc580]/30', border: 'border-[#7dc580]/60', text: 'text-foreground' },
+                { label: 'TSTM', bg: 'bg-[#bfe7bc]/30', border: 'border-[#bfe7bc]/60', text: 'text-foreground' },
+              ].map(({ label, bg, border, text }) => (
+                <div
+                  key={label}
+                  className={cn(
+                    'w-24 text-center px-4 py-2 rounded-lg border font-bold text-sm tracking-wide',
+                    bg, border, text
+                  )}
+                >
+                  {label}
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Welcome section for first-time users */}
-        {stats.daysWithData.length === 0 && stats.savedCyclesCount === 0 && (
-          <Card className="p-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/30">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              <div className="p-4 bg-primary/10 rounded-2xl shrink-0">
-                <Cloud className="h-12 w-12 text-primary" />
+        {/* ── Features ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              icon: <PenTool className="h-6 w-6 text-primary" />,
+              bg: 'bg-primary/10',
+              title: 'Polygon Drawing',
+              body: 'Draw tornado, wind, hail, and categorical outlook polygons on an interactive map — with snapping, cut-outs, and automatic categorical derivation.',
+            },
+            {
+              icon: <FileText className="h-6 w-6 text-btn-discussion" />,
+              bg: 'bg-purple-500/10',
+              title: 'Discussion Editor',
+              body: 'Write forecast discussions in DIY free-form mode or step through guided questions. Export to plain text in GFC\'s clean, readable format.',
+            },
+            {
+              icon: <BarChart2 className="h-6 w-6 text-success" />,
+              bg: 'bg-success/10',
+              title: 'Forecast Verification',
+              body: 'Load storm reports and see how many fell inside each risk level. Reports are scored to the highest applicable zone to avoid double-counting.',
+            },
+            {
+              icon: <RefreshCw className="h-6 w-6" style={{ color: 'var(--btn-cycle)' }} />,
+              bg: 'bg-btn-cycle/10',
+              title: 'Cycle Manager',
+              body: 'Save named snapshots of any cycle and copy regions between days. Use yesterday\'s Day 2 as the starting point for today\'s Day 1 in seconds.',
+            },
+          ].map(({ icon, bg, title, body }) => (
+            <Card key={title} className="p-6 bg-card border-border hover:shadow-lg transition-shadow space-y-3">
+              <div className={cn('p-3 rounded-xl w-fit', bg)}>
+                {icon}
               </div>
-              <div className="space-y-3 flex-1">
-                <h2 className="text-2xl font-bold text-foreground">Welcome to Graphical Forecast Creator</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Draw SPC-style severe weather outlooks for Days 1–8, write forecast discussions, and verify your forecasts against storm reports. 
-                  Your work auto-saves every 5 seconds and persists between sessions.
-                </p>
-                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">🌪 Tornado</span>
-                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">💨 Wind</span>
-                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">🌨 Hail</span>
-                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">📊 Categorical</span>
-                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">✍️ Discussion Editor</span>
-                  <span className="bg-background/50 rounded-full px-3 py-1 border border-border">✅ Verification</span>
-                </div>
-              </div>
-              <Button
-                size="lg"
-                className="shrink-0"
-                onClick={() => navigate('/forecast')}
-              >
-                Start Drawing
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
-          </Card>
-        )}
+              <h3 className="font-semibold text-foreground">{title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+            </Card>
+          ))}
+        </div>
 
-        {/* Quick Stats */}
+        {/* ── Outlook types quick-reference ── */}
+        <Card className="p-6 bg-card border-border">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-warning" />
+            Supported Outlook Types
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { icon: <Wind className="h-4 w-4 text-red-500" />,    label: 'Tornado',     sub: '2–60% + CIG' },
+              { icon: <Wind className="h-4 w-4 text-blue-500" />,   label: 'Wind',        sub: '5–90% + CIG' },
+              { icon: <CloudRain className="h-4 w-4 text-green-500" />, label: 'Hail',    sub: '5–60% + CIG' },
+              { icon: <Layers className="h-4 w-4 text-purple-500" />, label: 'Categorical', sub: 'TSTM→HIGH' },
+              { icon: <Cloud className="h-4 w-4 text-orange-500" />, label: 'Total Severe', sub: 'Day 3 only' },
+              { icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />, label: 'Day 4–8',  sub: '15% / 30%' },
+            ].map(({ icon, label, sub }) => (
+              <div key={label} className="p-3 bg-muted/30 rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  {icon}
+                  <p className="font-medium text-sm text-foreground">{label}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">{sub}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* ── Dashboard divider ── */}
+        <div className="flex items-center gap-4">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Your Dashboard</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="p-6 bg-card border-border hover:shadow-lg transition-shadow">
             <div className="flex items-center gap-4">
@@ -428,47 +515,6 @@ export const HomePage: React.FC = () => {
             </div>
           </Card>
         </div>
-
-        {/* Hazard Types Overview */}
-        <Card className="p-6 bg-card border-border">
-          <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-warning" />
-            Outlook Types
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-muted/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Wind className="h-5 w-5 text-red-500" />
-                <p className="font-medium text-foreground">Tornado</p>
-              </div>
-              <p className="text-xs text-muted-foreground">2%, 5%, 10%, 15%, 30%, 45%, 60%</p>
-            </div>
-            
-            <div className="p-4 bg-muted/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Wind className="h-5 w-5 text-blue-500" />
-                <p className="font-medium text-foreground">Wind</p>
-              </div>
-              <p className="text-xs text-muted-foreground">5%, 15%, 30%, 45%, 60%</p>
-            </div>
-            
-            <div className="p-4 bg-muted/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <CloudRain className="h-5 w-5 text-green-500" />
-                <p className="font-medium text-foreground">Hail</p>
-              </div>
-              <p className="text-xs text-muted-foreground">5%, 15%, 30%, 45%, 60%</p>
-            </div>
-            
-            <div className="p-4 bg-muted/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Layers className="h-5 w-5 text-purple-500" />
-                <p className="font-medium text-foreground">Categorical</p>
-              </div>
-              <p className="text-xs text-muted-foreground">TSTM, MRGL, SLGT, ENH, MDT, HIGH</p>
-            </div>
-          </div>
-        </Card>
 
         {/* Recent Cycles (if any) */}
         {savedCycles.length > 0 && (
