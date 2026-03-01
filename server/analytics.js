@@ -4,7 +4,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = parseInt(process.env.PORT || '3005', 10);
+const PORT = parseInt(process.env.PORT || '3006', 10);
 const LOG_DIR = process.env.LOG_DIR || path.join(__dirname, 'logs');
 const LOG_FILE = path.join(LOG_DIR, 'analytics.log');
 
