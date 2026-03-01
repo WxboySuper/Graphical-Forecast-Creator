@@ -198,12 +198,7 @@ export function windToCategorical(probability: string, cig: CIGLevel = 'CIG0'): 
   // ENH
   if (p === '15%' && cig === 'CIG2') return 'ENH';
   if (p === '30%' && (cig === 'CIG1' || cig === 'CIG2')) return 'ENH';
-  if ((p === '45%' || p === '60%' || p === '75%' || p === '90%') && (cig === 'CIG0' || cig === 'CIG1')) return 'ENH'; // Prompt says 45,60,75,90 CIG0 -> ENH. Table: "45%: CIG 0, 1". "60%: CIG 0". "75%: CIG 0". "90%: CIG 0".
-  // Correction from prompt:
-  // ENH: 45%: CIG 0, 1. 
-  // ENH: 60%: CIG 0.
-  // ENH: 75%: CIG 0.
-  // ENH: 90%: CIG 0.
+
   if (p === '45%' && cig === 'CIG1') return 'ENH';
   if (['45%', '60%', '75%', '90%'].includes(p) && cig === 'CIG0') return 'ENH';
 
