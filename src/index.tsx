@@ -9,6 +9,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { store } from './store';
 import { setupCycleHistoryListener } from './utils/cycleHistoryPersistence';
+import { trackPageView } from './utils/analyticsUtils';
 
 // Setup cycle history persistence
 setupCycleHistoryListener(store);
@@ -26,3 +27,6 @@ root.render(
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
+
+// Track page view (no-op in localhost/dev)
+trackPageView();
