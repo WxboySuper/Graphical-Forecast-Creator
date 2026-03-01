@@ -1,0 +1,43 @@
+name: Promote Beta to Main
+
+# Manually triggered from the GitHub Actions tab.
+# Merges the beta branch into main, then pushes — which triggers deploy-main-to-vps.yml.
+#
+# Required secrets:
+#   GH_PAT — Personal Access Token with `repo` scope.
+#             GITHUB_TOKEN pushes do NOT trigger other workflow runs (GitHub safety rule),
+#             so a PAT is required here to make the deploy workflow fire automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to confirm promotion of beta → main'
+        required: true
+        default: 'no'
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'yes' }}
+
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use GH_PAT so the push below triggers deploy-main-to-vps.yml
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge beta into main
+        run: |
+          git checkout main
+          git merge --no-ff origin/beta -m "chore: promote beta → main [automated]"
+
+      # This push (via GH_PAT) triggers deploy-main-to-vps.yml
+      - name: Push main
+        run: git push origin main

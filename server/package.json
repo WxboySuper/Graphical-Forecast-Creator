@@ -1,0 +1,16 @@
+{
+  "name": "gfc-analytics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightweight page-view analytics collector for Graphical Forecast Creator",
+  "main": "analytics.js",
+  "scripts": {
+    "start": "node analytics.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
