@@ -3,6 +3,7 @@ import * as L from 'leaflet';
 import html2canvas from 'html2canvas';
 import { OutlookData, OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
+import { store } from '../store';
 
 type ExportMapLike = {
   getContainer?: () => HTMLElement;
@@ -223,16 +224,67 @@ const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
   });
 };
 
-// Helper: add title/footer overlays
-const addOverlays = (container: HTMLElement, title?: string) => {
+// Helper: add title/footer/status and unofficial overlays
+const addOverlays = (container: HTMLElement, title?: string, statusText?: string, unofficialText?: string) => {
   const doc = container.ownerDocument;
+  const isDarkMode = store.getState().theme.darkMode;
+
+  // Status overlay recreated from text so html2canvas does not reflow flex styles.
+  if (statusText) {
+    const wrapperDiv = doc.createElement('div');
+    wrapperDiv.style.cssText = 'position:absolute;top:12px;left:0;width:100%;text-align:center;z-index:1400;pointer-events:none;';
+    const badgeBg = isDarkMode ? '#3a3a3a' : 'rgba(34,34,34,0.85)';
+    const badgeColor = isDarkMode ? '#e4e4e4' : '#ffffff';
+    const badgeBorder = isDarkMode ? 'border:1px solid #404040;' : '';
+    const badgeDiv = doc.createElement('div');
+    // Keep badge (shape) in normal position; move text up by 10px only for export
+    badgeDiv.style.cssText = `display:inline-block;background-color:${badgeBg};color:${badgeColor};padding:0 18px;height:34px;line-height:28px;border-radius:17px;font-weight:bold;font-size:14px;font-family:Arial,Helvetica,sans-serif;white-space:nowrap;box-shadow:0 4px 18px rgba(0,0,0,0.5);${badgeBorder}`;
+    // create inner span for text so we can nudge text without moving the pill shape
+    const badgeTextSpan = doc.createElement('span');
+    badgeTextSpan.textContent = statusText;
+    badgeTextSpan.style.cssText = 'display:inline-block;position:relative;top:-5px;';
+    badgeDiv.appendChild(badgeTextSpan);
+    wrapperDiv.appendChild(badgeDiv);
+    container.appendChild(wrapperDiv);
+  }
+
+  // Unofficial badge recreated from text to avoid html2canvas baseline drift.
+  if (unofficialText) {
+    const unofficialWrapper = doc.createElement('div');
+    unofficialWrapper.style.cssText = 'position:absolute;bottom:8px;left:0;right:0;text-align:center;z-index:1300;pointer-events:none;';
+
+    const innerBg = 'rgba(20,20,20,0.62)';
+    const innerColor = '#f0f0f0';
+    const innerDiv = doc.createElement('div');
+    innerDiv.style.cssText = `display:inline-block;background:${innerBg};color:${innerColor};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:0 10px;height:22px;line-height:16px;border-radius:999px;border:1px solid rgba(255,255,255,0.18);white-space:nowrap;`;
+
+    const dot = doc.createElement('span');
+    dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;margin-right:6px;vertical-align:middle;';
+
+    const text = doc.createElement('span');
+    text.textContent = unofficialText;
+    // Move bottom badge text up by 1px for exported image alignment
+    text.style.cssText = 'display:inline-block;vertical-align:middle;position:relative;top:-7px;';
+
+    innerDiv.appendChild(dot);
+    innerDiv.appendChild(text);
+    unofficialWrapper.appendChild(innerDiv);
+    container.appendChild(unofficialWrapper);
+  }
+
   if (title) {
     const titleDiv = doc.createElement('div');
-    titleDiv.style.cssText = 'position:absolute;top:20px;left:20px;z-index:1000;background-color:rgba(255,255,255,0.9);padding:10px 20px;border-radius:4px;font-weight:bold;font-size:18px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
-    titleDiv.textContent = title;    container.appendChild(titleDiv);
+    const bg = isDarkMode ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)';
+    const text = isDarkMode ? '#e4e4e4' : '#212529';
+    titleDiv.style.cssText = `position:absolute;top:20px;left:20px;z-index:1000;background-color:${bg};color:${text};padding:10px 20px;border-radius:4px;font-weight:bold;font-size:18px;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
+    titleDiv.textContent = title;
+    container.appendChild(titleDiv);
   }
+
   const footerDiv = doc.createElement('div');
-  footerDiv.style.cssText = 'position:absolute;bottom:20px;right:20px;z-index:1000;background-color:rgba(255,255,255,0.9);padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);';
+  const bg = isDarkMode ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)';
+  const text = isDarkMode ? '#e4e4e4' : '#212529';
+  footerDiv.style.cssText = `position:absolute;bottom:20px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
   footerDiv.innerHTML = `Created with Graphical Forecast Creator | ${getFormattedDate()} | © OpenStreetMap contributors`;
   container.appendChild(footerDiv);
 };
@@ -240,19 +292,25 @@ const addOverlays = (container: HTMLElement, title?: string) => {
 const cloneLegendAndStatusOverlays = (sourceMap: L.Map, exportContainer: HTMLElement) => {
   const sourceContainer = sourceMap.getContainer();
   const sourceRoot = sourceContainer.closest('.map-container, .forecast-map-container') || sourceContainer;
-  const overlaySelectors = ['.map-legend', '.gfc-status-overlay'];
 
-  overlaySelectors.forEach((selector) => {
-    const element = sourceRoot.querySelector(selector);
-    if (!element) {
-      return;
-    }
-
-    const clone = element.cloneNode(true) as HTMLElement;
+  // Only clone the legend — status overlay is recreated fresh via addOverlays to avoid
+  // html2canvas issues with CSS transforms and color inheritance on cloned elements.
+  const legend = sourceRoot.querySelector('.map-legend');
+  if (legend) {
+    const clone = legend.cloneNode(true) as HTMLElement;
     clone.style.pointerEvents = 'none';
     exportContainer.appendChild(clone);
-  });
+  }
 };
+
+const readStatusText = (root: HTMLElement): string =>
+  root.querySelector('.gfc-status-badge')?.getAttribute('aria-label') ??
+  root.querySelector('.gfc-status-badge')?.textContent?.trim() ??
+  '';
+
+const readUnofficialText = (root: HTMLElement): string =>
+  root.querySelector('.unofficial-badge-inner')?.textContent?.trim() ??
+  '';
 
 // Helper: capture container to data URL
 const captureContainer = async (
@@ -344,6 +402,10 @@ const exportLiveMapAsImage = async (
   const width = exportRoot.clientWidth;
   const height = exportRoot.clientHeight;
 
+  // Read overlays from live DOM before html2canvas clones/reflows styles
+  const statusText = includeLegendAndStatus ? readStatusText(exportRoot) : '';
+  const unofficialText = includeLegendAndStatus ? readUnofficialText(exportRoot) : '';
+
   await waitForMapSettleGeneric(map, 400);
 
   return captureContainer(exportRoot, width, height, format, quality, (clonedRoot) => {
@@ -352,14 +414,17 @@ const exportLiveMapAsImage = async (
       '.ol-control',
       '.map-toolbar-bottom-right',
       '.leaflet-pm-toolbar-container',
-      '.leaflet-pm-actions-container'
+      '.leaflet-pm-actions-container',
+      // Hide original overlays; recreated below with export-safe styles.
+      '.gfc-status-overlay',
+      '.unofficial-badge',
     ]);
 
     if (!includeLegendAndStatus) {
-      hideElementsInClone(clonedRoot, ['.map-legend', '.gfc-status-overlay']);
+      hideElementsInClone(clonedRoot, ['.map-legend']);
     }
 
-    addOverlays(clonedRoot, title);
+    addOverlays(clonedRoot, title, statusText || undefined, unofficialText || undefined);
   });
 };
 
@@ -389,10 +454,13 @@ const exportViaTempMapAsImage = async (
     await addTilesAndWait(tempMap, map);
     renderOutlooksToMap(tempMap, outlooks);
     await new Promise((r) => setTimeout(r, 300));
+    const sourceRoot = (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
+    const statusText = includeLegendAndStatus ? readStatusText(sourceRoot) : '';
+    const unofficialText = includeLegendAndStatus ? readUnofficialText(sourceRoot) : '';
     if (includeLegendAndStatus) {
       cloneLegendAndStatusOverlays(map, tempContainer);
     }
-    addOverlays(tempContainer, title);
+    addOverlays(tempContainer, title, statusText || undefined, unofficialText || undefined);
     return captureContainer(tempContainer, container.clientWidth, container.clientHeight, format, quality);
   } finally {
     try {
