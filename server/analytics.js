@@ -4,7 +4,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = parseInt(process.env.PORT || '3002', 10);
 const LOG_DIR = process.env.LOG_DIR || path.join(__dirname, 'logs');
 const LOG_FILE = path.join(LOG_DIR, 'analytics.log');
 
@@ -50,6 +50,6 @@ app.use((_req, res) => res.status(404).end());
 
 // Bind to loopback only — never exposed to the internet directly (nginx proxies in)
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[analytics] listening on 127.0.0.1:${PORT}`);
+  console.log(`[analytics] listening on 127.0.0.1:${PORT} (port ${PORT})`);
   console.log(`[analytics] writing to ${LOG_FILE}`);
 });
