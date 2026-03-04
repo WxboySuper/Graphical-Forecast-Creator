@@ -1,5 +1,8 @@
 name: Deploy Production to VPS
 
+permissions:
+  contents: read
+
 # Triggers on every push to main (including the automated promote-beta-to-main push)
 # and can also be triggered manually from the GitHub Actions tab.
 on:
