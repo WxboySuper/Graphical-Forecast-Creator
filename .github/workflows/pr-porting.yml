@@ -98,6 +98,5 @@ jobs:
               --head "$SOURCE_BRANCH" \
               --base "$TARGET" \
               --title "[Port] $PR_TITLE to $TARGET" \
-              --body "Automated port of merge into $BASE_BRANCH. Original PR: #${{ github.event.pull_request.number }}" \
-              --label "port:automated" || echo "Failed to create PR for $TARGET - likely merge conflicts or branch state."
+              --body "Automated port of merge into $BASE_BRANCH. Original PR: #${{ github.event.pull_request.number }}" || echo "Failed to create PR for $TARGET - likely merge conflicts or branch state."
           done
