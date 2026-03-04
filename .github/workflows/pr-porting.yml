@@ -1,0 +1,103 @@
+name: PR Porting System
+
+# Automates porting changes across the branch hierarchy via Pull Requests.
+# 
+# Flows:
+# 1. hotfix/* → main (broadcasts to beta, other hotfix/*, and all feature/*)
+# 2. feature/* → beta (broadcasts to all other feature/*)
+# 
+# Required secrets: GH_PAT (repo scope)
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - beta
+
+jobs:
+  port-changes:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure Git Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Discovery and Porting
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Merging $SOURCE_BRANCH into $BASE_BRANCH. Porting to relevant branches..."
+          
+          # Fetch all active branches
+          gh api repos/${{ github.repository }}/branches --paginate > branches.json
+          
+          TARGETS=()
+          
+          if [[ "$BASE_BRANCH" == "main" ]]; then
+            # Flow 1: Broadcast to beta, other hotfix/*, and all feature/*
+            TARGETS+=("beta")
+            
+            HOTFIX_BRANCHES=$(jq -r '.[].name | select(startswith("hotfix/"))' branches.json)
+            for b in $HOTFIX_BRANCHES; do
+              if [[ "$b" != "$SOURCE_BRANCH" ]]; then
+                TARGETS+=("$b")
+              fi
+            done
+            
+            FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
+            for b in $FEATURE_BRANCHES; do
+              TARGETS+=("$b")
+            done
+            
+          elif [[ "$BASE_BRANCH" == "beta" ]]; then
+            # Flow 2: Broadcast to all feature/* branches
+            FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
+            for b in $FEATURE_BRANCHES; do
+              if [[ "$b" != "$SOURCE_BRANCH" ]]; then
+                TARGETS+=("$b")
+              fi
+            done
+          fi
+
+          # Port to each target
+          for TARGET in "${TARGETS[@]}"; do
+            echo "Attempting to port $SOURCE_BRANCH to $TARGET"
+            
+            # Check if target branch exists on origin (double check)
+            if ! git ls-remote --exit-code --heads origin "$TARGET" > /dev/null; then
+              echo "Branch $TARGET no longer exists. Skipping."
+              continue
+            fi
+
+            # Check if PR already exists to avoid duplicates
+            EXISTING_PR=$(gh pr list --head "$SOURCE_BRANCH" --base "$TARGET" --state open --json number -q '.[0].number')
+            if [[ -n "$EXISTING_PR" ]]; then
+              echo "PR #$EXISTING_PR already exists from $SOURCE_BRANCH to $TARGET. Skipping."
+              continue
+            fi
+
+            # Create the PR
+            # Note: We use the same source branch. If it's already merged, it's still accessible.
+            gh pr create \
+              --head "$SOURCE_BRANCH" \
+              --base "$TARGET" \
+              --title "[Port] $PR_TITLE to $TARGET" \
+              --body "Automated port of merge into $BASE_BRANCH. Original PR: #${{ github.event.pull_request.number }}" \
+              --label "port:automated" || echo "Failed to create PR for $TARGET - likely merge conflicts or branch state."
+          done
