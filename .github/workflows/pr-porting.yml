@@ -82,22 +82,16 @@ jobs:
           for TARGET in "${TARGETS[@]}"; do
             echo "--- Attempting to port to $TARGET ---"
             
+            # Use a temporary porting branch
+            PORT_BRANCH="port/${PR_NUMBER}-to-${TARGET//\//-}"
+            
             # Check if target branch exists on origin
             if ! git ls-remote --exit-code --heads origin "$TARGET" > /dev/null; then
               echo "Branch $TARGET no longer exists. Skipping."
               continue
             fi
 
-            # Check if PR already exists to avoid duplicates
-            EXISTING_PR=$(gh pr list --head "$SOURCE_BRANCH" --base "$TARGET" --state open --json number -q '.[0].number')
-            if [[ -n "$EXISTING_PR" ]]; then
-              echo "PR #$EXISTING_PR already exists from $SOURCE_BRANCH to $TARGET. Skipping."
-              continue
-            fi
-
             # Check if there are any commits to port
-            # We check if TARGET contains help from SOURCE_BRANCH. 
-            # If SOURCE_BRANCH is already merged/contained in TARGET, this will be empty.
             git fetch origin "$TARGET"
             COMMITS=$(git log origin/"$TARGET"..origin/"$BASE_BRANCH" --oneline)
             if [[ -z "$COMMITS" ]]; then
@@ -105,28 +99,38 @@ jobs:
               continue
             fi
 
-            # Double check with merge-base to be absolutely sure there's a diff
-            # If the merge-base is the same as the source branch's head, there's nothing new to port to target
-            SOURCE_SHA=$(git rev-parse origin/"$BASE_BRANCH")
-            TARGET_SHA=$(git rev-parse origin/"$TARGET")
-            MERGE_BASE=$(git merge-base "$SOURCE_SHA" "$TARGET_SHA")
-            
-            if [[ "$MERGE_BASE" == "$SOURCE_SHA" ]]; then
-              echo "Target $TARGET already contains the source branch head. Skipping."
-              continue
-            fi
+            # Create a temporary branch from the merged state
+            git checkout -b "$PORT_BRANCH" origin/"$BASE_BRANCH"
+            git push origin "$PORT_BRANCH"
 
-            # Create the PR
-            # Using original HEAD ref and the SPECIFIC target
+            # Create the PR from the new temporary branch
             if ! gh pr create \
-              --head "$SOURCE_BRANCH" \
+              --head "$PORT_BRANCH" \
               --base "$TARGET" \
               --title "[Port] $PR_TITLE to $TARGET" \
               --body "Automated port of merge into $BASE_BRANCH. Original PR: #$PR_NUMBER"; then
               echo "FAILED: Could not create PR for $TARGET"
               FAILURES+=("$TARGET")
+              # Cleanup the failed branch
+              git push origin --delete "$PORT_BRANCH" || true
+            else
+              echo "Successfully created port PR for $TARGET using $PORT_BRANCH"
             fi
+
+            # Always return to main context for next loop
+            git checkout "$BASE_BRANCH"
           done
+
+          # --- Cleanup Original Branch ---
+          # If the source branch still exists on origin, delete it to keep repo clean
+          if [[ "$SOURCE_BRANCH" != "main" && "$SOURCE_BRANCH" != "beta" ]]; then
+            echo "--- Cleaning up original source branch $SOURCE_BRANCH ---"
+            if git ls-remote --exit-code --heads origin "$SOURCE_BRANCH" > /dev/null; then
+              gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/"$SOURCE_BRANCH" || echo "Note: Source branch $SOURCE_BRANCH was already deleted or is protected."
+            else
+              echo "Source branch $SOURCE_BRANCH already removed from origin."
+            fi
+          fi
 
           if [[ ${#FAILURES[@]} -gt 0 ]]; then
             FAILURE_MSG="### ⚠️ Automated Porting Failures\n\nSome branches could not be ported automatically from PR #$PR_NUMBER:\n"
