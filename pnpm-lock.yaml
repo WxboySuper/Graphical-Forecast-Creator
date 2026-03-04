@@ -49,8 +49,14 @@ importers:
       '@testing-library/user-event':
         specifier: ^13.5.0
         version: 13.5.0(@testing-library/dom@10.4.1)
+      '@turf/difference':
+        specifier: ^7.3.4
+        version: 7.3.4
+      '@turf/helpers':
+        specifier: ^7.3.4
+        version: 7.3.4
       '@turf/turf':
-        specifier: ^7.3.3
+        specifier: ^7.3.4
         version: 7.3.4
       '@types/jest':
         specifier: ^27.5.2
