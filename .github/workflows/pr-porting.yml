@@ -96,10 +96,23 @@ jobs:
             fi
 
             # Check if there are any commits to port
-            # If the branch has already been merged into the target, this will be empty
-            COMMITS=$(git log origin/$TARGET..origin/$BASE_BRANCH --oneline)
+            # We check if TARGET contains help from SOURCE_BRANCH. 
+            # If SOURCE_BRANCH is already merged/contained in TARGET, this will be empty.
+            git fetch origin "$TARGET"
+            COMMITS=$(git log origin/"$TARGET"..origin/"$BASE_BRANCH" --oneline)
             if [[ -z "$COMMITS" ]]; then
-              echo "No new commits to port to $TARGET. Skipping."
+              echo "No new commits to port to $TARGET (Target already contains these changes). Skipping."
+              continue
+            fi
+
+            # Double check with merge-base to be absolutely sure there's a diff
+            # If the merge-base is the same as the source branch's head, there's nothing new to port to target
+            SOURCE_SHA=$(git rev-parse origin/"$BASE_BRANCH")
+            TARGET_SHA=$(git rev-parse origin/"$TARGET")
+            MERGE_BASE=$(git merge-base "$SOURCE_SHA" "$TARGET_SHA")
+            
+            if [[ "$MERGE_BASE" == "$SOURCE_SHA" ]]; then
+              echo "Target $TARGET already contains the source branch head. Skipping."
               continue
             fi
 
