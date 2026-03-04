@@ -1,5 +1,6 @@
-name: Promote Hotfix to Production
+name: DEPRECATED: Promote Hotfix to Production
 
+# [DEPRECATED] This workflow is replaced by the PR Porting System (.github/workflows/pr-porting.yml).
 # Merges a hotfix/* branch into main (triggering a deploy) and back-merges into beta.
 #
 # Usage:

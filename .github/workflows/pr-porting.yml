@@ -1,0 +1,140 @@
+name: PR Porting System
+
+# Automates porting changes across the branch hierarchy via Pull Requests.
+# 
+# Flows:
+# 1. hotfix/* → main (broadcasts to beta, other hotfix/*, and all feature/*)
+# 2. feature/* → beta (broadcasts to all other feature/*)
+# 
+# Required secrets: GH_PAT (repo scope)
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - beta
+
+jobs:
+  port-changes:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure Git Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Discovery and Porting
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "Merging $SOURCE_BRANCH into $BASE_BRANCH. Porting to relevant branches..."
+          
+          # Fetch all active branches
+          gh api repos/${{ github.repository }}/branches --paginate > branches.json
+          
+          TARGETS=()
+          
+          if [[ "$BASE_BRANCH" == "main" ]]; then
+            # Flow 1: Broadcast to beta, other hotfix/*, and all feature/*
+            TARGETS+=("beta")
+            
+            HOTFIX_BRANCHES=$(jq -r '.[].name | select(startswith("hotfix/"))' branches.json)
+            for b in $HOTFIX_BRANCHES; do
+              if [[ "$b" != "$SOURCE_BRANCH" ]]; then
+                TARGETS+=("$b")
+              fi
+            done
+            
+            FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
+            for b in $FEATURE_BRANCHES; do
+              TARGETS+=("$b")
+            done
+            
+          elif [[ "$BASE_BRANCH" == "beta" ]]; then
+            # Flow 2: Broadcast to all feature/* branches
+            FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
+            for b in $FEATURE_BRANCHES; do
+              if [[ "$b" != "$SOURCE_BRANCH" ]]; then
+                TARGETS+=("$b")
+              fi
+            done
+          fi
+
+          FAILURES=()
+
+          # Port to each target
+          for TARGET in "${TARGETS[@]}"; do
+            echo "--- Attempting to port to $TARGET ---"
+            
+            # Check if target branch exists on origin
+            if ! git ls-remote --exit-code --heads origin "$TARGET" > /dev/null; then
+              echo "Branch $TARGET no longer exists. Skipping."
+              continue
+            fi
+
+            # Check if PR already exists to avoid duplicates
+            EXISTING_PR=$(gh pr list --head "$SOURCE_BRANCH" --base "$TARGET" --state open --json number -q '.[0].number')
+            if [[ -n "$EXISTING_PR" ]]; then
+              echo "PR #$EXISTING_PR already exists from $SOURCE_BRANCH to $TARGET. Skipping."
+              continue
+            fi
+
+            # Check if there are any commits to port
+            # We check if TARGET contains help from SOURCE_BRANCH. 
+            # If SOURCE_BRANCH is already merged/contained in TARGET, this will be empty.
+            git fetch origin "$TARGET"
+            COMMITS=$(git log origin/"$TARGET"..origin/"$BASE_BRANCH" --oneline)
+            if [[ -z "$COMMITS" ]]; then
+              echo "No new commits to port to $TARGET (Target already contains these changes). Skipping."
+              continue
+            fi
+
+            # Double check with merge-base to be absolutely sure there's a diff
+            # If the merge-base is the same as the source branch's head, there's nothing new to port to target
+            SOURCE_SHA=$(git rev-parse origin/"$BASE_BRANCH")
+            TARGET_SHA=$(git rev-parse origin/"$TARGET")
+            MERGE_BASE=$(git merge-base "$SOURCE_SHA" "$TARGET_SHA")
+            
+            if [[ "$MERGE_BASE" == "$SOURCE_SHA" ]]; then
+              echo "Target $TARGET already contains the source branch head. Skipping."
+              continue
+            fi
+
+            # Create the PR
+            # Using original HEAD ref and the SPECIFIC target
+            if ! gh pr create \
+              --head "$SOURCE_BRANCH" \
+              --base "$TARGET" \
+              --title "[Port] $PR_TITLE to $TARGET" \
+              --body "Automated port of merge into $BASE_BRANCH. Original PR: #$PR_NUMBER"; then
+              echo "FAILED: Could not create PR for $TARGET"
+              FAILURES+=("$TARGET")
+            fi
+          done
+
+          if [[ ${#FAILURES[@]} -gt 0 ]]; then
+            FAILURE_MSG="### ⚠️ Automated Porting Failures\n\nSome branches could not be ported automatically from PR #$PR_NUMBER:\n"
+            for f in "${FAILURES[@]}"; do
+              FAILURE_MSG="$FAILURE_MSG- $f (likely merge conflicts or clean history missing)\n"
+            done
+            FAILURE_MSG="$FAILURE_MSG\nPlease handle these manual ports to keep branches in sync."
+            
+            gh pr comment "$PR_NUMBER" --body "$(echo -e "$FAILURE_MSG")"
+            exit 1
+          fi
