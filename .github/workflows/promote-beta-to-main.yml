@@ -1,5 +1,8 @@
 name: Promote Beta to Main
 
+permissions:
+  contents: read
+
 # Manually triggered from the GitHub Actions tab.
 # Merges the beta branch into main, then pushes — which triggers deploy-main-to-vps.yml.
 #
