@@ -10,10 +10,14 @@ type ExportMapLike = {
   getTargetElement?: () => HTMLElement;
 };
 
+// Type guard to check if the map object is a Leaflet map instance (has getContainer and getBounds methods)
 const isLeafletMap = (map: unknown): map is L.Map => {
   return Boolean(map && typeof (map as L.Map).getContainer === 'function' && typeof (map as L.Map).getBounds === 'function');
 };
 
+
+// Helper: get the export container element from the map-like object,
+// trying multiple methods for compatibility with different map libraries
 const getExportContainer = (map: ExportMapLike): HTMLElement | null => {
   if (map.getContainer) {
     return map.getContainer();
@@ -49,6 +53,7 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string): L.PathO
     'day4-8': colorMappings['day4-8'] as Record<string, string>
   };
 
+  // Default to white if no match found, but this should not happen if data is valid
   const color = palettes[outlookType]?.[probability] ?? '#FFFFFF';
   
   // Check for CIG (Hatching)
@@ -128,8 +133,11 @@ const createTempMap = (container: HTMLElement, center: L.LatLng, zoom: number, c
 
 // Helper: add tiles to map and wait for load or timeout
 const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): Promise<{ timedOut: boolean; remaining: number }> => {
+  // We want to replicate the active tile layers from the source map onto the temp map to ensure they are captured in the export.
   return new Promise((resolve) => {
     const activeTileLayers: L.TileLayer[] = [];
+    // We look for active tile layers in the source map to replicate, but if we can't find any,
+    // we'll add a default OSM layer to ensure we have some basemap tiles in the export.
     sourceMap.eachLayer((layer) => {
       if (layer instanceof L.TileLayer) {
         activeTileLayers.push(layer as L.TileLayer);
@@ -150,6 +158,7 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
       }
     };
 
+    // Helper to add a tile layer and set up event listeners to track loading
     const addAndWatch = (srcLayer: L.TileLayer & { _url?: string }) => {
       // Derive a best-effort URL and options for a tile layer
       const deriveConfig = (layerSrc: L.TileLayer & { _url?: string }) => {
@@ -160,7 +169,11 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
         return { url, attribution, maxZoom };
       };
 
+      // Create a new tile layer for the export map using the derived config, ensuring CORS is enabled
       const { url: derivedUrl, attribution, maxZoom } = deriveConfig(srcLayer);
+      // Note: We use the derived URL directly in the tile layer,
+      // which should allow html2canvas to capture the tiles if they load successfully,
+      // and we track loading via events to know when to capture.
       const layer = L.tileLayer(derivedUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution,
         maxZoom,
@@ -178,6 +191,8 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
       layer.on('tileloadstart', onTileStart);
       layer.on('tileload', onTileFinish);
       layer.on('tileerror', onTileFinish);
+      // In case the layer has no tiles to load (e.g. a single-tile layer or already cached),
+      // we also listen for the 'load' event on the layer itself as a fallback to resolve when it's done.
       layer.on('load', () => finish(false));
       layer.addTo(mapInstance);
     };
@@ -192,11 +207,13 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
 
 // Helper to sort probabilities (extracted)
 const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
+  // We want to sort probabilities in a specific order for rendering:
   return entries.sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
 
     // CIG levels come after numeric probabilities (render on top)
     const isCigA = probA.startsWith('CIG');
+    // We want to sort CIG levels alphabetically among themselves, but all after numeric and TSTM/MRGL/SLGT/ENH/MDT/HIGH
     const isCigB = probB.startsWith('CIG');
     
     if (isCigA !== isCigB) {
@@ -210,23 +227,36 @@ const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, Geo
     if (probA === 'TSTM') return -1;
     if (probB === 'TSTM') return 1;
 
+    // For categorical outlooks, we want to sort by the predefined risk order rather than numeric value,
+    // since they are not strictly numeric and have a specific hierarchy. For other outlooks with numeric probabilities,
+    // we can sort by numeric value.
     const riskOrder: Record<string, number> = { 'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5 };
     if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) return riskOrder[probA] - riskOrder[probB];
+    // Extract numeric value for sorting, ignoring non-numeric characters (e.g. '%') and defaulting to 0 if not a number
     const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, '')) || 0;
     return getPercentValue(probA) - getPercentValue(probB);  });
 };
 
 // Helper: render outlooks onto a map instance
 const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
+  // We want to render in a specific order to ensure proper layering
+  // (e.g. categorical at bottom, then tornado/wind/hail, then totalSevere, then day4-8 on top)
   const outlookOrder: OutlookType[] = ['categorical', 'tornado', 'wind', 'hail', 'totalSevere', 'day4-8'];
+  // We loop through each outlook type in the defined order, and for each one, we get the corresponding features,
   outlookOrder.forEach((outlookType) => {
+    // Use a lookup to avoid branching and reduce cyclomatic complexity
     const outlookMap = outlooks[outlookType];
     if (!outlookMap) return;
     const entries = Array.from(outlookMap.entries()) as [string, GeoJSON.Feature[]][];
     const sortedEntries = sortProbabilities(entries);
+    // Then we loop through the sorted probabilities and render the features with styles based on the outlook type and probability.
     sortedEntries.forEach(([probability, features]) => {
       const styleOptions = getFeatureStyle(outlookType, probability);
+      // We add each feature as a GeoJSON layer to the map with the appropriate style.
+      // This ensures that the exported image will have the same outlook layers rendered as seen in the live map.
       features.forEach(feature => {
+        // Note: We use L.geoJSON to render the features,
+        // which should work with html2canvas as long as the styles are applied correctly.
         L.geoJSON(feature, { style: () => styleOptions }).addTo(mapInstance);
       });
     });
@@ -298,6 +328,7 @@ const addOverlays = (container: HTMLElement, title?: string, statusText?: string
   container.appendChild(footerDiv);
 };
 
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
 const cloneLegendAndStatusOverlays = (sourceMap: L.Map, exportContainer: HTMLElement) => {
   const sourceContainer = sourceMap.getContainer();
   const sourceRoot = sourceContainer.closest('.map-container, .forecast-map-container') || sourceContainer;
@@ -312,11 +343,13 @@ const cloneLegendAndStatusOverlays = (sourceMap: L.Map, exportContainer: HTMLEle
   }
 };
 
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
 const readStatusText = (root: HTMLElement): string =>
   root.querySelector('.gfc-status-badge')?.getAttribute('aria-label') ??
   root.querySelector('.gfc-status-badge')?.textContent?.trim() ??
   '';
 
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
 const readUnofficialText = (root: HTMLElement): string =>
   root.querySelector('.unofficial-badge-inner')?.textContent?.trim() ??
   '';
@@ -333,6 +366,7 @@ const captureContainer = async (
   const captureId = `gfc-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   container.setAttribute('data-gfc-export-capture-id', captureId);
 
+  // Important: we must set useCORS: true and ensure all images in the cloned document have crossOrigin='anonymous'
   const canvas = await html2canvas(container, {
     useCORS: true,
     allowTaint: false,
@@ -398,6 +432,7 @@ const captureContainer = async (
   return canvas.toDataURL('image/png');
 };
 
+// Helper: wait for Leaflet map to finish moving/zooming and tiles to load before capture, with a timeout fallback
 const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   return new Promise((resolve) => {
     let resolved = false;
@@ -503,6 +538,8 @@ const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
   });
 };
 
+// Main export function: handles both Leaflet and non-Leaflet maps,
+// with best-effort approaches for each to ensure tiles and overlays are captured properly.
 const exportLiveMapAsImage = async (
   map: ExportMapLike,
   options: ExportImageOptions
@@ -633,6 +670,7 @@ const exportViaTempMapAsImage = async (
   }
 };
 
+// Main export function: attempts live export first, and if it fails (e.g. not a Leaflet map), falls back to temp map approach
 export const exportMapAsImage = async (
   map: unknown,
   outlooks: OutlookData,
