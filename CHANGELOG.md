@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- **Discussion auto-save:** Discussion editor changes now auto-save after a short debounce by syncing local editor state back to Redux, which ensures the existing global auto-save-to-localStorage flow captures discussion updates even without clicking Save.
 - **Verification storm reports:** Prevented same-day NOAA storm report fetch attempts (which often return 404 before archive publication) by detecting local "today" and showing an informational message instead of a fetch error. Also added a distinct info-state message style for "no reports found" and same-day availability notices.
 - **Export (dark mode):** Fixed issue where map exports could render as a blank (black) image in dark mode. Root cause was an OpenLayers canvas being tainted by tile images requested without CORS. The fix sets `crossOrigin: 'anonymous'` on OpenLayers `OSM`/`XYZ` sources, ensures cloned images request CORS during export, and waits for the OpenLayers `rendercomplete` / tile load before capturing with `html2canvas`. Verified on branch `fix/blank-dark-mode-export`.
 - **Export warnings:** Added a console warning and an on-screen export banner (for live exports) when map tiles/images fail to load before capture, so users and developers can tell when the issue is network-related rather than a bug. Verified during manual export tests.
