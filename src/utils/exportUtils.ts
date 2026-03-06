@@ -364,10 +364,16 @@ const captureContainer = async (
               try {
                 const clonedDefs = d.cloneNode(true) as Node;
                 svgHolder!.appendChild(clonedDefs as unknown as Node);
-              } catch {}
+              } catch {
+                // ignore cloning errors for defs, but log to console for visibility
+                console.warn('GFC export: Failed to clone SVG defs for export; some patterns may not render correctly.', d);
+              }
             });
           }
-        } catch {}
+        } catch {
+          // ignore errors but log to console for visibility
+          console.warn('GFC export: Error occurred while cloning SVG defs for export; some patterns may not render correctly.');
+        }
 
         if (onClone) {
           onClone(clonedContainer);
@@ -525,8 +531,14 @@ const exportLiveMapAsImage = async (
       warningBanner.textContent = 'Warning: Map tiles timed out loading — check your internet connection. Export may be incomplete.';
       exportRoot.appendChild(warningBanner);
       // remove after a short duration so it doesn't permanently alter the UI
-      setTimeout(() => { try { warningBanner.remove(); } catch {} }, 6000);
-    } catch {}
+      setTimeout(() => { try { warningBanner.remove(); } catch {
+        // ignore errors but log to console for visibility
+        console.warn('GFC export: Failed to remove on-screen warning about tile load timeout.', warningBanner);
+      } }, 6000);
+    } catch {
+      // ignore errors but log to console for visibility
+      console.warn('GFC export: Failed to display on-screen warning about tile load timeout.', exportRoot);
+    }
   }
 
   return captureContainer(exportRoot, width, height, format, quality, (clonedRoot) => {
@@ -582,7 +594,10 @@ const exportViaTempMapAsImage = async (
         warnDiv.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2000;background:rgba(255,69,58,0.95);color:#fff;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600;pointer-events:none;';
         warnDiv.textContent = 'Warning: Map tiles timed out loading — export may be incomplete.';
         tempContainer.appendChild(warnDiv);
-      } catch {}
+      } catch {
+        // ignore errors but log to console for visibility
+        console.warn('GFC export: Failed to display warning about tile load timeout in temp map export.', tempContainer);
+      }
     }
     const sourceRoot = (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
     const statusText = includeLegendAndStatus ? readStatusText(sourceRoot) : '';
@@ -599,6 +614,7 @@ const exportViaTempMapAsImage = async (
       }
     } catch {
       // ignore cleanup errors
+      console.warn('GFC export: Failed to remove temporary container.', tempContainer);
     }
 
     try {
