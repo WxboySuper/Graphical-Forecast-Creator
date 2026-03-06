@@ -59,11 +59,13 @@ const buildReportStyle = (type: ReportType) => {
 // Cached US states GeoJSON for blank map style (fetched once per session)
 let cachedUsStatesGeoJSONVerif: any = null;
 
+// Simple style for blank land layer in verification map (cream fill, light borders)
 const BLANK_LAND_STYLE_VERIF = new Style({
   fill: new Fill({ color: '#f2ede2' }),
   stroke: new Stroke({ color: '#9e9585', width: 1 }),
 });
 
+// Function to create tile source based on selected base map style for verification map
 const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   switch (style) {
     case 'carto-light':
@@ -93,6 +95,7 @@ const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ
   }
 };
 
+// Function to create a hatch pattern for CIG overlays based on the CIG level
 const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   const canvas = document.createElement('canvas');
   const size = 10;
@@ -132,6 +135,7 @@ const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   return ctx.createPattern(canvas, 'repeat');
 };
 
+// Utility function to convert hex or named colors to RGBA format with specified alpha for OpenLayers styles
 const toRgbaColor = (color: string, alpha: number): string => {
   if (!color) {
     return `rgba(255,255,255,${alpha})`;
@@ -156,6 +160,7 @@ const toRgbaColor = (color: string, alpha: number): string => {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 };
 
+// Function to build OpenLayers style for a given feature based on its outlook type and probability,
 const buildStyle = (type: string, probability: string) => {
   const style = getFeatureStyle(type as any, probability);
   const fillColor = String(style.fillColor || '#999999');
@@ -184,6 +189,8 @@ const buildStyle = (type: string, probability: string) => {
   });
 };
 
+// OpenLayers map component for verification view,
+// supporting categorical and probabilistic outlooks with storm report overlays and base map style switching.
 const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayersVerificationMapProps>(({ 
   activeOutlookType = 'categorical',
   selectedDay = 1
@@ -206,12 +213,14 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     (state: RootState) => state.stormReports
   ); // Select storm reports state
 
+  // Memoize active features based on selected outlook type and available outlooks for the day,
   const activeFeatures = useMemo(() => {
     const outlook = outlooks[activeOutlookType];
     if (!outlook) {
       return [] as Array<{ feature: GeoJsonFeature; probability: string }>;
     }
 
+    // Flatten features from the selected outlook type into a single array with associated probabilities for styling.
     const items: Array<{ feature: GeoJsonFeature; probability: string }> = [];
     outlook.forEach((features, probability) => {
       features.forEach((feature) => {
@@ -236,6 +245,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
     const baseTileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = baseTileLayer;
+    // Land layer sits above the base tile layer and is toggled on for the 'blank' style to show state boundaries
+    // without roads or labels.
     const landLayer = new VectorLayer({
       source: landSourceRef.current,
       visible: false,
@@ -245,6 +256,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     const outlookLayer = new VectorLayer({ source: vectorSourceRef.current, zIndex: 3 });
     outlookLayerRef.current = outlookLayer;
 
+    // Initialize the map with the base tile layer, land layer, outlook layer, and storm reports layer.
     const map = new OLMap({
       target: mapElementRef.current,
       layers: [
@@ -312,6 +324,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
             cachedUsStatesGeoJSONVerif = geoData;
           }
           const format = new GeoJSON();
+          // Read features with correct projections and apply the blank land style before adding to the source.
           const features = format.readFeatures(geoData, {
             dataProjection: 'EPSG:4326',
             featureProjection: 'EPSG:3857',
@@ -350,6 +363,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
     const format = new GeoJSON();
 
+    // Sort features by computed z-index to ensure correct rendering order in OpenLayers,
+    // since it doesn't automatically handle SVG-style layering based on feature properties. Higher z-index features will be added last and rendered on top. CIG overlays are always on top, with CIG3 above CIG2 above CIG1, followed by regular probabilities sorted by their computed z-index.
     const sortedFeatures = [...activeFeatures].sort((a, b) => {
       return computeZIndex(activeOutlookType as any, a.probability) - computeZIndex(activeOutlookType as any, b.probability);
     });
@@ -378,6 +393,11 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     source.clear();
 
     if (reportsVisible) {
+      // Filter reports based on type visibility settings and active outlook type.
+      // If a report type is toggled off in the filter, it will be excluded.
+      // Additionally, if the active outlook type is probabilistic (tornado/wind/hail),
+      // only matching report types will be shown. If the active outlook type is categorical,
+      // all report types will be shown regardless of their specific type, as categorical view encompasses all types.
       const filteredReports = reports.filter((report) => {
         if (!filterByType[report.type]) {
           return false;
@@ -394,6 +414,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
       filteredReports.forEach(report => {
         const geometry = new Point(fromLonLat([report.longitude, report.latitude]));
+        // Create a new feature for each storm report with the appropriate geometry and styling based on its type,
+        // then add it to the storm reports source.
         const feature = new Feature({
           geometry,
           type: report.type, // Store type for styling

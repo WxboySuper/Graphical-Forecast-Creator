@@ -437,6 +437,7 @@ const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   return new Promise((resolve) => {
     let resolved = false;
 
+    // We listen for 'moveend' which indicates the map has finished moving/zooming and should have triggered tile loading.
     const finish = () => {
       if (!resolved) {
         resolved = true;
