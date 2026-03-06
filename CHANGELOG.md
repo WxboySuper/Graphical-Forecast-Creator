@@ -1,6 +1,13 @@
 # Changelog
+<!-- markdownlint-disable -->
 
 All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Fixed
+- **Export (dark mode):** Fixed issue where map exports could render as a blank (black) image in dark mode. Root cause was an OpenLayers canvas being tainted by tile images requested without CORS. The fix sets `crossOrigin: 'anonymous'` on OpenLayers `OSM`/`XYZ` sources, ensures cloned images request CORS during export, and waits for the OpenLayers `rendercomplete` / tile load before capturing with `html2canvas`. Verified on branch `fix/blank-dark-mode-export`.
+- **Export warnings:** Added a console warning and an on-screen export banner (for live exports) when map tiles/images fail to load before capture, so users and developers can tell when the issue is network-related rather than a bug. Verified during manual export tests.
 
 ## [1.0.0] - 2026-03-01
 

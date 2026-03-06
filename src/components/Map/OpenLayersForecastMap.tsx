@@ -30,6 +30,7 @@ import './ForecastMap.css';
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
 
+// Helper to convert hex/rgb/hsl color strings to rgba with specified alpha
 const toRgbaColor = (color: string, alpha: number): string => {
   if (!color) {
     return `rgba(255, 255, 255, ${alpha})`;
@@ -98,6 +99,7 @@ const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   return ctx.createPattern(canvas, 'repeat');
 };
 
+// Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
 const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean = false, forCategoricalLayer: boolean = false) => {
   const style = getFeatureStyle(outlookType as any, probability);
   const fillColor = style.fillColor || '#ffffff';
@@ -125,6 +127,9 @@ const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean
     });
   }
 
+  // For top layer (e.g. categorical), we want a thicker,
+  // fully opaque border to clearly delineate features,
+  // especially when colors are similar or when CIG hatching is used.
   const olStyle = new Style({
     fill: fill,
     stroke: new Stroke({
@@ -160,6 +165,7 @@ const BLANK_LAND_STYLE = new Style({
   stroke: new Stroke({ color: '#333333', width: 1 }),
 });
 
+// Helper to create tile source based on selected base map style
 const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   switch (style) {
     case 'carto-light':
@@ -167,25 +173,29 @@ const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
         url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
+        crossOrigin: 'anonymous',
       });
     case 'carto-dark':
       return new XYZ({
         url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
+        crossOrigin: 'anonymous',
       });
     case 'esri-satellite':
       return new XYZ({
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attributions: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
         maxZoom: 19,
+        crossOrigin: 'anonymous',
       });
     case 'osm':
     default:
-      return new OSM();
+      return new OSM({ crossOrigin: 'anonymous' });
   }
 };
 
+// Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const dispatch = useDispatch();
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
@@ -227,6 +237,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const selectRef = useRef<Select | null>(null);
   const isApplyingExternalViewRef = useRef(false);
 
+  // Serialize features from the Redux store into a flat array for rendering on the map.
   const serializedFeatures = useMemo(() => {
     const items: Array<{ outlookType: string; probability: string; feature: GeoJsonFeature }> = [];
     Object.entries(outlooks).forEach(([outlookType, probs]) => {
@@ -262,20 +273,25 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) return;
 
-    const tileLayer = new TileLayer({ source: new OSM() });
+    const tileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = tileLayer;
+    // Blank base map layers: start hidden, only one (tile vs. world+lakes+land) will be visible at a time based on baseMapStyle.
     const worldLayer = new VectorLayer({
       source: worldSourceRef.current,
       visible: false,
       zIndex: 1,
     });
     worldLayerRef.current = worldLayer;
+    // Lakes layer sits above world layer to provide better definition of coastlines and inland water bodies,
+    // especially when using blank basemap style.
     const lakesLayer = new VectorLayer({
       source: lakesSourceRef.current,
       visible: false,
       zIndex: 1.5,
     });
     lakesLayerRef.current = lakesLayer;
+    // Land layer (US states) sits above world and lakes, but below outlook features.
+    // It provides clear borders and a neutral fill for the US when using the blank basemap style.
     const landLayer = new VectorLayer({
       source: landSourceRef.current,
       visible: false,
@@ -297,6 +313,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       zIndex: 4,
     });
 
+    // Initialize the map with all layers, but only the tile layer visible by default.
+    // The blank basemap layers will be toggled on if the user selects the blank style.
+    // This allows us to keep all layers in place and just switch visibility/styles
+    // without needing to re-add/remove layers or features, which can be expensive.
     const map = new OLMap({
       target: mapElementRef.current,
       layers: [tileLayer, worldLayer, lakesLayer, landLayer, catLayer, vectorLayer],
@@ -350,6 +370,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         return;
       }
 
+      // Use forEachFeatureAtPixel to get the topmost feature at the clicked pixel,
+      // which accounts for z-index and layer visibility.
       const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f);
       if (feature && overlayRef.current) {
         const outlookType = feature.get('outlookType') as string;
@@ -383,10 +405,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           return;
         }
 
+        // Convert the modified geometry back to GeoJSON format with the correct projections for storage in Redux.
         const geoJsonGeometry = format.writeGeometryObject(geometry, {
           dataProjection: 'EPSG:4326',
           featureProjection: 'EPSG:3857'
         });
+        // Dispatch an action to update the feature in the Redux store with the new geometry.
         const updatedFeature: GeoJsonFeature = {
           type: 'Feature',
           id: featureId,
@@ -404,6 +428,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     map.addInteraction(modify);
     modifyRef.current = modify;
 
+    // Separate modify interaction for categorical layer to handle its unique properties
+    // and to prevent accidental edits of auto-generated categorical features.
     const catModify = new Modify({ source: catSourceRef.current });
     catModify.on('modifyend', (event) => {
       const fmt = new GeoJSON();
@@ -419,6 +445,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         const outlookType = feature.get('outlookType') as string | undefined;
         const probability = feature.get('probability') as string | undefined;
         if (!featureId || !outlookType || !probability) return;
+        // Convert the modified geometry back to GeoJSON format with the correct projections for storage in Redux.
         const geoJsonGeometry = fmt.writeGeometryObject(geometry, {
           dataProjection: 'EPSG:4326',
           featureProjection: 'EPSG:3857'
@@ -556,6 +583,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
       // Load world countries layer (gray fill for Canada, Mexico, etc.)
       if (worldSourceRef.current.getFeatures().length === 0) {
+        // Fetch and cache the GeoJSON for world countries if we haven't already,
+        // then add to the world layer with the blank style.
         const loadWorld = async () => {
           if (!cachedWorldCountriesGeoJSON) {
             const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson');
@@ -578,6 +607,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
       // Load lakes layer (Great Lakes, etc.) — blue, sits between world and US states
       if (lakesSourceRef.current.getFeatures().length === 0) {
+        // Fetch and cache the GeoJSON for lakes if we haven't already,
+        // then add to the lakes layer with the blank lake style.
         const loadLakes = async () => {
           if (!cachedLakesGeoJSON) {
             const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_lakes.geojson');
@@ -600,6 +631,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
       // Load US states layer (cream fill, black borders on top of world layer)
       if (landSourceRef.current.getFeatures().length === 0) {
+        // Fetch and cache the GeoJSON for US states if we haven't already,
+        // then add to the land layer with the blank land style.
         const loadStates = async () => {
           if (!cachedUsStatesGeoJSON) {
             const res = await fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json');
@@ -652,10 +685,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           return;
         }
 
+        // Convert the drawn geometry to GeoJSON format with the correct projections for storage in Redux.
         const geometry = format.writeGeometryObject(olGeometry, {
           dataProjection: 'EPSG:4326',
           featureProjection: 'EPSG:3857'
         });
+        // Create a new feature object with the drawn geometry and current drawing state properties,
+        // then dispatch an action to add it to the Redux store.
         const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
           type: 'Feature',
           id: uuidv4(),
@@ -699,6 +735,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       const zIndex = computeZIndex(outlookType as any, probability);
       const isTopLayer = zIndex === maxZIndex;
 
+      // Apply styles and properties to the feature, then add it to the appropriate source.
       const applyProps = (f: any) => {
         f.setStyle(toOlStyle(outlookType, probability, isTopLayer, isCategorical));
         f.set('featureId', feature.id as string);

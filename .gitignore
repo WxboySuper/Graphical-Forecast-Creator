@@ -35,3 +35,7 @@ yarn-error.log*
 /playwright-report/
 /test-results/
 /blob-report/
+
+# Local Triage & Planning
+todo.md
+internal-roadmap.md
