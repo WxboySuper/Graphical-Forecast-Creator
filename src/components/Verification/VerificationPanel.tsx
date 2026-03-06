@@ -36,6 +36,16 @@ interface ReportCounts {
   hail: number;
 }
 
+type RiskEntry = [
+  string,
+  {
+    hits: number;
+    misses: number;
+    hitRate: number;
+    total: number;
+  }
+];
+
 // Define a consistent order for risk levels to ensure they are displayed in a logical sequence in the UI.
 const RISK_LEVEL_ORDER = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH', '2%', '5%', '10%', '15%', '30%', '45%', '60%', 'SIG'];
 
@@ -146,6 +156,62 @@ const FilterByTypeSection: React.FC<{
   );
 };
 
+// The RiskLevelStatRow component displays a single row of the risk level breakdown,
+// showing the risk level name, hit count, and hit rate percentage.
+const RiskLevelStatRow: React.FC<{ level: string; hitRate: number; hits: number }> = ({ level, hitRate, hits }) => (
+  <div className="risk-level-stat">
+    <span className="risk-level-name">{level}:</span>
+    <span className="risk-level-value">
+      {hits} hits ({hitRate.toFixed(1)}%)
+    </span>
+  </div>
+);
+
+// The RiskLevelBreakdown component displays a breakdown of hits by risk level for the active outlook type,
+const RiskLevelBreakdown: React.FC<{ riskEntries: RiskEntry[] }> = ({ riskEntries }) => {
+  if (riskEntries.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="risk-level-breakdown">
+      <h4>By Risk Level:</h4>
+      <div className="risk-level-stats">
+        {riskEntries.map(([level, data]) => (
+          <RiskLevelStatRow
+            key={level}
+            level={level}
+            hits={data.hits}
+            hitRate={data.hitRate}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// The VerificationSummaryDetails component provides a collapsible section that shows a detailed textual summary
+// of the verification results,
+const VerificationSummaryDetails: React.FC<{
+  verificationResult: VerificationResult;
+  activeOutlookType: ActiveOutlookType;
+}> = ({ verificationResult, activeOutlookType }) => (
+  <>
+    <details className="verification-details">
+      <summary>View Detailed Summary</summary>
+      <pre className="verification-summary">
+        {formatVerificationSummary(verificationResult, activeOutlookType)}
+      </pre>
+    </details>
+    <p className="verification-note">
+      <small>
+        <strong>Note:</strong> A &quot;hit&quot; means the report falls within the forecast outlook area.
+        Risk levels show how many reports fell within each specific risk category.
+      </small>
+    </p>
+  </>
+);
+
 // The VerificationAnalysisSection component displays the results of the verification analysis for the selected outlook type.
 const VerificationAnalysisSection: React.FC<{
   verificationResult: VerificationResult;
@@ -154,7 +220,7 @@ const VerificationAnalysisSection: React.FC<{
   const activeVerification = verificationResult[activeOutlookType] as OutlookTypeVerification;
   const riskEntries = Object.entries(activeVerification.byRiskLevel).sort(
     (a, b) => RISK_LEVEL_ORDER.indexOf(b[0].toUpperCase()) - RISK_LEVEL_ORDER.indexOf(a[0].toUpperCase())
-  );
+  ) as RiskEntry[];
 
   return (
     <div className="verification-section">
@@ -174,35 +240,11 @@ const VerificationAnalysisSection: React.FC<{
             <span className="metric-value miss">{activeVerification.misses}</span>
           </div>
         </div>
-
-        {riskEntries.length > 0 && (
-          <div className="risk-level-breakdown">
-            <h4>By Risk Level:</h4>
-            <div className="risk-level-stats">
-              {riskEntries.map(([level, data]) => (
-                <div key={level} className="risk-level-stat">
-                  <span className="risk-level-name">{level}:</span>
-                  <span className="risk-level-value">
-                    {data.hits} hits ({data.hitRate.toFixed(1)}%)
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <details className="verification-details">
-          <summary>View Detailed Summary</summary>
-          <pre className="verification-summary">
-            {formatVerificationSummary(verificationResult, activeOutlookType)}
-          </pre>
-        </details>
-        <p className="verification-note">
-          <small>
-            <strong>Note:</strong> A "hit" means the report falls within the forecast outlook area.
-            Risk levels show how many reports fell within each specific risk category.
-          </small>
-        </p>
+        <RiskLevelBreakdown riskEntries={riskEntries} />
+        <VerificationSummaryDetails
+          verificationResult={verificationResult}
+          activeOutlookType={activeOutlookType}
+        />
       </div>
     </div>
   );
