@@ -151,31 +151,31 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
     };
 
     const addAndWatch = (srcLayer: L.TileLayer & { _url?: string }) => {
-      // Derive a best-effort URL: prefer options.url, then getTileUrl if available, then any private _url
-      const srcAny = srcLayer as L.TileLayer & { options: L.TileLayerOptions & { url?: string }; _url?: string };
-      const derivedUrl = srcAny.options?.url ?? (typeof srcAny.getTileUrl === 'function' ? srcAny.getTileUrl({ x: 0, y: 0, z: (srcAny.options?.maxZoom as number) ?? 0 } as L.Coords) : undefined) ?? srcAny._url;
-      const attribution = (srcLayer.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
-      const maxZoom = srcLayer.options?.maxZoom ?? 19;
+      // Derive a best-effort URL and options for a tile layer
+      const deriveConfig = (layerSrc: L.TileLayer & { _url?: string }) => {
+        const srcAny = layerSrc as L.TileLayer & { options: L.TileLayerOptions & { url?: string }; _url?: string };
+        const url = srcAny.options?.url ?? (typeof srcAny.getTileUrl === 'function' ? srcAny.getTileUrl({ x: 0, y: 0, z: (srcAny.options?.maxZoom as number) ?? 0 } as L.Coords) : undefined) ?? srcAny._url;
+        const attribution = (layerSrc.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
+        const maxZoom = layerSrc.options?.maxZoom ?? 19;
+        return { url, attribution, maxZoom };
+      };
+
+      const { url: derivedUrl, attribution, maxZoom } = deriveConfig(srcLayer);
       const layer = L.tileLayer(derivedUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution,
         maxZoom,
         crossOrigin: 'anonymous'
       });
 
-      layer.on('tileloadstart', () => {
-        pendingTiles += 1;
-      });
-
-      layer.on('tileload', () => {
+      const onTileStart = () => { pendingTiles += 1; };
+      const onTileFinish = () => {
         pendingTiles = Math.max(0, pendingTiles - 1);
         if (pendingTiles === 0) finish(false);
-      });
+      };
 
-      layer.on('tileerror', () => {
-        pendingTiles = Math.max(0, pendingTiles - 1);
-        if (pendingTiles === 0) finish(false);
-      });
-
+      layer.on('tileloadstart', onTileStart);
+      layer.on('tileload', onTileFinish);
+      layer.on('tileerror', onTileFinish);
       layer.on('load', () => finish(false));
       layer.addTo(mapInstance);
     };
@@ -512,14 +512,7 @@ const exportLiveMapAsImage = async (
     includeLegendAndStatus = false
   } = options;
 
-  const mapContainer = getExportContainer(map);
-  if (!mapContainer) {
-    throw new Error('Map container not available for export.');
-  }
-
-  const exportRoot = (mapContainer.closest('.map-container, .forecast-map-container') as HTMLElement | null) || mapContainer;
-  const width = exportRoot.clientWidth;
-  const height = exportRoot.clientHeight;
+  const { exportRoot, width, height } = getExportRootAndSize(map);
 
   // Read overlays from live DOM before html2canvas clones/reflows styles
   const statusText = includeLegendAndStatus ? readStatusText(exportRoot) : '';
@@ -527,45 +520,90 @@ const exportLiveMapAsImage = async (
 
   await waitForMapSettleGeneric(map, 400);
   const imgResult = await waitForImagesLoaded(exportRoot, 1200);
-  if (imgResult?.timedOut && imgResult.remaining > 0) {
-    // Inform developers/users via console and show an on-screen warning so it's obvious this is a network/tile load issue
-    console.warn('GFC export: Some map tiles/images did not finish loading before capture; this is usually caused by a slow internet connection. Export may be incomplete.');
-    try {
-      const warningBanner = document.createElement('div');
-      warningBanner.setAttribute('data-gfc-export-warning', '1');
-      // position within the export root so it appears in the export and on-screen
-      warningBanner.style.cssText = 'position:absolute;top:12px;left:12px;z-index:1600;background:rgba(255,69,58,0.95);color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;pointer-events:none;';
-      warningBanner.textContent = 'Warning: Map tiles timed out loading — check your internet connection. Export may be incomplete.';
-      exportRoot.appendChild(warningBanner);
-      // remove after a short duration so it doesn't permanently alter the UI
-      setTimeout(() => { try { warningBanner.remove(); } catch {
-        // ignore errors but log to console for visibility
-        console.warn('GFC export: Failed to remove on-screen warning about tile load timeout.', warningBanner);
-      } }, 6000);
-    } catch {
-      // ignore errors but log to console for visibility
-      console.warn('GFC export: Failed to display on-screen warning about tile load timeout.', exportRoot);
-    }
+  maybeShowTileTimeoutWarning(exportRoot, imgResult);
+
+  return captureContainer(exportRoot, width, height, format, quality,
+    buildCloneCallback(title, includeLegendAndStatus, statusText, unofficialText)
+  );
+};
+
+const addTempMapWarning = (container: HTMLElement) => {
+  console.warn('GFC export: temp map tiles did not finish loading before capture; this may be due to a slow internet connection and could cause blank or incomplete export.');
+  try {
+    const warnDiv = document.createElement('div');
+    warnDiv.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2000;background:rgba(255,69,58,0.95);color:#fff;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600;pointer-events:none;';
+    warnDiv.textContent = 'Warning: Map tiles timed out loading — export may be incomplete.';
+    container.appendChild(warnDiv);
+  } catch (err) {
+    console.warn('GFC export: Failed to display warning about tile load timeout in temp map export.', err);
+  }
+};
+
+const getSourceRoot = (map: L.Map): HTMLElement =>
+  (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
+
+// Helper: prepare a temporary map and container for export
+const prepareTempMapAndContainer = (map: L.Map): { tempContainer: HTMLDivElement; tempMap: L.Map; container: HTMLElement } => {
+  const container = map.getContainer();
+  const tempContainer = createTempContainer(container.clientWidth, container.clientHeight);
+  const tempMap = createTempMap(tempContainer, map.getCenter(), map.getZoom(), map.options.crs || L.CRS.EPSG3857);
+  tempMap.fitBounds(map.getBounds(), { animate: false, padding: [0, 0] });
+  tempMap.invalidateSize({ animate: false });
+  return { tempContainer, tempMap, container };
+};
+
+// Helper: cleanup temporary resources
+const cleanupTempMapResources = (tempContainer: HTMLDivElement | null, tempMap: L.Map | null) => {
+  try {
+    if (tempContainer?.parentNode) document.body.removeChild(tempContainer);
+  } catch (err) {
+    console.warn('GFC export: Failed to remove temporary container.', tempContainer, err);
   }
 
-  return captureContainer(exportRoot, width, height, format, quality, (clonedRoot) => {
-    hideElementsInClone(clonedRoot, [
-      '.leaflet-control-container',
-      '.ol-control',
-      '.map-toolbar-bottom-right',
-      '.leaflet-pm-toolbar-container',
-      '.leaflet-pm-actions-container',
-      // Hide original overlays; recreated below with export-safe styles.
-      '.gfc-status-overlay',
-      '.unofficial-badge',
-    ]);
+  try {
+    if (tempMap?.remove) tempMap.remove();
+  } catch (err) {
+    console.warn('GFC export: Failed to remove temporary map instance.', tempMap, err);
+  }
+};
 
-    if (!includeLegendAndStatus) {
-      hideElementsInClone(clonedRoot, ['.map-legend']);
-    }
+// Helper: perform capture flow on the prepared temp map
+const captureFromTempMap = async (
+  tempContainer: HTMLDivElement,
+  tempMap: L.Map,
+  sourceMap: L.Map,
+  outlooks: OutlookData,
+  options: ExportImageOptions
+): Promise<string> => {
+  const { title, format = 'png', quality = 0.92, includeLegendAndStatus = false } = options;
 
-    addOverlays(clonedRoot, title, statusText || undefined, unofficialText || undefined);
-  });
+  // Wait for map settle, add tiles, and render outlooks (returns tile wait result)
+  const waitAndRender = async () => {
+    await waitForMapSettle(tempMap);
+    const tileResult = await addTilesAndWait(tempMap, sourceMap);
+    renderOutlooksToMap(tempMap, outlooks);
+    await new Promise((r) => setTimeout(r, 300));
+    return tileResult;
+  };
+
+  // Prepare overlays (status, unofficial, legend) on the temp container
+  const prepareOverlays = () => {
+    const sourceRoot = getSourceRoot(sourceMap);
+    const statusText = includeLegendAndStatus ? readStatusText(sourceRoot) : '';
+    const unofficialText = includeLegendAndStatus ? readUnofficialText(sourceRoot) : '';
+    if (includeLegendAndStatus) cloneLegendAndStatusOverlays(sourceMap, tempContainer);
+    addOverlays(tempContainer, title, statusText || undefined, unofficialText || undefined);
+  };
+
+  const tileResult = await waitAndRender();
+
+  if (tileResult?.timedOut && tileResult.remaining > 0) {
+    addTempMapWarning(tempContainer);
+  }
+
+  prepareOverlays();
+
+  return captureContainer(tempContainer, sourceMap.getContainer().clientWidth, sourceMap.getContainer().clientHeight, format, quality);
 };
 
 const exportViaTempMapAsImage = async (
@@ -576,62 +614,13 @@ const exportViaTempMapAsImage = async (
   let tempContainer: HTMLDivElement | null = null;
   let tempMap: L.Map | null = null;
 
-  const {
-    title,
-    format = 'png',
-    quality = 0.92,
-    includeLegendAndStatus = false
-  } = options;
-
   try {
-    const originalBounds = map.getBounds();
-    const container = map.getContainer();
-    tempContainer = createTempContainer(container.clientWidth, container.clientHeight);
-    tempMap = createTempMap(tempContainer, map.getCenter(), map.getZoom(), map.options.crs || L.CRS.EPSG3857);
-    tempMap.fitBounds(originalBounds, { animate: false, padding: [0, 0] });
-    tempMap.invalidateSize({ animate: false });
-    await waitForMapSettle(tempMap);
-    const tileResult = await addTilesAndWait(tempMap, map);
-    renderOutlooksToMap(tempMap, outlooks);
-    await new Promise((r) => setTimeout(r, 300));
-    if (tileResult?.timedOut && tileResult.remaining > 0) {
-      console.warn('GFC export: temp map tiles did not finish loading before capture; this may be due to a slow internet connection and could cause blank or incomplete export.');
-      try {
-        const warnDiv = document.createElement('div');
-        warnDiv.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2000;background:rgba(255,69,58,0.95);color:#fff;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600;pointer-events:none;';
-        warnDiv.textContent = 'Warning: Map tiles timed out loading — export may be incomplete.';
-        tempContainer.appendChild(warnDiv);
-      } catch {
-        // ignore errors but log to console for visibility
-        console.warn('GFC export: Failed to display warning about tile load timeout in temp map export.', tempContainer);
-      }
-    }
-    const sourceRoot = (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
-    const statusText = includeLegendAndStatus ? readStatusText(sourceRoot) : '';
-    const unofficialText = includeLegendAndStatus ? readUnofficialText(sourceRoot) : '';
-    if (includeLegendAndStatus) {
-      cloneLegendAndStatusOverlays(map, tempContainer);
-    }
-    addOverlays(tempContainer, title, statusText || undefined, unofficialText || undefined);
-    return captureContainer(tempContainer, container.clientWidth, container.clientHeight, format, quality);
+    const prepared = prepareTempMapAndContainer(map);
+    tempContainer = prepared.tempContainer;
+    tempMap = prepared.tempMap;
+    return await captureFromTempMap(tempContainer, tempMap, map, outlooks, options);
   } finally {
-    try {
-      if (tempContainer?.parentNode) {
-        document.body.removeChild(tempContainer);
-      }
-    } catch {
-      // ignore cleanup errors
-      console.warn('GFC export: Failed to remove temporary container.', tempContainer);
-    }
-
-    try {
-      if (tempMap?.remove) {
-        tempMap.remove();
-      }
-    } catch {
-      // ignore cleanup errors
-      console.warn('GFC export: Failed to remove temporary map instance.', tempMap);
-    }
+    cleanupTempMapResources(tempContainer, tempMap);
   }
 };
 
@@ -662,4 +651,58 @@ export const downloadDataUrl = (dataUrl: string, filename: string) => {
   link.href = dataUrl;
   link.download = filename;
   link.click();
+};
+
+// Helper: determine export root and dimensions for a map-like object
+const getExportRootAndSize = (map: ExportMapLike) => {
+  const mapContainer = getExportContainer(map);
+  if (!mapContainer) {
+    throw new Error('Map container not available for export.');
+  }
+
+  const exportRoot = (mapContainer.closest('.map-container, .forecast-map-container') as HTMLElement | null) || mapContainer;
+  const width = exportRoot.clientWidth;
+  const height = exportRoot.clientHeight;
+  return { mapContainer, exportRoot, width, height };
+};
+
+// Helper: show the existing timeout warning banner when images timed out
+const maybeShowTileTimeoutWarning = (exportRoot: HTMLElement, imgResult?: { timedOut: boolean; remaining: number } | null) => {
+  if (imgResult?.timedOut && imgResult.remaining > 0) {
+    console.warn('GFC export: Some map tiles/images did not finish loading before capture; this is usually caused by a slow internet connection. Export may be incomplete.');
+    try {
+      const warningBanner = document.createElement('div');
+      warningBanner.setAttribute('data-gfc-export-warning', '1');
+      warningBanner.style.cssText = 'position:absolute;top:12px;left:12px;z-index:1600;background:rgba(255,69,58,0.95);color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;pointer-events:none;';
+      warningBanner.textContent = 'Warning: Map tiles timed out loading — check your internet connection. Export may be incomplete.';
+      exportRoot.appendChild(warningBanner);
+      setTimeout(() => { try { warningBanner.remove(); } catch {
+        console.warn('GFC export: Failed to remove on-screen warning about tile load timeout.', warningBanner);
+      } }, 6000);
+    } catch {
+      console.warn('GFC export: Failed to display on-screen warning about tile load timeout.', exportRoot);
+    }
+  }
+};
+
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
+const buildCloneCallback = (title?: string, includeLegendAndStatus = false, statusText?: string, unofficialText?: string) => {
+  return (clonedRoot: HTMLElement) => {
+    hideElementsInClone(clonedRoot, [
+      '.leaflet-control-container',
+      '.ol-control',
+      '.map-toolbar-bottom-right',
+      '.leaflet-pm-toolbar-container',
+      '.leaflet-pm-actions-container',
+      // Hide original overlays; recreated below with export-safe styles.
+      '.gfc-status-overlay',
+      '.unofficial-badge',
+    ]);
+
+    if (!includeLegendAndStatus) {
+      hideElementsInClone(clonedRoot, ['.map-legend']);
+    }
+
+    addOverlays(clonedRoot, title, statusText || undefined, unofficialText || undefined);
+  };
 };
