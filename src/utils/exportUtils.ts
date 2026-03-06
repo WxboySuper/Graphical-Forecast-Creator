@@ -142,6 +142,7 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
     let resolved = false;
     let pendingTiles = 0;
 
+    // Listen for tile load events to track pending tiles and resolve when done or on timeout
     const finish = (fromTimeout = false) => {
       if (!resolved) {
         resolved = true;
@@ -400,6 +401,8 @@ const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   });
 };
 
+// For non-Leaflet maps, we can only wait for a fixed time and hope for the best,
+// but for Leaflet maps we can listen for moveend to ensure tiles have loaded and map has settled before capture.
 const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<void> => {
   if (isLeafletMap(map)) {
     await waitForMapSettle(map, timeout);
@@ -408,6 +411,8 @@ const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<vo
 
   await new Promise<void>((resolve) => {
     let resolved = false;
+    // Listen for a generic 'rendercomplete' event if available (e.g. OpenLayers),
+    // but don't rely on it since it's not standard across all map libraries
     const finish = () => {
       if (!resolved) {
         resolved = true;
@@ -427,6 +432,7 @@ const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<vo
   });
 };
 
+// Wait for all images within the export root to finish loading, with a timeout fallback.
 const waitForImagesLoaded = async (root: HTMLElement, timeout = 1200): Promise<{ timedOut: boolean; remaining: number }> => {
   return new Promise((resolve) => {
     try {
@@ -440,6 +446,9 @@ const waitForImagesLoaded = async (root: HTMLElement, timeout = 1200): Promise<{
       let remaining = imgs.length;
       let resolved = false;
 
+      // Listen for load/error events on each image to track when all have finished loading or errored,
+      // and resolve accordingly. This helps ensure that all tiles/images are accounted for before capture,
+      // even if they load after the initial map settle.
       const finishOne = () => {
         remaining = Math.max(0, remaining - 1);
         if (remaining === 0 && !resolved) {
@@ -470,6 +479,7 @@ const waitForImagesLoaded = async (root: HTMLElement, timeout = 1200): Promise<{
   });
 };
 
+// Helper: hide elements in the cloned export DOM that shouldn't appear in the export, based on selectors
 const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
   selectors.forEach((selector) => {
     root.querySelectorAll(selector).forEach((el) => {
