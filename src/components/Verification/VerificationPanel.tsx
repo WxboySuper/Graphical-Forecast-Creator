@@ -53,15 +53,28 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       // Parse YYYY-MM-DD string directly to avoid timezone issues
       const [year, month, day] = selectedDate.split('-').map(Number);
       const dateObj = new Date(year, month - 1, day); // month is 0-indexed
+
+      // Check if the selected date is today in local time
+      const today = new Date();
+      const isToday = 
+        dateObj.getFullYear() === today.getFullYear() && 
+        dateObj.getMonth() === today.getMonth() && 
+        dateObj.getDate() === today.getDate();
+
+      if (isToday) {
+        dispatch(setError('info:Storm reports are not available for the current day until later.'));
+        dispatch(setLoading(false));
+        return;
+      }
+
       const reportDate = formatReportDate(dateObj);
-      
       const fetchedReports = await fetchStormReports(reportDate);
-      
+
       dispatch(setReports(fetchedReports));
       dispatch(setDate(reportDate));
-      
+
       if (fetchedReports.length === 0) {
-        dispatch(setError('No storm reports found for this date.'));
+        dispatch(setError('info:No storm reports found for this date.'));
       }
     } catch (err) {
       dispatch(setError(
@@ -121,8 +134,8 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         </div>
         
         {error && (
-          <div className="error-message">
-            <p>⚠️ {error}</p>
+          <div className={error.startsWith('info:') ? 'info-message' : 'error-message'}>
+            <p>{error.startsWith('info:') ? 'ℹ️' : '⚠️'} {error.startsWith('info:') ? error.replace('info:', '') : error}</p>
           </div>
         )}
       </div>
