@@ -9,7 +9,6 @@ import VectorSource from 'ol/source/Vector';
 import OSM from 'ol/source/OSM';
 import XYZ from 'ol/source/XYZ';
 import GeoJSON from 'ol/format/GeoJSON';
-import { Fill, Stroke, Style } from 'ol/style';
 import { fromLonLat } from 'ol/proj';
 import { RootState } from '../../store';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
@@ -21,7 +20,7 @@ import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature } from 'geojson';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
-import { Circle, Fill as StyleFill, Stroke as StyleStroke, Style as OlStyle } from 'ol/style';
+import { Circle, Fill as StyleFill, Stroke as StyleStroke, Style as OlStyle, Fill, Stroke, Style } from 'ol/style';
 import Legend from './Legend';
 import UnofficialBadge from './UnofficialBadge';
 import './ForecastMap.css';
@@ -316,6 +315,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       el.style.backgroundColor = '#b8d4e8';
 
       if (landSourceRef.current.getFeatures().length === 0) {
+        // Fetch and cache the GeoJSON for US states if we haven't already,
         const loadStates = async () => {
           let geoData = cachedUsStatesGeoJSONVerif;
           if (!geoData) {
