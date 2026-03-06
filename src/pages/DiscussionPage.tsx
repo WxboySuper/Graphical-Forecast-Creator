@@ -262,6 +262,7 @@ const DiscussionPreviewCard: React.FC<{ compiledText: string }> = ({ compiledTex
   </div>
 );
 
+// The DiscussionPreviewPane component renders the right-hand pane of the discussion page,
 const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledText }) => (
   <div className="w-[45%] flex-shrink-0 flex flex-col overflow-hidden bg-muted/20">
     <div className="flex-shrink-0 px-4 py-3 border-b border-border flex items-center gap-2">
@@ -366,8 +367,8 @@ const useDiscussionEditorState = (
 
   useEffect(() => {
     if (!hasUnsavedChanges) {
-      return;
-    }
+        return () => {};
+      }
 
     // Auto-saves the discussion data to the Redux store after a short debounce whenever there are unsaved changes.
     // This ensures that the global auto-save mechanism (which saves to localStorage) captures the latest discussion state even if the user doesn't click the Save button.
