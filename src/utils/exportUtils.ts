@@ -127,57 +127,63 @@ const createTempMap = (container: HTMLElement, center: L.LatLng, zoom: number, c
 };
 
 // Helper: add tiles to map and wait for load or timeout
-const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): Promise<void> => {
+const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): Promise<{ timedOut: boolean; remaining: number }> => {
   return new Promise((resolve) => {
-    let activeTileLayer: L.TileLayer | undefined;
+    const activeTileLayers: L.TileLayer[] = [];
     sourceMap.eachLayer((layer) => {
-      if (!activeTileLayer && layer instanceof L.TileLayer) {
-        activeTileLayer = layer;
+      if (layer instanceof L.TileLayer) {
+        activeTileLayers.push(layer as L.TileLayer);
       }
     });
-    const tileUrl = activeTileLayer?.getTileUrl
-      ? (activeTileLayer as unknown as { _url?: string })._url
-      : undefined;
-    const attribution = (activeTileLayer?.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
-    const maxZoom = activeTileLayer?.options?.maxZoom ?? 19;
 
-    const layer = L.tileLayer(tileUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution,
-      maxZoom,
-      crossOrigin: 'anonymous'
-    });
+    // Fallback to a default single OSM layer if none found
+    const layersToAdd = activeTileLayers.length > 0 ? activeTileLayers : [L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' })];
 
     let resolved = false;
     let pendingTiles = 0;
 
-    const finish = () => {
+    const finish = (fromTimeout = false) => {
       if (!resolved) {
         resolved = true;
-        resolve();
+        resolve({ timedOut: fromTimeout, remaining: pendingTiles });
       }
     };
 
-    layer.on('tileloadstart', () => {
-      pendingTiles += 1;
-    });
+    const addAndWatch = (srcLayer: L.TileLayer) => {
+      // Derive a best-effort URL: prefer options.url, then getTileUrl if available, then any private _url
+      const srcAny = srcLayer as any;
+      const derivedUrl = srcAny?.options?.url ?? (typeof srcAny.getTileUrl === 'function' ? srcAny.getTileUrl({ x: 0, y: 0, z: srcAny.options?.maxZoom ?? 0 }) : undefined) ?? srcAny?._url;
+      const attribution = (srcLayer.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
+      const maxZoom = srcLayer.options?.maxZoom ?? 19;
+      const layer = L.tileLayer(derivedUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution,
+        maxZoom,
+        crossOrigin: 'anonymous'
+      });
 
-    layer.on('tileload', () => {
-      pendingTiles = Math.max(0, pendingTiles - 1);
-      if (pendingTiles === 0) {
-        finish();
-      }
-    });
+      layer.on('tileloadstart', () => {
+        pendingTiles += 1;
+      });
 
-    layer.on('tileerror', () => {
-      pendingTiles = Math.max(0, pendingTiles - 1);
-      if (pendingTiles === 0) {
-        finish();
-      }
-    });
+      layer.on('tileload', () => {
+        pendingTiles = Math.max(0, pendingTiles - 1);
+        if (pendingTiles === 0) finish(false);
+      });
 
-    layer.on('load', finish);
-    setTimeout(finish, timeout);
-    layer.addTo(mapInstance);
+      layer.on('tileerror', () => {
+        pendingTiles = Math.max(0, pendingTiles - 1);
+        if (pendingTiles === 0) finish(false);
+      });
+
+      layer.on('load', () => finish(false));
+      layer.addTo(mapInstance);
+    };
+
+    // Add and watch all derived layers
+    layersToAdd.forEach(addAndWatch);
+
+    // Safety timeout
+    setTimeout(() => finish(true), timeout);
   });
 };
 
@@ -327,15 +333,44 @@ const captureContainer = async (
   const canvas = await html2canvas(container, {
     useCORS: true,
     allowTaint: false,
-    backgroundColor: '#ffffff',
+    backgroundColor: store.getState().theme.darkMode ? '#000000' : '#ffffff',
     scale: 2,
+    imageTimeout: 8000,
     logging: false,
     width,
     height,
     onclone: (clonedDocument) => {
       const clonedContainer = clonedDocument.querySelector(`[data-gfc-export-capture-id="${captureId}"]`) as HTMLElement | null;
-      if (clonedContainer && onClone) {
-        onClone(clonedContainer);
+      if (clonedContainer) {
+        // Ensure cloned container has explicit background matching current theme so dark tiles aren't lost
+        clonedContainer.style.backgroundColor = store.getState().theme.darkMode ? '#000000' : '#ffffff';
+        // Ensure cloned images request CORS so html2canvas can load external tiles
+        Array.from(clonedContainer.querySelectorAll('img')).forEach((img) => {
+          try { (img as HTMLImageElement).crossOrigin = 'anonymous'; } catch {}
+        });
+        // Copy any <defs> from SVGs in the source document into the cloned document so patterns/hatching render
+        try {
+          const srcDefs = Array.from(document.querySelectorAll('svg defs')) as Element[];
+          if (srcDefs.length > 0) {
+            let svgHolder = clonedDocument.querySelector('#gfc-export-svg-defs-holder') as Element | null;
+            if (!svgHolder) {
+              svgHolder = clonedDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              svgHolder.setAttribute('id', 'gfc-export-svg-defs-holder');
+              svgHolder.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden;');
+              clonedDocument.body.appendChild(svgHolder as unknown as HTMLElement);
+            }
+            srcDefs.forEach((d) => {
+              try {
+                const clonedDefs = d.cloneNode(true) as Node;
+                svgHolder!.appendChild(clonedDefs as unknown as Node);
+              } catch {}
+            });
+          }
+        } catch {}
+
+        if (onClone) {
+          onClone(clonedContainer);
+        }
       }
     }
   });
@@ -365,13 +400,74 @@ const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   });
 };
 
-const waitForMapSettleGeneric = async (map: unknown, timeout = 500): Promise<void> => {
+const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<void> => {
   if (isLeafletMap(map)) {
     await waitForMapSettle(map, timeout);
     return;
   }
 
-  await new Promise((resolve) => setTimeout(resolve, timeout));
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+
+    if (map && typeof (map as any).once === 'function') {
+      try {
+        (map as any).once('rendercomplete', finish);
+      } catch (err) {
+        // Fallback
+      }
+    }
+
+    setTimeout(finish, timeout);
+  });
+};
+
+const waitForImagesLoaded = async (root: HTMLElement, timeout = 1200): Promise<{ timedOut: boolean; remaining: number }> => {
+  return new Promise((resolve) => {
+    try {
+      const imgs = Array.from(root.querySelectorAll('img'));
+      if (imgs.length === 0) {
+        // no images to wait for; short delay to allow backgrounds to settle
+        setTimeout(() => resolve({ timedOut: false, remaining: 0 }), 50);
+        return;
+      }
+
+      let remaining = imgs.length;
+      let resolved = false;
+
+      const finishOne = () => {
+        remaining = Math.max(0, remaining - 1);
+        if (remaining === 0 && !resolved) {
+          resolved = true;
+          resolve({ timedOut: false, remaining: 0 });
+        }
+      };
+
+      imgs.forEach((i) => {
+        const img = i as HTMLImageElement;
+        if (img.complete) {
+          finishOne();
+        } else {
+          img.addEventListener('load', finishOne, { once: true });
+          img.addEventListener('error', finishOne, { once: true });
+        }
+      });
+
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ timedOut: true, remaining });
+        }
+      }, timeout);
+    } catch {
+      setTimeout(() => resolve({ timedOut: true, remaining: -1 }), timeout);
+    }
+  });
 };
 
 const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
@@ -407,6 +503,21 @@ const exportLiveMapAsImage = async (
   const unofficialText = includeLegendAndStatus ? readUnofficialText(exportRoot) : '';
 
   await waitForMapSettleGeneric(map, 400);
+  const imgResult = await waitForImagesLoaded(exportRoot, 1200);
+  if (imgResult?.timedOut && imgResult.remaining > 0) {
+    // Inform developers/users via console and show an on-screen warning so it's obvious this is a network/tile load issue
+    console.warn('GFC export: Some map tiles/images did not finish loading before capture; this is usually caused by a slow internet connection. Export may be incomplete.');
+    try {
+      const warningBanner = document.createElement('div');
+      warningBanner.setAttribute('data-gfc-export-warning', '1');
+      // position within the export root so it appears in the export and on-screen
+      warningBanner.style.cssText = 'position:absolute;top:12px;left:12px;z-index:1600;background:rgba(255,69,58,0.95);color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;pointer-events:none;';
+      warningBanner.textContent = 'Warning: Map tiles timed out loading — check your internet connection. Export may be incomplete.';
+      exportRoot.appendChild(warningBanner);
+      // remove after a short duration so it doesn't permanently alter the UI
+      setTimeout(() => { try { warningBanner.remove(); } catch {} }, 6000);
+    } catch {}
+  }
 
   return captureContainer(exportRoot, width, height, format, quality, (clonedRoot) => {
     hideElementsInClone(clonedRoot, [
@@ -451,9 +562,18 @@ const exportViaTempMapAsImage = async (
     tempMap.fitBounds(originalBounds, { animate: false, padding: [0, 0] });
     tempMap.invalidateSize({ animate: false });
     await waitForMapSettle(tempMap);
-    await addTilesAndWait(tempMap, map);
+    const tileResult = await addTilesAndWait(tempMap, map);
     renderOutlooksToMap(tempMap, outlooks);
     await new Promise((r) => setTimeout(r, 300));
+    if (tileResult?.timedOut && tileResult.remaining > 0) {
+      console.warn('GFC export: temp map tiles did not finish loading before capture; this may be due to a slow internet connection and could cause blank or incomplete export.');
+      try {
+        const warnDiv = document.createElement('div');
+        warnDiv.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2000;background:rgba(255,69,58,0.95);color:#fff;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600;pointer-events:none;';
+        warnDiv.textContent = 'Warning: Map tiles timed out loading — export may be incomplete.';
+        tempContainer.appendChild(warnDiv);
+      } catch {}
+    }
     const sourceRoot = (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
     const statusText = includeLegendAndStatus ? readStatusText(sourceRoot) : '';
     const unofficialText = includeLegendAndStatus ? readUnofficialText(sourceRoot) : '';

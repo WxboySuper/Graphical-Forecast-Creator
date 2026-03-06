@@ -167,22 +167,25 @@ const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
         url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
+        crossOrigin: 'anonymous',
       });
     case 'carto-dark':
       return new XYZ({
         url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
+        crossOrigin: 'anonymous',
       });
     case 'esri-satellite':
       return new XYZ({
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attributions: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
         maxZoom: 19,
+        crossOrigin: 'anonymous',
       });
     case 'osm':
     default:
-      return new OSM();
+      return new OSM({ crossOrigin: 'anonymous' });
   }
 };
 
@@ -262,7 +265,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) return;
 
-    const tileLayer = new TileLayer({ source: new OSM() });
+    const tileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = tileLayer;
     const worldLayer = new VectorLayer({
       source: worldSourceRef.current,
