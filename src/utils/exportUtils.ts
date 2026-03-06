@@ -167,7 +167,9 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
         crossOrigin: 'anonymous'
       });
 
+      // Listen for tile load events to track pending tiles and resolve when done or on timeout
       const onTileStart = () => { pendingTiles += 1; };
+      // We listen for both 'tileload' and 'tileerror' to ensure we account for all tiles, even if some fail to load.
       const onTileFinish = () => {
         pendingTiles = Math.max(0, pendingTiles - 1);
         if (pendingTiles === 0) finish(false);
@@ -527,6 +529,8 @@ const exportLiveMapAsImage = async (
   );
 };
 
+// If the map is a Leaflet map, we can create a temporary offscreen map,
+// replicate the view and layers, and render outlooks onto it before capture.
 const addTempMapWarning = (container: HTMLElement) => {
   console.warn('GFC export: temp map tiles did not finish loading before capture; this may be due to a slow internet connection and could cause blank or incomplete export.');
   try {
@@ -539,6 +543,7 @@ const addTempMapWarning = (container: HTMLElement) => {
   }
 };
 
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
 const getSourceRoot = (map: L.Map): HTMLElement =>
   (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
 
@@ -606,6 +611,10 @@ const captureFromTempMap = async (
   return captureContainer(tempContainer, sourceMap.getContainer().clientWidth, sourceMap.getContainer().clientHeight, format, quality);
 };
 
+
+// If the map is not a Leaflet map,
+// we fall back to cloning the existing DOM and hope for the best with tile loading and rendering,
+// but we can still add overlays and hide controls for a cleaner export.
 const exportViaTempMapAsImage = async (
   map: L.Map,
   outlooks: OutlookData,
@@ -654,7 +663,7 @@ export const downloadDataUrl = (dataUrl: string, filename: string) => {
 };
 
 // Helper: determine export root and dimensions for a map-like object
-const getExportRootAndSize = (map: ExportMapLike) => {
+function getExportRootAndSize(map: ExportMapLike) {
   const mapContainer = getExportContainer(map);
   if (!mapContainer) {
     throw new Error('Map container not available for export.');
@@ -664,10 +673,10 @@ const getExportRootAndSize = (map: ExportMapLike) => {
   const width = exportRoot.clientWidth;
   const height = exportRoot.clientHeight;
   return { mapContainer, exportRoot, width, height };
-};
+}
 
 // Helper: show the existing timeout warning banner when images timed out
-const maybeShowTileTimeoutWarning = (exportRoot: HTMLElement, imgResult?: { timedOut: boolean; remaining: number } | null) => {
+function maybeShowTileTimeoutWarning(exportRoot: HTMLElement, imgResult?: { timedOut: boolean; remaining: number } | null) {
   if (imgResult?.timedOut && imgResult.remaining > 0) {
     console.warn('GFC export: Some map tiles/images did not finish loading before capture; this is usually caused by a slow internet connection. Export may be incomplete.');
     try {
@@ -683,11 +692,11 @@ const maybeShowTileTimeoutWarning = (exportRoot: HTMLElement, imgResult?: { time
       console.warn('GFC export: Failed to display on-screen warning about tile load timeout.', exportRoot);
     }
   }
-};
+}
 
 // Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
-const buildCloneCallback = (title?: string, includeLegendAndStatus = false, statusText?: string, unofficialText?: string) => {
-  return (clonedRoot: HTMLElement) => {
+function buildCloneCallback(title?: string, includeLegendAndStatus = false, statusText?: string, unofficialText?: string) {
+  return function (clonedRoot: HTMLElement) {
     hideElementsInClone(clonedRoot, [
       '.leaflet-control-container',
       '.ol-control',
@@ -705,4 +714,4 @@ const buildCloneCallback = (title?: string, includeLegendAndStatus = false, stat
 
     addOverlays(clonedRoot, title, statusText || undefined, unofficialText || undefined);
   };
-};
+}
