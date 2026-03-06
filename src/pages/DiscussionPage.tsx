@@ -21,7 +21,6 @@ import GuidedDiscussionEditor from '../components/DiscussionEditor/GuidedDiscuss
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
-import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import type { AddToastFn } from '../components/Layout';
 
@@ -253,6 +252,16 @@ const DiscussionStatusBar: React.FC<{ wordCount: number; lastModified?: string }
 
 // The DiscussionPreviewPane component renders the right-hand pane of the discussion page,
 // showing a live preview of the compiled discussion text based on the current editor content and metadata.
+const DiscussionPreviewCard: React.FC<{ compiledText: string }> = ({ compiledText }) => (
+  <div className="flex-1 overflow-auto p-4">
+    <div className="p-4 bg-card rounded-md">
+      <pre className="whitespace-pre-wrap font-mono text-sm text-foreground leading-relaxed">
+        {compiledText}
+      </pre>
+    </div>
+  </div>
+);
+
 const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledText }) => (
   <div className="w-[45%] flex-shrink-0 flex flex-col overflow-hidden bg-muted/20">
     <div className="flex-shrink-0 px-4 py-3 border-b border-border flex items-center gap-2">
@@ -260,15 +269,7 @@ const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledTex
       <span className="font-medium text-sm">Live Preview</span>
     </div>
 
-    <div className="flex-1 overflow-auto p-4">
-      <Card>
-        <CardContent className="p-4">
-          <pre className="whitespace-pre-wrap font-mono text-sm text-foreground leading-relaxed">
-            {compiledText}
-          </pre>
-        </CardContent>
-      </Card>
-    </div>
+    <DiscussionPreviewCard compiledText={compiledText} />
   </div>
 );
 
@@ -375,7 +376,7 @@ const useDiscussionEditorState = (
       setHasUnsavedChanges(false);
     }, DISCUSSION_AUTOSAVE_DELAY_MS);
 
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); };
   }, [hasUnsavedChanges, dispatch, currentDay, buildDiscussionData]);
 
   return {
