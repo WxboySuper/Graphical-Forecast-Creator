@@ -347,7 +347,10 @@ const captureContainer = async (
         clonedContainer.style.backgroundColor = store.getState().theme.darkMode ? '#000000' : '#ffffff';
         // Ensure cloned images request CORS so html2canvas can load external tiles
         Array.from(clonedContainer.querySelectorAll('img')).forEach((img) => {
-          try { (img as HTMLImageElement).crossOrigin = 'anonymous'; } catch {}
+          try { (img as HTMLImageElement).crossOrigin = 'anonymous'; } catch {
+            // ignore errors but log to console for visibility
+            console.warn('GFC export: Failed to set crossOrigin on cloned image; some tiles may not render in export.', img);
+          }
         });
         // Copy any <defs> from SVGs in the source document into the cloned document so patterns/hatching render
         try {
@@ -363,7 +366,9 @@ const captureContainer = async (
             srcDefs.forEach((d) => {
               try {
                 const clonedDefs = d.cloneNode(true) as Node;
-                svgHolder!.appendChild(clonedDefs as unknown as Node);
+                if (svgHolder) {
+                  svgHolder.appendChild(clonedDefs as unknown as Node);
+                }
               } catch {
                 // ignore cloning errors for defs, but log to console for visibility
                 console.warn('GFC export: Failed to clone SVG defs for export; some patterns may not render correctly.', d);
@@ -431,6 +436,7 @@ const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<vo
         (map as L.Evented).once('rendercomplete', finish);
       } catch (err) {
         // Fallback
+        console.warn('GFC export: Failed to attach rendercomplete listener to map; falling back to timeout. This may cause exports to capture before the map has fully rendered.', err);
       }
     }
 
@@ -439,7 +445,7 @@ const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<vo
 };
 
 // Wait for all images within the export root to finish loading, with a timeout fallback.
-const waitForImagesLoaded = async (root: HTMLElement, timeout = 1200): Promise<{ timedOut: boolean; remaining: number }> => {
+const waitForImagesLoaded = (root: HTMLElement, timeout = 1200): Promise<{ timedOut: boolean; remaining: number }> => {
   return new Promise((resolve) => {
     try {
       const imgs = Array.from(root.querySelectorAll('img'));
@@ -479,8 +485,9 @@ const waitForImagesLoaded = async (root: HTMLElement, timeout = 1200): Promise<{
           resolve({ timedOut: true, remaining });
         }
       }, timeout);
-    } catch {
+    } catch (err) {
       setTimeout(() => resolve({ timedOut: true, remaining: -1 }), timeout);
+      console.warn('GFC export: Error occurred while waiting for images to load; proceeding with export. This may cause some tiles/images to be missing in the export.', err);
     }
   });
 };
