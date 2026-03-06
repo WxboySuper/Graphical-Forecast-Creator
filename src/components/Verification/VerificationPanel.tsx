@@ -36,14 +36,18 @@ interface ReportCounts {
   hail: number;
 }
 
+// Define a consistent order for risk levels to ensure they are displayed in a logical sequence in the UI.
 const RISK_LEVEL_ORDER = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH', '2%', '5%', '10%', '15%', '30%', '45%', '60%', 'SIG'];
 
+// Utility function to compare risk levels based on the defined order,
+// used for sorting risk level breakdowns in the verification analysis.
 const getReportCounts = (reports: { type: 'tornado' | 'wind' | 'hail' }[]): ReportCounts => ({
   tornado: reports.filter((r) => r.type === 'tornado').length,
   wind: reports.filter((r) => r.type === 'wind').length,
   hail: reports.filter((r) => r.type === 'hail').length
 });
 
+// Calculates hit rates for each risk level within an outlook type, based on the total relevant reports for that type.
 const ErrorBanner: React.FC<{ error: string }> = ({ error }) => {
   const isInfo = error.startsWith('info:');
   const message = isInfo ? error.replace('info:', '') : error;
@@ -56,6 +60,9 @@ const ErrorBanner: React.FC<{ error: string }> = ({ error }) => {
   );
 };
 
+// The ReportSummarySection component displays a summary of the loaded storm reports,
+// including the date, total count, and breakdown by type.
+// It provides users with a quick overview of the data they are working with before diving into the verification analysis.
 const ReportSummarySection: React.FC<{ date: string | null; totalReports: number; reportCounts: ReportCounts }> = ({
   date,
   totalReports,
@@ -75,6 +82,7 @@ const ReportSummarySection: React.FC<{ date: string | null; totalReports: number
   </div>
 );
 
+// The DisplayOptionsSection component provides a simple checkbox for toggling the visibility of storm reports on the map.
 const DisplayOptionsSection: React.FC<{ visible: boolean; onToggleVisibility: () => void }> = ({
   visible,
   onToggleVisibility
@@ -94,6 +102,7 @@ const DisplayOptionsSection: React.FC<{ visible: boolean; onToggleVisibility: ()
   </div>
 );
 
+// The FilterByTypeSection component provides checkboxes for filtering the displayed storm reports by type (tornado, wind, hail).
 const FilterByTypeSection: React.FC<{
   visible: boolean;
   filterByType: ReportTypeFilter;
@@ -137,6 +146,7 @@ const FilterByTypeSection: React.FC<{
   );
 };
 
+// The VerificationAnalysisSection component displays the results of the verification analysis for the selected outlook type.
 const VerificationAnalysisSection: React.FC<{
   verificationResult: VerificationResult;
   activeOutlookType: ActiveOutlookType;
@@ -198,14 +208,20 @@ const VerificationAnalysisSection: React.FC<{
   );
 };
 
+// The main VerificationPanel component manages the overall state and interactions for loading storm reports,
+// displaying summaries, and showing verification analysis results.
+// It connects to the Redux store to fetch data and dispatch actions,
+// and it uses local state for managing the selected date for report loading.
 const VerificationPanel: React.FC<VerificationPanelProps> = ({ 
   activeOutlookType = 'categorical',
   selectedDay = 1
 }) => {
   const dispatch = useDispatch();
+  // Select storm report data and UI state from the Redux store.
   const { date, loading, error, visible, filterByType, reports } = useSelector(
     (state: RootState) => state.stormReports
   );
+  // Select the relevant outlooks for the currently selected day from the verification slice of the Redux store.
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
   
   // Calculate verification results when reports or outlooks change
@@ -214,12 +230,14 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
     return analyzeVerification(reports, outlooks);
   }, [reports, outlooks]);
 
+  // Local state for managing the selected date for loading storm reports.
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Default to today's date
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
   
+  // Handler for loading storm reports based on the selected date.
   const handleLoadReports = async () => {
     try {
       dispatch(setLoading(true));
@@ -231,6 +249,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
 
       // Check if the selected date is today in local time
       const today = new Date();
+      // Compare year, month, and day to determine if the selected date is the same as today's date
       const isToday = 
         dateObj.getFullYear() === today.getFullYear() && 
         dateObj.getMonth() === today.getMonth() && 
@@ -260,14 +279,18 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
     }
   };
   
+  // Handler for clearing loaded storm reports from the Redux store, resetting the date and any errors.
   const handleClearReports = () => {
     dispatch(clearReports());
   };
   
+  // Handler for toggling the visibility of storm reports on the map, which updates the Redux store state accordingly.
   const handleToggleVisibility = () => {
     dispatch(toggleVisibility());
   };
   
+  // Handler for toggling the filter for a specific report type (tornado, wind, hail),
+  // which updates the Redux store state to show/hide that type of report on the map.
   const handleToggleType = (type: 'tornado' | 'wind' | 'hail') => {
     dispatch(toggleReportType(type));
   };
