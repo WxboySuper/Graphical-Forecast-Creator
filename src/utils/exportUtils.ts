@@ -150,10 +150,10 @@ const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): 
       }
     };
 
-    const addAndWatch = (srcLayer: L.TileLayer) => {
+    const addAndWatch = (srcLayer: L.TileLayer & { _url?: string }) => {
       // Derive a best-effort URL: prefer options.url, then getTileUrl if available, then any private _url
-      const srcAny = srcLayer as any;
-      const derivedUrl = srcAny?.options?.url ?? (typeof srcAny.getTileUrl === 'function' ? srcAny.getTileUrl({ x: 0, y: 0, z: srcAny.options?.maxZoom ?? 0 }) : undefined) ?? srcAny?._url;
+      const srcAny = srcLayer as L.TileLayer & { options: L.TileLayerOptions & { url?: string }; _url?: string };
+      const derivedUrl = srcAny.options?.url ?? (typeof srcAny.getTileUrl === 'function' ? srcAny.getTileUrl({ x: 0, y: 0, z: (srcAny.options?.maxZoom as number) ?? 0 } as L.Coords) : undefined) ?? srcAny._url;
       const attribution = (srcLayer.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
       const maxZoom = srcLayer.options?.maxZoom ?? 19;
       const layer = L.tileLayer(derivedUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -426,9 +426,9 @@ const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<vo
       }
     };
 
-    if (map && typeof (map as any).once === 'function') {
+    if (map && typeof (map as L.Evented).once === 'function') {
       try {
-        (map as any).once('rendercomplete', finish);
+        (map as L.Evented).once('rendercomplete', finish);
       } catch (err) {
         // Fallback
       }
@@ -623,6 +623,7 @@ const exportViaTempMapAsImage = async (
       }
     } catch {
       // ignore cleanup errors
+      console.warn('GFC export: Failed to remove temporary map instance.', tempMap);
     }
   }
 };
