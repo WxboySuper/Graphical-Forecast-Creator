@@ -366,18 +366,21 @@ const useDiscussionEditorState = (
   }, [buildDiscussionData, currentDay, addToast]);
 
   useEffect(() => {
-    if (!hasUnsavedChanges) {
-        return () => {};
-      }
-
     // Auto-saves the discussion data to the Redux store after a short debounce whenever there are unsaved changes.
     // This ensures that the global auto-save mechanism (which saves to localStorage) captures the latest discussion state even if the user doesn't click the Save button.
-    const timer = setTimeout(() => {
-      dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
-      setHasUnsavedChanges(false);
-    }, DISCUSSION_AUTOSAVE_DELAY_MS);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (hasUnsavedChanges) {
+      timer = setTimeout(() => {
+        dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+        setHasUnsavedChanges(false);
+      }, DISCUSSION_AUTOSAVE_DELAY_MS);
+    }
 
-    return () => { clearTimeout(timer); };
+    return () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
+    };
   }, [hasUnsavedChanges, dispatch, currentDay, buildDiscussionData]);
 
   return {
