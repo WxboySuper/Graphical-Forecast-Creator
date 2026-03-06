@@ -13,6 +13,7 @@ import {
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
 import { fetchStormReports, formatReportDate } from '../../utils/stormReportParser';
 import { analyzeVerification, formatVerificationSummary } from '../../utils/verificationUtils';
+import type { OutlookTypeVerification, VerificationResult } from '../../utils/verificationUtils';
 import { DayType } from '../../types/outlooks';
 import './VerificationPanel.css';
 
@@ -21,14 +22,268 @@ interface VerificationPanelProps {
   selectedDay?: DayType;
 }
 
+type ActiveOutlookType = NonNullable<VerificationPanelProps['activeOutlookType']>;
+
+interface ReportTypeFilter {
+  tornado: boolean;
+  wind: boolean;
+  hail: boolean;
+}
+
+interface ReportCounts {
+  tornado: number;
+  wind: number;
+  hail: number;
+}
+
+type RiskEntry = [
+  string,
+  {
+    hits: number;
+    misses: number;
+    hitRate: number;
+    total: number;
+  }
+];
+
+// Define a consistent order for risk levels to ensure they are displayed in a logical sequence in the UI.
+const RISK_LEVEL_ORDER = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH', '2%', '5%', '10%', '15%', '30%', '45%', '60%', 'SIG'];
+
+// Utility function to compare risk levels based on the defined order,
+// used for sorting risk level breakdowns in the verification analysis.
+const getReportCounts = (reports: { type: 'tornado' | 'wind' | 'hail' }[]): ReportCounts => ({
+  tornado: reports.filter((r) => r.type === 'tornado').length,
+  wind: reports.filter((r) => r.type === 'wind').length,
+  hail: reports.filter((r) => r.type === 'hail').length
+});
+
+// Calculates hit rates for each risk level within an outlook type, based on the total relevant reports for that type.
+const ErrorBanner: React.FC<{ error: string }> = ({ error }) => {
+  const isInfo = error.startsWith('info:');
+  const message = isInfo ? error.replace('info:', '') : error;
+  const icon = isInfo ? 'ℹ️' : '⚠️';
+
+  return (
+    <div className={isInfo ? 'info-message' : 'error-message'}>
+      <p>{icon} {message}</p>
+    </div>
+  );
+};
+
+// The ReportSummarySection component displays a summary of the loaded storm reports,
+// including the date, total count, and breakdown by type.
+// It provides users with a quick overview of the data they are working with before diving into the verification analysis.
+const ReportSummarySection: React.FC<{ date: string | null; totalReports: number; reportCounts: ReportCounts }> = ({
+  date,
+  totalReports,
+  reportCounts
+}) => (
+  <div className="verification-section">
+    <h3>Report Summary</h3>
+    <div className="report-summary">
+      <p><strong>Date:</strong> {date}</p>
+      <p><strong>Total Reports:</strong> {totalReports}</p>
+      <ul>
+        <li>Tornado: {reportCounts.tornado}</li>
+        <li>Wind: {reportCounts.wind}</li>
+        <li>Hail: {reportCounts.hail}</li>
+      </ul>
+    </div>
+  </div>
+);
+
+// The DisplayOptionsSection component provides a simple checkbox for toggling the visibility of storm reports on the map.
+const DisplayOptionsSection: React.FC<{ visible: boolean; onToggleVisibility: () => void }> = ({
+  visible,
+  onToggleVisibility
+}) => (
+  <div className="verification-section">
+    <h3>Display Options</h3>
+    <div className="display-controls">
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          checked={visible}
+          onChange={onToggleVisibility}
+        />
+        <span>Show Reports on Map</span>
+      </label>
+    </div>
+  </div>
+);
+
+// The FilterByTypeSection component provides checkboxes for filtering the displayed storm reports by type (tornado, wind, hail).
+const FilterByTypeSection: React.FC<{
+  visible: boolean;
+  filterByType: ReportTypeFilter;
+  reportCounts: ReportCounts;
+  onToggleType: (type: 'tornado' | 'wind' | 'hail') => void;
+}> = ({ visible, filterByType, reportCounts, onToggleType }) => {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <div className="verification-section">
+      <h3>Filter by Type</h3>
+      <div className="filter-controls">
+        <label className="checkbox-label tornado-label">
+          <input
+            type="checkbox"
+            checked={filterByType.tornado}
+            onChange={() => onToggleType('tornado')}
+          />
+          <span>🌪️ Tornado ({reportCounts.tornado})</span>
+        </label>
+        <label className="checkbox-label wind-label">
+          <input
+            type="checkbox"
+            checked={filterByType.wind}
+            onChange={() => onToggleType('wind')}
+          />
+          <span>💨 Wind ({reportCounts.wind})</span>
+        </label>
+        <label className="checkbox-label hail-label">
+          <input
+            type="checkbox"
+            checked={filterByType.hail}
+            onChange={() => onToggleType('hail')}
+          />
+          <span>🧊 Hail ({reportCounts.hail})</span>
+        </label>
+      </div>
+    </div>
+  );
+};
+
+// The RiskLevelStatRow component displays a single row of the risk level breakdown,
+// showing the risk level name, hit count, and hit rate percentage.
+const RiskLevelStatRow: React.FC<{ level: string; hitRate: number; hits: number }> = ({ level, hitRate, hits }) => (
+  <div className="risk-level-stat">
+    <span className="risk-level-name">{level}:</span>
+    <span className="risk-level-value">
+      {hits} hits ({hitRate.toFixed(1)}%)
+    </span>
+  </div>
+);
+
+// The VerificationMetricRow component is a reusable component for displaying a single metric
+// (like hit rate, hits, or misses) in the verification analysis section,
+const VerificationMetricRow: React.FC<{
+  label: string;
+  value: string | number;
+  valueClassName?: string;
+}> = ({ label, value, valueClassName = 'metric-value' }) => (
+  <div className="metric">
+    <span className="metric-label">{label}</span>
+    <span className={valueClassName}>{value}</span>
+  </div>
+);
+
+// The VerificationMetrics component displays the key metrics (hit rate, hits, misses) for the active outlook type,
+const VerificationMetrics: React.FC<{ activeVerification: OutlookTypeVerification }> = ({ activeVerification }) => (
+  <div className="verification-metrics">
+    <VerificationMetricRow
+      label="Hit Rate:"
+      value={`${activeVerification.hitRate.toFixed(1)}%`}
+    />
+    <VerificationMetricRow
+      label="Hits:"
+      value={activeVerification.hits}
+      valueClassName="metric-value hit"
+    />
+    <VerificationMetricRow
+      label="Misses:"
+      value={activeVerification.misses}
+      valueClassName="metric-value miss"
+    />
+  </div>
+);
+
+// The RiskLevelBreakdown component displays a breakdown of hits by risk level for the active outlook type,
+const RiskLevelBreakdown: React.FC<{ riskEntries: RiskEntry[] }> = ({ riskEntries }) => {
+  if (riskEntries.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="risk-level-breakdown">
+      <h4>By Risk Level:</h4>
+      <div className="risk-level-stats">
+        {riskEntries.map(([level, data]) => (
+          <RiskLevelStatRow
+            key={level}
+            level={level}
+            hits={data.hits}
+            hitRate={data.hitRate}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// The VerificationSummaryDetails component provides a collapsible section that shows a detailed textual summary
+// of the verification results,
+const VerificationSummaryDetails: React.FC<{
+  verificationResult: VerificationResult;
+  activeOutlookType: ActiveOutlookType;
+}> = ({ verificationResult, activeOutlookType }) => (
+  <>
+    <details className="verification-details">
+      <summary>View Detailed Summary</summary>
+      <pre className="verification-summary">
+        {formatVerificationSummary(verificationResult, activeOutlookType)}
+      </pre>
+    </details>
+    <p className="verification-note">
+      <small>
+        <strong>Note:</strong> A &quot;hit&quot; means the report falls within the forecast outlook area.
+        Risk levels show how many reports fell within each specific risk category.
+      </small>
+    </p>
+  </>
+);
+
+// The VerificationAnalysisSection component displays the results of the verification analysis for the selected outlook type.
+const VerificationAnalysisSection: React.FC<{
+  verificationResult: VerificationResult;
+  activeOutlookType: ActiveOutlookType;
+}> = ({ verificationResult, activeOutlookType }) => {
+  const activeVerification = verificationResult[activeOutlookType] as OutlookTypeVerification;
+  const riskEntries = Object.entries(activeVerification.byRiskLevel).sort(
+    (a, b) => RISK_LEVEL_ORDER.indexOf(b[0].toUpperCase()) - RISK_LEVEL_ORDER.indexOf(a[0].toUpperCase())
+  ) as RiskEntry[];
+
+  return (
+    <div className="verification-section">
+      <h3>Verification Analysis - {activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)}</h3>
+      <div className="verification-results">
+        <VerificationMetrics activeVerification={activeVerification} />
+        <RiskLevelBreakdown riskEntries={riskEntries} />
+        <VerificationSummaryDetails
+          verificationResult={verificationResult}
+          activeOutlookType={activeOutlookType}
+        />
+      </div>
+    </div>
+  );
+};
+
+// The main VerificationPanel component manages the overall state and interactions for loading storm reports,
+// displaying summaries, and showing verification analysis results.
+// It connects to the Redux store to fetch data and dispatch actions,
+// and it uses local state for managing the selected date for report loading.
 const VerificationPanel: React.FC<VerificationPanelProps> = ({ 
   activeOutlookType = 'categorical',
   selectedDay = 1
 }) => {
   const dispatch = useDispatch();
+  // Select storm report data and UI state from the Redux store.
   const { date, loading, error, visible, filterByType, reports } = useSelector(
     (state: RootState) => state.stormReports
   );
+  // Select the relevant outlooks for the currently selected day from the verification slice of the Redux store.
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
   
   // Calculate verification results when reports or outlooks change
@@ -36,15 +291,15 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
     if (reports.length === 0) return null;
     return analyzeVerification(reports, outlooks);
   }, [reports, outlooks]);
-  
-  // Get the verification data for the active outlook type
-  const activeVerification = verificationResult ? verificationResult[activeOutlookType] : null;
+
+  // Local state for managing the selected date for loading storm reports.
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Default to today's date
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
   
+  // Handler for loading storm reports based on the selected date.
   const handleLoadReports = async () => {
     try {
       dispatch(setLoading(true));
@@ -53,15 +308,29 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       // Parse YYYY-MM-DD string directly to avoid timezone issues
       const [year, month, day] = selectedDate.split('-').map(Number);
       const dateObj = new Date(year, month - 1, day); // month is 0-indexed
+
+      // Check if the selected date is today in local time
+      const today = new Date();
+      // Compare year, month, and day to determine if the selected date is the same as today's date
+      const isToday = 
+        dateObj.getFullYear() === today.getFullYear() && 
+        dateObj.getMonth() === today.getMonth() && 
+        dateObj.getDate() === today.getDate();
+
+      if (isToday) {
+        dispatch(setError('info:Storm reports are not available for the current day until later.'));
+        dispatch(setLoading(false));
+        return;
+      }
+
       const reportDate = formatReportDate(dateObj);
-      
       const fetchedReports = await fetchStormReports(reportDate);
-      
+
       dispatch(setReports(fetchedReports));
       dispatch(setDate(reportDate));
-      
+
       if (fetchedReports.length === 0) {
-        dispatch(setError('No storm reports found for this date.'));
+        dispatch(setError('info:No storm reports found for this date.'));
       }
     } catch (err) {
       dispatch(setError(
@@ -72,26 +341,25 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
     }
   };
   
+  // Handler for clearing loaded storm reports from the Redux store, resetting the date and any errors.
   const handleClearReports = () => {
     dispatch(clearReports());
   };
   
+  // Handler for toggling the visibility of storm reports on the map, which updates the Redux store state accordingly.
   const handleToggleVisibility = () => {
     dispatch(toggleVisibility());
   };
   
+  // Handler for toggling the filter for a specific report type (tornado, wind, hail),
+  // which updates the Redux store state to show/hide that type of report on the map.
   const handleToggleType = (type: 'tornado' | 'wind' | 'hail') => {
     dispatch(toggleReportType(type));
   };
-  
-  // Count reports by type
-  const reportCounts = {
-    tornado: reports.filter(r => r.type === 'tornado').length,
-    wind: reports.filter(r => r.type === 'wind').length,
-    hail: reports.filter(r => r.type === 'hail').length
-  };
-  
+
+  const reportCounts = getReportCounts(reports);
   const totalReports = reports.length;
+  const hasReports = totalReports > 0;
   
   return (
     <div className="verification-panel">
@@ -119,134 +387,37 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
             {loading ? 'Loading...' : 'Load Reports'}
           </button>
         </div>
-        
-        {error && (
-          <div className="error-message">
-            <p>⚠️ {error}</p>
-          </div>
-        )}
+
+        {error && <ErrorBanner error={error} />}
       </div>
-      
-      {totalReports > 0 && (
+
+      {hasReports && (
         <>
-          <div className="verification-section">
-            <h3>Report Summary</h3>
-            <div className="report-summary">
-              <p><strong>Date:</strong> {date}</p>
-              <p><strong>Total Reports:</strong> {totalReports}</p>
-              <ul>
-                <li>Tornado: {reportCounts.tornado}</li>
-                <li>Wind: {reportCounts.wind}</li>
-                <li>Hail: {reportCounts.hail}</li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="verification-section">
-            <h3>Display Options</h3>
-            <div className="display-controls">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={visible}
-                  onChange={handleToggleVisibility}
-                />
-                <span>Show Reports on Map</span>
-              </label>
-            </div>
-          </div>
-          
-          {visible && (
-            <div className="verification-section">
-              <h3>Filter by Type</h3>
-              <div className="filter-controls">
-                <label className="checkbox-label tornado-label">
-                  <input
-                    type="checkbox"
-                    checked={filterByType.tornado}
-                    onChange={() => handleToggleType('tornado')}
-                  />
-                  <span>🌪️ Tornado ({reportCounts.tornado})</span>
-                </label>
-                <label className="checkbox-label wind-label">
-                  <input
-                    type="checkbox"
-                    checked={filterByType.wind}
-                    onChange={() => handleToggleType('wind')}
-                  />
-                  <span>💨 Wind ({reportCounts.wind})</span>
-                </label>
-                <label className="checkbox-label hail-label">
-                  <input
-                    type="checkbox"
-                    checked={filterByType.hail}
-                    onChange={() => handleToggleType('hail')}
-                  />
-                  <span>🧊 Hail ({reportCounts.hail})</span>
-                </label>
-              </div>
-            </div>
+          <ReportSummarySection
+            date={date}
+            totalReports={totalReports}
+            reportCounts={reportCounts}
+          />
+
+          <DisplayOptionsSection
+            visible={visible}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <FilterByTypeSection
+            visible={visible}
+            filterByType={filterByType}
+            reportCounts={reportCounts}
+            onToggleType={handleToggleType}
+          />
+
+          {verificationResult && (
+            <VerificationAnalysisSection
+              verificationResult={verificationResult}
+              activeOutlookType={activeOutlookType}
+            />
           )}
-          
-          {activeVerification && (
-            <div className="verification-section">
-              <h3>Verification Analysis - {activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)}</h3>
-              <div className="verification-results">
-                <div className="verification-metrics">
-                  <div className="metric">
-                    <span className="metric-label">Hit Rate:</span>
-                    <span className="metric-value">{activeVerification.hitRate.toFixed(1)}%</span>
-                  </div>
-                  <div className="metric">
-                    <span className="metric-label">Hits:</span>
-                    <span className="metric-value hit">{activeVerification.hits}</span>
-                  </div>
-                  <div className="metric">
-                    <span className="metric-label">Misses:</span>
-                    <span className="metric-value miss">{activeVerification.misses}</span>
-                  </div>
-                </div>
-                
-                {Object.keys(activeVerification.byRiskLevel).length > 0 && (
-                  <div className="risk-level-breakdown">
-                    <h4>By Risk Level:</h4>
-                    <div className="risk-level-stats">
-                      {Object.entries(activeVerification.byRiskLevel)
-                        .sort((a, b) => {
-                          // Sort by risk level
-                          const order = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH', '2%', '5%', '10%', '15%', '30%', '45%', '60%', 'SIG'];
-                          return order.indexOf(b[0].toUpperCase()) - order.indexOf(a[0].toUpperCase());
-                        })
-                        .map(([level, data]) => {
-                          return (
-                            <div key={level} className="risk-level-stat">
-                              <span className="risk-level-name">{level}:</span>
-                              <span className="risk-level-value">
-                                {data.hits} hits ({data.hitRate.toFixed(1)}%)
-                              </span>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                )}
-                
-                <details className="verification-details">
-                  <summary>View Detailed Summary</summary>
-                  <pre className="verification-summary">
-                    {formatVerificationSummary(verificationResult!, activeOutlookType)}
-                  </pre>
-                </details>
-                <p className="verification-note">
-                  <small>
-                    <strong>Note:</strong> A "hit" means the report falls within the forecast outlook area.
-                    Risk levels show how many reports fell within each specific risk category.
-                  </small>
-                </p>
-              </div>
-            </div>
-          )}
-          
+
           <div className="verification-section">
             <button
               onClick={handleClearReports}
