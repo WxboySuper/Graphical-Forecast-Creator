@@ -167,6 +167,39 @@ const RiskLevelStatRow: React.FC<{ level: string; hitRate: number; hits: number 
   </div>
 );
 
+// The VerificationMetricRow component is a reusable component for displaying a single metric
+// (like hit rate, hits, or misses) in the verification analysis section,
+const VerificationMetricRow: React.FC<{
+  label: string;
+  value: string | number;
+  valueClassName?: string;
+}> = ({ label, value, valueClassName = 'metric-value' }) => (
+  <div className="metric">
+    <span className="metric-label">{label}</span>
+    <span className={valueClassName}>{value}</span>
+  </div>
+);
+
+// The VerificationMetrics component displays the key metrics (hit rate, hits, misses) for the active outlook type,
+const VerificationMetrics: React.FC<{ activeVerification: OutlookTypeVerification }> = ({ activeVerification }) => (
+  <div className="verification-metrics">
+    <VerificationMetricRow
+      label="Hit Rate:"
+      value={`${activeVerification.hitRate.toFixed(1)}%`}
+    />
+    <VerificationMetricRow
+      label="Hits:"
+      value={activeVerification.hits}
+      valueClassName="metric-value hit"
+    />
+    <VerificationMetricRow
+      label="Misses:"
+      value={activeVerification.misses}
+      valueClassName="metric-value miss"
+    />
+  </div>
+);
+
 // The RiskLevelBreakdown component displays a breakdown of hits by risk level for the active outlook type,
 const RiskLevelBreakdown: React.FC<{ riskEntries: RiskEntry[] }> = ({ riskEntries }) => {
   if (riskEntries.length === 0) {
@@ -226,20 +259,7 @@ const VerificationAnalysisSection: React.FC<{
     <div className="verification-section">
       <h3>Verification Analysis - {activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)}</h3>
       <div className="verification-results">
-        <div className="verification-metrics">
-          <div className="metric">
-            <span className="metric-label">Hit Rate:</span>
-            <span className="metric-value">{activeVerification.hitRate.toFixed(1)}%</span>
-          </div>
-          <div className="metric">
-            <span className="metric-label">Hits:</span>
-            <span className="metric-value hit">{activeVerification.hits}</span>
-          </div>
-          <div className="metric">
-            <span className="metric-label">Misses:</span>
-            <span className="metric-value miss">{activeVerification.misses}</span>
-          </div>
-        </div>
+        <VerificationMetrics activeVerification={activeVerification} />
         <RiskLevelBreakdown riskEntries={riskEntries} />
         <VerificationSummaryDetails
           verificationResult={verificationResult}
