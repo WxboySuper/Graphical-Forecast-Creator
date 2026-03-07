@@ -32,6 +32,15 @@ const DISCUSSION_AUTOSAVE_DELAY_MS = 1500;
 
 type GuidedContentState = NonNullable<DiscussionData['guidedContent']>;
 
+interface DiscussionFormDefaults {
+  mode: DiscussionMode;
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+  diyContent: string;
+  guidedContent: GuidedContentState;
+}
+
 interface DiscussionEditorState {
   mode: DiscussionMode;
   validStart: string;
@@ -74,6 +83,15 @@ const getInitialValidEnd = (existingDiscussion?: DiscussionData): string => {
   end.setHours(end.getHours() + 24);
   return end.toISOString().slice(0, 16);
 };
+
+const getDiscussionFormDefaults = (existingDiscussion?: DiscussionData): DiscussionFormDefaults => ({
+  mode: existingDiscussion?.mode ?? 'diy',
+  validStart: existingDiscussion?.validStart ?? new Date().toISOString().slice(0, 16),
+  validEnd: getInitialValidEnd(existingDiscussion),
+  forecasterName: existingDiscussion?.forecasterName ?? '',
+  diyContent: existingDiscussion?.diyContent ?? '',
+  guidedContent: existingDiscussion?.guidedContent ?? createDefaultGuidedContent()
+});
 
 // Formats an ISO datetime string into a more human-readable format for display in the metadata section of the discussion editor.
 const formatDateTime = (isoString: string): string => {
@@ -312,12 +330,14 @@ const buildDiscussionDataFrom = (fields: {
 
 // Manages the editable form state and unsaved flag; keeps setters small and focused.
 const useDiscussionFormState = (existingDiscussion?: DiscussionData) => {
-  const [mode, setMode] = useState<DiscussionMode>(existingDiscussion?.mode || 'diy');
-  const [validStart, setValidStart] = useState(existingDiscussion?.validStart || new Date().toISOString().slice(0, 16));
-  const [validEnd, setValidEnd] = useState(getInitialValidEnd(existingDiscussion));
-  const [forecasterName, setForecasterName] = useState(existingDiscussion?.forecasterName || '');
-  const [diyContent, setDiyContent] = useState(existingDiscussion?.diyContent || '');
-  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(existingDiscussion?.guidedContent || createDefaultGuidedContent());
+  const defaults = getDiscussionFormDefaults(existingDiscussion);
+
+  const [mode, setMode] = useState<DiscussionMode>(defaults.mode);
+  const [validStart, setValidStart] = useState(defaults.validStart);
+  const [validEnd, setValidEnd] = useState(defaults.validEnd);
+  const [forecasterName, setForecasterName] = useState(defaults.forecasterName);
+  const [diyContent, setDiyContent] = useState(defaults.diyContent);
+  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(defaults.guidedContent);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const markUnsaved = useCallback(() => setHasUnsavedChanges(true), []);
@@ -372,12 +392,16 @@ const useDiscussionAutoSave = (opts: {
 
 // Computes derived values (compiled text and word count) in a focused hook.
 const useDiscussionComputed = (
-  buildDiscussionData: () => DiscussionData,
-  currentDay: DayType,
-  mode: DiscussionMode,
-  diyContent: string,
-  guidedContent: GuidedContentState
+  opts: {
+    buildDiscussionData: () => DiscussionData;
+    currentDay: DayType;
+    mode: DiscussionMode;
+    diyContent: string;
+    guidedContent: GuidedContentState;
+  }
 ) => {
+  const { buildDiscussionData, currentDay, mode, diyContent, guidedContent } = opts;
+
   const compiledText = useMemo(() => compileDiscussionToText(buildDiscussionData(), currentDay), [buildDiscussionData, currentDay]);
 
   const wordCount = useMemo(() => {
@@ -386,6 +410,29 @@ const useDiscussionComputed = (
   }, [mode, diyContent, guidedContent]);
 
   return { compiledText, wordCount } as const;
+};
+
+const useDiscussionActions = (opts: {
+  dispatch: ReturnType<typeof useDispatch>;
+  currentDay: DayType;
+  buildDiscussionData: () => DiscussionData;
+  clearUnsaved: (v: boolean) => void;
+  addToast: AddToastFn;
+}) => {
+  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast } = opts;
+
+  const handleSave = useCallback(() => {
+    dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+    clearUnsaved(false);
+    addToast('Discussion saved!', 'success');
+  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast]);
+
+  const handleExport = useCallback(() => {
+    exportDiscussionToFile(buildDiscussionData(), currentDay);
+    addToast('Discussion exported!', 'success');
+  }, [buildDiscussionData, currentDay, addToast]);
+
+  return { handleSave, handleExport } as const;
 };
 
 const useDiscussionEditorState = (
@@ -413,30 +460,13 @@ const useDiscussionEditorState = (
     clearUnsaved: form.setHasUnsavedChanges
   });
 
-  const { compiledText, wordCount } = useDiscussionComputed(buildDiscussionData, currentDay, form.mode, form.diyContent, form.guidedContent);
-  // Extract action handlers into a small hook to reduce complexity here.
-  const useDiscussionActions = (opts: {
-    dispatch: ReturnType<typeof useDispatch>;
-    currentDay: DayType;
-    buildDiscussionData: () => DiscussionData;
-    clearUnsaved: (v: boolean) => void;
-    addToast: AddToastFn;
-  }) => {
-    const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast } = opts;
-
-    const handleSave = useCallback(() => {
-      dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
-      clearUnsaved(false);
-      addToast('Discussion saved!', 'success');
-    }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast]);
-
-    const handleExport = useCallback(() => {
-      exportDiscussionToFile(buildDiscussionData(), currentDay);
-      addToast('Discussion exported!', 'success');
-    }, [buildDiscussionData, currentDay, addToast]);
-
-    return { handleSave, handleExport } as const;
-  };
+  const { compiledText, wordCount } = useDiscussionComputed({
+    buildDiscussionData,
+    currentDay,
+    mode: form.mode,
+    diyContent: form.diyContent,
+    guidedContent: form.guidedContent
+  });
 
   const { handleSave, handleExport } = useDiscussionActions({
     dispatch,
