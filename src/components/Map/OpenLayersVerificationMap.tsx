@@ -32,6 +32,24 @@ interface OpenLayersVerificationMapProps {
   selectedDay?: DayType;
 }
 
+type VerificationOutlookType = NonNullable<OpenLayersVerificationMapProps['activeOutlookType']>;
+
+interface ColorWithOpacity {
+  color: string;
+  alpha: number;
+}
+
+interface OutlookStyleDescriptor {
+  outlookType: VerificationOutlookType;
+  probability: string;
+}
+
+interface StrokeDescriptor {
+  color: string;
+  opacity: number;
+  width: number;
+}
+
 // Define specific colors for each report type
 const reportColors = {
   tornado: '#FF0000', // Red for tornado
@@ -45,7 +63,7 @@ const buildReportStyle = (type: ReportType) => {
     image: new Circle({
       radius: 6,
       fill: new StyleFill({
-        color: reportColors[type] || '#888888', // Fallback to grey
+        color: reportColors[type] || FALLBACK_REPORT_COLOR, // Fallback to grey
       }),
       stroke: new StyleStroke({
         color: '#FFFFFF', // White border
@@ -134,13 +152,88 @@ const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   return ctx.createPattern(canvas, 'repeat');
 };
 
+const FUNCTION_COLOR_NOTATION_REGEX = /^(rgba?|hsla?)\(/i;
+const CATEGORICAL_OUTLOOK: VerificationOutlookType = 'categorical';
+const CIG_PREFIX = 'CIG';
+const FALLBACK_REPORT_COLOR = '#888888';
+const FALLBACK_FILL_COLOR = '#999999';
+const FALLBACK_STROKE_COLOR = '#000000';
+const TRANSPARENT_PATTERN_FILL = 'rgba(0,0,0,0)';
+const CIG_STROKE_COLOR = '#111111';
+const CIG_STROKE_WIDTH = 1.2;
+const OUTLOOK_FILL_OPACITY: Record<string, number> = {
+  [CATEGORICAL_OUTLOOK]: 1,
+};
+
+const isFunctionColorNotation = (color: string): boolean => {
+  return FUNCTION_COLOR_NOTATION_REGEX.test(color);
+};
+
+const coerceNumber = (value: unknown, fallback: number): number => {
+  return typeof value === 'number' ? value : fallback;
+};
+
+const resolveFillOpacity = (outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
+  const explicitTypeOpacity = OUTLOOK_FILL_OPACITY[outlookType];
+  if (typeof explicitTypeOpacity === 'number') {
+    return explicitTypeOpacity;
+  }
+
+  return coerceNumber(fillOpacity, 0.25);
+};
+
+const resolveStrokeOpacity = (opacity: unknown): number => {
+  return coerceNumber(opacity, 1);
+};
+
+const resolveStrokeWidth = (weight: unknown): number => {
+  return coerceNumber(weight, 2);
+};
+
+const isCigProbability = (probability: string): boolean => {
+  return probability.startsWith(CIG_PREFIX);
+};
+
+const getVerificationStyleZIndex = ({ outlookType, probability }: OutlookStyleDescriptor): number => {
+  const regularZ = computeZIndex(outlookType as any, probability);
+  const cigRank = parseInt(probability.replace(CIG_PREFIX, ''), 10) || 0;
+  const cigZ = 1000 + cigRank;
+
+  // CIG overlays must always render above regular probabilities.
+  // Within CIG, higher number gets higher priority (CIG3 > CIG2 > CIG1).
+  return isCigProbability(probability) ? cigZ : regularZ;
+};
+
+const buildCigStyleParts = (probability: string) => {
+  const hatchFill = createHatchPattern(probability) as any || TRANSPARENT_PATTERN_FILL;
+
+  return {
+    fill: new Fill({ color: hatchFill }),
+    stroke: new Stroke({
+      color: CIG_STROKE_COLOR,
+      width: CIG_STROKE_WIDTH
+    })
+  };
+};
+
+const createStandardFill = ({ color, alpha }: ColorWithOpacity): Fill => {
+  return new Fill({ color: toRgbaColor({ color, alpha }) });
+};
+
+const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stroke => {
+  return new Stroke({
+    color: toRgbaColor({ color, alpha: opacity }),
+    width
+  });
+};
+
 // Utility function to convert hex or named colors to RGBA format with specified alpha for OpenLayers styles
-const toRgbaColor = (color: string, alpha: number): string => {
+const toRgbaColor = ({ color, alpha }: ColorWithOpacity): string => {
   if (!color) {
     return `rgba(255,255,255,${alpha})`;
   }
 
-  if (color.startsWith('rgba(') || color.startsWith('rgb(') || color.startsWith('hsl(') || color.startsWith('hsla(')) {
+  if (isFunctionColorNotation(color)) {
     return color;
   }
 
@@ -160,38 +253,33 @@ const toRgbaColor = (color: string, alpha: number): string => {
 };
 
 // Function to build OpenLayers style for a given feature based on its outlook type and probability,
-const buildStyle = (type: string, probability: string) => {
-  const style = getFeatureStyle(type as any, probability);
-  const fillColor = String(style.fillColor || '#999999');
-  const strokeColor = String(style.color || '#000000');
-  const fillOpacity = type === 'categorical'
-    ? 1
-    : (typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.25);
-  const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
-  const strokeWidth = style.weight || 2;
-  const isCig = probability.startsWith('CIG');
-  const styleZ = isCig
-    // CIG overlays must always render above regular probabilities.
-    // Within CIG, higher number gets higher priority (CIG3 > CIG2 > CIG1).
-    ? 1000 + (parseInt(probability.replace('CIG', ''), 10) || 0)
-    : computeZIndex(type as any, probability);
+const buildStyle = ({ outlookType, probability }: OutlookStyleDescriptor) => {
+  const style = getFeatureStyle(outlookType as any, probability);
+  const fillColor = String(style.fillColor || FALLBACK_FILL_COLOR);
+  const strokeColor = String(style.color || FALLBACK_STROKE_COLOR);
+  const fillOpacity = resolveFillOpacity(outlookType, style.fillOpacity);
+  const strokeOpacity = resolveStrokeOpacity(style.opacity);
+  const strokeWidth = resolveStrokeWidth(style.weight);
+  const isCig = isCigProbability(probability);
+  const styleZ = getVerificationStyleZIndex({ outlookType, probability });
+  const styleParts = isCig
+    ? buildCigStyleParts(probability)
+    : {
+      fill: createStandardFill({ color: fillColor, alpha: fillOpacity }),
+      stroke: createStandardStroke({ color: strokeColor, opacity: strokeOpacity, width: strokeWidth }),
+    };
 
   return new Style({
     zIndex: styleZ,
-    stroke: new Stroke({
-      color: isCig ? '#111111' : toRgbaColor(strokeColor, strokeOpacity),
-      width: isCig ? 1.2 : strokeWidth
-    }),
-    fill: isCig
-      ? new Fill({ color: createHatchPattern(probability) as any || 'rgba(0,0,0,0)' })
-      : new Fill({ color: toRgbaColor(fillColor, fillOpacity) })
+    stroke: styleParts.stroke,
+    fill: styleParts.fill
   });
 };
 
 // OpenLayers map component for verification view,
 // supporting categorical and probabilistic outlooks with storm report overlays and base map style switching.
 const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayersVerificationMapProps>(({ 
-  activeOutlookType = 'categorical',
+  activeOutlookType = CATEGORICAL_OUTLOOK,
   selectedDay = 1
 }, ref) => {
   const dispatch = useDispatch();
@@ -354,7 +442,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
     // Match forecast map: categorical uses layer-level opacity so nested fills
     // don't compound differently than forecast rendering.
-    outlookLayer.setOpacity(activeOutlookType === 'categorical' ? 0.5 : 1);
+    outlookLayer.setOpacity(activeOutlookType === CATEGORICAL_OUTLOOK ? 0.5 : 1);
   }, [activeOutlookType]);
 
   useEffect(() => {
@@ -377,13 +465,13 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
       if (Array.isArray(olFeature)) {
         olFeature.forEach((item) => {
-          item.setStyle(buildStyle(activeOutlookType, probability));
+          item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
           source.addFeature(item);
         });
         return;
       }
 
-      olFeature.setStyle(buildStyle(activeOutlookType, probability));
+      olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
       source.addFeature(olFeature);
     });
   }, [activeFeatures, activeOutlookType]);
@@ -405,7 +493,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
         // Probabilistic verification views should only show matching report type.
         // Categorical view keeps all report types visible.
-        if (activeOutlookType === 'categorical') {
+        if (activeOutlookType === CATEGORICAL_OUTLOOK) {
           return true;
         }
 
@@ -427,6 +515,22 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     }
   }, [reports, reportsVisible, filterByType, activeOutlookType]);
 
+  // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
+  const handleToggleStylePicker = () => {
+    setShowStylePicker((v) => !v);
+  };
+
+  // Handle selection of a base map style from the style picker, updating the Redux store and hiding the picker.
+  const handleBaseMapStyleSelect = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const style = e.currentTarget.dataset.style as BaseMapStyle | undefined;
+    if (!style) {
+      return;
+    }
+
+    dispatch(setBaseMapStyle(style));
+    setShowStylePicker(false);
+  };
+
   return (
     <div className="forecast-map-container">
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
@@ -436,7 +540,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
             <button
               type="button"
               className="map-toolbar-button"
-              onClick={() => setShowStylePicker((v) => !v)}
+              onClick={handleToggleStylePicker}
               title="Base map style"
               aria-label="Base map style"
             >
@@ -453,12 +557,10 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
                 ] as { value: BaseMapStyle; label: string }[]).map(({ value, label }) => (
                   <button
                     key={value}
+                    data-style={value}
                     type="button"
                     className={`text-left px-2 py-1 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${baseMapStyle === value ? 'font-bold bg-gray-100 dark:bg-gray-700' : ''}`}
-                    onClick={() => {
-                      dispatch(setBaseMapStyle(value));
-                      setShowStylePicker(false);
-                    }}
+                    onClick={handleBaseMapStyleSelect}
                   >
                     {label}
                   </button>

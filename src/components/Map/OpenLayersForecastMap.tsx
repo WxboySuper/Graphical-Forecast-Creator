@@ -29,9 +29,69 @@ import UnofficialBadge from './UnofficialBadge';
 import './ForecastMap.css';
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
+type EditableOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail' | 'totalSevere' | 'day4-8';
+
+interface FeatureIdentity {
+  featureId: string;
+  outlookType: string;
+  probability: string;
+}
+
+interface BlankLayerConfig {
+  source: VectorSource;
+  isLoaded: () => boolean;
+  url: string;
+  getCache: () => any;
+  setCache: (data: any) => void;
+  style: Style;
+}
+
+interface OutlookSelection {
+  outlookType: string;
+  probability: string;
+}
+
+interface FillBuildInput {
+  probability: string;
+  fillColor: string;
+  fillOpacity: number;
+}
+
+interface LayerStyleOptions {
+  isTopLayer?: boolean;
+  forCategoricalLayer?: boolean;
+}
+
+interface RgbaInput {
+  color: string;
+  alpha: number;
+}
+
+interface FillOpacityInput {
+  fillOpacity: unknown;
+  forCategoricalLayer: boolean;
+}
+
+interface StrokeWidthInput {
+  weight: unknown;
+  isTopLayer: boolean;
+}
+
+interface HatchPatternInput {
+  cigLevel: string;
+}
+
+const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
+  'categorical',
+  'tornado',
+  'wind',
+  'hail',
+  'totalSevere',
+  'day4-8',
+]);
 
 // Helper to convert hex/rgb/hsl color strings to rgba with specified alpha
-const toRgbaColor = (color: string, alpha: number): string => {
+const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
   if (!color) {
     return `rgba(255, 255, 255, ${alpha})`;
   }
@@ -60,7 +120,7 @@ const toRgbaColor = (color: string, alpha: number): string => {
 };
 
 // Create canvas pattern for CIG hatching
-const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
+const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | null => {
   const canvas = document.createElement('canvas');
   const size = 10;
   canvas.width = size;
@@ -99,47 +159,130 @@ const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   return ctx.createPattern(canvas, 'repeat');
 };
 
-// Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
-const toOlStyle = (outlookType: string, probability: string, isTopLayer: boolean = false, forCategoricalLayer: boolean = false) => {
-  const style = getFeatureStyle(outlookType as any, probability);
-  const fillColor = style.fillColor || '#ffffff';
-  // For categorical features on the dedicated layer, use full opacity fill.
-  // The layer itself has reduced opacity, so colors won't blend with each other
-  // but the map will still show through.
-  const fillOpacity = forCategoricalLayer ? 1.0 : (typeof style.fillOpacity === 'number' ? style.fillOpacity : 0.25);
-  const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
-  const strokeColor = style.color || '#000000';
-  const zIndex = computeZIndex(outlookType as any, probability);
+const resolveFillOpacity = ({ fillOpacity, forCategoricalLayer }: FillOpacityInput): number => {
+  if (forCategoricalLayer) return 1.0;
+  return typeof fillOpacity === 'number' ? fillOpacity : 0.25;
+};
 
-  // Handle CIG hatching patterns
-  let fill: Fill;
-  if (probability.startsWith('CIG')) {
-    const pattern = createHatchPattern(probability);
-    if (pattern) {
-      fill = new Fill({ color: pattern as any });
-    } else {
-      // Fallback to transparent
-      fill = new Fill({ color: 'rgba(0, 0, 0, 0)' });
-    }
-  } else {
-    fill = new Fill({
-      color: toRgbaColor(String(fillColor), fillOpacity)
-    });
+const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInput): Fill => {
+  if (!probability.startsWith('CIG')) {
+    return new Fill({ color: toRgbaColor({ color: fillColor, alpha: fillOpacity }) });
   }
+
+  const pattern = createHatchPattern({ cigLevel: probability });
+  if (pattern) {
+    return new Fill({ color: pattern as any });
+  }
+
+  return new Fill({ color: 'rgba(0, 0, 0, 0)' });
+};
+
+const resolveStrokeWidth = ({ weight, isTopLayer }: StrokeWidthInput): number => {
+  if (isTopLayer) return 3;
+  return typeof weight === 'number' ? weight : 2;
+};
+
+const getFeatureIdentity = (feature: any): FeatureIdentity | null => {
+  const featureId = feature.get('featureId') as string | undefined;
+  const outlookType = feature.get('outlookType') as string | undefined;
+  const probability = feature.get('probability') as string | undefined;
+
+  if (!featureId) return null;
+  if (!outlookType) return null;
+  if (!probability) return null;
+
+  return { featureId, outlookType, probability };
+};
+
+const toUpdatedGeoJsonFeature = (
+  feature: any,
+  format: GeoJSON,
+  includeDerivedFrom: boolean
+): GeoJsonFeature | null => {
+  const identity = getFeatureIdentity(feature);
+  if (!identity) return null;
+
+  const geometry = feature.getGeometry();
+  if (!geometry) return null;
+
+  const geoJsonGeometry = format.writeGeometryObject(geometry, {
+    dataProjection: 'EPSG:4326',
+    featureProjection: 'EPSG:3857'
+  });
+
+  return {
+    type: 'Feature',
+    id: identity.featureId,
+    geometry: geoJsonGeometry as Polygon,
+    properties: {
+      outlookType: identity.outlookType,
+      probability: identity.probability,
+      isSignificant: Boolean(feature.get('isSignificant')),
+      ...(includeDerivedFrom ? { derivedFrom: feature.get('derivedFrom') } : {})
+    }
+  };
+};
+
+const applyBlankLayerStyle = (features: any[], style: Style) => {
+  features.forEach((feature) => {
+    if ('setStyle' in feature && typeof feature.setStyle === 'function') {
+      feature.setStyle(style);
+    }
+  });
+};
+
+const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
+  if (config.isLoaded()) return;
+
+  let geoJson = config.getCache();
+  if (!geoJson) {
+    const response = await fetch(config.url);
+    geoJson = await response.json();
+    config.setCache(geoJson);
+  }
+
+  const format = new GeoJSON();
+  const features = format.readFeatures(geoJson, {
+    dataProjection: 'EPSG:4326',
+    featureProjection: 'EPSG:3857',
+  });
+
+  applyBlankLayerStyle(features as any[], config.style);
+  config.source.addFeatures(features as any[]);
+};
+
+const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolean => {
+  return DRAWABLE_OUTLOOK_TYPES.has(outlookType as EditableOutlookType);
+};
+
+// Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
+const toOlStyle = (
+  selection: OutlookSelection,
+  options: LayerStyleOptions = {}
+) => {
+  const { outlookType, probability } = selection;
+  const { isTopLayer = false, forCategoricalLayer = false } = options;
+
+  const style = getFeatureStyle(outlookType as any, probability);
+  const fillColor = String(style.fillColor || '#ffffff');
+  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity, forCategoricalLayer });
+  const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
+  const strokeColor = String(style.color || '#000000');
+  const zIndex = computeZIndex(outlookType as any, probability);
+  const fill = createOutlookFill({ probability, fillColor, fillOpacity });
+  const strokeWidth = resolveStrokeWidth({ weight: style.weight, isTopLayer });
 
   // For top layer (e.g. categorical), we want a thicker,
   // fully opaque border to clearly delineate features,
   // especially when colors are similar or when CIG hatching is used.
-  const olStyle = new Style({
-    fill: fill,
+  return new Style({
+    fill,
     stroke: new Stroke({
-      color: toRgbaColor(String(strokeColor), strokeOpacity),
-      width: isTopLayer ? 3 : (style.weight || 2)
+      color: toRgbaColor({ color: strokeColor, alpha: strokeOpacity }),
+      width: strokeWidth
     }),
-    zIndex: zIndex
+    zIndex
   });
-  
-  return olStyle;
 };
 
 // Cached GeoJSON for blank map style — fetched once, shared across re-renders
@@ -391,37 +534,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     modify.on('modifyend', (event) => {
       const format = new GeoJSON();
       event.features.forEach((feature) => {
-        const geometry = feature.getGeometry();
-        if (!geometry) {
-          return;
-        }
-
-        // Use the original feature ID
-        const featureId = feature.get('featureId') as string | undefined;
-        const outlookType = feature.get('outlookType') as string | undefined;
-        const probability = feature.get('probability') as string | undefined;
-
-        if (!featureId || !outlookType || !probability) {
-          return;
-        }
-
-        // Convert the modified geometry back to GeoJSON format with the correct projections for storage in Redux.
-        const geoJsonGeometry = format.writeGeometryObject(geometry, {
-          dataProjection: 'EPSG:4326',
-          featureProjection: 'EPSG:3857'
-        });
-        // Dispatch an action to update the feature in the Redux store with the new geometry.
-        const updatedFeature: GeoJsonFeature = {
-          type: 'Feature',
-          id: featureId,
-          geometry: geoJsonGeometry as Polygon,
-          properties: {
-            outlookType,
-            probability,
-            isSignificant: Boolean(feature.get('isSignificant'))
-          }
-        };
-
+        const updatedFeature = toUpdatedGeoJsonFeature(feature, format, false);
+        if (!updatedFeature) return;
         dispatch(updateFeature({ feature: updatedFeature }));
       });
     });
@@ -432,37 +546,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // and to prevent accidental edits of auto-generated categorical features.
     const catModify = new Modify({ source: catSourceRef.current });
     catModify.on('modifyend', (event) => {
-      const fmt = new GeoJSON();
+      const format = new GeoJSON();
       event.features.forEach((feature) => {
         const derivedFrom = feature.get('derivedFrom') as string | undefined;
         if (derivedFrom === 'auto-generated') {
           return;
         }
 
-        const geometry = feature.getGeometry();
-        if (!geometry) return;
-        const featureId = feature.get('featureId') as string | undefined;
-        const outlookType = feature.get('outlookType') as string | undefined;
-        const probability = feature.get('probability') as string | undefined;
-        if (!featureId || !outlookType || !probability) return;
-        // Convert the modified geometry back to GeoJSON format with the correct projections for storage in Redux.
-        const geoJsonGeometry = fmt.writeGeometryObject(geometry, {
-          dataProjection: 'EPSG:4326',
-          featureProjection: 'EPSG:3857'
-        });
-        dispatch(updateFeature({
-          feature: {
-            type: 'Feature',
-            id: featureId,
-            geometry: geoJsonGeometry as Polygon,
-            properties: {
-              outlookType,
-              probability,
-              isSignificant: Boolean(feature.get('isSignificant')),
-              derivedFrom: feature.get('derivedFrom')
-            }
-          }
-        }));
+        const updatedFeature = toUpdatedGeoJsonFeature(feature, format, true);
+        if (!updatedFeature) return;
+        dispatch(updateFeature({ feature: updatedFeature }));
       });
     });
     map.addInteraction(catModify);
@@ -476,10 +569,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         return;
       }
 
-      // Use the original feature ID, not the potentially clipped one
-      const featureId = selected.get('featureId') as string | undefined;
       const outlookType = selected.get('outlookType') as string | undefined;
-      const probability = selected.get('probability') as string | undefined;
       const derivedFrom = selected.get('derivedFrom') as string | undefined;
 
       // Auto-generated categorical polygons are derived from probabilistic outlooks.
@@ -490,13 +580,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         return;
       }
 
-      if (featureId && outlookType && probability) {
-        dispatch(removeFeature({
-          outlookType: outlookType as any,
-          probability,
-          featureId
-        }));
+      const identity = getFeatureIdentity(selected);
+      if (!identity) {
+        select.getFeatures().clear();
+        return;
       }
+
+      dispatch(removeFeature({
+        outlookType: identity.outlookType as any,
+        probability: identity.probability,
+        featureId: identity.featureId
+      }));
 
       select.getFeatures().clear();
     });
@@ -581,77 +675,42 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       // Deeper ocean blue
       el.style.backgroundColor = '#7BA0C8';
 
-      // Load world countries layer (gray fill for Canada, Mexico, etc.)
-      if (worldSourceRef.current.getFeatures().length === 0) {
-        // Fetch and cache the GeoJSON for world countries if we haven't already,
-        // then add to the world layer with the blank style.
-        const loadWorld = async () => {
-          if (!cachedWorldCountriesGeoJSON) {
-            const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson');
-            cachedWorldCountriesGeoJSON = await res.json();
-          }
-          const format = new GeoJSON();
-          const features = format.readFeatures(cachedWorldCountriesGeoJSON, {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857',
-          });
-          features.forEach((f) => {
-            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
-              (f as any).setStyle(BLANK_WORLD_STYLE);
-            }
-          });
-          worldSourceRef.current.addFeatures(features as any[]);
-        };
-        loadWorld().catch(() => {});
-      }
+      const loaders: BlankLayerConfig[] = [
+        {
+          source: worldSourceRef.current,
+          isLoaded: () => worldSourceRef.current.getFeatures().length > 0,
+          url: 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson',
+          getCache: () => cachedWorldCountriesGeoJSON,
+          setCache: (data) => {
+            cachedWorldCountriesGeoJSON = data;
+          },
+          style: BLANK_WORLD_STYLE,
+        },
+        {
+          source: lakesSourceRef.current,
+          isLoaded: () => lakesSourceRef.current.getFeatures().length > 0,
+          url: 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_lakes.geojson',
+          getCache: () => cachedLakesGeoJSON,
+          setCache: (data) => {
+            cachedLakesGeoJSON = data;
+          },
+          style: BLANK_LAKE_STYLE,
+        },
+        {
+          source: landSourceRef.current,
+          isLoaded: () => landSourceRef.current.getFeatures().length > 0,
+          url: 'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json',
+          getCache: () => cachedUsStatesGeoJSON,
+          setCache: (data) => {
+            cachedUsStatesGeoJSON = data;
+          },
+          style: BLANK_LAND_STYLE,
+        },
+      ];
 
-      // Load lakes layer (Great Lakes, etc.) — blue, sits between world and US states
-      if (lakesSourceRef.current.getFeatures().length === 0) {
-        // Fetch and cache the GeoJSON for lakes if we haven't already,
-        // then add to the lakes layer with the blank lake style.
-        const loadLakes = async () => {
-          if (!cachedLakesGeoJSON) {
-            const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_lakes.geojson');
-            cachedLakesGeoJSON = await res.json();
-          }
-          const format = new GeoJSON();
-          const features = format.readFeatures(cachedLakesGeoJSON, {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857',
-          });
-          features.forEach((f) => {
-            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
-              (f as any).setStyle(BLANK_LAKE_STYLE);
-            }
-          });
-          lakesSourceRef.current.addFeatures(features as any[]);
-        };
-        loadLakes().catch(() => {});
-      }
-
-      // Load US states layer (cream fill, black borders on top of world layer)
-      if (landSourceRef.current.getFeatures().length === 0) {
-        // Fetch and cache the GeoJSON for US states if we haven't already,
-        // then add to the land layer with the blank land style.
-        const loadStates = async () => {
-          if (!cachedUsStatesGeoJSON) {
-            const res = await fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json');
-            cachedUsStatesGeoJSON = await res.json();
-          }
-          const format = new GeoJSON();
-          const features = format.readFeatures(cachedUsStatesGeoJSON, {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857',
-          });
-          features.forEach((f) => {
-            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
-              (f as any).setStyle(BLANK_LAND_STYLE);
-            }
-          });
-          landSourceRef.current.addFeatures(features as any[]);
-        };
-        loadStates().catch(() => {});
-      }
+      loaders.forEach((loader) => {
+        ensureBlankLayerLoaded(loader).catch(() => {});
+      });
     } else {
       tile.setVisible(true);
       world.setVisible(false);
@@ -675,38 +734,40 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       return;
     }
 
-    if (drawingState.activeOutlookType === 'categorical' || drawingState.activeOutlookType === 'tornado' || drawingState.activeOutlookType === 'wind' || drawingState.activeOutlookType === 'hail' || drawingState.activeOutlookType === 'totalSevere' || drawingState.activeOutlookType === 'day4-8') {
-      const drawSource = drawingState.activeOutlookType === 'categorical' ? catSourceRef.current : vectorSourceRef.current;
-      const draw = new Draw({ source: drawSource, type: 'Polygon' });
-      draw.on('drawend', (event) => {
-        const format = new GeoJSON();
-        const olGeometry = event.feature.getGeometry();
-        if (!olGeometry) {
-          return;
-        }
-
-        // Convert the drawn geometry to GeoJSON format with the correct projections for storage in Redux.
-        const geometry = format.writeGeometryObject(olGeometry, {
-          dataProjection: 'EPSG:4326',
-          featureProjection: 'EPSG:3857'
-        });
-        // Create a new feature object with the drawn geometry and current drawing state properties,
-        // then dispatch an action to add it to the Redux store.
-        const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
-          type: 'Feature',
-          id: uuidv4(),
-          geometry: geometry as Polygon,
-          properties: {
-            outlookType: drawingState.activeOutlookType,
-            probability: drawingState.activeProbability,
-            isSignificant: drawingState.isSignificant
-          }
-        };
-        dispatch(addFeature({ feature }));
-      });
-      map.addInteraction(draw);
-      drawRef.current = draw;
+    if (!isDrawableOutlookType({ outlookType: drawingState.activeOutlookType })) {
+      return;
     }
+
+    const drawSource = drawingState.activeOutlookType === 'categorical' ? catSourceRef.current : vectorSourceRef.current;
+    const draw = new Draw({ source: drawSource, type: 'Polygon' });
+    draw.on('drawend', (event) => {
+      const format = new GeoJSON();
+      const olGeometry = event.feature.getGeometry();
+      if (!olGeometry) {
+        return;
+      }
+
+      // Convert the drawn geometry to GeoJSON format with the correct projections for storage in Redux.
+      const geometry = format.writeGeometryObject(olGeometry, {
+        dataProjection: 'EPSG:4326',
+        featureProjection: 'EPSG:3857'
+      });
+      // Create a new feature object with the drawn geometry and current drawing state properties,
+      // then dispatch an action to add it to the Redux store.
+      const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
+        type: 'Feature',
+        id: uuidv4(),
+        geometry: geometry as Polygon,
+        properties: {
+          outlookType: drawingState.activeOutlookType,
+          probability: drawingState.activeProbability,
+          isSignificant: drawingState.isSignificant
+        }
+      };
+      dispatch(addFeature({ feature }));
+    });
+    map.addInteraction(draw);
+    drawRef.current = draw;
   }, [dispatch, drawingState.activeOutlookType, drawingState.activeProbability, drawingState.isSignificant, interactionMode]);
 
   useEffect(() => {
@@ -737,7 +798,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
       // Apply styles and properties to the feature, then add it to the appropriate source.
       const applyProps = (f: any) => {
-        f.setStyle(toOlStyle(outlookType, probability, isTopLayer, isCategorical));
+        f.setStyle(toOlStyle(
+          { outlookType, probability },
+          { isTopLayer, forCategoricalLayer: isCategorical }
+        ));
         f.set('featureId', feature.id as string);
         f.set('outlookType', outlookType);
         f.set('probability', probability);
@@ -753,6 +817,37 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       }
     });
   }, [serializedFeatures]);
+
+  // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
+  const handleSetModePan = () => {
+    setInteractionMode('pan');
+  };
+
+  // Draw mode allows users to draw new polygons on the map, which are then added to the Redux store and rendered on the map.
+  const handleSetModeDraw = () => {
+    setInteractionMode('draw');
+  };
+
+  // Delete mode allows users to click on existing polygons to remove them from the map and the Redux store.
+  const handleSetModeDelete = () => {
+    setInteractionMode('delete');
+  };
+
+  // Toggle the visibility of the base map style picker, which allows users to switch between different base map styles (e.g. blank, OSM, satellite).
+  const handleToggleStylePicker = () => {
+    setShowStylePicker((v) => !v);
+  };
+
+  // Handle selection of a base map style from the style picker, updating the Redux store and hiding the picker.
+  const handleBaseMapStyleSelect = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const style = e.currentTarget.dataset.style as BaseMapStyle | undefined;
+    if (!style) {
+      return;
+    }
+
+    dispatch(setBaseMapStyle(style));
+    setShowStylePicker(false);
+  };
 
   return (
     <div className="map-container">
@@ -778,7 +873,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           <button
             type="button"
             className={`map-toolbar-button mode-pan ${interactionMode === 'pan' ? 'active' : ''}`}
-            onClick={() => setInteractionMode('pan')}
+            onClick={handleSetModePan}
             title="Pan map"
             aria-label="Pan map"
           >
@@ -786,7 +881,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           </button>
           <button
             type="button"
-            onClick={() => setInteractionMode('draw')}
+            onClick={handleSetModeDraw}
             className={`map-toolbar-button mode-draw ${interactionMode === 'draw' ? 'active' : ''}`}
             title="Draw polygons"
             aria-label="Draw polygons"
@@ -795,7 +890,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           </button>
           <button
             type="button"
-            onClick={() => setInteractionMode('delete')}
+            onClick={handleSetModeDelete}
             className={`map-toolbar-button mode-delete ${interactionMode === 'delete' ? 'active' : ''}`}
             title="Delete polygons"
             aria-label="Delete polygons"
@@ -807,7 +902,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
             <button
               type="button"
               className="map-toolbar-button"
-              onClick={() => setShowStylePicker((v) => !v)}
+              onClick={handleToggleStylePicker}
               title="Base map style"
               aria-label="Base map style"
             >
@@ -824,12 +919,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
                 ] as { value: BaseMapStyle; label: string }[]).map(({ value, label }) => (
                   <button
                     key={value}
+                    data-style={value}
                     type="button"
                     className={`text-left px-2 py-1 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${baseMapStyle === value ? 'font-bold bg-gray-100 dark:bg-gray-700' : ''}`}
-                    onClick={() => {
-                      dispatch(setBaseMapStyle(value));
-                      setShowStylePicker(false);
-                    }}
+                    onClick={handleBaseMapStyleSelect}
                   >
                     {label}
                   </button>

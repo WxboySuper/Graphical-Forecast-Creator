@@ -6,9 +6,11 @@ interface DIYDiscussionEditorProps {
   onChange: (content: string) => void;
 }
 
+// A simple markdown editor for the forecast discussion, which provides a textarea for input and a toolbar with buttons to insert markdown formatting for bold, italic, and headings. It manages the cursor position to insert formatting around selected text and updates the content state as the user types or applies formatting. The editor also displays a character count below the textarea.
 const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onChange }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Function to insert markdown formatting at the current cursor position or around the selected text in the textarea. It takes the markdown syntax to insert before and after the selected text, updates the content state with the new formatted text, and restores the cursor position after insertion.
   const insertFormatting = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -33,22 +35,32 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
     }, 0);
   };
 
+  // Handler for inserting bold markdown syntax, which adds "**" before and after the selected text. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
   const handleBold = () => insertFormatting('**', '**');
+  // Handler for inserting italic markdown syntax, which adds "*" before and after the selected text. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
   const handleItalic = () => insertFormatting('*', '*');
+  // Handler for inserting a level 1 heading markdown syntax, which adds "# " at the beginning of the line. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
   const handleH1 = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     insertFormatting('\n# ', '');
   };
+  // Handler for inserting a level 2 heading markdown syntax, which adds "## " at the beginning of the line. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
   const handleH2 = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     insertFormatting('\n## ', '');
   };
+  // Handler for inserting a level 3 heading markdown syntax, which adds "### " at the beginning of the line. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
   const handleH3 = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     insertFormatting('\n### ', '');
+  };
+
+  // Handle text changes in the textarea
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(e.target.value);
   };
 
   return (
@@ -76,7 +88,7 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
         ref={textareaRef}
         className="diy-textarea"
         value={content}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleTextChange}
         placeholder="Write your forecast discussion here...
 
 You can use basic markdown formatting:

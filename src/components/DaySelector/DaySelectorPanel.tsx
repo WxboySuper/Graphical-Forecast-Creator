@@ -28,6 +28,103 @@ const getDayDescription = (day: DayType): string => {
   }
 };
 
+type ForecastDays = ReturnType<typeof selectForecastCycle>['days'];
+
+// Pure helper: checks whether a given day has any outlook data
+const hasDataForDay = (days: ForecastDays, day: DayType): boolean => {
+  const outlookDay = days[day];
+  if (!outlookDay) return false;
+  const { data } = outlookDay as any;
+  const keys = ['tornado', 'wind', 'hail', 'totalSevere', 'day4-8', 'categorical'];
+  return keys.some((k) => (data?.[k]?.size ?? 0) > 0);
+};
+
+// Small presentational control for editing/displaying the cycle date
+const CycleDateControl: React.FC<{
+  isEditingDate: boolean;
+  tempDate: string;
+  cycleDate: string;
+  onTempDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onDateSave: () => void;
+  onDateCancel: () => void;
+  onDateEdit: () => void;
+}> = ({ isEditingDate, tempDate, cycleDate, onTempDateChange, onDateSave, onDateCancel, onDateEdit }) => {
+  if (isEditingDate) {
+    return (
+      <div className="flex items-center gap-2 flex-1">
+        <Input type="date" value={tempDate} onChange={onTempDateChange} className="h-8 flex-1" />
+        <Button size="icon-sm" variant="success" onClick={onDateSave}>✓</Button>
+        <Button size="icon-sm" variant="ghost" onClick={onDateCancel}>✕</Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <span className="text-sm text-muted-foreground">
+        {new Date(cycleDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+      </span>
+      <Button size="icon-sm" variant="ghost" onClick={onDateEdit}>
+        <Calendar className="h-4 w-4" />
+      </Button>
+    </>
+  );
+};
+
+// Tabs for day selection (1-8)
+const DayTabs: React.FC<{ currentDay: DayType; days: ForecastDays; onDayButtonClick: (e: React.MouseEvent<HTMLButtonElement>) => void }> = ({ currentDay, days, onDayButtonClick }) => (
+  <div className="flex-1 grid grid-cols-8 gap-1">
+    {DAYS.map((day) => {
+      const hasData = hasDataForDay(days, day);
+      const isActive = currentDay === day;
+
+      return (
+        <Tooltip key={day}>
+          <TooltipTrigger asChild>
+            <button
+              data-day={day}
+              onClick={onDayButtonClick}
+              className={cn(
+                'relative h-8 w-full text-xs font-medium rounded-md transition-all',
+                'hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring',
+                isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-secondary-foreground'
+              )}
+            >
+              {day}
+              {hasData && <span className="absolute -top-1 -right-1 h-2 w-2 bg-success rounded-full" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="font-medium">Day {day}</p>
+            <p className="text-xs text-muted-foreground">{getDayDescription(day)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Press {day} to select</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    })}
+  </div>
+);
+
+// Custom hook: listen for number keys 1-8 to select forecast days
+const useDayNumberShortcuts = (dispatch: ReturnType<typeof useDispatch>) => {
+  const isEditable = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
+  const hasModifier = (e: KeyboardEvent) => e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditable(e.target as EventTarget | null)) return;
+      if (hasModifier(e)) return;
+
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 8) dispatch(setForecastDay(num as DayType));
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dispatch]);
+};
+
+// Component for selecting the forecast day and viewing the cycle date in the Outlook mode. It displays the current forecast cycle date with an option to edit it, and a set of tabs for each forecast day (1-8) that users can click to switch between days. Each day tab also indicates whether there is data available for that day, and hovering over the tabs shows a description of the outlook types included for that day.
 export const DaySelectorPanel: React.FC = () => {
   const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
@@ -35,58 +132,62 @@ export const DaySelectorPanel: React.FC = () => {
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState(forecastCycle.cycleDate);
 
-  // Helper to check if day has actual data (polygons)
-  const hasDataForDay = useCallback((day: DayType) => {
-    const outlookDay = days[day];
-    if (!outlookDay) return false;
-    const { data } = outlookDay;
-    
-    return (
-      (data.tornado && data.tornado.size > 0) ||
-      (data.wind && data.wind.size > 0) ||
-      (data.hail && data.hail.size > 0) ||
-      (data.totalSevere && data.totalSevere.size > 0) ||
-      (data['day4-8'] && data['day4-8'].size > 0) ||
-      (data.categorical && data.categorical.size > 0)
-    );
-  }, [days]);
+  // Note: `hasDataForDay` moved to a top-level pure helper to reduce component complexity
 
+  // Handlers for changing days and editing cycle date
   const handleDayChange = useCallback((day: DayType) => {
     dispatch(setForecastDay(day));
   }, [dispatch]);
 
+  // Handlers for previous/next day buttons
   const handlePrevDay = useCallback(() => {
     if (currentDay > 1) {
       dispatch(setForecastDay((currentDay - 1) as DayType));
     }
   }, [currentDay, dispatch]);
 
+  // Handler for next day button, which increments the current forecast day if it's less than 8. It dispatches the setForecastDay action with the new day value to update the Redux store and switch the forecast view to the selected day.
   const handleNextDay = useCallback(() => {
     if (currentDay < 8) {
       dispatch(setForecastDay((currentDay + 1) as DayType));
     }
   }, [currentDay, dispatch]);
 
+  // Handler for starting the date edit, which sets the temporary date state to the current cycle date and enters the editing mode. This allows the user to modify the cycle date using an input field, and the changes can be saved or canceled.
   const handleDateSave = useCallback(() => {
     dispatch(setCycleDate(tempDate));
     setIsEditingDate(false);
   }, [dispatch, tempDate]);
 
+  // Note: The date input is a simple text field for demonstration. In a real implementation, you might want to use a date picker component for better UX and validation.
+  const handleTempDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setTempDate(e.target.value);
+  }, []);
+
   // Keyboard shortcuts for day navigation (1-8)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  const handleCancelDateEdit = useCallback(() => {
+    setIsEditingDate(false);
+  }, []);
 
-      const num = parseInt(e.key);
-      if (num >= 1 && num <= 8) {
-        dispatch(setForecastDay(num as DayType));
-      }
-    };
+  // Keyboard shortcuts for day navigation (1-8)
+  const handleStartDateEdit = useCallback(() => {
+    setTempDate(forecastCycle.cycleDate);
+    setIsEditingDate(true);
+  }, [forecastCycle.cycleDate]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch]);
+  // Handler for day tab button clicks
+  const handleDayButtonClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const day = Number(e.currentTarget.dataset.day) as DayType;
+    if (Number.isNaN(day)) {
+      return;
+    }
+
+    handleDayChange(day);
+  }, [handleDayChange]);
+
+  // Keyboard shortcuts for day navigation (1-8)
+  // Keyboard shortcuts for day navigation (1-8)
+  useDayNumberShortcuts(dispatch);
 
   return (
     <TooltipProvider>
@@ -99,42 +200,15 @@ export const DaySelectorPanel: React.FC = () => {
         <div className="space-y-3">
           {/* Cycle Date */}
           <div className="flex items-center justify-between">
-            {isEditingDate ? (
-              <div className="flex items-center gap-2 flex-1">
-                <Input
-                  type="date"
-                  value={tempDate}
-                  onChange={(e) => setTempDate(e.target.value)}
-                  className="h-8 flex-1"
-                />
-                <Button size="icon-sm" variant="success" onClick={handleDateSave}>
-                  ✓
-                </Button>
-                <Button size="icon-sm" variant="ghost" onClick={() => setIsEditingDate(false)}>
-                  ✕
-                </Button>
-              </div>
-            ) : (
-              <>
-                <span className="text-sm text-muted-foreground">
-                  {new Date(forecastCycle.cycleDate).toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </span>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setTempDate(forecastCycle.cycleDate);
-                    setIsEditingDate(true);
-                  }}
-                >
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+            <CycleDateControl
+              isEditingDate={isEditingDate}
+              tempDate={tempDate}
+              cycleDate={forecastCycle.cycleDate}
+              onTempDateChange={handleTempDateChange}
+              onDateSave={handleDateSave}
+              onDateCancel={handleCancelDateEdit}
+              onDateEdit={handleStartDateEdit}
+            />
           </div>
 
           {/* Day Navigation */}
@@ -148,39 +222,7 @@ export const DaySelectorPanel: React.FC = () => {
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            <div className="flex-1 grid grid-cols-8 gap-1">
-              {DAYS.map((day) => {
-                const hasData = hasDataForDay(day);
-                const isActive = currentDay === day;
-
-                return (
-                  <Tooltip key={day}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleDayChange(day)}
-                        className={cn(
-                          'relative h-8 w-full text-xs font-medium rounded-md transition-all',
-                          'hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring',
-                          isActive
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'bg-secondary text-secondary-foreground'
-                        )}
-                      >
-                        {day}
-                        {hasData && (
-                          <span className="absolute -top-1 -right-1 h-2 w-2 bg-success rounded-full" />
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="font-medium">Day {day}</p>
-                      <p className="text-xs text-muted-foreground">{getDayDescription(day)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Press {day} to select</p>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
+            <DayTabs currentDay={currentDay} days={days} onDayButtonClick={handleDayButtonClick} />
 
             <Button
               size="icon-sm"

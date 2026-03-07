@@ -27,52 +27,71 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   const modalRef = useRef<HTMLDivElement>(null);
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
+  // Accessibility helpers: get focusable elements inside a modal and handle Tab navigation
+  const getFocusableElements = (root: HTMLElement | null): HTMLElement[] => {
+    if (!root) return [];
+    return Array.from(root.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    ));
+  };
+
+  const handleTabNavigation = React.useCallback((event: KeyboardEvent, root: HTMLElement | null) => {
+    if (!root) return;
+    const focusable = getFocusableElements(root);
+    if (focusable.length === 0) return;
+    
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const isFirstActive = document.activeElement === first;
+    const isLastActive = document.activeElement === last;
+
+    if (event.shiftKey && isFirstActive) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && isLastActive) {
+      event.preventDefault();
+      first.focus();
+    }
+  }, []);
+
+  // Top-level keydown handler for the modal that delegates to Tab navigation or close logic.
+  // Keeps modal-specific conditional branches out of the main effect for readability.
+  const handleModalKeyDown = React.useCallback((event: KeyboardEvent) => {
+    const isEscape = event.key === 'Escape';
+    const isTab = event.key === 'Tab';
+    const canTab = !!(modalRef.current && !confirmAction);
+
+    if (isEscape) {
+      if (confirmAction) {
+        setConfirmAction(null);
+      } else {
+        onClose();
+      }
+      return;
+    }
+
+    if (isTab && canTab) {
+      handleTabNavigation(event, modalRef.current);
+    }
+  }, [onClose, confirmAction, handleTabNavigation]);
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (confirmAction) {
-          setConfirmAction(null);
-        } else {
-          onClose();
-        }
-        return;
-      }
-      if (event.key === 'Tab' && modalRef.current && !confirmAction) {
-        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey) {
-          if (document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }
-      }
+    // Synchronize focus when the modal opens
+    const syncFocus = () => {
+      if (!modalRef.current) return;
+      const focusable = getFocusableElements(modalRef.current);
+      focusable[0]?.focus();
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleModalKeyDown);
+    syncFocus();
+
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleModalKeyDown);
     };
-  }, [isOpen, onClose, confirmAction]);
-
-  useEffect(() => {
-    if (!isOpen || !modalRef.current) return;
-    const first = modalRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )[0];
-    first?.focus();
-  }, [isOpen]);
+  }, [isOpen, handleModalKeyDown]);
 
   if (!isOpen) return null;
 
@@ -107,24 +126,63 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     });
   };
 
+  // Handler to open the save form
+  const handleOpenSaveForm = () => {
+    setShowSaveForm(true);
+  };
+
+  // Handler for changes in the new label input field
+  const handleNewLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewLabel(e.target.value);
+  };
+
+  // Handler to cancel the save form
+  const handleCancelSaveForm = () => {
+    setShowSaveForm(false);
+    setNewLabel('');
+  };
+
+  // Note: The "Copy from Previous" modal is only relevant if there is a previous cycle to copy from. In a real implementation, you might want to check if that data exists before allowing the modal to open, and show a toast or disable the button if not.
+  const handleCycleLoadClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const cycleId = e.currentTarget.dataset.cycleId;
+    if (!cycleId) {
+      return;
+    }
+
+    handleLoadCycle(cycleId);
+  };
+
+  // Note: The "Copy from Previous" modal is only relevant if there is a previous cycle to copy from. In a real implementation, you might want to check if that data exists before allowing the modal to open, and show a toast or disable the button if not.
+  const handleCycleDeleteClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const cycleId = e.currentTarget.dataset.cycleId;
+    if (!cycleId) {
+      return;
+    }
+
+    handleDeleteCycle(cycleId);
+  };
+
+  // Handler to cancel any confirmation action (just closes the confirmation modal)
+  const handleCancelConfirmAction = () => {
+    setConfirmAction(null);
+  };
+
   const getDaySummary = (cycle: any) => {
-    const days = Object.keys(cycle.forecastCycle.days);
-    if (days.length === 0) return 'No data';
-    
-    const daysWithData = days.filter(dayKey => {
+    // Extract day keys, then filter to those with any feature maps that have size > 0
+    const keys = Object.keys(cycle.forecastCycle.days);
+    if (keys.length === 0) return 'No data';
+
+    const daysWithData = keys.filter((dayKey) => {
       const day = cycle.forecastCycle.days[dayKey as any];
       if (!day) return false;
-      
-      // Check if any outlook map has features
-      return Object.keys(day.data).some(outlookKey => {
+      const outlookKeys = Object.keys(day.data || {});
+      return outlookKeys.some((outlookKey) => {
         const map = day.data[outlookKey as any];
-        return map && map.size > 0;
+        return !!(map && map.size > 0);
       });
     });
-    
-    return daysWithData.length > 0 
-      ? `Days: ${daysWithData.join(', ')}` 
-      : 'No polygons';
+
+    return daysWithData.length > 0 ? `Days: ${daysWithData.join(', ')}` : 'No polygons';
   };
 
   return (
@@ -155,7 +213,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
             {!showSaveForm ? (
               <button 
                 className="history-btn-save-current" 
-                onClick={() => setShowSaveForm(true)}
+                onClick={handleOpenSaveForm}
               >
                 💾 Save Current Cycle
               </button>
@@ -165,7 +223,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
                   type="text"
                   placeholder="Optional label (e.g., Morning, Afternoon, 00Z)"
                   value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
+                  onChange={handleNewLabelChange}
                   className="history-label-input"
                   maxLength={50}
                 />
@@ -173,10 +231,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
                   <button className="history-btn-save-confirm" onClick={handleSaveCurrent}>
                     Save
                   </button>
-                  <button className="history-btn-save-cancel" onClick={() => {
-                    setShowSaveForm(false);
-                    setNewLabel('');
-                  }}>
+                  <button className="history-btn-save-cancel" onClick={handleCancelSaveForm}>
                     Cancel
                   </button>
                 </div>
@@ -217,14 +272,16 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
                       <div className="history-item-actions">
                         <button
                           className="history-btn-load"
-                          onClick={() => handleLoadCycle(cycle.id)}
+                          data-cycle-id={cycle.id}
+                          onClick={handleCycleLoadClick}
                           title="Load this cycle"
                         >
                           Load
                         </button>
                         <button
                           className="history-btn-delete"
-                          onClick={() => handleDeleteCycle(cycle.id)}
+                          data-cycle-id={cycle.id}
+                          onClick={handleCycleDeleteClick}
                           title="Delete this cycle"
                         >
                           🗑️
@@ -252,7 +309,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
           title={confirmAction.title}
           message={confirmAction.message}
           onConfirm={confirmAction.onConfirm}
-          onCancel={() => setConfirmAction(null)}
+          onCancel={handleCancelConfirmAction}
           confirmLabel="Confirm"
           cancelLabel="Cancel"
         />

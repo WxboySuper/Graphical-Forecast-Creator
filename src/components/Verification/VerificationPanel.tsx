@@ -123,6 +123,21 @@ const FilterByTypeSection: React.FC<{
     return null;
   }
 
+  // Handlers for toggling each report type filter, which call the onToggleType prop with the corresponding type to update the Redux store state.
+  const handleToggleTornado = () => {
+    onToggleType('tornado');
+  };
+
+  // Handler to toggle the wind report type filter
+  const handleToggleWind = () => {
+    onToggleType('wind');
+  };
+
+  // Handler to toggle the hail report type filter
+  const handleToggleHail = () => {
+    onToggleType('hail');
+  };
+
   return (
     <div className="verification-section">
       <h3>Filter by Type</h3>
@@ -131,7 +146,7 @@ const FilterByTypeSection: React.FC<{
           <input
             type="checkbox"
             checked={filterByType.tornado}
-            onChange={() => onToggleType('tornado')}
+            onChange={handleToggleTornado}
           />
           <span>🌪️ Tornado ({reportCounts.tornado})</span>
         </label>
@@ -139,7 +154,7 @@ const FilterByTypeSection: React.FC<{
           <input
             type="checkbox"
             checked={filterByType.wind}
-            onChange={() => onToggleType('wind')}
+            onChange={handleToggleWind}
           />
           <span>💨 Wind ({reportCounts.wind})</span>
         </label>
@@ -147,7 +162,7 @@ const FilterByTypeSection: React.FC<{
           <input
             type="checkbox"
             checked={filterByType.hail}
-            onChange={() => onToggleType('hail')}
+            onChange={handleToggleHail}
           />
           <span>🧊 Hail ({reportCounts.hail})</span>
         </label>
@@ -357,6 +372,11 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
     dispatch(toggleReportType(type));
   };
 
+  // If there are no reports loaded, we can return early and only show the load section and any messages.
+  const handleSelectedDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedDate(e.target.value);
+  };
+
   const reportCounts = getReportCounts(reports);
   const totalReports = reports.length;
   const hasReports = totalReports > 0;
@@ -374,7 +394,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
               type="date"
               id="report-date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={handleSelectedDateChange}
               disabled={loading}
               max={new Date().toISOString().split('T')[0]}
             />
