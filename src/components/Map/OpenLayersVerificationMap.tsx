@@ -57,6 +57,9 @@ const reportColors = {
   hail: '#00FF00',    // Green for hail
 };
 
+// Fallback color for report dots when the report type is not found in reportColors
+const FALLBACK_REPORT_COLOR = '#888888';
+
 // Style function for storm reports
 const buildReportStyle = (type: ReportType) => {
   return new OlStyle({
@@ -74,7 +77,7 @@ const buildReportStyle = (type: ReportType) => {
 };
 
 // Cached US states GeoJSON for blank map style (fetched once per session)
-let cachedUsStatesGeoJSONVerif: any = null;
+let cachedUsStatesGeoJSONVerif: object | null = null;
 
 // Simple style for blank land layer in verification map (cream fill, light borders)
 const BLANK_LAND_STYLE_VERIF = new Style({
@@ -155,7 +158,6 @@ const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
 const FUNCTION_COLOR_NOTATION_REGEX = /^(rgba?|hsla?)\(/i;
 const CATEGORICAL_OUTLOOK: VerificationOutlookType = 'categorical';
 const CIG_PREFIX = 'CIG';
-const FALLBACK_REPORT_COLOR = '#888888';
 const FALLBACK_FILL_COLOR = '#999999';
 const FALLBACK_STROKE_COLOR = '#000000';
 const TRANSPARENT_PATTERN_FILL = 'rgba(0,0,0,0)';
@@ -165,14 +167,17 @@ const OUTLOOK_FILL_OPACITY: Record<string, number> = {
   [CATEGORICAL_OUTLOOK]: 1,
 };
 
+/** Returns true if the color string uses a CSS function notation like rgb(), rgba(), hsl(), or hsla(). */
 const isFunctionColorNotation = (color: string): boolean => {
   return FUNCTION_COLOR_NOTATION_REGEX.test(color);
 };
 
+/** Returns `value` as a number if it already is one, otherwise returns `fallback`. */
 const coerceNumber = (value: unknown, fallback: number): number => {
   return typeof value === 'number' ? value : fallback;
 };
 
+/** Resolves fill opacity: uses the per-type override from OUTLOOK_FILL_OPACITY if present, otherwise coerces the unknown value or defaults to 0.25. */
 const resolveFillOpacity = (outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
   const explicitTypeOpacity = OUTLOOK_FILL_OPACITY[outlookType];
   if (typeof explicitTypeOpacity === 'number') {
@@ -182,20 +187,24 @@ const resolveFillOpacity = (outlookType: VerificationOutlookType, fillOpacity: u
   return coerceNumber(fillOpacity, 0.25);
 };
 
+/** Returns the stroke opacity as a number, defaulting to 1 if the value is not numeric. */
 const resolveStrokeOpacity = (opacity: unknown): number => {
   return coerceNumber(opacity, 1);
 };
 
+/** Returns the stroke width as a number, defaulting to 2 if the value is not numeric. */
 const resolveStrokeWidth = (weight: unknown): number => {
   return coerceNumber(weight, 2);
 };
 
+/** Returns true if the probability string begins with the CIG prefix, indicating a ceiling-opacity level. */
 const isCigProbability = (probability: string): boolean => {
   return probability.startsWith(CIG_PREFIX);
 };
 
+/** Computes the rendering z-index for verification features: CIG overlays use a high-based rank; regular probabilities use the shared computeZIndex utility. */
 const getVerificationStyleZIndex = ({ outlookType, probability }: OutlookStyleDescriptor): number => {
-  const regularZ = computeZIndex(outlookType as any, probability);
+  const regularZ = computeZIndex(outlookType as VerificationOutlookType, probability);
   const cigRank = parseInt(probability.replace(CIG_PREFIX, ''), 10) || 0;
   const cigZ = 1000 + cigRank;
 
@@ -204,8 +213,9 @@ const getVerificationStyleZIndex = ({ outlookType, probability }: OutlookStyleDe
   return isCigProbability(probability) ? cigZ : regularZ;
 };
 
+/** Builds the OL fill and stroke style parts for a CIG probability level using a canvas hatch pattern. */
 const buildCigStyleParts = (probability: string) => {
-  const hatchFill = createHatchPattern(probability) as any || TRANSPARENT_PATTERN_FILL;
+  const hatchFill = createHatchPattern(probability) ?? TRANSPARENT_PATTERN_FILL;
 
   return {
     fill: new Fill({ color: hatchFill }),
@@ -214,17 +224,6 @@ const buildCigStyleParts = (probability: string) => {
       width: CIG_STROKE_WIDTH
     })
   };
-};
-
-const createStandardFill = ({ color, alpha }: ColorWithOpacity): Fill => {
-  return new Fill({ color: toRgbaColor({ color, alpha }) });
-};
-
-const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stroke => {
-  return new Stroke({
-    color: toRgbaColor({ color, alpha: opacity }),
-    width
-  });
 };
 
 // Utility function to convert hex or named colors to RGBA format with specified alpha for OpenLayers styles
@@ -252,9 +251,21 @@ const toRgbaColor = ({ color, alpha }: ColorWithOpacity): string => {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 };
 
+/** Creates an OL Fill with an rgba color derived from the given hex/rgb color and alpha value. */
+const createStandardFill = ({ color, alpha }: ColorWithOpacity): Fill => {
+  return new Fill({ color: toRgbaColor({ color, alpha }) });
+};
+
+const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stroke => {
+  return new Stroke({
+    color: toRgbaColor({ color, alpha: opacity }),
+    width
+  });
+};
+
 // Function to build OpenLayers style for a given feature based on its outlook type and probability,
 const buildStyle = ({ outlookType, probability }: OutlookStyleDescriptor) => {
-  const style = getFeatureStyle(outlookType as any, probability);
+  const style = getFeatureStyle(outlookType as VerificationOutlookType, probability);
   const fillColor = String(style.fillColor || FALLBACK_FILL_COLOR);
   const strokeColor = String(style.color || FALLBACK_STROKE_COLOR);
   const fillOpacity = resolveFillOpacity(outlookType, style.fillOpacity);
@@ -275,6 +286,32 @@ const buildStyle = ({ outlookType, probability }: OutlookStyleDescriptor) => {
     fill: styleParts.fill
   });
 };
+
+// Sub-component for the base map style-picker dropdown in the verification map.
+const VerifMapStylePicker: React.FC<{
+  baseMapStyle: BaseMapStyle;
+  onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ baseMapStyle, onSelect }) => (
+  <div className="absolute bottom-full mb-2 right-0 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-lg p-2 flex flex-col gap-1 min-w-[120px] z-50">
+    {([
+      { value: 'blank', label: 'Blank (Weather)' },
+      { value: 'osm', label: 'OpenStreetMap' },
+      { value: 'carto-light', label: 'Light' },
+      { value: 'carto-dark', label: 'Dark' },
+      { value: 'esri-satellite', label: 'Satellite' },
+    ] as { value: BaseMapStyle; label: string }[]).map(({ value, label }) => (
+      <button
+        key={value}
+        data-style={value}
+        type="button"
+        className={`text-left px-2 py-1 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${baseMapStyle === value ? 'font-bold bg-gray-100 dark:bg-gray-700' : ''}`}
+        onClick={onSelect}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
 
 // OpenLayers map component for verification view,
 // supporting categorical and probabilistic outlooks with storm report overlays and base map style switching.
@@ -365,7 +402,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     mapRef.current = map;
 
     return () => {
-      map.setTarget(undefined);
+      map.setTarget();
       mapRef.current = null;
     };
   }, []);
@@ -418,13 +455,13 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
             featureProjection: 'EPSG:3857',
           });
           features.forEach((f) => {
-            if ('setStyle' in f && typeof (f as any).setStyle === 'function') {
-              (f as any).setStyle(BLANK_LAND_STYLE_VERIF);
+            if ('setStyle' in f) {
+              (f as Feature).setStyle(BLANK_LAND_STYLE_VERIF);
             }
           });
-          landSourceRef.current.addFeatures(features as any[]);
+          landSourceRef.current.addFeatures(features as Feature[]);
         };
-        loadStates().catch(() => {});
+        loadStates().catch(() => { /* US states layer fetch failed — non-fatal */ });
       }
     } else {
       tile.setVisible(true);
@@ -454,7 +491,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     // Sort features by computed z-index to ensure correct rendering order in OpenLayers,
     // since it doesn't automatically handle SVG-style layering based on feature properties. Higher z-index features will be added last and rendered on top. CIG overlays are always on top, with CIG3 above CIG2 above CIG1, followed by regular probabilities sorted by their computed z-index.
     const sortedFeatures = [...activeFeatures].sort((a, b) => {
-      return computeZIndex(activeOutlookType as any, a.probability) - computeZIndex(activeOutlookType as any, b.probability);
+      return computeZIndex(activeOutlookType as VerificationOutlookType, a.probability) - computeZIndex(activeOutlookType as VerificationOutlookType, b.probability);
     });
 
     sortedFeatures.forEach(({ feature, probability }) => {
@@ -468,11 +505,10 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
           item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
           source.addFeature(item);
         });
-        return;
+      } else {
+        olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
+        source.addFeature(olFeature);
       }
-
-      olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
-      source.addFeature(olFeature);
     });
   }, [activeFeatures, activeOutlookType]);
 
@@ -547,25 +583,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
               Map
             </button>
             {showStylePicker && (
-              <div className="absolute bottom-full mb-2 right-0 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-lg p-2 flex flex-col gap-1 min-w-[120px] z-50">
-                {([
-                  { value: 'blank', label: 'Blank (Weather)' },
-                  { value: 'osm', label: 'OpenStreetMap' },
-                  { value: 'carto-light', label: 'Light' },
-                  { value: 'carto-dark', label: 'Dark' },
-                  { value: 'esri-satellite', label: 'Satellite' },
-                ] as { value: BaseMapStyle; label: string }[]).map(({ value, label }) => (
-                  <button
-                    key={value}
-                    data-style={value}
-                    type="button"
-                    className={`text-left px-2 py-1 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${baseMapStyle === value ? 'font-bold bg-gray-100 dark:bg-gray-700' : ''}`}
-                    onClick={handleBaseMapStyleSelect}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <VerifMapStylePicker baseMapStyle={baseMapStyle} onSelect={handleBaseMapStyleSelect} />
             )}
           </div>
         </div>

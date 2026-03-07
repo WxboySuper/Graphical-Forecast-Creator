@@ -34,9 +34,9 @@ type ForecastDays = ReturnType<typeof selectForecastCycle>['days'];
 const hasDataForDay = (days: ForecastDays, day: DayType): boolean => {
   const outlookDay = days[day];
   if (!outlookDay) return false;
-  const { data } = outlookDay as any;
+  const { data } = outlookDay;
   const keys = ['tornado', 'wind', 'hail', 'totalSevere', 'day4-8', 'categorical'];
-  return keys.some((k) => (data?.[k]?.size ?? 0) > 0);
+  return keys.some((k) => (data?.[k as keyof typeof data]?.size ?? 0) > 0);
 };
 
 // Small presentational control for editing/displaying the cycle date
@@ -107,10 +107,13 @@ const DayTabs: React.FC<{ currentDay: DayType; days: ForecastDays; onDayButtonCl
 
 // Custom hook: listen for number keys 1-8 to select forecast days
 const useDayNumberShortcuts = (dispatch: ReturnType<typeof useDispatch>) => {
+  /** Returns true if the given event target is a text-entry element that should absorb keystrokes. */
   const isEditable = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
+  /** Returns true if any modifier key (Ctrl, Meta, Alt, Shift) is held, so shortcuts don't clash with combos. */
   const hasModifier = (e: KeyboardEvent) => e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
 
   useEffect(() => {
+    /** Selects the forecast day matching the pressed digit key (1-8) unless focus is inside a text field. */
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isEditable(e.target as EventTarget | null)) return;
       if (hasModifier(e)) return;

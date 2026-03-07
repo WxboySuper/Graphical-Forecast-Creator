@@ -65,74 +65,72 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
     icon={<Menu className="h-4 w-4" />}
     minWidth={220}
   >
-    <div className="space-y-2">
-      <div className="space-y-1">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start"
-          onClick={onSave}
-          disabled={isSaved}
-        >
-          <Save className="h-4 w-4 mr-2" />
-          Save to JSON
-          <span className="ml-auto text-xs text-muted-foreground">⌃S</span>
-        </Button>
+    <div className="flex flex-col gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full justify-start"
+        onClick={onSave}
+        disabled={isSaved}
+      >
+        <Save className="h-4 w-4 mr-2" />
+        Save to JSON
+        <span className="ml-auto text-xs text-muted-foreground">⌃S</span>
+      </Button>
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start"
-          onClick={onLoadClick}
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          Load from JSON
-        </Button>
-      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full justify-start"
+        onClick={onLoadClick}
+      >
+        <Upload className="h-4 w-4 mr-2" />
+        Load from JSON
+      </Button>
 
-      <div className="border-t border-border pt-2 space-y-1">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start"
-          onClick={onOpenHistoryModal}
-        >
-          <History className="h-4 w-4 mr-2" />
-          Cycle History
-        </Button>
+      <hr className="border-border my-0.5" />
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start"
-          onClick={onOpenCopyModal}
-        >
-          <Copy className="h-4 w-4 mr-2" />
-          Copy from Previous
-        </Button>
-      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full justify-start"
+        onClick={onOpenHistoryModal}
+      >
+        <History className="h-4 w-4 mr-2" />
+        Cycle History
+      </Button>
 
-      <div className="border-t border-border pt-2 space-y-1">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start"
-          onClick={onInitiateExport}
-        >
-          <ImageIcon className="h-4 w-4 mr-2" />
-          Export Image
-        </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full justify-start"
+        onClick={onOpenCopyModal}
+      >
+        <Copy className="h-4 w-4 mr-2" />
+        Copy from Previous
+      </Button>
 
-        <Button
-          variant="destructive"
-          size="sm"
-          className="w-full justify-start"
-          onClick={onOpenResetConfirm}
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Reset All
-        </Button>
-      </div>
+      <hr className="border-border my-0.5" />
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full justify-start"
+        onClick={onInitiateExport}
+      >
+        <ImageIcon className="h-4 w-4 mr-2" />
+        Export Image
+      </Button>
+
+      <Button
+        variant="destructive"
+        size="sm"
+        className="w-full justify-start"
+        onClick={onOpenResetConfirm}
+      >
+        <Trash2 className="h-4 w-4 mr-2" />
+        Reset All
+      </Button>
     </div>
 
     <input

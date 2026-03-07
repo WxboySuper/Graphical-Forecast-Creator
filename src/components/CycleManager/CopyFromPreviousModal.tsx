@@ -17,8 +17,35 @@ const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 const getFocusableElements = (root: HTMLElement | null): HTMLElement[] => {
   if (!root) return [];
   return Array.from(root.querySelectorAll<HTMLElement>(
-    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-  ));
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter(el => {
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  });
+};
+
+// Returns true when Shift+Tab should wrap focus back to the last element.
+const shouldWrapBackward = (focusable: HTMLElement[], isInModal: boolean): boolean =>
+  !isInModal || document.activeElement === focusable[0];
+
+// Returns true when Tab should wrap focus forward to the first element.
+const shouldWrapForward = (focusable: HTMLElement[], isInModal: boolean): boolean =>
+  !isInModal || document.activeElement === focusable[focusable.length - 1];
+
+// Separate function to handle tab navigation for better readability and maintainability. It checks if the currently focused element is the first or last focusable element in the modal and cycles focus accordingly when the Tab key is pressed, ensuring that keyboard users can navigate through the modal without losing focus outside of it.
+const handleTabNavigation = (event: KeyboardEvent, modalRef: React.RefObject<HTMLDivElement>) => {
+  if (!modalRef.current) return;
+  const focusable = getFocusableElements(modalRef.current);
+  if (focusable.length === 0) return;
+  const isInModal = focusable.includes(document.activeElement as HTMLElement);
+
+  if (event.shiftKey && shouldWrapBackward(focusable, isInModal)) {
+    event.preventDefault();
+    focusable[focusable.length - 1].focus();
+  } else if (!event.shiftKey && shouldWrapForward(focusable, isInModal)) {
+    event.preventDefault();
+    focusable[0].focus();
+  }
 };
 
 // Handler for keyboard events in the modal, which implements focus trapping and allows closing the modal with the Escape key. It checks for Tab key presses to cycle focus within the modal and ensures that focus does not escape to elements outside the modal while it is open. It also listens for the Escape key to trigger the onClose function, allowing users to easily close the modal using the keyboard. This enhances accessibility for users who rely on keyboard navigation.
@@ -37,27 +64,6 @@ const handleModalKeyDown = (
   }
 };
 
-// Separate function to handle tab navigation for better readability and maintainability. It checks if the currently focused element is the first or last focusable element in the modal and cycles focus accordingly when the Tab key is pressed, ensuring that keyboard users can navigate through the modal without losing focus outside of it.
-const handleTabNavigation = (event: KeyboardEvent, modalRef: React.RefObject<HTMLDivElement>) => {
-  if (!modalRef.current) return;
-  const focusable = getFocusableElements(modalRef.current);
-  if (focusable.length === 0) return;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-
-  if (event.shiftKey) {
-    if (document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    }
-  } else {
-    if (document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
-};
-
 // Read a file as text (Promise wrapper) and deserialize into ForecastCycle
 const readFileAsText = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -67,6 +73,7 @@ const readFileAsText = (file: File): Promise<string> =>
     reader.readAsText(file);
   });
 
+/** Reads and parses a GFC JSON forecast file into a ForecastCycle object. */
 const parseForecastFile = async (file: File): Promise<ForecastCycle> => {
   const content = await readFileAsText(file);
   const parsed = JSON.parse(content);
@@ -89,6 +96,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
   useEffect(() => {
     if (!isOpen) return;
 
+    /** Keyboard event handler that traps focus and allows Escape to close the modal. */
     const handler = (event: KeyboardEvent) => handleModalKeyDown(event, modalRef, onClose);
 
     window.addEventListener('keydown', handler);
@@ -114,7 +122,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
       const cycle = await parseForecastFile(file);
       setLoadedCycle(cycle);
       setLoadedFileName(file.name);
-    } catch (err) {
+    } catch {
       addToast('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.', 'error');
     } finally {
       // Reset file input
@@ -151,7 +159,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
 
   return (
     <>
-      <div className="copy-modal-overlay" onClick={onClose}></div>
+      <div className="copy-modal-overlay" onClick={onClose} />
       <div
         className="copy-modal"
         role="dialog"

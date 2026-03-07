@@ -122,6 +122,17 @@ const OutlookTypeSelector: React.FC<{
   </div>
 );
 
+// Sub-component showing the checkmark and file name once a forecast is loaded.
+const LoadedIndicator: React.FC<{ fileName: string }> = ({ fileName }) => (
+  <div className="loaded-indicator">
+    <span className="checkmark">✓</span>
+    <div>
+      <strong>Forecast Loaded</strong>
+      <p className="file-name">{fileName}</p>
+    </div>
+  </div>
+);
+
 // Sidebar component that shows the forecast loading section and the verification panel, which conditionally renders either a file upload area for loading a forecast or the verification panel with storm report filters based on whether a forecast has been loaded. It also includes handlers for loading a forecast file and clearing the loaded forecast, which are passed down as props from the parent component.
 const ForecastLoaderSection: React.FC<{
   forecastLoaded: boolean;
@@ -157,13 +168,7 @@ const ForecastLoaderSection: React.FC<{
     <div className="forecast-loader-section">
       <h3>Step 1: Load Forecast</h3>
       <div className="forecast-loaded">
-        <div className="loaded-indicator">
-          <span className="checkmark">✓</span>
-          <div>
-            <strong>Forecast Loaded</strong>
-            <p className="file-name">{fileName}</p>
-          </div>
-        </div>
+        <LoadedIndicator fileName={fileName} />
         <button onClick={onClearForecast} className="clear-forecast-btn">
           Load Different Forecast
         </button>

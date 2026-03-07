@@ -6,6 +6,7 @@ import './ToSModal.css';
 const TOS_VERSION = '1.0.0';
 const STORAGE_KEY = 'gfc-tos-accepted';
 
+/** Returns true if the user has accepted the current version of the Terms of Service. */
 export function hasAcceptedToS(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY) === TOS_VERSION;
@@ -48,7 +49,7 @@ const ToSTermsContent: React.FC = () => (
     <ul>
       <li>Create or distribute graphics intended to incite public panic or spread misinformation.</li>
       <li>Impersonate, replicate, or misrepresent official government products or agencies.</li>
-      <li>Distribute forecasts without clearly labeling them as <em>"Unofficial"</em> or <em>"Experimental."</em></li>
+      <li>Distribute forecasts without clearly labeling them as <em>&quot;Unofficial&quot;</em> or <em>&quot;Experimental.&quot;</em></li>
       <li>Harass, threaten, or harm any individual or group.</li>
       <li>Violate any applicable local, state, federal, or international laws.</li>
     </ul>
@@ -70,9 +71,9 @@ const ToSTermsContent: React.FC = () => (
       own risk.
     </p>
 
-    <h3>5. "As-Is" Service</h3>
+    <h3>5. &quot;As-Is&quot; Service</h3>
     <p>
-      GFC is provided on an <strong>"As-Is"</strong> and <strong>"As-Available"</strong> basis without warranties
+      GFC is provided on an <strong>&quot;As-Is&quot;</strong> and <strong>&quot;As-Available&quot;</strong> basis without warranties
       of any kind. We do not guarantee uninterrupted, error-free, or secure operation, nor that any data
       (boundaries, storm reports, map layers) will be accurate or current.
     </p>
@@ -80,7 +81,7 @@ const ToSTermsContent: React.FC = () => (
     <h3>6. Indemnification</h3>
     <p>
       You agree to indemnify and hold harmless the creator of GFC from any claims, damages, or expenses (including
-      attorneys' fees) arising from your use of the App or violation of these Terms.
+      attorneys&apos; fees) arising from your use of the App or violation of these Terms.
     </p>
 
     <h3>7. Modifications &amp; Termination</h3>

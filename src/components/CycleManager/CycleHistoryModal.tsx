@@ -5,8 +5,10 @@ import {
   selectForecastCycle,
   saveCurrentCycle, 
   loadSavedCycle, 
-  deleteSavedCycle 
+  deleteSavedCycle,
+  SavedCycle
 } from '../../store/forecastSlice';
+import { DayType, OutlookData } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
 import './CycleHistoryModal.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
@@ -16,6 +18,7 @@ interface CycleHistoryModalProps {
   onClose: () => void;
 }
 
+/** Modal for browsing, saving, loading, and deleting saved forecast cycles. */
 const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
@@ -59,7 +62,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   const handleModalKeyDown = React.useCallback((event: KeyboardEvent) => {
     const isEscape = event.key === 'Escape';
     const isTab = event.key === 'Tab';
-    const canTab = !!(modalRef.current && !confirmAction);
+    const canTab = Boolean(modalRef.current && !confirmAction);
 
     if (isEscape) {
       if (confirmAction) {
@@ -95,6 +98,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
 
   if (!isOpen) return null;
 
+  /** Dispatches saveCurrentCycle with the current label, then resets the save form and shows a success toast. */
   const handleSaveCurrent = () => {
     dispatch(saveCurrentCycle({ label: newLabel.trim() || undefined }));
     setNewLabel('');
@@ -102,6 +106,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     addToast('Cycle saved successfully!', 'success');
   };
 
+  /** Prompts the user to confirm before dispatching loadSavedCycle, replacing the current forecast cycle. */
   const handleLoadCycle = (cycleId: string) => {
     setConfirmAction({
       title: 'Load Cycle',
@@ -115,6 +120,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     });
   };
 
+  /** Prompts the user to confirm before dispatching deleteSavedCycle to remove a saved cycle permanently. */
   const handleDeleteCycle = (cycleId: string) => {
     setConfirmAction({
       title: 'Delete Cycle',
@@ -167,18 +173,18 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     setConfirmAction(null);
   };
 
-  const getDaySummary = (cycle: any) => {
+  const getDaySummary = (cycle: SavedCycle) => {
     // Extract day keys, then filter to those with any feature maps that have size > 0
     const keys = Object.keys(cycle.forecastCycle.days);
     if (keys.length === 0) return 'No data';
 
     const daysWithData = keys.filter((dayKey) => {
-      const day = cycle.forecastCycle.days[dayKey as any];
+      const day = cycle.forecastCycle.days[Number(dayKey) as DayType];
       if (!day) return false;
       const outlookKeys = Object.keys(day.data || {});
       return outlookKeys.some((outlookKey) => {
-        const map = day.data[outlookKey as any];
-        return !!(map && map.size > 0);
+        const map = day.data[outlookKey as keyof OutlookData];
+        return Boolean(map && map.size > 0);
       });
     });
 
@@ -187,7 +193,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
 
   return (
     <>
-      <div className="history-modal-overlay" onClick={onClose}></div>
+      <div className="history-modal-overlay" onClick={onClose} />
       <div
         className="history-modal"
         role="dialog"

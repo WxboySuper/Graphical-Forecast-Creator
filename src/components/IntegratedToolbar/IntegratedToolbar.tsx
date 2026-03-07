@@ -89,6 +89,7 @@ interface IntegratedToolbarProps {
   addToast: AddToastFn;
 }
 
+/** Returns true if the given day in the forecast cycle has any outlook polygons drawn for any outlook type. */
 const hasDayOutlookData = (
   days: ReturnType<typeof selectForecastCycle>['days'],
   day: DayType
@@ -155,544 +156,423 @@ interface IntegratedToolbarViewProps {
   isLowProb: boolean;
 }
 
-const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = ({
-  onSave,
-  onLoadClick,
-  onPackageDownload,
-  onOpenHistoryModal,
-  onOpenCopyModal,
-  onOpenResetConfirm,
-  onDateSave,
-  onTempDateChange,
-  onStartDateEdit,
-  onDayButtonClick,
-  onPrevDay,
-  onNextDay,
-  onToggleLowProbability,
-  onCloseHistoryModal,
-  onCloseCopyModal,
-  onCancelReset,
-  onReset,
-  onFileSelect,
-  fileInputRef,
-  isSaved,
-  isExporting,
-  isExportModalOpen,
-  onInitiateExport,
-  onConfirmExport,
-  onCancelExport,
-  isPackageDownloading,
-  showHistoryModal,
-  showCopyModal,
-  showResetConfirm,
-  isEditingDate,
-  tempDate,
-  cycleDate,
-  currentDay,
-  days,
-  availableTypes,
-  activeOutlookType,
-  activeProbability,
-  isSignificant,
-  significantThreatsEnabled,
-  lowProbabilityOutlooks,
-  outlookTypeHandlers,
-  probabilities,
-  probabilityHandlers,
-  currentColor,
-  isLowProb,
-}) => (
-  <TooltipProvider>
-    <div className="fixed bottom-0 left-0 right-0 z-panel bg-background border-t border-border shadow-lg h-[200px] overflow-hidden">
-      <div className="h-full overflow-x-auto overflow-y-hidden">
-        <div className="flex items-center justify-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 h-full min-w-max">
-        {/* Tools Section - Always Visible */}
-        <div className="flex flex-col gap-2 lg:gap-3 border-r border-border pr-2 lg:pr-4">
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="h-14 w-14 lg:h-16 lg:w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400"
-                  onClick={onSave}
-                  disabled={isSaved}
-                >
-                  <Save className="h-6 w-6" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Save to JSON <span className="text-muted-foreground">(⌃S)</span></p>
-              </TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="h-14 w-14 lg:h-16 lg:w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400"
-                  onClick={onLoadClick}
-                >
-                  <Upload className="h-6 w-6" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Load from JSON <span className="text-muted-foreground">(⌃L)</span></p>
-              </TooltipContent>
-            </Tooltip>
+/** Toolbar actions panel: Save, Load, Export, Package download, Cycle History, Copy from Previous, and Reset buttons. */
+const ToolbarToolsSection: React.FC<{
+  onSave: () => void;
+  onLoadClick: () => void;
+  onInitiateExport: () => void;
+  onPackageDownload: () => void;
+  onOpenHistoryModal: () => void;
+  onOpenCopyModal: () => void;
+  onOpenResetConfirm: () => void;
+  isSaved: boolean;
+  isExporting: boolean;
+  isPackageDownloading: boolean;
+}> = ({ onSave, onLoadClick, onInitiateExport, onPackageDownload, onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm, isSaved, isExporting, isPackageDownloading }) => (
+  <div className="flex flex-col gap-2 lg:gap-3 border-r border-border pr-2 lg:pr-4">
+    <div className="flex items-center gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400" onClick={onSave} disabled={isSaved}>
+            <Save className="h-6 w-6" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Save to JSON <span className="text-muted-foreground">(⌃S)</span></p></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400" onClick={onLoadClick}>
+            <Upload className="h-6 w-6" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Load from JSON <span className="text-muted-foreground">(⌃L)</span></p></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-700 dark:!bg-orange-500/20 dark:hover:!bg-orange-500/30 dark:border-orange-500/50 dark:text-orange-400" onClick={onInitiateExport} disabled={isExporting}>
+            {isExporting ? <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" /> : <ImageIcon className="h-6 w-6" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>{isExporting ? 'Exporting...' : 'Export Image'} <span className="text-muted-foreground">(⌃E)</span></p></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400" onClick={onPackageDownload} disabled={isPackageDownloading}>
+            <Archive className="h-6 w-6" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p></TooltipContent>
+      </Tooltip>
+    </div>
+    <div className="flex items-center gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-700 dark:!bg-cyan-500/20 dark:hover:!bg-cyan-500/30 dark:border-cyan-500/50 dark:text-cyan-400" onClick={onOpenHistoryModal}>
+            <History className="h-6 w-6" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Cycle History</p></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-teal-500/20 hover:bg-teal-500/30 border-teal-500/50 text-teal-700 dark:!bg-teal-500/20 dark:hover:!bg-teal-500/30 dark:border-teal-500/50 dark:text-teal-400" onClick={onOpenCopyModal}>
+            <Copy className="h-6 w-6" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Copy from Previous</p></TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-700 dark:!bg-red-500/20 dark:hover:!bg-red-500/30 dark:border-red-500/50 dark:text-red-400" onClick={onOpenResetConfirm}>
+            <Trash2 className="h-6 w-6" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Reset All</p></TooltipContent>
+      </Tooltip>
+    </div>
+  </div>
+);
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="h-14 w-14 lg:h-16 lg:w-16 bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-700 dark:!bg-orange-500/20 dark:hover:!bg-orange-500/30 dark:border-orange-500/50 dark:text-orange-400"
-                  onClick={onInitiateExport}
-                  disabled={isExporting}
-                >
-                  {isExporting ? (
-                    <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" />
-                  ) : (
-                    <ImageIcon className="h-6 w-6" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{isExporting ? 'Exporting...' : 'Export Image'} <span className="text-muted-foreground">(⌃E)</span></p>
-              </TooltipContent>
-            </Tooltip>
+/** Button + Tooltip combination for a single outlook type; handles active/low-probability states and the keyboard-shortcut tooltip. */
+const OutlookTypeButton: React.FC<{
+  type: OutlookType;
+  isActive: boolean;
+  hasLowProb: boolean;
+  className: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ type, isActive, hasLowProb, className, onClick, children }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button
+        variant={isActive ? 'default' : 'secondary'}
+        size="sm"
+        className={cn(className, hasLowProb && "border-success-foreground border-2")}
+        onClick={onClick}
+      >
+        {children}
+        {hasLowProb && (
+          <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 text-success-foreground bg-background rounded-full" />
+        )}
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent>
+      <p>{outlookLabels[type]} <span className="text-muted-foreground">({outlookShortcuts[type]})</span></p>
+    </TooltipContent>
+  </Tooltip>
+);
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400"
-                  onClick={onPackageDownload}
-                  disabled={isPackageDownloading}
-                >
-                  <Archive className="h-6 w-6" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p>
-              </TooltipContent>
-            </Tooltip>
+/** Forecast day navigator: cycle date display/edit, prev/next arrows, and the 4×2 day button grid. */
+const ToolbarForecastDaySection: React.FC<{
+  isEditingDate: boolean;
+  tempDate: string;
+  cycleDate: string;
+  currentDay: DayType;
+  days: ReturnType<typeof selectForecastCycle>['days'];
+  onDateSave: () => void;
+  onTempDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onStartDateEdit: () => void;
+  onDayButtonClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onPrevDay: () => void;
+  onNextDay: () => void;
+}> = ({ isEditingDate, tempDate, cycleDate, currentDay, days, onDateSave, onTempDateChange, onStartDateEdit, onDayButtonClick, onPrevDay, onNextDay }) => (
+  <div className="border-r border-border pr-2 lg:pr-3">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Cycle</span>
+        {isEditingDate ? (
+          <div className="flex items-center gap-1">
+            <Input type="date" value={tempDate} onChange={onTempDateChange} className="h-6 text-xs w-32" />
+            <Button size="icon-sm" variant="ghost" className="h-6 w-6" onClick={onDateSave}>✓</Button>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="h-14 w-14 lg:h-16 lg:w-16 bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-700 dark:!bg-cyan-500/20 dark:hover:!bg-cyan-500/30 dark:border-cyan-500/50 dark:text-cyan-400"
-                  onClick={onOpenHistoryModal}
-                >
-                  <History className="h-6 w-6" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Cycle History</p>
-              </TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="h-14 w-14 lg:h-16 lg:w-16 bg-teal-500/20 hover:bg-teal-500/30 border-teal-500/50 text-teal-700 dark:!bg-teal-500/20 dark:hover:!bg-teal-500/30 dark:border-teal-500/50 dark:text-teal-400"
-                  onClick={onOpenCopyModal}
-                >
-                  <Copy className="h-6 w-6" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Copy from Previous</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="h-14 w-14 lg:h-16 lg:w-16 bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-700 dark:!bg-red-500/20 dark:hover:!bg-red-500/30 dark:border-red-500/50 dark:text-red-400"
-                  onClick={onOpenResetConfirm}
-                >
-                  <Trash2 className="h-6 w-6" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Reset All</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-
-        {/* Forecast Day Section - 2 Rows */}
-        <div className="border-r border-border pr-2 lg:pr-3">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Cycle</span>
-              {isEditingDate ? (
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="date"
-                    value={tempDate}
-                    onChange={onTempDateChange}
-                    className="h-6 text-xs w-32"
-                  />
-                  <Button 
-                    size="icon-sm" 
-                    variant="ghost" 
-                    className="h-6 w-6"
-                    onClick={onDateSave}
+        ) : (
+          <button
+            onClick={onStartDateEdit}
+            className="px-2 py-1 text-xs rounded border border-border bg-secondary hover:bg-accent transition-colors focus:outline-none select-none"
+          >
+            {new Date(cycleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="icon" variant="ghost" className="h-[124px] lg:h-[140px] w-9 lg:w-10" onClick={onPrevDay} disabled={currentDay === 1}>
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+        <div className="grid grid-cols-4 grid-rows-2 gap-1.5 lg:gap-2">
+          {DAYS.map((day) => {
+            const hasData = hasDayOutlookData(days, day);
+            const isActive = currentDay === day;
+            return (
+              <Tooltip key={day}>
+                <TooltipTrigger asChild>
+                  <button
+                    data-day={day}
+                    onClick={onDayButtonClick}
+                    className={cn(
+                      'relative h-16 w-16 text-base font-semibold rounded-md transition-all',
+                      'lg:h-16 lg:w-16 h-14 w-14',
+                      'hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring',
+                      isActive ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
+                    )}
                   >
-                    ✓
-                  </Button>
-                </div>
-              ) : (
+                    {day}
+                    {hasData && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-success rounded-full" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent><p className="text-xs">Day {day} (Press {day})</p></TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+        <Button size="icon" variant="ghost" className="h-[124px] lg:h-[140px] w-9 lg:w-10" onClick={onNextDay} disabled={currentDay === 8}>
+          <ChevronRight className="h-6 w-6" />
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
+/** Outlook type selector; adapts layout based on how many types are available (1 = Day 4-8 full-height, 2 = Day 3 stacked, 4 = Day 1/2 grid). */
+const ToolbarOutlookTypeSection: React.FC<{
+  availableTypes: OutlookType[];
+  activeOutlookType: OutlookType;
+  lowProbabilityOutlooks: OutlookType[];
+  outlookTypeHandlers: Record<OutlookType, () => void>;
+}> = ({ availableTypes, activeOutlookType, lowProbabilityOutlooks, outlookTypeHandlers }) => (
+  <div className="border-r border-border pr-2 lg:pr-4">
+    <div className="flex flex-col gap-3">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</label>
+      {availableTypes.length === 1 ? (
+        <div className="h-[124px] lg:h-[140px]">
+          {availableTypes.map((type) => (
+            <OutlookTypeButton key={type} type={type} isActive={activeOutlookType === type} hasLowProb={lowProbabilityOutlooks.includes(type)} className="h-full w-[96px] lg:w-[110px] relative" onClick={outlookTypeHandlers[type]}>
+              <div className="flex flex-col items-center gap-1">{outlookIcons[type]}<span className="text-sm">{outlookLabels[type]}</span></div>
+            </OutlookTypeButton>
+          ))}
+        </div>
+      ) : availableTypes.length === 2 ? (
+        <div className="flex flex-col gap-2 h-[124px] lg:h-[140px]">
+          {availableTypes.map((type) => (
+            <OutlookTypeButton key={type} type={type} isActive={activeOutlookType === type} hasLowProb={lowProbabilityOutlooks.includes(type)} className="h-[58px] lg:h-[66px] w-[96px] lg:w-[110px] relative" onClick={outlookTypeHandlers[type]}>
+              <div className="flex items-center gap-1">{outlookIcons[type]}<span className="text-sm">{outlookLabels[type]}</span></div>
+            </OutlookTypeButton>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 grid-rows-2 gap-2">
+          {availableTypes.slice(0, 4).map((type) => (
+            <OutlookTypeButton key={type} type={type} isActive={activeOutlookType === type} hasLowProb={lowProbabilityOutlooks.includes(type)} className="h-14 lg:h-16 w-[96px] lg:w-[110px] relative" onClick={outlookTypeHandlers[type]}>
+              <>{outlookIcons[type]}<span className="ml-1 text-sm">{outlookLabels[type]}</span></>
+            </OutlookTypeButton>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+/** Probability/Risk grid; column count adapts to the number of available probabilities. */
+const ToolbarProbabilitySection: React.FC<{
+  activeOutlookType: OutlookType;
+  activeProbability: string;
+  probabilities: string[];
+  probabilityHandlers: Record<string, () => void>;
+}> = ({ activeOutlookType, activeProbability, probabilities, probabilityHandlers }) => (
+  <div className="flex-1 px-2 lg:px-3">
+    <div className="flex flex-col gap-3">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        {activeOutlookType === 'categorical' ? 'Risk' : 'Probability'}
+      </label>
+      <div
+        className="grid gap-2 auto-rows-[60px]"
+        style={{
+          gridTemplateColumns: `repeat(${Math.ceil(probabilities.length / 2)}, 1fr)`,
+          gridTemplateRows: 'repeat(2, 60px)',
+        }}
+      >
+        {probabilities.map((prob, index) => {
+          const isActive = activeProbability === prob;
+          const color = getOutlookColor(activeOutlookType, prob);
+          return (
+            <Tooltip key={prob}>
+              <TooltipTrigger asChild>
                 <button
-                  onClick={onStartDateEdit}
-                  className="px-2 py-1 text-xs rounded border border-border bg-secondary hover:bg-accent transition-colors focus:outline-none select-none"
+                  onClick={probabilityHandlers[prob]}
+                  className={cn(
+                    'px-4 py-3 text-sm font-bold rounded-md transition-all',
+                    'border-2 focus:outline-none focus:ring-2 focus:ring-ring h-[60px]',
+                    isActive ? 'ring-2 ring-ring ring-offset-2' : 'hover:opacity-80'
+                  )}
+                  style={{
+                    backgroundColor: color,
+                    borderColor: isActive ? 'var(--ring)' : 'transparent',
+                    color: activeOutlookType === 'categorical' && ['TSTM', 'MRGL', 'SLGT'].includes(prob) ? '#000' : '#fff',
+                    gridRow: (index % 2) + 1,
+                    gridColumn: Math.floor(index / 2) + 1,
+                  }}
                 >
-                  {new Date(cycleDate).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                  })}
+                  {prob}
                 </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-[124px] lg:h-[140px] w-9 lg:w-10"
-                onClick={onPrevDay}
-                disabled={currentDay === 1}
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </Button>
-
-              <div className="grid grid-cols-4 grid-rows-2 gap-1.5 lg:gap-2">
-                {DAYS.map((day) => {
-                  const hasData = hasDayOutlookData(days, day);
-                  const isActive = currentDay === day;
-
-                  return (
-                    <Tooltip key={day}>
-                      <TooltipTrigger asChild>
-                        <button
-                          data-day={day}
-                          onClick={onDayButtonClick}
-                          className={cn(
-                            'relative h-16 w-16 text-base font-semibold rounded-md transition-all',
-                            'lg:h-16 lg:w-16 h-14 w-14',
-                            'hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring',
-                            isActive
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-secondary text-secondary-foreground'
-                          )}
-                        >
-                          {day}
-                          {hasData && (
-                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-success rounded-full" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">Day {day} (Press {day})</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-[124px] lg:h-[140px] w-9 lg:w-10"
-                onClick={onNextDay}
-                disabled={currentDay === 8}
-              >
-                <ChevronRight className="h-6 w-6" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Outlook Type Section */}
-        <div className="border-r border-border pr-2 lg:pr-4">
-          <div className="flex flex-col gap-3">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Type
-            </label>
-            {/* Dynamic layout based on number of outlook types */}
-            {availableTypes.length === 1 ? (
-              // Day 4-8: Single button fills entire space
-              <div className="h-[124px] lg:h-[140px]">
-                {availableTypes.map((type) => (
-                  <Tooltip key={type}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={activeOutlookType === type ? 'default' : 'secondary'}
-                        size="sm"
-                        className={cn(
-                          "h-full w-[96px] lg:w-[110px] relative",
-                          lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
-                        )}
-                        onClick={outlookTypeHandlers[type]}
-                      >
-                        <div className="flex flex-col items-center gap-1">
-                          {outlookIcons[type]}
-                          <span className="text-sm">{outlookLabels[type]}</span>
-                        </div>
-                        {lowProbabilityOutlooks.includes(type) && (
-                          <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 text-success-foreground bg-background rounded-full" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{outlookLabels[type]} <span className="text-muted-foreground">({outlookShortcuts[type]})</span></p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            ) : availableTypes.length === 2 ? (
-              // Day 3: Stack vertically (Categorical on top, Total Severe on bottom)
-              <div className="flex flex-col gap-2 h-[124px] lg:h-[140px]">
-                {availableTypes.map((type) => (
-                  <Tooltip key={type}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={activeOutlookType === type ? 'default' : 'secondary'}
-                        size="sm"
-                        className={cn(
-                          "h-[58px] lg:h-[66px] w-[96px] lg:w-[110px] relative",
-                          lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
-                        )}
-                        onClick={outlookTypeHandlers[type]}
-                      >
-                        <div className="flex items-center gap-1">
-                          {outlookIcons[type]}
-                          <span className="text-sm">{outlookLabels[type]}</span>
-                        </div>
-                        {lowProbabilityOutlooks.includes(type) && (
-                          <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 text-success-foreground bg-background rounded-full" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{outlookLabels[type]} <span className="text-muted-foreground">({outlookShortcuts[type]})</span></p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            ) : (
-              // Day 1/2: 2x2 grid layout
-              <div className="grid grid-cols-2 grid-rows-2 gap-2">
-                {availableTypes.slice(0, 4).map((type) => (
-                  <Tooltip key={type}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={activeOutlookType === type ? 'default' : 'secondary'}
-                        size="sm"
-                        className={cn(
-                          "h-14 lg:h-16 w-[96px] lg:w-[110px] relative",
-                          lowProbabilityOutlooks.includes(type) && "border-success-foreground border-2"
-                        )}
-                        onClick={outlookTypeHandlers[type]}
-                      >
-                        {outlookIcons[type]}
-                        <span className="ml-1 text-sm">{outlookLabels[type]}</span>
-                        {lowProbabilityOutlooks.includes(type) && (
-                          <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 text-success-foreground bg-background rounded-full" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{outlookLabels[type]} <span className="text-muted-foreground">({outlookShortcuts[type]})</span></p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Probability Section - Flexible */}
-        <div className="flex-1 px-2 lg:px-3">
-          <div className="flex flex-col gap-3">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              {activeOutlookType === 'categorical' ? 'Risk' : 'Probability'}
-            </label>
-            <div className="grid gap-2 auto-rows-[60px]" style={{
-              gridTemplateColumns: `repeat(${Math.ceil(probabilities.length / 2)}, 1fr)`,
-              gridTemplateRows: 'repeat(2, 60px)'
-            }}>
-              {probabilities.map((prob, index) => {
-                const isActive = activeProbability === prob;
-                const color = getOutlookColor(activeOutlookType, prob);
-                const row = (index % 2) + 1;
-                const col = Math.floor(index / 2) + 1;
-                
-                return (
-                  <Tooltip key={prob}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={probabilityHandlers[prob]}
-                        className={cn(
-                          'px-4 py-3 text-sm font-bold rounded-md transition-all',
-                          'border-2 focus:outline-none focus:ring-2 focus:ring-ring',
-                          'h-[60px]',
-                          isActive 
-                            ? 'ring-2 ring-ring ring-offset-2' 
-                            : 'hover:opacity-80'
-                        )}
-                        style={{
-                          backgroundColor: color,
-                          borderColor: isActive ? 'var(--ring)' : 'transparent',
-                          color: activeOutlookType === 'categorical' && 
-                            ['TSTM', 'MRGL', 'SLGT'].includes(prob) 
-                            ? '#000' 
-                            : '#fff',
-                          gridRow: row,
-                          gridColumn: col,
-                        }}
-                      >
-                        {prob}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {activeOutlookType === 'categorical' ? (
-                        <p>{getCategoricalRiskDisplayName(prob as CategoricalRiskLevel)}</p>
-                      ) : (
-                        <p>{prob} probability</p>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Current Selection */}
-        <div className="border-l border-border pl-2 lg:pl-4">
-          <div className="flex flex-col gap-3">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-              Current
-            </label>
-            <div className="flex flex-col gap-1 justify-center" style={{ height: '124px' }}>
-              <div 
-                className={cn(
-                  "flex flex-col items-center justify-center px-3 lg:px-4 py-2 rounded-lg w-[190px] lg:w-[220px] h-[64px] lg:h-[72px] transition-all",
-                  isLowProb && "opacity-40 grayscale"
+              </TooltipTrigger>
+              <TooltipContent>
+                {activeOutlookType === 'categorical' ? (
+                  <p>{getCategoricalRiskDisplayName(prob as CategoricalRiskLevel)}</p>
+                ) : (
+                  <p>{prob} probability</p>
                 )}
-                style={{ backgroundColor: currentColor }}
-              >
-                <span 
-                  className={cn(
-                    "text-sm font-bold whitespace-nowrap",
-                    activeOutlookType === 'categorical' && 
-                      ['TSTM', 'MRGL', 'SLGT'].includes(activeProbability)
-                      ? 'text-black'
-                      : 'text-white'
-                  )}
-                >
-                  {outlookLabels[activeOutlookType]}
-                </span>
-                <span 
-                  className={cn(
-                    "text-base font-bold whitespace-nowrap",
-                    activeOutlookType === 'categorical' && 
-                      ['TSTM', 'MRGL', 'SLGT'].includes(activeProbability)
-                      ? 'text-black'
-                      : 'text-white'
-                  )}
-                >
-                  {activeProbability}
-                  {isSignificant && significantThreatsEnabled && ' (Sig)'}
-                </span>
-              </div>
-              
-              <Button
-                variant={isLowProb ? 'success' : 'outline'}
-                size="sm"
-                className="w-full h-8 gap-2"
-                onClick={onToggleLowProbability}
-              >
-                <CheckCircle2 className={cn("h-4 w-4", isLowProb ? "text-white" : "text-muted-foreground")} />
-                <span className="text-xs">
-                  {activeOutlookType === 'categorical' ? 'No T-Storms' : 'Low Probability'}
-                </span>
-              </Button>
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+);
 
-              <div className="text-[10px] text-center text-muted-foreground/50">
-                T/W/L/C • ↑↓
-              </div>
-            </div>
+/** Current-selection swatch + low-probability toggle button. */
+const ToolbarCurrentSelectionSection: React.FC<{
+  activeOutlookType: OutlookType;
+  activeProbability: string;
+  isSignificant: boolean;
+  significantThreatsEnabled: boolean;
+  isLowProb: boolean;
+  currentColor: string;
+  onToggleLowProbability: () => void;
+}> = ({ activeOutlookType, activeProbability, isSignificant, significantThreatsEnabled, isLowProb, currentColor, onToggleLowProbability }) => {
+  const isDarkText = activeOutlookType === 'categorical' && ['TSTM', 'MRGL', 'SLGT'].includes(activeProbability);
+  const labelColorClass = isDarkText ? 'text-black' : 'text-white';
+  const swatchClass = cn('flex flex-col items-center justify-center px-3 lg:px-4 py-2 rounded-lg w-[190px] lg:w-[220px] h-[64px] lg:h-[72px] transition-all', isLowProb && 'opacity-40 grayscale');
+  const sigSuffix = isSignificant && significantThreatsEnabled ? ' (Sig)' : '';
+  const toggleVariant = isLowProb ? 'success' : 'outline' as const;
+  const iconColorClass = isLowProb ? 'text-white' : 'text-muted-foreground';
+  const lowProbLabel = activeOutlookType === 'categorical' ? 'No T-Storms' : 'Low Probability';
+  return (
+    <div className="border-l border-border pl-2 lg:pl-4">
+      <div className="flex flex-col gap-3">
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Current</label>
+        <div className="flex flex-col gap-1 justify-center" style={{ height: '124px' }}>
+          <div className={swatchClass} style={{ backgroundColor: currentColor }}>
+            <span className={cn('text-sm font-bold whitespace-nowrap', labelColorClass)}>
+              {outlookLabels[activeOutlookType]}
+            </span>
+            <span className={cn('text-base font-bold whitespace-nowrap', labelColorClass)}>
+              {activeProbability}{sigSuffix}
+            </span>
           </div>
-        </div>
+          <Button variant={toggleVariant} size="sm" className="w-full h-8 gap-2" onClick={onToggleLowProbability}>
+            <CheckCircle2 className={cn('h-4 w-4', iconColorClass)} />
+            <span className="text-xs">{lowProbLabel}</span>
+          </Button>
+          <div className="text-[10px] text-center text-muted-foreground/50">T/W/L/C • ↑↓</div>
         </div>
       </div>
     </div>
+  );
+};
 
-    {/* Hidden file input */}
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept=".json"
-      onChange={onFileSelect}
-      className="hidden"
-    />
-
-    {/* Modals */}
-    <CycleHistoryModal 
-      isOpen={showHistoryModal}
-      onClose={onCloseHistoryModal}
-    />
-
-    <CopyFromPreviousModal 
-      isOpen={showCopyModal}
-      onClose={onCloseCopyModal}
-    />
-
-    <ExportModal
-      isOpen={isExportModalOpen}
-      onConfirm={onConfirmExport}
-      onCancel={onCancelExport}
-    />
-
-    <Dialog open={showResetConfirm} onOpenChange={(open) => {
-      if (!open) {
-        onCancelReset();
-      }
-    }}>
+/** All modals and dialogs rendered by the toolbar: history, copy, export, and reset-confirm. */
+const ToolbarModals: React.FC<{
+  showHistoryModal: boolean;
+  showCopyModal: boolean;
+  showResetConfirm: boolean;
+  isExportModalOpen: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onCloseHistoryModal: () => void;
+  onCloseCopyModal: () => void;
+  onCancelReset: () => void;
+  onReset: () => void;
+  onConfirmExport: (title: string) => Promise<void>;
+  onCancelExport: () => void;
+}> = ({ showHistoryModal, showCopyModal, showResetConfirm, isExportModalOpen, fileInputRef, onFileSelect, onCloseHistoryModal, onCloseCopyModal, onCancelReset, onReset, onConfirmExport, onCancelExport }) => (
+  <>
+    <input ref={fileInputRef} type="file" accept=".json" onChange={onFileSelect} className="hidden" />
+    <CycleHistoryModal isOpen={showHistoryModal} onClose={onCloseHistoryModal} />
+    <CopyFromPreviousModal isOpen={showCopyModal} onClose={onCloseCopyModal} />
+    <ExportModal isOpen={isExportModalOpen} onConfirm={onConfirmExport} onCancel={onCancelExport} />
+    <Dialog open={showResetConfirm} onOpenChange={(open) => { if (!open) onCancelReset(); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Reset All Drawings?</DialogTitle>
-          <DialogDescription>
-            This will clear all outlook polygons for all days. This action cannot be undone.
-          </DialogDescription>
+          <DialogDescription>This will clear all outlook polygons for all days. This action cannot be undone.</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={onCancelReset}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={onReset}>
-            Reset All
-          </Button>
+          <Button variant="outline" onClick={onCancelReset}>Cancel</Button>
+          <Button variant="destructive" onClick={onReset}>Reset All</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </TooltipProvider>
+  </>
 );
 
+/** Pure presentational view layer for the integrated bottom toolbar; delegates all state and actions to parent hooks via props. */
+const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
+  const {
+    onSave, onLoadClick, onInitiateExport, onPackageDownload,
+    onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm,
+    onDateSave, onTempDateChange, onStartDateEdit,
+    onDayButtonClick, onPrevDay, onNextDay,
+    onToggleLowProbability,
+    onCloseHistoryModal, onCloseCopyModal, onCancelReset, onReset,
+    onFileSelect, onConfirmExport, onCancelExport,
+    fileInputRef,
+    isSaved, isExporting, isExportModalOpen, isPackageDownloading,
+    showHistoryModal, showCopyModal, showResetConfirm,
+    isEditingDate, tempDate, cycleDate,
+    currentDay, days, availableTypes,
+    activeOutlookType, activeProbability, isSignificant, significantThreatsEnabled,
+    lowProbabilityOutlooks, outlookTypeHandlers,
+    probabilities, probabilityHandlers,
+    currentColor, isLowProb,
+  } = props;
+
+  return (
+    <TooltipProvider>
+      <div className="fixed bottom-0 left-0 right-0 z-panel bg-background border-t border-border shadow-lg h-[200px] overflow-hidden">
+        <div className="h-full overflow-x-auto overflow-y-hidden">
+          <div className="flex items-center justify-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 h-full min-w-max">
+            <ToolbarToolsSection
+              onSave={onSave} onLoadClick={onLoadClick} onInitiateExport={onInitiateExport}
+              onPackageDownload={onPackageDownload} onOpenHistoryModal={onOpenHistoryModal}
+              onOpenCopyModal={onOpenCopyModal} onOpenResetConfirm={onOpenResetConfirm}
+              isSaved={isSaved} isExporting={isExporting} isPackageDownloading={isPackageDownloading}
+            />
+            <ToolbarForecastDaySection
+              isEditingDate={isEditingDate} tempDate={tempDate} cycleDate={cycleDate}
+              currentDay={currentDay} days={days}
+              onDateSave={onDateSave} onTempDateChange={onTempDateChange} onStartDateEdit={onStartDateEdit}
+              onDayButtonClick={onDayButtonClick} onPrevDay={onPrevDay} onNextDay={onNextDay}
+            />
+            <ToolbarOutlookTypeSection
+              availableTypes={availableTypes} activeOutlookType={activeOutlookType}
+              lowProbabilityOutlooks={lowProbabilityOutlooks} outlookTypeHandlers={outlookTypeHandlers}
+            />
+            <ToolbarProbabilitySection
+              activeOutlookType={activeOutlookType} activeProbability={activeProbability}
+              probabilities={probabilities} probabilityHandlers={probabilityHandlers}
+            />
+            <ToolbarCurrentSelectionSection
+              activeOutlookType={activeOutlookType} activeProbability={activeProbability}
+              isSignificant={isSignificant} significantThreatsEnabled={significantThreatsEnabled}
+              isLowProb={isLowProb} currentColor={currentColor}
+              onToggleLowProbability={onToggleLowProbability}
+            />
+          </div>
+        </div>
+      </div>
+      <ToolbarModals
+        showHistoryModal={showHistoryModal} showCopyModal={showCopyModal}
+        showResetConfirm={showResetConfirm} isExportModalOpen={isExportModalOpen}
+        fileInputRef={fileInputRef} onFileSelect={onFileSelect}
+        onCloseHistoryModal={onCloseHistoryModal} onCloseCopyModal={onCloseCopyModal}
+        onCancelReset={onCancelReset} onReset={onReset}
+        onConfirmExport={onConfirmExport} onCancelExport={onCancelExport}
+      />
+    </TooltipProvider>
+  );
+};
+
+/** Manages local UI state for the toolbar: modal visibility flags, the file input ref, date-editing state, and package download state. */
 const useToolbarLocalUi = (cycleDate: string) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -736,6 +616,7 @@ const useToolbarLocalUi = (cycleDate: string) => {
   };
 };
 
+/** Selects and derives all forecast-domain data needed by the toolbar: current cycle, day, outlook types, export state, and outlet panel logic. */
 const useToolbarDataModel = (mapRef: React.RefObject<ForecastMapHandle | null>, addToast: AddToastFn) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days, cycleDate } = forecastCycle;
@@ -795,6 +676,7 @@ interface ToolbarActionParams {
   handleCancelReset: () => void;
 }
 
+/** Constructs all event-handler callbacks for toolbar actions: save, load, day navigation, date editing, reset, export, and package download. */
 const useToolbarActionHandlers = ({
   dispatch,
   onLoad,
@@ -878,6 +760,7 @@ const useToolbarActionHandlers = ({
   };
 };
 
+/** Top-level integrated toolbar component; composes data, local-UI, and action hooks then delegates rendering to IntegratedToolbarView. */
 export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   onSave,
   onLoad,

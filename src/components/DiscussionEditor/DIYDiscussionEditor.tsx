@@ -72,7 +72,7 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
         <button onClick={handleItalic} title="Italic (Ctrl+I)" className="toolbar-button">
           <em>I</em>
         </button>
-        <div className="toolbar-divider"></div>
+        <div className="toolbar-divider" />
         <button onClick={handleH1} title="Heading 1" className="toolbar-button">
           H1
         </button>

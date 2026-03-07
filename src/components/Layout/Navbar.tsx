@@ -20,6 +20,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
 
+  /** Dispatches the toggleDarkMode action to switch between light and dark themes. */
+  /** Dispatches the toggleDarkMode action to switch between light and dark themes. */
   const handleToggleDarkMode = () => {
     dispatch(toggleDarkMode());
   };

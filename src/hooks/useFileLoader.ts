@@ -2,14 +2,17 @@ import { exportForecastToJson, deserializeForecast, validateForecastData } from 
 import { markAsSaved, importForecastCycle } from '../store/forecastSlice';
 import type { AddToastFn } from '../components/Layout';
 import type { Dispatch } from 'redux';
+import type { ForecastCycle } from '../types/outlooks';
 
+/** Creates save and load file handler functions bound to the given toast notifier, Redux dispatch, and current forecast state. */
 export function createFileHandlers({ addToast, dispatch, forecastCycle }: {
   addToast: AddToastFn;
   dispatch: Dispatch;
-  forecastCycle: any;
+  forecastCycle: ForecastCycle;
 }) {
   const fileInputRef = { current: null as HTMLInputElement | null } as React.MutableRefObject<HTMLInputElement | null>;
 
+  /** Reads a File object, validates the JSON content, deserializes it, and imports it as the active forecast cycle. */
   const handleLoad = async (file: File) => {
     try {
       const text = await file.text();
@@ -42,10 +45,12 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle }: {
     e.currentTarget.value = '';
   };
 
+  /** Triggers the hidden file input element to open the OS file picker dialog. */
   const handleOpenFilePicker = () => {
     fileInputRef.current?.click();
   };
 
+  /** Serializes the current forecast cycle to a JSON file and downloads it, then marks the store as saved. */
   const handleSave = () => {
     try {
       exportForecastToJson(forecastCycle, {
