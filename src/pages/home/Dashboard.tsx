@@ -10,6 +10,7 @@ interface Stats {
   savedCyclesCount: number;
 }
 
+/** Displays a quick-stats dashboard grid and feature highlight cards for the home page. */
 export const Dashboard: React.FC<{ stats: Stats }> = ({ stats }) => {
   return (
     <>

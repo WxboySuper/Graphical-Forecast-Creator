@@ -157,6 +157,25 @@ interface IntegratedToolbarViewProps {
 }
 
 /** Toolbar actions panel: Save, Load, Export, Package download, Cycle History, Copy from Previous, and Reset buttons. */
+/** Compact icon button wrapped in a Tooltip for use in the integrated toolbar. */
+const ToolbarTooltipButton: React.FC<{
+  icon: React.ReactNode;
+  tooltip: React.ReactNode;
+  className: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}> = ({ icon, tooltip, className, onClick, disabled }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button variant="outline" size="icon" className={className} onClick={onClick} disabled={disabled}>
+        {icon}
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent>{tooltip}</TooltipContent>
+  </Tooltip>
+);
+
+/** Save / load / export / package-download and history/copy/reset action buttons for the toolbar. */
 const ToolbarToolsSection: React.FC<{
   onSave: () => void;
   onLoadClick: () => void;
@@ -171,64 +190,53 @@ const ToolbarToolsSection: React.FC<{
 }> = ({ onSave, onLoadClick, onInitiateExport, onPackageDownload, onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm, isSaved, isExporting, isPackageDownloading }) => (
   <div className="flex flex-col gap-2 lg:gap-3 border-r border-border pr-2 lg:pr-4">
     <div className="flex items-center gap-2">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400" onClick={onSave} disabled={isSaved}>
-            <Save className="h-6 w-6" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Save to JSON <span className="text-muted-foreground">(⌃S)</span></p></TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400" onClick={onLoadClick}>
-            <Upload className="h-6 w-6" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Load from JSON <span className="text-muted-foreground">(⌃L)</span></p></TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-700 dark:!bg-orange-500/20 dark:hover:!bg-orange-500/30 dark:border-orange-500/50 dark:text-orange-400" onClick={onInitiateExport} disabled={isExporting}>
-            {isExporting ? <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" /> : <ImageIcon className="h-6 w-6" />}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>{isExporting ? 'Exporting...' : 'Export Image'} <span className="text-muted-foreground">(⌃E)</span></p></TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400" onClick={onPackageDownload} disabled={isPackageDownloading}>
-            <Archive className="h-6 w-6" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p></TooltipContent>
-      </Tooltip>
+      <ToolbarTooltipButton
+        icon={<Save className="h-6 w-6" />}
+        tooltip={<p>Save to JSON <span className="text-muted-foreground">(⌃S)</span></p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400"
+        onClick={onSave}
+        disabled={isSaved}
+      />
+      <ToolbarTooltipButton
+        icon={<Upload className="h-6 w-6" />}
+        tooltip={<p>Load from JSON <span className="text-muted-foreground">(⌃L)</span></p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400"
+        onClick={onLoadClick}
+      />
+      <ToolbarTooltipButton
+        icon={isExporting ? <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" /> : <ImageIcon className="h-6 w-6" />}
+        tooltip={<p>{isExporting ? 'Exporting...' : 'Export Image'} <span className="text-muted-foreground">(⌃E)</span></p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-700 dark:!bg-orange-500/20 dark:hover:!bg-orange-500/30 dark:border-orange-500/50 dark:text-orange-400"
+        onClick={onInitiateExport}
+        disabled={isExporting}
+      />
+      <ToolbarTooltipButton
+        icon={<Archive className="h-6 w-6" />}
+        tooltip={<p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400"
+        onClick={onPackageDownload}
+        disabled={isPackageDownloading}
+      />
     </div>
     <div className="flex items-center gap-2">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-700 dark:!bg-cyan-500/20 dark:hover:!bg-cyan-500/30 dark:border-cyan-500/50 dark:text-cyan-400" onClick={onOpenHistoryModal}>
-            <History className="h-6 w-6" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Cycle History</p></TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-teal-500/20 hover:bg-teal-500/30 border-teal-500/50 text-teal-700 dark:!bg-teal-500/20 dark:hover:!bg-teal-500/30 dark:border-teal-500/50 dark:text-teal-400" onClick={onOpenCopyModal}>
-            <Copy className="h-6 w-6" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Copy from Previous</p></TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-14 w-14 lg:h-16 lg:w-16 bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-700 dark:!bg-red-500/20 dark:hover:!bg-red-500/30 dark:border-red-500/50 dark:text-red-400" onClick={onOpenResetConfirm}>
-            <Trash2 className="h-6 w-6" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Reset All</p></TooltipContent>
-      </Tooltip>
+      <ToolbarTooltipButton
+        icon={<History className="h-6 w-6" />}
+        tooltip={<p>Cycle History</p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-700 dark:!bg-cyan-500/20 dark:hover:!bg-cyan-500/30 dark:border-cyan-500/50 dark:text-cyan-400"
+        onClick={onOpenHistoryModal}
+      />
+      <ToolbarTooltipButton
+        icon={<Copy className="h-6 w-6" />}
+        tooltip={<p>Copy from Previous</p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-teal-500/20 hover:bg-teal-500/30 border-teal-500/50 text-teal-700 dark:!bg-teal-500/20 dark:hover:!bg-teal-500/30 dark:border-teal-500/50 dark:text-teal-400"
+        onClick={onOpenCopyModal}
+      />
+      <ToolbarTooltipButton
+        icon={<Trash2 className="h-6 w-6" />}
+        tooltip={<p>Reset All</p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-700 dark:!bg-red-500/20 dark:hover:!bg-red-500/30 dark:border-red-500/50 dark:text-red-400"
+        onClick={onOpenResetConfirm}
+      />
     </div>
   </div>
 );
@@ -430,6 +438,55 @@ const ToolbarProbabilitySection: React.FC<{
 );
 
 /** Current-selection swatch + low-probability toggle button. */
+/** Color swatch showing the active outlook type label and probability value. */
+const CurrentSelectionSwatch: React.FC<{
+  swatchClass: string;
+  currentColor: string;
+  labelColorClass: string;
+  outlookLabel: string;
+  activeProbability: string;
+  sigSuffix: string;
+}> = ({ swatchClass, currentColor, labelColorClass, outlookLabel, activeProbability, sigSuffix }) => (
+  <div className={swatchClass} style={{ backgroundColor: currentColor }}>
+    <span className={cn('text-sm font-bold whitespace-nowrap', labelColorClass)}>{outlookLabel}</span>
+    <span className={cn('text-base font-bold whitespace-nowrap', labelColorClass)}>{activeProbability}{sigSuffix}</span>
+  </div>
+);
+
+/** Toggle button for switching the active draw probability to "low probability" mode. */
+const LowProbabilityToggle: React.FC<{
+  toggleVariant: 'success' | 'outline';
+  iconColorClass: string;
+  lowProbLabel: string;
+  onToggle: () => void;
+}> = ({ toggleVariant, iconColorClass, lowProbLabel, onToggle }) => (
+  <Button variant={toggleVariant} size="sm" className="w-full h-8 gap-2" onClick={onToggle}>
+    <CheckCircle2 className={cn('h-4 w-4', iconColorClass)} />
+    <span className="text-xs">{lowProbLabel}</span>
+  </Button>
+);
+
+/** Confirmation dialog for the destructive "reset all drawings" action. */
+const ResetConfirmDialog: React.FC<{
+  open: boolean;
+  onCancel: () => void;
+  onReset: () => void;
+}> = ({ open, onCancel, onReset }) => (
+  <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onCancel(); }}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Reset All Drawings?</DialogTitle>
+        <DialogDescription>This will clear all outlook polygons for all days. This action cannot be undone.</DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant="destructive" onClick={onReset}>Reset All</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+/** Displays the selected outlook type's color swatch, probability, and low-probability toggle. */
 const ToolbarCurrentSelectionSection: React.FC<{
   activeOutlookType: OutlookType;
   activeProbability: string;
@@ -451,18 +508,20 @@ const ToolbarCurrentSelectionSection: React.FC<{
       <div className="flex flex-col gap-3">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Current</label>
         <div className="flex flex-col gap-1 justify-center" style={{ height: '124px' }}>
-          <div className={swatchClass} style={{ backgroundColor: currentColor }}>
-            <span className={cn('text-sm font-bold whitespace-nowrap', labelColorClass)}>
-              {outlookLabels[activeOutlookType]}
-            </span>
-            <span className={cn('text-base font-bold whitespace-nowrap', labelColorClass)}>
-              {activeProbability}{sigSuffix}
-            </span>
-          </div>
-          <Button variant={toggleVariant} size="sm" className="w-full h-8 gap-2" onClick={onToggleLowProbability}>
-            <CheckCircle2 className={cn('h-4 w-4', iconColorClass)} />
-            <span className="text-xs">{lowProbLabel}</span>
-          </Button>
+          <CurrentSelectionSwatch
+            swatchClass={swatchClass}
+            currentColor={currentColor}
+            labelColorClass={labelColorClass}
+            outlookLabel={outlookLabels[activeOutlookType]}
+            activeProbability={activeProbability}
+            sigSuffix={sigSuffix}
+          />
+          <LowProbabilityToggle
+            toggleVariant={toggleVariant}
+            iconColorClass={iconColorClass}
+            lowProbLabel={lowProbLabel}
+            onToggle={onToggleLowProbability}
+          />
           <div className="text-[10px] text-center text-muted-foreground/50">T/W/L/C • ↑↓</div>
         </div>
       </div>
@@ -490,18 +549,7 @@ const ToolbarModals: React.FC<{
     <CycleHistoryModal isOpen={showHistoryModal} onClose={onCloseHistoryModal} />
     <CopyFromPreviousModal isOpen={showCopyModal} onClose={onCloseCopyModal} />
     <ExportModal isOpen={isExportModalOpen} onConfirm={onConfirmExport} onCancel={onCancelExport} />
-    <Dialog open={showResetConfirm} onOpenChange={(open) => { if (!open) onCancelReset(); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Reset All Drawings?</DialogTitle>
-          <DialogDescription>This will clear all outlook polygons for all days. This action cannot be undone.</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancelReset}>Cancel</Button>
-          <Button variant="destructive" onClick={onReset}>Reset All</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ResetConfirmDialog open={showResetConfirm} onCancel={onCancelReset} onReset={onReset} />
   </>
 );
 

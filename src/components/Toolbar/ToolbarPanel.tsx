@@ -143,6 +143,29 @@ const ToolbarActions: React.FC<ToolbarActionsProps> = ({
   </FloatingPanel>
 );
 
+/** Confirmation dialog for the destructive "reset all drawings" action. */
+const ResetConfirmDialog: React.FC<{
+  open: boolean;
+  onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
+  onCancel: () => void;
+  onReset: () => void;
+}> = ({ open, onOpenChange, onCancel, onReset }) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Reset All Drawings?</DialogTitle>
+        <DialogDescription>
+          This will clear all outlook polygons for all days. This action cannot be undone.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant="destructive" onClick={onReset}>Reset All</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
 interface ToolbarModalsProps {
   showHistoryModal: boolean;
   showCopyModal: boolean;
@@ -188,24 +211,7 @@ const ToolbarModals: React.FC<ToolbarModalsProps> = ({
       onCancel={onCancelExport}
     />
 
-    <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Reset All Drawings?</DialogTitle>
-          <DialogDescription>
-            This will clear all outlook polygons for all days. This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancelReset}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={onReset}>
-            Reset All
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ResetConfirmDialog open={showResetConfirm} onOpenChange={setShowResetConfirm} onCancel={onCancelReset} onReset={onReset} />
   </>
 );
 

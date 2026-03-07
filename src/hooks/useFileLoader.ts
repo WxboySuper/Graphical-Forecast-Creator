@@ -37,10 +37,11 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle }: {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /** Handles file input change events: passes the selected file to handleLoad and resets the input value. */
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (file) {
-      void handleLoad(file);
+      handleLoad(file).catch(() => undefined);
     }
     e.currentTarget.value = '';
   };

@@ -1,15 +1,22 @@
 import React from 'react';
 import { Card } from '../../components/ui/card';
 import { Clock, CheckCircle2, AlertTriangle, Map as MapIcon, FileText, ArrowRight, Zap, Calendar, Save, Upload, History, Cloud } from 'lucide-react';
-import { DayType } from '../../types/outlooks';
+import type { DayType, ForecastCycle } from '../../types/outlooks';
 import { Button } from '../../components/ui/button';
 import { cn } from '../../lib/utils';
+
+interface HomeStats {
+  daysWithData: DayType[];
+  totalOutlooks: number;
+  totalFeatures: number;
+  savedCyclesCount: number;
+}
 
 interface Props {
   formattedDate: string;
   isSaved: boolean;
-  forecastCycle: any;
-  stats: any;
+  forecastCycle: ForecastCycle;
+  stats: HomeStats;
   onQuickStartClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onNavigateForecast: () => void;
   onNavigateDiscussion: () => void;
@@ -19,6 +26,31 @@ interface Props {
   onOpenHistory: () => void;
 }
 
+/** Renders a day-button grid item for the forecast day selector. */
+const DayButton: React.FC<{
+  day: number;
+  hasData: boolean;
+  isCurrent: boolean;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ day, hasData, isCurrent, onClick }) => (
+  <button
+    key={day}
+    data-day={day}
+    onClick={onClick}
+    className={cn(
+      'relative p-4 rounded-lg border-2 transition-all',
+      'hover:shadow-md hover:scale-105',
+      hasData ? 'bg-primary/10 border-primary' : 'bg-muted/30 border-border',
+      isCurrent && 'ring-2 ring-primary ring-offset-2'
+    )}
+  >
+    <div className="text-center">
+      <p className="text-2xl font-bold text-foreground">{day}</p>
+    </div>
+  </button>
+);
+
+/** Main dashboard grid combining the current forecast cycle panel, quick actions, and navigation. */
 export const MainGrid: React.FC<Props> = ({ formattedDate, isSaved, forecastCycle, stats, onQuickStartClick, onNavigateForecast, onNavigateDiscussion, onNewCycle, onSave, onOpenFile, onOpenHistory }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -51,17 +83,15 @@ export const MainGrid: React.FC<Props> = ({ formattedDate, isSaved, forecastCycl
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Days with Outlooks</h3>
             <div className="grid grid-cols-8 gap-2">
-              {[1,2,3,4,5,6,7,8].map((day) => {
-                const hasData = stats.daysWithData.includes(day as DayType);
-                const isCurrent = forecastCycle.currentDay === day;
-                return (
-                  <button key={day} data-day={day} onClick={onQuickStartClick} className={cn('relative p-4 rounded-lg border-2 transition-all','hover:shadow-md hover:scale-105', hasData ? 'bg-primary/10 border-primary' : 'bg-muted/30 border-border', isCurrent && 'ring-2 ring-primary ring-offset-2')}>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{day}</p>
-                    </div>
-                  </button>
-                );
-              })}
+              {[1,2,3,4,5,6,7,8].map((day) => (
+                <DayButton
+                  key={day}
+                  day={day}
+                  hasData={stats.daysWithData.includes(day as DayType)}
+                  isCurrent={forecastCycle.currentDay === day}
+                  onClick={onQuickStartClick}
+                />
+              ))}
             </div>
           </div>
 

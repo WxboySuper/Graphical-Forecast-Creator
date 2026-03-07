@@ -20,6 +20,23 @@ interface PageContext {
   addToast: AddToastFn;
 }
 
+/** AI development disclosure banner shown at the bottom of the home page. */
+const AIDisclosure: React.FC = () => (
+  <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
+    <Bot className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground/70" />
+    <p className="leading-relaxed">
+      <span className="font-medium text-foreground">AI Development Disclosure:</span>{' '}
+      AI was used in the development of this project. All code has been reviewed by the maintainer
+      (Alex / WeatherboySuper) to ensure quality and correctness; however, bugs or issues may still
+      be present. If you encounter a problem, please report it via{' '}
+      <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">GitHub Issues</a>
+      {' '}or the{' '}
+      <a href="https://discord.gg/SGk37rg8sz" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">GFC Support Discord</a>.
+    </p>
+  </div>
+);
+
+/** Main home page component showing the hero, dashboard stats, forecast grid, recent cycles, and AI disclosure. */
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -35,6 +52,7 @@ const HomePage: React.FC = () => {
 
   const stats = useMemo(() => computeHomeStats(forecastCycle, savedCycles.length), [forecastCycle, savedCycles.length]);
 
+  /** Resets the forecast cycle, prompting for confirmation if there are unsaved changes. */
   const handleNewCycle = () => {
     if (!isSaved) {
       setConfirmNewCycle(true);
@@ -44,27 +62,38 @@ const HomePage: React.FC = () => {
     addToast('Started new forecast cycle', 'success');
   };
 
+  /** Switches to the given day and navigates to the forecast page. */
   const handleQuickStart = (day: DayType) => {
     dispatch(setForecastDay(day));
     navigate('/forecast');
   };
 
+  /** Triggers a save of the current forecast cycle to JSON. */
   const handleSave = () => doSave();
 
+  /** Navigates to the forecast map page. */
   const handleNavigateForecast = () => navigate('/forecast');
+
+  /** Navigates to the discussion editor page. */
   const handleNavigateDiscussion = () => navigate('/discussion');
 
+  /** Opens the OS file picker to load a forecast cycle from a JSON file. */
   const openFilePicker = () => handleOpenFilePicker();
 
+  /** Opens the cycle history modal. */
   const handleOpenHistoryModal = () => setShowHistoryModal(true);
+
+  /** Closes the cycle history modal. */
   const handleCloseHistoryModal = () => setShowHistoryModal(false);
 
+  /** Extracts the day from the button's data attribute and starts forecast editing for that day. */
   const handleQuickStartClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const day = Number(e.currentTarget.dataset.day);
     if (Number.isNaN(day)) return;
     handleQuickStart(day as DayType);
   };
 
+  /** Loads a recent saved cycle from the history by its ID stored on the button's data attribute. */
   const handleLoadRecentCycleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const cycleId = e.currentTarget.dataset.cycleId;
     if (!cycleId) return;
@@ -74,12 +103,14 @@ const HomePage: React.FC = () => {
     addToast('Cycle loaded from history', 'success');
   };
 
+  /** Confirms starting a new cycle after the user acknowledges unsaved changes will be lost. */
   const handleConfirmNewCycle = () => {
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
     setConfirmNewCycle(false);
   };
 
+  /** Cancels the new cycle confirmation dialog without discarding the current cycle. */
   const handleCancelNewCycle = () => setConfirmNewCycle(false);
 
   const formattedDate = useMemo(() => formatCycleDate(forecastCycle.cycleDate), [forecastCycle.cycleDate]);
@@ -105,18 +136,7 @@ const HomePage: React.FC = () => {
 
         <RecentCycles savedCycles={savedCycles} onLoad={handleLoadRecentCycleClick} onOpenHistory={handleOpenHistoryModal} />
 
-        <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-          <Bot className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground/70" />
-          <p className="leading-relaxed">
-            <span className="font-medium text-foreground">AI Development Disclosure:</span>{' '}
-            AI was used in the development of this project. All code has been reviewed by the maintainer
-            (Alex / WeatherboySuper) to ensure quality and correctness; however, bugs or issues may still
-            be present. If you encounter a problem, please report it via{' '}
-            <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">GitHub Issues</a>
-            {' '}or the{' '}
-            <a href="https://discord.gg/SGk37rg8sz" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">GFC Support Discord</a>.
-          </p>
-        </div>
+        <AIDisclosure />
       </div>
 
       <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" />

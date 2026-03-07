@@ -2,8 +2,10 @@ import React from 'react';
 import { Card } from '../../components/ui/card';
 import { History } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import type { SavedCycle } from '../../store/forecastSlice';
 
-export const RecentCycles: React.FC<{ savedCycles: any[]; onLoad: (e: React.MouseEvent<HTMLButtonElement>) => void; onOpenHistory: () => void; }> = ({ savedCycles, onLoad, onOpenHistory }) => {
+/** Displays the most recently saved forecast cycles as a card grid with a load button per cycle. */
+export const RecentCycles: React.FC<{ savedCycles: SavedCycle[]; onLoad: (e: React.MouseEvent<HTMLButtonElement>) => void; onOpenHistory: () => void; }> = ({ savedCycles, onLoad, onOpenHistory }) => {
   if (!savedCycles || savedCycles.length === 0) return null;
   return (
     <Card className="p-6 bg-card border-border">

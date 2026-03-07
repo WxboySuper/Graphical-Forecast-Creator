@@ -84,6 +84,7 @@ const getInitialValidEnd = (existingDiscussion?: DiscussionData): string => {
   return end.toISOString().slice(0, 16);
 };
 
+/** Returns default form field values for the Discussion editor, seeded from an existing discussion or blank defaults. */
 const getDiscussionFormDefaults = (existingDiscussion?: DiscussionData): DiscussionFormDefaults => ({
   mode: existingDiscussion?.mode ?? 'diy',
   validStart: existingDiscussion?.validStart ?? new Date().toISOString().slice(0, 16),
@@ -412,6 +413,7 @@ const useDiscussionComputed = (
   return { compiledText, wordCount } as const;
 };
 
+/** Provides save and export action callbacks for the discussion editor, dispatching to Redux and notifying via toast. */
 const useDiscussionActions = (opts: {
   dispatch: ReturnType<typeof useDispatch>;
   currentDay: DayType;
@@ -435,6 +437,7 @@ const useDiscussionActions = (opts: {
   return { handleSave, handleExport } as const;
 };
 
+/** Composes all discussion editor state — form fields, computed text, auto-save, and actions — into a single hook return value. */
 const useDiscussionEditorState = (
   existingDiscussion: DiscussionData | undefined,
   currentDay: DayType,

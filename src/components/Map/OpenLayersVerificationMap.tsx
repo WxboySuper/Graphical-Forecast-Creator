@@ -256,6 +256,7 @@ const createStandardFill = ({ color, alpha }: ColorWithOpacity): Fill => {
   return new Fill({ color: toRgbaColor({ color, alpha }) });
 };
 
+/** Creates a standard OpenLayers Stroke from a color, opacity, and width descriptor. */
 const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stroke => {
   return new Stroke({
     color: toRgbaColor({ color, alpha: opacity }),
@@ -313,6 +314,29 @@ const VerifMapStylePicker: React.FC<{
   </div>
 );
 
+/** Map toolbar button that toggles the base map style picker in the verification map. */
+const VerifMapStylePickerButton: React.FC<{
+  showStylePicker: boolean;
+  baseMapStyle: BaseMapStyle;
+  onToggle: () => void;
+  onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ showStylePicker, baseMapStyle, onToggle, onSelect }) => (
+  <div className="relative">
+    <button
+      type="button"
+      className="map-toolbar-button"
+      onClick={onToggle}
+      title="Base map style"
+      aria-label="Base map style"
+    >
+      Map
+    </button>
+    {showStylePicker && (
+      <VerifMapStylePicker baseMapStyle={baseMapStyle} onSelect={onSelect} />
+    )}
+  </div>
+);
+
 // OpenLayers map component for verification view,
 // supporting categorical and probabilistic outlooks with storm report overlays and base map style switching.
 const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayersVerificationMapProps>(({ 
@@ -365,7 +389,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   }), [mapView.center, mapView.zoom]);
 
   useEffect(() => {
-    if (!mapElementRef.current || mapRef.current) return;
+    if (!mapElementRef.current || mapRef.current) return undefined;
 
     const baseTileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = baseTileLayer;
@@ -572,20 +596,12 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
       <div className="map-toolbar-bottom-right">
         <div className="flex items-center gap-1 rounded-md bg-white dark:bg-gray-800 p-1 shadow-md border border-gray-300 dark:border-gray-600">
-          <div className="relative">
-            <button
-              type="button"
-              className="map-toolbar-button"
-              onClick={handleToggleStylePicker}
-              title="Base map style"
-              aria-label="Base map style"
-            >
-              Map
-            </button>
-            {showStylePicker && (
-              <VerifMapStylePicker baseMapStyle={baseMapStyle} onSelect={handleBaseMapStyleSelect} />
-            )}
-          </div>
+          <VerifMapStylePickerButton
+            showStylePicker={showStylePicker}
+            baseMapStyle={baseMapStyle}
+            onToggle={handleToggleStylePicker}
+            onSelect={handleBaseMapStyleSelect}
+          />
         </div>
       </div>
       <Legend activeOutlookType={activeOutlookType} />

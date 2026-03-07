@@ -7,6 +7,15 @@ interface Props {
   onWriteDiscussion: () => void;
 }
 
+/** Renders the main headline with primary-colored text highlight. */
+const HeroHeadline: React.FC = () => (
+  <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
+    Draw professional<br />
+    <span className="text-primary">severe weather outlooks.</span>
+  </h1>
+);
+
+/** Hero section for the home page with a headline, CTA buttons, and outlook level badge preview. */
 export const HomeHero: React.FC<Props> = ({ onStart, onWriteDiscussion }) => {
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 p-10 md:p-14">
@@ -21,10 +30,7 @@ export const HomeHero: React.FC<Props> = ({ onStart, onWriteDiscussion }) => {
           </div>
 
           <div className="space-y-3">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
-              Draw professional<br />
-              <span className="text-primary">severe weather outlooks.</span>
-            </h1>
+            <HeroHeadline />
             <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
               Create probabilistic severe weather outlooks for Days 1–8, write forecast discussions,
               and verify your predictions — right in your browser, no sign-in required.

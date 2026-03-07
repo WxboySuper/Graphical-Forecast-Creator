@@ -376,6 +376,34 @@ const MapStylePicker: React.FC<{
   </div>
 );
 
+/** Hides an OpenLayers Overlay by setting its position to undefined, removing it from the visible map. */
+const hideOverlay = (overlay: Overlay): void => {
+  overlay.setPosition(undefined);
+};
+
+/** Map toolbar button that toggles the base map style picker and renders the dropdown when open. */
+const MapStylePickerButton: React.FC<{
+  showStylePicker: boolean;
+  baseMapStyle: BaseMapStyle;
+  onToggle: () => void;
+  onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ showStylePicker, baseMapStyle, onToggle, onSelect }) => (
+  <div className="relative">
+    <button
+      type="button"
+      className="map-toolbar-button"
+      onClick={onToggle}
+      title="Base map style"
+      aria-label="Base map style"
+    >
+      Map
+    </button>
+    {showStylePicker && (
+      <MapStylePicker baseMapStyle={baseMapStyle} onSelect={onSelect} />
+    )}
+  </div>
+);
+
 // Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const dispatch = useDispatch();
@@ -452,7 +480,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   }), []);
 
   useEffect(() => {
-    if (!mapElementRef.current || mapRef.current) return;
+    if (!mapElementRef.current || mapRef.current) return undefined;
 
     const tileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = tileLayer;
@@ -562,7 +590,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         setPopupInfo({ outlookType, probability, isSignificant });
         overlayRef.current.setPosition(evt.coordinate);
       } else if (overlayRef.current) {
-        overlayRef.current.setPosition(undefined);
+        hideOverlay(overlayRef.current);
         setPopupInfo(null);
       }
     });
@@ -631,6 +659,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       }));
 
       select.getFeatures().clear();
+      return;
     });
     map.addInteraction(select);
     selectRef.current = select;
@@ -666,7 +695,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // Hide popup when not in pan mode
     if (interactionMode !== 'pan') {
       if (overlayRef.current) {
-        overlayRef.current.setPosition(undefined);
+        hideOverlay(overlayRef.current);
       }
       setPopupInfo(null);
     }
@@ -936,20 +965,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
             Delete
           </button>
           <span className="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
-          <div className="relative">
-            <button
-              type="button"
-              className="map-toolbar-button"
-              onClick={handleToggleStylePicker}
-              title="Base map style"
-              aria-label="Base map style"
-            >
-              Map
-            </button>
-            {showStylePicker && (
-              <MapStylePicker baseMapStyle={baseMapStyle} onSelect={handleBaseMapStyleSelect} />
-            )}
-          </div>
+          <MapStylePickerButton
+            showStylePicker={showStylePicker}
+            baseMapStyle={baseMapStyle}
+            onToggle={handleToggleStylePicker}
+            onSelect={handleBaseMapStyleSelect}
+          />
         </div>
         <div className="max-w-[260px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-md">
           {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}

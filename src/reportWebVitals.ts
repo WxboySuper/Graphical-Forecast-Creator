@@ -1,5 +1,6 @@
 import { ReportHandler } from 'web-vitals';
 
+/** Registers performance measurement callbacks for Core Web Vitals reporting. Only runs if a valid handler is provided. */
 const reportWebVitals = (onPerfEntry?: ReportHandler) => {
   if (onPerfEntry && onPerfEntry instanceof Function) {
     import('web-vitals')

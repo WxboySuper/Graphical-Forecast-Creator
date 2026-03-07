@@ -71,6 +71,7 @@ const EmergencyModeMessage: React.FC = () => (
   </div>
 );
 
+/** Reads the current map view (center + zoom) from the map adapter; returns defaults if no adapter is mounted. */
 const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
   const adapter = ref.current;
   if (!adapter) {
@@ -88,6 +89,7 @@ interface LoadedForecastPayload {
   deserializedCycle: ReturnType<typeof deserializeForecast>;
 }
 
+/** Reads and validates a forecast JSON file, returning the parsed payload or null on failure. */
 const parseLoadedForecast = async (
   file: File,
   addToast: AddToastFn
@@ -113,6 +115,7 @@ const parseLoadedForecast = async (
   };
 };
 
+/** Returns true if the given day data object contains at least one outlook map with features. */
 const dayHasAnyFeatures = (dayData: unknown): boolean => {
   if (!dayData || typeof dayData !== 'object') return false;
 
@@ -120,6 +123,7 @@ const dayHasAnyFeatures = (dayData: unknown): boolean => {
   return maps.some((outlookMap) => (outlookMap?.size ?? 0) > 0);
 };
 
+/** Dispatches the loaded forecast to Redux and updates the map view, auto-restoring center/zoom when available. */
 const applyLoadedForecast = (
   payload: LoadedForecastPayload,
   dispatch: ShortcutDispatch,
@@ -144,6 +148,7 @@ const applyLoadedForecast = (
   }
 };
 
+/** Returns a memoized callback that serializes the current forecast cycle to JSON and marks the store as saved. */
 const useForecastSaveAction = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
@@ -161,6 +166,7 @@ const useForecastSaveAction = (
   }, [forecastCycle, dispatch, addToast, mapRef]);
 };
 
+/** Returns a memoized async callback that parses and imports a forecast JSON file into Redux. */
 const useForecastLoadAction = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
@@ -179,11 +185,12 @@ const useForecastLoadAction = (
   }, [dispatch, addToast, mapRef]);
 };
 
+/** Returns a memoized file-input change handler that passes the selected file to the async load action. */
 const useShortcutFileInputChange = (handleLoad: (file: File) => Promise<void>) => {
-  return useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  return useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (file) {
-      void handleLoad(file);
+      handleLoad(file).catch(() => undefined);
     }
     e.target.value = '';
   }, [handleLoad]);
@@ -217,12 +224,15 @@ const OUTLOOK_SHORTCUTS: Record<string, { type: OutlookType; label: string }> = 
   c: { type: 'categorical', label: 'Categorical' },
 };
 
+/** Returns true if the event target is an input or textarea that should receive keyboard text. */
 const isTypingTarget = (target: EventTarget | null): boolean => {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 };
 
+/** Normalises a probability string by converting legacy `#` suffix to `%` (e.g. `"10#"` → `"10%"`). */
 const normalizeProbability = (value: string): string => value.replace('#', '%');
 
+/** Returns true if the current outlook type and probability support toggling the significant-threat flag. */
 const canToggleSignificantForState = (
   activeOutlookType: OutlookType,
   activeProbability: string
@@ -232,6 +242,7 @@ const canToggleSignificantForState = (
   return activeProbability !== '5%';
 };
 
+/** Returns true if any Ctrl / Meta / Alt / Shift modifier key is held during the event. */
 const hasAnyModifierKey = (e: KeyboardEvent): boolean => {
   return MODIFIER_KEYS.some((modifier) => e[modifier]);
 };
@@ -253,10 +264,12 @@ const COMMAND_SHORTCUT_HANDLERS: Record<CommandShortcutKey, CommandShortcutHandl
   },
 };
 
+/** Type-guard that narrows a key string to the set of recognised Ctrl/Cmd shortcut keys. */
 const isCommandShortcutKey = (key: string): key is CommandShortcutKey => {
   return key === 's' || key === 'o' || key === 'l' || key === 'e';
 };
 
+/** Handles Ctrl/Cmd shortcut keys (save, open, load, export); returns true if the key was handled. */
 const handleCommandShortcuts = (
   e: KeyboardEvent,
   key: string,
@@ -271,6 +284,7 @@ const handleCommandShortcuts = (
   return true;
 };
 
+/** Switches the active forecast day when a digit key 1–8 is pressed; returns true if handled. */
 const handleDayShortcut = (
   key: string,
   context: KeyboardShortcutContext
@@ -285,6 +299,7 @@ const handleDayShortcut = (
   return true;
 };
 
+/** Switches to a specific outlook type when its letter shortcut (t/w/h/c) is pressed; returns true if handled. */
 const handleOutlookShortcut = (
   key: string,
   context: KeyboardShortcutContext
@@ -299,6 +314,7 @@ const handleOutlookShortcut = (
   return true;
 };
 
+/** Sets the active probability to TSTM when `g` is pressed in categorical mode; returns true if handled. */
 const handleGeneralThunderstormShortcut = (
   key: string,
   context: KeyboardShortcutContext
@@ -312,6 +328,7 @@ const handleGeneralThunderstormShortcut = (
   return true;
 };
 
+/** Toggles the significant-threat flag when `s` is pressed (without Ctrl); returns true if handled. */
 const handleSignificantShortcut = (
   key: string,
   context: KeyboardShortcutContext
@@ -330,6 +347,7 @@ const handleSignificantShortcut = (
   return true;
 };
 
+/** Computes the next probability step from an arrow-key press; returns the step or null if at a boundary. */
 const getArrowProbabilityStep = (
   key: string,
   context: KeyboardShortcutContext
@@ -348,6 +366,7 @@ const getArrowProbabilityStep = (
   };
 };
 
+/** Handles arrow-key presses to step the active probability up or down; returns true if handled. */
 const handleArrowProbabilityShortcut = (
   key: string,
   context: KeyboardShortcutContext
@@ -362,6 +381,7 @@ const handleArrowProbabilityShortcut = (
   return true;
 };
 
+/** Dispatches the first matching standard shortcut handler (day, outlook type, TSTM, significant, arrow keys). */
 const handleStandardShortcuts = (
   key: string,
   context: KeyboardShortcutContext
@@ -379,6 +399,7 @@ const handleStandardShortcuts = (
   }
 };
 
+/** Central keydown router: runs command shortcuts first, then standard shortcuts, skipping typing targets. */
 const processShortcutKeyDown = (
   e: KeyboardEvent,
   context: KeyboardShortcutContext
@@ -392,6 +413,7 @@ const processShortcutKeyDown = (
   handleStandardShortcuts(key, context);
 };
 
+/** Syncs the Redux active outlook type and emergency mode whenever feature flags change. */
 const useFeatureFlagSync = (
   dispatch: ShortcutDispatch,
   featureFlags: RootState['featureFlags']
@@ -404,6 +426,7 @@ const useFeatureFlagSync = (
   }, [dispatch, featureFlags]);
 };
 
+/** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
 const useSessionRestore = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn
@@ -428,8 +451,10 @@ const useSessionRestore = (
   }, [dispatch, addToast]);
 };
 
+/** Registers a beforeunload listener to warn the user when the forecast has unsaved changes. */
 const useUnsavedChangesWarning = (isSaved: boolean) => {
   useEffect(() => {
+    /** Shows the browser's native leave-confirmation dialog when there are unsaved changes. */
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!isSaved) {
         const message = 'You have unsaved changes. Are you sure you want to leave?';
@@ -444,6 +469,7 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
   }, [isSaved]);
 };
 
+/** Composes save, load, and file-input-change callbacks into a single hook return. */
 const useForecastFileActions = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
@@ -468,6 +494,7 @@ interface KeyboardShortcutHookParams {
   currentDay: DayType;
 }
 
+/** Registers a keydown listener that processes all forecast keyboard shortcuts for the current context. */
 const useKeyboardShortcuts = ({
   dispatch,
   addToast,
@@ -493,6 +520,7 @@ const useKeyboardShortcuts = ({
       isSignificant,
     };
 
+    /** Processes each keydown event through the shortcut pipeline. */
     const handleKeyDown = (e: KeyboardEvent) => processShortcutKeyDown(e, shortcutContext);
 
     window.addEventListener('keydown', handleKeyDown);
@@ -500,6 +528,7 @@ const useKeyboardShortcuts = ({
   }, [dispatch, addToast, drawingState, isSaved, handleSave, fileInputRef, mapRef, currentDay]);
 };
 
+/** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
 export const ForecastPage: React.FC = () => {
   const dispatch = useDispatch();
   const { addToast } = useOutletContext<PageContext>();
