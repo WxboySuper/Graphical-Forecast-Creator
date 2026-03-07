@@ -24,6 +24,7 @@ interface FloatingPanelProps {
   minWidth?: number;
 }
 
+// Define position classes for the floating panel
 const positionClasses = {
   'top-left': 'top-20 left-4',
   'top-right': 'top-20 right-4',
@@ -31,6 +32,7 @@ const positionClasses = {
   'bottom-right': 'bottom-[100px] right-4',
 };
 
+// Define the FloatingPanel component
 export const FloatingPanel: React.FC<FloatingPanelProps> = ({
   title,
   children,
@@ -48,6 +50,18 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
   const toggleCollapsed = useCallback(() => {
     setIsCollapsed(prev => !prev);
   }, []);
+
+  // Handler for toggle button click - stops propagation to prevent triggering the header click which also toggles collapse
+  const handleToggleButtonClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    toggleCollapsed();
+  }, [toggleCollapsed]);
+
+  // Handler for close button click - stops propagation and calls onClose if provided
+  const handleCloseButtonClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    onClose?.();
+  }, [onClose]);
 
   if (!visible) return null;
 
@@ -84,10 +98,7 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
             variant="ghost"
             size="icon-sm"
             className="h-6 w-6"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleCollapsed();
-            }}
+            onClick={handleToggleButtonClick}
           >
             {isCollapsed ? (
               <ChevronDown className="h-4 w-4" />
@@ -101,10 +112,7 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
               variant="ghost"
               size="icon-sm"
               className="h-6 w-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose?.();
-              }}
+              onClick={handleCloseButtonClick}
             >
               <X className="h-4 w-4" />
             </Button>

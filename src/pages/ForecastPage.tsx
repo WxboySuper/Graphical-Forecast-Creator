@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
+import type { Dispatch, UnknownAction } from 'redux';
 import ForecastMap, { ForecastMapHandle } from '../components/Map/ForecastMap';
 import { IntegratedToolbar } from '../components/IntegratedToolbar/IntegratedToolbar';
 import { RootState } from '../store';
@@ -70,6 +71,7 @@ const EmergencyModeMessage: React.FC = () => (
   </div>
 );
 
+/** Reads the current map view (center + zoom) from the map adapter; returns defaults if no adapter is mounted. */
 const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
   const adapter = ref.current;
   if (!adapter) {
@@ -82,6 +84,451 @@ const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
   return adapter.getView();
 };
 
+interface LoadedForecastPayload {
+  rawData: { mapView?: { center: [number, number]; zoom: number } };
+  deserializedCycle: ReturnType<typeof deserializeForecast>;
+}
+
+/** Reads and validates a forecast JSON file, returning the parsed payload or null on failure. */
+const parseLoadedForecast = async (
+  file: File,
+  addToast: AddToastFn
+): Promise<LoadedForecastPayload | null> => {
+  const text = await file.text();
+  let data: unknown;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    addToast('File is not valid JSON.', 'error');
+    return null;
+  }
+
+  if (!validateForecastData(data)) {
+    addToast('Invalid forecast data format.', 'error');
+    return null;
+  }
+
+  return {
+    rawData: data as LoadedForecastPayload['rawData'],
+    deserializedCycle: deserializeForecast(data),
+  };
+};
+
+/** Returns true if the given day data object contains at least one outlook map with features. */
+const dayHasAnyFeatures = (dayData: unknown): boolean => {
+  if (!dayData || typeof dayData !== 'object') return false;
+
+  const maps = Object.values(dayData as Record<string, { size?: number } | undefined>);
+  return maps.some((outlookMap) => (outlookMap?.size ?? 0) > 0);
+};
+
+/** Dispatches the loaded forecast to Redux and updates the map view, auto-restoring center/zoom when available. */
+const applyLoadedForecast = (
+  payload: LoadedForecastPayload,
+  dispatch: ShortcutDispatch,
+  mapRef: React.RefObject<ForecastMapHandle | null>
+) => {
+  dispatch(importForecastCycle(payload.deserializedCycle));
+
+  if (payload.rawData.mapView) {
+    dispatch(setMapView(payload.rawData.mapView));
+    return;
+  }
+
+  const map = mapRef.current?.getMap();
+  if (!map) return;
+
+  const currentDayData = payload.deserializedCycle.days[payload.deserializedCycle.currentDay]?.data;
+  if (dayHasAnyFeatures(currentDayData)) {
+    dispatch(setMapView({
+      center: [39.8283, -98.5795],
+      zoom: 4
+    }));
+  }
+};
+
+/** Returns a memoized callback that serializes the current forecast cycle to JSON and marks the store as saved. */
+const useForecastSaveAction = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn,
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  mapRef: React.RefObject<ForecastMapHandle | null>
+) => {
+  return useCallback(() => {
+    try {
+      exportForecastToJson(forecastCycle, buildMapView(mapRef));
+      dispatch(markAsSaved());
+      addToast('Forecast exported to JSON!', 'success');
+    } catch {
+      addToast('Error exporting forecast.', 'error');
+    }
+  }, [forecastCycle, dispatch, addToast, mapRef]);
+};
+
+/** Returns a memoized async callback that parses and imports a forecast JSON file into Redux. */
+const useForecastLoadAction = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn,
+  mapRef: React.RefObject<ForecastMapHandle | null>
+) => {
+  return useCallback(async (file: File) => {
+    try {
+      const payload = await parseLoadedForecast(file, addToast);
+      if (!payload) return;
+
+      applyLoadedForecast(payload, dispatch, mapRef);
+      addToast('Forecast loaded successfully!', 'success');
+    } catch {
+      addToast('Error reading file.', 'error');
+    }
+  }, [dispatch, addToast, mapRef]);
+};
+
+/** Returns a memoized file-input change handler that passes the selected file to the async load action. */
+const useShortcutFileInputChange = (handleLoad: (file: File) => Promise<void>) => {
+  return useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleLoad(file).catch(() => undefined);
+    }
+    e.target.value = '';
+  }, [handleLoad]);
+};
+
+const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
+const INCREASE_PROBABILITY_KEYS = new Set(['arrowup', 'arrowright']);
+const MODIFIER_KEYS: Array<keyof Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>> = ['ctrlKey', 'metaKey', 'altKey', 'shiftKey'];
+type ShortcutDispatch = Dispatch<UnknownAction>;
+
+interface KeyboardShortcutContext {
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  isSaved: boolean;
+  handleSave: () => void;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
+  currentDay: DayType;
+  activeOutlookType: OutlookType;
+  activeProbability: string;
+  isSignificant: boolean;
+}
+
+type CommandShortcutKey = 's' | 'o' | 'l' | 'e';
+type CommandShortcutHandler = (context: KeyboardShortcutContext) => void;
+
+const OUTLOOK_SHORTCUTS: Record<string, { type: OutlookType; label: string }> = {
+  t: { type: 'tornado', label: 'Tornado' },
+  w: { type: 'wind', label: 'Wind' },
+  h: { type: 'hail', label: 'Hail' },
+  c: { type: 'categorical', label: 'Categorical' },
+};
+
+/** Returns true if the event target is an input or textarea that should receive keyboard text. */
+const isTypingTarget = (target: EventTarget | null): boolean => {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+};
+
+/** Normalises a probability string by converting legacy `#` suffix to `%` (e.g. `"10#"` → `"10%"`). */
+const normalizeProbability = (value: string): string => value.replace('#', '%');
+
+/** Returns true if the current outlook type and probability support toggling the significant-threat flag. */
+const canToggleSignificantForState = (
+  activeOutlookType: OutlookType,
+  activeProbability: string
+): boolean => {
+  if (activeOutlookType === 'categorical') return false;
+  if (activeOutlookType === 'tornado') return !['2%', '5%'].includes(activeProbability);
+  return activeProbability !== '5%';
+};
+
+/** Returns true if any Ctrl / Meta / Alt / Shift modifier key is held during the event. */
+const hasAnyModifierKey = (e: KeyboardEvent): boolean => {
+  return MODIFIER_KEYS.some((modifier) => e[modifier]);
+};
+
+const COMMAND_SHORTCUT_HANDLERS: Record<CommandShortcutKey, CommandShortcutHandler> = {
+  s: (context) => {
+    if (!context.isSaved) {
+      context.handleSave();
+    }
+  },
+  o: (context) => {
+    context.fileInputRef.current?.click();
+  },
+  l: (context) => {
+    context.fileInputRef.current?.click();
+  },
+  e: (context) => {
+    context.mapRef.current?.getMap();
+  },
+};
+
+/** Type-guard that narrows a key string to the set of recognised Ctrl/Cmd shortcut keys. */
+const isCommandShortcutKey = (key: string): key is CommandShortcutKey => {
+  return key === 's' || key === 'o' || key === 'l' || key === 'e';
+};
+
+/** Handles Ctrl/Cmd shortcut keys (save, open, load, export); returns true if the key was handled. */
+const handleCommandShortcuts = (
+  e: KeyboardEvent,
+  key: string,
+  context: KeyboardShortcutContext
+): boolean => {
+  if (!(e.ctrlKey || e.metaKey)) return false;
+  if (!isCommandShortcutKey(key)) return false;
+
+  const runShortcut = COMMAND_SHORTCUT_HANDLERS[key];
+  e.preventDefault();
+  runShortcut(context);
+  return true;
+};
+
+/** Switches the active forecast day when a digit key 1–8 is pressed; returns true if handled. */
+const handleDayShortcut = (
+  key: string,
+  context: KeyboardShortcutContext
+): boolean => {
+  if (!/^[1-8]$/.test(key)) return false;
+
+  const day = parseInt(key, 10) as DayType;
+  if (context.currentDay !== day) {
+    context.dispatch(setForecastDay(day));
+    context.addToast(`Switched to Day ${day}`, 'info');
+  }
+  return true;
+};
+
+/** Switches to a specific outlook type when its letter shortcut (t/w/h/c) is pressed; returns true if handled. */
+const handleOutlookShortcut = (
+  key: string,
+  context: KeyboardShortcutContext
+): boolean => {
+  const shortcut = OUTLOOK_SHORTCUTS[key];
+  if (!shortcut) return false;
+
+  if (context.activeOutlookType !== shortcut.type) {
+    context.dispatch(setActiveOutlookType(shortcut.type));
+    context.addToast(`Switched to ${shortcut.label} outlook`, 'info');
+  }
+  return true;
+};
+
+/** Sets the active probability to TSTM when `g` is pressed in categorical mode; returns true if handled. */
+const handleGeneralThunderstormShortcut = (
+  key: string,
+  context: KeyboardShortcutContext
+): boolean => {
+  if (key !== 'g') return false;
+
+  if (context.activeOutlookType === 'categorical') {
+    context.dispatch(setActiveProbability('TSTM'));
+    context.addToast('Added General Thunderstorm risk', 'info');
+  }
+  return true;
+};
+
+/** Toggles the significant-threat flag when `s` is pressed (without Ctrl); returns true if handled. */
+const handleSignificantShortcut = (
+  key: string,
+  context: KeyboardShortcutContext
+): boolean => {
+  if (key !== 's') return false;
+
+  if (!canToggleSignificantForState(context.activeOutlookType, context.activeProbability)) return true;
+
+  let threatStateLabel = 'Enabled';
+  if (context.isSignificant) {
+    threatStateLabel = 'Disabled';
+  }
+
+  context.dispatch(toggleSignificant());
+  context.addToast(`${threatStateLabel} significant threat`, 'info');
+  return true;
+};
+
+/** Computes the next probability step from an arrow-key press; returns the step or null if at a boundary. */
+const getArrowProbabilityStep = (
+  key: string,
+  context: KeyboardShortcutContext
+): { nextProbability: string; directionLabel: 'Increased' | 'Decreased' } | null => {
+  const probabilities = getProbabilityList(context.activeOutlookType);
+  const currentIndex = probabilities.indexOf(normalizeProbability(context.activeProbability));
+  if (currentIndex === -1) return null;
+
+  const isUp = INCREASE_PROBABILITY_KEYS.has(key);
+  const nextProbability = probabilities[isUp ? currentIndex + 1 : currentIndex - 1];
+  if (!nextProbability) return null;
+
+  return {
+    nextProbability,
+    directionLabel: isUp ? 'Increased' : 'Decreased'
+  };
+};
+
+/** Handles arrow-key presses to step the active probability up or down; returns true if handled. */
+const handleArrowProbabilityShortcut = (
+  key: string,
+  context: KeyboardShortcutContext
+): boolean => {
+  if (!ARROW_KEYS.has(key)) return false;
+
+  const step = getArrowProbabilityStep(key, context);
+  if (!step) return true;
+
+  context.dispatch(setActiveProbability(step.nextProbability as Probability));
+  context.addToast(`${step.directionLabel} to ${step.nextProbability}`, 'info');
+  return true;
+};
+
+/** Dispatches the first matching standard shortcut handler (day, outlook type, TSTM, significant, arrow keys). */
+const handleStandardShortcuts = (
+  key: string,
+  context: KeyboardShortcutContext
+) => {
+  const shortCircuitHandlers: Array<(shortcutKey: string, shortcutContext: KeyboardShortcutContext) => boolean> = [
+    handleDayShortcut,
+    handleOutlookShortcut,
+    handleGeneralThunderstormShortcut,
+    handleSignificantShortcut,
+  ];
+
+  const wasHandled = shortCircuitHandlers.some((handler) => handler(key, context));
+  if (!wasHandled) {
+    handleArrowProbabilityShortcut(key, context);
+  }
+};
+
+/** Central keydown router: runs command shortcuts first, then standard shortcuts, skipping typing targets. */
+const processShortcutKeyDown = (
+  e: KeyboardEvent,
+  context: KeyboardShortcutContext
+) => {
+  const key = e.key.toLowerCase();
+  if (isTypingTarget(e.target)) return;
+
+  if (handleCommandShortcuts(e, key, context)) return;
+  if (hasAnyModifierKey(e)) return;
+
+  handleStandardShortcuts(key, context);
+};
+
+/** Syncs the Redux active outlook type and emergency mode whenever feature flags change. */
+const useFeatureFlagSync = (
+  dispatch: ShortcutDispatch,
+  featureFlags: RootState['featureFlags']
+) => {
+  useEffect(() => {
+    const anyEnabled = isAnyOutlookEnabled(featureFlags);
+    dispatch(setEmergencyMode(!anyEnabled));
+    const firstEnabled = getFirstEnabledOutlookType(featureFlags);
+    dispatch(setActiveOutlookType(firstEnabled as OutlookType));
+  }, [dispatch, featureFlags]);
+};
+
+/** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
+const useSessionRestore = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn
+) => {
+  useEffect(() => {
+    try {
+      const savedData = localStorage.getItem('forecastData');
+      if (!savedData) return;
+
+      const data = JSON.parse(savedData);
+      if (!validateForecastData(data)) return;
+
+      const deserializedCycle = deserializeForecast(data);
+      dispatch(importForecastCycle(deserializedCycle));
+      if (data.mapView) {
+        dispatch(setMapView(data.mapView));
+      }
+      addToast('Session restored from auto-save.', 'success');
+    } catch {
+      // Silently skip auto-load errors to avoid disrupting initial render
+    }
+  }, [dispatch, addToast]);
+};
+
+/** Registers a beforeunload listener to warn the user when the forecast has unsaved changes. */
+const useUnsavedChangesWarning = (isSaved: boolean) => {
+  useEffect(() => {
+    /** Shows the browser's native leave-confirmation dialog when there are unsaved changes. */
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isSaved) {
+        const message = 'You have unsaved changes. Are you sure you want to leave?';
+        e.returnValue = message;
+        return message;
+      }
+      return undefined;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isSaved]);
+};
+
+/** Composes save, load, and file-input-change callbacks into a single hook return. */
+const useForecastFileActions = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn,
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  mapRef: React.RefObject<ForecastMapHandle | null>
+) => {
+  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef);
+  const handleLoad = useForecastLoadAction(dispatch, addToast, mapRef);
+  const handleShortcutFileInputChange = useShortcutFileInputChange(handleLoad);
+
+  return { handleSave, handleLoad, handleShortcutFileInputChange };
+};
+
+interface KeyboardShortcutHookParams {
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  drawingState: RootState['forecast']['drawingState'];
+  isSaved: boolean;
+  handleSave: () => void;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
+  currentDay: DayType;
+}
+
+/** Registers a keydown listener that processes all forecast keyboard shortcuts for the current context. */
+const useKeyboardShortcuts = ({
+  dispatch,
+  addToast,
+  drawingState,
+  isSaved,
+  handleSave,
+  fileInputRef,
+  mapRef,
+  currentDay,
+}: KeyboardShortcutHookParams) => {
+  useEffect(() => {
+    const { activeOutlookType, activeProbability, isSignificant } = drawingState;
+    const shortcutContext: KeyboardShortcutContext = {
+      dispatch,
+      addToast,
+      isSaved,
+      handleSave,
+      fileInputRef,
+      mapRef,
+      currentDay,
+      activeOutlookType,
+      activeProbability,
+      isSignificant,
+    };
+
+    /** Processes each keydown event through the shortcut pipeline. */
+    const handleKeyDown = (e: KeyboardEvent) => processShortcutKeyDown(e, shortcutContext);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dispatch, addToast, drawingState, isSaved, handleSave, fileInputRef, mapRef, currentDay]);
+};
+
+/** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
 export const ForecastPage: React.FC = () => {
   const dispatch = useDispatch();
   const { addToast } = useOutletContext<PageContext>();
@@ -99,209 +546,27 @@ export const ForecastPage: React.FC = () => {
   useAutoSave();
   useCycleHistoryPersistence();
 
-  // Initialize feature flags
-  useEffect(() => {
-    const anyEnabled = isAnyOutlookEnabled(featureFlags);
-    dispatch(setEmergencyMode(!anyEnabled));
-    const firstEnabled = getFirstEnabledOutlookType(featureFlags);
-    dispatch(setActiveOutlookType(firstEnabled as OutlookType));
-  }, [dispatch, featureFlags]);
+  useFeatureFlagSync(dispatch, featureFlags);
+  useSessionRestore(dispatch, addToast);
+  useUnsavedChangesWarning(isSaved);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedData = localStorage.getItem('forecastData');
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        if (validateForecastData(data)) {
-          const deserializedCycle = deserializeForecast(data);
-          dispatch(importForecastCycle(deserializedCycle));
-          if (data.mapView) {
-            dispatch(setMapView(data.mapView));
-          }
-          addToast('Session restored from auto-save.', 'success');
-        }
-      }
-    } catch {
-      // Silently skip auto-load errors to avoid disrupting initial render
-    }
-  }, [dispatch, addToast]);
+  const { handleSave, handleLoad, handleShortcutFileInputChange } = useForecastFileActions(
+    dispatch,
+    addToast,
+    forecastCycle,
+    mapRef
+  );
 
-  // Warn before closing with unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isSaved) {
-        const message = 'You have unsaved changes. Are you sure you want to leave?';
-        e.returnValue = message;
-        return message;
-      }
-      return undefined;
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isSaved]);
-
-  // Save handler
-  const handleSave = useCallback(() => {
-    try {
-      exportForecastToJson(forecastCycle, buildMapView(mapRef));
-      dispatch(markAsSaved());
-      addToast('Forecast exported to JSON!', 'success');
-    } catch {
-      addToast('Error exporting forecast.', 'error');
-    }
-  }, [forecastCycle, dispatch, addToast]);
-
-  // Load handler
-  const handleLoad = useCallback(async (file: File) => {
-    try {
-      const text = await file.text();
-      let data: unknown;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        addToast('File is not valid JSON.', 'error');
-        return;
-      }
-      
-      if (!validateForecastData(data)) {
-        addToast('Invalid forecast data format.', 'error');
-        return;
-      }
-
-      const deserializedCycle = deserializeForecast(data);
-      dispatch(importForecastCycle(deserializedCycle));
-      
-      const map = mapRef.current?.getMap();
-      const dataObj = data as { mapView?: { center: [number, number]; zoom: number } };
-      const currentDayData = deserializedCycle.days[deserializedCycle.currentDay]?.data;
-      
-      if (dataObj.mapView) {
-        dispatch(setMapView(dataObj.mapView));
-      } else if (map && currentDayData) {
-        const hasAnyFeatures = Object.values(currentDayData).some((outlookMap) => (outlookMap?.size || 0) > 0);
-        if (hasAnyFeatures) {
-          dispatch(setMapView({
-            center: [39.8283, -98.5795],
-            zoom: 4
-          }));
-        }
-      }
-      
-      addToast('Forecast loaded successfully!', 'success');
-    } catch {
-      addToast('Error reading file.', 'error');
-    }
-  }, [dispatch, addToast]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const { activeOutlookType, activeProbability, isSignificant } = drawingState;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if typing in input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      // Ctrl/Cmd shortcuts
-      if (e.ctrlKey || e.metaKey) {
-        switch (e.key.toLowerCase()) {
-          case 's':
-            e.preventDefault();
-            if (!isSaved) handleSave();
-            return;
-          case 'o':
-          case 'l':
-            e.preventDefault();
-            fileInputRef.current?.click();
-            return;
-          case 'e':
-            e.preventDefault();
-            mapRef.current?.getMap(); // Trigger export via useExportMap
-            return;
-        }
-      }
-
-      // Skip if any modifier keys for other shortcuts
-      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-
-      const key = e.key.toLowerCase();
-
-      // Day number shortcuts (1-8)
-      if (/^[1-8]$/.test(key)) {
-        const day = parseInt(key, 10) as DayType;
-        if (forecastCycle.currentDay !== day) {
-          dispatch(setForecastDay(day));
-          addToast(`Switched to Day ${day}`, 'info');
-        }
-        return;
-      }
-
-      // Type switching
-      switch (key) {
-        case 't':
-          if (activeOutlookType !== 'tornado') {
-            dispatch(setActiveOutlookType('tornado'));
-            addToast('Switched to Tornado outlook', 'info');
-          }
-          break;
-        case 'w':
-          if (activeOutlookType !== 'wind') {
-            dispatch(setActiveOutlookType('wind'));
-            addToast('Switched to Wind outlook', 'info');
-          }
-          break;
-        case 'h':
-          if (activeOutlookType !== 'hail') {
-            dispatch(setActiveOutlookType('hail'));
-            addToast('Switched to Hail outlook', 'info');
-          }
-          break;
-        case 'c':
-          if (activeOutlookType !== 'categorical') {
-            dispatch(setActiveOutlookType('categorical'));
-            addToast('Switched to Categorical outlook', 'info');
-          }
-          break;
-        case 'g':
-          if (activeOutlookType === 'categorical') {
-            dispatch(setActiveProbability('TSTM'));
-            addToast('Added General Thunderstorm risk', 'info');
-          }
-          break;
-        case 's':
-          const canToggle = activeOutlookType !== 'categorical' &&
-            (activeOutlookType === 'tornado' 
-              ? !['2%', '5%'].includes(activeProbability)
-              : !['5%'].includes(activeProbability));
-          if (canToggle) {
-            dispatch(toggleSignificant());
-            addToast(`${isSignificant ? 'Disabled' : 'Enabled'} significant threat`, 'info');
-          }
-          break;
-      }
-
-      // Arrow keys for probability navigation
-      if (['arrowup', 'arrowright', 'arrowdown', 'arrowleft'].includes(key)) {
-        const probabilities = getProbabilityList(activeOutlookType);
-        const currentIndex = probabilities.indexOf(activeProbability.replace('#', '%'));
-        const isUp = key === 'arrowup' || key === 'arrowright';
-
-        if (isUp && currentIndex < probabilities.length - 1) {
-          const nextProb = probabilities[currentIndex + 1];
-          dispatch(setActiveProbability(nextProb as Probability));
-          addToast(`Increased to ${nextProb}`, 'info');
-        } else if (!isUp && currentIndex > 0) {
-          const prevProb = probabilities[currentIndex - 1];
-          dispatch(setActiveProbability(prevProb as Probability));
-          addToast(`Decreased to ${prevProb}`, 'info');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, isSaved, drawingState, handleSave, addToast, forecastCycle.currentDay]);
+  useKeyboardShortcuts({
+    dispatch,
+    addToast,
+    drawingState,
+    isSaved,
+    handleSave,
+    fileInputRef,
+    mapRef,
+    currentDay: forecastCycle.currentDay,
+  });
 
   if (emergencyMode) {
     return <EmergencyModeMessage />;
@@ -319,11 +584,7 @@ export const ForecastPage: React.FC = () => {
         ref={fileInputRef}
         type="file"
         accept=".json"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleLoad(file);
-          e.target.value = '';
-        }}
+        onChange={handleShortcutFileInputChange}
         className="hidden"
       />
 

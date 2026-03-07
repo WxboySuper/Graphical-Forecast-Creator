@@ -32,6 +32,15 @@ const DISCUSSION_AUTOSAVE_DELAY_MS = 1500;
 
 type GuidedContentState = NonNullable<DiscussionData['guidedContent']>;
 
+interface DiscussionFormDefaults {
+  mode: DiscussionMode;
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+  diyContent: string;
+  guidedContent: GuidedContentState;
+}
+
 interface DiscussionEditorState {
   mode: DiscussionMode;
   validStart: string;
@@ -74,6 +83,16 @@ const getInitialValidEnd = (existingDiscussion?: DiscussionData): string => {
   end.setHours(end.getHours() + 24);
   return end.toISOString().slice(0, 16);
 };
+
+/** Returns default form field values for the Discussion editor, seeded from an existing discussion or blank defaults. */
+const getDiscussionFormDefaults = (existingDiscussion?: DiscussionData): DiscussionFormDefaults => ({
+  mode: existingDiscussion?.mode ?? 'diy',
+  validStart: existingDiscussion?.validStart ?? new Date().toISOString().slice(0, 16),
+  validEnd: getInitialValidEnd(existingDiscussion),
+  forecasterName: existingDiscussion?.forecasterName ?? '',
+  diyContent: existingDiscussion?.diyContent ?? '',
+  guidedContent: existingDiscussion?.guidedContent ?? createDefaultGuidedContent()
+});
 
 // Formats an ISO datetime string into a more human-readable format for display in the metadata section of the discussion editor.
 const formatDateTime = (isoString: string): string => {
@@ -138,8 +157,24 @@ const MetadataSection: React.FC<{
   onValidStartChange,
   onValidEndChange,
   onForecasterNameChange
-}) => (
-  <div className="flex-shrink-0 p-4 bg-muted/30 border-b border-border">
+}) => {
+  // Checks if there is any data available for the given day type by looking at the Redux store's forecast cycle data. This is used to determine whether to show a data indicator on the day tabs in the header.
+  const handleValidStartInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onValidStartChange(e.target.value);
+  };
+
+  // Handler for when the valid end datetime input changes, which calls the onValidEndChange prop to update the state in the parent component.
+  const handleValidEndInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onValidEndChange(e.target.value);
+  };
+
+  // Handler for when the forecaster name input changes, which calls the onForecasterNameChange prop to update the state in the parent component.
+  const handleForecasterNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onForecasterNameChange(e.target.value);
+  };
+
+  return (
+    <div className="flex-shrink-0 p-4 bg-muted/30 border-b border-border">
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="space-y-1">
         <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
@@ -149,7 +184,7 @@ const MetadataSection: React.FC<{
         <Input
           type="datetime-local"
           value={validStart}
-          onChange={(e) => onValidStartChange(e.target.value)}
+          onChange={handleValidStartInputChange}
           className="h-9"
         />
         <span className="text-xs text-muted-foreground">{formatDateTime(validStart)}</span>
@@ -163,7 +198,7 @@ const MetadataSection: React.FC<{
         <Input
           type="datetime-local"
           value={validEnd}
-          onChange={(e) => onValidEndChange(e.target.value)}
+          onChange={handleValidEndInputChange}
           className="h-9"
         />
         <span className="text-xs text-muted-foreground">{formatDateTime(validEnd)}</span>
@@ -177,7 +212,7 @@ const MetadataSection: React.FC<{
         <Input
           type="text"
           value={forecasterName}
-          onChange={(e) => onForecasterNameChange(e.target.value)}
+          onChange={handleForecasterNameInputChange}
           placeholder="Your name or username"
           maxLength={100}
           className="h-9"
@@ -189,8 +224,9 @@ const MetadataSection: React.FC<{
       <AlertTriangle className="h-4 w-4 flex-shrink-0" />
       <span><strong>UNOFFICIAL OUTLOOK</strong> - For educational purposes only.</span>
     </div>
-  </div>
-);
+    </div>
+  );
+};
 
 // The DiscussionTabsSection component renders the tabbed interface for switching between the DIY editor and the Guided editor,
 const DiscussionTabsSection: React.FC<{
@@ -275,113 +311,44 @@ const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledTex
 );
 
 // The useDiscussionEditorState hook encapsulates all the state management logic for the discussion editor,
-const useDiscussionEditorState = (
-  existingDiscussion: DiscussionData | undefined,
-  currentDay: DayType,
-  dispatch: ReturnType<typeof useDispatch>,
-  addToast: AddToastFn
-): DiscussionEditorState => {
-  const [mode, setMode] = useState<DiscussionMode>(existingDiscussion?.mode || 'diy');
-  const [validStart, setValidStartValue] = useState(existingDiscussion?.validStart || new Date().toISOString().slice(0, 16));
-  const [validEnd, setValidEndValue] = useState(getInitialValidEnd(existingDiscussion));
-  const [forecasterName, setForecasterNameValue] = useState(existingDiscussion?.forecasterName || '');
-  const [diyContent, setDiyContent] = useState(existingDiscussion?.diyContent || '');
-  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(existingDiscussion?.guidedContent || createDefaultGuidedContent());
+// Lightweight helper: build DiscussionData from form fields
+const buildDiscussionDataFrom = (fields: {
+  mode: DiscussionMode;
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+  diyContent: string;
+  guidedContent: GuidedContentState;
+}): DiscussionData => ({
+  mode: fields.mode,
+  validStart: fields.validStart,
+  validEnd: fields.validEnd,
+  forecasterName: fields.forecasterName,
+  diyContent: fields.mode === 'diy' ? fields.diyContent : undefined,
+  guidedContent: fields.mode === 'guided' ? fields.guidedContent : undefined,
+  lastModified: new Date().toISOString()
+});
+
+// Manages the editable form state and unsaved flag; keeps setters small and focused.
+const useDiscussionFormState = (existingDiscussion?: DiscussionData) => {
+  const defaults = getDiscussionFormDefaults(existingDiscussion);
+
+  const [mode, setMode] = useState<DiscussionMode>(defaults.mode);
+  const [validStart, setValidStart] = useState(defaults.validStart);
+  const [validEnd, setValidEnd] = useState(defaults.validEnd);
+  const [forecasterName, setForecasterName] = useState(defaults.forecasterName);
+  const [diyContent, setDiyContent] = useState(defaults.diyContent);
+  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(defaults.guidedContent);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Marks the discussion as having unsaved changes, which triggers the auto-save effect after a debounce.
-  const markUnsaved = useCallback(() => {
-    setHasUnsavedChanges(true);
-  }, []);
+  const markUnsaved = useCallback(() => setHasUnsavedChanges(true), []);
 
-  // The following handlers update the respective pieces of state and mark the discussion as having unsaved changes whenever the user modifies any field.
-  const setValidStart = useCallback((value: string) => {
-    setValidStartValue(value);
-    markUnsaved();
-  }, [markUnsaved]);
-
-  // Updates the valid end time in state and marks the discussion as having unsaved changes.
-  const setValidEnd = useCallback((value: string) => {
-    setValidEndValue(value);
-    markUnsaved();
-  }, [markUnsaved]);
-
-  // Updates the forecaster name in state and marks the discussion as having unsaved changes.
-  const setForecasterName = useCallback((value: string) => {
-    setForecasterNameValue(value);
-    markUnsaved();
-  }, [markUnsaved]);
-
-  // Updates the discussion mode (DIY vs Guided) and marks the discussion as having unsaved changes.
-  const handleModeChange = useCallback((value: string) => {
-    setMode(value as DiscussionMode);
-    markUnsaved();
-  }, [markUnsaved]);
-
-  // Updates the DIY content in state and marks the discussion as having unsaved changes.
-  const handleContentChange = useCallback((newContent: string) => {
-    setDiyContent(newContent);
-    markUnsaved();
-  }, [markUnsaved]);
-
-  // Updates the guided content in state and marks the discussion as having unsaved changes.
-  const handleGuidedChange = useCallback((newContent: GuidedContentState) => {
-    setGuidedContent(newContent);
-    markUnsaved();
-  }, [markUnsaved]);
-
-  // Builds the complete discussion data object based on the current state of the editor, which is used for saving and exporting.
-  const buildDiscussionData = useCallback((): DiscussionData => ({
-    mode,
-    validStart,
-    validEnd,
-    forecasterName,
-    diyContent: mode === 'diy' ? diyContent : undefined,
-    guidedContent: mode === 'guided' ? guidedContent : undefined,
-    lastModified: new Date().toISOString()
-  }), [mode, validStart, validEnd, forecasterName, diyContent, guidedContent]);
-
-  // Compiles the discussion data into a text format suitable for preview and export, using a utility function that formats the content based on the selected mode and metadata.
-  const compiledText = useMemo(() => {
-    return compileDiscussionToText(buildDiscussionData(), currentDay);
-  }, [buildDiscussionData, currentDay]);
-
-  // Calculates the current word count of the discussion content for display in the status bar, counting words from either the DIY content or the combined guided content based on the selected mode.
-  const wordCount = useMemo(() => {
-    const text = mode === 'diy' ? diyContent : Object.values(guidedContent).join(' ');
-    return text.trim().split(/\s+/).filter(Boolean).length;
-  }, [mode, diyContent, guidedContent]);
-
-  // Handles the save action by dispatching the updated discussion data to the Redux store, resetting the unsaved changes flag, and showing a success toast notification.
-  const handleSave = useCallback(() => {
-    dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
-    setHasUnsavedChanges(false);
-    addToast('Discussion saved!', 'success');
-  }, [dispatch, currentDay, buildDiscussionData, addToast]);
-
-  // Handles the export action by compiling the discussion data into text, triggering a file download, and showing a success toast notification.
-  const handleExport = useCallback(() => {
-    exportDiscussionToFile(buildDiscussionData(), currentDay);
-    addToast('Discussion exported!', 'success');
-  }, [buildDiscussionData, currentDay, addToast]);
-
-  useEffect(() => {
-    // Auto-saves the discussion data to the Redux store after a short debounce whenever there are unsaved changes.
-    // This ensures that the global auto-save mechanism (which saves to localStorage) captures the latest discussion state even if the user doesn't click the Save button.
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (hasUnsavedChanges) {
-      timer = setTimeout(() => {
-        dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
-        setHasUnsavedChanges(false);
-      }, DISCUSSION_AUTOSAVE_DELAY_MS);
-    }
-
-    return () => {
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
-    };
-  }, [hasUnsavedChanges, dispatch, currentDay, buildDiscussionData]);
+  const handleModeChange = useCallback((value: string) => { setMode(value as DiscussionMode); markUnsaved(); }, [markUnsaved]);
+  const handleValidStart = useCallback((v: string) => { setValidStart(v); markUnsaved(); }, [markUnsaved]);
+  const handleValidEnd = useCallback((v: string) => { setValidEnd(v); markUnsaved(); }, [markUnsaved]);
+  const handleForecasterName = useCallback((v: string) => { setForecasterName(v); markUnsaved(); }, [markUnsaved]);
+  const handleDiy = useCallback((c: string) => { setDiyContent(c); markUnsaved(); }, [markUnsaved]);
+  const handleGuided = useCallback((c: GuidedContentState) => { setGuidedContent(c); markUnsaved(); }, [markUnsaved]);
 
   return {
     mode,
@@ -391,14 +358,143 @@ const useDiscussionEditorState = (
     diyContent,
     guidedContent,
     hasUnsavedChanges,
+    setHasUnsavedChanges,
+    handleModeChange,
+    handleValidStart,
+    handleValidEnd,
+    handleForecasterName,
+    handleDiy,
+    handleGuided
+  } as const;
+};
+
+// Auto-save hook keeps the effect isolated and simple. Accepts a single options object
+const useDiscussionAutoSave = (opts: {
+  hasUnsavedChanges: boolean;
+  buildDiscussionData: () => DiscussionData;
+  currentDay: DayType;
+  dispatch: ReturnType<typeof useDispatch>;
+  clearUnsaved: (v: boolean) => void;
+}) => {
+  const { hasUnsavedChanges, buildDiscussionData, currentDay, dispatch, clearUnsaved } = opts;
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (hasUnsavedChanges) {
+      timer = setTimeout(() => {
+        dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+        clearUnsaved(false);
+      }, DISCUSSION_AUTOSAVE_DELAY_MS);
+    }
+
+    return () => { if (timer !== null) clearTimeout(timer); };
+  }, [hasUnsavedChanges, buildDiscussionData, currentDay, dispatch, clearUnsaved]);
+};
+
+// Computes derived values (compiled text and word count) in a focused hook.
+const useDiscussionComputed = (
+  opts: {
+    buildDiscussionData: () => DiscussionData;
+    currentDay: DayType;
+    mode: DiscussionMode;
+    diyContent: string;
+    guidedContent: GuidedContentState;
+  }
+) => {
+  const { buildDiscussionData, currentDay, mode, diyContent, guidedContent } = opts;
+
+  const compiledText = useMemo(() => compileDiscussionToText(buildDiscussionData(), currentDay), [buildDiscussionData, currentDay]);
+
+  const wordCount = useMemo(() => {
+    const text = mode === 'diy' ? diyContent : Object.values(guidedContent).join(' ');
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  }, [mode, diyContent, guidedContent]);
+
+  return { compiledText, wordCount } as const;
+};
+
+/** Provides save and export action callbacks for the discussion editor, dispatching to Redux and notifying via toast. */
+const useDiscussionActions = (opts: {
+  dispatch: ReturnType<typeof useDispatch>;
+  currentDay: DayType;
+  buildDiscussionData: () => DiscussionData;
+  clearUnsaved: (v: boolean) => void;
+  addToast: AddToastFn;
+}) => {
+  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast } = opts;
+
+  const handleSave = useCallback(() => {
+    dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+    clearUnsaved(false);
+    addToast('Discussion saved!', 'success');
+  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast]);
+
+  const handleExport = useCallback(() => {
+    exportDiscussionToFile(buildDiscussionData(), currentDay);
+    addToast('Discussion exported!', 'success');
+  }, [buildDiscussionData, currentDay, addToast]);
+
+  return { handleSave, handleExport } as const;
+};
+
+/** Composes all discussion editor state — form fields, computed text, auto-save, and actions — into a single hook return value. */
+const useDiscussionEditorState = (
+  existingDiscussion: DiscussionData | undefined,
+  currentDay: DayType,
+  dispatch: ReturnType<typeof useDispatch>,
+  addToast: AddToastFn
+): DiscussionEditorState => {
+  const form = useDiscussionFormState(existingDiscussion);
+
+  const buildDiscussionData = useCallback(() => buildDiscussionDataFrom({
+    mode: form.mode,
+    validStart: form.validStart,
+    validEnd: form.validEnd,
+    forecasterName: form.forecasterName,
+    diyContent: form.diyContent,
+    guidedContent: form.guidedContent
+  }), [form.mode, form.validStart, form.validEnd, form.forecasterName, form.diyContent, form.guidedContent]);
+
+  useDiscussionAutoSave({
+    hasUnsavedChanges: form.hasUnsavedChanges,
+    buildDiscussionData,
+    currentDay,
+    dispatch,
+    clearUnsaved: form.setHasUnsavedChanges
+  });
+
+  const { compiledText, wordCount } = useDiscussionComputed({
+    buildDiscussionData,
+    currentDay,
+    mode: form.mode,
+    diyContent: form.diyContent,
+    guidedContent: form.guidedContent
+  });
+
+  const { handleSave, handleExport } = useDiscussionActions({
+    dispatch,
+    currentDay,
+    buildDiscussionData,
+    clearUnsaved: form.setHasUnsavedChanges,
+    addToast
+  });
+
+  return {
+    mode: form.mode,
+    validStart: form.validStart,
+    validEnd: form.validEnd,
+    forecasterName: form.forecasterName,
+    diyContent: form.diyContent,
+    guidedContent: form.guidedContent,
+    hasUnsavedChanges: form.hasUnsavedChanges,
     compiledText,
     wordCount,
-    setValidStart,
-    setValidEnd,
-    setForecasterName,
-    handleModeChange,
-    handleContentChange,
-    handleGuidedChange,
+    setValidStart: form.handleValidStart,
+    setValidEnd: form.handleValidEnd,
+    setForecasterName: form.handleForecasterName,
+    handleModeChange: form.handleModeChange,
+    handleContentChange: form.handleDiy,
+    handleGuidedChange: form.handleGuided,
     handleSave,
     handleExport
   };
