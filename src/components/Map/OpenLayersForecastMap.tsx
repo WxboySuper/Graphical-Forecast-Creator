@@ -376,9 +376,12 @@ const MapStylePicker: React.FC<{
   </div>
 );
 
-/** Hides an OpenLayers Overlay by setting its position to undefined, removing it from the visible map. */
+/** Sentinel value used to clear an Overlay's position, causing it to be hidden from the map. */
+const OVERLAY_HIDDEN_POSITION: Parameters<Overlay['setPosition']>[0] = undefined;
+
+/** Hides an OpenLayers Overlay by clearing its map position. */
 const hideOverlay = (overlay: Overlay): void => {
-  overlay.setPosition(undefined);
+  overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 
 /** Map toolbar button that toggles the base map style picker and renders the dropdown when open. */
