@@ -52,6 +52,29 @@ const CyclePanelHeader: React.FC<{ formattedDate: string; isSaved: boolean }> = 
     </div>
   </div>
 );
+/** Renders a day-button grid item for the forecast day selector. */
+const DayButton: React.FC<{
+  day: number;
+  hasData: boolean;
+  isCurrent: boolean;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ day, hasData, isCurrent, onClick }) => (
+  <button
+    key={day}
+    data-day={day}
+    onClick={onClick}
+    className={cn(
+      'relative p-4 rounded-lg border-2 transition-all',
+      'hover:shadow-md hover:scale-105',
+      hasData ? 'bg-primary/10 border-primary' : 'bg-muted/30 border-border',
+      isCurrent && 'ring-2 ring-primary ring-offset-2'
+    )}
+  >
+    <div className="text-center">
+      <p className="text-2xl font-bold text-foreground">{day}</p>
+    </div>
+  </button>
+);
 
 /** Days-with-outlooks label and 1–8 day selector grid. */
 const CycleDayGrid: React.FC<{
@@ -139,30 +162,6 @@ const NavigateSection: React.FC<{
       </Button>
     </div>
   </div>
-);
-
-/** Renders a day-button grid item for the forecast day selector. */
-const DayButton: React.FC<{
-  day: number;
-  hasData: boolean;
-  isCurrent: boolean;
-  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}> = ({ day, hasData, isCurrent, onClick }) => (
-  <button
-    key={day}
-    data-day={day}
-    onClick={onClick}
-    className={cn(
-      'relative p-4 rounded-lg border-2 transition-all',
-      'hover:shadow-md hover:scale-105',
-      hasData ? 'bg-primary/10 border-primary' : 'bg-muted/30 border-border',
-      isCurrent && 'ring-2 ring-primary ring-offset-2'
-    )}
-  >
-    <div className="text-center">
-      <p className="text-2xl font-bold text-foreground">{day}</p>
-    </div>
-  </button>
 );
 
 /** Main dashboard grid combining the current forecast cycle panel, quick actions, and navigation. */
