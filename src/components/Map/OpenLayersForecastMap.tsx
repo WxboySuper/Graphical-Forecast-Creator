@@ -9,7 +9,7 @@ import VectorSource from 'ol/source/Vector';
 import OSM from 'ol/source/OSM';
 import XYZ from 'ol/source/XYZ';
 import GeoJSON from 'ol/format/GeoJSON';
-import { Draw, Modify, Select } from 'ol/interaction';
+import { Draw, Modify, Select, Snap } from 'ol/interaction';
 import { Fill, Stroke, Style } from 'ol/style';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import Overlay from 'ol/Overlay';
@@ -45,7 +45,7 @@ interface BlankLayerConfig {
   url: string;
   getCache: () => object | null;
   setCache: (data: object) => void;
-  style: Style;
+  style?: Style;
 }
 
 interface OutlookSelection {
@@ -82,6 +82,9 @@ interface StrokeWidthInput {
 interface HatchPatternInput {
   cigLevel: string;
 }
+
+const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
+const TOP_LABEL_LAYER_Z_INDEX = 1100;
 
 const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
   'categorical',
@@ -258,7 +261,9 @@ const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
     featureProjection: 'EPSG:3857',
   });
 
-  applyBlankLayerStyle(features as FeatureLike[], config.style);
+  if (config.style) {
+    applyBlankLayerStyle(features as FeatureLike[], config.style);
+  }
   config.source.addFeatures(features as unknown as OLFeature<Geometry>[]);
 };
 
@@ -314,25 +319,73 @@ const BLANK_LAKE_STYLE = new Style({
   stroke: new Stroke({ color: '#5585b5', width: 0.5 }),
 });
 
-// Cream style with crisp black borders for US states
-const BLANK_LAND_STYLE = new Style({
+// Cream fill for US land.
+const BLANK_LAND_FILL_STYLE = new Style({
   fill: new Fill({ color: '#f2ede2' }),
+});
+
+// Outline-only style for US state borders rendered above outlook polygons.
+const BLANK_LAND_OUTLINE_STYLE = new Style({
+  fill: new Fill({ color: 'rgba(0, 0, 0, 0)' }),
   stroke: new Stroke({ color: '#333333', width: 1 }),
 });
+
+// Creates a labels/places overlay source so cities and boundaries stay readable above polygons.
+const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
+  switch (style) {
+    case 'osm':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    case 'carto-light':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    case 'carto-dark':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    case 'esri-satellite':
+      return new XYZ({
+        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        attributions: 'Tiles &copy; Esri',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    default:
+      return null;
+  }
+};
 
 // Helper to create tile source based on selected base map style
 const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   switch (style) {
+    case 'osm':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
     case 'carto-light':
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        url: 'https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
         crossOrigin: 'anonymous',
       });
     case 'carto-dark':
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        url: 'https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
         crossOrigin: 'anonymous',
@@ -344,7 +397,6 @@ const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
         maxZoom: 19,
         crossOrigin: 'anonymous',
       });
-    case 'osm':
     default:
       return new OSM({ crossOrigin: 'anonymous' });
   }
@@ -440,12 +492,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const lakesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const landSourceRef = useRef<VectorSource>(new VectorSource());
   const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
   const catSourceRef = useRef<VectorSource>(new VectorSource());
   const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
   const catModifyRef = useRef<Modify | null>(null);
+  const snapRef = useRef<Snap | null>(null);
+  const catSnapRef = useRef<Snap | null>(null);
   const selectRef = useRef<Select | null>(null);
   const isApplyingExternalViewRef = useRef(false);
 
@@ -502,14 +558,22 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       zIndex: 1.5,
     });
     lakesLayerRef.current = lakesLayer;
-    // Land layer (US states) sits above world and lakes, but below outlook features.
-    // It provides clear borders and a neutral fill for the US when using the blank basemap style.
+    // Land fill sits above world and lakes, below outlook polygons.
     const landLayer = new VectorLayer({
       source: landSourceRef.current,
       visible: false,
       zIndex: 2,
+      style: BLANK_LAND_FILL_STYLE,
     });
     landLayerRef.current = landLayer;
+    // Land outlines sit above outlook polygons so borders remain visible.
+    const landOutlineLayer = new VectorLayer({
+      source: landSourceRef.current,
+      visible: false,
+      zIndex: TOP_OUTLINE_LAYER_Z_INDEX,
+      style: BLANK_LAND_OUTLINE_STYLE,
+    });
+    landOutlineLayerRef.current = landOutlineLayer;
     // Categorical layer: dedicated source with per-feature full-opacity fills.
     // Layer-level opacity (0.5) makes the basemap visible while higher-risk
     // polygons completely cover lower-risk ones (no color blending).
@@ -524,6 +588,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       source: vectorSourceRef.current,
       zIndex: 4,
     });
+    // Place labels/cities above outlook polygons.
+    const labelLayer = new TileLayer({
+      source: createLabelOverlaySource('osm') ?? undefined,
+      visible: true,
+      zIndex: TOP_LABEL_LAYER_Z_INDEX,
+    });
+    labelLayerRef.current = labelLayer;
 
     // Initialize the map with all layers, but only the tile layer visible by default.
     // The blank basemap layers will be toggled on if the user selects the blank style.
@@ -531,7 +602,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // without needing to re-add/remove layers or features, which can be expensive.
     const map = new OLMap({
       target: mapElementRef.current,
-      layers: [tileLayer, worldLayer, lakesLayer, landLayer, catLayer, vectorLayer],
+      layers: [tileLayer, worldLayer, lakesLayer, landLayer, catLayer, vectorLayer, landOutlineLayer, labelLayer],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
         zoom: initialMapViewRef.current.zoom
@@ -630,7 +701,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     map.addInteraction(catModify);
     catModifyRef.current = catModify;
 
-    const select = new Select({ condition: click });
+    const snap = new Snap({ source: vectorSourceRef.current });
+    map.addInteraction(snap);
+    snapRef.current = snap;
+
+    const catSnap = new Snap({ source: catSourceRef.current });
+    map.addInteraction(catSnap);
+    catSnapRef.current = catSnap;
+
+    // Limit delete picking to editable outlook layers so top overlays (state outlines/labels)
+    // do not intercept clicks and prevent polygon deletion.
+    const select = new Select({ condition: click, layers: [vectorLayer, catLayer] });
     select.setActive(false);
     select.on('select', (event) => {
       const selected = event.selected[0];
@@ -677,6 +758,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       if (catModifyRef.current) {
         map.removeInteraction(catModifyRef.current);
       }
+      if (snapRef.current) {
+        map.removeInteraction(snapRef.current);
+      }
+      if (catSnapRef.current) {
+        map.removeInteraction(catSnapRef.current);
+      }
       if (selectRef.current) {
         map.removeInteraction(selectRef.current);
       }
@@ -701,6 +788,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         hideOverlay(overlayRef.current);
       }
       setPopupInfo(null);
+    }
+  }, [interactionMode]);
+
+  useEffect(() => {
+    // Keep snapping enabled outside delete mode for draw/modify workflows.
+    const enableSnap = interactionMode !== 'delete';
+    if (snapRef.current) {
+      snapRef.current.setActive(enableSnap);
+    }
+    if (catSnapRef.current) {
+      catSnapRef.current.setActive(enableSnap);
     }
   }, [interactionMode]);
 
@@ -734,14 +832,40 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     const world = worldLayerRef.current;
     const lakes = lakesLayerRef.current;
     const land = landLayerRef.current;
+    const landOutline = landOutlineLayerRef.current;
+    const labels = labelLayerRef.current;
     const el = mapElementRef.current;
-    if (!tile || !world || !lakes || !land || !el) return;
+    if (!tile || !world || !lakes || !land || !landOutline || !labels || !el) return;
+
+    /**
+     * Ensure US states GeoJSON for the blank/base map is loaded into
+     * the `landSourceRef` so state outlines can be rendered above
+     * outlook polygons. Fetches data once and caches it in
+     * `cachedUsStatesGeoJSON`.
+     */
+    const loadUsStatesBoundaries = () => {
+      const landLoader: BlankLayerConfig = {
+        source: landSourceRef.current,
+        isLoaded: () => landSourceRef.current.getFeatures().length > 0,
+        url: 'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json',
+        getCache: () => cachedUsStatesGeoJSON,
+        setCache: (data) => {
+          cachedUsStatesGeoJSON = data;
+        },
+      };
+      ensureBlankLayerLoaded(landLoader).catch(() => { /* US states outline fetch failed — non-fatal */ });
+    };
+
+    // Keep state outlines available above outlook polygons in every map style.
+    loadUsStatesBoundaries();
 
     if (baseMapStyle === 'blank') {
       tile.setVisible(false);
       world.setVisible(true);
       lakes.setVisible(true);
       land.setVisible(true);
+      landOutline.setVisible(true);
+      labels.setVisible(false);
       // Deeper ocean blue
       el.style.backgroundColor = '#7BA0C8';
 
@@ -774,7 +898,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           setCache: (data) => {
             cachedUsStatesGeoJSON = data;
           },
-          style: BLANK_LAND_STYLE,
         },
       ];
 
@@ -786,8 +909,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       world.setVisible(false);
       lakes.setVisible(false);
       land.setVisible(false);
+      landOutline.setVisible(true);
       el.style.backgroundColor = '';
       tile.setSource(createTileSource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>));
+      const labelSource = createLabelOverlaySource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>);
+      if (labelSource) {
+        labels.setSource(labelSource);
+        labels.setVisible(true);
+      } else {
+        labels.setVisible(false);
+      }
     }
   }, [baseMapStyle]);
 
@@ -838,6 +969,18 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     });
     map.addInteraction(draw);
     drawRef.current = draw;
+
+    // OpenLayers evaluates interactions in reverse insertion order.
+    // Re-adding snap interactions here ensures snap runs before draw,
+    // so the cursor actually snaps instead of only showing a snap hint.
+    if (snapRef.current) {
+      map.removeInteraction(snapRef.current);
+      map.addInteraction(snapRef.current);
+    }
+    if (catSnapRef.current) {
+      map.removeInteraction(catSnapRef.current);
+      map.addInteraction(catSnapRef.current);
+    }
   }, [dispatch, drawingState.activeOutlookType, drawingState.activeProbability, drawingState.isSignificant, interactionMode]);
 
   useEffect(() => {

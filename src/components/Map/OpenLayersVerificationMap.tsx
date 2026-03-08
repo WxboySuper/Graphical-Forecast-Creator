@@ -50,6 +50,9 @@ interface StrokeDescriptor {
   width: number;
 }
 
+const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
+const TOP_LABEL_LAYER_Z_INDEX = 1100;
+
 // Define specific colors for each report type
 const reportColors = {
   tornado: '#FF0000', // Red for tornado
@@ -79,25 +82,80 @@ const buildReportStyle = (type: ReportType) => {
 // Cached US states GeoJSON for blank map style (fetched once per session)
 let cachedUsStatesGeoJSONVerif: object | null = null;
 
-// Simple style for blank land layer in verification map (cream fill, light borders)
-const BLANK_LAND_STYLE_VERIF = new Style({
+// Blank land fill for verification map.
+const BLANK_LAND_FILL_STYLE_VERIF = new Style({
   fill: new Fill({ color: '#f2ede2' }),
+});
+
+// Blank land outlines rendered above outlook polygons.
+const BLANK_LAND_OUTLINE_STYLE_VERIF = new Style({
+  fill: new Fill({ color: 'rgba(0, 0, 0, 0)' }),
   stroke: new Stroke({ color: '#9e9585', width: 1 }),
 });
+
+/**
+ * Create a tile `XYZ` source that provides label-only tiles for the
+ * verification map. Returns `null` for styles that don't support
+ * a separate label overlay (e.g. 'blank').
+ *
+ * @param style - The selected base map style (excluding 'blank')
+ * @returns An `XYZ` tile source for label-only tiles or `null`.
+ */
+const createVerificationLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
+  switch (style) {
+    case 'osm':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    case 'carto-light':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    case 'carto-dark':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    case 'esri-satellite':
+      return new XYZ({
+        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        attributions: 'Tiles &copy; Esri',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
+    default:
+      return null;
+  }
+};
 
 // Function to create tile source based on selected base map style for verification map
 const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   switch (style) {
+    case 'osm':
+      return new XYZ({
+        url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
+        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+        crossOrigin: 'anonymous',
+      });
     case 'carto-light':
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        url: 'https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
         crossOrigin: 'anonymous',
       });
     case 'carto-dark':
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        url: 'https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
         attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
         crossOrigin: 'anonymous',
@@ -109,7 +167,6 @@ const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ
         maxZoom: 19,
         crossOrigin: 'anonymous',
       });
-    case 'osm':
     default:
       return new OSM({ crossOrigin: 'anonymous' });
   }
@@ -350,6 +407,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
   const landSourceRef = useRef<VectorSource>(new VectorSource());
   const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
   const outlookLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const stormReportsSourceRef = useRef<VectorSource>(new VectorSource()); // New source for storm reports
@@ -393,16 +452,29 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
     const baseTileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = baseTileLayer;
-    // Land layer sits above the base tile layer and is toggled on for the 'blank' style to show state boundaries
-    // without roads or labels.
+    // Land fill sits above the base tile layer for blank style.
     const landLayer = new VectorLayer({
       source: landSourceRef.current,
       visible: false,
       zIndex: 1,
+      style: BLANK_LAND_FILL_STYLE_VERIF,
     });
     landLayerRef.current = landLayer;
+    const landOutlineLayer = new VectorLayer({
+      source: landSourceRef.current,
+      visible: false,
+      zIndex: TOP_OUTLINE_LAYER_Z_INDEX,
+      style: BLANK_LAND_OUTLINE_STYLE_VERIF,
+    });
+    landOutlineLayerRef.current = landOutlineLayer;
     const outlookLayer = new VectorLayer({ source: vectorSourceRef.current, zIndex: 3 });
     outlookLayerRef.current = outlookLayer;
+    const labelLayer = new TileLayer({
+      source: createVerificationLabelOverlaySource('osm') ?? undefined,
+      visible: true,
+      zIndex: TOP_LABEL_LAYER_Z_INDEX,
+    });
+    labelLayerRef.current = labelLayer;
 
     // Initialize the map with the base tile layer, land layer, outlook layer, and storm reports layer.
     const map = new OLMap({
@@ -411,11 +483,13 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
         baseTileLayer,
         landLayer,
         outlookLayer,
+        landOutlineLayer,
         new VectorLayer({
           source: stormReportsSourceRef.current,
           zIndex: 4,
           style: (feature) => buildReportStyle(feature.get('type') as ReportType),
         }),
+        labelLayer,
       ],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
@@ -455,43 +529,66 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   useEffect(() => {
     const tile = tileLayerRef.current;
     const land = landLayerRef.current;
+    const landOutline = landOutlineLayerRef.current;
+    const labels = labelLayerRef.current;
     const el = mapElementRef.current;
-    if (!tile || !land || !el) return;
+    if (!tile || !land || !landOutline || !labels || !el) return;
+
+    /**
+     * Load US state boundary features into the `landSourceRef` if they
+     * are not already present. This creates the state outline layer
+     * used for rendering above outlook polygons.
+     */
+    const loadStatesBoundaries = () => {
+      if (landSourceRef.current.getFeatures().length > 0) {
+        return;
+      }
+
+      /**
+       * Fetch and parse US states GeoJSON and add features to the
+       * verification map's `landSourceRef`. Cached in
+       * `cachedUsStatesGeoJSONVerif` to avoid repeated network calls.
+       */
+      const loadStates = async () => {
+        let geoData = cachedUsStatesGeoJSONVerif;
+        if (!geoData) {
+          const res = await fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json');
+          geoData = await res.json();
+          cachedUsStatesGeoJSONVerif = geoData;
+        }
+        const format = new GeoJSON();
+        const features = format.readFeatures(geoData, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857',
+        });
+        landSourceRef.current.addFeatures(features as Feature[]);
+      };
+
+      loadStates().catch(() => { /* US states layer fetch failed — non-fatal */ });
+    };
+
+    // Keep state outlines above outlook polygons across base-map styles.
+    loadStatesBoundaries();
 
     if (baseMapStyle === 'blank') {
       tile.setVisible(false);
       land.setVisible(true);
+      landOutline.setVisible(true);
+      labels.setVisible(false);
       el.style.backgroundColor = '#b8d4e8';
-
-      if (landSourceRef.current.getFeatures().length === 0) {
-        // Fetch and cache the GeoJSON for US states if we haven't already,
-        const loadStates = async () => {
-          let geoData = cachedUsStatesGeoJSONVerif;
-          if (!geoData) {
-            const res = await fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json');
-            geoData = await res.json();
-            cachedUsStatesGeoJSONVerif = geoData;
-          }
-          const format = new GeoJSON();
-          // Read features with correct projections and apply the blank land style before adding to the source.
-          const features = format.readFeatures(geoData, {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857',
-          });
-          features.forEach((f) => {
-            if ('setStyle' in f) {
-              (f as Feature).setStyle(BLANK_LAND_STYLE_VERIF);
-            }
-          });
-          landSourceRef.current.addFeatures(features as Feature[]);
-        };
-        loadStates().catch(() => { /* US states layer fetch failed — non-fatal */ });
-      }
     } else {
       tile.setVisible(true);
       land.setVisible(false);
+      landOutline.setVisible(true);
       el.style.backgroundColor = '';
       tile.setSource(createVerifTileSource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>));
+      const labelSource = createVerificationLabelOverlaySource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>);
+      if (labelSource) {
+        labels.setSource(labelSource);
+        labels.setVisible(true);
+      } else {
+        labels.setVisible(false);
+      }
     }
   }, [baseMapStyle]);
 
