@@ -963,6 +963,18 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     });
     map.addInteraction(draw);
     drawRef.current = draw;
+
+    // OpenLayers evaluates interactions in reverse insertion order.
+    // Re-adding snap interactions here ensures snap runs before draw,
+    // so the cursor actually snaps instead of only showing a snap hint.
+    if (snapRef.current) {
+      map.removeInteraction(snapRef.current);
+      map.addInteraction(snapRef.current);
+    }
+    if (catSnapRef.current) {
+      map.removeInteraction(catSnapRef.current);
+      map.addInteraction(catSnapRef.current);
+    }
   }, [dispatch, drawingState.activeOutlookType, drawingState.activeProbability, drawingState.isSignificant, interactionMode]);
 
   useEffect(() => {
