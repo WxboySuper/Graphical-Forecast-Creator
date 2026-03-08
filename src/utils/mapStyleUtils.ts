@@ -69,11 +69,8 @@ export const sortProbabilities = (entries: [string, Feature[]][]): [string, Feat
  * @returns Hex color string for use as a fill color
  */
 export const lookupColor = (outlookType: OutlookType, probability: string) => {
-  const mapping = colorMappings[outlookType as keyof typeof colorMappings];
-  if (mapping && typeof mapping === 'object' && probability in mapping) {
-    return (mapping as Record<string, string>)[probability];
-  }
-  return '#FFFFFF';
+  const mapping = colorMappings[outlookType as keyof typeof colorMappings] as Record<string, string>;
+  return mapping?.[probability] ?? '#FFFFFF';
 };
 
 /**
