@@ -93,6 +93,14 @@ const BLANK_LAND_OUTLINE_STYLE_VERIF = new Style({
   stroke: new Stroke({ color: '#9e9585', width: 1 }),
 });
 
+/**
+ * Create a tile `XYZ` source that provides label-only tiles for the
+ * verification map. Returns `null` for styles that don't support
+ * a separate label overlay (e.g. 'blank').
+ *
+ * @param style - The selected base map style (excluding 'blank')
+ * @returns An `XYZ` tile source for label-only tiles or `null`.
+ */
 const createVerificationLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
   switch (style) {
     case 'osm':
@@ -526,11 +534,21 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     const el = mapElementRef.current;
     if (!tile || !land || !landOutline || !labels || !el) return;
 
+    /**
+     * Load US state boundary features into the `landSourceRef` if they
+     * are not already present. This creates the state outline layer
+     * used for rendering above outlook polygons.
+     */
     const loadStatesBoundaries = () => {
       if (landSourceRef.current.getFeatures().length > 0) {
         return;
       }
 
+      /**
+       * Fetch and parse US states GeoJSON and add features to the
+       * verification map's `landSourceRef`. Cached in
+       * `cachedUsStatesGeoJSONVerif` to avoid repeated network calls.
+       */
       const loadStates = async () => {
         let geoData = cachedUsStatesGeoJSONVerif;
         if (!geoData) {

@@ -837,6 +837,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     const el = mapElementRef.current;
     if (!tile || !world || !lakes || !land || !landOutline || !labels || !el) return;
 
+    /**
+     * Ensure US states GeoJSON for the blank/base map is loaded into
+     * the `landSourceRef` so state outlines can be rendered above
+     * outlook polygons. Fetches data once and caches it in
+     * `cachedUsStatesGeoJSON`.
+     */
     const loadUsStatesBoundaries = () => {
       const landLoader: BlankLayerConfig = {
         source: landSourceRef.current,
