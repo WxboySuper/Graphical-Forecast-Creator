@@ -140,7 +140,7 @@ export const RightActions: React.FC<RightActionsProps> = ({
 }) => (
   <div className="flex items-center gap-1">
     <span className="text-xs text-muted-foreground px-2 hidden sm:inline select-none">
-      v1.0.0
+      v1.1.0
     </span>
 
     <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
