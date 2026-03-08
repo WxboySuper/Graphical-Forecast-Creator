@@ -7,9 +7,20 @@ import {
 } from '../../store/overlaysSlice';
 import './OverlayControls.css';
 
+// The OverlayControls component provides a user interface for toggling different map overlays.
 const OverlayControls: React.FC = () => {
   const dispatch = useDispatch();
   const overlays = useSelector((state: RootState) => state.overlays);
+
+  // Handlers for checkbox changes
+  const handleToggleStateBorders = () => {
+    dispatch(toggleStateBorders());
+  };
+
+  // Note: The county overlay can be quite dense and may impact performance on lower-end devices, especially when zoomed out. Consider adding a warning tooltip or message when enabling this overlay, or implementing a more performant way to render county boundaries (e.g., using vector tiles or simplifying the geometry at lower zoom levels).
+  const handleToggleCounties = () => {
+    dispatch(toggleCounties());
+  };
   
   return (
     <div className="overlay-controls">
@@ -19,7 +30,7 @@ const OverlayControls: React.FC = () => {
         <input
           type="checkbox"
           checked={overlays.stateBorders}
-          onChange={() => dispatch(toggleStateBorders())}
+          onChange={handleToggleStateBorders}
         />
         <span className="overlay-control-label">State Borders</span>
       </label>
@@ -28,7 +39,7 @@ const OverlayControls: React.FC = () => {
         <input
           type="checkbox"
           checked={overlays.counties}
-          onChange={() => dispatch(toggleCounties())}
+          onChange={handleToggleCounties}
         />
         <span className="overlay-control-label">Counties</span>
       </label>

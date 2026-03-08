@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
 import { 
@@ -14,14 +14,13 @@ import {
 } from 'lucide-react';
 import { RootState } from '../store';
 import { updateDiscussion } from '../store/forecastSlice';
-import { DiscussionMode, DiscussionData } from '../types/outlooks';
+import { DiscussionMode, DiscussionData, DayType } from '../types/outlooks';
 import { compileDiscussionToText, exportDiscussionToFile } from '../utils/discussionUtils';
 import DIYDiscussionEditor from '../components/DiscussionEditor/DIYDiscussionEditor';
 import GuidedDiscussionEditor from '../components/DiscussionEditor/GuidedDiscussionEditor';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
-import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import type { AddToastFn } from '../components/Layout';
 
@@ -29,250 +28,525 @@ interface PageContext {
   addToast: AddToastFn;
 }
 
-export const DiscussionPage: React.FC = () => {
-  const dispatch = useDispatch();
-  const { addToast } = useOutletContext<PageContext>();
-  
-  const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
-  const outlookDay = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]);
-  
-  const existingDiscussion = outlookDay?.discussion;
-  
-  const [mode, setMode] = useState<DiscussionMode>(existingDiscussion?.mode || 'diy');
-  const [validStart, setValidStart] = useState(existingDiscussion?.validStart || new Date().toISOString().slice(0, 16));
-  const [validEnd, setValidEnd] = useState(() => {
-    if (existingDiscussion?.validEnd) return existingDiscussion.validEnd;
-    const end = new Date();
-    end.setHours(end.getHours() + 24);
-    return end.toISOString().slice(0, 16);
+const DISCUSSION_AUTOSAVE_DELAY_MS = 1500;
+
+type GuidedContentState = NonNullable<DiscussionData['guidedContent']>;
+
+interface DiscussionFormDefaults {
+  mode: DiscussionMode;
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+  diyContent: string;
+  guidedContent: GuidedContentState;
+}
+
+interface DiscussionEditorState {
+  mode: DiscussionMode;
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+  diyContent: string;
+  guidedContent: GuidedContentState;
+  hasUnsavedChanges: boolean;
+  compiledText: string;
+  wordCount: number;
+  setValidStart: (value: string) => void;
+  setValidEnd: (value: string) => void;
+  setForecasterName: (value: string) => void;
+  handleModeChange: (value: string) => void;
+  handleContentChange: (newContent: string) => void;
+  handleGuidedChange: (newContent: GuidedContentState) => void;
+  handleSave: () => void;
+  handleExport: () => void;
+}
+
+// Creates a default empty state for the guided discussion content when starting fresh or if no existing guided content is found.
+const createDefaultGuidedContent = (): GuidedContentState => ({
+  synopsis: '',
+  meteorologicalSetup: '',
+  severeWeatherExpectations: '',
+  timing: '',
+  regionalBreakdown: '',
+  additionalConsiderations: ''
+});
+
+// Determines the initial valid end time for the discussion.
+// If an existing discussion has a valid end time, it uses that.
+// Otherwise, it defaults to 24 hours from the current time.
+const getInitialValidEnd = (existingDiscussion?: DiscussionData): string => {
+  if (existingDiscussion?.validEnd) {
+    return existingDiscussion.validEnd;
+  }
+
+  const end = new Date();
+  end.setHours(end.getHours() + 24);
+  return end.toISOString().slice(0, 16);
+};
+
+/** Returns default form field values for the Discussion editor, seeded from an existing discussion or blank defaults. */
+const getDiscussionFormDefaults = (existingDiscussion?: DiscussionData): DiscussionFormDefaults => ({
+  mode: existingDiscussion?.mode ?? 'diy',
+  validStart: existingDiscussion?.validStart ?? new Date().toISOString().slice(0, 16),
+  validEnd: getInitialValidEnd(existingDiscussion),
+  forecasterName: existingDiscussion?.forecasterName ?? '',
+  diyContent: existingDiscussion?.diyContent ?? '',
+  guidedContent: existingDiscussion?.guidedContent ?? createDefaultGuidedContent()
+});
+
+// Formats an ISO datetime string into a more human-readable format for display in the metadata section of the discussion editor.
+const formatDateTime = (isoString: string): string => {
+  const date = new Date(isoString);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short'
   });
-  const [forecasterName, setForecasterName] = useState(existingDiscussion?.forecasterName || '');
-  const [diyContent, setDiyContent] = useState(existingDiscussion?.diyContent || '');
-  const [guidedContent, setGuidedContent] = useState(existingDiscussion?.guidedContent || {
-    synopsis: '',
-    meteorologicalSetup: '',
-    severeWeatherExpectations: '',
-    timing: '',
-    regionalBreakdown: '',
-    additionalConsiderations: ''
-  });
+};
+
+// The DiscussionHeaderBar component renders the top header of the discussion page, showing the title, current day,
+// unsaved changes indicator, and action buttons for exporting and saving the discussion.
+const DiscussionHeaderBar: React.FC<{
+  currentDay: DayType;
+  hasUnsavedChanges: boolean;
+  onExport: () => void;
+  onSave: () => void;
+}> = ({ currentDay, hasUnsavedChanges, onExport, onSave }) => (
+  <div className="flex-shrink-0 border-b border-border bg-card px-6 py-4">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Forecast Discussion
+        </h1>
+        <Badge variant="secondary">Day {currentDay}</Badge>
+        {hasUnsavedChanges && (
+          <Badge variant="warning" className="animate-pulse">Unsaved</Badge>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={onExport}>
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
+        <Button variant="save" size="sm" onClick={onSave}>
+          <Save className="h-4 w-4 mr-2" />
+          Save
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
+// The MetadataSection component renders the top section of the discussion editor where users can input metadata about the forecast discussion,
+const MetadataSection: React.FC<{
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+  onValidStartChange: (value: string) => void;
+  onValidEndChange: (value: string) => void;
+  onForecasterNameChange: (value: string) => void;
+}> = ({
+  validStart,
+  validEnd,
+  forecasterName,
+  onValidStartChange,
+  onValidEndChange,
+  onForecasterNameChange
+}) => {
+  // Checks if there is any data available for the given day type by looking at the Redux store's forecast cycle data. This is used to determine whether to show a data indicator on the day tabs in the header.
+  const handleValidStartInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onValidStartChange(e.target.value);
+  };
+
+  // Handler for when the valid end datetime input changes, which calls the onValidEndChange prop to update the state in the parent component.
+  const handleValidEndInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onValidEndChange(e.target.value);
+  };
+
+  // Handler for when the forecaster name input changes, which calls the onForecasterNameChange prop to update the state in the parent component.
+  const handleForecasterNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onForecasterNameChange(e.target.value);
+  };
+
+  return (
+    <div className="flex-shrink-0 p-4 bg-muted/30 border-b border-border">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+          <Calendar className="h-3 w-3" />
+          Valid From
+        </label>
+        <Input
+          type="datetime-local"
+          value={validStart}
+          onChange={handleValidStartInputChange}
+          className="h-9"
+        />
+        <span className="text-xs text-muted-foreground">{formatDateTime(validStart)}</span>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+          <Calendar className="h-3 w-3" />
+          Valid To
+        </label>
+        <Input
+          type="datetime-local"
+          value={validEnd}
+          onChange={handleValidEndInputChange}
+          className="h-9"
+        />
+        <span className="text-xs text-muted-foreground">{formatDateTime(validEnd)}</span>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+          <User className="h-3 w-3" />
+          Forecaster
+        </label>
+        <Input
+          type="text"
+          value={forecasterName}
+          onChange={handleForecasterNameInputChange}
+          placeholder="Your name or username"
+          maxLength={100}
+          className="h-9"
+        />
+      </div>
+    </div>
+
+    <div className="mt-3 flex items-center gap-2 text-sm text-orange-900 dark:text-warning-foreground bg-warning/20 px-3 py-2 rounded-md">
+      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+      <span><strong>UNOFFICIAL OUTLOOK</strong> - For educational purposes only.</span>
+    </div>
+    </div>
+  );
+};
+
+// The DiscussionTabsSection component renders the tabbed interface for switching between the DIY editor and the Guided editor,
+const DiscussionTabsSection: React.FC<{
+  mode: DiscussionMode;
+  diyContent: string;
+  guidedContent: GuidedContentState;
+  onModeChange: (value: string) => void;
+  onDiyChange: (value: string) => void;
+  onGuidedChange: (value: GuidedContentState) => void;
+}> = ({ mode, diyContent, guidedContent, onModeChange, onDiyChange, onGuidedChange }) => (
+  <Tabs
+    value={mode}
+    onValueChange={onModeChange}
+    className="flex-1 flex flex-col overflow-hidden"
+  >
+    <div className="flex-shrink-0 px-4 pt-4">
+      <TabsList className="grid w-full max-w-xs grid-cols-2">
+        <TabsTrigger value="diy" className="flex items-center gap-2">
+          <Edit3 className="h-4 w-4" />
+          DIY Editor
+        </TabsTrigger>
+        <TabsTrigger value="guided" className="flex items-center gap-2">
+          <Wand2 className="h-4 w-4" />
+          Guided
+        </TabsTrigger>
+      </TabsList>
+    </div>
+
+    <TabsContent value="diy" className="flex-1 overflow-hidden m-0 p-4">
+      <div className="h-full overflow-auto">
+        <DIYDiscussionEditor
+          content={diyContent}
+          onChange={onDiyChange}
+        />
+      </div>
+    </TabsContent>
+
+    <TabsContent value="guided" className="flex-1 overflow-hidden m-0 p-4">
+      <div className="h-full overflow-auto">
+        <GuidedDiscussionEditor
+          content={guidedContent}
+          onChange={onGuidedChange}
+        />
+      </div>
+    </TabsContent>
+  </Tabs>
+);
+
+// The DiscussionStatusBar component renders the bottom status bar of the discussion editor,
+// showing the current word count and the last modified timestamp of the discussion.
+const DiscussionStatusBar: React.FC<{ wordCount: number; lastModified?: string }> = ({ wordCount, lastModified }) => (
+  <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-muted/30 flex items-center justify-between text-sm text-muted-foreground">
+    <span>{wordCount} words</span>
+    {lastModified && (
+      <span>Last saved: {new Date(lastModified).toLocaleString()}</span>
+    )}
+  </div>
+);
+
+// The DiscussionPreviewPane component renders the right-hand pane of the discussion page,
+// showing a live preview of the compiled discussion text based on the current editor content and metadata.
+const DiscussionPreviewCard: React.FC<{ compiledText: string }> = ({ compiledText }) => (
+  <div className="flex-1 overflow-auto p-4">
+    <div className="p-4 bg-card rounded-md">
+      <pre className="whitespace-pre-wrap font-mono text-sm text-foreground leading-relaxed">
+        {compiledText}
+      </pre>
+    </div>
+  </div>
+);
+
+// The DiscussionPreviewPane component renders the right-hand pane of the discussion page,
+const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledText }) => (
+  <div className="w-[45%] flex-shrink-0 flex flex-col overflow-hidden bg-muted/20">
+    <div className="flex-shrink-0 px-4 py-3 border-b border-border flex items-center gap-2">
+      <Eye className="h-4 w-4 text-muted-foreground" />
+      <span className="font-medium text-sm">Live Preview</span>
+    </div>
+
+    <DiscussionPreviewCard compiledText={compiledText} />
+  </div>
+);
+
+// The useDiscussionEditorState hook encapsulates all the state management logic for the discussion editor,
+// Lightweight helper: build DiscussionData from form fields
+const buildDiscussionDataFrom = (fields: {
+  mode: DiscussionMode;
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+  diyContent: string;
+  guidedContent: GuidedContentState;
+}): DiscussionData => ({
+  mode: fields.mode,
+  validStart: fields.validStart,
+  validEnd: fields.validEnd,
+  forecasterName: fields.forecasterName,
+  diyContent: fields.mode === 'diy' ? fields.diyContent : undefined,
+  guidedContent: fields.mode === 'guided' ? fields.guidedContent : undefined,
+  lastModified: new Date().toISOString()
+});
+
+// Manages the editable form state and unsaved flag; keeps setters small and focused.
+const useDiscussionFormState = (existingDiscussion?: DiscussionData) => {
+  const defaults = getDiscussionFormDefaults(existingDiscussion);
+
+  const [mode, setMode] = useState<DiscussionMode>(defaults.mode);
+  const [validStart, setValidStart] = useState(defaults.validStart);
+  const [validEnd, setValidEnd] = useState(defaults.validEnd);
+  const [forecasterName, setForecasterName] = useState(defaults.forecasterName);
+  const [diyContent, setDiyContent] = useState(defaults.diyContent);
+  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(defaults.guidedContent);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Track changes
-  const handleContentChange = useCallback((newContent: string) => {
-    setDiyContent(newContent);
-    setHasUnsavedChanges(true);
-  }, []);
+  const markUnsaved = useCallback(() => setHasUnsavedChanges(true), []);
 
-  const handleGuidedChange = useCallback((newContent: typeof guidedContent) => {
-    setGuidedContent(newContent);
-    setHasUnsavedChanges(true);
-  }, []);
+  const handleModeChange = useCallback((value: string) => { setMode(value as DiscussionMode); markUnsaved(); }, [markUnsaved]);
+  const handleValidStart = useCallback((v: string) => { setValidStart(v); markUnsaved(); }, [markUnsaved]);
+  const handleValidEnd = useCallback((v: string) => { setValidEnd(v); markUnsaved(); }, [markUnsaved]);
+  const handleForecasterName = useCallback((v: string) => { setForecasterName(v); markUnsaved(); }, [markUnsaved]);
+  const handleDiy = useCallback((c: string) => { setDiyContent(c); markUnsaved(); }, [markUnsaved]);
+  const handleGuided = useCallback((c: GuidedContentState) => { setGuidedContent(c); markUnsaved(); }, [markUnsaved]);
 
-  // Build discussion data object
-  const buildDiscussionData = useCallback((): DiscussionData => ({
+  return {
     mode,
     validStart,
     validEnd,
     forecasterName,
-    diyContent: mode === 'diy' ? diyContent : undefined,
-    guidedContent: mode === 'guided' ? guidedContent : undefined,
-    lastModified: new Date().toISOString()
-  }), [mode, validStart, validEnd, forecasterName, diyContent, guidedContent]);
+    diyContent,
+    guidedContent,
+    hasUnsavedChanges,
+    setHasUnsavedChanges,
+    handleModeChange,
+    handleValidStart,
+    handleValidEnd,
+    handleForecasterName,
+    handleDiy,
+    handleGuided
+  } as const;
+};
 
-  // Compile the discussion to text for preview
-  const compiledText = useMemo(() => {
-    return compileDiscussionToText(buildDiscussionData(), currentDay);
-  }, [buildDiscussionData, currentDay]);
+// Auto-save hook keeps the effect isolated and simple. Accepts a single options object
+const useDiscussionAutoSave = (opts: {
+  hasUnsavedChanges: boolean;
+  buildDiscussionData: () => DiscussionData;
+  currentDay: DayType;
+  dispatch: ReturnType<typeof useDispatch>;
+  clearUnsaved: (v: boolean) => void;
+}) => {
+  const { hasUnsavedChanges, buildDiscussionData, currentDay, dispatch, clearUnsaved } = opts;
 
-  // Word count
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (hasUnsavedChanges) {
+      timer = setTimeout(() => {
+        dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+        clearUnsaved(false);
+      }, DISCUSSION_AUTOSAVE_DELAY_MS);
+    }
+
+    return () => { if (timer !== null) clearTimeout(timer); };
+  }, [hasUnsavedChanges, buildDiscussionData, currentDay, dispatch, clearUnsaved]);
+};
+
+// Computes derived values (compiled text and word count) in a focused hook.
+const useDiscussionComputed = (
+  opts: {
+    buildDiscussionData: () => DiscussionData;
+    currentDay: DayType;
+    mode: DiscussionMode;
+    diyContent: string;
+    guidedContent: GuidedContentState;
+  }
+) => {
+  const { buildDiscussionData, currentDay, mode, diyContent, guidedContent } = opts;
+
+  const compiledText = useMemo(() => compileDiscussionToText(buildDiscussionData(), currentDay), [buildDiscussionData, currentDay]);
+
   const wordCount = useMemo(() => {
     const text = mode === 'diy' ? diyContent : Object.values(guidedContent).join(' ');
     return text.trim().split(/\s+/).filter(Boolean).length;
   }, [mode, diyContent, guidedContent]);
 
+  return { compiledText, wordCount } as const;
+};
+
+/** Provides save and export action callbacks for the discussion editor, dispatching to Redux and notifying via toast. */
+const useDiscussionActions = (opts: {
+  dispatch: ReturnType<typeof useDispatch>;
+  currentDay: DayType;
+  buildDiscussionData: () => DiscussionData;
+  clearUnsaved: (v: boolean) => void;
+  addToast: AddToastFn;
+}) => {
+  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast } = opts;
+
   const handleSave = useCallback(() => {
     dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
-    setHasUnsavedChanges(false);
+    clearUnsaved(false);
     addToast('Discussion saved!', 'success');
-  }, [dispatch, currentDay, buildDiscussionData, addToast]);
+  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast]);
 
   const handleExport = useCallback(() => {
     exportDiscussionToFile(buildDiscussionData(), currentDay);
     addToast('Discussion exported!', 'success');
   }, [buildDiscussionData, currentDay, addToast]);
 
-  const formatDateTime = (isoString: string): string => {
-    const date = new Date(isoString);
-    return date.toLocaleString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'short'
-    });
+  return { handleSave, handleExport } as const;
+};
+
+/** Composes all discussion editor state — form fields, computed text, auto-save, and actions — into a single hook return value. */
+const useDiscussionEditorState = (
+  existingDiscussion: DiscussionData | undefined,
+  currentDay: DayType,
+  dispatch: ReturnType<typeof useDispatch>,
+  addToast: AddToastFn
+): DiscussionEditorState => {
+  const form = useDiscussionFormState(existingDiscussion);
+
+  const buildDiscussionData = useCallback(() => buildDiscussionDataFrom({
+    mode: form.mode,
+    validStart: form.validStart,
+    validEnd: form.validEnd,
+    forecasterName: form.forecasterName,
+    diyContent: form.diyContent,
+    guidedContent: form.guidedContent
+  }), [form.mode, form.validStart, form.validEnd, form.forecasterName, form.diyContent, form.guidedContent]);
+
+  useDiscussionAutoSave({
+    hasUnsavedChanges: form.hasUnsavedChanges,
+    buildDiscussionData,
+    currentDay,
+    dispatch,
+    clearUnsaved: form.setHasUnsavedChanges
+  });
+
+  const { compiledText, wordCount } = useDiscussionComputed({
+    buildDiscussionData,
+    currentDay,
+    mode: form.mode,
+    diyContent: form.diyContent,
+    guidedContent: form.guidedContent
+  });
+
+  const { handleSave, handleExport } = useDiscussionActions({
+    dispatch,
+    currentDay,
+    buildDiscussionData,
+    clearUnsaved: form.setHasUnsavedChanges,
+    addToast
+  });
+
+  return {
+    mode: form.mode,
+    validStart: form.validStart,
+    validEnd: form.validEnd,
+    forecasterName: form.forecasterName,
+    diyContent: form.diyContent,
+    guidedContent: form.guidedContent,
+    hasUnsavedChanges: form.hasUnsavedChanges,
+    compiledText,
+    wordCount,
+    setValidStart: form.handleValidStart,
+    setValidEnd: form.handleValidEnd,
+    setForecasterName: form.handleForecasterName,
+    handleModeChange: form.handleModeChange,
+    handleContentChange: form.handleDiy,
+    handleGuidedChange: form.handleGuided,
+    handleSave,
+    handleExport
   };
+};
+
+// The DiscussionPage component is the main component for the forecast discussion page,
+// which integrates all the subcomponents and manages the overall state of the discussion editor through the useDiscussionEditorState hook.
+export const DiscussionPage: React.FC = () => {
+  const dispatch = useDispatch();
+  const { addToast } = useOutletContext<PageContext>();
+  
+  const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
+  const outlookDay = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]);
+  const existingDiscussion = outlookDay?.discussion;
+  const editorState = useDiscussionEditorState(existingDiscussion, currentDay, dispatch, addToast);
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header Bar */}
-      <div className="flex-shrink-0 border-b border-border bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Forecast Discussion
-            </h1>
-            <Badge variant="secondary">Day {currentDay}</Badge>
-            {hasUnsavedChanges && (
-              <Badge variant="warning" className="animate-pulse">Unsaved</Badge>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button variant="save" size="sm" onClick={handleSave}>
-              <Save className="h-4 w-4 mr-2" />
-              Save
-            </Button>
-          </div>
-        </div>
-      </div>
+      <DiscussionHeaderBar
+        currentDay={currentDay}
+        hasUnsavedChanges={editorState.hasUnsavedChanges}
+        onExport={editorState.handleExport}
+        onSave={editorState.handleSave}
+      />
 
-      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Editor Side */}
         <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
-          {/* Metadata Section */}
-          <div className="flex-shrink-0 p-4 bg-muted/30 border-b border-border">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Valid From */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Valid From
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={validStart}
-                  onChange={(e) => {
-                    setValidStart(e.target.value);
-                    setHasUnsavedChanges(true);
-                  }}
-                  className="h-9"
-                />
-                <span className="text-xs text-muted-foreground">{formatDateTime(validStart)}</span>
-              </div>
-              
-              {/* Valid To */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Valid To
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={validEnd}
-                  onChange={(e) => {
-                    setValidEnd(e.target.value);
-                    setHasUnsavedChanges(true);
-                  }}
-                  className="h-9"
-                />
-                <span className="text-xs text-muted-foreground">{formatDateTime(validEnd)}</span>
-              </div>
-              
-              {/* Forecaster */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  Forecaster
-                </label>
-                <Input
-                  type="text"
-                  value={forecasterName}
-                  onChange={(e) => {
-                    setForecasterName(e.target.value);
-                    setHasUnsavedChanges(true);
-                  }}
-                  placeholder="Your name or username"
-                  maxLength={100}
-                  className="h-9"
-                />
-              </div>
-            </div>
-            
-            {/* Disclaimer */}
-            <div className="mt-3 flex items-center gap-2 text-sm text-orange-900 dark:text-warning-foreground bg-warning/20 px-3 py-2 rounded-md">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              <span><strong>UNOFFICIAL OUTLOOK</strong> - For educational purposes only.</span>
-            </div>
-          </div>
+          <MetadataSection
+            validStart={editorState.validStart}
+            validEnd={editorState.validEnd}
+            forecasterName={editorState.forecasterName}
+            onValidStartChange={editorState.setValidStart}
+            onValidEndChange={editorState.setValidEnd}
+            onForecasterNameChange={editorState.setForecasterName}
+          />
 
-          {/* Mode Tabs */}
-          <Tabs value={mode} onValueChange={(v) => setMode(v as DiscussionMode)} className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-shrink-0 px-4 pt-4">
-              <TabsList className="grid w-full max-w-xs grid-cols-2">
-                <TabsTrigger value="diy" className="flex items-center gap-2">
-                  <Edit3 className="h-4 w-4" />
-                  DIY Editor
-                </TabsTrigger>
-                <TabsTrigger value="guided" className="flex items-center gap-2">
-                  <Wand2 className="h-4 w-4" />
-                  Guided
-                </TabsTrigger>
-              </TabsList>
-            </div>
+          <DiscussionTabsSection
+            mode={editorState.mode}
+            diyContent={editorState.diyContent}
+            guidedContent={editorState.guidedContent}
+            onModeChange={editorState.handleModeChange}
+            onDiyChange={editorState.handleContentChange}
+            onGuidedChange={editorState.handleGuidedChange}
+          />
 
-            <TabsContent value="diy" className="flex-1 overflow-hidden m-0 p-4">
-              <div className="h-full overflow-auto">
-                <DIYDiscussionEditor 
-                  content={diyContent}
-                  onChange={handleContentChange}
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="guided" className="flex-1 overflow-hidden m-0 p-4">
-              <div className="h-full overflow-auto">
-                <GuidedDiscussionEditor 
-                  content={guidedContent}
-                  onChange={handleGuidedChange}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          {/* Status Bar */}
-          <div className="flex-shrink-0 px-4 py-2 border-t border-border bg-muted/30 flex items-center justify-between text-sm text-muted-foreground">
-            <span>{wordCount} words</span>
-            {existingDiscussion?.lastModified && (
-              <span>Last saved: {new Date(existingDiscussion.lastModified).toLocaleString()}</span>
-            )}
-          </div>
+          <DiscussionStatusBar
+            wordCount={editorState.wordCount}
+            lastModified={existingDiscussion?.lastModified}
+          />
         </div>
 
-        {/* Preview Side */}
-        <div className="w-[45%] flex-shrink-0 flex flex-col overflow-hidden bg-muted/20">
-          <div className="flex-shrink-0 px-4 py-3 border-b border-border flex items-center gap-2">
-            <Eye className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-sm">Live Preview</span>
-          </div>
-          
-          <div className="flex-1 overflow-auto p-4">
-            <Card>
-              <CardContent className="p-4">
-                <pre className="whitespace-pre-wrap font-mono text-sm text-foreground leading-relaxed">
-                  {compiledText}
-                </pre>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <DiscussionPreviewPane compiledText={editorState.compiledText} />
       </div>
     </div>
   );

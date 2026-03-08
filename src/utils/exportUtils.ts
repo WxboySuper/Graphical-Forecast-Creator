@@ -10,10 +10,14 @@ type ExportMapLike = {
   getTargetElement?: () => HTMLElement;
 };
 
+// Type guard to check if the map object is a Leaflet map instance (has getContainer and getBounds methods)
 const isLeafletMap = (map: unknown): map is L.Map => {
   return Boolean(map && typeof (map as L.Map).getContainer === 'function' && typeof (map as L.Map).getBounds === 'function');
 };
 
+
+// Helper: get the export container element from the map-like object,
+// trying multiple methods for compatibility with different map libraries
 const getExportContainer = (map: ExportMapLike): HTMLElement | null => {
   if (map.getContainer) {
     return map.getContainer();
@@ -49,6 +53,7 @@ const getFeatureStyle = (outlookType: OutlookType, probability: string): L.PathO
     'day4-8': colorMappings['day4-8'] as Record<string, string>
   };
 
+  // Default to white if no match found, but this should not happen if data is valid
   const color = palettes[outlookType]?.[probability] ?? '#FFFFFF';
   
   // Check for CIG (Hatching)
@@ -127,67 +132,88 @@ const createTempMap = (container: HTMLElement, center: L.LatLng, zoom: number, c
 };
 
 // Helper: add tiles to map and wait for load or timeout
-const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): Promise<void> => {
+const addTilesAndWait = (mapInstance: L.Map, sourceMap: L.Map, timeout = 5000): Promise<{ timedOut: boolean; remaining: number }> => {
+  // We want to replicate the active tile layers from the source map onto the temp map to ensure they are captured in the export.
   return new Promise((resolve) => {
-    let activeTileLayer: L.TileLayer | undefined;
+    const activeTileLayers: L.TileLayer[] = [];
+    // We look for active tile layers in the source map to replicate, but if we can't find any,
+    // we'll add a default OSM layer to ensure we have some basemap tiles in the export.
     sourceMap.eachLayer((layer) => {
-      if (!activeTileLayer && layer instanceof L.TileLayer) {
-        activeTileLayer = layer;
+      if (layer instanceof L.TileLayer) {
+        activeTileLayers.push(layer as L.TileLayer);
       }
     });
-    const tileUrl = activeTileLayer?.getTileUrl
-      ? (activeTileLayer as unknown as { _url?: string })._url
-      : undefined;
-    const attribution = (activeTileLayer?.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
-    const maxZoom = activeTileLayer?.options?.maxZoom ?? 19;
 
-    const layer = L.tileLayer(tileUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution,
-      maxZoom,
-      crossOrigin: 'anonymous'
-    });
+    // Fallback to a default single OSM layer if none found
+    const layersToAdd = activeTileLayers.length > 0 ? activeTileLayers : [L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: 'anonymous' })];
 
     let resolved = false;
     let pendingTiles = 0;
 
-    const finish = () => {
+    // Listen for tile load events to track pending tiles and resolve when done or on timeout
+    const finish = (fromTimeout = false) => {
       if (!resolved) {
         resolved = true;
-        resolve();
+        resolve({ timedOut: fromTimeout, remaining: pendingTiles });
       }
     };
 
-    layer.on('tileloadstart', () => {
-      pendingTiles += 1;
-    });
+    // Helper to add a tile layer and set up event listeners to track loading
+    const addAndWatch = (srcLayer: L.TileLayer & { _url?: string }) => {
+      // Derive a best-effort URL and options for a tile layer
+      const deriveConfig = (layerSrc: L.TileLayer & { _url?: string }) => {
+        const srcAny = layerSrc as L.TileLayer & { options: L.TileLayerOptions & { url?: string }; _url?: string };
+        const url = srcAny.options?.url ?? (typeof srcAny.getTileUrl === 'function' ? srcAny.getTileUrl({ x: 0, y: 0, z: (srcAny.options?.maxZoom as number) ?? 0 } as L.Coords) : undefined) ?? srcAny._url;
+        const attribution = (layerSrc.options?.attribution as string | undefined) ?? '© OpenStreetMap contributors';
+        const maxZoom = layerSrc.options?.maxZoom ?? 19;
+        return { url, attribution, maxZoom };
+      };
 
-    layer.on('tileload', () => {
-      pendingTiles = Math.max(0, pendingTiles - 1);
-      if (pendingTiles === 0) {
-        finish();
-      }
-    });
+      // Create a new tile layer for the export map using the derived config, ensuring CORS is enabled
+      const { url: derivedUrl, attribution, maxZoom } = deriveConfig(srcLayer);
+      // Note: We use the derived URL directly in the tile layer,
+      // which should allow html2canvas to capture the tiles if they load successfully,
+      // and we track loading via events to know when to capture.
+      const layer = L.tileLayer(derivedUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution,
+        maxZoom,
+        crossOrigin: 'anonymous'
+      });
 
-    layer.on('tileerror', () => {
-      pendingTiles = Math.max(0, pendingTiles - 1);
-      if (pendingTiles === 0) {
-        finish();
-      }
-    });
+      // Listen for tile load events to track pending tiles and resolve when done or on timeout
+      const onTileStart = () => { pendingTiles += 1; };
+      // We listen for both 'tileload' and 'tileerror' to ensure we account for all tiles, even if some fail to load.
+      const onTileFinish = () => {
+        pendingTiles = Math.max(0, pendingTiles - 1);
+        if (pendingTiles === 0) finish(false);
+      };
 
-    layer.on('load', finish);
-    setTimeout(finish, timeout);
-    layer.addTo(mapInstance);
+      layer.on('tileloadstart', onTileStart);
+      layer.on('tileload', onTileFinish);
+      layer.on('tileerror', onTileFinish);
+      // In case the layer has no tiles to load (e.g. a single-tile layer or already cached),
+      // we also listen for the 'load' event on the layer itself as a fallback to resolve when it's done.
+      layer.on('load', () => finish(false));
+      layer.addTo(mapInstance);
+    };
+
+    // Add and watch all derived layers
+    layersToAdd.forEach(addAndWatch);
+
+    // Safety timeout
+    setTimeout(() => finish(true), timeout);
   });
 };
 
 // Helper to sort probabilities (extracted)
 const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, GeoJSON.Feature[]][] => {
+  // We want to sort probabilities in a specific order for rendering:
   return entries.sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
 
     // CIG levels come after numeric probabilities (render on top)
     const isCigA = probA.startsWith('CIG');
+    // We want to sort CIG levels alphabetically among themselves, but all after numeric and TSTM/MRGL/SLGT/ENH/MDT/HIGH
     const isCigB = probB.startsWith('CIG');
     
     if (isCigA !== isCigB) {
@@ -201,23 +227,36 @@ const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, Geo
     if (probA === 'TSTM') return -1;
     if (probB === 'TSTM') return 1;
 
+    // For categorical outlooks, we want to sort by the predefined risk order rather than numeric value,
+    // since they are not strictly numeric and have a specific hierarchy. For other outlooks with numeric probabilities,
+    // we can sort by numeric value.
     const riskOrder: Record<string, number> = { 'TSTM': 0, 'MRGL': 1, 'SLGT': 2, 'ENH': 3, 'MDT': 4, 'HIGH': 5 };
     if (riskOrder[probA] !== undefined && riskOrder[probB] !== undefined) return riskOrder[probA] - riskOrder[probB];
+    // Extract numeric value for sorting, ignoring non-numeric characters (e.g. '%') and defaulting to 0 if not a number
     const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, '')) || 0;
     return getPercentValue(probA) - getPercentValue(probB);  });
 };
 
 // Helper: render outlooks onto a map instance
 const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
+  // We want to render in a specific order to ensure proper layering
+  // (e.g. categorical at bottom, then tornado/wind/hail, then totalSevere, then day4-8 on top)
   const outlookOrder: OutlookType[] = ['categorical', 'tornado', 'wind', 'hail', 'totalSevere', 'day4-8'];
+  // We loop through each outlook type in the defined order, and for each one, we get the corresponding features,
   outlookOrder.forEach((outlookType) => {
+    // Use a lookup to avoid branching and reduce cyclomatic complexity
     const outlookMap = outlooks[outlookType];
     if (!outlookMap) return;
     const entries = Array.from(outlookMap.entries()) as [string, GeoJSON.Feature[]][];
     const sortedEntries = sortProbabilities(entries);
+    // Then we loop through the sorted probabilities and render the features with styles based on the outlook type and probability.
     sortedEntries.forEach(([probability, features]) => {
       const styleOptions = getFeatureStyle(outlookType, probability);
+      // We add each feature as a GeoJSON layer to the map with the appropriate style.
+      // This ensures that the exported image will have the same outlook layers rendered as seen in the live map.
       features.forEach(feature => {
+        // Note: We use L.geoJSON to render the features,
+        // which should work with html2canvas as long as the styles are applied correctly.
         L.geoJSON(feature, { style: () => styleOptions }).addTo(mapInstance);
       });
     });
@@ -289,6 +328,7 @@ const addOverlays = (container: HTMLElement, title?: string, statusText?: string
   container.appendChild(footerDiv);
 };
 
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
 const cloneLegendAndStatusOverlays = (sourceMap: L.Map, exportContainer: HTMLElement) => {
   const sourceContainer = sourceMap.getContainer();
   const sourceRoot = sourceContainer.closest('.map-container, .forecast-map-container') || sourceContainer;
@@ -303,11 +343,13 @@ const cloneLegendAndStatusOverlays = (sourceMap: L.Map, exportContainer: HTMLEle
   }
 };
 
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
 const readStatusText = (root: HTMLElement): string =>
   root.querySelector('.gfc-status-badge')?.getAttribute('aria-label') ??
   root.querySelector('.gfc-status-badge')?.textContent?.trim() ??
   '';
 
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
 const readUnofficialText = (root: HTMLElement): string =>
   root.querySelector('.unofficial-badge-inner')?.textContent?.trim() ??
   '';
@@ -324,18 +366,59 @@ const captureContainer = async (
   const captureId = `gfc-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   container.setAttribute('data-gfc-export-capture-id', captureId);
 
+  // Important: we must set useCORS: true and ensure all images in the cloned document have crossOrigin='anonymous'
   const canvas = await html2canvas(container, {
     useCORS: true,
     allowTaint: false,
-    backgroundColor: '#ffffff',
+    backgroundColor: store.getState().theme.darkMode ? '#000000' : '#ffffff',
     scale: 2,
+    imageTimeout: 8000,
     logging: false,
     width,
     height,
     onclone: (clonedDocument) => {
       const clonedContainer = clonedDocument.querySelector(`[data-gfc-export-capture-id="${captureId}"]`) as HTMLElement | null;
-      if (clonedContainer && onClone) {
-        onClone(clonedContainer);
+      if (clonedContainer) {
+        // Ensure cloned container has explicit background matching current theme so dark tiles aren't lost
+        clonedContainer.style.backgroundColor = store.getState().theme.darkMode ? '#000000' : '#ffffff';
+        // Ensure cloned images request CORS so html2canvas can load external tiles
+        Array.from(clonedContainer.querySelectorAll('img')).forEach((img) => {
+          try { (img as HTMLImageElement).crossOrigin = 'anonymous'; } catch {
+            // ignore errors but log to console for visibility
+            console.warn('GFC export: Failed to set crossOrigin on cloned image; some tiles may not render in export.', img);
+          }
+        });
+        // Copy any <defs> from SVGs in the source document into the cloned document so patterns/hatching render
+        try {
+          const srcDefs = Array.from(document.querySelectorAll('svg defs')) as Element[];
+          if (srcDefs.length > 0) {
+            let svgHolder = clonedDocument.querySelector('#gfc-export-svg-defs-holder') as Element | null;
+            if (!svgHolder) {
+              svgHolder = clonedDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              svgHolder.setAttribute('id', 'gfc-export-svg-defs-holder');
+              svgHolder.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden;');
+              clonedDocument.body.appendChild(svgHolder as unknown as HTMLElement);
+            }
+            srcDefs.forEach((d) => {
+              try {
+                const clonedDefs = d.cloneNode(true) as Node;
+                if (svgHolder) {
+                  svgHolder.appendChild(clonedDefs as unknown as Node);
+                }
+              } catch {
+                // ignore cloning errors for defs, but log to console for visibility
+                console.warn('GFC export: Failed to clone SVG defs for export; some patterns may not render correctly.', d);
+              }
+            });
+          }
+        } catch {
+          // ignore errors but log to console for visibility
+          console.warn('GFC export: Error occurred while cloning SVG defs for export; some patterns may not render correctly.');
+        }
+
+        if (onClone) {
+          onClone(clonedContainer);
+        }
       }
     }
   });
@@ -349,10 +432,12 @@ const captureContainer = async (
   return canvas.toDataURL('image/png');
 };
 
+// Helper: wait for Leaflet map to finish moving/zooming and tiles to load before capture, with a timeout fallback
 const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   return new Promise((resolve) => {
     let resolved = false;
 
+    // We listen for 'moveend' which indicates the map has finished moving/zooming and should have triggered tile loading.
     const finish = () => {
       if (!resolved) {
         resolved = true;
@@ -365,15 +450,87 @@ const waitForMapSettle = (map: L.Map, timeout = 1200): Promise<void> => {
   });
 };
 
-const waitForMapSettleGeneric = async (map: unknown, timeout = 500): Promise<void> => {
+// For non-Leaflet maps, we can only wait for a fixed time and hope for the best,
+// but for Leaflet maps we can listen for moveend to ensure tiles have loaded and map has settled before capture.
+const waitForMapSettleGeneric = async (map: unknown, timeout = 1200): Promise<void> => {
   if (isLeafletMap(map)) {
     await waitForMapSettle(map, timeout);
     return;
   }
 
-  await new Promise((resolve) => setTimeout(resolve, timeout));
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+    // Listen for a generic 'rendercomplete' event if available (e.g. OpenLayers),
+    // but don't rely on it since it's not standard across all map libraries
+    const finish = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+
+    if (map && typeof (map as L.Evented).once === 'function') {
+      try {
+        (map as L.Evented).once('rendercomplete', finish);
+      } catch (err) {
+        // Fallback
+        console.warn('GFC export: Failed to attach rendercomplete listener to map; falling back to timeout. This may cause exports to capture before the map has fully rendered.', err);
+      }
+    }
+
+    setTimeout(finish, timeout);
+  });
 };
 
+// Wait for all images within the export root to finish loading, with a timeout fallback.
+const waitForImagesLoaded = (root: HTMLElement, timeout = 1200): Promise<{ timedOut: boolean; remaining: number }> => {
+  return new Promise((resolve) => {
+    try {
+      const imgs = Array.from(root.querySelectorAll('img'));
+      if (imgs.length === 0) {
+        // no images to wait for; short delay to allow backgrounds to settle
+        setTimeout(() => resolve({ timedOut: false, remaining: 0 }), 50);
+        return;
+      }
+
+      let remaining = imgs.length;
+      let resolved = false;
+
+      // Listen for load/error events on each image to track when all have finished loading or errored,
+      // and resolve accordingly. This helps ensure that all tiles/images are accounted for before capture,
+      // even if they load after the initial map settle.
+      const finishOne = () => {
+        remaining = Math.max(0, remaining - 1);
+        if (remaining === 0 && !resolved) {
+          resolved = true;
+          resolve({ timedOut: false, remaining: 0 });
+        }
+      };
+
+      imgs.forEach((i) => {
+        const img = i as HTMLImageElement;
+        if (img.complete) {
+          finishOne();
+        } else {
+          img.addEventListener('load', finishOne, { once: true });
+          img.addEventListener('error', finishOne, { once: true });
+        }
+      });
+
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ timedOut: true, remaining });
+        }
+      }, timeout);
+    } catch (err) {
+      setTimeout(() => resolve({ timedOut: true, remaining: -1 }), timeout);
+      console.warn('GFC export: Error occurred while waiting for images to load; proceeding with export. This may cause some tiles/images to be missing in the export.', err);
+    }
+  });
+};
+
+// Helper: hide elements in the cloned export DOM that shouldn't appear in the export, based on selectors
 const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
   selectors.forEach((selector) => {
     root.querySelectorAll(selector).forEach((el) => {
@@ -382,6 +539,8 @@ const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
   });
 };
 
+// Main export function: handles both Leaflet and non-Leaflet maps,
+// with best-effort approaches for each to ensure tiles and overlays are captured properly.
 const exportLiveMapAsImage = async (
   map: ExportMapLike,
   options: ExportImageOptions
@@ -393,41 +552,107 @@ const exportLiveMapAsImage = async (
     includeLegendAndStatus = false
   } = options;
 
-  const mapContainer = getExportContainer(map);
-  if (!mapContainer) {
-    throw new Error('Map container not available for export.');
-  }
-
-  const exportRoot = (mapContainer.closest('.map-container, .forecast-map-container') as HTMLElement | null) || mapContainer;
-  const width = exportRoot.clientWidth;
-  const height = exportRoot.clientHeight;
+  const { exportRoot, width, height } = getExportRootAndSize(map);
 
   // Read overlays from live DOM before html2canvas clones/reflows styles
   const statusText = includeLegendAndStatus ? readStatusText(exportRoot) : '';
   const unofficialText = includeLegendAndStatus ? readUnofficialText(exportRoot) : '';
 
   await waitForMapSettleGeneric(map, 400);
+  const imgResult = await waitForImagesLoaded(exportRoot, 1200);
+  maybeShowTileTimeoutWarning(exportRoot, imgResult);
 
-  return captureContainer(exportRoot, width, height, format, quality, (clonedRoot) => {
-    hideElementsInClone(clonedRoot, [
-      '.leaflet-control-container',
-      '.ol-control',
-      '.map-toolbar-bottom-right',
-      '.leaflet-pm-toolbar-container',
-      '.leaflet-pm-actions-container',
-      // Hide original overlays; recreated below with export-safe styles.
-      '.gfc-status-overlay',
-      '.unofficial-badge',
-    ]);
-
-    if (!includeLegendAndStatus) {
-      hideElementsInClone(clonedRoot, ['.map-legend']);
-    }
-
-    addOverlays(clonedRoot, title, statusText || undefined, unofficialText || undefined);
-  });
+  return captureContainer(exportRoot, width, height, format, quality,
+    buildCloneCallback(title, includeLegendAndStatus, statusText, unofficialText)
+  );
 };
 
+// If the map is a Leaflet map, we can create a temporary offscreen map,
+// replicate the view and layers, and render outlooks onto it before capture.
+const addTempMapWarning = (container: HTMLElement) => {
+  console.warn('GFC export: temp map tiles did not finish loading before capture; this may be due to a slow internet connection and could cause blank or incomplete export.');
+  try {
+    const warnDiv = document.createElement('div');
+    warnDiv.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2000;background:rgba(255,69,58,0.95);color:#fff;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600;pointer-events:none;';
+    warnDiv.textContent = 'Warning: Map tiles timed out loading — export may be incomplete.';
+    container.appendChild(warnDiv);
+  } catch (err) {
+    console.warn('GFC export: Failed to display warning about tile load timeout in temp map export.', err);
+  }
+};
+
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
+const getSourceRoot = (map: L.Map): HTMLElement =>
+  (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
+
+// Helper: prepare a temporary map and container for export
+const prepareTempMapAndContainer = (map: L.Map): { tempContainer: HTMLDivElement; tempMap: L.Map; container: HTMLElement } => {
+  const container = map.getContainer();
+  const tempContainer = createTempContainer(container.clientWidth, container.clientHeight);
+  const tempMap = createTempMap(tempContainer, map.getCenter(), map.getZoom(), map.options.crs || L.CRS.EPSG3857);
+  tempMap.fitBounds(map.getBounds(), { animate: false, padding: [0, 0] });
+  tempMap.invalidateSize({ animate: false });
+  return { tempContainer, tempMap, container };
+};
+
+// Helper: cleanup temporary resources
+const cleanupTempMapResources = (tempContainer: HTMLDivElement | null, tempMap: L.Map | null) => {
+  try {
+    if (tempContainer?.parentNode) document.body.removeChild(tempContainer);
+  } catch (err) {
+    console.warn('GFC export: Failed to remove temporary container.', tempContainer, err);
+  }
+
+  try {
+    if (tempMap?.remove) tempMap.remove();
+  } catch (err) {
+    console.warn('GFC export: Failed to remove temporary map instance.', tempMap, err);
+  }
+};
+
+// Helper: perform capture flow on the prepared temp map
+const captureFromTempMap = async (
+  tempContainer: HTMLDivElement,
+  tempMap: L.Map,
+  sourceMap: L.Map,
+  outlooks: OutlookData,
+  options: ExportImageOptions
+): Promise<string> => {
+  const { title, format = 'png', quality = 0.92, includeLegendAndStatus = false } = options;
+
+  // Wait for map settle, add tiles, and render outlooks (returns tile wait result)
+  const waitAndRender = async () => {
+    await waitForMapSettle(tempMap);
+    const tileResult = await addTilesAndWait(tempMap, sourceMap);
+    renderOutlooksToMap(tempMap, outlooks);
+    await new Promise((r) => setTimeout(r, 300));
+    return tileResult;
+  };
+
+  // Prepare overlays (status, unofficial, legend) on the temp container
+  const prepareOverlays = () => {
+    const sourceRoot = getSourceRoot(sourceMap);
+    const statusText = includeLegendAndStatus ? readStatusText(sourceRoot) : '';
+    const unofficialText = includeLegendAndStatus ? readUnofficialText(sourceRoot) : '';
+    if (includeLegendAndStatus) cloneLegendAndStatusOverlays(sourceMap, tempContainer);
+    addOverlays(tempContainer, title, statusText || undefined, unofficialText || undefined);
+  };
+
+  const tileResult = await waitAndRender();
+
+  if (tileResult?.timedOut && tileResult.remaining > 0) {
+    addTempMapWarning(tempContainer);
+  }
+
+  prepareOverlays();
+
+  return captureContainer(tempContainer, sourceMap.getContainer().clientWidth, sourceMap.getContainer().clientHeight, format, quality);
+};
+
+
+// If the map is not a Leaflet map,
+// we fall back to cloning the existing DOM and hope for the best with tile loading and rendering,
+// but we can still add overlays and hide controls for a cleaner export.
 const exportViaTempMapAsImage = async (
   map: L.Map,
   outlooks: OutlookData,
@@ -436,51 +661,17 @@ const exportViaTempMapAsImage = async (
   let tempContainer: HTMLDivElement | null = null;
   let tempMap: L.Map | null = null;
 
-  const {
-    title,
-    format = 'png',
-    quality = 0.92,
-    includeLegendAndStatus = false
-  } = options;
-
   try {
-    const originalBounds = map.getBounds();
-    const container = map.getContainer();
-    tempContainer = createTempContainer(container.clientWidth, container.clientHeight);
-    tempMap = createTempMap(tempContainer, map.getCenter(), map.getZoom(), map.options.crs || L.CRS.EPSG3857);
-    tempMap.fitBounds(originalBounds, { animate: false, padding: [0, 0] });
-    tempMap.invalidateSize({ animate: false });
-    await waitForMapSettle(tempMap);
-    await addTilesAndWait(tempMap, map);
-    renderOutlooksToMap(tempMap, outlooks);
-    await new Promise((r) => setTimeout(r, 300));
-    const sourceRoot = (map.getContainer().closest('.map-container, .forecast-map-container') as HTMLElement | null) || map.getContainer();
-    const statusText = includeLegendAndStatus ? readStatusText(sourceRoot) : '';
-    const unofficialText = includeLegendAndStatus ? readUnofficialText(sourceRoot) : '';
-    if (includeLegendAndStatus) {
-      cloneLegendAndStatusOverlays(map, tempContainer);
-    }
-    addOverlays(tempContainer, title, statusText || undefined, unofficialText || undefined);
-    return captureContainer(tempContainer, container.clientWidth, container.clientHeight, format, quality);
+    const prepared = prepareTempMapAndContainer(map);
+    tempContainer = prepared.tempContainer;
+    tempMap = prepared.tempMap;
+    return await captureFromTempMap(tempContainer, tempMap, map, outlooks, options);
   } finally {
-    try {
-      if (tempContainer?.parentNode) {
-        document.body.removeChild(tempContainer);
-      }
-    } catch {
-      // ignore cleanup errors
-    }
-
-    try {
-      if (tempMap?.remove) {
-        tempMap.remove();
-      }
-    } catch {
-      // ignore cleanup errors
-    }
+    cleanupTempMapResources(tempContainer, tempMap);
   }
 };
 
+// Main export function: attempts live export first, and if it fails (e.g. not a Leaflet map), falls back to temp map approach
 export const exportMapAsImage = async (
   map: unknown,
   outlooks: OutlookData,
@@ -509,3 +700,57 @@ export const downloadDataUrl = (dataUrl: string, filename: string) => {
   link.download = filename;
   link.click();
 };
+
+// Helper: determine export root and dimensions for a map-like object
+function getExportRootAndSize(map: ExportMapLike) {
+  const mapContainer = getExportContainer(map);
+  if (!mapContainer) {
+    throw new Error('Map container not available for export.');
+  }
+
+  const exportRoot = (mapContainer.closest('.map-container, .forecast-map-container') as HTMLElement | null) || mapContainer;
+  const width = exportRoot.clientWidth;
+  const height = exportRoot.clientHeight;
+  return { mapContainer, exportRoot, width, height };
+}
+
+// Helper: show the existing timeout warning banner when images timed out
+function maybeShowTileTimeoutWarning(exportRoot: HTMLElement, imgResult?: { timedOut: boolean; remaining: number } | null) {
+  if (imgResult?.timedOut && imgResult.remaining > 0) {
+    console.warn('GFC export: Some map tiles/images did not finish loading before capture; this is usually caused by a slow internet connection. Export may be incomplete.');
+    try {
+      const warningBanner = document.createElement('div');
+      warningBanner.setAttribute('data-gfc-export-warning', '1');
+      warningBanner.style.cssText = 'position:absolute;top:12px;left:12px;z-index:1600;background:rgba(255,69,58,0.95);color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;pointer-events:none;';
+      warningBanner.textContent = 'Warning: Map tiles timed out loading — check your internet connection. Export may be incomplete.';
+      exportRoot.appendChild(warningBanner);
+      setTimeout(() => { try { warningBanner.remove(); } catch {
+        console.warn('GFC export: Failed to remove on-screen warning about tile load timeout.', warningBanner);
+      } }, 6000);
+    } catch {
+      console.warn('GFC export: Failed to display on-screen warning about tile load timeout.', exportRoot);
+    }
+  }
+}
+
+// Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
+function buildCloneCallback(title?: string, includeLegendAndStatus = false, statusText?: string, unofficialText?: string) {
+  return function (clonedRoot: HTMLElement) {
+    hideElementsInClone(clonedRoot, [
+      '.leaflet-control-container',
+      '.ol-control',
+      '.map-toolbar-bottom-right',
+      '.leaflet-pm-toolbar-container',
+      '.leaflet-pm-actions-container',
+      // Hide original overlays; recreated below with export-safe styles.
+      '.gfc-status-overlay',
+      '.unofficial-badge',
+    ]);
+
+    if (!includeLegendAndStatus) {
+      hideElementsInClone(clonedRoot, ['.map-legend']);
+    }
+
+    addOverlays(clonedRoot, title, statusText || undefined, unofficialText || undefined);
+  };
+}

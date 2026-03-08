@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { store } from './store';
+import type { RootState } from './store';
 import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
-import { RootState } from './store';
 import { OutlookType } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
@@ -25,6 +25,7 @@ import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 const LAUNCH_TIME = new Date('2026-03-01T18:00:00.000Z').getTime(); // noon CST
 const COMING_SOON_MODE = process.env.REACT_APP_COMING_SOON === 'true';
 
+// Custom hook to manage the launch gate, which checks the current date against a predefined launch time and returns whether the app has launched. It also sets up a timer to update the launched state when the launch time is reached, allowing for real-time transition from coming soon mode to live mode without needing a page refresh.
 function useLaunchGate(): boolean {
   const [launched, setLaunched] = useState(() => Date.now() >= LAUNCH_TIME);
   useEffect(() => {
@@ -67,6 +68,9 @@ function App() {
   const showComingSoon = COMING_SOON_MODE && !isLaunched;
   // ToS gate: only shown after launch (not during coming-soon mode)
   const [tosAccepted, setTosAccepted] = useState(() => showComingSoon || hasAcceptedToS());
+  const handleAcceptToS = useCallback(() => {
+    setTosAccepted(true);
+  }, []);
 
   return (
     <Provider store={store}>
@@ -77,7 +81,7 @@ function App() {
         }}
       >
         {!showComingSoon && !tosAccepted && (
-          <ToSModal onAccept={() => setTosAccepted(true)} />
+          <ToSModal onAccept={handleAcceptToS} />
         )}
         {(!showComingSoon && tosAccepted) && <AppHooks />}
         <Routes>

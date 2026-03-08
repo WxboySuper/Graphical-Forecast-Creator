@@ -1,6 +1,17 @@
 # Changelog
+<!-- markdownlint-disable -->
 
 All notable changes to this project will be documented in this file.
+
+## [1.1.0] - 2026-03-07
+
+### Fixed
+- **Discussion auto-save:** Discussion editor changes now auto-save after a short debounce by syncing local editor state back to Redux, which ensures the existing global auto-save-to-localStorage flow captures discussion updates even without clicking Save.
+- **Verification storm reports:** Prevented same-day NOAA storm report fetch attempts (which often return 404 before archive publication) by detecting local "today" and showing an informational message instead of a fetch error. Also added a distinct info-state message style for "no reports found" and same-day availability notices.
+- **Export (dark mode):** Fixed issue where map exports could render as a blank (black) image in dark mode. Root cause was an OpenLayers canvas being tainted by tile images requested without CORS. The fix sets `crossOrigin: 'anonymous'` on OpenLayers `OSM`/`XYZ` sources, ensures cloned images request CORS during export, and waits for the OpenLayers `rendercomplete` / tile load before capturing with `html2canvas`. Verified on branch `fix/blank-dark-mode-export`.
+- **Export warnings:** Added a console warning and an on-screen export banner (for live exports) when map tiles/images fail to load before capture, so users and developers can tell when the issue is network-related rather than a bug. Verified during manual export tests.
+- **Layer ordering (forecast + verification maps):** Added top overlay layers so state outlines and map labels/city names render above outlook polygons, improving readability when polygons cover dense areas.
+- **Polygon snapping:** Added OpenLayers Snap interactions for both probabilistic and categorical sources so drawing and editing can snap to existing vertices/segments (disabled only in delete mode).
 
 ## [1.0.0] - 2026-03-01
 

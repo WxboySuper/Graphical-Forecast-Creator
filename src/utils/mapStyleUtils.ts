@@ -1,9 +1,11 @@
-import { PathOptions } from 'leaflet';
 import { OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
 import { Feature } from 'geojson';
 
-export type FeatureStyle = PathOptions & {
+export type FeatureStyle = {
+  color?: string;
+  weight?: number;
+  opacity?: number;
   className?: string;
   zIndex?: number;
   fillColor?: string;
@@ -14,6 +16,16 @@ const RISK_ORDER: Record<string, number> = {
   TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 4, HIGH: 5
 };
 
+/**
+ * Sort probability entries for rendering order.
+ * - Places CIG entries after numeric probabilities and sorts them lexicographically.
+ * - Keeps 'TSTM' at the start.
+ * - Uses `RISK_ORDER` for categorical ordering when available.
+ * - Falls back to numeric percent ordering for percentage-style probabilities.
+ *
+ * @param entries - Array of `[probability, features]` tuples to sort
+ * @returns A new array sorted according to rendering priority
+ */
 export const sortProbabilities = (entries: [string, Feature[]][]): [string, Feature[]][] => {
   return [...entries].sort((a, b) => {
     const [probA, probB] = [a[0], b[0]];
@@ -36,29 +48,39 @@ export const sortProbabilities = (entries: [string, Feature[]][]): [string, Feat
       return RISK_ORDER[probA] - RISK_ORDER[probB];
     }
 
+    /**
+     * Extract a numeric percent value from a probability string (e.g. '40%' -> 40).
+     * Non-numeric strings return 0.
+     *
+     * @param prob - Probability string to parse
+     * @returns Numeric percent value or 0
+     */
     const getPercentValue = (prob: string) => parseInt(prob.replace(/[^0-9]/g, '')) || 0;
     return getPercentValue(probA) - getPercentValue(probB);
   });
 };
 
+/**
+ * Lookup display color for a given outlook type and probability.
+ * Falls back to white ('#FFFFFF') if no mapping exists.
+ *
+ * @param outlookType - The outlook type (e.g. 'categorical', 'tornado')
+ * @param probability - The probability key to lookup
+ * @returns Hex color string for use as a fill color
+ */
 export const lookupColor = (outlookType: OutlookType, probability: string) => {
-  switch (outlookType) {
-    case 'categorical':
-      return colorMappings.categorical[probability as keyof typeof colorMappings.categorical] || '#FFFFFF';
-    case 'tornado':
-      return colorMappings.tornado[probability as keyof typeof colorMappings.tornado] || '#FFFFFF';
-    case 'wind':
-    case 'hail':
-      return colorMappings.wind[probability as keyof typeof colorMappings.wind] || '#FFFFFF';
-    case 'totalSevere':
-      return colorMappings.totalSevere[probability as keyof typeof colorMappings.totalSevere] || '#FFFFFF';
-    case 'day4-8':
-      return colorMappings['day4-8'][probability as keyof typeof colorMappings['day4-8']] || '#FFFFFF';
-    default:
-      return '#FFFFFF';
-  }
+  const mapping = colorMappings[outlookType as keyof typeof colorMappings] as Record<string, string>;
+  return mapping?.[probability] ?? '#FFFFFF';
 };
 
+/**
+ * Compute a z-index for drawing features based on outlook type
+ * and probability so higher-risk polygons render above lower-risk ones.
+ *
+ * @param outlookType - The outlook type
+ * @param probability - The probability string used to weight ordering
+ * @returns Numeric z-index for layer/feature ordering
+ */
 export const computeZIndex = (outlookType: OutlookType, probability: string) => {
   let baseZIndex = 400;
   if (outlookType === 'categorical') {
@@ -74,6 +96,16 @@ export const computeZIndex = (outlookType: OutlookType, probability: string) => 
   return baseZIndex;
 };
 
+/**
+ * Create a `FeatureStyle` describing stroke/fill and z-index for a
+ * specific outlook/probability combination. Handles special 'CIG'
+ * pattern values and provides sensible defaults for categorical and
+ * non-categorical outlooks.
+ *
+ * @param outlookType - The outlook type (e.g. 'categorical')
+ * @param probability - The probability string
+ * @returns A `FeatureStyle` object used by rendering code
+ */
 export const getFeatureStyle = (outlookType: OutlookType, probability: string): FeatureStyle => {
   if (probability.startsWith('CIG')) {
     const patternMap: Record<string, string> = {

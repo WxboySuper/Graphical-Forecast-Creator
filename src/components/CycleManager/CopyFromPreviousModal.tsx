@@ -13,6 +13,74 @@ interface CopyFromPreviousModalProps {
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
+// Accessibility helpers for modals: focusable elements and keyboard handling
+const getFocusableElements = (root: HTMLElement | null): HTMLElement[] => {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter(el => {
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  });
+};
+
+// Returns true when Shift+Tab should wrap focus back to the last element.
+const shouldWrapBackward = (focusable: HTMLElement[], isInModal: boolean): boolean =>
+  !isInModal || document.activeElement === focusable[0];
+
+// Returns true when Tab should wrap focus forward to the first element.
+const shouldWrapForward = (focusable: HTMLElement[], isInModal: boolean): boolean =>
+  !isInModal || document.activeElement === focusable[focusable.length - 1];
+
+// Separate function to handle tab navigation for better readability and maintainability. It checks if the currently focused element is the first or last focusable element in the modal and cycles focus accordingly when the Tab key is pressed, ensuring that keyboard users can navigate through the modal without losing focus outside of it.
+const handleTabNavigation = (event: KeyboardEvent, modalRef: React.RefObject<HTMLDivElement>) => {
+  if (!modalRef.current) return;
+  const focusable = getFocusableElements(modalRef.current);
+  if (focusable.length === 0) return;
+  const isInModal = focusable.includes(document.activeElement as HTMLElement);
+
+  if (event.shiftKey && shouldWrapBackward(focusable, isInModal)) {
+    event.preventDefault();
+    focusable[focusable.length - 1].focus();
+  } else if (!event.shiftKey && shouldWrapForward(focusable, isInModal)) {
+    event.preventDefault();
+    focusable[0].focus();
+  }
+};
+
+// Handler for keyboard events in the modal, which implements focus trapping and allows closing the modal with the Escape key. It checks for Tab key presses to cycle focus within the modal and ensures that focus does not escape to elements outside the modal while it is open. It also listens for the Escape key to trigger the onClose function, allowing users to easily close the modal using the keyboard. This enhances accessibility for users who rely on keyboard navigation.
+const handleModalKeyDown = (
+  event: KeyboardEvent,
+  modalRef: React.RefObject<HTMLDivElement>,
+  onClose: () => void
+) => {
+  if (event.key === 'Escape') {
+    onClose();
+    return;
+  }
+
+  if (event.key === 'Tab') {
+    handleTabNavigation(event, modalRef);
+  }
+};
+
+// Read a file as text (Promise wrapper) and deserialize into ForecastCycle
+const readFileAsText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file.'));
+    reader.readAsText(file);
+  });
+
+/** Reads and parses a GFC JSON forecast file into a ForecastCycle object. */
+const parseForecastFile = async (file: File): Promise<ForecastCycle> => {
+  const content = await readFileAsText(file);
+  const parsed = JSON.parse(content);
+  return deserializeForecast(parsed);
+};
+
+// Component for the "Copy from Previous Cycle" modal, which allows users to load a forecast file from a previous cycle and copy features from a selected day in that file to a selected day in the current cycle. The modal includes file input for loading the forecast, dropdowns for selecting source and target days, and handles the copying logic while providing feedback through toast notifications. It also implements accessibility features such as focus trapping and keyboard navigation.
 const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
@@ -28,75 +96,41 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-        return;
-      }
-      if (event.key === 'Tab' && modalRef.current) {
-        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey) {
-          if (document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }
-      }
-    };
+    /** Keyboard event handler that traps focus and allows Escape to close the modal. */
+    const handler = (event: KeyboardEvent) => handleModalKeyDown(event, modalRef, onClose);
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handler);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handler);
     };
   }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen || !modalRef.current) return;
-    const first = modalRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )[0];
+    const first = getFocusableElements(modalRef.current)[0];
     first?.focus();
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleFileLoad = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handler for file selection when loading a forecast from JSON, which reads the selected file and parses it as a ForecastCycle object. It updates the local state with the loaded cycle and file name, and shows error toasts if the file cannot be read or parsed correctly. After handling the file, it resets the file input value to allow for loading the same file again if needed.
+  const handleFileLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const parsed = JSON.parse(content);
-        const cycle = deserializeForecast(parsed);
-        setLoadedCycle(cycle);
-        setLoadedFileName(file.name);
-      } catch {
-        addToast('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.', 'error');
-      }
-    };
-    reader.onerror = () => {
-      addToast('Failed to read file. Please check file permissions and try again.', 'error');
-    };
-    reader.readAsText(file);
-    
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    try {
+      const cycle = await parseForecastFile(file);
+      setLoadedCycle(cycle);
+      setLoadedFileName(file.name);
+    } catch {
+      addToast('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.', 'error');
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
+  // Handler for copying features from the loaded cycle's source day to the current cycle's target day. It checks if a cycle is loaded, then dispatches the copyFeaturesFromPrevious action with the selected source and target days. After copying, it shows a success toast notification and closes the modal.
   const handleCopy = () => {
     if (!loadedCycle) {
       addToast('Please load a forecast file first.', 'warning');
@@ -113,9 +147,19 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
     onClose();
   };
 
+  // Handlers for day selection changes
+  const handleSourceDayChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSourceDay(Number(e.target.value) as DayType);
+  };
+
+  // Note: The target day defaults to the currently selected day in the app, but the user can change it to any day. The copy logic will handle converting features appropriately based on the source and target day formats.
+  const handleTargetDayChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTargetDay(Number(e.target.value) as DayType);
+  };
+
   return (
     <>
-      <div className="copy-modal-overlay" onClick={onClose}></div>
+      <div className="copy-modal-overlay" onClick={onClose} />
       <div
         className="copy-modal"
         role="dialog"
@@ -152,7 +196,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
                   <select
                     id="source-day"
                     value={sourceDay}
-                    onChange={(e) => setSourceDay(Number(e.target.value) as DayType)}
+                    onChange={handleSourceDayChange}
                     className="copy-select"
                   >
                     {DAYS.map((day) => (
@@ -170,7 +214,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
                   <select
                     id="target-day"
                     value={targetDay}
-                    onChange={(e) => setTargetDay(Number(e.target.value) as DayType)}
+                    onChange={handleTargetDayChange}
                     className="copy-select"
                   >
                     {DAYS.map((day) => (

@@ -9,70 +9,295 @@ import { useAppLayout } from '../Layout/AppLayout';
 import './VerificationMode.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
+type VerificationOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail';
+
+// Helper function to extract available days from the loaded forecast data, which checks the days object in the deserialized forecast and returns an array of day types that have data. This is used to populate the day selector buttons in the UI so users can only select days that actually have forecast data to view.
+const getAvailableDays = (days: Record<string, unknown> | undefined): DayType[] => {
+  if (!days) {
+    return [];
+  }
+
+  return (Object.keys(days) as unknown as DayType[])
+    .filter((day) => Boolean((days as Record<DayType, unknown>)[day]))
+    .sort((a, b) => a - b);
+};
+
+// Helper function to read a file as text, which returns a promise that resolves with the file content as a string. This is used when loading a forecast file to read its contents before parsing and validating it.
+const readFileAsText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file. Please check file permissions and try again.'));
+    reader.readAsText(file);
+  });
+
+// Parses and validates the loaded forecast file, which reads the file content as text, parses it as JSON, and then validates the structure to ensure it matches the expected format for a GFC forecast. If the file is valid, it returns the deserialized forecast object; otherwise, it throws an error with an appropriate message.
+const parseAndValidateForecast = async (file: File) => {
+  const content = await readFileAsText(file);
+  const json = JSON.parse(content);
+
+  if (!validateForecastData(json)) {
+    throw new Error('Invalid forecast file format. Please ensure it\'s a valid GFC forecast JSON.');
+  }
+
+  return deserializeForecast(json);
+};
+
+// Helper function to analyze verification results by comparing storm reports against the forecast outlooks, which takes in the storm reports and the outlook data for the selected day and calculates various metrics such as total reports, reports by type, and hit/miss analysis for each outlook type. It returns a structured result that can be used to display verification summaries in the UI.
+const VerificationModeHeader: React.FC = () => (
+  <div className="verification-header">
+    <h2>Forecast Verification Mode</h2>
+    <p className="verification-subtitle">
+      Load a saved forecast and compare it against actual storm reports
+    </p>
+  </div>
+);
+
+// Component for selecting the forecast day to view in verification mode, which renders a set of buttons for each available day based on the loaded forecast data. When a day button is clicked, it calls the onDayClick handler passed in as a prop to update the selected day in the parent component's state.
+const DaySelectorSection: React.FC<{
+  selectedDay: DayType;
+  availableDays: DayType[];
+  onDayClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ selectedDay, availableDays, onDayClick }) => (
+  <div className="day-selector-section">
+    <label>Forecast Day:</label>
+    <div className="day-selector-buttons">
+      {availableDays.map((day) => (
+        <button
+          key={day}
+          className={`day-btn ${selectedDay === day ? 'active' : ''}`}
+          data-day={day}
+          onClick={onDayClick}
+          title={`Day ${day}`}
+        >
+          Day {day}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+// Helper function to compare risk levels for sorting purposes, which defines a specific order for risk levels (e.g., High > Moderate > Slight > Marginal) and returns a value that can be used to sort them accordingly when displaying verification summaries by risk level.
+const OutlookTypeSelector: React.FC<{
+  activeOutlookType: VerificationOutlookType;
+  onSelectCategorical: () => void;
+  onSelectTornado: () => void;
+  onSelectWind: () => void;
+  onSelectHail: () => void;
+}> = ({
+  activeOutlookType,
+  onSelectCategorical,
+  onSelectTornado,
+  onSelectWind,
+  onSelectHail
+}) => (
+  <div className="outlook-type-selector">
+    <label>View Outlook Type:</label>
+    <div className="outlook-type-buttons">
+      <button
+        className={`outlook-type-btn ${activeOutlookType === 'categorical' ? 'active' : ''}`}
+        onClick={onSelectCategorical}
+      >
+        📊 Categorical
+      </button>
+      <button
+        className={`outlook-type-btn ${activeOutlookType === 'tornado' ? 'active' : ''}`}
+        onClick={onSelectTornado}
+      >
+        🌪️ Tornado
+      </button>
+      <button
+        className={`outlook-type-btn ${activeOutlookType === 'wind' ? 'active' : ''}`}
+        onClick={onSelectWind}
+      >
+        💨 Wind
+      </button>
+      <button
+        className={`outlook-type-btn ${activeOutlookType === 'hail' ? 'active' : ''}`}
+        onClick={onSelectHail}
+      >
+        🧊 Hail
+      </button>
+    </div>
+  </div>
+);
+
+// Sub-component showing the checkmark and file name once a forecast is loaded.
+const LoadedIndicator: React.FC<{ fileName: string }> = ({ fileName }) => (
+  <div className="loaded-indicator">
+    <span className="checkmark">✓</span>
+    <div>
+      <strong>Forecast Loaded</strong>
+      <p className="file-name">{fileName}</p>
+    </div>
+  </div>
+);
+
+// Sidebar component that shows the forecast loading section and the verification panel, which conditionally renders either a file upload area for loading a forecast or the verification panel with storm report filters based on whether a forecast has been loaded. It also includes handlers for loading a forecast file and clearing the loaded forecast, which are passed down as props from the parent component.
+const ForecastLoaderSection: React.FC<{
+  forecastLoaded: boolean;
+  fileName: string;
+  onLoadForecast: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onClearForecast: () => void;
+}> = ({ forecastLoaded, fileName, onLoadForecast, onClearForecast }) => {
+  if (!forecastLoaded) {
+    return (
+      <div className="forecast-loader-section">
+        <h3>Step 1: Load Forecast</h3>
+        <div className="file-upload-area">
+          <label htmlFor="forecast-file" className="file-upload-label">
+            <div className="upload-icon">📁</div>
+            <span>Choose Forecast File</span>
+            <input
+              type="file"
+              id="forecast-file"
+              accept=".json"
+              onChange={onLoadForecast}
+              className="file-input"
+            />
+          </label>
+          <p className="upload-hint">
+            Select a .json forecast file exported from the Outlook Creator
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="forecast-loader-section">
+      <h3>Step 1: Load Forecast</h3>
+      <div className="forecast-loaded">
+        <LoadedIndicator fileName={fileName} />
+        <button onClick={onClearForecast} className="clear-forecast-btn">
+          Load Different Forecast
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Main sidebar component that conditionally renders the forecast loader or the verification panel based on whether a forecast has been loaded, which also manages the state for the loaded forecast file name, active outlook type, selected day, and available days. It passes down necessary handlers and state as props to the child components for loading forecasts, selecting outlook types, and selecting days.
+const VerificationSidebar: React.FC<{
+  forecastLoaded: boolean;
+  fileName: string;
+  activeOutlookType: VerificationOutlookType;
+  selectedDay: DayType;
+  onLoadForecast: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onClearForecast: () => void;
+}> = ({
+  forecastLoaded,
+  fileName,
+  activeOutlookType,
+  selectedDay,
+  onLoadForecast,
+  onClearForecast
+}) => {
+  if (!forecastLoaded) {
+    return (
+      <div className="verification-sidebar">
+        <ForecastLoaderSection
+          forecastLoaded={forecastLoaded}
+          fileName={fileName}
+          onLoadForecast={onLoadForecast}
+          onClearForecast={onClearForecast}
+        />
+        <div className="waiting-message">
+          <p>👈 Load a forecast to begin verification</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="verification-sidebar">
+      <ForecastLoaderSection
+        forecastLoaded={forecastLoaded}
+        fileName={fileName}
+        onLoadForecast={onLoadForecast}
+        onClearForecast={onClearForecast}
+      />
+      <div className="reports-section">
+        <h3>Step 2: Load Storm Reports</h3>
+        <VerificationPanel activeOutlookType={activeOutlookType} selectedDay={selectedDay} />
+      </div>
+    </div>
+  );
+};
+
+// Main component for the verification mode, which manages the overall state for the loaded forecast, selected day, active outlook type, and handles the logic for loading a forecast file, clearing the loaded forecast, and selecting different outlook types and days. It renders the header, day selector, outlook type selector, sidebar with forecast loading and verification panel, and the verification map that displays the forecast and storm reports based on the selected options.
 const VerificationMode: React.FC = () => {
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
   const mapRef = useRef<VerificationMapHandle>(null);
   const [forecastLoaded, setForecastLoaded] = useState(false);
   const [fileName, setFileName] = useState<string>('');
-  const [activeOutlookType, setActiveOutlookType] = useState<'categorical' | 'tornado' | 'wind' | 'hail'>('categorical');
+  const [activeOutlookType, setActiveOutlookType] = useState<VerificationOutlookType>('categorical');
   const [selectedDay, setSelectedDay] = useState<DayType>(1);
   const [availableDays, setAvailableDays] = useState<DayType[]>([]);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const handleLoadForecast = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handler for when a forecast file is selected for loading, which reads the file, parses and validates it, and then dispatches an action to load the forecast data into the Redux store. It also updates local state for the loaded file name, available days based on the forecast data, and shows toast notifications for success or error cases.
+  const handleLoadForecast = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setFileName(file.name);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const json = JSON.parse(content);
+    try {
+      const deserialized = await parseAndValidateForecast(file);
+      const daysWithData = getAvailableDays(deserialized.days as Record<string, unknown> | undefined);
 
-        // Validate the forecast data
-        if (!validateForecastData(json)) {
-          addToast('Invalid forecast file format. Please ensure it\'s a valid GFC forecast JSON.', 'error');
-          return;
-        }
-
-        // Deserialize and import the forecast
-        const deserialized = deserializeForecast(json);
-        dispatch(loadVerificationForecast(deserialized));
-        
-        // Extract available days from the forecast cycle
-        const daysWithData: DayType[] = [];
-        if (deserialized.days) {
-          (Object.keys(deserialized.days) as unknown as DayType[]).forEach((day) => {
-            const dayData = deserialized.days[day];
-            if (dayData) {
-              daysWithData.push(day);
-            }
-          });
-        }
-        
-        setAvailableDays(daysWithData.sort((a, b) => a - b));
-        setSelectedDay(daysWithData[0] || 1);
-        setForecastLoaded(true);
-
-        addToast('Forecast loaded! Load storm reports to begin verification.', 'success');
-      } catch {
-        addToast('Failed to load forecast file. Please ensure it\'s a valid GFC forecast JSON.', 'error');
-      }
-    };
-    reader.onerror = () => {
-      addToast('Failed to read file. Please check file permissions and try again.', 'error');
-    };
-
-    reader.readAsText(file);
+      dispatch(loadVerificationForecast(deserialized));
+      setAvailableDays(daysWithData);
+      setSelectedDay(daysWithData[0] || 1);
+      setForecastLoaded(true);
+      addToast('Forecast loaded! Load storm reports to begin verification.', 'success');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Failed to load forecast file. Please ensure it\'s a valid GFC forecast JSON.';
+      addToast(message, 'error');
+    } finally {
+      event.target.value = '';
+    }
   }, [dispatch, addToast]);
 
+  // Handler for when the user clicks the button to clear the loaded forecast, which opens a confirmation modal to confirm the action. If the user confirms, it dispatches an action to clear the forecast data from the Redux store and resets local state related to the loaded forecast. If the user cancels, it simply closes the confirmation modal without making any changes.
   const handleClearForecast = useCallback(() => {
     setConfirmClear(true);
   }, []);
 
+  // Canceling clear just closes the confirmation modal without changing anything
+  const handleCancelClear = useCallback(() => {
+    setConfirmClear(false);
+  }, []);
+
+  // Outlook type selection handlers
+  const handleSelectOutlook = useCallback((type: VerificationOutlookType) => {
+    setActiveOutlookType(type);
+  }, []);
+
+  const outlookHandlers = React.useMemo(() => ({
+    categorical: () => handleSelectOutlook('categorical'),
+    tornado: () => handleSelectOutlook('tornado'),
+    wind: () => handleSelectOutlook('wind'),
+    hail: () => handleSelectOutlook('hail'),
+  }), [handleSelectOutlook]);
+
+  // Handler for day selection buttons
+  const handleDayButtonClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    const day = Number(event.currentTarget.dataset.day) as DayType;
+    if (Number.isNaN(day)) {
+      return;
+    }
+
+    setSelectedDay(day);
+  }, []);
+
+  // Handler for confirming forecast clear, which dispatches an action to clear the forecast data from the Redux store and resets local state related to the loaded forecast. This is called when the user confirms they want to clear the loaded forecast in the confirmation modal.
   const handleConfirmClear = useCallback(() => {
     dispatch(clearVerificationForecast());
     setForecastLoaded(false);
@@ -84,113 +309,35 @@ const VerificationMode: React.FC = () => {
 
   return (
     <div className="verification-mode">
-      <div className="verification-header">
-        <h2>Forecast Verification Mode</h2>
-        <p className="verification-subtitle">
-          Load a saved forecast and compare it against actual storm reports
-        </p>
-      </div>
+      <VerificationModeHeader />
 
       {forecastLoaded && (
         <>
-          <div className="day-selector-section">
-            <label>Forecast Day:</label>
-            <div className="day-selector-buttons">
-              {availableDays.map((day) => (
-                <button
-                  key={day}
-                  className={`day-btn ${selectedDay === day ? 'active' : ''}`}
-                  onClick={() => setSelectedDay(day)}
-                  title={`Day ${day}`}
-                >
-                  Day {day}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          <div className="outlook-type-selector">
-            <label>View Outlook Type:</label>
-            <div className="outlook-type-buttons">
-              <button
-                className={`outlook-type-btn ${activeOutlookType === 'categorical' ? 'active' : ''}`}
-                onClick={() => setActiveOutlookType('categorical')}
-              >
-                📊 Categorical
-              </button>
-              <button
-                className={`outlook-type-btn ${activeOutlookType === 'tornado' ? 'active' : ''}`}
-                onClick={() => setActiveOutlookType('tornado')}
-              >
-                🌪️ Tornado
-              </button>
-              <button
-                className={`outlook-type-btn ${activeOutlookType === 'wind' ? 'active' : ''}`}
-                onClick={() => setActiveOutlookType('wind')}
-              >
-                💨 Wind
-              </button>
-              <button
-                className={`outlook-type-btn ${activeOutlookType === 'hail' ? 'active' : ''}`}
-                onClick={() => setActiveOutlookType('hail')}
-              >
-                🧊 Hail
-              </button>
-            </div>
-          </div>
+          <DaySelectorSection
+            selectedDay={selectedDay}
+            availableDays={availableDays}
+            onDayClick={handleDayButtonClick}
+          />
+
+          <OutlookTypeSelector
+            activeOutlookType={activeOutlookType}
+            onSelectCategorical={outlookHandlers.categorical}
+            onSelectTornado={outlookHandlers.tornado}
+            onSelectWind={outlookHandlers.wind}
+            onSelectHail={outlookHandlers.hail}
+          />
         </>
       )}
 
       <div className="verification-content">
-        <div className="verification-sidebar">
-          <div className="forecast-loader-section">
-            <h3>Step 1: Load Forecast</h3>
-            {!forecastLoaded ? (
-              <div className="file-upload-area">
-                <label htmlFor="forecast-file" className="file-upload-label">
-                  <div className="upload-icon">📁</div>
-                  <span>Choose Forecast File</span>
-                  <input
-                    type="file"
-                    id="forecast-file"
-                    accept=".json"
-                    onChange={handleLoadForecast}
-                    className="file-input"
-                  />
-                </label>
-                <p className="upload-hint">
-                  Select a .json forecast file exported from the Outlook Creator
-                </p>
-              </div>
-            ) : (
-              <div className="forecast-loaded">
-                <div className="loaded-indicator">
-                  <span className="checkmark">✓</span>
-                  <div>
-                    <strong>Forecast Loaded</strong>
-                    <p className="file-name">{fileName}</p>
-                  </div>
-                </div>
-                <button onClick={handleClearForecast} className="clear-forecast-btn">
-                  Load Different Forecast
-                </button>
-              </div>
-            )}
-          </div>
-
-          {forecastLoaded && (
-            <div className="reports-section">
-              <h3>Step 2: Load Storm Reports</h3>
-              <VerificationPanel activeOutlookType={activeOutlookType} selectedDay={selectedDay} />
-            </div>
-          )}
-
-          {!forecastLoaded && (
-            <div className="waiting-message">
-              <p>👈 Load a forecast to begin verification</p>
-            </div>
-          )}
-        </div>
+        <VerificationSidebar
+          forecastLoaded={forecastLoaded}
+          fileName={fileName}
+          activeOutlookType={activeOutlookType}
+          selectedDay={selectedDay}
+          onLoadForecast={handleLoadForecast}
+          onClearForecast={handleClearForecast}
+        />
 
         <div className="verification-map-container">
           <VerificationMap ref={mapRef} activeOutlookType={activeOutlookType} selectedDay={selectedDay} />
@@ -201,7 +348,7 @@ const VerificationMode: React.FC = () => {
         title="Clear Forecast"
         message="Clear the loaded forecast? This will also clear any storm reports."
         onConfirm={handleConfirmClear}
-        onCancel={() => setConfirmClear(false)}
+        onCancel={handleCancelClear}
         confirmLabel="Clear"
       />
     </div>

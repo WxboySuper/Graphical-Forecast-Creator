@@ -7,11 +7,24 @@ interface GuidedDiscussionEditorProps {
   onChange: (content: GuidedDiscussionData) => void;
 }
 
+// The GuidedDiscussionEditor component provides a structured interface for forecasters to input their discussion content. It breaks down the discussion into specific sections with guiding questions, helping forecasters to organize their thoughts and ensure they cover all relevant aspects of the forecast. Each section has a header, a question prompt, and a textarea for input. The onChange handler is called whenever any of the textareas are updated, allowing the parent component to maintain the overall state of the discussion content.
 const GuidedDiscussionEditor: React.FC<GuidedDiscussionEditorProps> = ({ content, onChange }) => {
+  // Function to update a specific field in the discussion content
   const updateField = (field: keyof GuidedDiscussionData, value: string) => {
     onChange({ ...content, [field]: value });
   };
 
+  // Handler for changes in any of the textareas. The data-field attribute on each textarea indicates which field of the GuidedDiscussionData is being updated, allowing this single handler to manage updates for all sections.
+  const handleFieldChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const field = e.currentTarget.dataset.field as keyof GuidedDiscussionData | undefined;
+    if (!field) {
+      return;
+    }
+
+    updateField(field, e.target.value);
+  };
+
+  // List of guided questions for the discussion editor
   const guidedQuestions = [
     {
       field: 'synopsis' as keyof GuidedDiscussionData,
@@ -73,7 +86,8 @@ const GuidedDiscussionEditor: React.FC<GuidedDiscussionEditorProps> = ({ content
           <textarea
             className="guided-textarea"
             value={content[item.field]}
-            onChange={(e) => updateField(item.field, e.target.value)}
+            data-field={item.field}
+            onChange={handleFieldChange}
             placeholder={item.placeholder}
             rows={item.rows}
             spellCheck={true}
