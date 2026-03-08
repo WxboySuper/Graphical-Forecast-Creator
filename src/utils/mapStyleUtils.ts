@@ -1,9 +1,11 @@
-import { PathOptions } from 'leaflet';
 import { OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
 import { Feature } from 'geojson';
 
-export type FeatureStyle = PathOptions & {
+export type FeatureStyle = {
+  color?: string;
+  weight?: number;
+  opacity?: number;
   className?: string;
   zIndex?: number;
   fillColor?: string;
