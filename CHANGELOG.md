@@ -3,7 +3,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.1.0] - 2026-03-07
 
 ### Fixed
 - **Discussion auto-save:** Discussion editor changes now auto-save after a short debounce by syncing local editor state back to Redux, which ensures the existing global auto-save-to-localStorage flow captures discussion updates even without clicking Save.
