@@ -3,11 +3,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.2.0] - 2026-03-15
 
 ### Added
 - **Forecast undo/redo:** Added undo and redo controls to the forecast page toolbar, along with standard keyboard shortcuts (`Ctrl/Cmd+Z`, `Ctrl/Cmd+Y`, and `Ctrl/Cmd+Shift+Z`) for reversible drawing edits.
 
+### Fixed
+- **Porting automation:** Updated the internal PR porting workflow so it cherry-picks only the original merged PR commits and cleans up temporary `port/*` branches after their PRs close, which keeps branch synchronization cleaner and avoids noisy port PRs.
 ## [1.1.0] - 2026-03-07
 
 ### Fixed
