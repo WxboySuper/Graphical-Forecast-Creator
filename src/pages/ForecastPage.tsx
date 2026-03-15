@@ -275,6 +275,7 @@ const isCommandShortcutKey = (key: string): key is CommandShortcutKey => {
   return key === 's' || key === 'o' || key === 'l' || key === 'e';
 };
 
+/** Handles the app-level undo/redo shortcuts before browser defaults can consume them. */
 const handleUndoRedoShortcuts = (
   e: KeyboardEvent,
   key: string,

@@ -39,6 +39,7 @@ interface ForecastHistoryEntry {
 
 const HISTORY_LIMIT = 50;
 
+/** Creates an empty forecast day with the outlook maps supported for that day number. */
 const createEmptyOutlook = (day: DayType): OutlookDay => {
   const baseData: OutlookData = {};
   
@@ -101,6 +102,7 @@ const computeOutlookType = (feature: Feature, state: ForecastState): OutlookType
   return (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
 };
 
+/** Normalizes a feature's probability into the store format for its outlook type. */
 const computeProbability = (feature: Feature, state: ForecastState): string => {
   const fallback = state.drawingState.activeProbability;
   const base = (feature.properties?.probability ?? fallback) as string;
@@ -120,6 +122,7 @@ const computeProbability = (feature: Feature, state: ForecastState): string => {
   return `${normalized}%`;
 };
 
+/** Ensures new features carry the active outlook metadata required by the editor. */
 const buildFeatureWithProps = (
   feature: Feature,
   outlookType: OutlookType,
@@ -149,15 +152,17 @@ const getCurrentOutlook = (state: ForecastState): OutlookData => {
   return day.data;
 };
 
-const cloneOutlookData = (data: OutlookData): OutlookData => {
-  const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | undefined => {
-    if (!map) return undefined;
-    return new Map(Array.from(map.entries(), ([probability, features]) => [
-      probability,
-      features.map((feature) => JSON.parse(JSON.stringify(feature)) as Feature),
-    ]));
-  };
+/** Deep-clones one probability map so undo/redo snapshots do not share mutable arrays. */
+const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | undefined => {
+  if (!map) return undefined;
+  return new Map(Array.from(map.entries(), ([probability, features]) => [
+    probability,
+    features.map((feature) => JSON.parse(JSON.stringify(feature)) as Feature),
+  ]));
+};
 
+/** Deep-clones all outlook maps for a day so history snapshots remain isolated from live edits. */
+const cloneOutlookData = (data: OutlookData): OutlookData => {
   return {
     tornado: cloneEntries(data.tornado),
     wind: cloneEntries(data.wind),
@@ -168,6 +173,7 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
   };
 };
 
+/** Captures the current day's drawable outlook data and low-probability metadata for history. */
 const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {
   const currentDay = state.forecastCycle.currentDay;
   const dayData = state.forecastCycle.days[currentDay];
@@ -180,6 +186,7 @@ const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null
   };
 };
 
+/** Applies a stored day snapshot back into Redux state during undo/redo restoration. */
 const applyDaySnapshot = (state: ForecastState, snapshot: ForecastDaySnapshot) => {
   const dayData = state.forecastCycle.days[snapshot.day];
   if (!dayData) {
@@ -194,23 +201,83 @@ const applyDaySnapshot = (state: ForecastState, snapshot: ForecastDaySnapshot) =
   targetDay.metadata.lastModified = new Date().toISOString();
 };
 
+/** Moves the current day snapshot onto the provided history stack before a reversible edit. */
+const pushHistoryEntry = (
+  stack: ForecastHistoryEntry[],
+  snapshot: ForecastDaySnapshot
+) => {
+  stack.push({
+    day: snapshot.day,
+    snapshot,
+  });
+  if (stack.length > HISTORY_LIMIT) {
+    stack.shift();
+  }
+};
+
+/** Saves the current day into the undo stack and clears redo after a new user edit. */
 const pushUndoSnapshot = (state: ForecastState) => {
   const snapshot = getCurrentDaySnapshot(state);
   if (!snapshot) return;
 
-  state.undoStack.push({
-    day: snapshot.day,
-    snapshot,
-  });
-  if (state.undoStack.length > HISTORY_LIMIT) {
-    state.undoStack.shift();
-  }
+  pushHistoryEntry(state.undoStack, snapshot);
   state.redoStack = [];
 };
 
+/** Clears both history stacks when the editing context changes to a new document/day. */
 const clearHistory = (state: ForecastState) => {
   state.undoStack = [];
   state.redoStack = [];
+};
+
+/** Ensures low-probability metadata exists before mutating it in reducers. */
+const ensureLowProbabilityOutlooks = (dayData: OutlookDay): OutlookType[] => {
+  if (!dayData.metadata.lowProbabilityOutlooks) {
+    dayData.metadata.lowProbabilityOutlooks = [];
+  }
+
+  return dayData.metadata.lowProbabilityOutlooks;
+};
+
+/** Applies a low-probability toggle for one outlook type and clears its features when enabled. */
+const setLowProbabilityState = (
+  state: ForecastState,
+  outlookType: OutlookType,
+  isLow: boolean
+) => {
+  const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
+  if (!dayData) return;
+
+  const lowProbabilityOutlooks = ensureLowProbabilityOutlooks(dayData);
+  const isCurrentlyLow = lowProbabilityOutlooks.includes(outlookType);
+
+  if (isLow && !isCurrentlyLow) {
+    lowProbabilityOutlooks.push(outlookType);
+    dayData.data[outlookType]?.clear();
+  } else if (!isLow && isCurrentlyLow) {
+    dayData.metadata.lowProbabilityOutlooks = lowProbabilityOutlooks.filter((type) => type !== outlookType);
+  }
+
+  state.isSaved = false;
+};
+
+/** Moves one history snapshot to the opposite stack and restores it for undo/redo reducers. */
+const restoreHistoryEntry = (
+  sourceStack: ForecastHistoryEntry[],
+  targetStack: ForecastHistoryEntry[],
+  state: ForecastState
+) => {
+  const nextEntry = sourceStack.pop();
+  if (!nextEntry) return;
+
+  const currentSnapshot = getCurrentDaySnapshot(state);
+  if (currentSnapshot) {
+    pushHistoryEntry(targetStack, currentSnapshot);
+  }
+
+  applyDaySnapshot(state, nextEntry.snapshot);
+  state.forecastCycle.currentDay = nextEntry.day;
+  state.isSaved = false;
 };
 
 export const forecastSlice = createSlice({
@@ -636,101 +703,23 @@ export const forecastSlice = createSlice({
     setLowProbability: (state, action: PayloadAction<{ outlookType: OutlookType, isLow: boolean }>) => {
       pushUndoSnapshot(state);
       const { outlookType, isLow } = action.payload;
-      const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
-      
-      if (dayData) {
-        if (!dayData.metadata.lowProbabilityOutlooks) {
-          dayData.metadata.lowProbabilityOutlooks = [];
-        }
-        
-        if (isLow) {
-          if (!dayData.metadata.lowProbabilityOutlooks.includes(outlookType)) {
-            dayData.metadata.lowProbabilityOutlooks.push(outlookType);
-            
-            // "Finalize" logic: Clear any existing features of this type
-            const outlookData = dayData.data;
-            const outlookMap = outlookData[outlookType];
-            if (outlookMap) {
-              outlookMap.clear();
-            }
-          }
-        } else {
-          dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
-            t => t !== outlookType
-          );
-        }
-        state.isSaved = false;
-      }
+      setLowProbabilityState(state, outlookType, isLow);
     },
 
     toggleLowProbability: (state) => {
       pushUndoSnapshot(state);
       const outlookType = state.drawingState.activeOutlookType;
       const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
-      
-      if (dayData) {
-        if (!dayData.metadata.lowProbabilityOutlooks) {
-          dayData.metadata.lowProbabilityOutlooks = [];
-        }
-        
-        const isCurrentlyLow = dayData.metadata.lowProbabilityOutlooks.includes(outlookType);
-        
-        if (!isCurrentlyLow) {
-          dayData.metadata.lowProbabilityOutlooks.push(outlookType);
-          
-          // "Finalize" logic: Clear any existing features of this type
-          const outlookData = dayData.data;
-          const outlookMap = outlookData[outlookType];
-          if (outlookMap) {
-            outlookMap.clear();
-          }
-        } else {
-          dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
-            t => t !== outlookType
-          );
-        }
-        state.isSaved = false;
-      }
+      const isCurrentlyLow = dayData?.metadata.lowProbabilityOutlooks?.includes(outlookType) || false;
+      setLowProbabilityState(state, outlookType, !isCurrentlyLow);
     },
 
     undoLastEdit: (state) => {
-      const previousEntry = state.undoStack.pop();
-      if (!previousEntry) return;
-
-      const currentSnapshot = getCurrentDaySnapshot(state);
-      if (currentSnapshot) {
-        state.redoStack.push({
-          day: currentSnapshot.day,
-          snapshot: currentSnapshot,
-        });
-        if (state.redoStack.length > HISTORY_LIMIT) {
-          state.redoStack.shift();
-        }
-      }
-
-      applyDaySnapshot(state, previousEntry.snapshot);
-      state.forecastCycle.currentDay = previousEntry.day;
-      state.isSaved = false;
+      restoreHistoryEntry(state.undoStack, state.redoStack, state);
     },
 
     redoLastEdit: (state) => {
-      const nextEntry = state.redoStack.pop();
-      if (!nextEntry) return;
-
-      const currentSnapshot = getCurrentDaySnapshot(state);
-      if (currentSnapshot) {
-        state.undoStack.push({
-          day: currentSnapshot.day,
-          snapshot: currentSnapshot,
-        });
-        if (state.undoStack.length > HISTORY_LIMIT) {
-          state.undoStack.shift();
-        }
-      }
-
-      applyDaySnapshot(state, nextEntry.snapshot);
-      state.forecastCycle.currentDay = nextEntry.day;
-      state.isSaved = false;
+      restoreHistoryEntry(state.redoStack, state.undoStack, state);
     }
   }
 });
@@ -764,22 +753,30 @@ export const {
   redoLastEdit
 } = forecastSlice.actions;
 
-// Selectors
+/** Selects the full forecast slice. */
 export const selectForecast = (state: RootState) => state.forecast;
+/** Selects the active forecast cycle document. */
 export const selectForecastCycle = (state: RootState) => state.forecast.forecastCycle;
+/** Selects the currently active forecast day number. */
 export const selectCurrentDay = (state: RootState) => state.forecast.forecastCycle.currentDay;
+/** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
   return cycle.days[cycle.currentDay]?.data || createEmptyOutlook(cycle.currentDay).data;
 };
+/** Selects the outlook maps for a specific day, falling back to an empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
   return cycle.days[day]?.data || createEmptyOutlook(day).data;
 };
+/** Selects the saved forecast cycle snapshots shown in cycle history. */
 export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;
+/** Returns whether there is at least one reversible edit available. */
 export const selectCanUndo = (state: RootState) => state.forecast.undoStack.length > 0;
+/** Returns whether there is at least one redo entry available. */
 export const selectCanRedo = (state: RootState) => state.forecast.redoStack.length > 0;
 
+/** Returns whether the active outlook type is currently marked as low probability. */
 export const selectIsLowProbability = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
   const day = cycle.days[cycle.currentDay];
