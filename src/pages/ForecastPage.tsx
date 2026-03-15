@@ -275,29 +275,44 @@ const isCommandShortcutKey = (key: string): key is CommandShortcutKey => {
   return key === 's' || key === 'o' || key === 'l' || key === 'e';
 };
 
+type UndoRedoAction = 'undo' | 'redo' | null;
+
+/** Resolves whether the current modifier/key combination should undo, redo, or do nothing. */
+const getUndoRedoAction = (e: KeyboardEvent, key: string): UndoRedoAction => {
+  if (!(e.ctrlKey || e.metaKey)) return null;
+  if (key === 'y') return 'redo';
+  if (key !== 'z') return null;
+  return e.shiftKey ? 'redo' : 'undo';
+};
+
+/** Dispatches an undo/redo action only when that action is currently available in history. */
+const dispatchUndoRedoAction = (
+  action: Exclude<UndoRedoAction, null>,
+  context: KeyboardShortcutContext
+) => {
+  if (action === 'undo') {
+    if (context.canUndo) {
+      context.dispatch(undoLastEdit());
+    }
+    return;
+  }
+
+  if (context.canRedo) {
+    context.dispatch(redoLastEdit());
+  }
+};
+
 /** Handles the app-level undo/redo shortcuts before browser defaults can consume them. */
 const handleUndoRedoShortcuts = (
   e: KeyboardEvent,
   key: string,
   context: KeyboardShortcutContext
 ): boolean => {
-  if (!(e.ctrlKey || e.metaKey)) return false;
-
-  const isRedo = key === 'y' || (key === 'z' && e.shiftKey);
-  const isUndo = key === 'z' && !e.shiftKey;
-
-  if (!isUndo && !isRedo) return false;
+  const action = getUndoRedoAction(e, key);
+  if (!action) return false;
 
   e.preventDefault();
-
-  if (isUndo && context.canUndo) {
-    context.dispatch(undoLastEdit());
-  }
-
-  if (isRedo && context.canRedo) {
-    context.dispatch(redoLastEdit());
-  }
-
+  dispatchUndoRedoAction(action, context);
   return true;
 };
 
