@@ -754,6 +754,8 @@ interface ToolbarActionParams {
   addToast: AddToastFn;
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   currentDay: DayType;
+  canUndo: boolean;
+  canRedo: boolean;
   cycleDate: string;
   tempDate: string;
   setIsEditingDate: React.Dispatch<React.SetStateAction<boolean>>;
@@ -770,6 +772,8 @@ const useToolbarActionHandlers = ({
   addToast,
   forecastCycle,
   currentDay,
+  canUndo,
+  canRedo,
   tempDate,
   setIsEditingDate,
   setIsPackageDownloading,
@@ -832,8 +836,16 @@ const useToolbarActionHandlers = ({
   }, [handleDayChange]);
 
   const handleToggleLowProbability = useCallback(() => dispatch(toggleLowProbability()), [dispatch]);
-  const handleUndo = useCallback(() => dispatch(undoLastEdit()), [dispatch]);
-  const handleRedo = useCallback(() => dispatch(redoLastEdit()), [dispatch]);
+  const handleUndo = useCallback(() => {
+    if (canUndo) {
+      dispatch(undoLastEdit());
+    }
+  }, [canUndo, dispatch]);
+  const handleRedo = useCallback(() => {
+    if (canRedo) {
+      dispatch(redoLastEdit());
+    }
+  }, [canRedo, dispatch]);
 
   return {
     onUndo: handleUndo,
@@ -868,6 +880,8 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
     addToast,
     forecastCycle: model.forecastCycle,
     currentDay: model.currentDay,
+    canUndo: model.canUndo,
+    canRedo: model.canRedo,
     cycleDate: model.cycleDate,
     tempDate: localUi.tempDate,
     setIsEditingDate: localUi.setIsEditingDate,
