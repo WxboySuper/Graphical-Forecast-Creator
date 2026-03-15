@@ -3,6 +3,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Forecast undo/redo:** Added undo and redo controls to the forecast page toolbar, along with standard keyboard shortcuts (`Ctrl/Cmd+Z`, `Ctrl/Cmd+Y`, and `Ctrl/Cmd+Shift+Z`) for reversible drawing edits.
+
 ## [1.1.0] - 2026-03-07
 
 ### Fixed
