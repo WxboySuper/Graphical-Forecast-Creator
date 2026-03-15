@@ -14,7 +14,11 @@ import {
   toggleSignificant,
   setEmergencyMode,
   selectForecastCycle,
+  selectCanRedo,
+  selectCanUndo,
   setForecastDay,
+  redoLastEdit,
+  undoLastEdit,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson } from '../utils/fileUtils';
@@ -205,6 +209,8 @@ interface KeyboardShortcutContext {
   dispatch: ShortcutDispatch;
   addToast: AddToastFn;
   isSaved: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
   handleSave: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   mapRef: React.RefObject<ForecastMapHandle | null>;
@@ -267,6 +273,31 @@ const COMMAND_SHORTCUT_HANDLERS: Record<CommandShortcutKey, CommandShortcutHandl
 /** Type-guard that narrows a key string to the set of recognised Ctrl/Cmd shortcut keys. */
 const isCommandShortcutKey = (key: string): key is CommandShortcutKey => {
   return key === 's' || key === 'o' || key === 'l' || key === 'e';
+};
+
+const handleUndoRedoShortcuts = (
+  e: KeyboardEvent,
+  key: string,
+  context: KeyboardShortcutContext
+): boolean => {
+  if (!(e.ctrlKey || e.metaKey)) return false;
+
+  const isRedo = key === 'y' || (key === 'z' && e.shiftKey);
+  const isUndo = key === 'z' && !e.shiftKey;
+
+  if (!isUndo && !isRedo) return false;
+
+  e.preventDefault();
+
+  if (isUndo && context.canUndo) {
+    context.dispatch(undoLastEdit());
+  }
+
+  if (isRedo && context.canRedo) {
+    context.dispatch(redoLastEdit());
+  }
+
+  return true;
 };
 
 /** Handles Ctrl/Cmd shortcut keys (save, open, load, export); returns true if the key was handled. */
@@ -407,6 +438,7 @@ const processShortcutKeyDown = (
   const key = e.key.toLowerCase();
   if (isTypingTarget(e.target)) return;
 
+  if (handleUndoRedoShortcuts(e, key, context)) return;
   if (handleCommandShortcuts(e, key, context)) return;
   if (hasAnyModifierKey(e)) return;
 
@@ -488,6 +520,8 @@ interface KeyboardShortcutHookParams {
   addToast: AddToastFn;
   drawingState: RootState['forecast']['drawingState'];
   isSaved: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
   handleSave: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   mapRef: React.RefObject<ForecastMapHandle | null>;
@@ -500,6 +534,8 @@ const useKeyboardShortcuts = ({
   addToast,
   drawingState,
   isSaved,
+  canUndo,
+  canRedo,
   handleSave,
   fileInputRef,
   mapRef,
@@ -511,6 +547,8 @@ const useKeyboardShortcuts = ({
       dispatch,
       addToast,
       isSaved,
+      canUndo,
+      canRedo,
       handleSave,
       fileInputRef,
       mapRef,
@@ -525,7 +563,7 @@ const useKeyboardShortcuts = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, addToast, drawingState, isSaved, handleSave, fileInputRef, mapRef, currentDay]);
+  }, [dispatch, addToast, drawingState, isSaved, canUndo, canRedo, handleSave, fileInputRef, mapRef, currentDay]);
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
@@ -538,6 +576,8 @@ export const ForecastPage: React.FC = () => {
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const forecastCycle = useSelector(selectForecastCycle);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const canUndo = useSelector(selectCanUndo);
+  const canRedo = useSelector(selectCanRedo);
   const emergencyMode = useSelector((state: RootState) => state.forecast.emergencyMode);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
 
@@ -562,6 +602,8 @@ export const ForecastPage: React.FC = () => {
     addToast,
     drawingState,
     isSaved,
+    canUndo,
+    canRedo,
     handleSave,
     fileInputRef,
     mapRef,
