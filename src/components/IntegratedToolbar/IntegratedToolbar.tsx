@@ -764,6 +764,35 @@ interface ToolbarActionParams {
   handleCancelReset: () => void;
 }
 
+/** Returns the selected file from a file input change event, or null when none was chosen. */
+const getSelectedFile = (e: React.ChangeEvent<HTMLInputElement>): File | null => {
+  return e.target.files?.[0] ?? null;
+};
+
+/** Returns the neighboring forecast day in the requested direction, or null at the ends. */
+const getAdjacentDay = (currentDay: DayType, offset: -1 | 1): DayType | null => {
+  const nextDay = currentDay + offset;
+  if (nextDay < 1 || nextDay > 8) return null;
+  return nextDay as DayType;
+};
+
+/** Parses the day button's data attribute into a DayType, or null when invalid. */
+const getClickedDay = (e: React.MouseEvent<HTMLButtonElement>): DayType | null => {
+  const day = Number(e.currentTarget.dataset.day);
+  return Number.isNaN(day) ? null : day as DayType;
+};
+
+/** Dispatches an action creator only when the corresponding history state allows it. */
+const dispatchHistoryAction = (
+  dispatch: ReturnType<typeof useDispatch>,
+  isAvailable: boolean,
+  actionCreator: typeof undoLastEdit | typeof redoLastEdit
+) => {
+  if (isAvailable) {
+    dispatch(actionCreator());
+  }
+};
+
 /** Constructs all event-handler callbacks for toolbar actions: save, load, day navigation, date editing, reset, export, and package download. */
 const useToolbarActionHandlers = ({
   dispatch,
@@ -794,7 +823,7 @@ const useToolbarActionHandlers = ({
   }, [mapRef, forecastCycle, addToast, setIsPackageDownloading]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = getSelectedFile(e);
     if (file) {
       onLoad(file);
     }
@@ -812,14 +841,16 @@ const useToolbarActionHandlers = ({
   const handleDayChange = useCallback((day: DayType) => dispatch(setForecastDay(day)), [dispatch]);
 
   const handlePrevDay = useCallback(() => {
-    if (currentDay > 1) {
-      dispatch(setForecastDay((currentDay - 1) as DayType));
+    const previousDay = getAdjacentDay(currentDay, -1);
+    if (previousDay) {
+      dispatch(setForecastDay(previousDay));
     }
   }, [dispatch, currentDay]);
 
   const handleNextDay = useCallback(() => {
-    if (currentDay < 8) {
-      dispatch(setForecastDay((currentDay + 1) as DayType));
+    const nextDay = getAdjacentDay(currentDay, 1);
+    if (nextDay) {
+      dispatch(setForecastDay(nextDay));
     }
   }, [dispatch, currentDay]);
 
@@ -829,23 +860,15 @@ const useToolbarActionHandlers = ({
   }, [dispatch, tempDate, setIsEditingDate]);
 
   const handleDayButtonClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const day = Number(e.currentTarget.dataset.day) as DayType;
-    if (!Number.isNaN(day)) {
+    const day = getClickedDay(e);
+    if (day) {
       handleDayChange(day);
     }
   }, [handleDayChange]);
 
   const handleToggleLowProbability = useCallback(() => dispatch(toggleLowProbability()), [dispatch]);
-  const handleUndo = useCallback(() => {
-    if (canUndo) {
-      dispatch(undoLastEdit());
-    }
-  }, [canUndo, dispatch]);
-  const handleRedo = useCallback(() => {
-    if (canRedo) {
-      dispatch(redoLastEdit());
-    }
-  }, [canRedo, dispatch]);
+  const handleUndo = useCallback(() => dispatchHistoryAction(dispatch, canUndo, undoLastEdit), [canUndo, dispatch]);
+  const handleRedo = useCallback(() => dispatchHistoryAction(dispatch, canRedo, redoLastEdit), [canRedo, dispatch]);
 
   return {
     onUndo: handleUndo,
