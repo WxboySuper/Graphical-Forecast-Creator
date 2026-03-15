@@ -12,6 +12,25 @@ interface Stats {
 
 /** Displays a quick-stats dashboard grid and feature highlight cards for the home page. */
 export const Dashboard: React.FC<{ stats: Stats }> = ({ stats }) => {
+  const featureCards = [
+    {
+      title: 'Polygon Drawing',
+      description: 'Draw, edit, and remove outlook polygons directly on the forecast map for each supported day and hazard type.',
+    },
+    {
+      title: 'Discussion Editor',
+      description: 'Write forecast discussions with guided and freeform editing tools, then export the finished text with your package.',
+    },
+    {
+      title: 'Forecast Verification',
+      description: 'Compare saved outlooks against storm reports with visual overlays and summary metrics for hits and misses.',
+    },
+    {
+      title: 'Cycle Manager',
+      description: 'Save forecast cycles, reopen previous work, and copy outlooks between days or older forecast packages.',
+    },
+  ];
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -36,11 +55,10 @@ export const Dashboard: React.FC<{ stats: Stats }> = ({ stats }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        {/* Features cards simplified */}
-        {[ 'Polygon Drawing', 'Discussion Editor', 'Forecast Verification', 'Cycle Manager' ].map((title) => (
+        {featureCards.map(({ title, description }) => (
           <Card key={title} className="p-6 bg-card border-border hover:shadow-lg transition-shadow space-y-3">
             <h3 className="font-semibold text-foreground">{title}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">Brief description here.</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
           </Card>
         ))}
       </div>
