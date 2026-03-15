@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -63,7 +62,7 @@ const createFeature = () => ({
 });
 
 describe('IntegratedToolbar undo/redo buttons', () => {
-  test('renders undo and redo buttons with disabled state from selectors', async () => {
+  test('renders undo and redo buttons with disabled state from selectors', () => {
     const store = createStore();
 
     render(
