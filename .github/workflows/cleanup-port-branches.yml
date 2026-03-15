@@ -1,0 +1,23 @@
+name: Cleanup Port Branches
+
+on:
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  delete-merged-port-branch:
+    if: github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'port/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Delete closed port branch
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          PORT_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "Cleaning up remote port branch $PORT_BRANCH from PR #$PR_NUMBER"
+          gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/"$PORT_BRANCH" || \
+            echo "Port branch $PORT_BRANCH was already removed or is protected."

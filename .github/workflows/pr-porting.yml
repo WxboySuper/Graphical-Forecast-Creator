@@ -47,6 +47,17 @@ jobs:
           
           # Fetch all active branches
           gh api repos/${{ github.repository }}/branches --paginate > branches.json
+
+          # Resolve the original PR commits so port branches only carry the
+          # intended change set instead of every commit missing from target.
+          git fetch origin pull/"$PR_NUMBER"/head:refs/remotes/origin/pr/"$PR_NUMBER"
+          gh api repos/${{ github.repository }}/pulls/"$PR_NUMBER"/commits --paginate > pr-commits.json
+          mapfile -t PR_COMMIT_SHAS < <(jq -r '.[].sha' pr-commits.json)
+
+          if [[ ${#PR_COMMIT_SHAS[@]} -eq 0 ]]; then
+            echo "No source PR commits found for #$PR_NUMBER. Aborting."
+            exit 1
+          fi
           
           TARGETS=()
           
@@ -91,24 +102,42 @@ jobs:
               continue
             fi
 
-            # Check if there are any commits to port
             git fetch origin "$TARGET"
-            COMMITS=$(git log origin/"$TARGET"..origin/"$BASE_BRANCH" --oneline)
-            if [[ -z "$COMMITS" ]]; then
-              echo "No new commits to port to $TARGET (Target already contains these changes). Skipping."
+            git checkout -B "$PORT_BRANCH" origin/"$TARGET"
+
+            COMMITS_TO_PICK=()
+            for SHA in "${PR_COMMIT_SHAS[@]}"; do
+              if git merge-base --is-ancestor "$SHA" origin/"$TARGET"; then
+                echo "Commit $SHA already exists on $TARGET. Skipping it."
+                continue
+              fi
+              COMMITS_TO_PICK+=("$SHA")
+            done
+
+            if [[ ${#COMMITS_TO_PICK[@]} -eq 0 ]]; then
+              echo "No source PR commits need porting to $TARGET. Skipping."
+              git checkout "$BASE_BRANCH"
+              git branch -D "$PORT_BRANCH" || true
               continue
             fi
 
-            # Create a temporary branch from the merged state
-            git checkout -b "$PORT_BRANCH" origin/"$BASE_BRANCH"
-            git push origin "$PORT_BRANCH"
+            if ! git cherry-pick "${COMMITS_TO_PICK[@]}"; then
+              echo "FAILED: Could not cherry-pick commits onto $TARGET"
+              git cherry-pick --abort || true
+              FAILURES+=("$TARGET")
+              git checkout "$BASE_BRANCH"
+              git branch -D "$PORT_BRANCH" || true
+              continue
+            fi
+
+            git push --force-with-lease origin "$PORT_BRANCH"
 
             # Create the PR from the new temporary branch
             if ! gh pr create \
               --head "$PORT_BRANCH" \
               --base "$TARGET" \
               --title "[Port] $PR_TITLE to $TARGET" \
-              --body "Automated port of merge into $BASE_BRANCH. Original PR: #$PR_NUMBER"; then
+              --body "Automated port of the original commits from PR #$PR_NUMBER into $TARGET after merge into $BASE_BRANCH."; then
               echo "FAILED: Could not create PR for $TARGET"
               FAILURES+=("$TARGET")
               # Cleanup the failed branch
@@ -119,6 +148,7 @@ jobs:
 
             # Always return to main context for next loop
             git checkout "$BASE_BRANCH"
+            git branch -D "$PORT_BRANCH" || true
           done
 
           # --- Cleanup Original Branch ---
