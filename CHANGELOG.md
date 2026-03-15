@@ -10,7 +10,6 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Porting automation:** Updated the internal PR porting workflow so it cherry-picks only the original merged PR commits and cleans up temporary `port/*` branches after their PRs close, which keeps branch synchronization cleaner and avoids noisy port PRs.
-
 ## [1.1.0] - 2026-03-07
 
 ### Fixed
