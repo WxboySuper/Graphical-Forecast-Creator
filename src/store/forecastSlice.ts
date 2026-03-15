@@ -152,12 +152,29 @@ const getCurrentOutlook = (state: ForecastState): OutlookData => {
   return day.data;
 };
 
+const cloneJsonValue = <T>(value: T): T => {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneJsonValue(item)) as T;
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, cloneJsonValue(entry)])
+    ) as T;
+  }
+
+  return value;
+};
+
+/** Clones one GeoJSON feature without JSON serialization so history snapshots are cheaper. */
+const cloneFeature = (feature: Feature): Feature => cloneJsonValue(feature);
+
 /** Deep-clones one probability map so undo/redo snapshots do not share mutable arrays. */
 const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | undefined => {
   if (!map) return undefined;
   return new Map(Array.from(map.entries(), ([probability, features]) => [
     probability,
-    features.map((feature) => JSON.parse(JSON.stringify(feature)) as Feature),
+    features.map(cloneFeature),
   ]));
 };
 
