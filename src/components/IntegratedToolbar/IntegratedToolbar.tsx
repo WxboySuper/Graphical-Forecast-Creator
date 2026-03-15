@@ -16,6 +16,8 @@ import {
   Archive,
   Trash2,
   CheckCircle2,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -40,10 +42,14 @@ import { cn } from '../../lib/utils';
 import { RootState } from '../../store';
 import { 
   selectForecastCycle, 
+  selectCanRedo,
+  selectCanUndo,
   setForecastDay, 
   setCycleDate,
   resetForecasts,
   toggleLowProbability,
+  redoLastEdit,
+  undoLastEdit,
 } from '../../store/forecastSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import CycleHistoryModal from '../CycleManager/CycleHistoryModal';
@@ -115,6 +121,8 @@ interface IntegratedToolbarViewProps {
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
   onOpenResetConfirm: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onDateSave: () => void;
   onTempDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onStartDateEdit: () => void;
@@ -129,6 +137,8 @@ interface IntegratedToolbarViewProps {
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   isSaved: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
   isExporting: boolean;
   isExportModalOpen: boolean;
   onInitiateExport: () => void;
@@ -162,12 +172,13 @@ const ToolbarTooltipButton: React.FC<{
   icon: React.ReactNode;
   tooltip: React.ReactNode;
   className: string;
+  ariaLabel?: string;
   onClick?: () => void;
   disabled?: boolean;
-}> = ({ icon, tooltip, className, onClick, disabled }) => (
+}> = ({ icon, tooltip, className, ariaLabel, onClick, disabled }) => (
   <Tooltip>
     <TooltipTrigger asChild>
-      <Button variant="outline" size="icon" className={className} onClick={onClick} disabled={disabled}>
+      <Button aria-label={ariaLabel} variant="outline" size="icon" className={className} onClick={onClick} disabled={disabled}>
         {icon}
       </Button>
     </TooltipTrigger>
@@ -184,12 +195,32 @@ const ToolbarToolsSection: React.FC<{
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
   onOpenResetConfirm: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   isSaved: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
   isExporting: boolean;
   isPackageDownloading: boolean;
-}> = ({ onSave, onLoadClick, onInitiateExport, onPackageDownload, onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm, isSaved, isExporting, isPackageDownloading }) => (
+}> = ({ onSave, onLoadClick, onInitiateExport, onPackageDownload, onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm, onUndo, onRedo, isSaved, canUndo, canRedo, isExporting, isPackageDownloading }) => (
   <div className="flex flex-col gap-2 lg:gap-3 border-r border-border pr-2 lg:pr-4">
     <div className="flex items-center gap-2">
+      <ToolbarTooltipButton
+        icon={<Undo2 className="h-6 w-6" />}
+        tooltip={<p>Undo <span className="text-muted-foreground">(Ctrl/Cmd+Z)</span></p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-700 dark:!bg-amber-500/20 dark:hover:!bg-amber-500/30 dark:border-amber-500/50 dark:text-amber-400"
+        ariaLabel="Undo"
+        onClick={onUndo}
+        disabled={!canUndo}
+      />
+      <ToolbarTooltipButton
+        icon={<Redo2 className="h-6 w-6" />}
+        tooltip={<p>Redo <span className="text-muted-foreground">(Ctrl/Cmd+Y / Shift+Ctrl/Cmd+Z)</span></p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-700 dark:!bg-amber-500/20 dark:hover:!bg-amber-500/30 dark:border-amber-500/50 dark:text-amber-400"
+        ariaLabel="Redo"
+        onClick={onRedo}
+        disabled={!canRedo}
+      />
       <ToolbarTooltipButton
         icon={<Save className="h-6 w-6" />}
         tooltip={<p>Save to JSON <span className="text-muted-foreground">(⌃S)</span></p>}
@@ -558,13 +589,14 @@ const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
   const {
     onSave, onLoadClick, onInitiateExport, onPackageDownload,
     onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm,
+    onUndo, onRedo,
     onDateSave, onTempDateChange, onStartDateEdit,
     onDayButtonClick, onPrevDay, onNextDay,
     onToggleLowProbability,
     onCloseHistoryModal, onCloseCopyModal, onCancelReset, onReset,
     onFileSelect, onConfirmExport, onCancelExport,
     fileInputRef,
-    isSaved, isExporting, isExportModalOpen, isPackageDownloading,
+    isSaved, canUndo, canRedo, isExporting, isExportModalOpen, isPackageDownloading,
     showHistoryModal, showCopyModal, showResetConfirm,
     isEditingDate, tempDate, cycleDate,
     currentDay, days, availableTypes,
@@ -583,7 +615,9 @@ const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
               onSave={onSave} onLoadClick={onLoadClick} onInitiateExport={onInitiateExport}
               onPackageDownload={onPackageDownload} onOpenHistoryModal={onOpenHistoryModal}
               onOpenCopyModal={onOpenCopyModal} onOpenResetConfirm={onOpenResetConfirm}
-              isSaved={isSaved} isExporting={isExporting} isPackageDownloading={isPackageDownloading}
+              onUndo={onUndo} onRedo={onRedo}
+              isSaved={isSaved} canUndo={canUndo} canRedo={canRedo}
+              isExporting={isExporting} isPackageDownloading={isPackageDownloading}
             />
             <ToolbarForecastDaySection
               isEditingDate={isEditingDate} tempDate={tempDate} cycleDate={cycleDate}
@@ -669,6 +703,8 @@ const useToolbarDataModel = (mapRef: React.RefObject<ForecastMapHandle | null>, 
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days, cycleDate } = forecastCycle;
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const canUndo = useSelector(selectCanUndo);
+  const canRedo = useSelector(selectCanRedo);
   const lowProbabilityOutlooks = useSelector((state: RootState) =>
     state.forecast.forecastCycle.days[currentDay]?.metadata?.lowProbabilityOutlooks || []
   );
@@ -696,6 +732,8 @@ const useToolbarDataModel = (mapRef: React.RefObject<ForecastMapHandle | null>, 
     days,
     cycleDate,
     isSaved,
+    canUndo,
+    canRedo,
     lowProbabilityOutlooks,
     availableTypes,
     currentColor,
@@ -794,8 +832,12 @@ const useToolbarActionHandlers = ({
   }, [handleDayChange]);
 
   const handleToggleLowProbability = useCallback(() => dispatch(toggleLowProbability()), [dispatch]);
+  const handleUndo = useCallback(() => dispatch(undoLastEdit()), [dispatch]);
+  const handleRedo = useCallback(() => dispatch(redoLastEdit()), [dispatch]);
 
   return {
+    onUndo: handleUndo,
+    onRedo: handleRedo,
     onLoadClick: handleLoadClick,
     onPackageDownload: handlePackageDownload,
     onDateSave: handleDateSave,
