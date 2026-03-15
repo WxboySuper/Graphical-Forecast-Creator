@@ -241,6 +241,8 @@ const ToolbarToolsSection: React.FC<{
         onClick={onInitiateExport}
         disabled={isExporting}
       />
+    </div>
+    <div className="flex items-center gap-2">
       <ToolbarTooltipButton
         icon={<Archive className="h-6 w-6" />}
         tooltip={<p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p>}
@@ -248,8 +250,6 @@ const ToolbarToolsSection: React.FC<{
         onClick={onPackageDownload}
         disabled={isPackageDownloading}
       />
-    </div>
-    <div className="flex items-center gap-2">
       <ToolbarTooltipButton
         icon={<History className="h-6 w-6" />}
         tooltip={<p>Cycle History</p>}
