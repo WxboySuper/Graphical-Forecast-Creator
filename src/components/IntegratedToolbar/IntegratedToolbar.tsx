@@ -5,6 +5,7 @@ import {
   Wind, 
   CloudHail, 
   LayoutGrid,
+  Layers,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -51,6 +52,7 @@ import {
   redoLastEdit,
   undoLastEdit,
 } from '../../store/forecastSlice';
+import { toggleGhostOutlook } from '../../store/overlaysSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import CycleHistoryModal from '../CycleManager/CycleHistoryModal';
 import CopyFromPreviousModal from '../CycleManager/CopyFromPreviousModal';
@@ -159,7 +161,9 @@ interface IntegratedToolbarViewProps {
   isSignificant: boolean;
   significantThreatsEnabled: boolean;
   lowProbabilityOutlooks: OutlookType[];
+  visibleGhostOutlooks: OutlookType[];
   outlookTypeHandlers: Record<OutlookType, () => void>;
+  ghostOutlookHandlers: Partial<Record<OutlookType, () => void>>;
   probabilities: string[];
   probabilityHandlers: Record<string, () => void>;
   currentColor: string;
@@ -410,6 +414,51 @@ const ToolbarOutlookTypeSection: React.FC<{
   </div>
 );
 
+/** Toggle row for showing faded ghost overlays of non-active hazards on the current day. */
+const ToolbarGhostLayersSection: React.FC<{
+  ghostTypes: OutlookType[];
+  visibleGhostOutlooks: OutlookType[];
+  ghostOutlookHandlers: Partial<Record<OutlookType, () => void>>;
+}> = ({ ghostTypes, visibleGhostOutlooks, ghostOutlookHandlers }) => (
+  <div className="border-r border-border pr-2 lg:pr-4">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Layers className="h-4 w-4 text-muted-foreground" />
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Ghost Layers</label>
+      </div>
+      <div className="grid grid-cols-2 gap-2 min-w-[220px]">
+        {ghostTypes.length > 0 ? ghostTypes.map((type) => {
+          const isVisible = visibleGhostOutlooks.includes(type);
+          const ghostColor = getOutlookColor(type, type === 'categorical' ? 'SLGT' : type === 'day4-8' ? '15%' : '15%');
+          return (
+            <Tooltip key={type}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={isVisible ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn('justify-start gap-2 h-14', !isVisible && 'opacity-60')}
+                  onClick={ghostOutlookHandlers[type]}
+                  style={isVisible ? { backgroundColor: ghostColor, borderColor: ghostColor, color: '#fff' } : undefined}
+                >
+                  {outlookIcons[type]}
+                  <span className="text-xs">{outlookLabels[type]}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isVisible ? 'Hide' : 'Show'} ghost {outlookLabels[type]}</p>
+              </TooltipContent>
+            </Tooltip>
+          );
+        }) : (
+          <div className="col-span-2 h-[60px] rounded-md border border-dashed border-border flex items-center justify-center text-xs text-muted-foreground">
+            No other hazards for this day
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
 /** Probability/Risk grid; column count adapts to the number of available probabilities. */
 const ToolbarProbabilitySection: React.FC<{
   activeOutlookType: OutlookType;
@@ -601,10 +650,12 @@ const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
     isEditingDate, tempDate, cycleDate,
     currentDay, days, availableTypes,
     activeOutlookType, activeProbability, isSignificant, significantThreatsEnabled,
-    lowProbabilityOutlooks, outlookTypeHandlers,
+    lowProbabilityOutlooks, visibleGhostOutlooks, outlookTypeHandlers, ghostOutlookHandlers,
     probabilities, probabilityHandlers,
     currentColor, isLowProb,
   } = props;
+
+  const ghostTypes = availableTypes.filter((type) => type !== activeOutlookType);
 
   return (
     <TooltipProvider>
@@ -628,6 +679,11 @@ const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
             <ToolbarOutlookTypeSection
               availableTypes={availableTypes} activeOutlookType={activeOutlookType}
               lowProbabilityOutlooks={lowProbabilityOutlooks} outlookTypeHandlers={outlookTypeHandlers}
+            />
+            <ToolbarGhostLayersSection
+              ghostTypes={ghostTypes}
+              visibleGhostOutlooks={visibleGhostOutlooks}
+              ghostOutlookHandlers={ghostOutlookHandlers}
             />
             <ToolbarProbabilitySection
               activeOutlookType={activeOutlookType} activeProbability={activeProbability}
@@ -700,11 +756,13 @@ const useToolbarLocalUi = (cycleDate: string) => {
 
 /** Selects and derives all forecast-domain data needed by the toolbar: current cycle, day, outlook types, export state, and outlet panel logic. */
 const useToolbarDataModel = (mapRef: React.RefObject<ForecastMapHandle | null>, addToast: AddToastFn) => {
+  const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days, cycleDate } = forecastCycle;
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const canUndo = useSelector(selectCanUndo);
   const canRedo = useSelector(selectCanRedo);
+  const ghostOutlookState = useSelector((state: RootState) => state.overlays.ghostOutlooks);
   const lowProbabilityOutlooks = useSelector((state: RootState) =>
     state.forecast.forecastCycle.days[currentDay]?.metadata?.lowProbabilityOutlooks || []
   );
@@ -725,6 +783,10 @@ const useToolbarDataModel = (mapRef: React.RefObject<ForecastMapHandle | null>, 
     .filter((type) => panel.getOutlookTypeEnabled(type));
   const currentColor = getOutlookColor(panel.activeOutlookType, panel.activeProbability);
   const isLowProb = lowProbabilityOutlooks.includes(panel.activeOutlookType);
+  const visibleGhostOutlooks = availableTypes.filter((type) => type !== panel.activeOutlookType && ghostOutlookState[type]);
+  const ghostOutlookHandlers = Object.fromEntries(
+    availableTypes.map((type) => [type, () => dispatch(toggleGhostOutlook(type))])
+  ) as Partial<Record<OutlookType, () => void>>;
 
   return {
     forecastCycle,
@@ -735,9 +797,11 @@ const useToolbarDataModel = (mapRef: React.RefObject<ForecastMapHandle | null>, 
     canUndo,
     canRedo,
     lowProbabilityOutlooks,
+    visibleGhostOutlooks,
     availableTypes,
     currentColor,
     isLowProb,
+    ghostOutlookHandlers,
     ...panel,
     isExporting,
     isExportModalOpen: isModalOpen,
