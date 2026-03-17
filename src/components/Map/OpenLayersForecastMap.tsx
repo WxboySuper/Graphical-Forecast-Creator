@@ -309,13 +309,17 @@ const toOlStyle = (
 /** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
 const toGhostOlStyle = ({ outlookType, probability, isCategorical }: GhostSelection) => {
   const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
-  const fillColor = String(style.fillColor || '#ffffff');
   const strokeColor = String(style.color || '#000000');
-  const fill = createOutlookFill({
-    probability,
-    fillColor,
-    fillOpacity: isCategorical ? 0.15 : 0.15,
-  });
+  const ghostFillOpacity = isCategorical ? 0.15 : 0.15;
+  const isCig = probability.startsWith('CIG');
+
+  const fill = isCig
+    ? new Fill({ color: 'rgba(0,0,0,0)' })
+    : createOutlookFill({
+        probability,
+        fillColor: String(style.fillColor || '#ffffff'),
+        fillOpacity: ghostFillOpacity,
+      });
 
   return new Style({
     fill,
@@ -1096,6 +1100,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
             featureProjection: 'EPSG:3857'
           });
 
+          /** Apply ghost styling/metadata and add the feature to the ghost source. */
           const applyGhostProps = (f: OLFeature<Geometry>) => {
             f.setStyle(toGhostOlStyle({ outlookType, probability, isCategorical }));
             f.set('featureId', feature.id as string);
