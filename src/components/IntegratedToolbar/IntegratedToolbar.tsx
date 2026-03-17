@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   Tornado, 
@@ -78,6 +78,8 @@ const outlookLabels: Record<OutlookType, string> = {
   totalSevere: 'Total Severe',
   'day4-8': 'Day 4-8',
 };
+
+const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 
 const outlookShortcuts: Record<OutlookType, string> = {
   tornado: 'T',
@@ -415,6 +417,17 @@ const ToolbarOutlookTypeSection: React.FC<{
 );
 
 /** Toggle row for showing faded ghost overlays of non-active hazards on the current day. */
+const getContrastTextColor = (color: string) => {
+  const hex = color.replace('#', '');
+  const normalized = hex.length === 3 ? hex.split('').map((char) => `${char}${char}`).join('') : hex;
+  const value = /^[0-9a-fA-F]{6}$/.test(normalized) ? normalized : '000000';
+  const red = parseInt(value.slice(0, 2), 16);
+  const green = parseInt(value.slice(2, 4), 16);
+  const blue = parseInt(value.slice(4, 6), 16);
+  const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
+  return luminance > 0.7 ? '#000' : '#fff';
+};
+
 const ToolbarGhostLayersSection: React.FC<{
   ghostTypes: OutlookType[];
   visibleGhostOutlooks: OutlookType[];
@@ -438,7 +451,7 @@ const ToolbarGhostLayersSection: React.FC<{
                   size="sm"
                   className={cn('justify-start gap-2 h-14', !isVisible && 'opacity-60')}
                   onClick={ghostOutlookHandlers[type]}
-                  style={isVisible ? { backgroundColor: ghostColor, borderColor: ghostColor, color: '#fff' } : undefined}
+                  style={isVisible ? { backgroundColor: ghostColor, borderColor: ghostColor, color: getContrastTextColor(ghostColor) } : undefined}
                 >
                   {outlookIcons[type]}
                   <span className="text-xs">{outlookLabels[type]}</span>
@@ -779,14 +792,18 @@ const useToolbarDataModel = (mapRef: React.RefObject<ForecastMapHandle | null>, 
     addToast,
   });
 
-  const availableTypes = (['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'] as OutlookType[])
-    .filter((type) => panel.getOutlookTypeEnabled(type));
+  const availableTypes = OUTLOOK_TYPE_ORDER.filter((type) => panel.getOutlookTypeEnabled(type));
+  const logoHandlersMemo = useMemo(() => {
+    const handlers: Partial<Record<OutlookType, () => void>> = {};
+    OUTLOOK_TYPE_ORDER.forEach((type) => {
+      handlers[type] = () => dispatch(toggleGhostOutlook(type));
+    });
+    return handlers;
+  }, [dispatch]);
   const currentColor = getOutlookColor(panel.activeOutlookType, panel.activeProbability);
   const isLowProb = lowProbabilityOutlooks.includes(panel.activeOutlookType);
   const visibleGhostOutlooks = availableTypes.filter((type) => type !== panel.activeOutlookType && ghostOutlookState[type]);
-  const ghostOutlookHandlers = Object.fromEntries(
-    availableTypes.map((type) => [type, () => dispatch(toggleGhostOutlook(type))])
-  ) as Partial<Record<OutlookType, () => void>>;
+  const ghostOutlookHandlers = logoHandlersMemo;
 
   return {
     forecastCycle,
