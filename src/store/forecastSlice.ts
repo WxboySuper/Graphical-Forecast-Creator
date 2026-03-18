@@ -261,7 +261,7 @@ const pushUndoSnapshot = (state: ForecastState) => {
   dayHistory.redoStack = [];
 };
 
-/** Clears both history stacks when the editing context changes to a new document/day. */
+/** Clears all per-day history stacks when the editing context changes to a new document. */
 const clearHistory = (state: ForecastState) => {
   state.historyByDay = {};
 };
@@ -284,7 +284,7 @@ const canSetLowProbabilityState = (
   const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
   if (!dayData) return false;
 
-  const lowProbabilityOutlooks = ensureLowProbabilityOutlooks(dayData);
+  const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
   const isCurrentlyLow = lowProbabilityOutlooks.includes(outlookType);
 
   return (isLow && !isCurrentlyLow) || (!isLow && isCurrentlyLow);
@@ -494,12 +494,12 @@ export const forecastSlice = createSlice({
       if (!outlooks.categorical) {
         return; // No categorical map for this day (e.g., Day 4-8)
       }
-      const tstmFeatures = outlooks.categorical.get('TSTM') || [];
-      const hasOnlyTstm = outlooks.categorical.size === 1 && outlooks.categorical.has('TSTM');
-      if (tstmFeatures.length === 0 && hasOnlyTstm) {
+      const categoricalTypes = Array.from(outlooks.categorical.keys());
+      if (categoricalTypes.every((type) => type === 'TSTM')) {
         return;
       }
 
+      const tstmFeatures = outlooks.categorical.get('TSTM') || [];
       pushUndoSnapshot(state);
       outlooks.categorical = new Map();
       if (tstmFeatures.length > 0) {
