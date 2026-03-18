@@ -324,8 +324,8 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       dispatch(setLoading(true));
       dispatch(setError(null));
 
-      const target = resolveStormReportFetchTarget(selectedDate);
-      const fetchedReports = await fetchStormReportsFromUrl(target.url);
+      const target = resolveStormReportFetchTarget({ selectedDate });
+      const fetchedReports = await fetchStormReportsFromUrl({ url: target.url });
 
       dispatch(setReports(fetchedReports));
       dispatch(setDate(target.reportDate));
