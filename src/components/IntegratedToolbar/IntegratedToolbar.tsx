@@ -428,6 +428,7 @@ const getContrastTextColor = (color: string) => {
   return luminance > 0.7 ? '#000' : '#fff';
 };
 
+/** Ghost-layer toggle group for non-active hazards on the current forecast day. */
 const ToolbarGhostLayersSection: React.FC<{
   ghostTypes: OutlookType[];
   visibleGhostOutlooks: OutlookType[];
