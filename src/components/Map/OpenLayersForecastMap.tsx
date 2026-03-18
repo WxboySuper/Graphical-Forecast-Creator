@@ -53,6 +53,10 @@ interface OutlookSelection {
   probability: string;
 }
 
+interface GhostSelection extends OutlookSelection {
+  isCategorical: boolean;
+}
+
 interface FillBuildInput {
   probability: string;
   fillColor: string;
@@ -302,6 +306,31 @@ const toOlStyle = (
   });
 };
 
+/** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
+const toGhostOlStyle = ({ outlookType, probability, isCategorical }: GhostSelection) => {
+  const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
+  const strokeColor = String(style.color || '#000000');
+  const ghostFillOpacity = isCategorical ? 0.15 : 0.15;
+  const isCig = probability.startsWith('CIG');
+
+  const fill = isCig
+    ? new Fill({ color: 'rgba(0,0,0,0)' })
+    : createOutlookFill({
+        probability,
+        fillColor: String(style.fillColor || '#ffffff'),
+        fillOpacity: ghostFillOpacity,
+      });
+
+  return new Style({
+    fill,
+    stroke: new Stroke({
+      color: toRgbaColor({ color: strokeColor, alpha: 0.15 }),
+      width: 2,
+    }),
+    zIndex: computeZIndex(outlookType as EditableOutlookType, probability),
+  });
+};
+
 // Cached GeoJSON for blank map style — fetched once, shared across re-renders
 let cachedUsStatesGeoJSON: object | null = null;
 let cachedWorldCountriesGeoJSON: object | null = null;
@@ -469,6 +498,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
   const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
+  const ghostOutlooks = useSelector((state: RootState) => state.overlays.ghostOutlooks);
   const initialMapViewRef = useRef(currentMapView);
   const currentMapViewRef = useRef(currentMapView);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -496,12 +526,15 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const vectorSourceRef = useRef<VectorSource>(new VectorSource());
   const catSourceRef = useRef<VectorSource>(new VectorSource());
+  const ghostSourceRef = useRef<VectorSource>(new VectorSource());
   const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
   const catModifyRef = useRef<Modify | null>(null);
   const snapRef = useRef<Snap | null>(null);
   const catSnapRef = useRef<Snap | null>(null);
+  const ghostSnapRef = useRef<Snap | null>(null);
   const selectRef = useRef<Select | null>(null);
   const isApplyingExternalViewRef = useRef(false);
 
@@ -583,6 +616,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       opacity: 0.5,
     });
     catLayerRef.current = catLayer;
+    const ghostLayer = new VectorLayer({
+      source: ghostSourceRef.current,
+      zIndex: 2.5,
+    });
+    ghostLayerRef.current = ghostLayer;
     // Probabilistic/other features layer: separate source, normal per-feature opacity
     const vectorLayer = new VectorLayer({
       source: vectorSourceRef.current,
@@ -602,7 +640,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // without needing to re-add/remove layers or features, which can be expensive.
     const map = new OLMap({
       target: mapElementRef.current,
-      layers: [tileLayer, worldLayer, lakesLayer, landLayer, catLayer, vectorLayer, landOutlineLayer, labelLayer],
+      layers: [tileLayer, worldLayer, lakesLayer, landLayer, ghostLayer, catLayer, vectorLayer, landOutlineLayer, labelLayer],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
         zoom: initialMapViewRef.current.zoom
@@ -709,6 +747,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     map.addInteraction(catSnap);
     catSnapRef.current = catSnap;
 
+    const ghostSnap = new Snap({ source: ghostSourceRef.current });
+    map.addInteraction(ghostSnap);
+    ghostSnapRef.current = ghostSnap;
+
     // Limit delete picking to editable outlook layers so top overlays (state outlines/labels)
     // do not intercept clicks and prevent polygon deletion.
     const select = new Select({ condition: click, layers: [vectorLayer, catLayer] });
@@ -764,6 +806,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       if (catSnapRef.current) {
         map.removeInteraction(catSnapRef.current);
       }
+      if (ghostSnapRef.current) {
+        map.removeInteraction(ghostSnapRef.current);
+      }
       if (selectRef.current) {
         map.removeInteraction(selectRef.current);
       }
@@ -799,6 +844,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     }
     if (catSnapRef.current) {
       catSnapRef.current.setActive(enableSnap);
+    }
+    if (ghostSnapRef.current) {
+      ghostSnapRef.current.setActive(enableSnap);
     }
   }, [interactionMode]);
 
@@ -981,13 +1029,19 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       map.removeInteraction(catSnapRef.current);
       map.addInteraction(catSnapRef.current);
     }
+    if (ghostSnapRef.current) {
+      map.removeInteraction(ghostSnapRef.current);
+      map.addInteraction(ghostSnapRef.current);
+    }
   }, [dispatch, drawingState.activeOutlookType, drawingState.activeProbability, drawingState.isSignificant, interactionMode]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;
     const catSource = catSourceRef.current;
+    const ghostSource = ghostSourceRef.current;
     source.clear();
     catSource.clear();
+    ghostSource.clear();
     const format = new GeoJSON();
 
     // Find the maximum z-index for bold styling
@@ -1029,7 +1083,43 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         applyProps(olFeature as OLFeature<Geometry>);
       }
     });
-  }, [serializedFeatures]);
+
+    Object.entries(outlooks).forEach(([outlookType, probs]) => {
+      if (outlookType === drawingState.activeOutlookType || !ghostOutlooks[outlookType as EditableOutlookType]) {
+        return;
+      }
+
+      if (!(probs instanceof Map)) return;
+
+      probs.forEach((features: GeoJsonFeature[], probability: string) => {
+        const isCategorical = outlookType === 'categorical';
+
+        features.forEach((feature) => {
+          const olFeature = format.readFeature(feature, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857'
+          });
+
+          /** Apply ghost styling/metadata and add the feature to the ghost source. */
+          const applyGhostProps = (f: OLFeature<Geometry>) => {
+            f.setStyle(toGhostOlStyle({ outlookType, probability, isCategorical }));
+            f.set('featureId', feature.id as string);
+            f.set('outlookType', outlookType);
+            f.set('probability', probability);
+            f.set('isSignificant', Boolean(feature.properties?.isSignificant));
+            f.set('derivedFrom', feature.properties?.derivedFrom);
+            ghostSource.addFeature(f);
+          };
+
+          if (Array.isArray(olFeature)) {
+            olFeature.forEach((item: FeatureLike) => applyGhostProps(item as OLFeature<Geometry>));
+          } else {
+            applyGhostProps(olFeature as OLFeature<Geometry>);
+          }
+        });
+      });
+    });
+  }, [serializedFeatures, outlooks, drawingState.activeOutlookType, ghostOutlooks]);
 
   // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
   const handleSetModePan = () => {
