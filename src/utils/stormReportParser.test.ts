@@ -16,21 +16,21 @@ describe('stormReportParser', () => {
   test('resolves today, yesterday, and archive sources in UTC', () => {
     const now = new Date('2026-03-18T15:00:00Z');
 
-    expect(resolveStormReportFetchTarget('2026-03-18', now)).toEqual({
+    expect(resolveStormReportFetchTarget({ selectedDate: '2026-03-18', now })).toEqual({
       source: 'today',
       url: 'https://www.spc.noaa.gov/climo/reports/today.csv',
       reportDate: '260318',
       label: 'today.csv',
     });
 
-    expect(resolveStormReportFetchTarget('2026-03-17', now)).toEqual({
+    expect(resolveStormReportFetchTarget({ selectedDate: '2026-03-17', now })).toEqual({
       source: 'yesterday',
       url: 'https://www.spc.noaa.gov/climo/reports/yesterday.csv',
       reportDate: '260317',
       label: 'yesterday.csv',
     });
 
-    expect(resolveStormReportFetchTarget('2026-03-16', now)).toEqual({
+    expect(resolveStormReportFetchTarget({ selectedDate: '2026-03-16', now })).toEqual({
       source: 'archive',
       url: 'https://www.spc.noaa.gov/climo/reports/260316_rpts_raw.csv',
       reportDate: '260316',
@@ -39,7 +39,7 @@ describe('stormReportParser', () => {
   });
 
   test('describes the resolved source for user-facing status messages', () => {
-    const target = resolveStormReportFetchTarget('2026-03-18', new Date('2026-03-18T15:00:00Z'));
+    const target = resolveStormReportFetchTarget({ selectedDate: '2026-03-18', now: new Date('2026-03-18T15:00:00Z') });
     expect(describeStormReportFetchTarget(target)).toContain('today.csv');
   });
 
@@ -59,7 +59,7 @@ describe('stormReportParser', () => {
 
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const reports = await fetchStormReportsFromUrl('https://www.spc.noaa.gov/climo/reports/today.csv');
+    const reports = await fetchStormReportsFromUrl({ url: 'https://www.spc.noaa.gov/climo/reports/today.csv' });
 
     expect(fetchMock).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/today.csv');
     expect(reports).toHaveLength(2);
