@@ -1,4 +1,5 @@
 import type { Feature, Polygon } from 'geojson';
+import type { DayType } from '../types/outlooks';
 import reducer, {
   addFeature,
   importForecastCycle,
@@ -37,6 +38,12 @@ const createFeature = (id: string, offset: number): Feature => ({
 
 const getTornadoFeatures = (state: ReturnType<typeof reducer>) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.data.tornado?.get('2%') || [];
+
+const getUndoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
+  state.historyByDay[day]?.undoStack || [];
+
+const getRedoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
+  state.historyByDay[day]?.redoStack || [];
 
 describe('forecastSlice undo/redo', () => {
   test('undoes and redoes added features', () => {
@@ -124,10 +131,10 @@ describe('forecastSlice undo/redo', () => {
       state = reducer(state, addFeature({ feature: createFeature(`feature-${index}`, index) }));
     }
 
-    expect(state.undoStack).toHaveLength(50);
+    expect(getUndoStack(state, 1)).toHaveLength(50);
   });
 
-  test('changing day, importing, and resetting clear history', () => {
+  test('history stays with each day when switching days', () => {
     let state = reducer(undefined, addFeature({ feature: createFeature('feature-1', 0) }));
     expect(selectCanUndo({ forecast: state } as never)).toBe(true);
 
@@ -135,8 +142,33 @@ describe('forecastSlice undo/redo', () => {
     expect(selectCanUndo({ forecast: state } as never)).toBe(false);
 
     state = reducer(state, addFeature({ feature: createFeature('feature-2', 1) }));
+    expect(selectCanUndo({ forecast: state } as never)).toBe(true);
+    expect(getUndoStack(state, 1)).toHaveLength(1);
+    expect(getUndoStack(state, 2)).toHaveLength(1);
+
+    state = reducer(state, undoLastEdit());
+    expect(getTornadoFeatures(state)).toHaveLength(0);
+    expect(selectCanUndo({ forecast: state } as never)).toBe(false);
+    expect(selectCanRedo({ forecast: state } as never)).toBe(true);
+
+    state = reducer(state, setForecastDay(1));
+    expect(selectCanUndo({ forecast: state } as never)).toBe(true);
+    state = reducer(state, undoLastEdit());
+    expect(getTornadoFeatures(state)).toHaveLength(0);
+    expect(selectCanRedo({ forecast: state } as never)).toBe(true);
+  });
+
+  test('importing and resetting clear all per-day history', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('feature-1', 0) }));
+    state = reducer(state, setForecastDay(2));
+    state = reducer(state, addFeature({ feature: createFeature('feature-2', 1) }));
+
     state = reducer(state, importForecastCycle(state.forecastCycle));
     expect(selectCanUndo({ forecast: state } as never)).toBe(false);
+    expect(getUndoStack(state, 1)).toHaveLength(0);
+    expect(getUndoStack(state, 2)).toHaveLength(0);
+    expect(getRedoStack(state, 1)).toHaveLength(0);
+    expect(getRedoStack(state, 2)).toHaveLength(0);
 
     state = reducer(state, addFeature({ feature: createFeature('feature-3', 2) }));
     state = reducer(state, resetForecasts());
