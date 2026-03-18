@@ -13,9 +13,9 @@ import {
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
 import {
   describeStormReportFetchTarget,
-  fetchStormReportsFromUrl,
   resolveStormReportFetchTarget
-} from '../../utils/stormReportParser';
+} from '../../utils/stormReportSource';
+import { fetchStormReportsFromUrl } from '../../utils/stormReportParser';
 import { analyzeVerification, formatVerificationSummary } from '../../utils/verificationUtils';
 import type { OutlookTypeVerification, VerificationResult } from '../../utils/verificationUtils';
 import { DayType } from '../../types/outlooks';

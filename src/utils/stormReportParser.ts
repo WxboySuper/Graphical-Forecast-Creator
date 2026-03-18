@@ -1,14 +1,6 @@
 import { StormReport, ReportType } from '../types/stormReports';
 import { v4 as uuidv4 } from 'uuid';
-
-export type StormReportSource = 'today' | 'yesterday' | 'archive';
-
-export interface StormReportFetchTarget {
-  source: StormReportSource;
-  url: string;
-  reportDate: string;
-  label: string;
-}
+export { describeStormReportFetchTarget, formatReportDate, resolveStormReportFetchTarget } from './stormReportSource';
 
 interface StormReportCsvRow {
   time: string;
@@ -23,82 +15,6 @@ interface StormReportCsvRow {
   remarks: string;
 }
 
-/** Formats a UTC date into a stable YYYY-MM-DD key. */
-const formatUtcDateKey = (date: Date): string => {
-  const year = date.getUTCFullYear().toString();
-  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = date.getUTCDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-/** Truncates a date to UTC midnight for day-level comparisons. */
-const toUtcDateOnly = (date: Date): Date => new Date(Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth(),
-  date.getUTCDate()
-));
-
-/** Adds a UTC day offset without crossing local-time boundaries. */
-const addUtcDays = (date: Date, days: number): Date => new Date(Date.UTC(
-  date.getUTCFullYear(),
-  date.getUTCMonth(),
-  date.getUTCDate() + days
-));
-
-/**
- * Resolves the SPC storm-report source for a selected calendar day.
- * Today and yesterday use the live SPC endpoints; all other dates use the archive CSV path.
- */
-export function resolveStormReportFetchTarget(input: { selectedDate: string; now?: Date }): StormReportFetchTarget {
-  const { selectedDate, now = new Date() } = input;
-  const [year, month, day] = selectedDate.split('-').map(Number);
-  const selectedUtcDate = new Date(Date.UTC(year, month - 1, day));
-  const currentUtcDate = toUtcDateOnly(now);
-  const yesterdayUtcDate = addUtcDays(currentUtcDate, -1);
-
-  const reportDate = formatReportDate(selectedUtcDate);
-
-  if (formatUtcDateKey(selectedUtcDate) === formatUtcDateKey(currentUtcDate)) {
-    return {
-      source: 'today',
-      url: 'https://www.spc.noaa.gov/climo/reports/today.csv',
-      reportDate,
-      label: 'today.csv'
-    };
-  }
-
-  if (formatUtcDateKey(selectedUtcDate) === formatUtcDateKey(yesterdayUtcDate)) {
-    return {
-      source: 'yesterday',
-      url: 'https://www.spc.noaa.gov/climo/reports/yesterday.csv',
-      reportDate,
-      label: 'yesterday.csv'
-    };
-  }
-
-  return {
-    source: 'archive',
-    url: `https://www.spc.noaa.gov/climo/reports/${reportDate}_rpts_raw.csv`,
-    reportDate,
-    label: `${reportDate}_rpts_raw.csv`
-  };
-}
-
-/**
- * Returns a user-facing label for a resolved storm report source.
- */
-export function describeStormReportFetchTarget(target: StormReportFetchTarget): string {
-  const prettyDate = `${target.reportDate.slice(0, 2)}/${target.reportDate.slice(2, 4)}/${target.reportDate.slice(4, 6)}`;
-
-  const messages: Record<StormReportSource, string> = {
-    today: `Loaded storm reports from SPC today.csv for ${prettyDate}.`,
-    yesterday: `Loaded storm reports from SPC yesterday.csv for ${prettyDate}.`,
-    archive: `Loaded storm reports from SPC archive for ${prettyDate}.`
-  };
-
-  return messages[target.source];
-}
-
 /**
  * Fetches storm reports from NOAA archives for a given date
  * @param date Date in YYMMDD format (e.g., "260130" for January 30, 2026)
@@ -109,9 +25,6 @@ export function fetchStormReports(input: { date: string }): Promise<StormReport[
   return fetchStormReportsFromUrl({ url });
 }
 
-/**
- * Fetches storm reports from a specific SPC CSV URL.
- */
 export async function fetchStormReportsFromUrl(input: { url: string }): Promise<StormReport[]> {
   try {
     const response = await fetch(input.url);
@@ -191,6 +104,7 @@ function getReportSection(line: string): ReportType | null {
   return null;
 }
 
+/** Converts one CSV line into a typed row object the parser can work with. */
 function buildCsvRow(line: string, headers: string[]): StormReportCsvRow {
   // Split by comma, but handle quoted fields
   const values: string[] = [];
@@ -230,30 +144,20 @@ function buildCsvRow(line: string, headers: string[]): StormReportCsvRow {
   };
 }
 
-function extractMagnitude(type: ReportType, row: StormReportCsvRow): string {
-  if (type === 'tornado') {
-    if (row.efScale && row.efScale !== 'UNK') {
-      return row.efScale;
-    }
+/** Extracts a report magnitude from a parsed CSV row using the row's hazard type. */
+function extractMagnitude(input: { row: StormReportCsvRow; type: ReportType }): string {
+  const extractors: Record<ReportType, (row: StormReportCsvRow) => string> = {
+    tornado: (row) => row.efScale !== 'UNK' && row.efScale ? row.efScale : (row.remarks.match(/EF-?(\d+)/i)?.[1] ? `EF${row.remarks.match(/EF-?(\d+)/i)?.[1]}` : ''),
+    wind: (row) => row.speedMph !== 'UNK' && row.speedMph ? `${row.speedMph} mph` : '',
+    hail: (row) => row.sizeHundredthsInch !== 'UNK' && row.sizeHundredthsInch
+      ? `${(parseInt(row.sizeHundredthsInch, 10) / 100).toFixed(2)}"`
+      : ''
+  };
 
-    const efMatch = row.remarks.match(/EF-?(\d+)/i);
-    if (efMatch) {
-      return `EF${efMatch[1]}`;
-    }
-  }
-
-  if (type === 'wind' && row.speedMph && row.speedMph !== 'UNK') {
-    return `${row.speedMph} mph`;
-  }
-
-  if (type === 'hail' && row.sizeHundredthsInch && row.sizeHundredthsInch !== 'UNK') {
-    const inches = parseInt(row.sizeHundredthsInch, 10) / 100;
-    return `${inches.toFixed(2)}"`;
-  }
-
-  return '';
+  return extractors[input.type](input.row);
 }
 
+/** Converts a parsed CSV row into a storm report record. */
 function parseCSVRow(input: { row: StormReportCsvRow; type: ReportType }): StormReport | null {
   const lat = parseFloat(input.row.latitude);
   const lon = parseFloat(input.row.longitude);
@@ -268,22 +172,12 @@ function parseCSVRow(input: { row: StormReportCsvRow; type: ReportType }): Storm
     latitude: lat,
     longitude: lon,
     time: input.row.time ? `${input.row.time}Z` : '',
-    magnitude: extractMagnitude(input.type, input.row),
+    magnitude: extractMagnitude(input),
     location: input.row.location,
     county: input.row.county,
     state: input.row.state,
     comments: input.row.remarks
   };
-}
-
-/**
- * Formats a date object to YYMMDD format for NOAA storm report archives
- */
-export function formatReportDate(date: Date): string {
-  const year = date.getUTCFullYear().toString().slice(-2);
-  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = date.getUTCDate().toString().padStart(2, '0');
-  return `${year}${month}${day}`;
 }
 
 /**
