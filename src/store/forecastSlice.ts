@@ -185,15 +185,7 @@ const getOrCreateDayHistory = (
     };
   }
 
-  return state.historyByDay[day]!;
-};
-
-/** Returns the history stacks for one day without creating them. */
-const getDayHistory = (
-  state: ForecastState,
-  day: DayType = state.forecastCycle.currentDay
-): ForecastHistoryStacks | null => {
-  return state.historyByDay[day] ?? null;
+  return state.historyByDay[day] as ForecastHistoryStacks;
 };
 
 /** Deep-clones one probability map so undo/redo snapshots do not share mutable arrays. */
@@ -295,13 +287,7 @@ const canSetLowProbabilityState = (
   const lowProbabilityOutlooks = ensureLowProbabilityOutlooks(dayData);
   const isCurrentlyLow = lowProbabilityOutlooks.includes(outlookType);
 
-  if (isLow && !isCurrentlyLow) {
-    return true;
-  } else if (!isLow && isCurrentlyLow) {
-    return true;
-  }
-
-  return false;
+  return (isLow && !isCurrentlyLow) || (!isLow && isCurrentlyLow);
 };
 
 /** Applies a low-probability toggle for one outlook type and clears its features when enabled. */
