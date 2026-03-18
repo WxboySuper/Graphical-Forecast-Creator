@@ -10,6 +10,7 @@ export interface StormReportFetchTarget {
   label: string;
 }
 
+/** Formats a UTC date into a stable YYYY-MM-DD key. */
 const formatUtcDateKey = (date: Date): string => {
   const year = date.getUTCFullYear().toString();
   const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
@@ -17,12 +18,14 @@ const formatUtcDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+/** Truncates a date to UTC midnight for day-level comparisons. */
 const toUtcDateOnly = (date: Date): Date => new Date(Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth(),
   date.getUTCDate()
 ));
 
+/** Adds a UTC day offset without crossing local-time boundaries. */
 const addUtcDays = (date: Date, days: number): Date => new Date(Date.UTC(
   date.getUTCFullYear(),
   date.getUTCMonth(),
@@ -88,7 +91,7 @@ export function describeStormReportFetchTarget(target: StormReportFetchTarget): 
  * @param date Date in YYMMDD format (e.g., "260130" for January 30, 2026)
  * @returns Promise with array of storm reports
  */
-export async function fetchStormReports(date: string): Promise<StormReport[]> {
+export function fetchStormReports(date: string): Promise<StormReport[]> {
   const url = `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
   return fetchStormReportsFromUrl(url);
 }
