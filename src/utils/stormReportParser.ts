@@ -12,6 +12,7 @@ export function fetchStormReports(input: { date: string }): Promise<StormReport[
   return fetchStormReportsFromUrl({ url });
 }
 
+/** Fetches storm reports from a specific SPC CSV URL and parses the response. */
 export async function fetchStormReportsFromUrl(input: { url: string }): Promise<StormReport[]> {
   try {
     const response = await fetch(input.url);

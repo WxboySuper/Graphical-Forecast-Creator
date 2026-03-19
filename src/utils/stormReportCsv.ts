@@ -74,24 +74,7 @@ function getReportSection(line: string): ReportType | null {
 
 /** Converts one CSV line into a typed row object the parser can work with. */
 function buildCsvRow(line: string, headers: string[]): StormReportCsvRow {
-  const values: string[] = [];
-  let currentValue = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      values.push(currentValue);
-      currentValue = '';
-    } else {
-      currentValue += char;
-    }
-  }
-
-  values.push(currentValue);
+  const values = splitCsvLine(line);
   const rowMap = headers.reduce<Record<string, string>>((acc, header, index) => {
     acc[header] = values[index] || '';
     return acc;
@@ -113,19 +96,16 @@ function buildCsvRow(line: string, headers: string[]): StormReportCsvRow {
 
 /** Extracts a report magnitude from a parsed CSV row using the row's hazard type. */
 function extractMagnitude(input: { row: StormReportCsvRow; type: ReportType }): string {
-  const extractors: Record<ReportType, (row: StormReportCsvRow) => string> = {
-    tornado: (row) => row.efScale !== 'UNK' && row.efScale
-      ? row.efScale
-      : row.remarks.match(/EF-?(\d+)/i)?.[1]
-        ? `EF${row.remarks.match(/EF-?(\d+)/i)?.[1]}`
-        : '',
-    wind: (row) => row.speedMph !== 'UNK' && row.speedMph ? `${row.speedMph} mph` : '',
-    hail: (row) => row.sizeHundredthsInch !== 'UNK' && row.sizeHundredthsInch
-      ? `${(parseInt(row.sizeHundredthsInch, 10) / 100).toFixed(2)}"`
-      : ''
-  };
-
-  return extractors[input.type](input.row);
+  switch (input.type) {
+    case 'tornado':
+      return extractTornadoMagnitude(input.row);
+    case 'wind':
+      return extractWindMagnitude(input.row);
+    case 'hail':
+      return extractHailMagnitude(input.row);
+    default:
+      return '';
+  }
 }
 
 /** Converts a parsed CSV row into a storm report record. */
@@ -149,4 +129,31 @@ function parseCsvRow(input: { row: StormReportCsvRow; type: ReportType }): Storm
     state: input.row.state,
     comments: input.row.remarks
   };
+}
+
+/** Splits a CSV line while preserving quoted commas. */
+function splitCsvLine(line: string): string[] {
+  return line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((value) => value.replaceAll('"', ''));
+}
+
+/** Pulls the tornado magnitude from either the EF scale or the remarks text. */
+function extractTornadoMagnitude(row: StormReportCsvRow): string {
+  if (row.efScale && row.efScale !== 'UNK') {
+    return row.efScale;
+  }
+
+  const efMatch = row.remarks.match(/EF-?(\d+)/i);
+  return efMatch ? `EF${efMatch[1]}` : '';
+}
+
+/** Pulls the wind magnitude when the SPC report includes a valid speed. */
+function extractWindMagnitude(row: StormReportCsvRow): string {
+  return row.speedMph && row.speedMph !== 'UNK' ? `${row.speedMph} mph` : '';
+}
+
+/** Pulls the hail magnitude when the SPC report includes a valid size. */
+function extractHailMagnitude(row: StormReportCsvRow): string {
+  return row.sizeHundredthsInch && row.sizeHundredthsInch !== 'UNK'
+    ? `${(parseInt(row.sizeHundredthsInch, 10) / 100).toFixed(2)}"`
+    : '';
 }
