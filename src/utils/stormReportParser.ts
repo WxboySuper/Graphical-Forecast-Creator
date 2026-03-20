@@ -3,12 +3,16 @@ export { describeStormReportFetchTarget, formatReportDate, resolveStormReportFet
 import { parseStormReportsCsv } from './stormReportCsv';
 
 /**
- * Fetches storm reports from NOAA archives for a given date
- * @param date Date in YYMMDD format (e.g., "260130" for January 30, 2026)
+ * Fetches storm reports from NOAA archives for a given date.
+ * Supports the legacy positional YYMMDD string and the object form used by newer callers.
+ * @param input Date in YYMMDD format or an object containing that date.
  * @returns Promise with array of storm reports
  */
-export function fetchStormReports(input: { date: string }): Promise<StormReport[]> {
-  const url = `https://www.spc.noaa.gov/climo/reports/${input.date}_rpts_raw.csv`;
+export function fetchStormReports(date: string): Promise<StormReport[]>;
+export function fetchStormReports(input: { date: string }): Promise<StormReport[]>;
+export function fetchStormReports(input: string | { date: string }): Promise<StormReport[]> {
+  const date = typeof input === 'string' ? input : input.date;
+  const url = `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
   return fetchStormReportsFromUrl({ url });
 }
 
