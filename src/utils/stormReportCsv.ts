@@ -41,7 +41,7 @@ export function parseStormReportsCsv(csvText: string): StormReport[] {
       continue;
     }
 
-    const section = getReportSection(line);
+    const section = getReportSection({ line });
     if (section) {
       currentSection = section;
       continue;
@@ -57,7 +57,7 @@ export function parseStormReportsCsv(csvText: string): StormReport[] {
     }
 
     const report = parseCsvRow({
-      row: buildCsvRow(line, headers),
+      row: buildCsvRow({ line, headers }),
       type: currentSection
     });
     if (report) {
@@ -69,16 +69,16 @@ export function parseStormReportsCsv(csvText: string): StormReport[] {
 }
 
 /** Determines which report section a CSV line belongs to. */
-function getReportSection(line: string): ReportType | null {
-  if (line.includes('Raw Tornado LSR')) {
+function getReportSection(input: { line: string }): ReportType | null {
+  if (input.line.includes('Raw Tornado LSR')) {
     return 'tornado';
   }
 
-  if (line.includes('Raw Wind/Gust LSR') || line.includes('Raw Wind LSR')) {
+  if (input.line.includes('Raw Wind/Gust LSR') || input.line.includes('Raw Wind LSR')) {
     return 'wind';
   }
 
-  if (line.includes('Raw Hail LSR')) {
+  if (input.line.includes('Raw Hail LSR')) {
     return 'hail';
   }
 
@@ -86,12 +86,12 @@ function getReportSection(line: string): ReportType | null {
 }
 
 /** Converts one CSV line into a typed row object the parser can work with. */
-function buildCsvRow(line: string, headers: string[]): StormReportCsvRow {
-  const values = splitCsvLine(line);
-  const rowMap = buildRowMap(headers, values);
+function buildCsvRow(input: { line: string; headers: string[] }): StormReportCsvRow {
+  const values = splitCsvLine({ line: input.line });
+  const rowMap = buildRowMap({ headers: input.headers, values });
 
   return CSV_ROW_FIELDS.reduce<StormReportCsvRow>((row, [field, header]) => {
-    row[field] = getCsvField(rowMap, header);
+    row[field] = getCsvField({ rowMap, header });
     return row;
   }, {
     time: '',
@@ -111,11 +111,11 @@ function buildCsvRow(line: string, headers: string[]): StormReportCsvRow {
 function extractMagnitude(input: { row: StormReportCsvRow; type: ReportType }): string {
   switch (input.type) {
     case 'tornado':
-      return extractTornadoMagnitude(input.row);
+      return extractTornadoMagnitude({ row: input.row });
     case 'wind':
-      return extractWindMagnitude(input.row);
+      return extractWindMagnitude({ row: input.row });
     case 'hail':
-      return extractHailMagnitude(input.row);
+      return extractHailMagnitude({ row: input.row });
     default:
       return '';
   }
@@ -145,41 +145,41 @@ function parseCsvRow(input: { row: StormReportCsvRow; type: ReportType }): Storm
 }
 
 /** Splits a CSV line while preserving quoted commas. */
-function splitCsvLine(line: string): string[] {
-  return line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((value) => value.replaceAll('"', ''));
+function splitCsvLine(input: { line: string }): string[] {
+  return input.line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((value) => value.replaceAll('"', ''));
 }
 
 /** Builds a header-to-value lookup from one CSV line. */
-function buildRowMap(headers: string[], values: string[]): Record<string, string> {
-  return headers.reduce<Record<string, string>>((acc, header, index) => {
-    acc[header] = values[index] ?? '';
+function buildRowMap(input: { headers: string[]; values: string[] }): Record<string, string> {
+  return input.headers.reduce<Record<string, string>>((acc, header, index) => {
+    acc[header] = input.values[index] ?? '';
     return acc;
   }, {});
 }
 
 /** Returns a CSV field value or an empty string when the field is missing. */
-function getCsvField(rowMap: Record<string, string>, header: string): string {
-  return rowMap[header] ?? '';
+function getCsvField(input: { rowMap: Record<string, string>; header: string }): string {
+  return input.rowMap[input.header] ?? '';
 }
 
 /** Pulls the tornado magnitude from either the EF scale or the remarks text. */
-function extractTornadoMagnitude(row: StormReportCsvRow): string {
-  if (row.efScale && row.efScale !== 'UNK') {
-    return row.efScale;
+function extractTornadoMagnitude(input: { row: StormReportCsvRow }): string {
+  if (input.row.efScale && input.row.efScale !== 'UNK') {
+    return input.row.efScale;
   }
 
-  const efMatch = row.remarks.match(/EF-?(\d+)/i);
+  const efMatch = input.row.remarks.match(/EF-?(\d+)/i);
   return efMatch ? `EF${efMatch[1]}` : '';
 }
 
 /** Pulls the wind magnitude when the SPC report includes a valid speed. */
-function extractWindMagnitude(row: StormReportCsvRow): string {
-  return row.speedMph && row.speedMph !== 'UNK' ? `${row.speedMph} mph` : '';
+function extractWindMagnitude(input: { row: StormReportCsvRow }): string {
+  return input.row.speedMph && input.row.speedMph !== 'UNK' ? `${input.row.speedMph} mph` : '';
 }
 
 /** Pulls the hail magnitude when the SPC report includes a valid size. */
-function extractHailMagnitude(row: StormReportCsvRow): string {
-  return row.sizeHundredthsInch && row.sizeHundredthsInch !== 'UNK'
-    ? `${(parseInt(row.sizeHundredthsInch, 10) / 100).toFixed(2)}"`
+function extractHailMagnitude(input: { row: StormReportCsvRow }): string {
+  return input.row.sizeHundredthsInch && input.row.sizeHundredthsInch !== 'UNK'
+    ? `${(parseInt(input.row.sizeHundredthsInch, 10) / 100).toFixed(2)}"`
     : '';
 }
