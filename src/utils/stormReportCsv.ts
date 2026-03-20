@@ -14,6 +14,19 @@ interface StormReportCsvRow {
   remarks: string;
 }
 
+const CSV_ROW_FIELDS = [
+  ['time', 'Time'],
+  ['latitude', 'LAT'],
+  ['longitude', 'LON'],
+  ['efScale', 'EF_Scale'],
+  ['speedMph', 'Speed(MPH)'],
+  ['sizeHundredthsInch', 'Size(1/100in.)'],
+  ['location', 'Location'],
+  ['county', 'County'],
+  ['state', 'State'],
+  ['remarks', 'Remarks'],
+] as const;
+
 /** Parses CSV text into storm reports. */
 export function parseStormReportsCsv(csvText: string): StormReport[] {
   const reports: StormReport[] = [];
@@ -75,23 +88,23 @@ function getReportSection(line: string): ReportType | null {
 /** Converts one CSV line into a typed row object the parser can work with. */
 function buildCsvRow(line: string, headers: string[]): StormReportCsvRow {
   const values = splitCsvLine(line);
-  const rowMap = headers.reduce<Record<string, string>>((acc, header, index) => {
-    acc[header] = values[index] || '';
-    return acc;
-  }, {});
+  const rowMap = buildRowMap(headers, values);
 
-  return {
-    time: rowMap['Time'] || '',
-    latitude: rowMap['LAT'] || '',
-    longitude: rowMap['LON'] || '',
-    efScale: rowMap['EF_Scale'] || '',
-    speedMph: rowMap['Speed(MPH)'] || '',
-    sizeHundredthsInch: rowMap['Size(1/100in.)'] || '',
-    location: rowMap['Location'] || '',
-    county: rowMap['County'] || '',
-    state: rowMap['State'] || '',
-    remarks: rowMap['Remarks'] || ''
-  };
+  return CSV_ROW_FIELDS.reduce<StormReportCsvRow>((row, [field, header]) => {
+    row[field] = getCsvField(rowMap, header);
+    return row;
+  }, {
+    time: '',
+    latitude: '',
+    longitude: '',
+    efScale: '',
+    speedMph: '',
+    sizeHundredthsInch: '',
+    location: '',
+    county: '',
+    state: '',
+    remarks: '',
+  });
 }
 
 /** Extracts a report magnitude from a parsed CSV row using the row's hazard type. */
@@ -134,6 +147,19 @@ function parseCsvRow(input: { row: StormReportCsvRow; type: ReportType }): Storm
 /** Splits a CSV line while preserving quoted commas. */
 function splitCsvLine(line: string): string[] {
   return line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((value) => value.replaceAll('"', ''));
+}
+
+/** Builds a header-to-value lookup from one CSV line. */
+function buildRowMap(headers: string[], values: string[]): Record<string, string> {
+  return headers.reduce<Record<string, string>>((acc, header, index) => {
+    acc[header] = values[index] ?? '';
+    return acc;
+  }, {});
+}
+
+/** Returns a CSV field value or an empty string when the field is missing. */
+function getCsvField(rowMap: Record<string, string>, header: string): string {
+  return rowMap[header] ?? '';
 }
 
 /** Pulls the tornado magnitude from either the EF scale or the remarks text. */
