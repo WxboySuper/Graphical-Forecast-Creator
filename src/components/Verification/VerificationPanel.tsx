@@ -11,7 +11,11 @@ import {
   clearReports
 } from '../../store/stormReportsSlice';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
-import { fetchStormReports, formatReportDate } from '../../utils/stormReportParser';
+import {
+  describeStormReportFetchTarget,
+  resolveStormReportFetchTarget
+} from '../../utils/stormReportSource';
+import { fetchStormReportsFromUrl } from '../../utils/stormReportParser';
 import { analyzeVerification, formatVerificationSummary } from '../../utils/verificationUtils';
 import type { OutlookTypeVerification, VerificationResult } from '../../utils/verificationUtils';
 import { DayType } from '../../types/outlooks';
@@ -319,33 +323,17 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
     try {
       dispatch(setLoading(true));
       dispatch(setError(null));
-      
-      // Parse YYYY-MM-DD string directly to avoid timezone issues
-      const [year, month, day] = selectedDate.split('-').map(Number);
-      const dateObj = new Date(year, month - 1, day); // month is 0-indexed
 
-      // Check if the selected date is today in local time
-      const today = new Date();
-      // Compare year, month, and day to determine if the selected date is the same as today's date
-      const isToday = 
-        dateObj.getFullYear() === today.getFullYear() && 
-        dateObj.getMonth() === today.getMonth() && 
-        dateObj.getDate() === today.getDate();
-
-      if (isToday) {
-        dispatch(setError('info:Storm reports are not available for the current day until later.'));
-        dispatch(setLoading(false));
-        return;
-      }
-
-      const reportDate = formatReportDate(dateObj);
-      const fetchedReports = await fetchStormReports(reportDate);
+      const target = resolveStormReportFetchTarget({ selectedDate });
+      const fetchedReports = await fetchStormReportsFromUrl({ url: target.url });
 
       dispatch(setReports(fetchedReports));
-      dispatch(setDate(reportDate));
+      dispatch(setDate(target.reportDate));
 
       if (fetchedReports.length === 0) {
         dispatch(setError('info:No storm reports found for this date.'));
+      } else {
+        dispatch(setError(`info:${describeStormReportFetchTarget(target)}`));
       }
     } catch (err) {
       dispatch(setError(
