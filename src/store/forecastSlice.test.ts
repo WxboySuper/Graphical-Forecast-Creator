@@ -253,6 +253,66 @@ describe('forecastSlice undo/redo', () => {
     expect(nextState.forecastCycle.days[3]?.data.totalSevere?.get('30%') || []).toHaveLength(0);
   });
 
+  test('copies direct day 1 outlooks into day 2 and deep-clones the features', () => {
+    let sourceState = reducer(undefined, addFeature({ feature: createFeature('source-day1', 0) }));
+    sourceState = reducer(
+      sourceState,
+      addFeature({ feature: createCategoricalFeature('source-categorical', 1) })
+    );
+
+    let targetState = reducer(undefined, setForecastDay(2));
+    targetState = reducer(
+      targetState,
+      addFeature({ feature: createFeature('stale-target', 5) })
+    );
+
+    const nextState = reducer(
+      targetState,
+      copyFeaturesFromPrevious({
+        sourceCycle: sourceState.forecastCycle,
+        sourceDay: 1,
+        targetDay: 2,
+      })
+    );
+
+    const copiedTornado = nextState.forecastCycle.days[2]?.data.tornado?.get('2%')?.[0];
+    const copiedCategorical = nextState.forecastCycle.days[2]?.data.categorical?.get('ENH')?.[0];
+    const sourceTornado = sourceState.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
+
+    expect(copiedTornado?.id).toBe('source-day1');
+    expect(copiedCategorical?.id).toBe('source-categorical');
+    expect(nextState.forecastCycle.days[2]?.data.tornado?.get('2%')).toHaveLength(1);
+    expect(copiedTornado).not.toBe(sourceTornado);
+  });
+
+  test('copies only categorical outlooks from day 3 into day 1', () => {
+    let sourceState = reducer(undefined, setForecastDay(3));
+    sourceState = reducer(
+      sourceState,
+      addFeature({ feature: createOutlookFeature('source-total-severe', 3, 'totalSevere', '15%') })
+    );
+    sourceState = reducer(
+      sourceState,
+      addFeature({ feature: createCategoricalFeature('source-categorical', 4) })
+    );
+
+    const targetState = reducer(undefined, addFeature({ feature: createFeature('stale-target', 8) }));
+
+    const nextState = reducer(
+      targetState,
+      copyFeaturesFromPrevious({
+        sourceCycle: sourceState.forecastCycle,
+        sourceDay: 3,
+        targetDay: 1,
+      })
+    );
+
+    expect(nextState.forecastCycle.days[1]?.data.categorical?.get('ENH')?.[0].id).toBe('source-categorical');
+    expect(nextState.forecastCycle.days[1]?.data.tornado?.size ?? 0).toBe(0);
+    expect(nextState.forecastCycle.days[1]?.data.wind?.size ?? 0).toBe(0);
+    expect(nextState.forecastCycle.days[1]?.data.hail?.size ?? 0).toBe(0);
+  });
+
   test('clears incompatible target data when copying from day 1 to day 4', () => {
     let sourceState = reducer(undefined, addFeature({ feature: createFeature('source-day1', 0) }));
 

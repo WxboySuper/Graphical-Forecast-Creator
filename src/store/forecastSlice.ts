@@ -43,7 +43,7 @@ interface ForecastHistoryStacks {
 
 type DayBucket = 'day12' | 'day3' | 'day48';
 
-interface OutlookCopyInstruction {
+interface CopyFeatureRule {
   sourceType: OutlookType;
   targetType: OutlookType;
 }
@@ -58,7 +58,7 @@ const ALL_OUTLOOK_TYPES: OutlookType[] = [
   'day4-8',
 ];
 const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical'];
-const COPY_FEATURE_RULES: Record<DayBucket, Record<DayBucket, OutlookCopyInstruction[]>> = {
+const COPY_FEATURE_RULES: Record<DayBucket, Record<DayBucket, CopyFeatureRule[]>> = {
   day12: {
     day12: DIRECT_DAY12_COPY_TYPES.map((type) => ({ sourceType: type, targetType: type })),
     day3: [{ sourceType: 'categorical', targetType: 'categorical' }],
@@ -94,32 +94,6 @@ const getDayBucket = (day: DayType): DayBucket => {
 const clearOutlookMaps = (data: OutlookData) => {
   ALL_OUTLOOK_TYPES.forEach((type) => {
     data[type]?.clear();
-  });
-};
-
-/** Deep-clones one probability map so undo/redo snapshots do not share mutable arrays. */
-const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | undefined => {
-  if (!map) return undefined;
-  return new Map(Array.from(map.entries(), ([probability, features]) => [
-    probability,
-    features.map(f => ({ ...f })),
-  ]));
-};
-
-/** Copies only the outlook types allowed by the source/target day compatibility rules. */
-const copyCompatibleOutlooks = (
-  sourceData: OutlookData,
-  targetData: OutlookData,
-  sourceDay: DayType,
-  targetDay: DayType
-) => {
-  const copyInstructions = COPY_FEATURE_RULES[getDayBucket(sourceDay)][getDayBucket(targetDay)];
-  copyInstructions.forEach(({ sourceType, targetType }) => {
-    const sourceMap = sourceData[sourceType];
-    const clonedMap = cloneEntries(sourceMap);
-    if (clonedMap && targetData[targetType]) {
-      targetData[targetType] = clonedMap;
-    }
   });
 };
 
@@ -275,6 +249,23 @@ const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | un
     probability,
     features.map(cloneFeature),
   ]));
+};
+
+/** Copies only the outlook types allowed by the source/target day compatibility rules. */
+const copyCompatibleOutlooks = (
+  sourceData: OutlookData,
+  targetData: OutlookData,
+  sourceDay: DayType,
+  targetDay: DayType
+) => {
+  const copyRules = COPY_FEATURE_RULES[getDayBucket(sourceDay)][getDayBucket(targetDay)];
+
+  copyRules.forEach(({ sourceType, targetType }) => {
+    const clonedMap = cloneEntries(sourceData[sourceType]);
+    if (clonedMap) {
+      targetData[targetType] = clonedMap;
+    }
+  });
 };
 
 /** Deep-clones all outlook maps for a day so history snapshots remain isolated from live edits. */
