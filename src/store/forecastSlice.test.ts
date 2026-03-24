@@ -314,7 +314,7 @@ describe('forecastSlice undo/redo', () => {
   });
 
   test('clears incompatible target data when copying from day 1 to day 4', () => {
-    let sourceState = reducer(undefined, addFeature({ feature: createFeature('source-day1', 0) }));
+    const sourceState = reducer(undefined, addFeature({ feature: createFeature('source-day1', 0) }));
 
     let targetState = reducer(undefined, setForecastDay(4));
     targetState = reducer(
