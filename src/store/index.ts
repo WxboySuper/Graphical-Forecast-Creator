@@ -36,6 +36,7 @@ export const store = configureStore({
           'forecast/importForecasts',
           'forecast/importForecastCycle',
           'forecast/setOutlookMap',
+          'forecast/applyAutoCategoricalSync',
           'forecast/resetCategorical',
           'forecast/undoLastEdit',
           'forecast/redoLastEdit',

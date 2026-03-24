@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **Ghost overlays:** New overlay type that shows previous outlooks as semi-transparent ghosts on the map for comparison. Toggle visibility in the toolbar.
+- **Ghost overlays:** New overlay type that shows previous outlooks as semi-transparent ghosts on the map for comparison. Toggle visibility in the toolbar, with ghost overlays defaulting to off.
 - **Verification storm report windows:** Added support for loading both today's and yesterday's storm reports in the Verification panel.
 - **Alert banner system:** Added configurable alert banner with info/warning/error types and dismissible behavior.
 
