@@ -42,6 +42,54 @@ const signatureFromCategoricalMap = (categoricalMap: OutlookData['categorical'])
   return signatureFromFeatures(items);
 };
 
+const signatureFromOutlookMap = (
+  outlookType: string,
+  outlookMap?: Map<string, GeoJSON.Feature[]>
+): string => {
+  if (!(outlookMap instanceof Map)) {
+    return '';
+  }
+
+  const items: GeoJSON.Feature[] = [];
+  outlookMap.forEach((features, probability) => {
+    features.forEach((feature) => {
+      items.push({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          outlookType,
+          probability
+        }
+      });
+    });
+  });
+
+  return items
+    .map((feature) => {
+      const sourceType = String(feature.properties?.outlookType || '');
+      const probability = String(feature.properties?.probability || '');
+      return `${sourceType}:${probability}:${JSON.stringify(feature.geometry)}`;
+    })
+    .sort()
+    .join('|');
+};
+
+const signatureFromProbabilisticOutlooks = (outlooks: OutlookData, currentDay: number): string => {
+  if (currentDay === 1 || currentDay === 2) {
+    return [
+      signatureFromOutlookMap('tornado', outlooks.tornado),
+      signatureFromOutlookMap('wind', outlooks.wind),
+      signatureFromOutlookMap('hail', outlooks.hail),
+    ].join('|');
+  }
+
+  if (currentDay === 3) {
+    return signatureFromOutlookMap('totalSevere', outlooks.totalSevere);
+  }
+
+  return '';
+};
+
 const buildCategoricalMap = (
   tstmFeatures: GeoJSON.Feature[],
   generatedFeatures: GeoJSON.Feature[]
@@ -88,20 +136,7 @@ const useAutoCategorical = () => {
       return;
     }
 
-    // Create a hash of the current probabilistic outlooks to detect changes
-    let currentHash = '';
-    
-    if (currentDay === 1 || currentDay === 2) {
-      // Day 1/2: Hash tornado, wind, hail
-      const tornadoIds = (outlooks.tornado instanceof Map) ? Array.from(outlooks.tornado.values()).flat().map(f => f.id).sort().join(',') : '';
-      const windIds = (outlooks.wind instanceof Map) ? Array.from(outlooks.wind.values()).flat().map(f => f.id).sort().join(',') : '';
-      const hailIds = (outlooks.hail instanceof Map) ? Array.from(outlooks.hail.values()).flat().map(f => f.id).sort().join(',') : '';
-      currentHash = `${tornadoIds}|${windIds}|${hailIds}`;
-    } else if (currentDay === 3) {
-      // Day 3: Hash totalSevere
-      const totalSevereIds = (outlooks.totalSevere instanceof Map) ? Array.from(outlooks.totalSevere.values()).flat().map(f => f.id).sort().join(',') : '';
-      currentHash = totalSevereIds;
-    }
+    const currentHash = signatureFromProbabilisticOutlooks(outlooks, currentDay);
 
     // Skip if there are no changes to process
     let hasChanges = false;
@@ -114,10 +149,6 @@ const useAutoCategorical = () => {
       hasChanges = outlooks.totalSevere instanceof Map ? outlooks.totalSevere.size > 0 : false;
     }
     
-    if (!hasChanges) {
-      return;
-    }
-
     // Build the categorical geometry that *should* exist for current probabilistic data
     // and compare to what is currently present. This catches imported stale/ring
     // categorical geometry even when probabilistic IDs/hash are unchanged.
@@ -131,6 +162,13 @@ const useAutoCategorical = () => {
     const expectedSignature = signatureFromFeatures(generatedFeatures);
     const currentSignature = signatureFromCategoricalMap(outlooks.categorical);
     const categoricalOutOfSync = expectedSignature !== currentSignature;
+
+    if (!hasChanges) {
+      lastProcessedRef.current = currentHash;
+      if (!categoricalOutOfSync) {
+        return;
+      }
+    }
 
     // Fast path: same probabilistic state and categorical already matches expected output.
     if (currentHash === lastProcessedRef.current && !categoricalOutOfSync) {
