@@ -3,6 +3,7 @@ import type { DayType } from '../types/outlooks';
 import reducer, {
   addFeature,
   applyAutoCategoricalSync,
+  copyFeaturesFromPrevious,
   importForecastCycle,
   redoLastEdit,
   resetForecasts,
@@ -33,6 +34,22 @@ const createFeature = (id: string, offset: number): Feature => ({
   properties: {
     outlookType: 'tornado',
     probability: '2%',
+    isSignificant: false,
+  },
+});
+
+const createOutlookFeature = (
+  id: string,
+  offset: number,
+  outlookType: 'tornado' | 'totalSevere' | 'day4-8',
+  probability: '2%' | '15%' | '30%'
+): Feature => ({
+  type: 'Feature',
+  id,
+  geometry: createPolygon(offset),
+  properties: {
+    outlookType,
+    probability,
     isSignificant: false,
   },
 });
@@ -207,5 +224,53 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, resetForecasts());
     expect(selectCanUndo({ forecast: state } as never)).toBe(false);
     expect(selectCanRedo({ forecast: state } as never)).toBe(false);
+  });
+
+  test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {
+    let sourceState = reducer(undefined, setForecastDay(4));
+    sourceState = reducer(
+      sourceState,
+      addFeature({ feature: createOutlookFeature('source-day48', 4, 'day4-8', '15%') })
+    );
+
+    let targetState = reducer(undefined, setForecastDay(3));
+    targetState = reducer(
+      targetState,
+      addFeature({ feature: createOutlookFeature('stale-target', 8, 'totalSevere', '30%') })
+    );
+
+    const nextState = reducer(
+      targetState,
+      copyFeaturesFromPrevious({
+        sourceCycle: sourceState.forecastCycle,
+        sourceDay: 4,
+        targetDay: 3,
+      })
+    );
+
+    expect(nextState.forecastCycle.days[3]?.data.totalSevere?.get('15%')).toHaveLength(1);
+    expect(nextState.forecastCycle.days[3]?.data.totalSevere?.get('15%')?.[0].id).toBe('source-day48');
+    expect(nextState.forecastCycle.days[3]?.data.totalSevere?.get('30%') || []).toHaveLength(0);
+  });
+
+  test('clears incompatible target data when copying from day 1 to day 4', () => {
+    let sourceState = reducer(undefined, addFeature({ feature: createFeature('source-day1', 0) }));
+
+    let targetState = reducer(undefined, setForecastDay(4));
+    targetState = reducer(
+      targetState,
+      addFeature({ feature: createOutlookFeature('existing-day48', 6, 'day4-8', '15%') })
+    );
+
+    const nextState = reducer(
+      targetState,
+      copyFeaturesFromPrevious({
+        sourceCycle: sourceState.forecastCycle,
+        sourceDay: 1,
+        targetDay: 4,
+      })
+    );
+
+    expect(nextState.forecastCycle.days[4]?.data['day4-8']?.size ?? 0).toBe(0);
   });
 });
