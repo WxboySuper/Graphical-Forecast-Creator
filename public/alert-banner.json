@@ -1,6 +1,6 @@
 {
   "enabled": false,
-  "message": "We'll be performing routine server maintenance on Tuesday, March 24th at ~10:00am CT. During this time you may experience intermittent disruptions in accessing the site. Updates will be posted in the Discord.",
+  "message": "",
   "type": "info",
   "dismissible": true
 }

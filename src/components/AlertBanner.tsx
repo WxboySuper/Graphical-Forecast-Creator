@@ -19,25 +19,13 @@ interface AlertBannerProps {
   configPath?: string;
 }
 
-/** Builds a cache-busting config URL so alert JSON changes are reflected immediately in production. */
-const getAlertConfigUrl = (configPath: string): string => {
-  const separator = configPath.includes('?') ? '&' : '?';
-  return `${configPath}${separator}ts=${Date.now()}`;
-};
-
 /** Loads a static JSON banner config and renders a site-wide alert when enabled. */
 export function AlertBanner({ configPath = '/alert-banner.json' }: AlertBannerProps) {
   const [config, setConfig] = useState<AlertConfig>(DEFAULT_CONFIG);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    fetch(getAlertConfigUrl(configPath), {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
-    })
+    fetch(configPath)
       .then((response) => {
         if (!response.ok) {
           throw new Error('Banner config unavailable');
@@ -49,8 +37,7 @@ export function AlertBanner({ configPath = '/alert-banner.json' }: AlertBannerPr
         setDismissed(false);
       })
       .catch(() => {
-        setConfig(DEFAULT_CONFIG);
-        setDismissed(false);
+        // Invalid or missing config should fail closed and keep the banner hidden.
       });
   }, [configPath]);
 

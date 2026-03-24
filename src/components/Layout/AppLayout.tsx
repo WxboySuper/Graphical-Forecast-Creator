@@ -160,6 +160,8 @@ export const AppLayout: React.FC = () => {
           onViewTerms={handleViewTerms}
         />
 
+        <AlertBanner />
+        
         {/* Documentation side-panel (right-side drawer) */}
         <DocumentationPanel show={showDocumentation} onClose={handleCloseDocumentation} />
 

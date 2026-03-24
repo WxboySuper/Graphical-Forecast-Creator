@@ -26,7 +26,7 @@ export const store = configureStore({
         // Use regex to match all days and outlook types
         ignoredPaths: [
           /^forecast\.forecastCycle\.days\.\d+\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
-          /^forecast\.(undoStack|redoStack)\.\d+\.snapshot\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
+          /^forecast\.historyByDay\.\d+\.(undoStack|redoStack)\.\d+\.snapshot\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
           /^verification\.loadedForecast\.days\.\d+\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
           'forecast.outlooks',
         ],
@@ -36,6 +36,7 @@ export const store = configureStore({
           'forecast/importForecasts',
           'forecast/importForecastCycle',
           'forecast/setOutlookMap',
+          'forecast/applyAutoCategoricalSync',
           'forecast/resetCategorical',
           'forecast/undoLastEdit',
           'forecast/redoLastEdit',

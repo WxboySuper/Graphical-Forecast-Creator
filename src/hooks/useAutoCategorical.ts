@@ -1,12 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addFeature, resetCategorical, setOutlookMap, selectCurrentOutlooks, selectCurrentDay } from '../store/forecastSlice';
+import { applyAutoCategoricalSync, selectCurrentOutlooks, selectCurrentDay } from '../store/forecastSlice';
 import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevereToCategorical } from '../utils/outlookUtils';
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { v4 as uuidv4 } from 'uuid';
 import * as turf from '@turf/turf';
 import { Feature, Polygon, MultiPolygon } from 'geojson';
 
+/**
+ * Builds a stable geometry signature for a list of features so we can detect
+ * probabilistic changes without relying on generated IDs.
+ */
 const signatureFromFeatures = (features: GeoJSON.Feature[]): string => {
   return features
     .map((feature) => {
@@ -17,6 +21,10 @@ const signatureFromFeatures = (features: GeoJSON.Feature[]): string => {
     .join('|');
 };
 
+/**
+ * Builds a comparable signature for the current categorical outlook map while
+ * ignoring manually managed TSTM polygons.
+ */
 const signatureFromCategoricalMap = (categoricalMap: OutlookData['categorical']): string => {
   if (!(categoricalMap instanceof Map)) {
     return '';
@@ -40,6 +48,85 @@ const signatureFromCategoricalMap = (categoricalMap: OutlookData['categorical'])
   });
 
   return signatureFromFeatures(items);
+};
+
+/**
+ * Serializes one probabilistic outlook map into a stable string that includes
+ * both the source outlook type and the polygon geometry.
+ */
+const signatureFromOutlookMap = (
+  outlookType: string,
+  outlookMap?: Map<string, GeoJSON.Feature[]>
+): string => {
+  if (!(outlookMap instanceof Map)) {
+    return '';
+  }
+
+  const items: GeoJSON.Feature[] = [];
+  outlookMap.forEach((features, probability) => {
+    features.forEach((feature) => {
+      items.push({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          outlookType,
+          probability
+        }
+      });
+    });
+  });
+
+  return items
+    .map((feature) => {
+      const sourceType = String(feature.properties?.outlookType || '');
+      const probability = String(feature.properties?.probability || '');
+      return `${sourceType}:${probability}:${JSON.stringify(feature.geometry)}`;
+    })
+    .sort()
+    .join('|');
+};
+
+/**
+ * Builds a day-aware signature of the probabilistic outlooks that drive
+ * automatic categorical generation.
+ */
+const signatureFromProbabilisticOutlooks = (outlooks: OutlookData, currentDay: number): string => {
+  if (currentDay === 1 || currentDay === 2) {
+    return [
+      signatureFromOutlookMap('tornado', outlooks.tornado),
+      signatureFromOutlookMap('wind', outlooks.wind),
+      signatureFromOutlookMap('hail', outlooks.hail),
+    ].join('|');
+  }
+
+  if (currentDay === 3) {
+    return signatureFromOutlookMap('totalSevere', outlooks.totalSevere);
+  }
+
+  return '';
+};
+
+/**
+ * Rebuilds the categorical map from generated features while preserving any
+ * existing manual TSTM geometry.
+ */
+const buildCategoricalMap = (
+  tstmFeatures: GeoJSON.Feature[],
+  generatedFeatures: GeoJSON.Feature[]
+): Map<string, GeoJSON.Feature[]> => {
+  const categoricalMap = new Map<string, GeoJSON.Feature[]>();
+
+  if (tstmFeatures.length > 0) {
+    categoricalMap.set('TSTM', tstmFeatures);
+  }
+
+  generatedFeatures.forEach((feature) => {
+    const probability = String(feature.properties?.probability || '');
+    const existingFeatures = categoricalMap.get(probability) || [];
+    categoricalMap.set(probability, [...existingFeatures, feature]);
+  });
+
+  return categoricalMap;
 };
 
 /**
@@ -69,20 +156,7 @@ const useAutoCategorical = () => {
       return;
     }
 
-    // Create a hash of the current probabilistic outlooks to detect changes
-    let currentHash = '';
-    
-    if (currentDay === 1 || currentDay === 2) {
-      // Day 1/2: Hash tornado, wind, hail
-      const tornadoIds = (outlooks.tornado instanceof Map) ? Array.from(outlooks.tornado.values()).flat().map(f => f.id).sort().join(',') : '';
-      const windIds = (outlooks.wind instanceof Map) ? Array.from(outlooks.wind.values()).flat().map(f => f.id).sort().join(',') : '';
-      const hailIds = (outlooks.hail instanceof Map) ? Array.from(outlooks.hail.values()).flat().map(f => f.id).sort().join(',') : '';
-      currentHash = `${tornadoIds}|${windIds}|${hailIds}`;
-    } else if (currentDay === 3) {
-      // Day 3: Hash totalSevere
-      const totalSevereIds = (outlooks.totalSevere instanceof Map) ? Array.from(outlooks.totalSevere.values()).flat().map(f => f.id).sort().join(',') : '';
-      currentHash = totalSevereIds;
-    }
+    const currentHash = signatureFromProbabilisticOutlooks(outlooks, currentDay);
 
     // Skip if there are no changes to process
     let hasChanges = false;
@@ -95,10 +169,6 @@ const useAutoCategorical = () => {
       hasChanges = outlooks.totalSevere instanceof Map ? outlooks.totalSevere.size > 0 : false;
     }
     
-    if (!hasChanges) {
-      return;
-    }
-
     // Build the categorical geometry that *should* exist for current probabilistic data
     // and compare to what is currently present. This catches imported stale/ring
     // categorical geometry even when probabilistic IDs/hash are unchanged.
@@ -113,6 +183,13 @@ const useAutoCategorical = () => {
     const currentSignature = signatureFromCategoricalMap(outlooks.categorical);
     const categoricalOutOfSync = expectedSignature !== currentSignature;
 
+    if (!hasChanges) {
+      lastProcessedRef.current = currentHash;
+      if (!categoricalOutOfSync) {
+        return;
+      }
+    }
+
     // Fast path: same probabilistic state and categorical already matches expected output.
     if (currentHash === lastProcessedRef.current && !categoricalOutOfSync) {
       return;
@@ -124,20 +201,9 @@ const useAutoCategorical = () => {
     try {
       // Store existing TSTM areas before clearing categoricals
       const tstmFeatures = (outlooks.categorical instanceof Map) ? (outlooks.categorical.get('TSTM') || []) : [];
-      const tstmMap = new Map([['TSTM', tstmFeatures]]);
+      const categoricalMap = buildCategoricalMap(tstmFeatures, generatedFeatures);
 
-      // Clear categorical outlooks except TSTM
-      dispatch(resetCategorical());
-
-      // Restore TSTM features if they exist
-      if (tstmFeatures.length > 0) {
-        dispatch(setOutlookMap({ outlookType: 'categorical', map: tstmMap }));
-      }
-
-      // Add all generated categorical features
-      generatedFeatures.forEach((feature) => {
-        dispatch(addFeature({ feature }));
-      });
+      dispatch(applyAutoCategoricalSync({ map: categoricalMap }));
     } finally {
       processingRef.current = false;
     }
@@ -174,6 +240,10 @@ const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon
   }
 };
 
+/**
+ * Unions the collected risk polygons into cumulative categorical rings so each
+ * lower tier includes all higher-risk geometry beneath it.
+ */
 const buildCumulativeCategoricalFeatures = (
   riskPolygons: Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>
 ): GeoJSON.Feature[] => {
@@ -304,6 +374,10 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
   return buildCumulativeCategoricalFeatures(riskPolygons);
 }
 
+/**
+ * Maps one intersected probabilistic polygon piece into its categorical risk
+ * bucket and appends it unless it resolves to TSTM.
+ */
 function addPieceToRiskMap(
   type: 'tornado' | 'wind' | 'hail', 
   prob: string, 
