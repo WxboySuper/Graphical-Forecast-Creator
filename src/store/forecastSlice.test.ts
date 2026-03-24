@@ -65,6 +65,63 @@ const createOutlookFeature = (
   probability: '2%' | '15%' | '30%'
 ): Feature => createBaseFeature(id, offset, { outlookType, probability });
 
+interface CopyTestSetup {
+  sourceDay: DayType;
+  sourceType: string;
+  sourceProb: string;
+  targetDay: DayType;
+  targetType: string;
+  targetProb: string;
+}
+
+interface CopyExpectations {
+  state: ReturnType<typeof reducer>;
+  day: DayType;
+  outlookType: string;
+  probability: string;
+  expectedLength: number;
+  expectedId?: string;
+}
+
+const createCopyTestSetup = ({
+  sourceDay,
+  sourceType,
+  sourceProb,
+  targetDay,
+  targetType,
+  targetProb,
+}: CopyTestSetup) => {
+  let sourceState = reducer(undefined, setForecastDay(sourceDay));
+  sourceState = reducer(
+    sourceState,
+    addFeature({ feature: createOutlookFeature('source', sourceDay, sourceType as never, sourceProb as never) })
+  );
+
+  let targetState = reducer(undefined, setForecastDay(targetDay));
+  targetState = reducer(
+    targetState,
+    addFeature({ feature: createOutlookFeature('stale', targetDay + 5, targetType as never, targetProb as never) })
+  );
+
+  return { sourceState, targetState };
+};
+
+const expectCopyResult = ({
+  state,
+  day,
+  outlookType,
+  probability,
+  expectedLength,
+  expectedId,
+}: CopyExpectations) => {
+  const data = state.forecastCycle.days[day]?.data as Record<string, Map<string, Feature[]> | undefined>;
+  const features = data[outlookType]?.get(probability);
+  expect(features).toHaveLength(expectedLength);
+  if (expectedId) {
+    expect(features?.[0].id).toBe(expectedId);
+  }
+};
+
 const getTornadoFeatures = (state: ReturnType<typeof reducer>) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.data.tornado?.get('2%') || [];
 
@@ -226,17 +283,14 @@ describe('forecastSlice undo/redo', () => {
   });
 
   test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {
-    let sourceState = reducer(undefined, setForecastDay(4));
-    sourceState = reducer(
-      sourceState,
-      addFeature({ feature: createOutlookFeature('source-day48', 4, 'day4-8', '15%') })
-    );
-
-    let targetState = reducer(undefined, setForecastDay(3));
-    targetState = reducer(
-      targetState,
-      addFeature({ feature: createOutlookFeature('stale-target', 8, 'totalSevere', '30%') })
-    );
+    const { sourceState, targetState } = createCopyTestSetup({
+      sourceDay: 4,
+      sourceType: 'day4-8',
+      sourceProb: '15%',
+      targetDay: 3,
+      targetType: 'totalSevere',
+      targetProb: '30%',
+    });
 
     const nextState = reducer(
       targetState,
@@ -247,8 +301,14 @@ describe('forecastSlice undo/redo', () => {
       })
     );
 
-    expect(nextState.forecastCycle.days[3]?.data.totalSevere?.get('15%')).toHaveLength(1);
-    expect(nextState.forecastCycle.days[3]?.data.totalSevere?.get('15%')?.[0].id).toBe('source-day48');
+    expectCopyResult({
+      state: nextState,
+      day: 3,
+      outlookType: 'totalSevere',
+      probability: '15%',
+      expectedLength: 1,
+      expectedId: 'source',
+    });
     expect(nextState.forecastCycle.days[3]?.data.totalSevere?.get('30%') || []).toHaveLength(0);
   });
 
