@@ -167,6 +167,7 @@ export const AppLayout: React.FC = () => {
 
         {/* Main content area - below navbar */}
         <main className="pt-14 h-screen">
+          <AlertBanner />
           
           {/* Page content via router outlet */}
           <Outlet context={{ addToast }} />

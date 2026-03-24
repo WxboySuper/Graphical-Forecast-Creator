@@ -19,6 +19,12 @@ interface AlertBannerProps {
   configPath?: string;
 }
 
+/** Builds a cache-busting config URL so alert JSON changes are reflected immediately in production. */
+const getAlertConfigUrl = (configPath: string): string => {
+  const separator = configPath.includes('?') ? '&' : '?';
+  return `${configPath}${separator}ts=${Date.now()}`;
+};
+
 /** Loads a static JSON banner config and renders a site-wide alert when enabled. */
 export function AlertBanner({ configPath = '/alert-banner.json' }: AlertBannerProps) {
   const [config, setConfig] = useState<AlertConfig>(DEFAULT_CONFIG);
