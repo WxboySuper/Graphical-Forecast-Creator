@@ -131,6 +131,27 @@ const expectOutlookTypeEmpty = (
   expect(data[outlookType]?.size ?? 0).toBe(0);
 };
 
+interface DeepCloneCheck {
+  copiedFeature: Feature | undefined;
+  sourceFeature: Feature | undefined;
+}
+
+const expectDeepCloned = ({ copiedFeature, sourceFeature }: DeepCloneCheck) => {
+  expect(copiedFeature).not.toBe(sourceFeature);
+};
+
+const createSourceWithFeatures = (id1: string, id2: string) => {
+  let state = reducer(undefined, addFeature({ feature: createFeature(id1, 0) }));
+  state = reducer(state, addFeature({ feature: createCategoricalFeature(id2, 1) }));
+  return state;
+};
+
+const createTargetWithFeature = (day: DayType, id: string, offset: number) => {
+  let state = reducer(undefined, setForecastDay(day));
+  state = reducer(state, addFeature({ feature: createFeature(id, offset) }));
+  return state;
+};
+
 const getTornadoFeatures = (state: ReturnType<typeof reducer>) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.data.tornado?.get('2%') || [];
 
@@ -322,17 +343,8 @@ describe('forecastSlice undo/redo', () => {
   });
 
   test('copies direct day 1 outlooks into day 2 and deep-clones the features', () => {
-    let sourceState = reducer(undefined, addFeature({ feature: createFeature('source-day1', 0) }));
-    sourceState = reducer(
-      sourceState,
-      addFeature({ feature: createCategoricalFeature('source-categorical', 1) })
-    );
-
-    let targetState = reducer(undefined, setForecastDay(2));
-    targetState = reducer(
-      targetState,
-      addFeature({ feature: createFeature('stale-target', 5) })
-    );
+    const sourceState = createSourceWithFeatures('source-day1', 'source-categorical');
+    const targetState = createTargetWithFeature(2, 'stale-target', 5);
 
     const nextState = reducer(
       targetState,
@@ -350,7 +362,7 @@ describe('forecastSlice undo/redo', () => {
     expect(copiedTornado?.id).toBe('source-day1');
     expect(copiedCategorical?.id).toBe('source-categorical');
     expect(nextState.forecastCycle.days[2]?.data.tornado?.get('2%')).toHaveLength(1);
-    expect(copiedTornado).not.toBe(sourceTornado);
+    expectDeepCloned({ copiedFeature: copiedTornado, sourceFeature: sourceTornado });
   });
 
   test('copies only categorical outlooks from day 3 into day 1', () => {
