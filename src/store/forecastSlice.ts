@@ -676,7 +676,10 @@ export const forecastSlice = createSlice({
         state.forecastCycle.days[targetDay] = createEmptyOutlook(targetDay);
       }
 
-      const targetDayData = state.forecastCycle.days[targetDay]!;
+      const targetDayData = state.forecastCycle.days[targetDay];
+      if (!targetDayData) {
+        return;
+      }
       
       // Determine source and target day types
       const isSourceDay12 = sourceDay === 1 || sourceDay === 2;

@@ -6,12 +6,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **Ghost overlays:** New overlay type that shows previous outlooks as semi-transparent ghosts on the map for comparison. Toggle visibility in the toolbar.
-- **Per-day undo/redo:** Undo and redo history now persists correctly when switching between forecast days.
+- **Ghost overlays:** New overlay type that shows previous outlooks as semi-transparent ghosts on the map for comparison. Toggle visibility in the toolbar, with ghost overlays defaulting to off.
 - **Verification storm report live windows:** Added support for loading both today's and yesterday's storm reports in the Verification panel.
 
 ### Changed
 - **Alert banner:** Added configurable alert banner system with support for info/warning/error types and dismissible behavior.
+
+### Fixed
+- **Per-day undo/redo:** Undo and redo history now persists correctly when switching between forecast days.
 
 ## [1.2.0] - 2026-03-15
 

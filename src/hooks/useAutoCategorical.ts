@@ -7,6 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
 import * as turf from '@turf/turf';
 import { Feature, Polygon, MultiPolygon } from 'geojson';
 
+/**
+ * Builds a stable geometry signature for a list of features so we can detect
+ * probabilistic changes without relying on generated IDs.
+ */
 const signatureFromFeatures = (features: GeoJSON.Feature[]): string => {
   return features
     .map((feature) => {
@@ -17,6 +21,10 @@ const signatureFromFeatures = (features: GeoJSON.Feature[]): string => {
     .join('|');
 };
 
+/**
+ * Builds a comparable signature for the current categorical outlook map while
+ * ignoring manually managed TSTM polygons.
+ */
 const signatureFromCategoricalMap = (categoricalMap: OutlookData['categorical']): string => {
   if (!(categoricalMap instanceof Map)) {
     return '';
@@ -42,6 +50,10 @@ const signatureFromCategoricalMap = (categoricalMap: OutlookData['categorical'])
   return signatureFromFeatures(items);
 };
 
+/**
+ * Serializes one probabilistic outlook map into a stable string that includes
+ * both the source outlook type and the polygon geometry.
+ */
 const signatureFromOutlookMap = (
   outlookType: string,
   outlookMap?: Map<string, GeoJSON.Feature[]>
@@ -74,6 +86,10 @@ const signatureFromOutlookMap = (
     .join('|');
 };
 
+/**
+ * Builds a day-aware signature of the probabilistic outlooks that drive
+ * automatic categorical generation.
+ */
 const signatureFromProbabilisticOutlooks = (outlooks: OutlookData, currentDay: number): string => {
   if (currentDay === 1 || currentDay === 2) {
     return [
@@ -90,6 +106,10 @@ const signatureFromProbabilisticOutlooks = (outlooks: OutlookData, currentDay: n
   return '';
 };
 
+/**
+ * Rebuilds the categorical map from generated features while preserving any
+ * existing manual TSTM geometry.
+ */
 const buildCategoricalMap = (
   tstmFeatures: GeoJSON.Feature[],
   generatedFeatures: GeoJSON.Feature[]
@@ -220,6 +240,10 @@ const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon
   }
 };
 
+/**
+ * Unions the collected risk polygons into cumulative categorical rings so each
+ * lower tier includes all higher-risk geometry beneath it.
+ */
 const buildCumulativeCategoricalFeatures = (
   riskPolygons: Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>
 ): GeoJSON.Feature[] => {
@@ -350,6 +374,10 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
   return buildCumulativeCategoricalFeatures(riskPolygons);
 }
 
+/**
+ * Maps one intersected probabilistic polygon piece into its categorical risk
+ * bucket and appends it unless it resolves to TSTM.
+ */
 function addPieceToRiskMap(
   type: 'tornado' | 'wind' | 'hail', 
   prob: string, 
