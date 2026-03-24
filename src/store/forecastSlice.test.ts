@@ -122,6 +122,15 @@ const expectCopyResult = ({
   }
 };
 
+const expectOutlookTypeEmpty = (
+  state: ReturnType<typeof reducer>,
+  day: DayType,
+  outlookType: string
+) => {
+  const data = state.forecastCycle.days[day]?.data as Record<string, Map<string, Feature[]> | undefined>;
+  expect(data[outlookType]?.size ?? 0).toBe(0);
+};
+
 const getTornadoFeatures = (state: ReturnType<typeof reducer>) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.data.tornado?.get('2%') || [];
 
@@ -366,10 +375,17 @@ describe('forecastSlice undo/redo', () => {
       })
     );
 
-    expect(nextState.forecastCycle.days[1]?.data.categorical?.get('ENH')?.[0].id).toBe('source-categorical');
-    expect(nextState.forecastCycle.days[1]?.data.tornado?.size ?? 0).toBe(0);
-    expect(nextState.forecastCycle.days[1]?.data.wind?.size ?? 0).toBe(0);
-    expect(nextState.forecastCycle.days[1]?.data.hail?.size ?? 0).toBe(0);
+    expectCopyResult({
+      state: nextState,
+      day: 1,
+      outlookType: 'categorical',
+      probability: 'ENH',
+      expectedLength: 1,
+      expectedId: 'source-categorical',
+    });
+    expectOutlookTypeEmpty(nextState, 1, 'tornado');
+    expectOutlookTypeEmpty(nextState, 1, 'wind');
+    expectOutlookTypeEmpty(nextState, 1, 'hail');
   });
 
   test('clears incompatible target data when copying from day 1 to day 4', () => {
