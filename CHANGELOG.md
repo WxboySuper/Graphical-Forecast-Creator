@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Per-day undo/redo:** Undo and redo history now persists correctly when switching between forecast days.
+
 ## [1.2.0] - 2026-03-15
 
 ### Added
