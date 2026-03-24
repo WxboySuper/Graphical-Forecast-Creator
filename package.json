@@ -38,7 +38,7 @@
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
     "react-redux": "^9.2.0",
-    "react-router-dom": "^7.13.1",
+    "react-router-dom": "^7.13.2",
     "react-scripts": "^5.0.1",
     "redux": "^5.0.1",
     "rollup": ">=2.80.0",
@@ -114,7 +114,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@tailwindcss/postcss": "^4.2.1",
+    "@tailwindcss/postcss": "^4.2.2",
     "@types/geojson": "^7946.0.16",
     "@types/uuid": "^11.0.0",
     "autoprefixer": "^10.4.27",
