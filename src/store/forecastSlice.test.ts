@@ -140,6 +140,31 @@ const expectDeepCloned = ({ copiedFeature, sourceFeature }: DeepCloneCheck) => {
   expect(copiedFeature).not.toBe(sourceFeature);
 };
 
+interface CopyVerificationInput {
+  state: ReturnType<typeof reducer>;
+  sourceState: ReturnType<typeof reducer>;
+  targetDay: DayType;
+  expectedTornadoId: string;
+  expectedCategoricalId: string;
+}
+
+const expectCopyVerification = ({
+  state,
+  sourceState,
+  targetDay,
+  expectedTornadoId,
+  expectedCategoricalId,
+}: CopyVerificationInput) => {
+  const copiedTornado = state.forecastCycle.days[targetDay]?.data.tornado?.get('2%')?.[0];
+  const copiedCategorical = state.forecastCycle.days[targetDay]?.data.categorical?.get('ENH')?.[0];
+  const sourceTornado = sourceState.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
+
+  expect(copiedTornado?.id).toBe(expectedTornadoId);
+  expect(copiedCategorical?.id).toBe(expectedCategoricalId);
+  expect(state.forecastCycle.days[targetDay]?.data.tornado?.get('2%')).toHaveLength(1);
+  expectDeepCloned({ copiedFeature: copiedTornado, sourceFeature: sourceTornado });
+};
+
 const createSourceWithFeatures = (id1: string, id2: string) => {
   let state = reducer(undefined, addFeature({ feature: createFeature(id1, 0) }));
   state = reducer(state, addFeature({ feature: createCategoricalFeature(id2, 1) }));
@@ -355,14 +380,13 @@ describe('forecastSlice undo/redo', () => {
       })
     );
 
-    const copiedTornado = nextState.forecastCycle.days[2]?.data.tornado?.get('2%')?.[0];
-    const copiedCategorical = nextState.forecastCycle.days[2]?.data.categorical?.get('ENH')?.[0];
-    const sourceTornado = sourceState.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
-
-    expect(copiedTornado?.id).toBe('source-day1');
-    expect(copiedCategorical?.id).toBe('source-categorical');
-    expect(nextState.forecastCycle.days[2]?.data.tornado?.get('2%')).toHaveLength(1);
-    expectDeepCloned({ copiedFeature: copiedTornado, sourceFeature: sourceTornado });
+    expectCopyVerification({
+      state: nextState,
+      sourceState,
+      targetDay: 2,
+      expectedTornadoId: 'source-day1',
+      expectedCategoricalId: 'source-categorical',
+    });
   });
 
   test('copies only categorical outlooks from day 3 into day 1', () => {
