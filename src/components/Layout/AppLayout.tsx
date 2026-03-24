@@ -5,7 +5,6 @@ import { Navbar } from './Navbar';
 import Documentation from '../Documentation/Documentation';
 import { ToastManager } from '../Toast/Toast';
 import ToSModal from '../ToS/ToSModal';
-import { AlertBanner } from '../AlertBanner';
 import { RootState } from '../../store';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '../../lib/utils';
@@ -159,8 +158,6 @@ export const AppLayout: React.FC = () => {
           showDocumentation={showDocumentation}
           onViewTerms={handleViewTerms}
         />
-        
-        <AlertBanner />
         
         {/* Documentation side-panel (right-side drawer) */}
         <DocumentationPanel show={showDocumentation} onClose={handleCloseDocumentation} />
