@@ -27,36 +27,43 @@ const createPolygon = (offset: number): Polygon => ({
   ]],
 });
 
+interface FeatureOptions {
+  outlookType: string;
+  probability: string;
+  extras?: Record<string, unknown>;
+}
+
 const createBaseFeature = (
   id: string,
   offset: number,
-  outlookType: string,
-  probability: string,
-  extras?: Record<string, unknown>
+  options: FeatureOptions
 ): Feature => ({
   type: 'Feature',
   id,
   geometry: createPolygon(offset),
   properties: {
-    outlookType,
-    probability,
+    ...options,
     isSignificant: false,
-    ...extras,
+    ...options.extras,
   },
 });
 
 const createFeature = (id: string, offset: number): Feature =>
-  createBaseFeature(id, offset, 'tornado', '2%');
+  createBaseFeature(id, offset, { outlookType: 'tornado', probability: '2%' });
 
 const createCategoricalFeature = (id: string, offset: number): Feature =>
-  createBaseFeature(id, offset, 'categorical', 'ENH', { derivedFrom: 'auto-generated' });
+  createBaseFeature(id, offset, {
+    outlookType: 'categorical',
+    probability: 'ENH',
+    extras: { derivedFrom: 'auto-generated' },
+  });
 
 const createOutlookFeature = (
   id: string,
   offset: number,
   outlookType: 'tornado' | 'totalSevere' | 'day4-8',
   probability: '2%' | '15%' | '30%'
-): Feature => createBaseFeature(id, offset, outlookType, probability);
+): Feature => createBaseFeature(id, offset, { outlookType, probability });
 
 const getTornadoFeatures = (state: ReturnType<typeof reducer>) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.data.tornado?.get('2%') || [];
