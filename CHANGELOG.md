@@ -3,7 +3,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.0] - 2026-03-24
 
 ### Added
 - **Ghost overlays:** New overlay type that shows previous outlooks as semi-transparent ghosts on the map for comparison. Toggle visibility in the toolbar, with ghost overlays defaulting to off.
