@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addFeature, resetCategorical, setOutlookMap, selectCurrentOutlooks, selectCurrentDay } from '../store/forecastSlice';
+import { applyAutoCategoricalSync, selectCurrentOutlooks, selectCurrentDay } from '../store/forecastSlice';
 import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevereToCategorical } from '../utils/outlookUtils';
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { v4 as uuidv4 } from 'uuid';
@@ -40,6 +40,25 @@ const signatureFromCategoricalMap = (categoricalMap: OutlookData['categorical'])
   });
 
   return signatureFromFeatures(items);
+};
+
+const buildCategoricalMap = (
+  tstmFeatures: GeoJSON.Feature[],
+  generatedFeatures: GeoJSON.Feature[]
+): Map<string, GeoJSON.Feature[]> => {
+  const categoricalMap = new Map<string, GeoJSON.Feature[]>();
+
+  if (tstmFeatures.length > 0) {
+    categoricalMap.set('TSTM', tstmFeatures);
+  }
+
+  generatedFeatures.forEach((feature) => {
+    const probability = String(feature.properties?.probability || '');
+    const existingFeatures = categoricalMap.get(probability) || [];
+    categoricalMap.set(probability, [...existingFeatures, feature]);
+  });
+
+  return categoricalMap;
 };
 
 /**
@@ -124,20 +143,9 @@ const useAutoCategorical = () => {
     try {
       // Store existing TSTM areas before clearing categoricals
       const tstmFeatures = (outlooks.categorical instanceof Map) ? (outlooks.categorical.get('TSTM') || []) : [];
-      const tstmMap = new Map([['TSTM', tstmFeatures]]);
+      const categoricalMap = buildCategoricalMap(tstmFeatures, generatedFeatures);
 
-      // Clear categorical outlooks except TSTM
-      dispatch(resetCategorical());
-
-      // Restore TSTM features if they exist
-      if (tstmFeatures.length > 0) {
-        dispatch(setOutlookMap({ outlookType: 'categorical', map: tstmMap }));
-      }
-
-      // Add all generated categorical features
-      generatedFeatures.forEach((feature) => {
-        dispatch(addFeature({ feature }));
-      });
+      dispatch(applyAutoCategoricalSync({ map: categoricalMap }));
     } finally {
       processingRef.current = false;
     }

@@ -529,6 +529,16 @@ export const forecastSlice = createSlice({
         state.isSaved = false;
       }
     },
+
+    applyAutoCategoricalSync: (state, action: PayloadAction<{ map: Map<string, Feature[]> }>) => {
+      const outlookData = getCurrentOutlook(state);
+      if (!outlookData.categorical) {
+        return;
+      }
+
+      outlookData.categorical = action.payload.map;
+      state.isSaved = false;
+    },
     
     setMapView: (state, action: PayloadAction<{ center: [number, number], zoom: number }>) => {
       state.currentMapView = action.payload;
@@ -803,6 +813,7 @@ export const {
   removeFeature,
   resetCategorical,
   setOutlookMap,
+  applyAutoCategoricalSync,
   setMapView,
   resetForecasts,
   markAsSaved,

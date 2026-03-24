@@ -15,12 +15,12 @@ const initialState: OverlaysState = {
   counties: false,
   baseMapStyle: 'osm',
   ghostOutlooks: {
-    tornado: true,
-    wind: true,
-    hail: true,
-    categorical: true,
-    totalSevere: true,
-    'day4-8': true,
+    tornado: false,
+    wind: false,
+    hail: false,
+    categorical: false,
+    totalSevere: false,
+    'day4-8': false,
   },
 };
 

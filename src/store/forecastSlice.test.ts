@@ -2,6 +2,7 @@ import type { Feature, Polygon } from 'geojson';
 import type { DayType } from '../types/outlooks';
 import reducer, {
   addFeature,
+  applyAutoCategoricalSync,
   importForecastCycle,
   redoLastEdit,
   resetForecasts,
@@ -33,6 +34,18 @@ const createFeature = (id: string, offset: number): Feature => ({
     outlookType: 'tornado',
     probability: '2%',
     isSignificant: false,
+  },
+});
+
+const createCategoricalFeature = (id: string, offset: number): Feature => ({
+  type: 'Feature',
+  id,
+  geometry: createPolygon(offset),
+  properties: {
+    outlookType: 'categorical',
+    probability: 'ENH',
+    isSignificant: false,
+    derivedFrom: 'auto-generated',
   },
 });
 
@@ -156,6 +169,26 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, undoLastEdit());
     expect(getTornadoFeatures(state)).toHaveLength(0);
     expect(selectCanRedo({ forecast: state } as never)).toBe(true);
+  });
+
+  test('auto categorical sync updates state without adding its own undo entry', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('feature-1', 0) }));
+    expect(getUndoStack(state, 1)).toHaveLength(1);
+
+    state = reducer(
+      state,
+      applyAutoCategoricalSync({
+        map: new Map([['ENH', [createCategoricalFeature('categorical-1', 5)]]]),
+      })
+    );
+
+    expect(getUndoStack(state, 1)).toHaveLength(1);
+    expect(state.forecastCycle.days[1]?.data.categorical?.get('ENH')).toHaveLength(1);
+
+    state = reducer(state, undoLastEdit());
+
+    expect(getTornadoFeatures(state)).toHaveLength(0);
+    expect(state.forecastCycle.days[1]?.data.categorical?.size ?? 0).toBe(0);
   });
 
   test('importing and resetting clear all per-day history', () => {
