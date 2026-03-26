@@ -18,9 +18,29 @@ if (typeof global.__GFC_COMING_SOON__ === 'undefined') {
 }
 
 if (!global.fetch) {
+  const createMockResponse = () => {
+    const headers = new Headers();
+
+    return {
+      ok: false,
+      status: 500,
+      statusText: 'Mock fetch not implemented',
+      headers,
+      redirected: false,
+      type: 'basic' as ResponseType,
+      url: '',
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      blob: () => Promise.resolve(new Blob()),
+      clone() {
+        return createMockResponse();
+      },
+    };
+  };
+
   global.fetch = jest.fn().mockResolvedValue({
-    ok: false,
-    json: () => Promise.resolve({}),
+    ...createMockResponse(),
   }) as unknown as typeof global.fetch;
 }
 
