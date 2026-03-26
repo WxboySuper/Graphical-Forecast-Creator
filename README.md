@@ -69,8 +69,8 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 
 ### Prerequisites
 
-- Node.js (v16 or later)
-- npm or pnpm
+- Node.js `20.19.0` or later
+- pnpm `9`
 
 ### Installation
 
@@ -82,19 +82,20 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 
 2. Install the dependencies:
    ```sh
-   npm install
-   # or
    pnpm install
    ```
+
+Use `pnpm` consistently for this repo so the checked-in `pnpm-lock.yaml` remains the source of truth.
 
 ### Available Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | Dev server at http://localhost:3000 |
-| `npm test` | Run Jest unit test suite |
-| `npm run test:e2e` | Run Playwright end-to-end tests |
-| `npm run build` | Production build to `/build` |
+| `pnpm start` | Vite dev server at http://localhost:3000 |
+| `pnpm run dev` | Vite dev server at http://localhost:3000 |
+| `pnpm test` | Run Jest unit test suite |
+| `pnpm run test:e2e` | Run Playwright end-to-end tests |
+| `pnpm run build` | Production build to `/build` via Vite |
 
 ---
 
