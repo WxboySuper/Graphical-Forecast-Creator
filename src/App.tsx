@@ -19,6 +19,7 @@ import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 import { AppLayout } from './components/Layout';
 import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage } from './pages';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
+import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 
 // Launch gate: set VITE_COMING_SOON=true in the public build to enable pre-launch mode.
 // The app auto-unlocks at the launch date/time regardless of the env var.
@@ -68,8 +69,12 @@ function App() {
   const showComingSoon = COMING_SOON_MODE && !isLaunched;
   // ToS gate: only shown after launch (not during coming-soon mode)
   const [tosAccepted, setTosAccepted] = useState(() => showComingSoon || hasAcceptedToS());
+  const [privacyAccepted, setPrivacyAccepted] = useState(() => showComingSoon || hasAcceptedPrivacyPolicy());
   const handleAcceptToS = useCallback(() => {
     setTosAccepted(true);
+  }, []);
+  const handleAcceptPrivacyPolicy = useCallback(() => {
+    setPrivacyAccepted(true);
   }, []);
 
   return (
@@ -78,7 +83,10 @@ function App() {
         {!showComingSoon && !tosAccepted && (
           <ToSModal onAccept={handleAcceptToS} />
         )}
-        {(!showComingSoon && tosAccepted) && <AppHooks />}
+        {!showComingSoon && tosAccepted && !privacyAccepted && (
+          <PrivacyPolicyModal onAccept={handleAcceptPrivacyPolicy} />
+        )}
+        {(!showComingSoon && tosAccepted && privacyAccepted) && <AppHooks />}
         <Routes>
           {showComingSoon ? (
             <>
