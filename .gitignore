@@ -39,3 +39,9 @@ yarn-error.log*
 # Local Triage & Planning
 todo.md
 internal-roadmap.md
+
+# Night Watch
+/logs/
+night-watch.config.json
+*.claim
+/instructions
