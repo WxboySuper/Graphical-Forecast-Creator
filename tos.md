@@ -44,11 +44,21 @@ Welcome to the Graphical Forecast Creator ("GFC", "the App"). By clicking "I Agr
 10. **Contact Us**  
     If you have any questions regarding these Terms, please reach out via the official GFC Support Discord.
 
-11. **Accounts, Premium Subscriptions, and Billing**
-GFC offers an optional premium subscription for hosted cloud storage and cross-device synchronization. Payments are processed securely via Stripe. Subscriptions are billed automatically on a monthly or annual basis depending on your selected plan. You may cancel your subscription at any time through the in-app account portal. Upon cancellation, you will retain access to premium features until the end of your current paid billing cycle. GFC does not store, process, or have direct access to your credit card or banking details.
+11. **Accounts, Premium Subscriptions, and Billing**  
+    - GFC offers an optional premium subscription for hosted cloud storage and cross-device synchronization.
+    - Payments are processed securely via Stripe.
+    - Subscriptions are billed automatically on a monthly or annual basis depending on your selected plan.
+    - You may cancel your subscription at any time through the in-app account portal.
+    - Upon cancellation, you will retain access to premium features until the end of your current paid billing cycle.
+    - GFC does not store, process, or have direct access to your credit card or banking details.
 
-12. **Cloud Storage & "Best Effort" Service**
-Premium cloud storage features are provided on a "best-effort" basis. While we utilize enterprise-grade infrastructure (Firebase) to secure and sync your data, we do not guarantee 100% uptime or absolute immunity from service interruptions or data loss. You are strongly encouraged to continue utilizing GFC’s local export tools to maintain offline backups of your most critical forecast cycles.
+12. **Cloud Storage & "Best Effort" Service**  
+    - Premium cloud storage features are provided on a "best-effort" basis.
+    - While we utilize enterprise-grade infrastructure (Firebase) to secure and sync your data, we do not guarantee 100% uptime or absolute immunity from service interruptions or data loss.
+    - You are strongly encouraged to continue utilizing GFC’s local export tools to maintain offline backups of your most critical forecast cycles.
 
-13. **Premium Expiration and Data Handling**
-If your premium subscription lapses or is canceled, your account will transition to a "read-only" state regarding cloud services. You will lose the ability to save new cycles to the cloud and background sync will be disabled. Your existing cloud-hosted cycles will not be automatically deleted upon expiration, and any local work stored on your physical device will remain 100% accessible, editable, and unaffected.
+13. **Premium Expiration and Data Handling**  
+    - If your premium subscription lapses or is canceled, your account will transition to a "read-only" state regarding cloud services.
+    - You will lose the ability to save new cycles to the cloud and background sync will be disabled.
+    - Your existing cloud-hosted cycles will not be automatically deleted upon expiration.
+    - Any local work stored on your physical device will remain 100% accessible, editable, and unaffected.
