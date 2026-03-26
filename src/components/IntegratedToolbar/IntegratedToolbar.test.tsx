@@ -5,6 +5,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { IntegratedToolbar } from './IntegratedToolbar';
 import forecastReducer, { addFeature } from '../../store/forecastSlice';
 import featureFlagsReducer from '../../store/featureFlagsSlice';
+import overlaysReducer from '../../store/overlaysSlice';
 
 jest.mock('../CycleManager/CycleHistoryModal', () => () => <div>CycleHistoryModal Mock</div>);
 jest.mock('../CycleManager/CopyFromPreviousModal', () => () => <div>CopyFromPreviousModal Mock</div>);
@@ -40,6 +41,7 @@ const createStore = () => configureStore({
   reducer: {
     forecast: forecastReducer,
     featureFlags: featureFlagsReducer,
+    overlays: overlaysReducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware({
     serializableCheck: false,

@@ -20,10 +20,10 @@ import { AppLayout } from './components/Layout';
 import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage } from './pages';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 
-// Launch gate: set REACT_APP_COMING_SOON=true in the public build to enable pre-launch mode.
+// Launch gate: set VITE_COMING_SOON=true in the public build to enable pre-launch mode.
 // The app auto-unlocks at the launch date/time regardless of the env var.
 const LAUNCH_TIME = new Date('2026-03-01T18:00:00.000Z').getTime(); // noon CST
-const COMING_SOON_MODE = process.env.REACT_APP_COMING_SOON === 'true';
+const COMING_SOON_MODE = __GFC_COMING_SOON__;
 
 // Custom hook to manage the launch gate, which checks the current date against a predefined launch time and returns whether the app has launched. It also sets up a timer to update the launched state when the launch time is reached, allowing for real-time transition from coming soon mode to live mode without needing a page refresh.
 function useLaunchGate(): boolean {

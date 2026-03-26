@@ -91,10 +91,11 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 
 | Command | Description |
 |---------|-------------|
-| `npm start` | Dev server at http://localhost:3000 |
+| `npm start` | Vite dev server at http://localhost:3000 |
+| `npm run dev` | Vite dev server at http://localhost:3000 |
 | `npm test` | Run Jest unit test suite |
 | `npm run test:e2e` | Run Playwright end-to-end tests |
-| `npm run build` | Production build to `/build` |
+| `npm run build` | Production build to `/build` via Vite |
 
 ---
 
