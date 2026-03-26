@@ -18,6 +18,7 @@ if (typeof global.__GFC_COMING_SOON__ === 'undefined') {
 }
 
 if (!global.fetch) {
+  /** Builds a minimal Response-like object for tests that depend on common fetch response fields. */
   const createMockResponse = () => {
     const headers = new Headers();
 
