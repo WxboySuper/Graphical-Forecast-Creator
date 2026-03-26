@@ -20,7 +20,7 @@ if (typeof global.__GFC_COMING_SOON__ === 'undefined') {
 if (!global.fetch) {
   global.fetch = jest.fn().mockResolvedValue({
     ok: false,
-    json: async () => ({}),
+    json: () => Promise.resolve({}),
   }) as unknown as typeof global.fetch;
 }
 

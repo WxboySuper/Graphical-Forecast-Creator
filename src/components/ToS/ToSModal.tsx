@@ -30,6 +30,7 @@ interface ToSModalProps {
   onClose?: () => void;
 }
 
+/** Renders the current in-app Terms of Service content for both acceptance and view-only modes. */
 const ToSTermsContent: React.FC = () => (
   <>
     <h3>1. Unofficial Use &amp; Disclaimer (Critical)</h3>
