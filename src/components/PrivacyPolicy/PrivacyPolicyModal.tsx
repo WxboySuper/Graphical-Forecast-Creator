@@ -109,7 +109,7 @@ const PrivacyPolicyContent: React.FC = () => (
 const PrivacyPolicyViewOnlyFooter: React.FC<{ onClose?: () => void }> = ({ onClose }) => (
   <div className="privacy-modal-footer">
     <div className="privacy-button-row">
-      <button className="privacy-btn-accept" onClick={onClose}>
+      <button className="privacy-btn-decline" onClick={onClose}>
         Close
       </button>
     </div>
@@ -144,6 +144,23 @@ const PrivacyPolicyAcceptanceFooter: React.FC<{
   </div>
 );
 
+/** Renders the privacy policy title block and optional close action. */
+const PrivacyPolicyHeader: React.FC<{ viewOnly: boolean; onClose?: () => void }> = ({ viewOnly, onClose }) => (
+  <div className="privacy-modal-header">
+    <div className="privacy-modal-header-row">
+      <div>
+        <h2 id="privacy-title">Privacy Policy</h2>
+        <p>Please read and accept before using Graphical Forecast Creator &mdash; Last Updated March 2026</p>
+      </div>
+      {viewOnly && (
+        <button className="privacy-close-view-btn" onClick={onClose} aria-label="Close">
+          &times;
+        </button>
+      )}
+    </div>
+  </div>
+);
+
 /** Displays the GFC Privacy Policy in either acceptance or read-only mode. */
 const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept, viewOnly = false, onClose }) => {
   const [checked, setChecked] = useState(false);
@@ -168,20 +185,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept, viewO
   return (
     <div className="privacy-backdrop" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
       <div className="privacy-modal">
-        <div className="privacy-modal-header">
-          <div className="privacy-modal-header-row">
-            <div>
-              <h2 id="privacy-title">Privacy Policy</h2>
-              <p>Please read and accept before using Graphical Forecast Creator &mdash; Last Updated March 2026</p>
-            </div>
-            {viewOnly && (
-              <button className="privacy-close-view-btn" onClick={onClose} aria-label="Close">
-                &times;
-              </button>
-            )}
-          </div>
-        </div>
-
+        <PrivacyPolicyHeader viewOnly={viewOnly} onClose={onClose} />
         <div className="privacy-modal-body">
           <PrivacyPolicyContent />
         </div>

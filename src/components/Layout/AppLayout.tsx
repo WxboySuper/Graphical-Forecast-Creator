@@ -165,6 +165,7 @@ export const AppLayout: React.FC = () => {
     return <ToSModal viewOnly onClose={onClose} onAccept={onAccept} />;
   };
 
+  /** Keeps the view-only privacy policy modal wiring out of the main layout JSX. */
   const PrivacyViewer: React.FC<{ show: boolean; onClose: () => void; onAccept: () => void }> = ({ show, onClose, onAccept }) => {
     if (!show) return null;
     return <PrivacyPolicyModal viewOnly onClose={onClose} onAccept={onAccept} />;

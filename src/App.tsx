@@ -63,46 +63,81 @@ const AppHooks = () => {
   return null;
 };
 
-// Main App with Router
-function App() {
-  const isLaunched = useLaunchGate();
-  const showComingSoon = COMING_SOON_MODE && !isLaunched;
-  // ToS gate: only shown after launch (not during coming-soon mode)
-  const [tosAccepted, setTosAccepted] = useState(() => showComingSoon || hasAcceptedToS());
-  const [privacyAccepted, setPrivacyAccepted] = useState(() => showComingSoon || hasAcceptedPrivacyPolicy());
+interface AgreementGateProps {
+  showComingSoon: boolean;
+}
+
+/** Handles the launch-dependent agreement flow before the main app is allowed to initialize. */
+const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
+  const [tosAccepted, setTosAccepted] = useState(() => hasAcceptedToS());
+  const [privacyAccepted, setPrivacyAccepted] = useState(() => hasAcceptedPrivacyPolicy());
+
   const handleAcceptToS = useCallback(() => {
     setTosAccepted(true);
   }, []);
+
   const handleAcceptPrivacyPolicy = useCallback(() => {
     setPrivacyAccepted(true);
   }, []);
 
+  useEffect(() => {
+    if (showComingSoon) {
+      return;
+    }
+
+    setTosAccepted(hasAcceptedToS());
+    setPrivacyAccepted(hasAcceptedPrivacyPolicy());
+  }, [showComingSoon]);
+
+  if (showComingSoon || !tosAccepted) {
+    return showComingSoon ? null : <ToSModal onAccept={handleAcceptToS} />;
+  }
+
+  if (!privacyAccepted) {
+    return <PrivacyPolicyModal onAccept={handleAcceptPrivacyPolicy} />;
+  }
+
+  return <AppHooks />;
+};
+
+interface AppRoutesProps {
+  showComingSoon: boolean;
+}
+
+/** Selects between the public launch gate routes and the full application routes. */
+const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
+  if (showComingSoon) {
+    return (
+      <Routes>
+        <Route index element={<ComingSoonPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route index element={<HomePage />} />
+        <Route path="forecast" element={<ForecastPage />} />
+        <Route path="discussion" element={<DiscussionPage />} />
+        <Route path="verification" element={<VerificationPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+};
+
+// Main App with Router
+function App() {
+  const isLaunched = useLaunchGate();
+  const showComingSoon = COMING_SOON_MODE && !isLaunched;
+
   return (
     <Provider store={store}>
       <BrowserRouter>
-        {!showComingSoon && !tosAccepted && (
-          <ToSModal onAccept={handleAcceptToS} />
-        )}
-        {!showComingSoon && tosAccepted && !privacyAccepted && (
-          <PrivacyPolicyModal onAccept={handleAcceptPrivacyPolicy} />
-        )}
-        {(!showComingSoon && tosAccepted && privacyAccepted) && <AppHooks />}
-        <Routes>
-          {showComingSoon ? (
-            <>
-              <Route index element={<ComingSoonPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </>
-          ) : (
-            <Route element={<AppLayout />}>
-              <Route index element={<HomePage />} />
-              <Route path="forecast" element={<ForecastPage />} />
-              <Route path="discussion" element={<DiscussionPage />} />
-              <Route path="verification" element={<VerificationPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          )}
-        </Routes>
+        <AgreementGate showComingSoon={showComingSoon} />
+        <AppRoutes showComingSoon={showComingSoon} />
       </BrowserRouter>
     </Provider>
   );
