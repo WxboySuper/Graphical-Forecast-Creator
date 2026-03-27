@@ -77,6 +77,9 @@ const HomePage: React.FC = () => {
   /** Navigates to the discussion editor page. */
   const handleNavigateDiscussion = () => navigate('/discussion');
 
+  /** Navigates to the account page for hosted sign-in and sync settings. */
+  const handleNavigateAccount = () => navigate('/account');
+
   /** Opens the OS file picker to load a forecast cycle from a JSON file. */
   const openFilePicker = () => handleOpenFilePicker();
 
@@ -118,7 +121,7 @@ const HomePage: React.FC = () => {
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
       <div className="max-w-7xl mx-auto p-8 space-y-10">
-        <HomeHero onStart={handleNavigateForecast} onWriteDiscussion={handleNavigateDiscussion} />
+        <HomeHero onStart={handleNavigateForecast} onWriteDiscussion={handleNavigateDiscussion} onViewAccount={handleNavigateAccount} />
         <Dashboard stats={stats} />
         <MainGrid
           formattedDate={formattedDate}

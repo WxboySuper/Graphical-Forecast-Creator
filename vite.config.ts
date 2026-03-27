@@ -5,11 +5,23 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const base = env.PUBLIC_URL || '/';
+  const firebaseConfig = {
+    apiKey: env.VITE_FIREBASE_API_KEY ?? '',
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? '',
+    projectId: env.VITE_FIREBASE_PROJECT_ID ?? '',
+    appId: env.VITE_FIREBASE_APP_ID ?? '',
+  };
 
   return {
     base,
     define: {
       __GFC_COMING_SOON__: JSON.stringify(env.VITE_COMING_SOON === 'true'),
+      __GFC_FIREBASE_CONFIG__: {
+        apiKey: JSON.stringify(firebaseConfig.apiKey),
+        authDomain: JSON.stringify(firebaseConfig.authDomain),
+        projectId: JSON.stringify(firebaseConfig.projectId),
+        appId: JSON.stringify(firebaseConfig.appId),
+      },
     },
     plugins: [react()],
     resolve: {

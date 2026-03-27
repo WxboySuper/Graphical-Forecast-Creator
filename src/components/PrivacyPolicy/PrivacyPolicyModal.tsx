@@ -51,7 +51,7 @@ const PrivacyPolicyContent: React.FC = () => (
     </p>
     <ul>
       <li>Your email address.</li>
-      <li>Your authentication provider (Google, GitHub, or Email/Password).</li>
+      <li>Your authentication provider (Google or Email/Password).</li>
       <li>Basic profile information (name/avatar).</li>
     </ul>
 

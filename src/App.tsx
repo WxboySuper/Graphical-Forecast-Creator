@@ -14,10 +14,11 @@ import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/feature
 
 import { useAutoSave } from './hooks/useAutoSave';
 import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
+import { AuthProvider } from './auth/AuthProvider';
 
 // New UI components
 import { AppLayout } from './components/Layout';
-import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage } from './pages';
+import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage, AccountPage } from './pages';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 
@@ -30,10 +31,18 @@ const COMING_SOON_MODE = __GFC_COMING_SOON__;
 function useLaunchGate(): boolean {
   const [launched, setLaunched] = useState(() => Date.now() >= LAUNCH_TIME);
   useEffect(() => {
-    if (launched) return;
-    const delay = Math.max(0, LAUNCH_TIME - Date.now());
-    const t = setTimeout(() => setLaunched(true), delay);
-    return () => clearTimeout(t);
+    let launchTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if (!launched) {
+      const delay = Math.max(0, LAUNCH_TIME - Date.now());
+      launchTimer = setTimeout(() => setLaunched(true), delay);
+    }
+
+    return () => {
+      if (launchTimer) {
+        clearTimeout(launchTimer);
+      }
+    };
   }, [launched]);
   return launched;
 }
@@ -119,6 +128,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<HomePage />} />
+        <Route path="account" element={<AccountPage />} />
         <Route path="forecast" element={<ForecastPage />} />
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
@@ -135,10 +145,12 @@ function App() {
 
   return (
     <Provider store={store}>
-      <BrowserRouter>
-        <AgreementGate showComingSoon={showComingSoon} />
-        <AppRoutes showComingSoon={showComingSoon} />
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <AgreementGate showComingSoon={showComingSoon} />
+          <AppRoutes showComingSoon={showComingSoon} />
+        </BrowserRouter>
+      </AuthProvider>
     </Provider>
   );
 }
