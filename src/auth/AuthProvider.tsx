@@ -168,6 +168,7 @@ const applySettingsToState = (
   );
 };
 
+/** Creates or updates the hosted profile document while preserving the original creation timestamp. */
 const syncProfileDocument = async (
   profileRef: ReturnType<typeof doc>,
   user: User
@@ -183,6 +184,7 @@ const syncProfileDocument = async (
   );
 };
 
+/** Reuses remote settings when available or seeds Firestore from the current local settings snapshot. */
 const seedOrApplySettings = async (opts: {
   settingsRef: ReturnType<typeof doc>;
   settingsSnapshot: Awaited<ReturnType<typeof getDoc>>;
@@ -226,6 +228,85 @@ const seedOrApplySettings = async (opts: {
   setSyncedSettings(localSettings);
 };
 
+const startSettingsSubscription = (opts: {
+  settingsRef: ReturnType<typeof doc>;
+  isActive: () => boolean;
+  applyRemoteSettings: (settings: UserSettingsDocument) => void;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+}): Unsubscribe =>
+  onSnapshot(
+    opts.settingsRef,
+    (snapshot) => {
+      const nextSettings = readRemoteSettings(snapshot.data() as Partial<UserSettingsDocument> | undefined);
+      if (!opts.isActive() || !nextSettings) {
+        return;
+      }
+
+      opts.applyRemoteSettings(nextSettings);
+      opts.setSettingsSyncStatus('synced');
+    },
+    (snapshotError) => {
+      if (opts.isActive()) {
+        opts.setSettingsSyncStatus('error');
+        opts.setError(snapshotError.message);
+      }
+    }
+  );
+
+const runInitialHostedSync = async (opts: {
+  profileRef: ReturnType<typeof doc>;
+  settingsRef: ReturnType<typeof doc>;
+  user: User;
+  buildLocalSettingsSnapshot: () => UserSettingsDocument;
+  applyRemoteSettings: (settings: UserSettingsDocument) => void;
+  isActive: () => boolean;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  hasInitializedSettingsRef: React.MutableRefObject<boolean>;
+}): Promise<Unsubscribe | undefined> => {
+  opts.setSettingsSyncStatus('syncing');
+
+  try {
+    await syncProfileDocument(opts.profileRef, opts.user);
+
+    const settingsSnapshot = await getDoc(opts.settingsRef);
+    const localSettings = opts.buildLocalSettingsSnapshot();
+    await seedOrApplySettings({
+      settingsRef: opts.settingsRef,
+      settingsSnapshot,
+      localSettings,
+      applyRemoteSettings: opts.applyRemoteSettings,
+      isActive: opts.isActive,
+      lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
+      setSyncedSettings: opts.setSyncedSettings,
+    });
+
+    if (!opts.isActive()) {
+      return undefined;
+    }
+
+    opts.hasInitializedSettingsRef.current = true;
+    opts.setSettingsSyncStatus('synced');
+
+    return startSettingsSubscription({
+      settingsRef: opts.settingsRef,
+      isActive: opts.isActive,
+      applyRemoteSettings: opts.applyRemoteSettings,
+      setSettingsSyncStatus: opts.setSettingsSyncStatus,
+      setError: opts.setError,
+    });
+  } catch (syncError) {
+    if (opts.isActive()) {
+      opts.setSettingsSyncStatus('error');
+      opts.setError(getSettingsSyncError(syncError));
+    }
+    return undefined;
+  }
+};
+
 /** Returns the no-config auth context used for intentionally local-only deployments. */
 const getDefaultContextValue = (): AuthContextValue => ({
   status: 'disabled',
@@ -241,6 +322,7 @@ const getDefaultContextValue = (): AuthContextValue => ({
   updateSyncedSettings: disabledAuthAction,
 });
 
+/** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
 const useHostedAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
@@ -295,6 +377,7 @@ const useHostedAuthState = (): AuthContextValue => {
       }
     );
 
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupHostedAuthSubscription() {
       unsubscribe();
     };
@@ -329,67 +412,25 @@ const useHostedAuthState = (): AuthContextValue => {
     /** Applies validated remote settings into Redux and local auth state. */
     const applyRemoteSettings = (settings: UserSettingsDocument) =>
       applySettingsToState(settings, settingsApplyContext);
-
-    /** Creates the hosted profile/settings docs and starts the live settings subscription. */
-    const syncUserDocuments = async () => {
-      setSettingsSyncStatus('syncing');
-
-      try {
-        await syncProfileDocument(profileRef, user);
-
-        const settingsSnapshot = await getDoc(settingsRef);
-        const localSettings = buildLocalSettingsSnapshot();
-        await seedOrApplySettings({
-          settingsRef,
-          settingsSnapshot,
-          localSettings,
-          applyRemoteSettings,
-          isActive: () => isActive,
-          lastSyncedSettingsRef,
-          setSyncedSettings,
-        });
-
-        hasInitializedSettingsRef.current = true;
-        if (isActive) {
-          setSettingsSyncStatus('synced');
-        }
-
-        unsubscribeSettings = onSnapshot(
-          settingsRef,
-          (snapshot) => {
-            const nextSettings = readRemoteSettings(snapshot.data() as Partial<UserSettingsDocument> | undefined);
-            if (!isActive || !nextSettings) {
-              return;
-            }
-
-            applyRemoteSettings(nextSettings);
-
-            if (isActive) {
-              setSettingsSyncStatus('synced');
-            }
-          },
-          (snapshotError) => {
-            if (isActive) {
-              setSettingsSyncStatus('error');
-              setError(snapshotError.message);
-            }
-          }
-        );
-      } catch (syncError) {
-        if (isActive) {
-          setSettingsSyncStatus('error');
-          setError(getSettingsSyncError(syncError));
-        }
-      }
-    };
-
-    syncUserDocuments().catch((syncError) => {
-      if (isActive) {
-        setSettingsSyncStatus('error');
-        setError(getSettingsSyncError(syncError));
+    runInitialHostedSync({
+      profileRef,
+      settingsRef,
+      user,
+      buildLocalSettingsSnapshot,
+      applyRemoteSettings,
+      isActive: () => isActive,
+      lastSyncedSettingsRef,
+      setSyncedSettings,
+      setSettingsSyncStatus,
+      setError,
+      hasInitializedSettingsRef,
+    }).then((nextUnsubscribe) => {
+      if (nextUnsubscribe) {
+        unsubscribeSettings = nextUnsubscribe;
       }
     });
 
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupHostedUserSync() {
       isActive = false;
       hasInitializedSettingsRef.current = false;

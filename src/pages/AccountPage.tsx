@@ -247,6 +247,7 @@ const SignedInAccountCard: React.FC = () => {
     }
   };
 
+  /** Bridges the async save routine into a plain button click handler. */
   const handleSaveDefaultsClick = () => {
     handleSaveDefaults().catch(() => {
       // Save feedback is already surfaced by handleSaveDefaults.
@@ -506,6 +507,7 @@ const SignInCard: React.FC = () => {
     }
   };
 
+  /** Bridges the async Google sign-in routine into a plain button click handler. */
   const handleGoogleSignInClick = () => {
     handleGoogleSignIn().catch(() => {
       // Form feedback is already handled by handleGoogleSignIn.
