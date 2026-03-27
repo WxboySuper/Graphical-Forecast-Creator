@@ -56,8 +56,10 @@ const disabledAuthAction = (): Promise<void> => {
   throw new Error('Hosted accounts are not enabled for this deployment.');
 };
 
+/** Returns the settings-sync status that corresponds to the current deployment mode. */
 const getDisabledSettingsStatus = (): SettingsSyncStatus => (isHostedAuthEnabled ? 'idle' : 'disabled');
 
+/** Builds the normalized settings document shape from current local state. */
 const createSettingsSnapshot = (
   darkMode: boolean,
   overlays: OverlaysState,
@@ -71,6 +73,7 @@ const createSettingsSnapshot = (
   defaultForecasterName,
 });
 
+/** Validates a Firestore settings payload before the app applies it locally. */
 const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
   if (!value) {
     return null;
@@ -111,6 +114,7 @@ const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): U
   };
 };
 
+/** Creates the user profile payload written to Firestore on hosted sign-in. */
 const createProfilePayload = (user: User) => ({
   email: user.email ?? '',
   displayName: user.displayName ?? '',
@@ -120,24 +124,32 @@ const createProfilePayload = (user: User) => ({
   createdAt: serverTimestamp(),
 });
 
+/** Normalizes update-write failures into a user-facing sync error message. */
 const getSettingsUpdateError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to update synced settings right now.';
 
+/** Normalizes initial/settings hydration failures into a user-facing sync error message. */
 const getSettingsSyncError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to sync account settings right now.';
 
+/** Builds the payload used when seeding or repairing a remote settings document. */
 const getRemoteSeedPayload = (settings: UserSettingsDocument, includeCreatedAt: boolean) => ({
   ...settings,
   updatedAt: serverTimestamp(),
   ...(includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
 
-const applySettingsToState = (
-  settings: UserSettingsDocument,
+interface ApplySettingsContext {
   currentDarkModeRef: React.MutableRefObject<boolean>,
   dispatch: ReturnType<typeof useDispatch>,
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>,
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>
+}
+
+/** Applies a validated settings document into Redux plus local hosted-auth state. */
+const applySettingsToState = (
+  settings: UserSettingsDocument,
+  { currentDarkModeRef, dispatch, setSyncedSettings, lastSyncedSettingsRef }: ApplySettingsContext
 ) => {
   lastSyncedSettingsRef.current = settings;
   setSyncedSettings(settings);
@@ -156,6 +168,65 @@ const applySettingsToState = (
   );
 };
 
+const syncProfileDocument = async (
+  profileRef: ReturnType<typeof doc>,
+  user: User
+): Promise<void> => {
+  const profileSnapshot = await getDoc(profileRef);
+  await setDoc(
+    profileRef,
+    {
+      ...createProfilePayload(user),
+      ...(profileSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
+    },
+    { merge: true }
+  );
+};
+
+const seedOrApplySettings = async (opts: {
+  settingsRef: ReturnType<typeof doc>;
+  settingsSnapshot: Awaited<ReturnType<typeof getDoc>>;
+  localSettings: UserSettingsDocument;
+  applyRemoteSettings: (settings: UserSettingsDocument) => void;
+  isActive: () => boolean;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+}): Promise<void> => {
+  const {
+    settingsRef,
+    settingsSnapshot,
+    localSettings,
+    applyRemoteSettings,
+    isActive,
+    lastSyncedSettingsRef,
+    setSyncedSettings,
+  } = opts;
+  const remoteSettings = readRemoteSettings(settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined);
+
+  if (!isActive()) {
+    return;
+  }
+
+  if (remoteSettings) {
+    applyRemoteSettings(remoteSettings);
+    return;
+  }
+
+  await setDoc(
+    settingsRef,
+    getRemoteSeedPayload(localSettings, !settingsSnapshot.exists()),
+    { merge: true }
+  );
+
+  if (!isActive()) {
+    return;
+  }
+
+  lastSyncedSettingsRef.current = localSettings;
+  setSyncedSettings(localSettings);
+};
+
+/** Returns the no-config auth context used for intentionally local-only deployments. */
 const getDefaultContextValue = (): AuthContextValue => ({
   status: 'disabled',
   settingsSyncStatus: 'disabled',
@@ -170,8 +241,7 @@ const getDefaultContextValue = (): AuthContextValue => ({
   updateSyncedSettings: disabledAuthAction,
 });
 
-/** Provides hosted-auth state and actions while gracefully falling back to local-only mode. */
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const useHostedAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const overlays = useSelector((state: RootState) => state.overlays);
@@ -193,7 +263,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentOverlaysRef.current = overlays;
   }, [overlays]);
 
-  useEffect(() => {
+  useEffect(function subscribeToHostedAuthState() {
     if (!isHostedAuthEnabled || !auth) {
       setStatus('disabled');
       setSettingsSyncStatus('disabled');
@@ -225,12 +295,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    return () => {
+    return function cleanupHostedAuthSubscription() {
       unsubscribe();
     };
   }, []);
 
-  useEffect(() => {
+  useEffect(function syncHostedUserDocuments() {
     if (!isHostedAuthEnabled || !db || !user) {
       hasInitializedSettingsRef.current = false;
       lastSyncedSettingsRef.current = null;
@@ -245,6 +315,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const settingsRef = doc(db, 'userSettings', user.uid);
     const profileRef = doc(db, 'userProfiles', user.uid);
     let unsubscribeSettings: Unsubscribe | undefined;
+    const settingsApplyContext: ApplySettingsContext = {
+      currentDarkModeRef,
+      dispatch,
+      setSyncedSettings,
+      lastSyncedSettingsRef,
+    };
 
     /** Captures the current local settings so they can seed a missing cloud document. */
     const buildLocalSettingsSnapshot = (): UserSettingsDocument =>
@@ -252,45 +328,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     /** Applies validated remote settings into Redux and local auth state. */
     const applyRemoteSettings = (settings: UserSettingsDocument) =>
-      applySettingsToState(settings, currentDarkModeRef, dispatch, setSyncedSettings, lastSyncedSettingsRef);
+      applySettingsToState(settings, settingsApplyContext);
 
     /** Creates the hosted profile/settings docs and starts the live settings subscription. */
     const syncUserDocuments = async () => {
       setSettingsSyncStatus('syncing');
 
       try {
-        const profileSnapshot = await getDoc(profileRef);
-        await setDoc(
-          profileRef,
-          {
-            ...createProfilePayload(user),
-            ...(profileSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
-          },
-          { merge: true }
-        );
+        await syncProfileDocument(profileRef, user);
 
         const settingsSnapshot = await getDoc(settingsRef);
-        const remoteSettings = readRemoteSettings(settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined);
         const localSettings = buildLocalSettingsSnapshot();
-
-        if (!isActive) {
-          return;
-        }
-
-        if (remoteSettings) {
-          applyRemoteSettings(remoteSettings);
-        } else {
-          await setDoc(
-            settingsRef,
-            getRemoteSeedPayload(localSettings, !settingsSnapshot.exists()),
-            { merge: true }
-          );
-          if (!isActive) {
-            return;
-          }
-          lastSyncedSettingsRef.current = localSettings;
-          setSyncedSettings(localSettings);
-        }
+        await seedOrApplySettings({
+          settingsRef,
+          settingsSnapshot,
+          localSettings,
+          applyRemoteSettings,
+          isActive: () => isActive,
+          lastSyncedSettingsRef,
+          setSyncedSettings,
+        });
 
         hasInitializedSettingsRef.current = true;
         if (isActive) {
@@ -333,7 +390,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => {
+    return function cleanupHostedUserSync() {
       isActive = false;
       hasInitializedSettingsRef.current = false;
       unsubscribeSettings?.();
@@ -451,6 +508,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateSyncedSettings,
     };
   }, [error, settingsSyncStatus, status, syncedSettings, user]);
+
+  return value;
+};
+
+/** Provides hosted-auth state and actions while gracefully falling back to local-only mode. */
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const value = useHostedAuthState();
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

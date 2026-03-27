@@ -42,11 +42,8 @@ if (typeof globalScope.__GFC_FIREBASE_CONFIG__ === 'undefined') {
 if (typeof globalScope.Headers === 'undefined') {
   globalScope.Headers =
     window.Headers ??
-    (class MockHeaders {
-      append() {}
-      get() {
-        return null;
-      }
+    (function MockHeaders() {
+      return undefined;
     } as unknown as typeof Headers);
 }
 

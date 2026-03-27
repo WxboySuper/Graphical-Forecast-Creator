@@ -7,6 +7,7 @@ import { useAuth } from '../auth/AuthProvider';
 
 type AuthMode = 'sign_in' | 'sign_up';
 
+/** Maps Firebase provider ids to short labels for the account UI. */
 const getProviderLabel = (providerId: string): string => {
   switch (providerId) {
     case 'google.com':
@@ -18,6 +19,7 @@ const getProviderLabel = (providerId: string): string => {
   }
 };
 
+/** Turns the raw sync status enum into copy for the account page. */
 const getSettingsSyncCopy = (settingsSyncStatus: ReturnType<typeof useAuth>['settingsSyncStatus']): string => {
   switch (settingsSyncStatus) {
     case 'synced':
@@ -35,11 +37,45 @@ const getSettingsSyncCopy = (settingsSyncStatus: ReturnType<typeof useAuth>['set
   }
 };
 
+/** Renders the save button label while optionally showing a loading spinner. */
 const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode => (
   <>
     {savingDefaults ? <LoaderCircle className="h-4 w-4 mr-2 animate-spin" /> : null}
     Save Defaults
   </>
+);
+
+/** Handles the small synced discussion-default form used in the signed-in account view. */
+const DiscussionDefaultsCard: React.FC<{
+  defaultForecasterName: string;
+  setDefaultForecasterName: React.Dispatch<React.SetStateAction<string>>;
+  savingDefaults: boolean;
+  saveMessage: string | null;
+  onSave: () => void;
+}> = ({ defaultForecasterName, setDefaultForecasterName, savingDefaults, saveMessage, onSave }) => (
+  <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+    <p className="text-sm font-medium text-foreground">Discussion Defaults</p>
+    <div className="space-y-2">
+      <label htmlFor="default-forecaster-name" className="text-sm text-muted-foreground">
+        Default forecaster name
+      </label>
+      <input
+        id="default-forecaster-name"
+        type="text"
+        value={defaultForecasterName}
+        onChange={(e) => setDefaultForecasterName(e.target.value)}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+        placeholder="Your name or preferred byline"
+        maxLength={100}
+      />
+    </div>
+    <div className="flex items-center gap-3">
+      <Button variant="outline" onClick={onSave} disabled={savingDefaults}>
+        {renderSaveDefaultsButtonLabel(savingDefaults)}
+      </Button>
+      {saveMessage && <p className="text-sm text-muted-foreground">{saveMessage}</p>}
+    </div>
+  </div>
 );
 
 /** Shows the basic account identity and hosted sync status cards. */
@@ -154,39 +190,6 @@ const SignedInSidebar: React.FC = () => (
   </div>
 );
 
-/** Handles the small synced discussion-default form used in the signed-in account view. */
-const DiscussionDefaultsCard: React.FC<{
-  defaultForecasterName: string;
-  setDefaultForecasterName: React.Dispatch<React.SetStateAction<string>>;
-  savingDefaults: boolean;
-  saveMessage: string | null;
-  onSave: () => void;
-}> = ({ defaultForecasterName, setDefaultForecasterName, savingDefaults, saveMessage, onSave }) => (
-  <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-    <p className="text-sm font-medium text-foreground">Discussion Defaults</p>
-    <div className="space-y-2">
-      <label htmlFor="default-forecaster-name" className="text-sm text-muted-foreground">
-        Default forecaster name
-      </label>
-      <input
-        id="default-forecaster-name"
-        type="text"
-        value={defaultForecasterName}
-        onChange={(e) => setDefaultForecasterName(e.target.value)}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-        placeholder="Your name or preferred byline"
-        maxLength={100}
-      />
-    </div>
-    <div className="flex items-center gap-3">
-      <Button variant="outline" onClick={onSave} disabled={savingDefaults}>
-        {renderSaveDefaultsButtonLabel(savingDefaults)}
-      </Button>
-      {saveMessage && <p className="text-sm text-muted-foreground">{saveMessage}</p>}
-    </div>
-  </div>
-);
-
 /** Displays a short explanation when hosted accounts are unavailable in the current deployment. */
 const DisabledStateCard: React.FC = () => (
   <Card className="border-border bg-card">
@@ -250,6 +253,12 @@ const SignedInAccountCard: React.FC = () => {
     });
   };
 
+  /** Wraps the async save action for a button click without leaking promise handling into JSX. */
+  const onSaveDefaultsClick = () => {
+    handleSaveDefaultsClick();
+  };
+
+  /** Wraps sign-out for button usage while shared auth state handles any failure messaging. */
   const handleSignOutClick = () => {
     signOutUser().catch(() => {
       // Auth failures surface through shared auth state.
@@ -266,13 +275,112 @@ const SignedInAccountCard: React.FC = () => {
         setDefaultForecasterName={setDefaultForecasterName}
         savingDefaults={savingDefaults}
         saveMessage={saveMessage}
-        onSaveDefaults={handleSaveDefaultsClick}
+        onSaveDefaults={onSaveDefaultsClick}
         onSignOut={handleSignOutClick}
       />
       <SignedInSidebar />
     </div>
   );
 };
+
+/** Keeps the sign-in primary card shallow while preserving the current auth flow. */
+const SignInCardHeader: React.FC = () => (
+  <CardHeader>
+    <CardTitle className="flex items-center gap-2 text-xl">
+      <CircleUserRound className="h-5 w-5 text-primary" />
+      Sign In to Sync Settings
+    </CardTitle>
+    <CardDescription>
+      Use Google or email/password to keep your profile and app preferences ready across devices without changing the
+      local-first forecasting workflow.
+    </CardDescription>
+  </CardHeader>
+);
+
+/** Renders the email/password form inside the hosted sign-in card. */
+const EmailAuthForm: React.FC<{
+  mode: AuthMode;
+  email: string;
+  password: string;
+  isBusy: boolean;
+  formError: string | null;
+  authError: string | null;
+  onModeChange: (mode: AuthMode) => void;
+  onEmailChange: (email: string) => void;
+  onPasswordChange: (password: string) => void;
+  onEmailSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+}> = ({
+  mode,
+  email,
+  password,
+  isBusy,
+  formError,
+  authError,
+  onModeChange,
+  onEmailChange,
+  onPasswordChange,
+  onEmailSubmit,
+}) => (
+  <>
+    <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+      <div className="h-px flex-1 bg-border" />
+      <span>Email / Password</span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+
+    <div className="flex gap-2">
+      <Button variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => onModeChange('sign_in')} disabled={isBusy}>
+        Sign In
+      </Button>
+      <Button variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => onModeChange('sign_up')} disabled={isBusy}>
+        Create Account
+      </Button>
+    </div>
+
+    <form className="space-y-4" onSubmit={onEmailSubmit}>
+      <div className="space-y-2">
+        <label htmlFor="account-email" className="text-sm font-medium text-foreground">
+          Email
+        </label>
+        <input
+          id="account-email"
+          type="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+          autoComplete="email"
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <label htmlFor="account-password" className="text-sm font-medium text-foreground">
+          Password
+        </label>
+        <input
+          id="account-password"
+          type="password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+          autoComplete={mode === 'sign_in' ? 'current-password' : 'new-password'}
+          minLength={6}
+          required
+        />
+      </div>
+
+      {(formError || authError) && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {formError ?? authError}
+        </div>
+      )}
+
+      <Button type="submit" disabled={isBusy}>
+        {isBusy ? <LoaderCircle className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+        {mode === 'sign_in' ? 'Sign In with Email' : 'Create Account'}
+      </Button>
+    </form>
+  </>
+);
 
 /** Keeps the sign-in primary card shallow while preserving the current auth flow. */
 const SignInPrimaryCard: React.FC<{
@@ -301,79 +409,25 @@ const SignInPrimaryCard: React.FC<{
   onEmailSubmit,
 }) => (
   <Card className="xl:col-span-2 border-border bg-card">
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2 text-xl">
-        <CircleUserRound className="h-5 w-5 text-primary" />
-        Sign In to Sync Settings
-      </CardTitle>
-      <CardDescription>
-        Use Google or email/password to keep your profile and app preferences ready across devices without changing
-        the local-first forecasting workflow.
-      </CardDescription>
-    </CardHeader>
+    <SignInCardHeader />
     <CardContent className="space-y-4">
       <Button variant="outline" className="w-full justify-center" onClick={onGoogleSignIn} disabled={isBusy}>
         <Cloud className="h-4 w-4 mr-2" />
         Continue with Google
       </Button>
 
-      <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
-        <div className="h-px flex-1 bg-border" />
-        <span>Email / Password</span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-
-      <div className="flex gap-2">
-        <Button variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => onModeChange('sign_in')} disabled={isBusy}>
-          Sign In
-        </Button>
-        <Button variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => onModeChange('sign_up')} disabled={isBusy}>
-          Create Account
-        </Button>
-      </div>
-
-      <form className="space-y-4" onSubmit={onEmailSubmit}>
-        <div className="space-y-2">
-          <label htmlFor="account-email" className="text-sm font-medium text-foreground">
-            Email
-          </label>
-          <input
-            id="account-email"
-            type="email"
-            value={email}
-            onChange={(e) => onEmailChange(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-            autoComplete="email"
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="account-password" className="text-sm font-medium text-foreground">
-            Password
-          </label>
-          <input
-            id="account-password"
-            type="password"
-            value={password}
-            onChange={(e) => onPasswordChange(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-            autoComplete={mode === 'sign_in' ? 'current-password' : 'new-password'}
-            minLength={6}
-            required
-          />
-        </div>
-
-        {(formError || authError) && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {formError ?? authError}
-          </div>
-        )}
-
-        <Button type="submit" disabled={isBusy}>
-          {isBusy ? <LoaderCircle className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-          {mode === 'sign_in' ? 'Sign In with Email' : 'Create Account'}
-        </Button>
-      </form>
+      <EmailAuthForm
+        mode={mode}
+        email={email}
+        password={password}
+        isBusy={isBusy}
+        formError={formError}
+        authError={authError}
+        onModeChange={onModeChange}
+        onEmailChange={onEmailChange}
+        onPasswordChange={onPasswordChange}
+        onEmailSubmit={onEmailSubmit}
+      />
     </CardContent>
   </Card>
 );
@@ -458,6 +512,11 @@ const SignInCard: React.FC = () => {
     });
   };
 
+  /** Wraps Google sign-in for button usage without inline promise handling in JSX. */
+  const onGoogleSignInClick = () => {
+    handleGoogleSignInClick();
+  };
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <SignInPrimaryCard
@@ -467,7 +526,7 @@ const SignInCard: React.FC = () => {
         password={password}
         formError={formError}
         authError={error}
-        onGoogleSignIn={handleGoogleSignInClick}
+        onGoogleSignIn={onGoogleSignInClick}
         onModeChange={setMode}
         onEmailChange={setEmail}
         onPasswordChange={setPassword}

@@ -174,6 +174,7 @@ const MoreActionsMenu: React.FC<{
   onViewPrivacyPolicy?: () => void;
   onToggleDocumentation?: () => void;
 }> = ({ onViewTerms, onViewPrivacyPolicy, onToggleDocumentation }) => {
+  /** Opens a community/resource link from the navbar overflow menu in a new tab. */
   const openExternalLink = (href: string) => {
     window.open(href, '_blank', 'noopener,noreferrer');
   };
