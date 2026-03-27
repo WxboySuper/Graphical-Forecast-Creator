@@ -59,6 +59,10 @@ const disabledAuthAction = (): Promise<void> => {
 /** Returns the settings-sync status that corresponds to the current deployment mode. */
 const getDisabledSettingsStatus = (): SettingsSyncStatus => (isHostedAuthEnabled ? 'idle' : 'disabled');
 
+/** True when the hosted settings sync has everything it needs to run for the current user. */
+const canSyncHostedUserDocuments = (user: User | null): user is User =>
+  Boolean(isHostedAuthEnabled && db && user);
+
 /** Builds the normalized settings document shape from current local state. */
 const createSettingsSnapshot = (
   darkMode: boolean,
@@ -228,6 +232,7 @@ const seedOrApplySettings = async (opts: {
   setSyncedSettings(localSettings);
 };
 
+/** Starts the live Firestore listener that keeps hosted settings mirrored into local app state. */
 const startSettingsSubscription = (opts: {
   settingsRef: ReturnType<typeof doc>;
   isActive: () => boolean;
@@ -254,6 +259,7 @@ const startSettingsSubscription = (opts: {
     }
   );
 
+/** Runs the initial hosted profile/settings sync before the live subscription takes over. */
 const runInitialHostedSync = async (opts: {
   profileRef: ReturnType<typeof doc>;
   settingsRef: ReturnType<typeof doc>;
@@ -384,7 +390,7 @@ const useHostedAuthState = (): AuthContextValue => {
   }, []);
 
   useEffect(function syncHostedUserDocuments() {
-    if (!isHostedAuthEnabled || !db || !user) {
+    if (!canSyncHostedUserDocuments(user)) {
       hasInitializedSettingsRef.current = false;
       lastSyncedSettingsRef.current = null;
       setSyncedSettings(null);
