@@ -49,10 +49,126 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const INITIAL_PROFILE_SYNC_STATUS: SettingsSyncStatus = isHostedAuthEnabled ? 'idle' : 'disabled';
 
-const disabledAuthAction = async (): Promise<void> => {
+/** Rejects hosted-auth actions when the current deployment intentionally runs in local-only mode. */
+const disabledAuthAction = (): Promise<void> => {
   throw new Error('Hosted accounts are not enabled for this deployment.');
 };
+
+const getDisabledSettingsStatus = (): SettingsSyncStatus => (isHostedAuthEnabled ? 'idle' : 'disabled');
+
+const createSettingsSnapshot = (
+  darkMode: boolean,
+  overlays: OverlaysState,
+  defaultForecasterName: string
+): UserSettingsDocument => ({
+  darkMode,
+  baseMapStyle: overlays.baseMapStyle,
+  stateBorders: overlays.stateBorders,
+  counties: overlays.counties,
+  ghostOutlooks: overlays.ghostOutlooks,
+  defaultForecasterName,
+});
+
+const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
+  if (!value) {
+    return null;
+  }
+
+  const {
+    darkMode,
+    baseMapStyle,
+    stateBorders,
+    counties,
+    ghostOutlooks,
+    defaultForecasterName,
+  } = value;
+
+  if (typeof darkMode !== 'boolean') {
+    return null;
+  }
+
+  if (typeof stateBorders !== 'boolean' || typeof counties !== 'boolean') {
+    return null;
+  }
+
+  if (typeof defaultForecasterName !== 'string') {
+    return null;
+  }
+
+  if (!baseMapStyle || !ghostOutlooks) {
+    return null;
+  }
+
+  return {
+    darkMode,
+    baseMapStyle,
+    stateBorders,
+    counties,
+    ghostOutlooks,
+    defaultForecasterName,
+  };
+};
+
+const createProfilePayload = (user: User) => ({
+  email: user.email ?? '',
+  displayName: user.displayName ?? '',
+  photoURL: user.photoURL ?? '',
+  providers: (user.providerData ?? []).map((provider) => provider.providerId),
+  updatedAt: serverTimestamp(),
+  createdAt: serverTimestamp(),
+});
+
+const getSettingsUpdateError = (error: unknown): string =>
+  error instanceof Error ? error.message : 'Unable to update synced settings right now.';
+
+const getSettingsSyncError = (error: unknown): string =>
+  error instanceof Error ? error.message : 'Unable to sync account settings right now.';
+
+const getRemoteSeedPayload = (settings: UserSettingsDocument, includeCreatedAt: boolean) => ({
+  ...settings,
+  updatedAt: serverTimestamp(),
+  ...(includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
+});
+
+const applySettingsToState = (
+  settings: UserSettingsDocument,
+  currentDarkModeRef: React.MutableRefObject<boolean>,
+  dispatch: ReturnType<typeof useDispatch>,
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>,
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>
+) => {
+  lastSyncedSettingsRef.current = settings;
+  setSyncedSettings(settings);
+
+  if (settings.darkMode !== currentDarkModeRef.current) {
+    dispatch(setDarkMode(settings.darkMode));
+  }
+
+  dispatch(
+    applyOverlaySettings({
+      baseMapStyle: settings.baseMapStyle,
+      stateBorders: settings.stateBorders,
+      counties: settings.counties,
+      ghostOutlooks: settings.ghostOutlooks,
+    })
+  );
+};
+
+const getDefaultContextValue = (): AuthContextValue => ({
+  status: 'disabled',
+  settingsSyncStatus: 'disabled',
+  user: null,
+  syncedSettings: null,
+  error: null,
+  hostedAuthEnabled: false,
+  signInWithGoogle: disabledAuthAction,
+  signInWithEmail: disabledAuthAction,
+  signUpWithEmail: disabledAuthAction,
+  signOutUser: disabledAuthAction,
+  updateSyncedSettings: disabledAuthAction,
+});
 
 /** Provides hosted-auth state and actions while gracefully falling back to local-only mode. */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -64,7 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hasInitializedSettingsRef = useRef(false);
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
-  const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(isHostedAuthEnabled ? 'idle' : 'disabled');
+  const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
   const [user, setUser] = useState<User | null>(null);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +210,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (nextUser) => {
         setUser(nextUser);
         setStatus(nextUser ? 'signed_in' : 'signed_out');
-        setSettingsSyncStatus(nextUser ? 'idle' : 'disabled');
+        setSettingsSyncStatus('idle');
         if (!nextUser) {
           setSyncedSettings(null);
         }
@@ -109,7 +225,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -118,7 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastSyncedSettingsRef.current = null;
       setSyncedSettings(null);
       if (status !== 'loading') {
-        setSettingsSyncStatus(isHostedAuthEnabled ? 'idle' : 'disabled');
+        setSettingsSyncStatus(getDisabledSettingsStatus());
       }
       return;
     }
@@ -128,80 +246,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const profileRef = doc(db, 'userProfiles', user.uid);
     let unsubscribeSettings: Unsubscribe | undefined;
 
-    const buildLocalSettingsSnapshot = (): UserSettingsDocument => ({
-      darkMode: currentDarkModeRef.current,
-      baseMapStyle: currentOverlaysRef.current.baseMapStyle,
-      stateBorders: currentOverlaysRef.current.stateBorders,
-      counties: currentOverlaysRef.current.counties,
-      ghostOutlooks: currentOverlaysRef.current.ghostOutlooks,
-      defaultForecasterName: user.displayName ?? '',
-    });
+    /** Captures the current local settings so they can seed a missing cloud document. */
+    const buildLocalSettingsSnapshot = (): UserSettingsDocument =>
+      createSettingsSnapshot(currentDarkModeRef.current, currentOverlaysRef.current, user.displayName ?? '');
 
-    const applyRemoteSettings = (settings: UserSettingsDocument) => {
-      lastSyncedSettingsRef.current = settings;
-      setSyncedSettings(settings);
+    /** Applies validated remote settings into Redux and local auth state. */
+    const applyRemoteSettings = (settings: UserSettingsDocument) =>
+      applySettingsToState(settings, currentDarkModeRef, dispatch, setSyncedSettings, lastSyncedSettingsRef);
 
-      if (settings.darkMode !== currentDarkModeRef.current) {
-        dispatch(setDarkMode(settings.darkMode));
-      }
-
-      dispatch(
-        applyOverlaySettings({
-          baseMapStyle: settings.baseMapStyle,
-          stateBorders: settings.stateBorders,
-          counties: settings.counties,
-          ghostOutlooks: settings.ghostOutlooks,
-        })
-      );
-    };
-
+    /** Creates the hosted profile/settings docs and starts the live settings subscription. */
     const syncUserDocuments = async () => {
       setSettingsSyncStatus('syncing');
 
       try {
+        const profileSnapshot = await getDoc(profileRef);
         await setDoc(
           profileRef,
           {
-            email: user.email ?? '',
-            displayName: user.displayName ?? '',
-            photoURL: user.photoURL ?? '',
-            providers: (user.providerData ?? []).map((provider) => provider.providerId),
-            updatedAt: serverTimestamp(),
-            createdAt: serverTimestamp(),
+            ...createProfilePayload(user),
+            ...(profileSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
           },
           { merge: true }
         );
 
         const settingsSnapshot = await getDoc(settingsRef);
-        const remoteSettings = settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined;
+        const remoteSettings = readRemoteSettings(settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined);
         const localSettings = buildLocalSettingsSnapshot();
 
-        if (
-          typeof remoteSettings?.darkMode === 'boolean' &&
-          typeof remoteSettings?.stateBorders === 'boolean' &&
-          typeof remoteSettings?.counties === 'boolean' &&
-          typeof remoteSettings?.defaultForecasterName === 'string' &&
-          remoteSettings.baseMapStyle &&
-          remoteSettings.ghostOutlooks
-        ) {
-          applyRemoteSettings({
-            darkMode: remoteSettings.darkMode,
-            baseMapStyle: remoteSettings.baseMapStyle,
-            stateBorders: remoteSettings.stateBorders,
-            counties: remoteSettings.counties,
-            ghostOutlooks: remoteSettings.ghostOutlooks,
-            defaultForecasterName: remoteSettings.defaultForecasterName,
-          });
+        if (!isActive) {
+          return;
+        }
+
+        if (remoteSettings) {
+          applyRemoteSettings(remoteSettings);
         } else {
           await setDoc(
             settingsRef,
-            {
-              ...localSettings,
-              updatedAt: serverTimestamp(),
-              createdAt: serverTimestamp(),
-            },
+            getRemoteSeedPayload(localSettings, !settingsSnapshot.exists()),
             { merge: true }
           );
+          if (!isActive) {
+            return;
+          }
           lastSyncedSettingsRef.current = localSettings;
           setSyncedSettings(localSettings);
         }
@@ -214,27 +300,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unsubscribeSettings = onSnapshot(
           settingsRef,
           (snapshot) => {
-            const nextSettings = snapshot.data() as Partial<UserSettingsDocument> | undefined;
-            if (
-              !nextSettings ||
-              typeof nextSettings.darkMode !== 'boolean' ||
-              typeof nextSettings.stateBorders !== 'boolean' ||
-              typeof nextSettings.counties !== 'boolean' ||
-              typeof nextSettings.defaultForecasterName !== 'string' ||
-              !nextSettings.baseMapStyle ||
-              !nextSettings.ghostOutlooks
-            ) {
+            const nextSettings = readRemoteSettings(snapshot.data() as Partial<UserSettingsDocument> | undefined);
+            if (!isActive || !nextSettings) {
               return;
             }
 
-            applyRemoteSettings({
-              darkMode: nextSettings.darkMode,
-              baseMapStyle: nextSettings.baseMapStyle,
-              stateBorders: nextSettings.stateBorders,
-              counties: nextSettings.counties,
-              ghostOutlooks: nextSettings.ghostOutlooks,
-              defaultForecasterName: nextSettings.defaultForecasterName,
-            });
+            applyRemoteSettings(nextSettings);
 
             if (isActive) {
               setSettingsSyncStatus('synced');
@@ -250,12 +321,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (syncError) {
         if (isActive) {
           setSettingsSyncStatus('error');
-          setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings right now.');
+          setError(getSettingsSyncError(syncError));
         }
       }
     };
 
-    void syncUserDocuments();
+    syncUserDocuments().catch((syncError) => {
+      if (isActive) {
+        setSettingsSyncStatus('error');
+        setError(getSettingsSyncError(syncError));
+      }
+    });
 
     return () => {
       isActive = false;
@@ -265,22 +341,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [dispatch, status, user]);
 
   useEffect(() => {
-    if (!isHostedAuthEnabled || !db || !user || settingsSyncStatus === 'disabled' || settingsSyncStatus === 'idle') {
+    const isSyncUnavailable =
+      !isHostedAuthEnabled || !db || !user || settingsSyncStatus === 'disabled' || settingsSyncStatus === 'idle';
+    if (isSyncUnavailable) {
       return;
     }
 
-    if (settingsSyncStatus === 'syncing' || status !== 'signed_in' || !hasInitializedSettingsRef.current) {
+    const isSyncBlocked = settingsSyncStatus === 'syncing' || status !== 'signed_in' || !hasInitializedSettingsRef.current;
+    if (isSyncBlocked) {
       return;
     }
 
-    const nextSettings: UserSettingsDocument = {
+    const nextSettings = createSettingsSnapshot(
       darkMode,
-      baseMapStyle: overlays.baseMapStyle,
-      stateBorders: overlays.stateBorders,
-      counties: overlays.counties,
-      ghostOutlooks: overlays.ghostOutlooks,
-      defaultForecasterName: syncedSettings?.defaultForecasterName ?? user.displayName ?? '',
-    };
+      overlays,
+      syncedSettings?.defaultForecasterName ?? user.displayName ?? ''
+    );
 
     if (JSON.stringify(lastSyncedSettingsRef.current) === JSON.stringify(nextSettings)) {
       return;
@@ -289,7 +365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const settingsRef = doc(db, 'userSettings', user.uid);
     lastSyncedSettingsRef.current = nextSettings;
 
-    void setDoc(
+    setDoc(
       settingsRef,
       {
         ...nextSettings,
@@ -299,60 +375,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ).catch((syncError) => {
       lastSyncedSettingsRef.current = null;
       setSettingsSyncStatus('error');
-      setError(syncError instanceof Error ? syncError.message : 'Unable to update synced settings right now.');
+      setError(getSettingsUpdateError(syncError));
     });
   }, [darkMode, overlays, settingsSyncStatus, status, syncedSettings?.defaultForecasterName, user]);
 
+  /** Persists explicit account settings changes made from the account page. */
   const updateSyncedSettings = async (settings: Partial<UserSettingsDocument>): Promise<void> => {
-    if (!isHostedAuthEnabled || !db || !user) {
+    const hostedSyncUnavailable = !isHostedAuthEnabled || !db || !user;
+    if (hostedSyncUnavailable) {
       throw new Error('Hosted accounts are not enabled for this deployment.');
     }
 
     const settingsRef = doc(db, 'userSettings', user.uid);
+    const fallbackSettings = createSettingsSnapshot(darkMode, overlays, user.displayName ?? '');
     const nextSettings: UserSettingsDocument = {
-      ...(lastSyncedSettingsRef.current ?? {
-        darkMode,
-        baseMapStyle: overlays.baseMapStyle,
-        stateBorders: overlays.stateBorders,
-        counties: overlays.counties,
-        ghostOutlooks: overlays.ghostOutlooks,
-        defaultForecasterName: user.displayName ?? '',
-      }),
+      ...(lastSyncedSettingsRef.current ?? fallbackSettings),
       ...settings,
     };
+    const previousSettings = lastSyncedSettingsRef.current;
+    const previousSyncedSettings = syncedSettings;
 
     lastSyncedSettingsRef.current = nextSettings;
     setSyncedSettings(nextSettings);
     setSettingsSyncStatus('syncing');
     setError(null);
 
-    await setDoc(
-      settingsRef,
-      {
-        ...nextSettings,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    try {
+      await setDoc(
+        settingsRef,
+        {
+          ...nextSettings,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
 
-    setSettingsSyncStatus('synced');
+      setSettingsSyncStatus('synced');
+    } catch (updateError) {
+      lastSyncedSettingsRef.current = previousSettings;
+      setSyncedSettings(previousSyncedSettings);
+      setSettingsSyncStatus('error');
+      setError(getSettingsUpdateError(updateError));
+      throw updateError;
+    }
   };
 
   const value = useMemo<AuthContextValue>(() => {
     if (!isHostedAuthEnabled || !auth) {
-      return {
-        status: 'disabled',
-        settingsSyncStatus: 'disabled',
-        user: null,
-        syncedSettings: null,
-        error: null,
-        hostedAuthEnabled: false,
-        signInWithGoogle: disabledAuthAction,
-        signInWithEmail: disabledAuthAction,
-        signUpWithEmail: disabledAuthAction,
-        signOutUser: disabledAuthAction,
-        updateSyncedSettings: disabledAuthAction,
-      };
+      return getDefaultContextValue();
     }
 
     return {

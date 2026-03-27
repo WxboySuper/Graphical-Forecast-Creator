@@ -31,10 +31,18 @@ const COMING_SOON_MODE = __GFC_COMING_SOON__;
 function useLaunchGate(): boolean {
   const [launched, setLaunched] = useState(() => Date.now() >= LAUNCH_TIME);
   useEffect(() => {
-    if (launched) return;
-    const delay = Math.max(0, LAUNCH_TIME - Date.now());
-    const t = setTimeout(() => setLaunched(true), delay);
-    return () => clearTimeout(t);
+    let launchTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if (!launched) {
+      const delay = Math.max(0, LAUNCH_TIME - Date.now());
+      launchTimer = setTimeout(() => setLaunched(true), delay);
+    }
+
+    return () => {
+      if (launchTimer) {
+        clearTimeout(launchTimer);
+      }
+    };
   }, [launched]);
   return launched;
 }

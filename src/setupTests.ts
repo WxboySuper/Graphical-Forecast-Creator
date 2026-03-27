@@ -40,15 +40,32 @@ if (typeof globalScope.__GFC_FIREBASE_CONFIG__ === 'undefined') {
 }
 
 if (typeof globalScope.Headers === 'undefined') {
-  globalScope.Headers = window.Headers ?? (class MockHeaders {} as typeof Headers);
+  globalScope.Headers =
+    window.Headers ??
+    (class MockHeaders {
+      append() {}
+      get() {
+        return null;
+      }
+    } as unknown as typeof Headers);
 }
 
 if (typeof globalScope.Request === 'undefined') {
-  globalScope.Request = window.Request ?? (class MockRequest {} as typeof Request);
+  globalScope.Request =
+    window.Request ??
+    (class MockRequest {
+      url = '';
+      method = 'GET';
+    } as unknown as typeof Request);
 }
 
 if (typeof globalScope.Response === 'undefined') {
-  globalScope.Response = window.Response ?? (class MockResponse {} as typeof Response);
+  globalScope.Response =
+    window.Response ??
+    (class MockResponse {
+      ok = true;
+      status = 200;
+    } as unknown as typeof Response);
 }
 
 if (!globalScope.fetch) {
@@ -81,7 +98,7 @@ if (!globalScope.fetch) {
 
 // Mock Leaflet
 jest.mock('leaflet', () => {
-  const L = {
+  const leafletMock = {
     divIcon: jest.fn(() => ({})),
     icon: jest.fn(() => ({})),
     point: jest.fn(() => ({})),
@@ -119,5 +136,5 @@ jest.mock('leaflet', () => {
       }
     },
   };
-  return L;
+  return leafletMock;
 });

@@ -442,14 +442,22 @@ const useDiscussionActions = (opts: {
   return { handleSave, handleExport } as const;
 };
 
+interface DiscussionEditorStateOptions {
+  existingDiscussion: DiscussionData | undefined;
+  defaultForecasterName: string;
+  currentDay: DayType;
+  dispatch: ReturnType<typeof useDispatch>;
+  addToast: AddToastFn;
+}
+
 /** Composes all discussion editor state — form fields, computed text, auto-save, and actions — into a single hook return value. */
-const useDiscussionEditorState = (
-  existingDiscussion: DiscussionData | undefined,
-  defaultForecasterName: string,
-  currentDay: DayType,
-  dispatch: ReturnType<typeof useDispatch>,
-  addToast: AddToastFn
-): DiscussionEditorState => {
+const useDiscussionEditorState = ({
+  existingDiscussion,
+  defaultForecasterName,
+  currentDay,
+  dispatch,
+  addToast,
+}: DiscussionEditorStateOptions): DiscussionEditorState => {
   const form = useDiscussionFormState(existingDiscussion, defaultForecasterName);
 
   const buildDiscussionData = useCallback(() => buildDiscussionDataFrom({
@@ -517,7 +525,13 @@ export const DiscussionPage: React.FC = () => {
   const outlookDay = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]);
   const existingDiscussion = outlookDay?.discussion;
   const defaultForecasterName = syncedSettings?.defaultForecasterName ?? user?.displayName ?? '';
-  const editorState = useDiscussionEditorState(existingDiscussion, defaultForecasterName, currentDay, dispatch, addToast);
+  const editorState = useDiscussionEditorState({
+    existingDiscussion,
+    defaultForecasterName,
+    currentDay,
+    dispatch,
+    addToast,
+  });
 
   return (
     <div className="h-full flex flex-col bg-background">

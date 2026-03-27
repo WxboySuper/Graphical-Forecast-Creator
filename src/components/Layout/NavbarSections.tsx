@@ -140,76 +140,79 @@ const ExternalLinkButton: React.FC<ExternalActionLink> = ({ href, label, icon })
   </Tooltip>
 );
 
+/** Displays the small signed-in dot without adding more nesting to the account button. */
+const AccountIndicator: React.FC<{ showSignedInDot: boolean }> = ({ showSignedInDot }) => {
+  if (!showSignedInDot) {
+    return null;
+  }
+
+  return <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />;
+};
+
 /** Keeps account access visually distinct from lower-priority utility links in the navbar. */
 const AccountButton: React.FC<{ accountLabel: string; showSignedInDot: boolean; status: string }> = ({
   accountLabel,
   showSignedInDot,
   status,
-}) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <Button variant={status === 'signed_in' ? 'secondary' : 'outline'} size="sm" asChild aria-label={accountLabel} className="gap-2">
-        <NavLink to="/account" className="relative">
-          <CircleUserRound className="h-4 w-4" />
-          <span className="hidden lg:inline">Account</span>
-          {showSignedInDot && (
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />
-          )}
-        </NavLink>
-      </Button>
-    </TooltipTrigger>
-    <TooltipContent>
-      <p>{accountLabel}</p>
-    </TooltipContent>
-  </Tooltip>
-);
+}) => {
+  const buttonVariant = status === 'signed_in' ? 'secondary' : 'outline';
+
+  return (
+    <Button variant={buttonVariant} size="sm" asChild aria-label={accountLabel} className="gap-2" title={accountLabel}>
+      <NavLink to="/account" className="relative">
+        <CircleUserRound className="h-4 w-4" />
+        <span className="hidden lg:inline">Account</span>
+        <AccountIndicator showSignedInDot={showSignedInDot} />
+      </NavLink>
+    </Button>
+  );
+};
 
 /** Groups lower-priority documentation, legal, and social links into a compact overflow menu. */
 const MoreActionsMenu: React.FC<{
   onViewTerms?: () => void;
   onViewPrivacyPolicy?: () => void;
   onToggleDocumentation?: () => void;
-}> = ({ onViewTerms, onViewPrivacyPolicy, onToggleDocumentation }) => (
-  <DropdownMenu>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="More actions">
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>More</p>
-      </TooltipContent>
-    </Tooltip>
+}> = ({ onViewTerms, onViewPrivacyPolicy, onToggleDocumentation }) => {
+  const openExternalLink = (href: string) => {
+    window.open(href, '_blank', 'noopener,noreferrer');
+  };
 
-    <DropdownMenuContent align="end" className="w-56">
-      <DropdownMenuLabel>Resources</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={onToggleDocumentation}>
-        <HelpCircle className="h-4 w-4" />
-        Documentation
-      </DropdownMenuItem>
-      <DropdownMenuItem onSelect={onViewTerms}>
-        <FileText className="h-4 w-4" />
-        Terms of Service
-      </DropdownMenuItem>
-      <DropdownMenuItem onSelect={onViewPrivacyPolicy}>
-        <Shield className="h-4 w-4" />
-        Privacy Policy
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuLabel>Community</DropdownMenuLabel>
-      {externalLinks.map((link) => (
-        <DropdownMenuItem key={link.href} onSelect={() => window.open(link.href, '_blank', 'noopener,noreferrer')}>
-          {link.icon}
-          {link.label}
-          <ExternalLink className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="More actions" title="More">
+          <MoreHorizontal className="h-5 w-5" />
+        </Button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Resources</DropdownMenuLabel>
+        <DropdownMenuItem onSelect={onToggleDocumentation}>
+          <HelpCircle className="h-4 w-4" />
+          Documentation
         </DropdownMenuItem>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-);
+        <DropdownMenuItem onSelect={onViewTerms}>
+          <FileText className="h-4 w-4" />
+          Terms of Service
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onViewPrivacyPolicy}>
+          <Shield className="h-4 w-4" />
+          Privacy Policy
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Community</DropdownMenuLabel>
+        {externalLinks.map((link) => (
+          <DropdownMenuItem key={link.href} onSelect={() => openExternalLink(link.href)}>
+            {link.icon}
+            {link.label}
+            <ExternalLink className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
 // The RightActions component displays the action buttons on the right side of the navbar.
 export const RightActions: React.FC<RightActionsProps> = ({
