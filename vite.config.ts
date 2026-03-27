@@ -10,6 +10,12 @@ export default defineConfig(({ mode }) => {
     base,
     define: {
       __GFC_COMING_SOON__: JSON.stringify(env.VITE_COMING_SOON === 'true'),
+      __GFC_FIREBASE_CONFIG__: JSON.stringify({
+        apiKey: env.VITE_FIREBASE_API_KEY ?? '',
+        authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? '',
+        projectId: env.VITE_FIREBASE_PROJECT_ID ?? '',
+        appId: env.VITE_FIREBASE_APP_ID ?? '',
+      }),
     },
     plugins: [react()],
     resolve: {

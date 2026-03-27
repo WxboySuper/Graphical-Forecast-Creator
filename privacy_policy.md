@@ -9,7 +9,7 @@ If you use Graphical Forecast Creator (GFC) without creating an account, all of 
 **2. Account & Authentication Data**
 If you choose to create an account to sync your settings or use premium features, we authenticate you via Firebase Auth. We use essential session cookies strictly to keep you logged in and we store:
 * Your email address
-* Your authentication provider (Google, GitHub, or Email/Password)
+* Your authentication provider (Google or Email/Password)
 * Basic profile information (Name/Avatar)
 
 **3. Premium Cloud Storage & Encryption**

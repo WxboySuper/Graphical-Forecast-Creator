@@ -48,6 +48,28 @@ const overlaysSlice = createSlice({
       const { outlookType, visible } = action.payload;
       state.ghostOutlooks[outlookType] = visible;
     },
+    applyOverlaySettings: (state, action: PayloadAction<Partial<OverlaysState>>) => {
+      const { stateBorders, counties, baseMapStyle, ghostOutlooks } = action.payload;
+
+      if (typeof stateBorders === 'boolean') {
+        state.stateBorders = stateBorders;
+      }
+
+      if (typeof counties === 'boolean') {
+        state.counties = counties;
+      }
+
+      if (baseMapStyle) {
+        state.baseMapStyle = baseMapStyle;
+      }
+
+      if (ghostOutlooks) {
+        state.ghostOutlooks = {
+          ...state.ghostOutlooks,
+          ...ghostOutlooks,
+        };
+      }
+    },
     resetOverlays: () => initialState,
   },
 });
@@ -59,6 +81,7 @@ export const {
   setBaseMapStyle,
   toggleGhostOutlook,
   setGhostOutlookVisibility,
+  applyOverlaySettings,
   resetOverlays,
 } = overlaysSlice.actions;
 

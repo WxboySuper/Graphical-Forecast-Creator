@@ -45,3 +45,5 @@ internal-roadmap.md
 night-watch.config.json
 *.claim
 /instructions
+
+.env

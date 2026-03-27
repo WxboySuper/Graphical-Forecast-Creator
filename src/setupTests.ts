@@ -5,22 +5,56 @@
 import '@testing-library/jest-dom';
 import { TextDecoder, TextEncoder } from 'util';
 
-if (!global.TextEncoder) {
-  global.TextEncoder = TextEncoder as typeof global.TextEncoder;
+const globalScope = globalThis as typeof globalThis & {
+  __GFC_COMING_SOON__?: boolean;
+  __GFC_FIREBASE_CONFIG__?: {
+    apiKey?: string;
+    authDomain?: string;
+    projectId?: string;
+    appId?: string;
+  };
+  Headers?: typeof Headers;
+  Request?: typeof Request;
+  Response?: typeof Response;
+};
+
+if (!globalScope.TextEncoder) {
+  globalScope.TextEncoder = TextEncoder as typeof globalScope.TextEncoder;
 }
 
-if (!global.TextDecoder) {
-  global.TextDecoder = TextDecoder as typeof global.TextDecoder;
+if (!globalScope.TextDecoder) {
+  globalScope.TextDecoder = TextDecoder as typeof globalScope.TextDecoder;
 }
 
-if (typeof global.__GFC_COMING_SOON__ === 'undefined') {
-  global.__GFC_COMING_SOON__ = false;
+if (typeof globalScope.__GFC_COMING_SOON__ === 'undefined') {
+  globalScope.__GFC_COMING_SOON__ = false;
 }
 
-if (!global.fetch) {
+if (typeof globalScope.__GFC_FIREBASE_CONFIG__ === 'undefined') {
+  globalScope.__GFC_FIREBASE_CONFIG__ = {
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    appId: '',
+  };
+}
+
+if (typeof globalScope.Headers === 'undefined') {
+  globalScope.Headers = window.Headers ?? (class MockHeaders {} as typeof Headers);
+}
+
+if (typeof globalScope.Request === 'undefined') {
+  globalScope.Request = window.Request ?? (class MockRequest {} as typeof Request);
+}
+
+if (typeof globalScope.Response === 'undefined') {
+  globalScope.Response = window.Response ?? (class MockResponse {} as typeof Response);
+}
+
+if (!globalScope.fetch) {
   /** Builds a minimal Response-like object for tests that depend on common fetch response fields. */
   const createMockResponse = () => {
-    const headers = new Headers();
+    const headers = new globalScope.Headers();
 
     return {
       ok: false,
@@ -40,9 +74,9 @@ if (!global.fetch) {
     };
   };
 
-  global.fetch = jest.fn().mockResolvedValue({
+  globalScope.fetch = jest.fn().mockResolvedValue({
     ...createMockResponse(),
-  }) as unknown as typeof global.fetch;
+  }) as unknown as typeof globalScope.fetch;
 }
 
 // Mock Leaflet
