@@ -12,6 +12,7 @@ import {
   Github,
   Twitter,
   FileText,
+  Shield,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -32,6 +33,7 @@ interface RightActionsProps {
   darkMode: boolean;
   showDocumentation?: boolean;
   onViewTerms?: () => void;
+  onViewPrivacyPolicy?: () => void;
   onToggleDocumentation?: () => void;
   onToggleDarkMode: () => void;
 }
@@ -135,6 +137,7 @@ export const RightActions: React.FC<RightActionsProps> = ({
   darkMode,
   showDocumentation,
   onViewTerms,
+  onViewPrivacyPolicy,
   onToggleDocumentation,
   onToggleDarkMode,
 }) => (
@@ -158,6 +161,22 @@ export const RightActions: React.FC<RightActionsProps> = ({
       </TooltipTrigger>
       <TooltipContent>
         <p>Terms of Service</p>
+      </TooltipContent>
+    </Tooltip>
+
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onViewPrivacyPolicy}
+          aria-label="Privacy Policy"
+        >
+          <Shield className="h-5 w-5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Privacy Policy</p>
       </TooltipContent>
     </Tooltip>
 
