@@ -1,8 +1,11 @@
 'use strict';
 
+require('./load-env');
+
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { registerBillingRoutes } = require('./billing');
 
 const PORT = parseInt(process.env.PORT || '3006', 10);
 const LOG_DIR = process.env.LOG_DIR || path.join(__dirname, 'logs');
@@ -15,10 +18,9 @@ if (!fs.existsSync(LOG_DIR)) {
 
 const app = express();
 
-// 1 kb body limit — more than enough for page + referrer; blocks abuse
-app.use(express.json({ limit: '1kb' }));
+registerBillingRoutes(app, express);
 
-app.post('/collect', (req, res) => {
+app.post('/collect', express.json({ limit: '1kb' }), (req, res) => {
   // Sanitise and cap all user-controlled fields
   const page = (typeof req.body?.page === 'string' ? req.body.page : '/').slice(0, 200);
   const referrer = (typeof req.body?.referrer === 'string' ? req.body.referrer : '').slice(0, 500);

@@ -16,6 +16,7 @@ import {
   Shield,
   CircleUserRound,
   MoreHorizontal,
+  Crown,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -200,6 +201,12 @@ const MoreActionsMenu: React.FC<{
         <DropdownMenuItem onSelect={onViewPrivacyPolicy}>
           <Shield className="h-4 w-4" />
           Privacy Policy
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <NavLink to="/pricing">
+            <Crown className="h-4 w-4" />
+            Pricing
+          </NavLink>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Community</DropdownMenuLabel>
