@@ -1,18 +1,23 @@
 import React from 'react';
-import { Card } from '../../components/ui/card';
-import { Clock, CheckCircle2, AlertTriangle, Map as MapIcon, FileText, ArrowRight, Zap, Calendar, Save, Upload, History, Cloud } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Calendar, CheckCircle2, Clock3, FileText, History, Layers3, Map, Save, Upload } from 'lucide-react';
 import type { DayType, ForecastCycle } from '../../types/outlooks';
 import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { cn } from '../../lib/utils';
+import type { HomeVariant } from './HomeHero';
 
 interface HomeStats {
   daysWithData: DayType[];
   totalOutlooks: number;
   totalFeatures: number;
   savedCyclesCount: number;
+  totalForecastsMade: number;
+  totalCyclesMade: number;
+  forecastStreak: number;
 }
 
 interface Props {
+  variant: HomeVariant;
   formattedDate: string;
   isSaved: boolean;
   forecastCycle: ForecastCycle;
@@ -26,33 +31,68 @@ interface Props {
   onOpenHistory: () => void;
 }
 
-/** Card header showing the cycle title, formatted date, and current save status. */
-const CyclePanelHeader: React.FC<{ formattedDate: string; isSaved: boolean }> = ({ formattedDate, isSaved }) => (
-  <div className="flex items-center justify-between">
-    <div>
-      <h2 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-        <Clock className="h-6 w-6 text-primary" />
-        Current Forecast Cycle
-      </h2>
-      <p className="text-sm text-muted-foreground mt-1">{formattedDate}</p>
+/** Header copy for the main current-cycle card. */
+const getWorkspaceCopy = (variant: HomeVariant) => {
+  if (variant === 'signed_in') {
+    return {
+      description: 'Resume the package already in progress, switch days, or jump into the next step without losing context.',
+      primaryAction: 'Continue Forecast',
+    };
+  }
+
+  return {
+    description: 'Start here whether you are sketching a fresh package or reopening older local work.',
+    primaryAction: 'Open Forecast Map',
+  };
+};
+
+/** Compact stat tile used to keep the current-cycle card informative without dashboard clutter. */
+const WorkspaceStat: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}> = ({ icon, label, value }) => (
+  <div className="rounded-2xl border border-border/80 bg-muted/25 p-4">
+    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+      {icon}
+      {label}
     </div>
-    <div className="flex items-center gap-2">
-      {!isSaved && (
-        <span className="flex items-center gap-1 text-warning text-sm font-medium">
-          <AlertTriangle className="h-4 w-4" />
-          Unsaved
-        </span>
-      )}
-      {isSaved && (
-        <span className="flex items-center gap-1 text-success text-sm font-medium">
-          <CheckCircle2 className="h-4 w-4" />
-          Saved
-        </span>
-      )}
-    </div>
+    <p className="mt-3 text-lg font-semibold text-foreground">{value}</p>
   </div>
 );
-/** Renders a day-button grid item for the forecast day selector. */
+
+/** Header showing the current cycle and save state. */
+const CurrentCycleHeader: React.FC<{
+  variant: HomeVariant;
+  formattedDate: string;
+  isSaved: boolean;
+}> = ({ variant, formattedDate, isSaved }) => {
+  const copy = getWorkspaceCopy(variant);
+
+  return (
+    <CardHeader className="space-y-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-2">
+          <CardTitle className="text-2xl">Current Forecast Cycle</CardTitle>
+          <CardDescription className="max-w-2xl">{copy.description}</CardDescription>
+        </div>
+        <div className="flex min-h-20 self-start rounded-full border border-border/80 bg-background/80 px-4 py-2 text-sm font-medium md:min-w-40 md:items-center md:justify-center">
+          <span className={cn('inline-flex items-center gap-2 text-center', isSaved ? 'text-success' : 'text-warning')}>
+            {isSaved ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+            {isSaved ? 'Saved locally' : 'Unsaved changes'}
+          </span>
+        </div>
+      </div>
+
+      <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-sm text-muted-foreground">
+        <Clock3 className="h-4 w-4 text-primary" />
+        {formattedDate}
+      </div>
+    </CardHeader>
+  );
+};
+
+/** Individual day button for jumping directly into a forecast day. */
 const DayButton: React.FC<{
   day: number;
   hasData: boolean;
@@ -60,32 +100,36 @@ const DayButton: React.FC<{
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }> = ({ day, hasData, isCurrent, onClick }) => (
   <button
-    key={day}
     data-day={day}
     onClick={onClick}
     className={cn(
-      'relative p-4 rounded-lg border-2 transition-all',
-      'hover:shadow-md hover:scale-105',
-      hasData ? 'bg-primary/10 border-primary' : 'bg-muted/30 border-border',
+      'rounded-2xl border px-3 py-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-sm',
+      hasData ? 'border-primary/30 bg-primary/8' : 'border-border/80 bg-background/70',
       isCurrent && 'ring-2 ring-primary ring-offset-2'
     )}
   >
-    <div className="text-center">
+    <div className="space-y-1">
+      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Day</p>
       <p className="text-2xl font-bold text-foreground">{day}</p>
+      <p className="text-xs text-muted-foreground">{hasData ? 'Outlooks started' : 'Ready to edit'}</p>
     </div>
   </button>
 );
 
-/** Days-with-outlooks label and 1–8 day selector grid. */
+/** Selector for the active forecast day. */
 const CycleDayGrid: React.FC<{
   daysWithData: DayType[];
   currentDay: number;
   onDayClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }> = ({ daysWithData, currentDay, onDayClick }) => (
-  <div>
-    <h3 className="text-sm font-medium text-muted-foreground mb-3">Days with Outlooks</h3>
-    <div className="grid grid-cols-8 gap-2">
-      {[1,2,3,4,5,6,7,8].map((day) => (
+  <div className="space-y-3">
+    <div className="space-y-1">
+      <h3 className="text-sm font-medium text-foreground">Jump to a forecast day</h3>
+      <p className="text-sm text-muted-foreground">Pick a day below to head straight into the map editor.</p>
+    </div>
+
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+      {[1, 2, 3, 4, 5, 6, 7, 8].map((day) => (
         <DayButton
           key={day}
           day={day}
@@ -98,93 +142,129 @@ const CycleDayGrid: React.FC<{
   </div>
 );
 
-/** Continue Forecast and Write Discussion navigation buttons. */
-const CycleNavButtons: React.FC<{
+/** Primary workflow actions that move the user back into the main forecast flow. */
+const PrimaryActions: React.FC<{
+  variant: HomeVariant;
   onNavigateForecast: () => void;
   onNavigateDiscussion: () => void;
-}> = ({ onNavigateForecast, onNavigateDiscussion }) => (
-  <div className="grid grid-cols-2 gap-3">
-    <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={onNavigateForecast}>
-      <MapIcon className="h-5 w-5" />
-      <span>Continue Forecast</span>
-      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-    </Button>
-    <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={onNavigateDiscussion}>
-      <FileText className="h-5 w-5" />
-      <span>Write Discussion</span>
-      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-    </Button>
-  </div>
-);
+}> = ({ variant, onNavigateForecast, onNavigateDiscussion }) => {
+  const copy = getWorkspaceCopy(variant);
 
-/** New cycle, save, load, and history quick-action buttons. */
-const QuickActionsList: React.FC<{
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <Button className="h-auto justify-between rounded-2xl px-5 py-4 text-left" onClick={onNavigateForecast}>
+        <span className="flex items-center gap-3">
+          <Map className="h-4 w-4" />
+          {copy.primaryAction}
+        </span>
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        className="h-auto justify-between rounded-2xl px-5 py-4 text-left"
+        onClick={onNavigateDiscussion}
+      >
+        <span className="flex items-center gap-3">
+          <FileText className="h-4 w-4" />
+          Write Discussion
+        </span>
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
+
+/** Secondary utility actions for file and cycle management. */
+const UtilityActions: React.FC<{
   onNewCycle: () => void;
   onSave: () => void;
   onOpenFile: () => void;
   onOpenHistory: () => void;
 }> = ({ onNewCycle, onSave, onOpenFile, onOpenHistory }) => (
-  <div className="space-y-2">
-    <Button variant="default" className="w-full justify-start h-auto py-3" onClick={onNewCycle}>
-      <Calendar className="h-4 w-4 mr-2" />
-      New Forecast Cycle
-    </Button>
-    <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={onSave}>
-      <Save className="h-4 w-4 mr-2" />
-      Save Current Cycle
-    </Button>
-    <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={onOpenFile}>
-      <Upload className="h-4 w-4 mr-2" />
-      Load Cycle from File
-    </Button>
-    <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={onOpenHistory}>
-      <History className="h-4 w-4 mr-2" />
-      View Cycle History
-    </Button>
-  </div>
-);
+  <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/15 p-5">
+    <div className="space-y-1">
+      <h3 className="text-sm font-medium text-foreground">Cycle tools</h3>
+      <p className="text-sm text-muted-foreground">Keep the package moving without leaving the landing page.</p>
+    </div>
 
-/** Forecast Map and Discussion Editor ghost navigation buttons. */
-const NavigateSection: React.FC<{
-  onNavigateForecast: () => void;
-  onNavigateDiscussion: () => void;
-}> = ({ onNavigateForecast, onNavigateDiscussion }) => (
-  <div className="pt-4 border-t border-border">
-    <h3 className="text-sm font-medium text-muted-foreground mb-2">Navigate</h3>
-    <div className="space-y-2">
-      <Button variant="ghost" className="w-full justify-start" onClick={onNavigateForecast}>
-        <Cloud className="h-4 w-4 mr-2 text-foreground" />
-        Forecast Map
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Button variant="outline" className="justify-start rounded-xl" onClick={onNewCycle}>
+        <Calendar className="h-4 w-4 mr-2" />
+        Start New Cycle
       </Button>
-      <Button variant="ghost" className="w-full justify-start" onClick={onNavigateDiscussion}>
-        <FileText className="h-4 w-4 mr-2 text-btn-discussion" />
-        Discussion Editor
+      <Button variant="outline" className="justify-start rounded-xl" onClick={onSave}>
+        <Save className="h-4 w-4 mr-2" />
+        Save Cycle File
+      </Button>
+      <Button variant="outline" className="justify-start rounded-xl" onClick={onOpenFile}>
+        <Upload className="h-4 w-4 mr-2" />
+        Load From File
+      </Button>
+      <Button variant="outline" className="justify-start rounded-xl" onClick={onOpenHistory}>
+        <History className="h-4 w-4 mr-2" />
+        Open Cycle History
       </Button>
     </div>
   </div>
 );
 
-/** Main dashboard grid combining the current forecast cycle panel, quick actions, and navigation. */
-export const MainGrid: React.FC<Props> = ({ formattedDate, isSaved, forecastCycle, stats, onQuickStartClick, onNavigateForecast, onNavigateDiscussion, onNewCycle, onSave, onOpenFile, onOpenHistory }) => {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <Card className="lg:col-span-2 p-6 bg-card border-border">
-        <div className="space-y-6">
-          <CyclePanelHeader formattedDate={formattedDate} isSaved={isSaved} />
-          <CycleDayGrid daysWithData={stats.daysWithData} currentDay={forecastCycle.currentDay} onDayClick={onQuickStartClick} />
-          <CycleNavButtons onNavigateForecast={onNavigateForecast} onNavigateDiscussion={onNavigateDiscussion} />
-        </div>
-      </Card>
-      <Card className="p-6 bg-card border-border space-y-4">
-        <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-          <Zap className="h-5 w-5 text-warning" />
-          Quick Actions
-        </h2>
-        <QuickActionsList onNewCycle={onNewCycle} onSave={onSave} onOpenFile={onOpenFile} onOpenHistory={onOpenHistory} />
-        <NavigateSection onNavigateForecast={onNavigateForecast} onNavigateDiscussion={onNavigateDiscussion} />
-      </Card>
-    </div>
-  );
-};
+/** Workflow-first card for the current cycle and the most common forecast actions. */
+export const MainGrid: React.FC<Props> = ({
+  variant,
+  formattedDate,
+  isSaved,
+  forecastCycle,
+  stats,
+  onQuickStartClick,
+  onNavigateForecast,
+  onNavigateDiscussion,
+  onNewCycle,
+  onSave,
+  onOpenFile,
+  onOpenHistory,
+}) => (
+  <Card className="border-border/80 bg-card/95 shadow-sm">
+    <CurrentCycleHeader variant={variant} formattedDate={formattedDate} isSaved={isSaved} />
+
+    <CardContent className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-3">
+        <WorkspaceStat
+          icon={<Clock3 className="h-4 w-4 text-primary" />}
+          label="Active day"
+          value={`Day ${forecastCycle.currentDay}`}
+        />
+        <WorkspaceStat
+          icon={<Map className="h-4 w-4 text-primary" />}
+          label="Days with outlooks"
+          value={`${stats.daysWithData.length}`}
+        />
+        <WorkspaceStat
+          icon={<Layers3 className="h-4 w-4 text-primary" />}
+          label="Mapped outlooks"
+          value={`${stats.totalOutlooks}`}
+        />
+      </div>
+
+      <CycleDayGrid
+        daysWithData={stats.daysWithData}
+        currentDay={forecastCycle.currentDay}
+        onDayClick={onQuickStartClick}
+      />
+
+      <PrimaryActions
+        variant={variant}
+        onNavigateForecast={onNavigateForecast}
+        onNavigateDiscussion={onNavigateDiscussion}
+      />
+
+      <UtilityActions
+        onNewCycle={onNewCycle}
+        onSave={onSave}
+        onOpenFile={onOpenFile}
+        onOpenHistory={onOpenHistory}
+      />
+    </CardContent>
+  </Card>
+);
 
 export default MainGrid;

@@ -1,69 +1,149 @@
 import React from 'react';
-import { Card } from '../../components/ui/card';
-import { Calendar, Layers, TrendingUp } from 'lucide-react';
-import { DayType } from '../../types/outlooks';
+import { CalendarDays, Layers3, Route, ShieldCheck } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import type { DayType } from '../../types/outlooks';
+import type { HomeVariant } from './HomeHero';
 
 interface Stats {
   daysWithData: DayType[];
   totalOutlooks: number;
   totalFeatures: number;
   savedCyclesCount: number;
+  totalForecastsMade: number;
+  totalCyclesMade: number;
+  forecastStreak: number;
 }
 
-/** Displays a quick-stats dashboard grid and feature highlight cards for the home page. */
-export const Dashboard: React.FC<{ stats: Stats }> = ({ stats }) => {
-  const featureCards = [
-    {
-      title: 'Polygon Drawing',
-      description: 'Draw, edit, and remove outlook polygons directly on the forecast map for each supported day and hazard type.',
-    },
-    {
-      title: 'Discussion Editor',
-      description: 'Write forecast discussions with guided and freeform editing tools, then export the finished text with your package.',
-    },
-    {
-      title: 'Forecast Verification',
-      description: 'Compare saved outlooks against storm reports with visual overlays and summary metrics for hits and misses.',
-    },
-    {
-      title: 'Cycle Manager',
-      description: 'Save forecast cycles, reopen previous work, and copy outlooks between days or older forecast packages.',
-    },
-  ];
+interface Props {
+  stats: Stats;
+  variant: HomeVariant;
+}
 
-  return (
-    <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          {
-            icon: <Calendar className="h-6 w-6 text-primary" />, title: 'Days with Data', value: stats.daysWithData.length,
-          },
-          { icon: <Layers className="h-6 w-6 text-success" />, title: 'Outlook Maps', value: stats.totalOutlooks },
-          { icon: <TrendingUp className="h-6 w-6 text-warning" />, title: 'Total Features', value: stats.totalFeatures },
-          { icon: <Calendar className="h-6 w-6" />, title: 'Saved Cycles', value: stats.savedCyclesCount },
-        ].map(({ icon, title, value }) => (
-          <Card key={title} className="p-6 bg-card border-border hover:shadow-lg transition-shadow">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-lg">{icon}</div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{value}</p>
-                <p className="text-sm text-muted-foreground">{title}</p>
-              </div>
-            </div>
-          </Card>
+/** Shared compact stat card for the redesigned landing page. */
+const SnapshotCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+}> = ({ icon, title, value }) => (
+  <Card className="border-border/80 bg-card/95 shadow-sm">
+    <CardContent className="flex items-center gap-4 p-5">
+      <div className="rounded-2xl bg-primary/10 p-3 text-primary">{icon}</div>
+      <div>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
+        <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+/** Dedicated getting-started guidance for first-time or signed-out users. */
+const GettingStartedPanel: React.FC = () => (
+  <section className="space-y-4">
+    <div className="space-y-2">
+      <h2 className="text-xl font-semibold text-foreground">Getting Started</h2>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        GFC works best when you treat it like a package workspace: start a cycle, build the map, then write the
+        discussion while the setup is still fresh.
+      </p>
+    </div>
+    <div className="space-y-4">
+      {[
+        {
+          step: '1',
+          title: 'Start or load a cycle',
+          copy: 'Begin with a fresh package or reopen one you already saved locally.',
+        },
+        {
+          step: '2',
+          title: 'Open the forecast map',
+          copy: 'Use the day buttons to jump straight into the map and start sketching outlook areas.',
+        },
+        {
+          step: '3',
+          title: 'Write the discussion',
+          copy: 'Once the graphics are set, head into the discussion editor to build the text side of the package.',
+        },
+      ].map(({ step, title, copy }) => (
+        <div key={step} className="flex gap-4 rounded-2xl border border-border/80 bg-muted/20 p-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+            {step}
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-medium text-foreground">{title}</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">{copy}</p>
+          </div>
+        </div>
         ))}
+    </div>
+  </section>
+);
+
+/** Compact workflow snapshot for signed-in users returning to active work. */
+const SignedInSnapshotStrip: React.FC<{ stats: Stats }> = ({ stats }) => (
+  <div className="grid gap-4 md:grid-cols-3">
+    <SnapshotCard
+      icon={<CalendarDays className="h-5 w-5" />}
+      title="Streak"
+      value={`${stats.forecastStreak}`}
+    />
+    <SnapshotCard
+      icon={<Layers3 className="h-5 w-5" />}
+      title="Total Forecasts Made"
+      value={`${stats.totalForecastsMade}`}
+    />
+    <SnapshotCard
+      icon={<Route className="h-5 w-5" />}
+      title="Total Cycles Made"
+      value={`${stats.totalCyclesMade}`}
+    />
+  </div>
+);
+
+/** Secondary signed-out sidebar that keeps guidance and a few grounded stats close by. */
+const SignedOutSidebar: React.FC<{ stats: Stats }> = ({ stats }) => (
+  <Card className="h-full border-border/80 bg-card/95 shadow-sm">
+    <CardContent className="flex h-full flex-col gap-5 p-6">
+      <GettingStartedPanel />
+
+      <div className="rounded-2xl border border-border/80 bg-muted/10 p-5">
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-foreground">At a Glance</h3>
+          <p className="text-sm text-muted-foreground">What is already in this local workspace right now.</p>
+        </div>
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
+            <span className="text-sm text-muted-foreground">Days with outlooks</span>
+            <span className="font-semibold text-foreground">{stats.daysWithData.length}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
+            <span className="text-sm text-muted-foreground">Mapped outlooks</span>
+            <span className="font-semibold text-foreground">{stats.totalOutlooks}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
+            <span className="text-sm text-muted-foreground">Saved cycles</span>
+            <span className="font-semibold text-foreground">{stats.savedCyclesCount}</span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        {featureCards.map(({ title, description }) => (
-          <Card key={title} className="p-6 bg-card border-border hover:shadow-lg transition-shadow space-y-3">
-            <h3 className="font-semibold text-foreground">{title}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-          </Card>
-        ))}
+      <div className="mt-auto rounded-2xl border border-border/80 bg-muted/10 p-5">
+        <h3 className="text-lg font-semibold text-foreground">Still Local-First</h3>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          You can start forecasting, save cycle files, and export work immediately. Accounts are optional and only add
+          convenience, not gatekeeping.
+        </p>
       </div>
-    </>
-  );
+    </CardContent>
+  </Card>
+);
+
+/** Secondary home-page content that changes based on whether the user is returning to work or onboarding. */
+export const Dashboard: React.FC<Props> = ({ stats, variant }) => {
+  if (variant === 'signed_in') {
+    return <SignedInSnapshotStrip stats={stats} />;
+  }
+
+  return <SignedOutSidebar stats={stats} />;
 };
 
 export default Dashboard;

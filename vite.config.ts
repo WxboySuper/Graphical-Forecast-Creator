@@ -16,12 +16,7 @@ export default defineConfig(({ mode }) => {
     base,
     define: {
       __GFC_COMING_SOON__: JSON.stringify(env.VITE_COMING_SOON === 'true'),
-      __GFC_FIREBASE_CONFIG__: {
-        apiKey: JSON.stringify(firebaseConfig.apiKey),
-        authDomain: JSON.stringify(firebaseConfig.authDomain),
-        projectId: JSON.stringify(firebaseConfig.projectId),
-        appId: JSON.stringify(firebaseConfig.appId),
-      },
+      __GFC_FIREBASE_CONFIG__: firebaseConfig,
     },
     plugins: [react()],
     resolve: {

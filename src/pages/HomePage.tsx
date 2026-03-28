@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Bot } from 'lucide-react';
 import { RootState } from '../store';
@@ -7,10 +7,11 @@ import { selectForecastCycle, setForecastDay, resetForecasts, importForecastCycl
 import CycleHistoryModal from '../components/CycleManager/CycleHistoryModal';
 import ConfirmationModal from '../components/DrawingTools/ConfirmationModal';
 import type { AddToastFn } from '../components/Layout';
+import { useAuth } from '../auth/AuthProvider';
 
 import { computeHomeStats, formatCycleDate } from './homeUtils';
 import { createFileHandlers } from '../hooks/useFileLoader';
-import HomeHero from './home/HomeHero';
+import HomeHero, { type HomeVariant } from './home/HomeHero';
 import Dashboard from './home/Dashboard';
 import MainGrid from './home/MainGrid';
 import RecentCycles from './home/RecentCycles';
@@ -20,27 +21,43 @@ interface PageContext {
   addToast: AddToastFn;
 }
 
-/** AI development disclosure banner shown at the bottom of the home page. */
+/** Maintainer note kept at the bottom of the home page without dominating the product message. */
 const AIDisclosure: React.FC = () => (
   <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-    <Bot className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground/70" />
+    <Bot className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
     <p className="leading-relaxed">
       <span className="font-medium text-foreground">AI Development Disclosure:</span>{' '}
       AI was used in the development of this project. All code has been reviewed by the maintainer
       (Alex / WeatherboySuper) to ensure quality and correctness; however, bugs or issues may still
       be present. If you encounter a problem, please report it via{' '}
-      <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">GitHub Issues</a>
+      <a
+        href="https://github.com/WxboySuper/Graphical-Forecast-Creator/issues"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline transition-colors hover:text-foreground"
+      >
+        GitHub Issues
+      </a>
       {' '}or the{' '}
-      <a href="https://discord.gg/SGk37rg8sz" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">GFC Support Discord</a>.
+      <a
+        href="https://discord.gg/SGk37rg8sz"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline transition-colors hover:text-foreground"
+      >
+        GFC Support Discord
+      </a>
+      .
     </p>
   </div>
 );
 
-/** Main home page component showing the hero, dashboard stats, forecast grid, recent cycles, and AI disclosure. */
+/** Main home page with auth-aware landing variants and a workflow-first forecast layout. */
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { addToast } = useOutletContext<PageContext>();
+  const { hostedAuthEnabled, status } = useAuth();
   const forecastCycle = useSelector(selectForecastCycle);
   const savedCycles = useSelector((state: RootState) => state.forecast.savedCycles);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
@@ -48,9 +65,15 @@ const HomePage: React.FC = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [confirmNewCycle, setConfirmNewCycle] = useState(false);
 
-  const { fileInputRef, handleFileSelect, handleOpenFilePicker, handleSave: doSave } = createFileHandlers({ addToast, dispatch, forecastCycle });
+  const { fileInputRef, handleFileSelect, handleOpenFilePicker, handleSave: doSave } = createFileHandlers({
+    addToast,
+    dispatch,
+    forecastCycle,
+  });
 
-  const stats = useMemo(() => computeHomeStats(forecastCycle, savedCycles.length), [forecastCycle, savedCycles.length]);
+  const stats = useMemo(() => computeHomeStats(forecastCycle, savedCycles), [forecastCycle, savedCycles]);
+  const formattedDate = useMemo(() => formatCycleDate(forecastCycle.cycleDate), [forecastCycle.cycleDate]);
+  const variant: HomeVariant = hostedAuthEnabled && status === 'signed_in' ? 'signed_in' : 'signed_out';
 
   /** Resets the forecast cycle, prompting for confirmation if there are unsaved changes. */
   const handleNewCycle = () => {
@@ -92,16 +115,24 @@ const HomePage: React.FC = () => {
   /** Extracts the day from the button's data attribute and starts forecast editing for that day. */
   const handleQuickStartClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const day = Number(e.currentTarget.dataset.day);
-    if (Number.isNaN(day)) return;
+    if (Number.isNaN(day)) {
+      return;
+    }
     handleQuickStart(day as DayType);
   };
 
   /** Loads a recent saved cycle from the history by its ID stored on the button's data attribute. */
   const handleLoadRecentCycleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const cycleId = e.currentTarget.dataset.cycleId;
-    if (!cycleId) return;
+    if (!cycleId) {
+      return;
+    }
+
     const cycle = savedCycles.find((item) => item.id === cycleId);
-    if (!cycle) return;
+    if (!cycle) {
+      return;
+    }
+
     dispatch(importForecastCycle(cycle.forecastCycle));
     addToast('Cycle loaded from history', 'success');
   };
@@ -116,28 +147,79 @@ const HomePage: React.FC = () => {
   /** Cancels the new cycle confirmation dialog without discarding the current cycle. */
   const handleCancelNewCycle = () => setConfirmNewCycle(false);
 
-  const formattedDate = useMemo(() => formatCycleDate(forecastCycle.cycleDate), [forecastCycle.cycleDate]);
-
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-7xl mx-auto p-8 space-y-10">
-        <HomeHero onStart={handleNavigateForecast} onWriteDiscussion={handleNavigateDiscussion} onViewAccount={handleNavigateAccount} />
-        <Dashboard stats={stats} />
-        <MainGrid
+      <div className="mx-auto max-w-7xl space-y-6 p-6 md:p-8">
+        <HomeHero
+          variant={variant}
           formattedDate={formattedDate}
-          isSaved={isSaved}
-          forecastCycle={forecastCycle}
-          stats={stats}
-          onQuickStartClick={handleQuickStartClick}
-          onNavigateForecast={handleNavigateForecast}
-          onNavigateDiscussion={handleNavigateDiscussion}
-          onNewCycle={handleNewCycle}
-          onSave={handleSave}
-          onOpenFile={openFilePicker}
+          hasSavedCycles={savedCycles.length > 0}
+          savedCyclesCount={savedCycles.length}
+          onStart={handleNavigateForecast}
+          onWriteDiscussion={handleNavigateDiscussion}
+          onViewAccount={handleNavigateAccount}
           onOpenHistory={handleOpenHistoryModal}
         />
 
-        <RecentCycles savedCycles={savedCycles} onLoad={handleLoadRecentCycleClick} onOpenHistory={handleOpenHistoryModal} />
+        {variant === 'signed_in' ? (
+          <>
+            <div className="grid items-start gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <MainGrid
+                  variant={variant}
+                  formattedDate={formattedDate}
+                  isSaved={isSaved}
+                  forecastCycle={forecastCycle}
+                  stats={stats}
+                  onQuickStartClick={handleQuickStartClick}
+                  onNavigateForecast={handleNavigateForecast}
+                  onNavigateDiscussion={handleNavigateDiscussion}
+                  onNewCycle={handleNewCycle}
+                  onSave={handleSave}
+                  onOpenFile={openFilePicker}
+                  onOpenHistory={handleOpenHistoryModal}
+                />
+              </div>
+              <RecentCycles
+                variant="compact"
+                savedCycles={savedCycles}
+                onLoad={handleLoadRecentCycleClick}
+                onOpenHistory={handleOpenHistoryModal}
+              />
+            </div>
+
+            <Dashboard variant={variant} stats={stats} />
+          </>
+        ) : (
+          <>
+            <div className="grid items-stretch gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <MainGrid
+                  variant={variant}
+                  formattedDate={formattedDate}
+                  isSaved={isSaved}
+                  forecastCycle={forecastCycle}
+                  stats={stats}
+                  onQuickStartClick={handleQuickStartClick}
+                  onNavigateForecast={handleNavigateForecast}
+                  onNavigateDiscussion={handleNavigateDiscussion}
+                  onNewCycle={handleNewCycle}
+                  onSave={handleSave}
+                  onOpenFile={openFilePicker}
+                  onOpenHistory={handleOpenHistoryModal}
+                />
+              </div>
+              <Dashboard variant={variant} stats={stats} />
+            </div>
+
+            <RecentCycles
+              variant="section"
+              savedCycles={savedCycles}
+              onLoad={handleLoadRecentCycleClick}
+              onOpenHistory={handleOpenHistoryModal}
+            />
+          </>
+        )}
 
         <AIDisclosure />
       </div>
@@ -145,7 +227,14 @@ const HomePage: React.FC = () => {
       <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" />
 
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
-      <ConfirmationModal isOpen={confirmNewCycle} title="Start New Cycle" message="You have unsaved changes. Start a new cycle anyway?" onConfirm={handleConfirmNewCycle} onCancel={handleCancelNewCycle} confirmLabel="Start New Cycle" />
+      <ConfirmationModal
+        isOpen={confirmNewCycle}
+        title="Start New Cycle"
+        message="You have unsaved changes. Start a new cycle anyway?"
+        onConfirm={handleConfirmNewCycle}
+        onCancel={handleCancelNewCycle}
+        confirmLabel="Start New Cycle"
+      />
     </div>
   );
 };
