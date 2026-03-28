@@ -1,12 +1,10 @@
 /// <reference types="vite/client" />
 
 declare const __GFC_COMING_SOON__: boolean;
-declare const __GFC_FIREBASE_CONFIG__: {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  appId: string;
-};
+declare const __GFC_FIREBASE_API_KEY__: string;
+declare const __GFC_FIREBASE_AUTH_DOMAIN__: string;
+declare const __GFC_FIREBASE_PROJECT_ID__: string;
+declare const __GFC_FIREBASE_APP_ID__: string;
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string;
@@ -21,12 +19,10 @@ interface ImportMeta {
 
 declare global {
   var __GFC_COMING_SOON__: boolean;
-  var __GFC_FIREBASE_CONFIG__: {
-    apiKey: string;
-    authDomain: string;
-    projectId: string;
-    appId: string;
-  };
+  var __GFC_FIREBASE_API_KEY__: string;
+  var __GFC_FIREBASE_AUTH_DOMAIN__: string;
+  var __GFC_FIREBASE_PROJECT_ID__: string;
+  var __GFC_FIREBASE_APP_ID__: string;
 }
 
 export {};

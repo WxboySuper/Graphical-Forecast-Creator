@@ -1,33 +1,162 @@
 import React from 'react';
-import { Card } from '../../components/ui/card';
 import { History } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import type { SavedCycle } from '../../store/forecastSlice';
 
-/** Displays the most recently saved forecast cycles as a card grid with a load button per cycle. */
-export const RecentCycles: React.FC<{ savedCycles: SavedCycle[]; onLoad: (e: React.MouseEvent<HTMLButtonElement>) => void; onOpenHistory: () => void; }> = ({ savedCycles, onLoad, onOpenHistory }) => {
-  if (!savedCycles || savedCycles.length === 0) return null;
-  return (
-    <Card className="p-6 bg-card border-border">
-      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-        <History className="h-5 w-5 text-btn-cycle" />
-        Recent Saved Cycles
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {savedCycles.slice(0,6).map((cycle) => (
-          <button key={cycle.id} className="p-4 bg-muted/30 rounded-lg border border-border hover:border-primary hover:shadow-md transition-all text-left" data-cycle-id={cycle.id} onClick={onLoad}>
-            <div className="flex items-start justify-between mb-2">
-              <p className="font-medium text-foreground">{cycle.cycleDate}</p>
-              {cycle.label && (<span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">{cycle.label}</span>)}
-            </div>
-            <p className="text-xs text-muted-foreground">{new Date(cycle.timestamp).toLocaleString()}</p>
-          </button>
+interface Props {
+  savedCycles: SavedCycle[];
+  onLoad: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenHistory: () => void;
+  variant?: 'compact' | 'section';
+}
+
+interface RecentCyclesContentProps {
+  savedCycles: SavedCycle[];
+  onLoad: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenHistory: () => void;
+}
+
+/** Formats saved-cycle timestamps consistently for the home page. */
+const formatSavedCycleTime = (timestamp: string): string => new Date(timestamp).toLocaleString();
+
+/** True when there are no saved cycles to display. */
+const hasNoSavedCycles = (savedCycles: SavedCycle[]): boolean => savedCycles.length === 0;
+
+/** Card row used in the compact recent-cycles sidebar. */
+const CompactCycleRow: React.FC<{
+  cycle: SavedCycle;
+  onLoad: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ cycle, onLoad }) => (
+  <button
+    data-cycle-id={cycle.id}
+    onClick={onLoad}
+    className="w-full rounded-2xl border border-border/80 bg-muted/20 px-4 py-4 text-left transition-all hover:border-primary hover:shadow-sm"
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div className="space-y-1">
+        <p className="font-medium text-foreground">{cycle.cycleDate}</p>
+        <p className="text-xs text-muted-foreground">{formatSavedCycleTime(cycle.timestamp)}</p>
+      </div>
+      <span className="text-xs font-medium text-primary">Resume</span>
+    </div>
+    {cycle.label ? <p className="mt-3 text-sm text-muted-foreground">{cycle.label}</p> : null}
+  </button>
+);
+
+/** Card tile used by the wider recent-cycles section for signed-out or shared local history. */
+const SectionCycleTile: React.FC<{
+  cycle: SavedCycle;
+  onLoad: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ cycle, onLoad }) => (
+  <button
+    data-cycle-id={cycle.id}
+    onClick={onLoad}
+    className="rounded-2xl border border-border/80 bg-muted/20 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-sm"
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div className="space-y-1">
+        <p className="font-medium text-foreground">{cycle.cycleDate}</p>
+        <p className="text-xs text-muted-foreground">{formatSavedCycleTime(cycle.timestamp)}</p>
+      </div>
+      {cycle.label ? (
+        <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+          {cycle.label}
+        </span>
+      ) : null}
+    </div>
+  </button>
+);
+
+/** Empty-state card for signed-in users who have not saved any cycles yet. */
+const EmptyRecentCyclesCard: React.FC = () => (
+  <Card className="border-border/80 bg-card/95 shadow-sm">
+    <CardHeader className="space-y-2">
+      <CardTitle className="text-xl">Recent Cycles</CardTitle>
+      <CardDescription>Saved local packages will show up here once you start building a forecast cycle.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Start on the current cycle card, then save locally whenever you want a package ready to reopen later.
+      </p>
+    </CardContent>
+  </Card>
+);
+
+/** Compact recent-cycle sidebar used on the signed-in landing page. */
+const CompactRecentCycles: React.FC<RecentCyclesContentProps> = ({
+  savedCycles,
+  onLoad,
+  onOpenHistory,
+}) => (
+  <Card className="border-border/80 bg-card/95 shadow-sm">
+    <CardHeader className="space-y-2">
+      <CardTitle className="text-xl">Recent Cycles</CardTitle>
+      <CardDescription>Jump back into a saved package without leaving the landing page.</CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      {savedCycles.slice(0, 4).map((cycle) => (
+        <CompactCycleRow key={cycle.id} cycle={cycle} onLoad={onLoad} />
+      ))}
+
+      <Button variant="outline" className="w-full" onClick={onOpenHistory}>
+        View Full History
+      </Button>
+    </CardContent>
+  </Card>
+);
+
+/** Wider recent-cycle section used lower on the signed-out landing page. */
+const SectionRecentCycles: React.FC<RecentCyclesContentProps> = ({
+  savedCycles,
+  onLoad,
+  onOpenHistory,
+}) => (
+  <Card className="border-border/80 bg-card/95 shadow-sm">
+    <CardHeader className="space-y-2">
+      <CardTitle className="flex items-center gap-2 text-2xl">
+        <History className="h-5 w-5 text-primary" />
+        Recent Local Cycles
+      </CardTitle>
+      <CardDescription>
+        Saved packages stay easy to reopen, which makes it simpler to compare setups or continue older work.
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {savedCycles.slice(0, 6).map((cycle) => (
+          <SectionCycleTile key={cycle.id} cycle={cycle} onLoad={onLoad} />
         ))}
       </div>
-      {savedCycles.length > 6 && (
-        <Button variant="outline" className="w-full mt-4" onClick={onOpenHistory}>View All {savedCycles.length} Cycles</Button>
-      )}
-    </Card>
+
+      {savedCycles.length > 6 ? (
+        <Button variant="outline" className="w-full" onClick={onOpenHistory}>
+          View All {savedCycles.length} Cycles
+        </Button>
+      ) : null}
+    </CardContent>
+  </Card>
+);
+
+/** Returns the right empty-state behavior for the current recent-cycle variant. */
+const renderEmptyRecentCycles = (variant: Props['variant']) =>
+  variant === 'compact' ? <EmptyRecentCyclesCard /> : null;
+
+/** Recent cycle list, shown as either a prominent section or a compact resume sidebar. */
+export const RecentCycles: React.FC<Props> = ({
+  savedCycles,
+  onLoad,
+  onOpenHistory,
+  variant = 'section',
+}) => {
+  if (hasNoSavedCycles(savedCycles)) {
+    return renderEmptyRecentCycles(variant);
+  }
+
+  return variant === 'compact' ? (
+    <CompactRecentCycles savedCycles={savedCycles} onLoad={onLoad} onOpenHistory={onOpenHistory} />
+  ) : (
+    <SectionRecentCycles savedCycles={savedCycles} onLoad={onLoad} onOpenHistory={onOpenHistory} />
   );
 };
 

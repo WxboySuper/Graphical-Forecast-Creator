@@ -155,6 +155,15 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
   };
 };
 
+/** Creates a deep forecast-cycle clone while preserving Map-backed outlook data. */
+export const cloneForecastCycle = (forecastCycle: ForecastCycle): ForecastCycle =>
+  deserializeForecast(
+    serializeForecast(forecastCycle, {
+      center: [0, 0],
+      zoom: 0,
+    })
+  );
+
 /**
  * Validates that the input data conforms to the GFCForecastSaveData schema.
  */
