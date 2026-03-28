@@ -7,12 +7,10 @@ import { TextDecoder, TextEncoder } from 'util';
 
 const globalScope = globalThis as typeof globalThis & {
   __GFC_COMING_SOON__?: boolean;
-  __GFC_FIREBASE_CONFIG__?: {
-    apiKey?: string;
-    authDomain?: string;
-    projectId?: string;
-    appId?: string;
-  };
+  __GFC_FIREBASE_API_KEY__?: string;
+  __GFC_FIREBASE_AUTH_DOMAIN__?: string;
+  __GFC_FIREBASE_PROJECT_ID__?: string;
+  __GFC_FIREBASE_APP_ID__?: string;
   Headers?: typeof Headers;
   Request?: typeof Request;
   Response?: typeof Response;
@@ -30,14 +28,10 @@ if (typeof globalScope.__GFC_COMING_SOON__ === 'undefined') {
   globalScope.__GFC_COMING_SOON__ = false;
 }
 
-if (typeof globalScope.__GFC_FIREBASE_CONFIG__ === 'undefined') {
-  globalScope.__GFC_FIREBASE_CONFIG__ = {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    appId: '',
-  };
-}
+if (typeof globalScope.__GFC_FIREBASE_API_KEY__ === 'undefined') globalScope.__GFC_FIREBASE_API_KEY__ = '';
+if (typeof globalScope.__GFC_FIREBASE_AUTH_DOMAIN__ === 'undefined') globalScope.__GFC_FIREBASE_AUTH_DOMAIN__ = '';
+if (typeof globalScope.__GFC_FIREBASE_PROJECT_ID__ === 'undefined') globalScope.__GFC_FIREBASE_PROJECT_ID__ = '';
+if (typeof globalScope.__GFC_FIREBASE_APP_ID__ === 'undefined') globalScope.__GFC_FIREBASE_APP_ID__ = '';
 
 if (typeof globalScope.Headers === 'undefined') {
   globalScope.Headers =

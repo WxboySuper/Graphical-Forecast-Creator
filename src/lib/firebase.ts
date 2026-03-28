@@ -10,10 +10,10 @@ interface FirebaseClientConfig {
 }
 
 const firebaseClientConfig: FirebaseClientConfig = {
-  apiKey: __GFC_FIREBASE_CONFIG__.apiKey ?? '',
-  authDomain: __GFC_FIREBASE_CONFIG__.authDomain ?? '',
-  projectId: __GFC_FIREBASE_CONFIG__.projectId ?? '',
-  appId: __GFC_FIREBASE_CONFIG__.appId ?? '',
+  apiKey: __GFC_FIREBASE_API_KEY__ ?? '',
+  authDomain: __GFC_FIREBASE_AUTH_DOMAIN__ ?? '',
+  projectId: __GFC_FIREBASE_PROJECT_ID__ ?? '',
+  appId: __GFC_FIREBASE_APP_ID__ ?? '',
 };
 
 /** True when the hosted auth configuration required for Firebase sign-in is present. */

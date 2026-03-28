@@ -152,8 +152,31 @@ const HeroSummaryCard: React.FC<{
   );
 };
 
-/** Forecast-oriented landing-page hero with tailored copy for signed-in and signed-out users. */
-export const HomeHero: React.FC<Props> = ({
+/** Shared card shell that preserves the current home-hero look while reducing JSX depth in the main component. */
+const HeroShell: React.FC<{
+  variant: HomeVariant;
+  children: React.ReactNode;
+}> = ({ variant, children }) => (
+  <div
+    className={`relative overflow-hidden rounded-[2rem] border border-primary/20 bg-gradient-to-br from-primary/12 via-background to-background ${
+      variant === 'signed_in' ? 'p-8 md:px-12 md:py-12' : 'p-8 md:p-12'
+    }`}
+  >
+    <HeroBackdrop />
+    {children}
+  </div>
+);
+
+/** Shared decorative background shapes for the home hero card. */
+const HeroBackdrop: React.FC = () => (
+  <>
+    <div className="absolute -top-16 -right-12 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+    <div className="absolute -bottom-16 -left-10 h-56 w-56 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
+  </>
+);
+
+/** Main left-hand content stack for the home hero. */
+const HeroMainContent: React.FC<Props> = ({
   variant,
   formattedDate,
   hasSavedCycles,
@@ -166,51 +189,69 @@ export const HomeHero: React.FC<Props> = ({
   const copy = getHeroCopy(variant);
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-[2rem] border border-primary/20 bg-gradient-to-br from-primary/12 via-background to-background ${
-        variant === 'signed_in' ? 'p-8 md:px-12 md:py-12' : 'p-8 md:p-12'
-      }`}
-    >
-      <div className="absolute -top-16 -right-12 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-16 -left-10 h-56 w-56 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
+    <div className="space-y-10 py-2 lg:col-span-2 lg:pr-6 lg:py-4">
+      <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+        <Map className="h-4 w-4" />
+        {copy.eyebrow}
+      </div>
 
-      <div className="relative grid gap-8 lg:grid-cols-3 lg:items-start lg:gap-10">
-        <div className="space-y-10 py-2 lg:col-span-2 lg:pr-6 lg:py-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-            <Map className="h-4 w-4" />
-            {copy.eyebrow}
-          </div>
-
-          <div className="space-y-8">
-            <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-foreground md:text-5xl">
-              {copy.title}
-            </h1>
-            <div className="pt-1">
-              <p className="max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
-                {copy.description}
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-3">
-            <HeroActions
-              variant={variant}
-              formattedDate={formattedDate}
-              hasSavedCycles={hasSavedCycles}
-              savedCyclesCount={savedCyclesCount}
-              onStart={onStart}
-              onWriteDiscussion={onWriteDiscussion}
-              onViewAccount={onViewAccount}
-              onOpenHistory={onOpenHistory}
-            />
-          </div>
+      <div className="space-y-8">
+        <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-foreground md:text-5xl">
+          {copy.title}
+        </h1>
+        <div className="pt-1">
+          <p className="max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
+            {copy.description}
+          </p>
         </div>
+      </div>
+
+      <div className="pt-3">
+        <HeroActions
+          variant={variant}
+          formattedDate={formattedDate}
+          hasSavedCycles={hasSavedCycles}
+          savedCyclesCount={savedCyclesCount}
+          onStart={onStart}
+          onWriteDiscussion={onWriteDiscussion}
+          onViewAccount={onViewAccount}
+          onOpenHistory={onOpenHistory}
+        />
+      </div>
+    </div>
+  );
+};
+
+/** Forecast-oriented landing-page hero with tailored copy for signed-in and signed-out users. */
+export const HomeHero: React.FC<Props> = ({
+  variant,
+  formattedDate,
+  hasSavedCycles,
+  savedCyclesCount,
+  onStart,
+  onWriteDiscussion,
+  onViewAccount,
+  onOpenHistory,
+}) => {
+  return (
+    <HeroShell variant={variant}>
+      <div className="relative grid gap-8 lg:grid-cols-3 lg:items-start lg:gap-10">
+        <HeroMainContent
+          variant={variant}
+          formattedDate={formattedDate}
+          hasSavedCycles={hasSavedCycles}
+          savedCyclesCount={savedCyclesCount}
+          onStart={onStart}
+          onWriteDiscussion={onWriteDiscussion}
+          onViewAccount={onViewAccount}
+          onOpenHistory={onOpenHistory}
+        />
 
         <div className="lg:pt-2">
           <HeroSummaryCard variant={variant} formattedDate={formattedDate} savedCyclesCount={savedCyclesCount} />
         </div>
       </div>
-    </div>
+    </HeroShell>
   );
 };
 

@@ -1,35 +1,6 @@
-import type { Feature } from 'geojson';
 import type { ForecastCycle, OutlookDay, DayType } from '../types/outlooks';
 import type { SavedCycle } from '../store/forecastSlice';
-
-/** Counts how many forecast days inside a cycle actually contain outlook data. */
-const countForecastDays = (forecastCycle: ForecastCycle): number => {
-  let totalForecastDays = 0;
-
-  (Object.values(forecastCycle.days) as (OutlookDay | undefined)[]).forEach((dayData) => {
-    let dayHasData = false;
-
-    if (!dayData) {
-      return;
-    }
-
-    if (dayData.metadata?.lowProbabilityOutlooks && dayData.metadata.lowProbabilityOutlooks.length > 0) {
-      dayHasData = true;
-    }
-
-    (Object.values(dayData.data) as (Map<string, Feature[]> | undefined)[]).forEach((outlookMap) => {
-      if (outlookMap instanceof Map && outlookMap.size > 0) {
-        dayHasData = true;
-      }
-    });
-
-    if (dayHasData) {
-      totalForecastDays += 1;
-    }
-  });
-
-  return totalForecastDays;
-};
+import { countForecastMetrics } from '../utils/forecastMetrics';
 
 /** Calculates a local streak of consecutive saved cycle dates, ending on the newest saved date. */
 const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
@@ -44,9 +15,9 @@ const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
   let streak = 1;
 
   for (let index = 1; index < uniqueDates.length; index += 1) {
-    const previous = new Date(uniqueDates[index - 1]);
-    const current = new Date(uniqueDates[index]);
-    const diffInDays = Math.round((previous.getTime() - current.getTime()) / 86400000);
+    const previousDayIndex = getUtcDayIndex(uniqueDates[index - 1]);
+    const currentDayIndex = getUtcDayIndex(uniqueDates[index]);
+    const diffInDays = previousDayIndex - currentDayIndex;
 
     if (diffInDays !== 1) {
       break;
@@ -58,8 +29,15 @@ const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
   return streak;
 };
 
+/** Converts a YYYY-MM-DD cycle date into a stable UTC day index for day-to-day comparisons. */
+const getUtcDayIndex = (cycleDate: string): number => {
+  const [year, month, day] = cycleDate.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
 /** Aggregates outlook statistics from a forecast cycle for dashboard display. */
 export function computeHomeStats(forecastCycle: ForecastCycle, savedCycles: SavedCycle[]) {
+  const currentCycleMetrics = countForecastMetrics(forecastCycle);
   const daysWithData: DayType[] = [];
   let totalOutlooks = 0;
   let totalFeatures = 0;
@@ -95,8 +73,8 @@ export function computeHomeStats(forecastCycle: ForecastCycle, savedCycles: Save
     totalFeatures,
     savedCyclesCount: savedCycles.length,
     totalForecastsMade: savedCycles.reduce(
-      (runningTotal, cycle) => runningTotal + countForecastDays(cycle.forecastCycle),
-      countForecastDays(forecastCycle)
+      (runningTotal, cycle) => runningTotal + cycle.stats.forecastDays,
+      currentCycleMetrics.forecastDays
     ),
     totalCyclesMade: savedCycles.length,
     forecastStreak: computeSavedCycleStreak(savedCycles),

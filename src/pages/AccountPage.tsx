@@ -52,28 +52,42 @@ const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode
   </>
 );
 
+/** Decorative background accents shared by the account hero. */
+const AccountHeroBackdrop: React.FC = () => (
+  <>
+    <div className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
+    <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-primary/8 blur-2xl" />
+  </>
+);
+
+/** Main content stack inside the account hero shell. */
+const AccountHeroContent: React.FC<{
+  description: string;
+  children?: React.ReactNode;
+}> = ({ description, children }) => (
+  <div className="relative">
+    <div className="space-y-4">
+      <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+        <CircleUserRound className="h-4 w-4" />
+        Account
+      </div>
+      <div className="space-y-3">
+        <h1 className="text-4xl font-extrabold tracking-tight text-foreground md:text-5xl">Account</h1>
+        <p className="max-w-3xl text-base leading-relaxed text-muted-foreground md:text-lg">{description}</p>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
 /** Shared hero used for signed-in, signed-out, and local-only account states. */
 const AccountHero: React.FC<{
   description: string;
   children?: React.ReactNode;
 }> = ({ description, children }) => (
   <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background p-8 md:p-10">
-    <div className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
-    <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-primary/8 blur-2xl" />
-
-    <div className="relative">
-      <div className="space-y-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-          <CircleUserRound className="h-4 w-4" />
-          Account
-        </div>
-        <div className="space-y-3">
-          <h1 className="text-4xl font-extrabold tracking-tight text-foreground md:text-5xl">Account</h1>
-          <p className="max-w-3xl text-base leading-relaxed text-muted-foreground md:text-lg">{description}</p>
-        </div>
-        {children}
-      </div>
-    </div>
+    <AccountHeroBackdrop />
+    <AccountHeroContent description={description}>{children}</AccountHeroContent>
   </div>
 );
 
@@ -108,6 +122,71 @@ const SummaryTile: React.FC<{ label: string; value: string }> = ({ label, value 
   </div>
 );
 
+/** Small two-column summary row for the signed-in profile card. */
+const ProfileSummaryGrid: React.FC<{
+  email: string;
+  providerLabels: string[];
+}> = ({ email, providerLabels }) => (
+  <div className="grid gap-4 md:grid-cols-2">
+    <SummaryTile label="Email" value={email} />
+    <SummaryTile
+      label="Sign-in Method"
+      value={providerLabels.length > 0 ? providerLabels.join(', ') : 'Unavailable'}
+    />
+  </div>
+);
+
+/** Editable byline section for the signed-in account card. */
+const DiscussionDefaultsSection: React.FC<{
+  defaultForecasterName: string;
+  setDefaultForecasterName: React.Dispatch<React.SetStateAction<string>>;
+}> = ({ defaultForecasterName, setDefaultForecasterName }) => (
+  <div className="rounded-2xl border border-border/80 bg-muted/20 p-5">
+    <div className="space-y-2">
+      <h2 className="text-lg font-semibold text-foreground">Discussion defaults</h2>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Set the name that should prefill the forecaster field when you write a discussion.
+      </p>
+    </div>
+
+    <div className="mt-5 space-y-3">
+      <label htmlFor="default-forecaster-name" className="text-sm font-medium text-foreground">
+        Default forecaster name
+      </label>
+      <Input
+        id="default-forecaster-name"
+        type="text"
+        value={defaultForecasterName}
+        onChange={(e) => setDefaultForecasterName(e.target.value)}
+        placeholder="Your name or preferred byline"
+        maxLength={100}
+      />
+    </div>
+  </div>
+);
+
+/** Bottom action row for saving defaults and ending the current session. */
+const SignedInActionRow: React.FC<{
+  savingDefaults: boolean;
+  saveMessage: string | null;
+  onSaveDefaults: () => void;
+  onSignOut: () => void;
+}> = ({ savingDefaults, saveMessage, onSaveDefaults, onSignOut }) => (
+  <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <Button onClick={onSaveDefaults} disabled={savingDefaults}>
+        {renderSaveDefaultsButtonLabel(savingDefaults)}
+      </Button>
+      {saveMessage ? <p className="text-sm text-muted-foreground">{saveMessage}</p> : null}
+    </div>
+
+    <Button variant="outline" onClick={onSignOut}>
+      <LogOut className="mr-2 h-4 w-4" />
+      Sign Out
+    </Button>
+  </div>
+);
+
 /** Signed-in primary card with the only profile setting exposed in Phase 2. */
 const SignedInPrimaryCard: React.FC<{
   email: string;
@@ -134,52 +213,20 @@ const SignedInPrimaryCard: React.FC<{
       <CardDescription>
         Keep your sign-in details and your default discussion byline ready wherever you open GFC.
       </CardDescription>
-      <div className="grid gap-4 md:grid-cols-2">
-        <SummaryTile label="Email" value={email} />
-        <SummaryTile
-          label="Sign-in Method"
-          value={providerLabels.length > 0 ? providerLabels.join(', ') : 'Unavailable'}
-        />
-      </div>
+      <ProfileSummaryGrid email={email} providerLabels={providerLabels} />
     </CardHeader>
 
     <CardContent className="space-y-6">
-      <div className="rounded-2xl border border-border/80 bg-muted/20 p-5">
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-foreground">Discussion defaults</h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Set the name that should prefill the forecaster field when you write a discussion.
-          </p>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          <label htmlFor="default-forecaster-name" className="text-sm font-medium text-foreground">
-            Default forecaster name
-          </label>
-          <Input
-            id="default-forecaster-name"
-            type="text"
-            value={defaultForecasterName}
-            onChange={(e) => setDefaultForecasterName(e.target.value)}
-            placeholder="Your name or preferred byline"
-            maxLength={100}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Button onClick={onSaveDefaults} disabled={savingDefaults}>
-            {renderSaveDefaultsButtonLabel(savingDefaults)}
-          </Button>
-          {saveMessage ? <p className="text-sm text-muted-foreground">{saveMessage}</p> : null}
-        </div>
-
-        <Button variant="outline" onClick={onSignOut}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </Button>
-      </div>
+      <DiscussionDefaultsSection
+        defaultForecasterName={defaultForecasterName}
+        setDefaultForecasterName={setDefaultForecasterName}
+      />
+      <SignedInActionRow
+        savingDefaults={savingDefaults}
+        saveMessage={saveMessage}
+        onSaveDefaults={onSaveDefaults}
+        onSignOut={onSignOut}
+      />
     </CardContent>
   </Card>
 );
@@ -450,6 +497,27 @@ const SignedOutSupportCard: React.FC = () => (
   </Card>
 );
 
+/** Shared local-only card body used when hosted accounts are disabled. */
+const LocalOnlyCard: React.FC = () => (
+  <Card className="border-border/80 bg-card/95 shadow-sm">
+    <CardHeader className="space-y-2">
+      <CardTitle className="text-2xl">Local-only mode</CardTitle>
+      <CardDescription>
+        Hosted accounts are turned off here, but the full local forecasting workflow is still ready to go.
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        Forecast drawing, discussions, verification, imports, exports, and local history keep working exactly as
+        expected.
+      </p>
+      <Button asChild variant="outline">
+        <Link to="/">Back to Home</Link>
+      </Button>
+    </CardContent>
+  </Card>
+);
+
 /** Signed-out account experience focused on a clean auth flow plus one concise reassurance card. */
 const SignedOutAccountView: React.FC = () => {
   const { signInWithEmail, signInWithGoogle, signUpWithEmail, error, status } = useAuth();
@@ -548,24 +616,7 @@ const SignedOutAccountView: React.FC = () => {
 const DisabledStateView: React.FC = () => (
   <div className="space-y-8">
     <AccountHero description="This deployment is running in local-only mode. You can still use every core GFC workflow without signing in." />
-
-    <Card className="border-border/80 bg-card/95 shadow-sm">
-      <CardHeader className="space-y-2">
-        <CardTitle className="text-2xl">Local-only mode</CardTitle>
-        <CardDescription>
-          Hosted accounts are turned off here, but the full local forecasting workflow is still ready to go.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Forecast drawing, discussions, verification, imports, exports, and local history keep working exactly as
-          expected.
-        </p>
-        <Button asChild variant="outline">
-          <Link to="/">Back to Home</Link>
-        </Button>
-      </CardContent>
-    </Card>
+    <LocalOnlyCard />
   </div>
 );
 

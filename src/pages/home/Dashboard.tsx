@@ -1,6 +1,6 @@
 import React from 'react';
-import { CalendarDays, Layers3, Route, ShieldCheck } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { CalendarDays, Layers3, Route } from 'lucide-react';
+import { Card, CardContent } from '../../components/ui/card';
 import type { DayType } from '../../types/outlooks';
 import type { HomeVariant } from './HomeHero';
 
@@ -36,6 +36,23 @@ const SnapshotCard: React.FC<{
   </Card>
 );
 
+/** One numbered getting-started step inside the signed-out sidebar. */
+const GettingStartedStep: React.FC<{
+  step: string;
+  title: string;
+  copy: string;
+}> = ({ step, title, copy }) => (
+  <div className="flex gap-4 rounded-2xl border border-border/80 bg-muted/20 p-4">
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+      {step}
+    </div>
+    <div className="space-y-1">
+      <h3 className="font-medium text-foreground">{title}</h3>
+      <p className="text-sm leading-relaxed text-muted-foreground">{copy}</p>
+    </div>
+  </div>
+);
+
 /** Dedicated getting-started guidance for first-time or signed-out users. */
 const GettingStartedPanel: React.FC = () => (
   <section className="space-y-4">
@@ -64,16 +81,8 @@ const GettingStartedPanel: React.FC = () => (
           copy: 'Once the graphics are set, head into the discussion editor to build the text side of the package.',
         },
       ].map(({ step, title, copy }) => (
-        <div key={step} className="flex gap-4 rounded-2xl border border-border/80 bg-muted/20 p-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
-            {step}
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-medium text-foreground">{title}</h3>
-            <p className="text-sm leading-relaxed text-muted-foreground">{copy}</p>
-          </div>
-        </div>
-        ))}
+        <GettingStartedStep key={step} step={step} title={title} copy={copy} />
+      ))}
     </div>
   </section>
 );
@@ -99,41 +108,53 @@ const SignedInSnapshotStrip: React.FC<{ stats: Stats }> = ({ stats }) => (
   </div>
 );
 
+/** Small row inside the signed-out "At a Glance" block. */
+const AtAGlanceRow: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+  <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <span className="font-semibold text-foreground">{value}</span>
+  </div>
+);
+
+/** Lower stats panel for signed-out users. */
+const AtAGlancePanel: React.FC<{ stats: Stats }> = ({ stats }) => (
+  <div className="rounded-2xl border border-border/80 bg-muted/10 p-5">
+    <div className="space-y-2">
+      <h3 className="text-lg font-semibold text-foreground">At a Glance</h3>
+      <p className="text-sm text-muted-foreground">What is already in this local workspace right now.</p>
+    </div>
+    <div className="mt-4 space-y-3">
+      <AtAGlanceRow label="Days with outlooks" value={stats.daysWithData.length} />
+      <AtAGlanceRow label="Mapped outlooks" value={stats.totalOutlooks} />
+      <AtAGlanceRow label="Saved cycles" value={stats.savedCyclesCount} />
+    </div>
+  </div>
+);
+
+/** Shared body layout for the signed-out sidebar card. */
+const SignedOutSidebarContent: React.FC<{ stats: Stats }> = ({ stats }) => (
+  <CardContent className="flex h-full flex-col gap-5 p-6">
+    <GettingStartedPanel />
+    <AtAGlancePanel stats={stats} />
+    <LocalFirstPanel />
+  </CardContent>
+);
+
+/** Short reassurance block for the signed-out sidebar footer. */
+const LocalFirstPanel: React.FC = () => (
+  <div className="mt-auto rounded-2xl border border-border/80 bg-muted/10 p-5">
+    <h3 className="text-lg font-semibold text-foreground">Still Local-First</h3>
+    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+      You can start forecasting, save cycle files, and export work immediately. Accounts are optional and only add
+      convenience, not gatekeeping.
+    </p>
+  </div>
+);
+
 /** Secondary signed-out sidebar that keeps guidance and a few grounded stats close by. */
 const SignedOutSidebar: React.FC<{ stats: Stats }> = ({ stats }) => (
   <Card className="h-full border-border/80 bg-card/95 shadow-sm">
-    <CardContent className="flex h-full flex-col gap-5 p-6">
-      <GettingStartedPanel />
-
-      <div className="rounded-2xl border border-border/80 bg-muted/10 p-5">
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-foreground">At a Glance</h3>
-          <p className="text-sm text-muted-foreground">What is already in this local workspace right now.</p>
-        </div>
-        <div className="mt-4 space-y-3">
-          <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
-            <span className="text-sm text-muted-foreground">Days with outlooks</span>
-            <span className="font-semibold text-foreground">{stats.daysWithData.length}</span>
-          </div>
-          <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
-            <span className="text-sm text-muted-foreground">Mapped outlooks</span>
-            <span className="font-semibold text-foreground">{stats.totalOutlooks}</span>
-          </div>
-          <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
-            <span className="text-sm text-muted-foreground">Saved cycles</span>
-            <span className="font-semibold text-foreground">{stats.savedCyclesCount}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-auto rounded-2xl border border-border/80 bg-muted/10 p-5">
-        <h3 className="text-lg font-semibold text-foreground">Still Local-First</h3>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          You can start forecasting, save cycle files, and export work immediately. Accounts are optional and only add
-          convenience, not gatekeeping.
-        </p>
-      </div>
-    </CardContent>
+    <SignedOutSidebarContent stats={stats} />
   </Card>
 );
 

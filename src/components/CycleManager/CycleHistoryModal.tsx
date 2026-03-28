@@ -174,6 +174,10 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   };
 
   const getDaySummary = (cycle: SavedCycle) => {
+    if (typeof cycle.stats?.forecastDays === 'number') {
+      return cycle.stats.forecastDays > 0 ? `${cycle.stats.forecastDays} forecast day${cycle.stats.forecastDays === 1 ? '' : 's'}` : 'No polygons';
+    }
+
     // Extract day keys, then filter to those with any feature maps that have size > 0
     const keys = Object.keys(cycle.forecastCycle.days);
     if (keys.length === 0) return 'No data';
