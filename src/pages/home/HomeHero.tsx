@@ -152,6 +152,14 @@ const HeroSummaryCard: React.FC<{
   );
 };
 
+/** Shared decorative background shapes for the home hero card. */
+const HeroBackdrop: React.FC = () => (
+  <>
+    <div className="absolute -top-16 -right-12 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+    <div className="absolute -bottom-16 -left-10 h-56 w-56 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
+  </>
+);
+
 /** Shared card shell that preserves the current home-hero look while reducing JSX depth in the main component. */
 const HeroShell: React.FC<{
   variant: HomeVariant;
@@ -165,14 +173,6 @@ const HeroShell: React.FC<{
     <HeroBackdrop />
     {children}
   </div>
-);
-
-/** Shared decorative background shapes for the home hero card. */
-const HeroBackdrop: React.FC = () => (
-  <>
-    <div className="absolute -top-16 -right-12 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-    <div className="absolute -bottom-16 -left-10 h-56 w-56 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
-  </>
 );
 
 /** Main left-hand content stack for the home hero. */

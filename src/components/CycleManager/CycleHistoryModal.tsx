@@ -173,6 +173,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     setConfirmAction(null);
   };
 
+  /** Builds a short saved-cycle summary, preferring cached stats metadata when it is available. */
   const getDaySummary = (cycle: SavedCycle) => {
     if (typeof cycle.stats?.forecastDays === 'number') {
       return cycle.stats.forecastDays > 0 ? `${cycle.stats.forecastDays} forecast day${cycle.stats.forecastDays === 1 ? '' : 's'}` : 'No polygons';

@@ -131,15 +131,6 @@ const AtAGlancePanel: React.FC<{ stats: Stats }> = ({ stats }) => (
   </div>
 );
 
-/** Shared body layout for the signed-out sidebar card. */
-const SignedOutSidebarContent: React.FC<{ stats: Stats }> = ({ stats }) => (
-  <CardContent className="flex h-full flex-col gap-5 p-6">
-    <GettingStartedPanel />
-    <AtAGlancePanel stats={stats} />
-    <LocalFirstPanel />
-  </CardContent>
-);
-
 /** Short reassurance block for the signed-out sidebar footer. */
 const LocalFirstPanel: React.FC = () => (
   <div className="mt-auto rounded-2xl border border-border/80 bg-muted/10 p-5">
@@ -149,6 +140,15 @@ const LocalFirstPanel: React.FC = () => (
       convenience, not gatekeeping.
     </p>
   </div>
+);
+
+/** Shared body layout for the signed-out sidebar card. */
+const SignedOutSidebarContent: React.FC<{ stats: Stats }> = ({ stats }) => (
+  <CardContent className="flex h-full flex-col gap-5 p-6">
+    <GettingStartedPanel />
+    <AtAGlancePanel stats={stats} />
+    <LocalFirstPanel />
+  </CardContent>
 );
 
 /** Secondary signed-out sidebar that keeps guidance and a few grounded stats close by. */

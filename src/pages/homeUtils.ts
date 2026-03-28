@@ -2,6 +2,12 @@ import type { ForecastCycle, OutlookDay, DayType } from '../types/outlooks';
 import type { SavedCycle } from '../store/forecastSlice';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 
+/** Converts a YYYY-MM-DD cycle date into a stable UTC day index for day-to-day comparisons. */
+const getUtcDayIndex = (cycleDate: string): number => {
+  const [year, month, day] = cycleDate.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
 /** Calculates a local streak of consecutive saved cycle dates, ending on the newest saved date. */
 const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
   if (savedCycles.length === 0) {
@@ -27,12 +33,6 @@ const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
   }
 
   return streak;
-};
-
-/** Converts a YYYY-MM-DD cycle date into a stable UTC day index for day-to-day comparisons. */
-const getUtcDayIndex = (cycleDate: string): number => {
-  const [year, month, day] = cycleDate.split('-').map(Number);
-  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
 };
 
 /** Aggregates outlook statistics from a forecast cycle for dashboard display. */
