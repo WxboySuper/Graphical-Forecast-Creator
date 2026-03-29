@@ -3,6 +3,7 @@
 require('./load-env');
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 const { registerBillingRoutes } = require('./billing');
@@ -17,22 +18,22 @@ if (!fs.existsSync(LOG_DIR)) {
 }
 
 const app = express();
+const collectRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 registerBillingRoutes(app, express);
 
-app.post('/collect', express.json({ limit: '1kb' }), (req, res) => {
+app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, (req, res) => {
   // Sanitise and cap all user-controlled fields
   const page = (typeof req.body?.page === 'string' ? req.body.page : '/').slice(0, 200);
   const referrer = (typeof req.body?.referrer === 'string' ? req.body.referrer : '').slice(0, 500);
 
-  // nginx sets X-Forwarded-For to $remote_addr (trusted, since server is loopback-only)
-  const ip = ((req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '') + '')
-    .split(',')[0]
-    .trim();
-
   const entry = {
     ts: new Date().toISOString(),
-    ip,
     ua: (req.headers['user-agent'] || '').slice(0, 300),
     page,
     ref: referrer,
