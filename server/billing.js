@@ -1,16 +1,24 @@
 'use strict';
 
 const Stripe = require('stripe');
+const rateLimit = require('express-rate-limit');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 
 let stripeClient = null;
-const routeRateLimitBuckets = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMITS = {
-  checkout: { maxRequests: 5, windowMs: RATE_LIMIT_WINDOW_MS },
-  portal: { maxRequests: 10, windowMs: RATE_LIMIT_WINDOW_MS },
-};
+const createBillingRateLimitMiddleware = (max) =>
+  rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many billing requests right now. Please wait a moment and try again.' },
+  });
+
+const checkoutRateLimit = createBillingRateLimitMiddleware(5);
+const portalRateLimit = createBillingRateLimitMiddleware(10);
+const webhookRateLimit = createBillingRateLimitMiddleware(100);
 
 /** Returns the Stripe SDK client when the current deployment is configured for billing. */
 const getStripeClient = () => {
@@ -37,62 +45,6 @@ const redactIdentifier = (value) => {
 /** Returns a Stripe-compatible customer email only when the decoded token actually includes one. */
 const getCheckoutCustomerEmail = (decodedToken) =>
   typeof decodedToken.email === 'string' && decodedToken.email.trim() ? decodedToken.email : undefined;
-
-/** Returns the client IP the server should use for lightweight route-level rate limiting. */
-const getClientIp = (req) =>
-  String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim() || 'unknown';
-
-/** Removes stale rate-limit entries so the in-memory map stays bounded over time. */
-const pruneExpiredRateLimitEntries = (now) => {
-  routeRateLimitBuckets.forEach((bucket, key) => {
-    if (bucket.resetAt <= now) {
-      routeRateLimitBuckets.delete(key);
-    }
-  });
-};
-
-/** Builds the per-route rate-limit key for the current request. */
-const getRateLimitKey = (routeName, req) => `${routeName}:${getClientIp(req)}`;
-
-/** Enforces a lightweight per-IP rate limit on sensitive billing routes. */
-const applyRouteRateLimit = (routeName, req, res) => {
-  const limit = RATE_LIMITS[routeName];
-  if (!limit) {
-    return true;
-  }
-
-  const now = Date.now();
-  pruneExpiredRateLimitEntries(now);
-
-  const key = getRateLimitKey(routeName, req);
-  const bucket = routeRateLimitBuckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    routeRateLimitBuckets.set(key, {
-      count: 1,
-      resetAt: now + limit.windowMs,
-    });
-    return true;
-  }
-
-  if (bucket.count >= limit.maxRequests) {
-    const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
-    res.set('Retry-After', `${retryAfterSeconds}`);
-    res.status(429).json({ error: 'Too many billing requests right now. Please wait a moment and try again.' });
-    return false;
-  }
-
-  bucket.count += 1;
-  return true;
-};
-
-/** Express middleware wrapper for per-route billing rate limiting. */
-const createBillingRateLimitMiddleware = (routeName) => (req, res, next) => {
-  if (!applyRouteRateLimit(routeName, req, res)) {
-    return;
-  }
-
-  next();
-};
 
 /** True when the user should retain premium access from Stripe state alone. */
 const isStripePremiumStatus = (billingStatus) => billingStatus === 'active' || billingStatus === 'trialing';
@@ -512,11 +464,16 @@ const wrapBillingJsonRoute = ({ handler, fallbackMessage }) => async (req, res) 
 /** Registers the billing endpoints on the existing hosted-service Express app. */
 const registerBillingRoutes = (app, express) => {
   app.get('/api/billing/config', handleBillingConfig);
-  app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleBillingWebhook);
+  app.post(
+    '/api/billing/webhook',
+    webhookRateLimit,
+    express.raw({ type: 'application/json' }),
+    handleBillingWebhook
+  );
   app.post(
     '/api/billing/checkout',
+    checkoutRateLimit,
     express.json({ limit: '8kb' }),
-    createBillingRateLimitMiddleware('checkout'),
     wrapBillingJsonRoute({
       handler: handleCheckout,
       fallbackMessage: 'Unable to create checkout session.',
@@ -524,8 +481,8 @@ const registerBillingRoutes = (app, express) => {
   );
   app.post(
     '/api/billing/portal',
+    portalRateLimit,
     express.json({ limit: '8kb' }),
-    createBillingRateLimitMiddleware('portal'),
     wrapBillingJsonRoute({
       handler: handleBillingPortal,
       fallbackMessage: 'Unable to open the billing portal.',
