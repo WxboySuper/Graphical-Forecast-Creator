@@ -7,6 +7,7 @@ const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require(
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+/** Creates a standard billing rate-limit middleware with the given request cap. */
 const createBillingRateLimitMiddleware = (max) =>
   rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
