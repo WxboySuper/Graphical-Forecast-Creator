@@ -3,6 +3,7 @@
 const Stripe = require('stripe');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
+const rateLimit = require('express-rate-limit');
 
 let stripeClient = null;
 const routeRateLimitBuckets = new Map();
@@ -10,6 +11,32 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMITS = {
   checkout: { maxRequests: 5, windowMs: RATE_LIMIT_WINDOW_MS },
   portal: { maxRequests: 10, windowMs: RATE_LIMIT_WINDOW_MS },
+};
+
+/**
+ * Returns a rate limiting middleware for the given billing route.
+ * Uses express-rate-limit under the hood and caches limiters per route key.
+ */
+const createBillingRateLimitMiddleware = (routeKey) => {
+  if (!RATE_LIMITS[routeKey]) {
+    // If no specific config exists for this route, fall back to a sane default.
+    RATE_LIMITS[routeKey] = { maxRequests: 10, windowMs: RATE_LIMIT_WINDOW_MS };
+  }
+
+  if (routeRateLimitBuckets.has(routeKey)) {
+    return routeRateLimitBuckets.get(routeKey);
+  }
+
+  const { maxRequests, windowMs } = RATE_LIMITS[routeKey];
+  const limiter = rateLimit({
+    windowMs,
+    max: maxRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  routeRateLimitBuckets.set(routeKey, limiter);
+  return limiter;
 };
 
 /** Returns the Stripe SDK client when the current deployment is configured for billing. */
