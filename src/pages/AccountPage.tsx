@@ -100,6 +100,7 @@ const getBillingSupportCopy = (
 const getPricingButtonVariant = (premiumActive: boolean): 'outline' | 'default' =>
   premiumActive ? 'outline' : 'default';
 
+/** Returns the current plan price shown in the billing summary card. */
 const getCurrentPlanPrice = (
   premiumActive: boolean,
   planInterval: ReturnType<typeof useEntitlement>['planInterval'],
@@ -274,6 +275,91 @@ const BillingCardHeader: React.FC<{
   </CardHeader>
 );
 
+/** Small summary grid used by the billing card. */
+const BillingSummaryGrid: React.FC<{
+  billingStatus: string;
+  currentPlanPrice: string;
+}> = ({ billingStatus, currentPlanPrice }) => (
+  <div className="account-summary-grid">
+    <SummaryTile label="Billing status" value={billingStatus || 'inactive'} />
+    <SummaryTile label="Current plan price" value={currentPlanPrice} />
+  </div>
+);
+
+/** Action row for billing management and pricing navigation. */
+const BillingActionRow: React.FC<{
+  stripeCustomerId: string | null;
+  billingEnabled: boolean;
+  openingPortal: boolean;
+  premiumActive: boolean;
+  onOpenPortal: () => void;
+}> = ({ stripeCustomerId, billingEnabled, openingPortal, premiumActive, onOpenPortal }) => (
+  <div className="account-button-row">
+    {stripeCustomerId && billingEnabled ? (
+      <Button variant="outline" onClick={onOpenPortal} disabled={openingPortal}>
+        {openingPortal ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Manage Subscription
+      </Button>
+    ) : null}
+
+    <Button asChild variant={getPricingButtonVariant(premiumActive)}>
+      <Link to="/pricing">
+        <Crown className="mr-2 h-4 w-4" />
+        View Pricing
+      </Link>
+    </Button>
+  </div>
+);
+
+/** Supporting helper text and error state inside the billing card body. */
+const BillingCardMessages: React.FC<{
+  supportCopy: string | null;
+  portalMessage: string | null;
+  error: string | null;
+}> = ({ supportCopy, portalMessage, error }) => (
+  <>
+    {supportCopy ? <p className="text-sm text-muted-foreground">{supportCopy}</p> : null}
+    {portalMessage || error ? <p className="text-sm text-destructive">{portalMessage ?? error}</p> : null}
+  </>
+);
+
+/** Main billing card content so the top-level card tree stays flatter. */
+const BillingCardContent: React.FC<{
+  billingStatus: string;
+  currentPlanPrice: string;
+  supportCopy: string | null;
+  portalMessage: string | null;
+  error: string | null;
+  stripeCustomerId: string | null;
+  billingEnabled: boolean;
+  openingPortal: boolean;
+  premiumActive: boolean;
+  onOpenPortal: () => void;
+}> = ({
+  billingStatus,
+  currentPlanPrice,
+  supportCopy,
+  portalMessage,
+  error,
+  stripeCustomerId,
+  billingEnabled,
+  openingPortal,
+  premiumActive,
+  onOpenPortal,
+}) => (
+  <CardContent className="account-section-content">
+    <BillingSummaryGrid billingStatus={billingStatus} currentPlanPrice={currentPlanPrice} />
+    <BillingCardMessages supportCopy={supportCopy} portalMessage={portalMessage} error={error} />
+    <BillingActionRow
+      stripeCustomerId={stripeCustomerId}
+      billingEnabled={billingEnabled}
+      openingPortal={openingPortal}
+      premiumActive={premiumActive}
+      onOpenPortal={onOpenPortal}
+    />
+  </CardContent>
+);
+
 /** Billing summary card for Phase 3 subscription state and management. */
 const BillingCard: React.FC = () => {
   const {
@@ -320,32 +406,18 @@ const BillingCard: React.FC = () => {
   return (
     <Card className="account-surface-card">
       <BillingCardHeader premiumActive={premiumActive} planLabel={planLabel} />
-      <CardContent className="account-section-content">
-        <div className="account-summary-grid">
-          <SummaryTile label="Billing status" value={billingStatus || 'inactive'} />
-          <SummaryTile label="Current plan price" value={currentPlanPrice} />
-        </div>
-
-        {supportCopy ? <p className="text-sm text-muted-foreground">{supportCopy}</p> : null}
-
-        <div className="account-button-row">
-          {stripeCustomerId && billingEnabled ? (
-            <Button variant="outline" onClick={handleOpenPortalClick} disabled={openingPortal}>
-              {openingPortal ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Manage Subscription
-            </Button>
-          ) : null}
-
-          <Button asChild variant={getPricingButtonVariant(premiumActive)}>
-            <Link to="/pricing">
-              <Crown className="mr-2 h-4 w-4" />
-              View Pricing
-            </Link>
-          </Button>
-        </div>
-
-        {portalMessage || error ? <p className="text-sm text-destructive">{portalMessage ?? error}</p> : null}
-      </CardContent>
+      <BillingCardContent
+        billingStatus={billingStatus}
+        currentPlanPrice={currentPlanPrice}
+        supportCopy={supportCopy}
+        portalMessage={portalMessage}
+        error={error}
+        stripeCustomerId={stripeCustomerId}
+        billingEnabled={billingEnabled}
+        openingPortal={openingPortal}
+        premiumActive={premiumActive}
+        onOpenPortal={handleOpenPortalClick}
+      />
     </Card>
   );
 };

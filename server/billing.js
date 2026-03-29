@@ -40,7 +40,7 @@ const getCheckoutCustomerEmail = (decodedToken) =>
 
 /** Returns the client IP the server should use for lightweight route-level rate limiting. */
 const getClientIp = (req) =>
-  ((req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '') + '').split(',')[0].trim() || 'unknown';
+  String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim() || 'unknown';
 
 /** Removes stale rate-limit entries so the in-memory map stays bounded over time. */
 const pruneExpiredRateLimitEntries = (now) => {
@@ -85,6 +85,15 @@ const applyRouteRateLimit = (routeName, req, res) => {
   return true;
 };
 
+/** Express middleware wrapper for per-route billing rate limiting. */
+const createBillingRateLimitMiddleware = (routeName) => (req, res, next) => {
+  if (!applyRouteRateLimit(routeName, req, res)) {
+    return;
+  }
+
+  next();
+};
+
 /** True when the user should retain premium access from Stripe state alone. */
 const isStripePremiumStatus = (billingStatus) => billingStatus === 'active' || billingStatus === 'trialing';
 
@@ -99,6 +108,41 @@ const computeEffectiveEntitlement = (payload) => {
     premiumActive,
     effectiveSource: betaOverrideActive ? 'beta_override' : stripePremiumActive ? 'stripe' : 'none',
   };
+};
+
+/** Builds the baseline entitlement payload before incoming webhook fields are merged in. */
+const createBaseEntitlementPayload = (uid, existingData) => ({
+  uid: uid || existingData.uid || '',
+  planInterval: null,
+  billingStatus: 'inactive',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  cancelAtPeriodEnd: false,
+  currentPeriodEnd: null,
+  betaOverrideActive: Boolean(existingData.betaOverrideActive),
+  ...existingData,
+  updatedAt: new Date(),
+});
+
+/** Logs the skipped write case where no Firestore document target could be resolved. */
+const logSkippedEntitlementWrite = ({ uid, stripeCustomerId, stripeSubscriptionId }) => {
+  console.warn('[billing] writeEntitlement:skipped-no-doc-ref', {
+    uid,
+    stripeCustomerId: redactIdentifier(stripeCustomerId),
+    stripeSubscriptionId: redactIdentifier(stripeSubscriptionId),
+  });
+};
+
+/** Logs a Firestore entitlement write failure with redacted Stripe identifiers. */
+const logEntitlementWriteError = ({ uid, stripeCustomerId, stripeSubscriptionId, nextPayload, error }) => {
+  console.error('[billing] writeEntitlement:error', {
+    uid: nextPayload.uid || uid,
+    stripeCustomerId: redactIdentifier(stripeCustomerId),
+    stripeSubscriptionId: redactIdentifier(stripeSubscriptionId),
+    billingStatus: nextPayload.billingStatus,
+    planInterval: nextPayload.planInterval,
+    error: error instanceof Error ? error.message : 'Unknown Firestore write failure',
+  });
 };
 
 /** Fetches one entitlement document by UID. */
@@ -169,39 +213,19 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
 
   const existing = await getExistingEntitlementData(uid, { stripeCustomerId, stripeSubscriptionId });
   if (!existing) {
-    console.warn('[billing] writeEntitlement:skipped-no-doc-ref', {
-      uid,
-      stripeCustomerId: redactIdentifier(stripeCustomerId),
-      stripeSubscriptionId: redactIdentifier(stripeSubscriptionId),
-    });
+    logSkippedEntitlementWrite({ uid, stripeCustomerId, stripeSubscriptionId });
     return;
   }
 
   const nextPayload = computeEffectiveEntitlement({
-    uid: uid || existing.data.uid || '',
-    planInterval: null,
-    billingStatus: 'inactive',
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
-    cancelAtPeriodEnd: false,
-    currentPeriodEnd: null,
-    betaOverrideActive: Boolean(existing.data.betaOverrideActive),
-    ...existing.data,
+    ...createBaseEntitlementPayload(uid, existing.data),
     ...payload,
-    updatedAt: new Date(),
   });
 
   try {
     await existing.ref.set(nextPayload, { merge: true });
   } catch (error) {
-    console.error('[billing] writeEntitlement:error', {
-      uid: nextPayload.uid,
-      stripeCustomerId: redactIdentifier(stripeCustomerId),
-      stripeSubscriptionId: redactIdentifier(stripeSubscriptionId),
-      billingStatus: nextPayload.billingStatus,
-      planInterval: nextPayload.planInterval,
-      error: error instanceof Error ? error.message : 'Unknown Firestore write failure',
-    });
+    logEntitlementWriteError({ uid, stripeCustomerId, stripeSubscriptionId, nextPayload, error });
     throw error;
   }
 
@@ -238,10 +262,29 @@ const verifyRequestUser = async (req, res) => {
 };
 
 /** Creates the plan-specific Stripe checkout session for the verified user. */
+const isCheckoutAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.checkoutEnabled);
+
+/** Resolves the Stripe price id for the selected billing plan. */
+const getCheckoutPriceId = (plan, billingConfig) => {
+  if (plan === 'monthly') {
+    return billingConfig.monthlyPriceId;
+  }
+
+  if (plan === 'annual') {
+    return billingConfig.annualPriceId;
+  }
+
+  return '';
+};
+
+/** Builds the checkout metadata shared between the session and subscription objects. */
+const createCheckoutMetadata = (uid, plan) => ({ uid, plan });
+
+/** Creates the plan-specific Stripe checkout session for the verified user. */
 const handleCheckout = async (req, res) => {
   const billingConfig = getBillingRuntimeConfig();
   const stripe = getStripeClient();
-  if (!stripe || !billingConfig.checkoutEnabled) {
+  if (!isCheckoutAvailable(stripe, billingConfig)) {
     res.status(503).json({ error: 'Billing is not available on this deployment yet.' });
     return;
   }
@@ -252,28 +295,23 @@ const handleCheckout = async (req, res) => {
   }
 
   const plan = req.body?.plan;
-  const priceId = plan === 'monthly' ? billingConfig.monthlyPriceId : plan === 'annual' ? billingConfig.annualPriceId : '';
+  const priceId = getCheckoutPriceId(plan, billingConfig);
   if (!priceId) {
     res.status(400).json({ error: 'Invalid billing plan selected.' });
     return;
   }
 
   const baseUrl = getBaseUrl(req);
+  const metadata = createCheckoutMetadata(decodedToken.uid, plan);
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${baseUrl}/account?checkout=success`,
     cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
     ...(getCheckoutCustomerEmail(decodedToken) ? { customer_email: getCheckoutCustomerEmail(decodedToken) } : {}),
-    metadata: {
-      uid: decodedToken.uid,
-      plan,
-    },
+    metadata,
     subscription_data: {
-      metadata: {
-        uid: decodedToken.uid,
-        plan,
-      },
+      metadata,
     },
   });
 
@@ -315,57 +353,86 @@ const getPlanInterval = (interval) => (interval === 'year' ? 'annual' : 'monthly
 const getInvoiceUid = (invoice) =>
   invoice.parent?.subscription_details?.metadata?.uid || invoice.subscription_details?.metadata?.uid || '';
 
-/** Applies the checkout-complete event to the entitlement document. */
-const handleCheckoutSessionCompleted = async (session) => {
-  await writeEntitlement({
-    uid: session.metadata?.uid || '',
-    stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
-    stripeSubscriptionId: typeof session.subscription === 'string' ? session.subscription : null,
+/** Normalizes a Stripe API customer id into a nullable string. */
+const getStripeCustomerId = (value) => (typeof value === 'string' ? value : null);
+
+/** Normalizes a Stripe API subscription id into a nullable string. */
+const getStripeSubscriptionId = (value) => (typeof value === 'string' ? value : null);
+
+/** Converts Stripe unix timestamps into nullable JS dates. */
+const getStripeDate = (value) => (value ? new Date(value * 1000) : null);
+
+/** Builds the entitlement payload for a checkout completion event. */
+const createCheckoutEntitlementWrite = (session) => {
+  const uid = session.metadata?.uid || '';
+  const stripeCustomerId = getStripeCustomerId(session.customer);
+  const stripeSubscriptionId = getStripeSubscriptionId(session.subscription);
+
+  return {
+    uid,
+    stripeCustomerId,
+    stripeSubscriptionId,
     payload: {
-      uid: session.metadata?.uid || '',
+      uid,
       planInterval: session.metadata?.plan === 'annual' ? 'annual' : 'monthly',
       billingStatus: 'active',
-      stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
-      stripeSubscriptionId: typeof session.subscription === 'string' ? session.subscription : null,
+      stripeCustomerId,
+      stripeSubscriptionId,
       cancelAtPeriodEnd: false,
       currentPeriodEnd: null,
     },
-  });
+  };
 };
 
-/** Applies the subscription lifecycle event to the entitlement document. */
-const handleSubscriptionEvent = async (subscription) => {
-  await writeEntitlement({
-    uid: subscription.metadata?.uid || '',
-    stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : null,
+/** Builds the entitlement payload for subscription lifecycle updates. */
+const createSubscriptionEntitlementWrite = (subscription) => {
+  const uid = subscription.metadata?.uid || '';
+  const stripeCustomerId = getStripeCustomerId(subscription.customer);
+
+  return {
+    uid,
+    stripeCustomerId,
     stripeSubscriptionId: subscription.id,
     payload: {
-      uid: subscription.metadata?.uid || '',
+      uid,
       planInterval: getPlanInterval(subscription.items?.data?.[0]?.price?.recurring?.interval),
       billingStatus: subscription.status || 'inactive',
-      stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : null,
+      stripeCustomerId,
       stripeSubscriptionId: subscription.id,
       cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-      currentPeriodEnd: subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : null,
+      currentPeriodEnd: getStripeDate(subscription.current_period_end),
     },
-  });
+  };
 };
 
-/** Applies invoice payment results to the entitlement document. */
-const handleInvoiceEvent = async (eventType, invoice) => {
-  await writeEntitlement({
-    uid: getInvoiceUid(invoice),
-    stripeCustomerId: typeof invoice.customer === 'string' ? invoice.customer : null,
-    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+/** Builds the entitlement payload for invoice payment events. */
+const createInvoiceEntitlementWrite = (eventType, invoice) => {
+  const uid = getInvoiceUid(invoice);
+  const stripeCustomerId = getStripeCustomerId(invoice.customer);
+  const stripeSubscriptionId = getStripeSubscriptionId(invoice.subscription);
+
+  return {
+    uid,
+    stripeCustomerId,
+    stripeSubscriptionId,
     payload: {
-      uid: getInvoiceUid(invoice),
+      uid,
       planInterval: getPlanInterval(invoice.lines?.data?.[0]?.price?.recurring?.interval),
       billingStatus: eventType === 'invoice.paid' ? 'active' : 'past_due',
-      stripeCustomerId: typeof invoice.customer === 'string' ? invoice.customer : null,
-      stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+      stripeCustomerId,
+      stripeSubscriptionId,
     },
-  });
+  };
 };
+
+/** Applies the checkout-complete event to the entitlement document. */
+const handleCheckoutSessionCompleted = async (session) => writeEntitlement(createCheckoutEntitlementWrite(session));
+
+/** Applies the subscription lifecycle event to the entitlement document. */
+const handleSubscriptionEvent = async (subscription) => writeEntitlement(createSubscriptionEntitlementWrite(subscription));
+
+/** Applies invoice payment results to the entitlement document. */
+const handleInvoiceEvent = async (eventType, invoice) => writeEntitlement(createInvoiceEntitlementWrite(eventType, invoice));
 
 const webhookHandlers = {
   'checkout.session.completed': (event) => handleCheckoutSessionCompleted(event.data.object),
@@ -428,11 +495,7 @@ const handleBillingWebhook = async (req, res) => {
 };
 
 /** Generic wrapper for billing JSON routes with shared error handling. */
-const wrapBillingJsonRoute = (handler, fallbackMessage, routeName) => async (req, res) => {
-  if (routeName && !applyRouteRateLimit(routeName, req, res)) {
-    return;
-  }
-
+const wrapBillingJsonRoute = ({ handler, fallbackMessage }) => async (req, res) => {
   try {
     await handler(req, res);
   } catch (error) {
@@ -447,12 +510,20 @@ const registerBillingRoutes = (app, express) => {
   app.post(
     '/api/billing/checkout',
     express.json({ limit: '8kb' }),
-    wrapBillingJsonRoute(handleCheckout, 'Unable to create checkout session.', 'checkout')
+    createBillingRateLimitMiddleware('checkout'),
+    wrapBillingJsonRoute({
+      handler: handleCheckout,
+      fallbackMessage: 'Unable to create checkout session.',
+    })
   );
   app.post(
     '/api/billing/portal',
     express.json({ limit: '8kb' }),
-    wrapBillingJsonRoute(handleBillingPortal, 'Unable to open the billing portal.', 'portal')
+    createBillingRateLimitMiddleware('portal'),
+    wrapBillingJsonRoute({
+      handler: handleBillingPortal,
+      fallbackMessage: 'Unable to open the billing portal.',
+    })
   );
 };
 

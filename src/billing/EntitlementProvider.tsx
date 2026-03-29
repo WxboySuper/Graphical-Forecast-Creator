@@ -71,6 +71,7 @@ const DEFAULT_ENTITLEMENT: UserEntitlementDocument = {
 };
 
 const EntitlementContext = createContext<EntitlementContextValue | null>(null);
+const VALID_EFFECTIVE_SOURCES: EffectiveSource[] = ['stripe', 'beta_override', 'none'];
 
 interface EntitlementListenerState {
   entitlement: UserEntitlementDocument;
@@ -106,13 +107,8 @@ const fetchBillingConfig = async (): Promise<BillingConfig> => {
 };
 
 /** Validates a Firestore entitlement doc before the UI trusts it. */
-const normalizeEffectiveSource = (value: unknown): EffectiveSource => {
-  if (value === 'stripe' || value === 'beta_override' || value === 'none') {
-    return value;
-  }
-
-  return 'none';
-};
+const normalizeEffectiveSource = (value: unknown): EffectiveSource =>
+  VALID_EFFECTIVE_SOURCES.includes(value as EffectiveSource) ? (value as EffectiveSource) : 'none';
 
 /** Validates a Firestore entitlement doc before the UI trusts it. */
 const normalizePlanInterval = (value: unknown): PlanInterval => {
@@ -216,6 +212,90 @@ const subscribeToEntitlements = (
 /** True when the provider should operate in hosted mode for the current render. */
 const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && db);
 
+/** Applies the loading state used while auth is still resolving. */
+const applyLoadingEntitlementState = (
+  setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>
+) => {
+  setEntitlementStatus('loading');
+};
+
+/** Returns true when auth is currently signed out from the hosted entitlement perspective. */
+const isSignedOutEntitlementState = (status: ReturnType<typeof useAuth>['status'], user: ReturnType<typeof useAuth>['user']) =>
+  status !== 'signed_in' || !user;
+
+/** Starts the signed-in entitlement subscription and returns its cleanup callback. */
+const startSignedInEntitlementSubscription = (
+  userId: string,
+  handlers: {
+    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
+    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+  }
+) => {
+  handlers.setEntitlementStatus('loading');
+  return subscribeToEntitlements(userId, handlers);
+};
+
+/** Resolves the next entitlement effect outcome for the current auth snapshot. */
+const resolveEntitlementEffect = (
+  args: {
+    hostedAuthEnabled: boolean;
+    status: ReturnType<typeof useAuth>['status'];
+    user: ReturnType<typeof useAuth>['user'];
+  },
+  handlers: {
+    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
+    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+  }
+) => {
+  if (!isHostedEntitlementMode(args.hostedAuthEnabled)) {
+    applyDisabledEntitlementState(handlers.setEntitlement, handlers.setEntitlementStatus, handlers.setError);
+    return null;
+  }
+
+  if (args.status === 'loading') {
+    applyLoadingEntitlementState(handlers.setEntitlementStatus);
+    return null;
+  }
+
+  if (isSignedOutEntitlementState(args.status, args.user)) {
+    applySignedOutEntitlementState(handlers.setEntitlement, handlers.setEntitlementStatus, handlers.setError);
+    return null;
+  }
+
+  return startSignedInEntitlementSubscription(args.user.uid, handlers);
+};
+
+/** Converts provider state into the memoized entitlement context value. */
+const createEntitlementContextValue = (args: {
+  billingConfig: BillingConfig;
+  entitlement: UserEntitlementDocument;
+  entitlementStatus: EntitlementStatus;
+  error: string | null;
+  hostedAuthEnabled: boolean;
+  openBillingPortal: () => Promise<void>;
+  openCheckout: (plan: 'monthly' | 'annual') => Promise<void>;
+}): EntitlementContextValue => ({
+  entitlementStatus: args.entitlementStatus,
+  premiumActive: args.entitlement.premiumActive,
+  planInterval: args.entitlement.planInterval,
+  billingStatus: args.entitlement.billingStatus,
+  effectiveSource: args.entitlement.effectiveSource,
+  cancelAtPeriodEnd: args.entitlement.cancelAtPeriodEnd,
+  currentPeriodEnd: args.entitlement.currentPeriodEnd?.toDate?.() ?? null,
+  stripeCustomerId: args.entitlement.stripeCustomerId,
+  betaOverrideActive: args.entitlement.betaOverrideActive,
+  checkoutEnabled: args.billingConfig.checkoutEnabled && args.hostedAuthEnabled,
+  billingEnabled: args.billingConfig.billingEnabled,
+  annualPromoActive: args.billingConfig.annualPromoActive,
+  monthlyDisplayPrice: args.billingConfig.monthlyDisplayPrice,
+  annualDisplayPrice: args.billingConfig.annualDisplayPrice,
+  error: args.error,
+  openCheckout: args.openCheckout,
+  openBillingPortal: args.openBillingPortal,
+});
+
 /** Provides one app-readable entitlement source of truth on top of auth. */
 export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { hostedAuthEnabled, status, user } = useAuth();
@@ -229,27 +309,18 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   useEffect(() => {
-    if (!isHostedEntitlementMode(hostedAuthEnabled)) {
-      applyDisabledEntitlementState(setEntitlement, setEntitlementStatus, setError);
+    const unsubscribe = resolveEntitlementEffect(
+      { hostedAuthEnabled, status, user },
+      {
+        setEntitlement,
+        setEntitlementStatus,
+        setError,
+      }
+    );
+
+    if (!unsubscribe) {
       return;
     }
-
-    if (status === 'loading') {
-      setEntitlementStatus('loading');
-      return;
-    }
-
-    if (status !== 'signed_in' || !user) {
-      applySignedOutEntitlementState(setEntitlement, setEntitlementStatus, setError);
-      return;
-    }
-
-    setEntitlementStatus('loading');
-    const unsubscribe = subscribeToEntitlements(user.uid, {
-      setEntitlement,
-      setEntitlementStatus,
-      setError,
-    });
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupEntitlementSubscription() {
@@ -257,18 +328,30 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, [hostedAuthEnabled, status, user]);
 
-  /** Starts a Stripe checkout flow for the selected billing interval. */
-  const openCheckout = useCallback(async (plan: 'monthly' | 'annual'): Promise<void> => {
+  /** Returns the current signed-in user or throws a user-facing error for billing actions. */
+  const requireBillingUser = useCallback(() => {
     if (!user) {
-      throw new Error('Sign in before starting checkout.');
+      throw new Error('Sign in before starting billing actions.');
     }
+
+    return user;
+  }, [user]);
+
+  /** Returns billing availability or throws a user-facing error for checkout attempts. */
+  const requireCheckoutEnabled = useCallback(() => {
     if (!billingConfig.checkoutEnabled) {
       throw new Error('Billing is not available on this deployment yet.');
     }
+  }, [billingConfig.checkoutEnabled]);
+
+  /** Starts a Stripe checkout flow for the selected billing interval. */
+  const openCheckout = useCallback(async (plan: 'monthly' | 'annual'): Promise<void> => {
+    const currentUser = requireBillingUser();
+    requireCheckoutEnabled();
 
     const response = await fetch('/api/billing/checkout', {
       method: 'POST',
-      headers: await createAuthHeaders(() => user.getIdToken()),
+      headers: await createAuthHeaders(() => currentUser.getIdToken()),
       body: JSON.stringify({ plan }),
     });
 
@@ -278,17 +361,15 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     redirectToBillingUrl(data.url);
-  }, [billingConfig.checkoutEnabled, user]);
+  }, [requireBillingUser, requireCheckoutEnabled]);
 
   /** Opens the Stripe billing portal for an existing customer. */
   const openBillingPortal = useCallback(async (): Promise<void> => {
-    if (!user) {
-      throw new Error('Sign in before opening billing management.');
-    }
+    const currentUser = requireBillingUser();
 
     const response = await fetch('/api/billing/portal', {
       method: 'POST',
-      headers: await createAuthHeaders(() => user.getIdToken()),
+      headers: await createAuthHeaders(() => currentUser.getIdToken()),
     });
 
     const data = await response.json().catch(() => ({}));
@@ -297,28 +378,19 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     redirectToBillingUrl(data.url);
-  }, [user]);
+  }, [requireBillingUser]);
 
   const value = useMemo<EntitlementContextValue>(
-    () => ({
-      entitlementStatus,
-      premiumActive: entitlement.premiumActive,
-      planInterval: entitlement.planInterval,
-      billingStatus: entitlement.billingStatus,
-      effectiveSource: entitlement.effectiveSource,
-      cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd,
-      currentPeriodEnd: entitlement.currentPeriodEnd?.toDate?.() ?? null,
-      stripeCustomerId: entitlement.stripeCustomerId,
-      betaOverrideActive: entitlement.betaOverrideActive,
-      checkoutEnabled: billingConfig.checkoutEnabled && hostedAuthEnabled,
-      billingEnabled: billingConfig.billingEnabled,
-      annualPromoActive: billingConfig.annualPromoActive,
-      monthlyDisplayPrice: billingConfig.monthlyDisplayPrice,
-      annualDisplayPrice: billingConfig.annualDisplayPrice,
-      error,
-      openCheckout,
-      openBillingPortal,
-    }),
+    () =>
+      createEntitlementContextValue({
+        billingConfig,
+        entitlement,
+        entitlementStatus,
+        error,
+        hostedAuthEnabled,
+        openBillingPortal,
+        openCheckout,
+      }),
     [billingConfig, entitlement, entitlementStatus, error, hostedAuthEnabled, openBillingPortal, openCheckout]
   );
 

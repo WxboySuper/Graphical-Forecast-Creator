@@ -214,6 +214,43 @@ const PricingPlanHeader: React.FC<{
   </div>
 );
 
+/** Price and description block used in each pricing card header. */
+const PricingPlanPriceBlock: React.FC<{
+  price: string;
+  priceNote: string;
+  description: string;
+}> = ({ price, priceNote, description }) => (
+  <div className="pricing-plan-price-block">
+    <div className="pricing-plan-price-row">
+      <span className="pricing-plan-price">{price}</span>
+      <span className="pricing-plan-price-note">{priceNote}</span>
+    </div>
+    <CardDescription>{description}</CardDescription>
+  </div>
+);
+
+/** Feature list and CTA body used by each pricing plan card. */
+const PricingPlanBody: React.FC<{
+  summary: string;
+  features: string[];
+  highlighted: boolean;
+  cta: React.ReactNode;
+}> = ({ summary, features, highlighted, cta }) => (
+  <CardContent className="pricing-plan-content">
+    <p className="pricing-plan-summary">{summary}</p>
+
+    <ul className="pricing-plan-feature-list">
+      {features.map((feature) => (
+        <PlanFeatureItem key={feature}>{feature}</PlanFeatureItem>
+      ))}
+    </ul>
+
+    <div className={highlighted ? 'pricing-plan-note pricing-plan-note-highlighted' : 'pricing-plan-note'}>{summary}</div>
+
+    <div className="pricing-plan-cta">{cta}</div>
+  </CardContent>
+);
+
 /** Standard pricing card used for both free and premium. */
 const PricingPlanCard: React.FC<PricingPlanCardProps> = ({
   eyebrow,
@@ -237,29 +274,9 @@ const PricingPlanCard: React.FC<PricingPlanCardProps> = ({
         badgeLabel={badgeLabel}
         badgeVariant={badgeVariant}
       />
-
-      <div className="pricing-plan-price-block">
-        <div className="pricing-plan-price-row">
-          <span className="pricing-plan-price">{price}</span>
-          <span className="pricing-plan-price-note">{priceNote}</span>
-        </div>
-        <CardDescription>{description}</CardDescription>
-      </div>
+      <PricingPlanPriceBlock price={price} priceNote={priceNote} description={description} />
     </CardHeader>
-
-    <CardContent className="pricing-plan-content">
-      <p className="pricing-plan-summary">{summary}</p>
-
-      <ul className="pricing-plan-feature-list">
-        {features.map((feature) => (
-          <PlanFeatureItem key={feature}>{feature}</PlanFeatureItem>
-        ))}
-      </ul>
-
-      <div className={highlighted ? 'pricing-plan-note pricing-plan-note-highlighted' : 'pricing-plan-note'}>{summary}</div>
-
-      <div className="pricing-plan-cta">{cta}</div>
-    </CardContent>
+    <PricingPlanBody summary={summary} features={features} highlighted={highlighted} cta={cta} />
   </Card>
 );
 
