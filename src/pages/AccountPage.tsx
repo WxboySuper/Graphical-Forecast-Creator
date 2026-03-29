@@ -54,20 +54,52 @@ const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode
   </>
 );
 
-/** Formats the billing renewal timestamp for the account UI when Stripe has supplied one. */
-const formatRenewalDate = (date: Date | null): string | null => {
-  if (!date) {
-    return null;
+/** Returns the user-facing current plan price based on the active entitlement interval. */
+const getPlanLabel = (
+  premiumActive: boolean,
+  planInterval: ReturnType<typeof useEntitlement>['planInterval'],
+  effectiveSource: ReturnType<typeof useEntitlement>['effectiveSource']
+): string => {
+  if (!premiumActive) {
+    return 'Free Plan';
   }
 
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  if (planInterval === 'annual') {
+    return 'Premium Annual';
+  }
+
+  if (planInterval === 'monthly') {
+    return 'Premium Monthly';
+  }
+
+  return effectiveSource === 'beta_override' ? 'Premium Beta Access' : 'Premium';
 };
 
-/** Returns the user-facing current plan price based on the active entitlement interval. */
+/** Returns the short helper copy used under the billing summary grid. */
+const getBillingSupportCopy = (
+  effectiveSource: ReturnType<typeof useEntitlement>['effectiveSource'],
+  premiumActive: boolean,
+  annualPromoActive: boolean
+): string | null => {
+  if (effectiveSource === 'beta_override') {
+    return 'Premium is currently being granted through the beta override path, so no live Stripe subscription is required yet.';
+  }
+
+  if (!premiumActive) {
+    return 'If premium lapses later, cloud writes and background sync will be disabled while local work remains fully available.';
+  }
+
+  if (annualPromoActive) {
+    return 'Annual intro pricing is currently active on this deployment.';
+  }
+
+  return null;
+};
+
+/** Returns the CTA variant for the pricing button based on current entitlement state. */
+const getPricingButtonVariant = (premiumActive: boolean): 'outline' | 'default' =>
+  premiumActive ? 'outline' : 'default';
+
 const getCurrentPlanPrice = (
   premiumActive: boolean,
   planInterval: ReturnType<typeof useEntitlement>['planInterval'],
@@ -223,14 +255,32 @@ const SignedInActionRow: React.FC<{
 );
 
 /** Billing summary card for Phase 3 subscription state and management. */
+const BillingCardHeader: React.FC<{
+  premiumActive: boolean;
+  planLabel: string;
+}> = ({ premiumActive, planLabel }) => (
+  <CardHeader className="account-section-header">
+    <div className="account-section-topline">
+      <div className="account-section-copy">
+        <CardTitle className="text-2xl">Billing & Premium</CardTitle>
+        <CardDescription>
+          Premium funds hosted sync and storage. Core forecasting workflows remain free.
+        </CardDescription>
+      </div>
+      <Badge variant={premiumActive ? 'success' : 'outline'} className="account-plan-badge">
+        {planLabel}
+      </Badge>
+    </div>
+  </CardHeader>
+);
+
+/** Billing summary card for Phase 3 subscription state and management. */
 const BillingCard: React.FC = () => {
   const {
     annualPromoActive,
     annualDisplayPrice,
     billingEnabled,
     billingStatus,
-    cancelAtPeriodEnd,
-    currentPeriodEnd,
     effectiveSource,
     error,
     monthlyDisplayPrice,
@@ -243,15 +293,8 @@ const BillingCard: React.FC = () => {
   const [openingPortal, setOpeningPortal] = useState(false);
 
   const currentPlanPrice = getCurrentPlanPrice(premiumActive, planInterval, monthlyDisplayPrice, annualDisplayPrice);
-  const planLabel = premiumActive
-    ? planInterval === 'annual'
-      ? 'Premium Annual'
-      : planInterval === 'monthly'
-        ? 'Premium Monthly'
-        : effectiveSource === 'beta_override'
-          ? 'Premium Beta Access'
-          : 'Premium'
-    : 'Free Plan';
+  const planLabel = getPlanLabel(premiumActive, planInterval, effectiveSource);
+  const supportCopy = getBillingSupportCopy(effectiveSource, premiumActive, annualPromoActive);
 
   /** Opens the Stripe billing portal and surfaces any failure as local account feedback. */
   const handleOpenPortal = async () => {
@@ -276,40 +319,14 @@ const BillingCard: React.FC = () => {
 
   return (
     <Card className="account-surface-card">
-      <CardHeader className="account-section-header">
-        <div className="account-section-topline">
-          <div className="account-section-copy">
-            <CardTitle className="text-2xl">Billing & Premium</CardTitle>
-            <CardDescription>
-              Premium funds hosted sync and storage. Core forecasting workflows remain free.
-            </CardDescription>
-          </div>
-          <Badge variant={premiumActive ? 'success' : 'outline'} className="account-plan-badge">
-            {planLabel}
-          </Badge>
-        </div>
-      </CardHeader>
+      <BillingCardHeader premiumActive={premiumActive} planLabel={planLabel} />
       <CardContent className="account-section-content">
         <div className="account-summary-grid">
           <SummaryTile label="Billing status" value={billingStatus || 'inactive'} />
           <SummaryTile label="Current plan price" value={currentPlanPrice} />
         </div>
 
-        {effectiveSource === 'beta_override' ? (
-          <p className="text-sm text-muted-foreground">
-            Premium is currently being granted through the beta override path, so no live Stripe subscription is required yet.
-          </p>
-        ) : null}
-
-        {!premiumActive ? (
-          <p className="text-sm text-muted-foreground">
-            If premium lapses later, cloud writes and background sync will be disabled while local work remains fully available.
-          </p>
-        ) : null}
-
-        {annualPromoActive ? (
-          <p className="text-sm text-muted-foreground">Annual intro pricing is currently active on this deployment.</p>
-        ) : null}
+        {supportCopy ? <p className="text-sm text-muted-foreground">{supportCopy}</p> : null}
 
         <div className="account-button-row">
           {stripeCustomerId && billingEnabled ? (
@@ -319,7 +336,7 @@ const BillingCard: React.FC = () => {
             </Button>
           ) : null}
 
-          <Button asChild variant={premiumActive ? 'outline' : 'default'}>
+          <Button asChild variant={getPricingButtonVariant(premiumActive)}>
             <Link to="/pricing">
               <Crown className="mr-2 h-4 w-4" />
               View Pricing

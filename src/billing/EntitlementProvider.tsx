@@ -72,6 +72,12 @@ const DEFAULT_ENTITLEMENT: UserEntitlementDocument = {
 
 const EntitlementContext = createContext<EntitlementContextValue | null>(null);
 
+interface EntitlementListenerState {
+  entitlement: UserEntitlementDocument;
+  status: EntitlementStatus;
+  error: string | null;
+}
+
 /** Returns the auth header needed for server-side billing endpoints. */
 const createAuthHeaders = async (getToken: () => Promise<string>): Promise<Record<string, string>> => ({
   Authorization: `Bearer ${await getToken()}`,
@@ -100,22 +106,40 @@ const fetchBillingConfig = async (): Promise<BillingConfig> => {
 };
 
 /** Validates a Firestore entitlement doc before the UI trusts it. */
+const normalizeEffectiveSource = (value: unknown): EffectiveSource => {
+  if (value === 'stripe' || value === 'beta_override' || value === 'none') {
+    return value;
+  }
+
+  return 'none';
+};
+
+/** Validates a Firestore entitlement doc before the UI trusts it. */
+const normalizePlanInterval = (value: unknown): PlanInterval => {
+  if (value === 'monthly' || value === 'annual') {
+    return value;
+  }
+
+  return null;
+};
+
+/** Validates a Firestore entitlement doc before the UI trusts it. */
+const normalizeNullableString = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
+/** Validates a Firestore entitlement doc before the UI trusts it. */
 const readEntitlementDocument = (value: Partial<UserEntitlementDocument> | undefined): UserEntitlementDocument => {
   if (!value) {
     return DEFAULT_ENTITLEMENT;
   }
 
   return {
-    uid: typeof value.uid === 'string' ? value.uid : '',
+    uid: normalizeNullableString(value.uid) ?? '',
     premiumActive: Boolean(value.premiumActive),
-    effectiveSource:
-      value.effectiveSource === 'stripe' || value.effectiveSource === 'beta_override' || value.effectiveSource === 'none'
-        ? value.effectiveSource
-        : 'none',
-    planInterval: value.planInterval === 'monthly' || value.planInterval === 'annual' ? value.planInterval : null,
-    billingStatus: typeof value.billingStatus === 'string' ? value.billingStatus : 'inactive',
-    stripeCustomerId: typeof value.stripeCustomerId === 'string' ? value.stripeCustomerId : null,
-    stripeSubscriptionId: typeof value.stripeSubscriptionId === 'string' ? value.stripeSubscriptionId : null,
+    effectiveSource: normalizeEffectiveSource(value.effectiveSource),
+    planInterval: normalizePlanInterval(value.planInterval),
+    billingStatus: normalizeNullableString(value.billingStatus) ?? 'inactive',
+    stripeCustomerId: normalizeNullableString(value.stripeCustomerId),
+    stripeSubscriptionId: normalizeNullableString(value.stripeSubscriptionId),
     cancelAtPeriodEnd: Boolean(value.cancelAtPeriodEnd),
     currentPeriodEnd: value.currentPeriodEnd ?? null,
     betaOverrideActive: Boolean(value.betaOverrideActive),
@@ -127,6 +151,70 @@ const readEntitlementDocument = (value: Partial<UserEntitlementDocument> | undef
 const redirectToBillingUrl = (url: string) => {
   window.location.assign(url);
 };
+
+/** Applies the disabled hosted-auth fallback into entitlement state. */
+const applyDisabledEntitlementState = (
+  setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>,
+  setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>,
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+) => {
+  setEntitlement(DEFAULT_ENTITLEMENT);
+  setEntitlementStatus('disabled');
+  setError(null);
+};
+
+/** Applies the signed-out hosted-auth fallback into entitlement state. */
+const applySignedOutEntitlementState = (
+  setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>,
+  setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>,
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+) => {
+  setEntitlement(DEFAULT_ENTITLEMENT);
+  setEntitlementStatus('free');
+  setError(null);
+};
+
+/** Converts a successful entitlement snapshot into provider state. */
+const createEntitlementListenerState = (snapshotData: Partial<UserEntitlementDocument> | undefined): EntitlementListenerState => {
+  const entitlement = readEntitlementDocument(snapshotData);
+  return {
+    entitlement,
+    status: entitlement.premiumActive ? 'premium' : 'free',
+    error: null,
+  };
+};
+
+/** Starts the Firestore listener that mirrors hosted entitlement state into the client. */
+const subscribeToEntitlements = (
+  userId: string,
+  handlers: {
+    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
+    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+  }
+) => {
+  const entitlementRef = doc(db, 'userEntitlements', userId);
+
+  return onSnapshot(
+    entitlementRef,
+    (snapshot) => {
+      const nextState = createEntitlementListenerState(
+        snapshot.data() as Partial<UserEntitlementDocument> | undefined
+      );
+      handlers.setEntitlement(nextState.entitlement);
+      handlers.setEntitlementStatus(nextState.status);
+      handlers.setError(nextState.error);
+    },
+    (nextError) => {
+      handlers.setEntitlement(DEFAULT_ENTITLEMENT);
+      handlers.setEntitlementStatus('error');
+      handlers.setError(nextError.message);
+    }
+  );
+};
+
+/** True when the provider should operate in hosted mode for the current render. */
+const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && db);
 
 /** Provides one app-readable entitlement source of truth on top of auth. */
 export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -141,10 +229,8 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   useEffect(() => {
-    if (!hostedAuthEnabled || !db) {
-      setEntitlement(DEFAULT_ENTITLEMENT);
-      setEntitlementStatus('disabled');
-      setError(null);
+    if (!isHostedEntitlementMode(hostedAuthEnabled)) {
+      applyDisabledEntitlementState(setEntitlement, setEntitlementStatus, setError);
       return;
     }
 
@@ -154,31 +240,21 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     if (status !== 'signed_in' || !user) {
-      setEntitlement(DEFAULT_ENTITLEMENT);
-      setEntitlementStatus('free');
-      setError(null);
+      applySignedOutEntitlementState(setEntitlement, setEntitlementStatus, setError);
       return;
     }
 
     setEntitlementStatus('loading');
-    const entitlementRef = doc(db, 'userEntitlements', user.uid);
+    const unsubscribe = subscribeToEntitlements(user.uid, {
+      setEntitlement,
+      setEntitlementStatus,
+      setError,
+    });
 
-    const unsubscribe = onSnapshot(
-      entitlementRef,
-      (snapshot) => {
-        const nextEntitlement = readEntitlementDocument(snapshot.data() as Partial<UserEntitlementDocument> | undefined);
-        setEntitlement(nextEntitlement);
-        setEntitlementStatus(nextEntitlement.premiumActive ? 'premium' : 'free');
-        setError(null);
-      },
-      (nextError) => {
-        setEntitlement(DEFAULT_ENTITLEMENT);
-        setEntitlementStatus('error');
-        setError(nextError.message);
-      }
-    );
-
-    return () => unsubscribe();
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupEntitlementSubscription() {
+      unsubscribe();
+    };
   }, [hostedAuthEnabled, status, user]);
 
   /** Starts a Stripe checkout flow for the selected billing interval. */

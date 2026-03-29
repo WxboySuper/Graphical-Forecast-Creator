@@ -39,6 +39,117 @@ const comparisonRows: ComparisonRow[] = [
   { label: 'Cross-device cloud access', freeIncluded: false, premiumIncluded: true },
 ];
 
+/** Returns the premium-card badge for the current entitlement state. */
+const getActivePremiumLabel = (
+  premiumActive: boolean,
+  planInterval: ReturnType<typeof useEntitlement>['planInterval']
+): string | null => {
+  if (!premiumActive) {
+    return null;
+  }
+
+  if (planInterval === 'annual') {
+    return 'Current: Annual';
+  }
+
+  if (planInterval === 'monthly') {
+    return 'Current: Monthly';
+  }
+
+  return 'Current Plan';
+};
+
+/** Returns the main premium price shown on the pricing card. */
+const getPremiumPrice = (
+  premiumActive: boolean,
+  planInterval: ReturnType<typeof useEntitlement>['planInterval'],
+  monthlyDisplayPrice: string,
+  annualDisplayPrice: string
+): string => {
+  if (!premiumActive) {
+    return annualDisplayPrice;
+  }
+
+  return planInterval === 'monthly' ? monthlyDisplayPrice : annualDisplayPrice;
+};
+
+/** Returns the secondary premium price note shown next to the main price. */
+const getPremiumPriceNote = (
+  premiumActive: boolean,
+  planInterval: ReturnType<typeof useEntitlement>['planInterval'],
+  monthlyDisplayPrice: string
+): string => {
+  if (!premiumActive) {
+    return `or ${monthlyDisplayPrice}`;
+  }
+
+  return planInterval === 'monthly' ? 'active subscription' : `or ${monthlyDisplayPrice}`;
+};
+
+/** Returns the premium summary copy for free vs subscribed users. */
+const getPremiumSummary = (
+  premiumActive: boolean,
+  planInterval: ReturnType<typeof useEntitlement>['planInterval']
+): string => {
+  if (!premiumActive) {
+    return 'Premium adds the hosted layer. If it lapses later, local work remains available and only new cloud writes are disabled.';
+  }
+
+  if (planInterval === 'monthly') {
+    return 'You are currently on Premium Monthly. Hosted storage and cross-device sync are active on this account.';
+  }
+
+  if (planInterval === 'annual') {
+    return 'You are currently on Premium Annual. Hosted storage and cross-device sync are active on this account.';
+  }
+
+  return 'Premium is currently active on this account.';
+};
+
+/** Returns the premium CTA for the current auth and subscription state. */
+const renderPremiumCtas = (opts: {
+  premiumActive: boolean;
+  isSignedIn: boolean;
+  checkoutEnabled: boolean;
+  submittingPlan: 'monthly' | 'annual' | null;
+  handleCheckout: (plan: 'monthly' | 'annual') => void;
+}): React.ReactNode => {
+  if (opts.premiumActive) {
+    return (
+      <Button asChild variant="outline" className="w-full">
+        <Link to="/account">
+          <CircleUserRound className="mr-2 h-4 w-4" />
+          View Billing Details
+        </Link>
+      </Button>
+    );
+  }
+
+  if (opts.isSignedIn) {
+    return (
+      <div className="pricing-premium-cta-grid">
+        <Button disabled={!opts.checkoutEnabled || opts.submittingPlan !== null} onClick={() => opts.handleCheckout('annual')}>
+          {opts.submittingPlan === 'annual' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Crown className="mr-2 h-4 w-4" />}
+          Choose annual
+        </Button>
+        <Button variant="outline" disabled={!opts.checkoutEnabled || opts.submittingPlan !== null} onClick={() => opts.handleCheckout('monthly')}>
+          {opts.submittingPlan === 'monthly' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Cloud className="mr-2 h-4 w-4" />}
+          Choose monthly
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Button asChild className="w-full">
+      <Link to="/account">
+        <CircleUserRound className="mr-2 h-4 w-4" />
+        Sign in to choose premium
+      </Link>
+    </Button>
+  );
+};
+
 /** Small bullet row inside one plan card. */
 const PlanFeatureItem: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <li className="pricing-plan-feature">
@@ -87,6 +198,23 @@ const PricingHero: React.FC<{ annualPromoActive: boolean }> = ({ annualPromoActi
 );
 
 /** Standard pricing card used for both free and premium. */
+const PricingPlanHeader: React.FC<{
+  eyebrow: string;
+  title: string;
+  highlighted: boolean;
+  badgeLabel?: string;
+  badgeVariant: React.ComponentProps<typeof Badge>['variant'];
+}> = ({ eyebrow, title, highlighted, badgeLabel, badgeVariant }) => (
+  <div className="pricing-plan-topline">
+    <div className="pricing-plan-heading">
+      <p>{eyebrow}</p>
+      <CardTitle>{title}</CardTitle>
+    </div>
+    {badgeLabel ? <Badge variant={badgeVariant}>{badgeLabel}</Badge> : highlighted ? <Badge variant="success">Recommended</Badge> : null}
+  </div>
+);
+
+/** Standard pricing card used for both free and premium. */
 const PricingPlanCard: React.FC<PricingPlanCardProps> = ({
   eyebrow,
   title,
@@ -102,13 +230,13 @@ const PricingPlanCard: React.FC<PricingPlanCardProps> = ({
 }) => (
   <Card className={highlighted ? 'pricing-plan-card pricing-plan-card-highlighted' : 'pricing-plan-card'}>
     <CardHeader className="pricing-plan-header">
-      <div className="pricing-plan-topline">
-        <div className="pricing-plan-heading">
-          <p>{eyebrow}</p>
-          <CardTitle>{title}</CardTitle>
-        </div>
-        {badgeLabel ? <Badge variant={badgeVariant}>{badgeLabel}</Badge> : highlighted ? <Badge variant="success">Recommended</Badge> : null}
-      </div>
+      <PricingPlanHeader
+        eyebrow={eyebrow}
+        title={title}
+        highlighted={highlighted}
+        badgeLabel={badgeLabel}
+        badgeVariant={badgeVariant}
+      />
 
       <div className="pricing-plan-price-block">
         <div className="pricing-plan-price-row">
@@ -239,57 +367,17 @@ const PricingPage: React.FC = () => {
   };
 
   const isSignedIn = status === 'signed_in';
-  const activePremiumLabel = premiumActive
-    ? planInterval === 'annual'
-      ? 'Current: Annual'
-      : planInterval === 'monthly'
-        ? 'Current: Monthly'
-        : 'Current Plan'
-    : null;
-  const premiumPrice = premiumActive
-    ? planInterval === 'monthly'
-      ? monthlyDisplayPrice
-      : annualDisplayPrice
-    : annualDisplayPrice;
-  const premiumPriceNote = premiumActive
-    ? planInterval === 'monthly'
-      ? 'active subscription'
-      : `or ${monthlyDisplayPrice}`
-    : `or ${monthlyDisplayPrice}`;
-  const premiumSummary = premiumActive
-    ? planInterval === 'monthly'
-      ? 'You are currently on Premium Monthly. Hosted storage and cross-device sync are active on this account.'
-      : planInterval === 'annual'
-        ? 'You are currently on Premium Annual. Hosted storage and cross-device sync are active on this account.'
-        : 'Premium is currently active on this account.'
-    : 'Premium adds the hosted layer. If it lapses later, local work remains available and only new cloud writes are disabled.';
-
-  const premiumCtas = premiumActive ? (
-    <Button asChild variant="outline" className="w-full">
-      <Link to="/account">
-        <CircleUserRound className="mr-2 h-4 w-4" />
-        View Billing Details
-      </Link>
-    </Button>
-  ) : isSignedIn ? (
-    <div className="pricing-premium-cta-grid">
-      <Button disabled={!checkoutEnabled || submittingPlan !== null} onClick={() => handleCheckout('annual')}>
-        {submittingPlan === 'annual' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Crown className="mr-2 h-4 w-4" />}
-        Choose annual
-      </Button>
-      <Button variant="outline" disabled={!checkoutEnabled || submittingPlan !== null} onClick={() => handleCheckout('monthly')}>
-        {submittingPlan === 'monthly' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Cloud className="mr-2 h-4 w-4" />}
-        Choose monthly
-      </Button>
-    </div>
-  ) : (
-    <Button asChild className="w-full">
-      <Link to="/account">
-        <CircleUserRound className="mr-2 h-4 w-4" />
-        Sign in to choose premium
-      </Link>
-    </Button>
-  );
+  const activePremiumLabel = getActivePremiumLabel(premiumActive, planInterval);
+  const premiumPrice = getPremiumPrice(premiumActive, planInterval, monthlyDisplayPrice, annualDisplayPrice);
+  const premiumPriceNote = getPremiumPriceNote(premiumActive, planInterval, monthlyDisplayPrice);
+  const premiumSummary = getPremiumSummary(premiumActive, planInterval);
+  const premiumCtas = renderPremiumCtas({
+    premiumActive,
+    isSignedIn,
+    checkoutEnabled,
+    submittingPlan,
+    handleCheckout,
+  });
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">

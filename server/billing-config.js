@@ -56,8 +56,8 @@ const getAnnualPlanConfig = () => {
   };
 };
 
-/** Returns the public billing config that the client can safely consume. */
-const getPublicBillingConfig = () => {
+/** Returns the full billing config the server needs to resolve checkout sessions. */
+const getBillingRuntimeConfig = () => {
   const monthlyPriceId = process.env.STRIPE_PRICE_MONTHLY || '';
   const annualPlan = getAnnualPlanConfig();
   const billingEnabled = Boolean(
@@ -77,8 +77,21 @@ const getPublicBillingConfig = () => {
   };
 };
 
+/** Returns the public billing config that the client can safely consume. */
+const getPublicBillingConfig = () => {
+  const runtimeConfig = getBillingRuntimeConfig();
+  return {
+    billingEnabled: runtimeConfig.billingEnabled,
+    checkoutEnabled: runtimeConfig.checkoutEnabled,
+    annualPromoActive: runtimeConfig.annualPromoActive,
+    monthlyDisplayPrice: runtimeConfig.monthlyDisplayPrice,
+    annualDisplayPrice: runtimeConfig.annualDisplayPrice,
+  };
+};
+
 module.exports = {
   getBaseUrl,
+  getBillingRuntimeConfig,
   getPublicBillingConfig,
   isAnnualPromoActive,
 };

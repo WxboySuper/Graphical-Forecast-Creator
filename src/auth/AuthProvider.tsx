@@ -543,7 +543,8 @@ const useHostedAuthState = (): AuthContextValue => {
       });
     }, 750);
 
-    return () => {
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupPendingSettingsWrite() {
       if (pendingSettingsWriteRef.current) {
         window.clearTimeout(pendingSettingsWriteRef.current);
         pendingSettingsWriteRef.current = null;
