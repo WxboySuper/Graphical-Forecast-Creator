@@ -385,23 +385,29 @@ const createCheckoutEntitlementWrite = (session) => {
 };
 
 /** Builds the entitlement payload for subscription lifecycle updates. */
+const getSubscriptionUid = (subscription) => subscription.metadata?.uid || '';
+
+/** Builds the nested payload for a subscription webhook entitlement update. */
+const createSubscriptionEntitlementPayload = (subscription, uid, stripeCustomerId) => ({
+  uid,
+  planInterval: getPlanInterval(subscription.items?.data?.[0]?.price?.recurring?.interval),
+  billingStatus: subscription.status || 'inactive',
+  stripeCustomerId,
+  stripeSubscriptionId: subscription.id,
+  cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
+  currentPeriodEnd: getStripeDate(subscription.current_period_end),
+});
+
+/** Builds the entitlement payload for subscription lifecycle updates. */
 const createSubscriptionEntitlementWrite = (subscription) => {
-  const uid = subscription.metadata?.uid || '';
+  const uid = getSubscriptionUid(subscription);
   const stripeCustomerId = getStripeCustomerId(subscription.customer);
 
   return {
     uid,
     stripeCustomerId,
     stripeSubscriptionId: subscription.id,
-    payload: {
-      uid,
-      planInterval: getPlanInterval(subscription.items?.data?.[0]?.price?.recurring?.interval),
-      billingStatus: subscription.status || 'inactive',
-      stripeCustomerId,
-      stripeSubscriptionId: subscription.id,
-      cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-      currentPeriodEnd: getStripeDate(subscription.current_period_end),
-    },
+    payload: createSubscriptionEntitlementPayload(subscription, uid, stripeCustomerId),
   };
 };
 
@@ -426,13 +432,13 @@ const createInvoiceEntitlementWrite = (eventType, invoice) => {
 };
 
 /** Applies the checkout-complete event to the entitlement document. */
-const handleCheckoutSessionCompleted = async (session) => writeEntitlement(createCheckoutEntitlementWrite(session));
+const handleCheckoutSessionCompleted = (session) => writeEntitlement(createCheckoutEntitlementWrite(session));
 
 /** Applies the subscription lifecycle event to the entitlement document. */
-const handleSubscriptionEvent = async (subscription) => writeEntitlement(createSubscriptionEntitlementWrite(subscription));
+const handleSubscriptionEvent = (subscription) => writeEntitlement(createSubscriptionEntitlementWrite(subscription));
 
 /** Applies invoice payment results to the entitlement document. */
-const handleInvoiceEvent = async (eventType, invoice) => writeEntitlement(createInvoiceEntitlementWrite(eventType, invoice));
+const handleInvoiceEvent = (eventType, invoice) => writeEntitlement(createInvoiceEntitlementWrite(eventType, invoice));
 
 const webhookHandlers = {
   'checkout.session.completed': (event) => handleCheckoutSessionCompleted(event.data.object),

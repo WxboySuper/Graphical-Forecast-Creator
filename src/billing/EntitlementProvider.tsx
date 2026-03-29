@@ -106,6 +106,17 @@ const fetchBillingConfig = async (): Promise<BillingConfig> => {
   }
 };
 
+/** Loads the billing config once on mount and keeps the provider code flatter. */
+const useBillingConfigState = (): BillingConfig => {
+  const [billingConfig, setBillingConfig] = useState<BillingConfig>(DEFAULT_BILLING_CONFIG);
+
+  useEffect(() => {
+    fetchBillingConfig().then(setBillingConfig);
+  }, []);
+
+  return billingConfig;
+};
+
 /** Validates a Firestore entitlement doc before the UI trusts it. */
 const normalizeEffectiveSource = (value: unknown): EffectiveSource =>
   VALID_EFFECTIVE_SOURCES.includes(value as EffectiveSource) ? (value as EffectiveSource) : 'none';
@@ -296,17 +307,80 @@ const createEntitlementContextValue = (args: {
   openBillingPortal: args.openBillingPortal,
 });
 
+/** Shared fetch helper for authenticated billing POST endpoints. */
+const fetchBillingAction = async (
+  currentUser: NonNullable<ReturnType<typeof useAuth>['user']>,
+  endpoint: string,
+  body?: Record<string, unknown>
+) => {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: await createAuthHeaders(() => currentUser.getIdToken()),
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  return {
+    response,
+    data: await response.json().catch(() => ({})),
+  };
+};
+
+/** Creates the billing action callbacks used by the entitlement provider. */
+const useBillingActions = (
+  user: ReturnType<typeof useAuth>['user'],
+  checkoutEnabled: boolean
+) => {
+  /** Returns the current signed-in user or throws a user-facing error for billing actions. */
+  const requireBillingUser = useCallback(() => {
+    if (!user) {
+      throw new Error('Sign in before starting billing actions.');
+    }
+
+    return user;
+  }, [user]);
+
+  /** Returns billing availability or throws a user-facing error for checkout attempts. */
+  const requireCheckoutEnabled = useCallback(() => {
+    if (!checkoutEnabled) {
+      throw new Error('Billing is not available on this deployment yet.');
+    }
+  }, [checkoutEnabled]);
+
+  /** Starts a Stripe checkout flow for the selected billing interval. */
+  const openCheckout = useCallback(async (plan: 'monthly' | 'annual'): Promise<void> => {
+    const currentUser = requireBillingUser();
+    requireCheckoutEnabled();
+
+    const { response, data } = await fetchBillingAction(currentUser, '/api/billing/checkout', { plan });
+    if (!response.ok || typeof data.url !== 'string') {
+      throw new Error(typeof data.error === 'string' ? data.error : 'Unable to start checkout right now.');
+    }
+
+    redirectToBillingUrl(data.url);
+  }, [requireBillingUser, requireCheckoutEnabled]);
+
+  /** Opens the Stripe billing portal for an existing customer. */
+  const openBillingPortal = useCallback(async (): Promise<void> => {
+    const currentUser = requireBillingUser();
+
+    const { response, data } = await fetchBillingAction(currentUser, '/api/billing/portal');
+    if (!response.ok || typeof data.url !== 'string') {
+      throw new Error(typeof data.error === 'string' ? data.error : 'Unable to open billing management right now.');
+    }
+
+    redirectToBillingUrl(data.url);
+  }, [requireBillingUser]);
+
+  return { openCheckout, openBillingPortal };
+};
+
 /** Provides one app-readable entitlement source of truth on top of auth. */
 export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { hostedAuthEnabled, status, user } = useAuth();
-  const [billingConfig, setBillingConfig] = useState<BillingConfig>(DEFAULT_BILLING_CONFIG);
+  const billingConfig = useBillingConfigState();
   const [entitlement, setEntitlement] = useState<UserEntitlementDocument>(DEFAULT_ENTITLEMENT);
   const [entitlementStatus, setEntitlementStatus] = useState<EntitlementStatus>(hostedAuthEnabled ? 'loading' : 'disabled');
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchBillingConfig().then(setBillingConfig);
-  }, []);
 
   useEffect(() => {
     const unsubscribe = resolveEntitlementEffect(
@@ -327,58 +401,7 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
       unsubscribe();
     };
   }, [hostedAuthEnabled, status, user]);
-
-  /** Returns the current signed-in user or throws a user-facing error for billing actions. */
-  const requireBillingUser = useCallback(() => {
-    if (!user) {
-      throw new Error('Sign in before starting billing actions.');
-    }
-
-    return user;
-  }, [user]);
-
-  /** Returns billing availability or throws a user-facing error for checkout attempts. */
-  const requireCheckoutEnabled = useCallback(() => {
-    if (!billingConfig.checkoutEnabled) {
-      throw new Error('Billing is not available on this deployment yet.');
-    }
-  }, [billingConfig.checkoutEnabled]);
-
-  /** Starts a Stripe checkout flow for the selected billing interval. */
-  const openCheckout = useCallback(async (plan: 'monthly' | 'annual'): Promise<void> => {
-    const currentUser = requireBillingUser();
-    requireCheckoutEnabled();
-
-    const response = await fetch('/api/billing/checkout', {
-      method: 'POST',
-      headers: await createAuthHeaders(() => currentUser.getIdToken()),
-      body: JSON.stringify({ plan }),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || typeof data.url !== 'string') {
-      throw new Error(typeof data.error === 'string' ? data.error : 'Unable to start checkout right now.');
-    }
-
-    redirectToBillingUrl(data.url);
-  }, [requireBillingUser, requireCheckoutEnabled]);
-
-  /** Opens the Stripe billing portal for an existing customer. */
-  const openBillingPortal = useCallback(async (): Promise<void> => {
-    const currentUser = requireBillingUser();
-
-    const response = await fetch('/api/billing/portal', {
-      method: 'POST',
-      headers: await createAuthHeaders(() => currentUser.getIdToken()),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || typeof data.url !== 'string') {
-      throw new Error(typeof data.error === 'string' ? data.error : 'Unable to open billing management right now.');
-    }
-
-    redirectToBillingUrl(data.url);
-  }, [requireBillingUser]);
+  const { openCheckout, openBillingPortal } = useBillingActions(user, billingConfig.checkoutEnabled);
 
   const value = useMemo<EntitlementContextValue>(
     () =>
