@@ -94,7 +94,7 @@ const HeroActions: React.FC<Props> = ({
   onViewAccount,
   onOpenHistory,
 }) => (
-  <div className="flex flex-wrap gap-3">
+  <div className="home-hero-actions">
     <Button size="lg" onClick={onStart}>
       {variant === 'signed_in' ? 'Continue Forecast' : 'Start Forecast'}
       <ArrowRight className="h-4 w-4 ml-2" />
@@ -127,24 +127,24 @@ const HeroSummaryCard: React.FC<{
   const stats = getHeroStats(variant, formattedDate, savedCyclesCount);
 
   return (
-    <div className="w-full rounded-3xl border border-primary/20 bg-background/80 p-6 shadow-sm backdrop-blur">
-      <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">
+    <div className="home-hero-panel">
+      <div className="home-hero-panel-header">
+        <p>
           {variant === 'signed_in' ? 'Today In GFC' : 'What This Helps With'}
         </p>
-        <h2 className="text-lg font-semibold text-foreground">
+        <h2>
           {variant === 'signed_in' ? 'Get back into the package quickly.' : 'A single workspace for the full package.'}
         </h2>
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="home-hero-panel-list">
         {stats.map(({ icon, label, value }) => (
-          <div key={label} className="rounded-2xl border border-border/70 bg-muted/25 p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <div key={label} className="home-hero-panel-item">
+            <div className="home-hero-panel-item-label">
               {icon}
               {label}
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{value}</p>
+            <p>{value}</p>
           </div>
         ))}
       </div>
@@ -165,14 +165,10 @@ const HeroShell: React.FC<{
   variant: HomeVariant;
   children: React.ReactNode;
 }> = ({ variant, children }) => (
-  <div
-    className={`relative overflow-hidden rounded-[2rem] border border-primary/20 bg-gradient-to-br from-primary/12 via-background to-background ${
-      variant === 'signed_in' ? 'p-8 md:px-12 md:py-12' : 'p-8 md:p-12'
-    }`}
-  >
+  <section className={variant === 'signed_in' ? 'home-hero home-hero-signed-in' : 'home-hero'}>
     <HeroBackdrop />
     {children}
-  </div>
+  </section>
 );
 
 /** Main left-hand content stack for the home hero. */
@@ -189,24 +185,20 @@ const HeroMainContent: React.FC<Props> = ({
   const copy = getHeroCopy(variant);
 
   return (
-    <div className="space-y-10 py-2 lg:col-span-2 lg:pr-6 lg:py-4">
-      <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+    <div className="home-hero-main">
+      <div className="home-pill">
         <Map className="h-4 w-4" />
         {copy.eyebrow}
       </div>
 
-      <div className="space-y-8">
-        <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-foreground md:text-5xl">
+      <div className="home-hero-text">
+        <h1>
           {copy.title}
         </h1>
-        <div className="pt-1">
-          <p className="max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
-            {copy.description}
-          </p>
-        </div>
+        <p>{copy.description}</p>
       </div>
 
-      <div className="pt-3">
+      <div>
         <HeroActions
           variant={variant}
           formattedDate={formattedDate}
@@ -235,7 +227,7 @@ export const HomeHero: React.FC<Props> = ({
 }) => {
   return (
     <HeroShell variant={variant}>
-      <div className="relative grid gap-8 lg:grid-cols-3 lg:items-start lg:gap-10">
+      <div className="home-hero-grid">
         <HeroMainContent
           variant={variant}
           formattedDate={formattedDate}
@@ -247,7 +239,7 @@ export const HomeHero: React.FC<Props> = ({
           onOpenHistory={onOpenHistory}
         />
 
-        <div className="lg:pt-2">
+        <div className="home-hero-side">
           <HeroSummaryCard variant={variant} formattedDate={formattedDate} savedCyclesCount={savedCyclesCount} />
         </div>
       </div>

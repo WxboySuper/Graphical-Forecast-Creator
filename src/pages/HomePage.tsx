@@ -16,6 +16,7 @@ import Dashboard from './home/Dashboard';
 import MainGrid from './home/MainGrid';
 import RecentCycles from './home/RecentCycles';
 import { DayType } from '../types/outlooks';
+import './HomePage.css';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -23,7 +24,7 @@ interface PageContext {
 
 /** Maintainer note kept at the bottom of the home page without dominating the product message. */
 const AIDisclosure: React.FC = () => (
-  <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
+  <div className="home-disclosure">
     <Bot className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
     <p className="leading-relaxed">
       <span className="font-medium text-foreground">AI Development Disclosure:</span>{' '}
@@ -149,7 +150,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="mx-auto max-w-7xl space-y-6 p-6 md:p-8">
+      <div className="home-page-shell">
         <HomeHero
           variant={variant}
           formattedDate={formattedDate}
@@ -163,8 +164,8 @@ const HomePage: React.FC = () => {
 
         {variant === 'signed_in' ? (
           <>
-            <div className="grid items-start gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
+            <div className="home-primary-grid">
+              <div>
                 <MainGrid
                   variant={variant}
                   formattedDate={formattedDate}
@@ -192,8 +193,8 @@ const HomePage: React.FC = () => {
           </>
         ) : (
           <>
-            <div className="grid items-stretch gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
+            <div className="home-primary-grid home-primary-grid-signed-out">
+              <div>
                 <MainGrid
                   variant={variant}
                   formattedDate={formattedDate}

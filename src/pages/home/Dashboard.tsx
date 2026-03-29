@@ -25,12 +25,12 @@ const SnapshotCard: React.FC<{
   title: string;
   value: string;
 }> = ({ icon, title, value }) => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
-    <CardContent className="flex items-center gap-4 p-5">
-      <div className="rounded-2xl bg-primary/10 p-3 text-primary">{icon}</div>
+  <Card className="home-surface-card">
+    <CardContent className="home-stat-card">
+      <div className="home-stat-card-icon">{icon}</div>
       <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
-        <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
+        <p className="home-stat-card-label">{title}</p>
+        <p className="home-stat-card-value">{value}</p>
       </div>
     </CardContent>
   </Card>
@@ -42,28 +42,28 @@ const GettingStartedStep: React.FC<{
   title: string;
   copy: string;
 }> = ({ step, title, copy }) => (
-  <div className="flex gap-4 rounded-2xl border border-border/80 bg-muted/20 p-4">
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+  <div className="home-step-card">
+    <div className="home-step-number">
       {step}
     </div>
-    <div className="space-y-1">
-      <h3 className="font-medium text-foreground">{title}</h3>
-      <p className="text-sm leading-relaxed text-muted-foreground">{copy}</p>
+    <div className="home-step-copy">
+      <h3>{title}</h3>
+      <p>{copy}</p>
     </div>
   </div>
 );
 
 /** Dedicated getting-started guidance for first-time or signed-out users. */
 const GettingStartedPanel: React.FC = () => (
-  <section className="space-y-4">
-    <div className="space-y-2">
-      <h2 className="text-xl font-semibold text-foreground">Getting Started</h2>
-      <p className="text-sm leading-relaxed text-muted-foreground">
+  <section className="home-guidance-section">
+    <div className="home-guidance-header">
+      <h2>Getting Started</h2>
+      <p>
         GFC works best when you treat it like a package workspace: start a cycle, build the map, then write the
         discussion while the setup is still fresh.
       </p>
     </div>
-    <div className="space-y-4">
+    <div className="home-step-list">
       {[
         {
           step: '1',
@@ -118,12 +118,12 @@ const AtAGlanceRow: React.FC<{ label: string; value: number }> = ({ label, value
 
 /** Lower stats panel for signed-out users. */
 const AtAGlancePanel: React.FC<{ stats: Stats }> = ({ stats }) => (
-  <div className="rounded-2xl border border-border/80 bg-muted/10 p-5">
-    <div className="space-y-2">
-      <h3 className="text-lg font-semibold text-foreground">At a Glance</h3>
-      <p className="text-sm text-muted-foreground">What is already in this local workspace right now.</p>
+  <div className="home-info-panel">
+    <div className="home-guidance-header">
+      <h3>At a Glance</h3>
+      <p>What is already in this local workspace right now.</p>
     </div>
-    <div className="mt-4 space-y-3">
+    <div className="home-glance-list">
       <AtAGlanceRow label="Days with outlooks" value={stats.daysWithData.length} />
       <AtAGlanceRow label="Mapped outlooks" value={stats.totalOutlooks} />
       <AtAGlanceRow label="Saved cycles" value={stats.savedCyclesCount} />
@@ -133,9 +133,9 @@ const AtAGlancePanel: React.FC<{ stats: Stats }> = ({ stats }) => (
 
 /** Short reassurance block for the signed-out sidebar footer. */
 const LocalFirstPanel: React.FC = () => (
-  <div className="mt-auto rounded-2xl border border-border/80 bg-muted/10 p-5">
-    <h3 className="text-lg font-semibold text-foreground">Still Local-First</h3>
-    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+  <div className="home-info-panel home-info-panel-footer">
+    <h3>Still Local-First</h3>
+    <p>
       You can start forecasting, save cycle files, and export work immediately. Accounts are optional and only add
       convenience, not gatekeeping.
     </p>
@@ -144,7 +144,7 @@ const LocalFirstPanel: React.FC = () => (
 
 /** Shared body layout for the signed-out sidebar card. */
 const SignedOutSidebarContent: React.FC<{ stats: Stats }> = ({ stats }) => (
-  <CardContent className="flex h-full flex-col gap-5 p-6">
+  <CardContent className="home-sidebar-content">
     <GettingStartedPanel />
     <AtAGlancePanel stats={stats} />
     <LocalFirstPanel />
@@ -153,7 +153,7 @@ const SignedOutSidebarContent: React.FC<{ stats: Stats }> = ({ stats }) => (
 
 /** Secondary signed-out sidebar that keeps guidance and a few grounded stats close by. */
 const SignedOutSidebar: React.FC<{ stats: Stats }> = ({ stats }) => (
-  <Card className="h-full border-border/80 bg-card/95 shadow-sm">
+  <Card className="home-surface-card h-full">
     <SignedOutSidebarContent stats={stats} />
   </Card>
 );

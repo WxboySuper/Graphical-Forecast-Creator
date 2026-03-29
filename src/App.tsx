@@ -15,10 +15,11 @@ import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/feature
 import { useAutoSave } from './hooks/useAutoSave';
 import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 import { AuthProvider } from './auth/AuthProvider';
+import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
 import { AppLayout } from './components/Layout';
-import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage, AccountPage } from './pages';
+import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage, AccountPage, PricingPage } from './pages';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 
@@ -129,6 +130,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
       <Route element={<AppLayout />}>
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
+        <Route path="pricing" element={<PricingPage />} />
         <Route path="forecast" element={<ForecastPage />} />
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
@@ -146,10 +148,12 @@ function App() {
   return (
     <Provider store={store}>
       <AuthProvider>
-        <BrowserRouter>
-          <AgreementGate showComingSoon={showComingSoon} />
-          <AppRoutes showComingSoon={showComingSoon} />
-        </BrowserRouter>
+        <EntitlementProvider>
+          <BrowserRouter>
+            <AgreementGate showComingSoon={showComingSoon} />
+            <AppRoutes showComingSoon={showComingSoon} />
+          </BrowserRouter>
+        </EntitlementProvider>
       </AuthProvider>
     </Provider>
   );

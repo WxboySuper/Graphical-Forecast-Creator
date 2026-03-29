@@ -143,8 +143,38 @@ const getRemoteSeedPayload = (settings: UserSettingsDocument, includeCreatedAt: 
   ...(includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
 
+/** True when two normalized settings payloads contain the same user-visible values. */
+const areUserSettingsEqual = (
+  left: UserSettingsDocument | null,
+  right: UserSettingsDocument | null
+): boolean => {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return (
+    left.darkMode === right.darkMode &&
+    left.baseMapStyle === right.baseMapStyle &&
+    left.stateBorders === right.stateBorders &&
+    left.counties === right.counties &&
+    left.defaultForecasterName === right.defaultForecasterName &&
+    JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks)
+  );
+};
+
+/** True when the current overlay state already matches the incoming synced overlay values. */
+const areOverlaySettingsEqual = (
+  current: OverlaysState,
+  incoming: Pick<UserSettingsDocument, 'baseMapStyle' | 'stateBorders' | 'counties' | 'ghostOutlooks'>
+): boolean =>
+  current.baseMapStyle === incoming.baseMapStyle &&
+  current.stateBorders === incoming.stateBorders &&
+  current.counties === incoming.counties &&
+  JSON.stringify(current.ghostOutlooks) === JSON.stringify(incoming.ghostOutlooks);
+
 interface ApplySettingsContext {
   currentDarkModeRef: React.MutableRefObject<boolean>,
+  currentOverlaysRef: React.MutableRefObject<OverlaysState>,
   dispatch: ReturnType<typeof useDispatch>,
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>,
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>
@@ -153,23 +183,36 @@ interface ApplySettingsContext {
 /** Applies a validated settings document into Redux plus local hosted-auth state. */
 const applySettingsToState = (
   settings: UserSettingsDocument,
-  { currentDarkModeRef, dispatch, setSyncedSettings, lastSyncedSettingsRef }: ApplySettingsContext
+  { currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef }: ApplySettingsContext
 ) => {
-  lastSyncedSettingsRef.current = settings;
-  setSyncedSettings(settings);
+  if (areUserSettingsEqual(lastSyncedSettingsRef.current, settings)) {
+    return;
+  }
 
   if (settings.darkMode !== currentDarkModeRef.current) {
     dispatch(setDarkMode(settings.darkMode));
   }
 
-  dispatch(
-    applyOverlaySettings({
+  if (
+    !areOverlaySettingsEqual(currentOverlaysRef.current, {
       baseMapStyle: settings.baseMapStyle,
       stateBorders: settings.stateBorders,
       counties: settings.counties,
       ghostOutlooks: settings.ghostOutlooks,
     })
-  );
+  ) {
+    dispatch(
+      applyOverlaySettings({
+        baseMapStyle: settings.baseMapStyle,
+        stateBorders: settings.stateBorders,
+        counties: settings.counties,
+        ghostOutlooks: settings.ghostOutlooks,
+      })
+    );
+  }
+
+  lastSyncedSettingsRef.current = settings;
+  setSyncedSettings(settings);
 };
 
 /** Creates or updates the hosted profile document while preserving the original creation timestamp. */
@@ -337,6 +380,7 @@ const useHostedAuthState = (): AuthContextValue => {
   const currentOverlaysRef = useRef(overlays);
   const hasInitializedSettingsRef = useRef(false);
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
+  const pendingSettingsWriteRef = useRef<number | null>(null);
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
   const [user, setUser] = useState<User | null>(null);
@@ -393,6 +437,10 @@ const useHostedAuthState = (): AuthContextValue => {
     if (!canSyncHostedUserDocuments(user)) {
       hasInitializedSettingsRef.current = false;
       lastSyncedSettingsRef.current = null;
+      if (pendingSettingsWriteRef.current) {
+        window.clearTimeout(pendingSettingsWriteRef.current);
+        pendingSettingsWriteRef.current = null;
+      }
       setSyncedSettings(null);
       if (status !== 'loading') {
         setSettingsSyncStatus(getDisabledSettingsStatus());
@@ -406,6 +454,7 @@ const useHostedAuthState = (): AuthContextValue => {
     let unsubscribeSettings: Unsubscribe | undefined;
     const settingsApplyContext: ApplySettingsContext = {
       currentDarkModeRef,
+      currentOverlaysRef,
       dispatch,
       setSyncedSettings,
       lastSyncedSettingsRef,
@@ -440,6 +489,10 @@ const useHostedAuthState = (): AuthContextValue => {
     return function cleanupHostedUserSync() {
       isActive = false;
       hasInitializedSettingsRef.current = false;
+      if (pendingSettingsWriteRef.current) {
+        window.clearTimeout(pendingSettingsWriteRef.current);
+        pendingSettingsWriteRef.current = null;
+      }
       unsubscribeSettings?.();
     };
   }, [dispatch, status, user]);
@@ -462,25 +515,41 @@ const useHostedAuthState = (): AuthContextValue => {
       syncedSettings?.defaultForecasterName ?? user.displayName ?? ''
     );
 
-    if (JSON.stringify(lastSyncedSettingsRef.current) === JSON.stringify(nextSettings)) {
+    if (areUserSettingsEqual(lastSyncedSettingsRef.current, nextSettings)) {
       return;
     }
 
     const settingsRef = doc(db, 'userSettings', user.uid);
-    lastSyncedSettingsRef.current = nextSettings;
+    if (pendingSettingsWriteRef.current) {
+      window.clearTimeout(pendingSettingsWriteRef.current);
+    }
 
-    setDoc(
-      settingsRef,
-      {
-        ...nextSettings,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    ).catch((syncError) => {
-      lastSyncedSettingsRef.current = null;
-      setSettingsSyncStatus('error');
-      setError(getSettingsUpdateError(syncError));
-    });
+    pendingSettingsWriteRef.current = window.setTimeout(() => {
+      lastSyncedSettingsRef.current = nextSettings;
+
+      setDoc(
+        settingsRef,
+        {
+          ...nextSettings,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      ).catch((syncError) => {
+        lastSyncedSettingsRef.current = null;
+        setSettingsSyncStatus('error');
+        setError(getSettingsUpdateError(syncError));
+      }).finally(() => {
+        pendingSettingsWriteRef.current = null;
+      });
+    }, 750);
+
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupPendingSettingsWrite() {
+      if (pendingSettingsWriteRef.current) {
+        window.clearTimeout(pendingSettingsWriteRef.current);
+        pendingSettingsWriteRef.current = null;
+      }
+    };
   }, [darkMode, overlays, settingsSyncStatus, status, syncedSettings?.defaultForecasterName, user]);
 
   /** Persists explicit account settings changes made from the account page. */
@@ -496,6 +565,10 @@ const useHostedAuthState = (): AuthContextValue => {
       ...(lastSyncedSettingsRef.current ?? fallbackSettings),
       ...settings,
     };
+    if (areUserSettingsEqual(lastSyncedSettingsRef.current ?? fallbackSettings, nextSettings)) {
+      setSettingsSyncStatus('synced');
+      return;
+    }
     const previousSettings = lastSyncedSettingsRef.current;
     const previousSyncedSettings = syncedSettings;
 

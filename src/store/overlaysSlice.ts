@@ -24,6 +24,13 @@ const initialState: OverlaysState = {
   },
 };
 
+/** True when two ghost-outlook visibility maps contain the same values. */
+const areGhostOutlooksEqual = (
+  left: Record<OutlookType, boolean>,
+  right: Record<OutlookType, boolean>
+): boolean =>
+  (Object.keys(left) as OutlookType[]).every((key) => left[key] === right[key]);
+
 const overlaysSlice = createSlice({
   name: 'overlays',
   initialState,
@@ -63,7 +70,10 @@ const overlaysSlice = createSlice({
         state.baseMapStyle = baseMapStyle;
       }
 
-      if (ghostOutlooks) {
+      if (ghostOutlooks && !areGhostOutlooksEqual(state.ghostOutlooks, {
+        ...state.ghostOutlooks,
+        ...ghostOutlooks,
+      })) {
         state.ghostOutlooks = {
           ...state.ghostOutlooks,
           ...ghostOutlooks,

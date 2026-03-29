@@ -31,7 +31,7 @@ const CompactCycleRow: React.FC<{
   <button
     data-cycle-id={cycle.id}
     onClick={onLoad}
-    className="w-full rounded-2xl border border-border/80 bg-muted/20 px-4 py-4 text-left transition-all hover:border-primary hover:shadow-sm"
+    className="home-cycle-button home-cycle-button-compact"
   >
     <div className="flex items-start justify-between gap-3">
       <div className="space-y-1">
@@ -52,7 +52,7 @@ const SectionCycleTile: React.FC<{
   <button
     data-cycle-id={cycle.id}
     onClick={onLoad}
-    className="rounded-2xl border border-border/80 bg-muted/20 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-sm"
+    className="home-cycle-button"
   >
     <div className="flex items-start justify-between gap-3">
       <div className="space-y-1">
@@ -70,12 +70,12 @@ const SectionCycleTile: React.FC<{
 
 /** Empty-state card for signed-in users who have not saved any cycles yet. */
 const EmptyRecentCyclesCard: React.FC = () => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
-    <CardHeader className="space-y-2">
+  <Card className="home-surface-card">
+    <CardHeader className="home-section-header">
       <CardTitle className="text-xl">Recent Cycles</CardTitle>
       <CardDescription>Saved local packages will show up here once you start building a forecast cycle.</CardDescription>
     </CardHeader>
-    <CardContent>
+    <CardContent className="home-section-content">
       <p className="text-sm leading-relaxed text-muted-foreground">
         Start on the current cycle card, then save locally whenever you want a package ready to reopen later.
       </p>
@@ -89,12 +89,12 @@ const CompactRecentCycles: React.FC<RecentCyclesContentProps> = ({
   onLoad,
   onOpenHistory,
 }) => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
-    <CardHeader className="space-y-2">
+  <Card className="home-surface-card">
+    <CardHeader className="home-section-header">
       <CardTitle className="text-xl">Recent Cycles</CardTitle>
       <CardDescription>Jump back into a saved package without leaving the landing page.</CardDescription>
     </CardHeader>
-    <CardContent className="space-y-4">
+    <CardContent className="home-section-content home-recent-content">
       {savedCycles.slice(0, 4).map((cycle) => (
         <CompactCycleRow key={cycle.id} cycle={cycle} onLoad={onLoad} />
       ))}
@@ -112,8 +112,8 @@ const SectionRecentCycles: React.FC<RecentCyclesContentProps> = ({
   onLoad,
   onOpenHistory,
 }) => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
-    <CardHeader className="space-y-2">
+  <Card className="home-surface-card">
+    <CardHeader className="home-section-header">
       <CardTitle className="flex items-center gap-2 text-2xl">
         <History className="h-5 w-5 text-primary" />
         Recent Local Cycles
@@ -122,8 +122,8 @@ const SectionRecentCycles: React.FC<RecentCyclesContentProps> = ({
         Saved packages stay easy to reopen, which makes it simpler to compare setups or continue older work.
       </CardDescription>
     </CardHeader>
-    <CardContent className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <CardContent className="home-section-content home-recent-content">
+      <div className="home-recent-grid">
         {savedCycles.slice(0, 6).map((cycle) => (
           <SectionCycleTile key={cycle.id} cycle={cycle} onLoad={onLoad} />
         ))}

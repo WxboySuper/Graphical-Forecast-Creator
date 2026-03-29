@@ -5,10 +5,36 @@ import { AccountPage } from './AccountPage';
 jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
+jest.mock('../billing/EntitlementProvider', () => ({
+  useEntitlement: jest.fn(),
+}));
 
 const mockUseAuth = jest.requireMock('../auth/AuthProvider').useAuth as jest.Mock;
+const mockUseEntitlement = jest.requireMock('../billing/EntitlementProvider').useEntitlement as jest.Mock;
 
 describe('AccountPage', () => {
+  beforeEach(() => {
+    mockUseEntitlement.mockReturnValue({
+      entitlementStatus: 'free',
+      premiumActive: false,
+      planInterval: null,
+      billingStatus: 'inactive',
+      effectiveSource: 'none',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+      stripeCustomerId: null,
+      betaOverrideActive: false,
+      checkoutEnabled: false,
+      billingEnabled: false,
+      annualPromoActive: false,
+      monthlyDisplayPrice: '$3/month',
+      annualDisplayPrice: '$30/year',
+      error: null,
+      openCheckout: jest.fn(),
+      openBillingPortal: jest.fn(),
+    });
+  });
+
   test('shows the local-only fallback when hosted auth is disabled', () => {
     mockUseAuth.mockReturnValue({
       hostedAuthEnabled: false,
@@ -95,5 +121,6 @@ describe('AccountPage', () => {
     expect(screen.getByDisplayValue('Alex')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sign Out/i })).toBeInTheDocument();
     expect(screen.getAllByText(/^Synced$/i)).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /View Pricing/i })).toBeInTheDocument();
   });
 });

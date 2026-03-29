@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CircleUserRound, Cloud, LoaderCircle, LogOut, Mail } from 'lucide-react';
+import { CircleUserRound, Cloud, Crown, LoaderCircle, LogOut, Mail } from 'lucide-react';
 import { Badge, type BadgeProps } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { useAuth } from '../auth/AuthProvider';
+import { useEntitlement } from '../billing/EntitlementProvider';
+import './AccountPage.css';
 
 type AuthMode = 'sign_in' | 'sign_up';
 type SyncStatus = ReturnType<typeof useAuth>['settingsSyncStatus'];
@@ -52,6 +54,74 @@ const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode
   </>
 );
 
+/** Returns the user-facing current plan price based on the active entitlement interval. */
+const getPlanLabel = (
+  premiumActive: boolean,
+  planInterval: ReturnType<typeof useEntitlement>['planInterval'],
+  effectiveSource: ReturnType<typeof useEntitlement>['effectiveSource']
+): string => {
+  if (!premiumActive) {
+    return 'Free Plan';
+  }
+
+  if (planInterval === 'annual') {
+    return 'Premium Annual';
+  }
+
+  if (planInterval === 'monthly') {
+    return 'Premium Monthly';
+  }
+
+  return effectiveSource === 'beta_override' ? 'Premium Beta Access' : 'Premium';
+};
+
+/** Returns the short helper copy used under the billing summary grid. */
+const getBillingSupportCopy = (
+  effectiveSource: ReturnType<typeof useEntitlement>['effectiveSource'],
+  premiumActive: boolean,
+  annualPromoActive: boolean
+): string | null => {
+  if (effectiveSource === 'beta_override') {
+    return 'Premium is currently being granted through the beta override path, so no live Stripe subscription is required yet.';
+  }
+
+  if (!premiumActive) {
+    return 'If premium lapses later, cloud writes and background sync will be disabled while local work remains fully available.';
+  }
+
+  if (annualPromoActive) {
+    return 'Annual intro pricing is currently active on this deployment.';
+  }
+
+  return null;
+};
+
+/** Returns the CTA variant for the pricing button based on current entitlement state. */
+const getPricingButtonVariant = (premiumActive: boolean): 'outline' | 'default' =>
+  premiumActive ? 'outline' : 'default';
+
+/** Returns the current plan price shown in the billing summary card. */
+const getCurrentPlanPrice = (
+  premiumActive: boolean,
+  planInterval: ReturnType<typeof useEntitlement>['planInterval'],
+  monthlyDisplayPrice: string,
+  annualDisplayPrice: string
+): string => {
+  if (!premiumActive) {
+    return '$0';
+  }
+
+  if (planInterval === 'annual') {
+    return annualDisplayPrice;
+  }
+
+  if (planInterval === 'monthly') {
+    return monthlyDisplayPrice;
+  }
+
+  return 'Included';
+};
+
 /** Decorative background accents shared by the account hero. */
 const AccountHeroBackdrop: React.FC = () => (
   <>
@@ -65,15 +135,15 @@ const AccountHeroContent: React.FC<{
   description: string;
   children?: React.ReactNode;
 }> = ({ description, children }) => (
-  <div className="relative">
-    <div className="space-y-4">
-      <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+  <div className="account-hero-content">
+    <div className="account-hero-copy">
+      <div className="account-pill">
         <CircleUserRound className="h-4 w-4" />
         Account
       </div>
-      <div className="space-y-3">
-        <h1 className="text-4xl font-extrabold tracking-tight text-foreground md:text-5xl">Account</h1>
-        <p className="max-w-3xl text-base leading-relaxed text-muted-foreground md:text-lg">{description}</p>
+      <div className="account-hero-text">
+        <h1>Account</h1>
+        <p>{description}</p>
       </div>
       {children}
     </div>
@@ -85,10 +155,10 @@ const AccountHero: React.FC<{
   description: string;
   children?: React.ReactNode;
 }> = ({ description, children }) => (
-  <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background p-8 md:p-10">
+  <section className="account-hero">
     <AccountHeroBackdrop />
     <AccountHeroContent description={description}>{children}</AccountHeroContent>
-  </div>
+  </section>
 );
 
 /** Shows the signed-in identity details as compact chips under the account hero. */
@@ -97,17 +167,15 @@ const AccountIdentityChips: React.FC<{
   providerLabels: string[];
   statusMeta?: SyncStatusMeta;
 }> = ({ email, providerLabels, statusMeta }) => (
-  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-    <span className="rounded-full border border-border bg-background/80 px-3 py-1.5 font-medium text-foreground">
-      {email}
-    </span>
+  <div className="account-chip-row">
+    <span className="account-chip account-chip-strong">{email}</span>
     {providerLabels.map((provider) => (
-      <span key={provider} className="rounded-full border border-border bg-background/70 px-3 py-1.5">
+      <span key={provider} className="account-chip">
         {provider}
       </span>
     ))}
     {statusMeta ? (
-      <Badge variant={statusMeta.variant} className="px-3 py-1.5 text-xs uppercase tracking-[0.18em]">
+      <Badge variant={statusMeta.variant} className="account-sync-badge">
         {statusMeta.label}
       </Badge>
     ) : null}
@@ -116,9 +184,9 @@ const AccountIdentityChips: React.FC<{
 
 /** Small summary tile that keeps the profile card readable and compact. */
 const SummaryTile: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-2xl border border-border/80 bg-muted/25 p-4">
-    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-    <p className="mt-3 text-sm font-semibold text-foreground">{value}</p>
+  <div className="account-summary-tile">
+    <p>{label}</p>
+    <strong>{value}</strong>
   </div>
 );
 
@@ -141,15 +209,15 @@ const DiscussionDefaultsSection: React.FC<{
   defaultForecasterName: string;
   setDefaultForecasterName: React.Dispatch<React.SetStateAction<string>>;
 }> = ({ defaultForecasterName, setDefaultForecasterName }) => (
-  <div className="rounded-2xl border border-border/80 bg-muted/20 p-5">
-    <div className="space-y-2">
-      <h2 className="text-lg font-semibold text-foreground">Discussion defaults</h2>
-      <p className="text-sm leading-relaxed text-muted-foreground">
+  <div className="account-subsection-card">
+    <div className="account-subsection-header">
+      <h2>Discussion defaults</h2>
+      <p>
         Set the name that should prefill the forecaster field when you write a discussion.
       </p>
     </div>
 
-    <div className="mt-5 space-y-3">
+    <div className="account-field-group">
       <label htmlFor="default-forecaster-name" className="text-sm font-medium text-foreground">
         Default forecaster name
       </label>
@@ -172,12 +240,12 @@ const SignedInActionRow: React.FC<{
   onSaveDefaults: () => void;
   onSignOut: () => void;
 }> = ({ savingDefaults, saveMessage, onSaveDefaults, onSignOut }) => (
-  <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+  <div className="account-action-row">
+    <div className="account-action-group">
       <Button onClick={onSaveDefaults} disabled={savingDefaults}>
         {renderSaveDefaultsButtonLabel(savingDefaults)}
       </Button>
-      {saveMessage ? <p className="text-sm text-muted-foreground">{saveMessage}</p> : null}
+      {saveMessage ? <p className="account-inline-message">{saveMessage}</p> : null}
     </div>
 
     <Button variant="outline" onClick={onSignOut}>
@@ -186,6 +254,173 @@ const SignedInActionRow: React.FC<{
     </Button>
   </div>
 );
+
+/** Billing summary card for Phase 3 subscription state and management. */
+const BillingCardHeader: React.FC<{
+  premiumActive: boolean;
+  planLabel: string;
+}> = ({ premiumActive, planLabel }) => (
+  <CardHeader className="account-section-header">
+    <div className="account-section-topline">
+      <div className="account-section-copy">
+        <CardTitle className="text-2xl">Billing & Premium</CardTitle>
+        <CardDescription>
+          Premium funds hosted sync and storage. Core forecasting workflows remain free.
+        </CardDescription>
+      </div>
+      <Badge variant={premiumActive ? 'success' : 'outline'} className="account-plan-badge">
+        {planLabel}
+      </Badge>
+    </div>
+  </CardHeader>
+);
+
+/** Small summary grid used by the billing card. */
+const BillingSummaryGrid: React.FC<{
+  billingStatus: string;
+  currentPlanPrice: string;
+}> = ({ billingStatus, currentPlanPrice }) => (
+  <div className="account-summary-grid">
+    <SummaryTile label="Billing status" value={billingStatus || 'inactive'} />
+    <SummaryTile label="Current plan price" value={currentPlanPrice} />
+  </div>
+);
+
+/** Action row for billing management and pricing navigation. */
+const BillingActionRow: React.FC<{
+  stripeCustomerId: string | null;
+  billingEnabled: boolean;
+  openingPortal: boolean;
+  premiumActive: boolean;
+  onOpenPortal: () => void;
+}> = ({ stripeCustomerId, billingEnabled, openingPortal, premiumActive, onOpenPortal }) => (
+  <div className="account-button-row">
+    {stripeCustomerId && billingEnabled ? (
+      <Button variant="outline" onClick={onOpenPortal} disabled={openingPortal}>
+        {openingPortal ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Manage Subscription
+      </Button>
+    ) : null}
+
+    <Button asChild variant={getPricingButtonVariant(premiumActive)}>
+      <Link to="/pricing">
+        <Crown className="mr-2 h-4 w-4" />
+        View Pricing
+      </Link>
+    </Button>
+  </div>
+);
+
+/** Supporting helper text and error state inside the billing card body. */
+const BillingCardMessages: React.FC<{
+  supportCopy: string | null;
+  portalMessage: string | null;
+  error: string | null;
+}> = ({ supportCopy, portalMessage, error }) => (
+  <>
+    {supportCopy ? <p className="text-sm text-muted-foreground">{supportCopy}</p> : null}
+    {portalMessage || error ? <p className="text-sm text-destructive">{portalMessage ?? error}</p> : null}
+  </>
+);
+
+/** Main billing card content so the top-level card tree stays flatter. */
+const BillingCardContent: React.FC<{
+  billingStatus: string;
+  currentPlanPrice: string;
+  supportCopy: string | null;
+  portalMessage: string | null;
+  error: string | null;
+  stripeCustomerId: string | null;
+  billingEnabled: boolean;
+  openingPortal: boolean;
+  premiumActive: boolean;
+  onOpenPortal: () => void;
+}> = ({
+  billingStatus,
+  currentPlanPrice,
+  supportCopy,
+  portalMessage,
+  error,
+  stripeCustomerId,
+  billingEnabled,
+  openingPortal,
+  premiumActive,
+  onOpenPortal,
+}) => (
+  <CardContent className="account-section-content">
+    <BillingSummaryGrid billingStatus={billingStatus} currentPlanPrice={currentPlanPrice} />
+    <BillingCardMessages supportCopy={supportCopy} portalMessage={portalMessage} error={error} />
+    <BillingActionRow
+      stripeCustomerId={stripeCustomerId}
+      billingEnabled={billingEnabled}
+      openingPortal={openingPortal}
+      premiumActive={premiumActive}
+      onOpenPortal={onOpenPortal}
+    />
+  </CardContent>
+);
+
+/** Billing summary card for Phase 3 subscription state and management. */
+const BillingCard: React.FC = () => {
+  const {
+    annualPromoActive,
+    annualDisplayPrice,
+    billingEnabled,
+    billingStatus,
+    effectiveSource,
+    error,
+    monthlyDisplayPrice,
+    openBillingPortal,
+    planInterval,
+    premiumActive,
+    stripeCustomerId,
+  } = useEntitlement();
+  const [portalMessage, setPortalMessage] = useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = useState(false);
+
+  const currentPlanPrice = getCurrentPlanPrice(premiumActive, planInterval, monthlyDisplayPrice, annualDisplayPrice);
+  const planLabel = getPlanLabel(premiumActive, planInterval, effectiveSource);
+  const supportCopy = getBillingSupportCopy(effectiveSource, premiumActive, annualPromoActive);
+
+  /** Opens the Stripe billing portal and surfaces any failure as local account feedback. */
+  const handleOpenPortal = async () => {
+    setPortalMessage(null);
+    setOpeningPortal(true);
+
+    try {
+      await openBillingPortal();
+    } catch (nextError) {
+      setPortalMessage(nextError instanceof Error ? nextError.message : 'Unable to open billing management right now.');
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
+
+  /** Wraps the portal action so button handlers stay synchronous. */
+  const handleOpenPortalClick = () => {
+    handleOpenPortal().catch(() => {
+      // Billing feedback is already surfaced by handleOpenPortal.
+    });
+  };
+
+  return (
+    <Card className="account-surface-card">
+      <BillingCardHeader premiumActive={premiumActive} planLabel={planLabel} />
+      <BillingCardContent
+        billingStatus={billingStatus}
+        currentPlanPrice={currentPlanPrice}
+        supportCopy={supportCopy}
+        portalMessage={portalMessage}
+        error={error}
+        stripeCustomerId={stripeCustomerId}
+        billingEnabled={billingEnabled}
+        openingPortal={openingPortal}
+        premiumActive={premiumActive}
+        onOpenPortal={handleOpenPortalClick}
+      />
+    </Card>
+  );
+};
 
 /** Signed-in primary card with the only profile setting exposed in Phase 2. */
 const SignedInPrimaryCard: React.FC<{
@@ -207,8 +442,8 @@ const SignedInPrimaryCard: React.FC<{
   onSaveDefaults,
   onSignOut,
 }) => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
-    <CardHeader className="space-y-3">
+  <Card className="account-surface-card">
+    <CardHeader className="account-section-header">
       <CardTitle className="text-2xl">Profile & Preferences</CardTitle>
       <CardDescription>
         Keep your sign-in details and your default discussion byline ready wherever you open GFC.
@@ -216,7 +451,7 @@ const SignedInPrimaryCard: React.FC<{
       <ProfileSummaryGrid email={email} providerLabels={providerLabels} />
     </CardHeader>
 
-    <CardContent className="space-y-6">
+    <CardContent className="account-section-content">
       <DiscussionDefaultsSection
         defaultForecasterName={defaultForecasterName}
         setDefaultForecasterName={setDefaultForecasterName}
@@ -282,7 +517,7 @@ const SignedInAccountView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="account-page-stack">
       <AccountHero
         description="Keep your profile and app defaults ready across devices while the core forecasting workflow stays yours."
       >
@@ -293,23 +528,27 @@ const SignedInAccountView: React.FC = () => {
         />
       </AccountHero>
 
-      <SignedInPrimaryCard
-        email={user?.email ?? 'Unavailable'}
-        providerLabels={providerLabels}
-        defaultForecasterName={defaultForecasterName}
-        setDefaultForecasterName={setDefaultForecasterName}
-        savingDefaults={savingDefaults}
-        saveMessage={saveMessage}
-        onSaveDefaults={handleSaveDefaultsClick}
-        onSignOut={handleSignOutClick}
-      />
+      <div className="account-signed-grid">
+        <SignedInPrimaryCard
+          email={user?.email ?? 'Unavailable'}
+          providerLabels={providerLabels}
+          defaultForecasterName={defaultForecasterName}
+          setDefaultForecasterName={setDefaultForecasterName}
+          savingDefaults={savingDefaults}
+          saveMessage={saveMessage}
+          onSaveDefaults={handleSaveDefaultsClick}
+          onSignOut={handleSignOutClick}
+        />
+
+        <BillingCard />
+      </div>
     </div>
   );
 };
 
 /** Shared sign-in header for the signed-out account flow. */
 const SignInCardHeader: React.FC = () => (
-  <CardHeader className="space-y-3">
+  <CardHeader className="account-section-header">
     <CardTitle className="text-2xl">Sign in or create an account</CardTitle>
     <CardDescription>
       Keep your profile and app defaults ready across devices. Signing in is optional, and core forecasting stays free.
@@ -345,14 +584,14 @@ const EmailAuthForm: React.FC<{
   onConfirmPasswordChange,
   onEmailSubmit,
 }) => (
-  <div className="space-y-5">
-    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+  <div className="account-email-form">
+    <div className="account-divider-label">
       <div className="h-px flex-1 bg-border" />
       <span>Email / Password</span>
       <div className="h-px flex-1 bg-border" />
     </div>
 
-    <div className="flex gap-2">
+    <div className="account-mode-toggle">
       <Button variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => onModeChange('sign_in')} disabled={isBusy}>
         Sign In
       </Button>
@@ -361,8 +600,8 @@ const EmailAuthForm: React.FC<{
       </Button>
     </div>
 
-    <form className="space-y-4" onSubmit={onEmailSubmit}>
-      <div className="space-y-2">
+    <form className="account-form-fields" onSubmit={onEmailSubmit}>
+      <div className="account-field-group">
         <label htmlFor="account-email" className="text-sm font-medium text-foreground">
           Email
         </label>
@@ -376,7 +615,7 @@ const EmailAuthForm: React.FC<{
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="account-field-group">
         <label htmlFor="account-password" className="text-sm font-medium text-foreground">
           Password
         </label>
@@ -392,7 +631,7 @@ const EmailAuthForm: React.FC<{
       </div>
 
       {mode === 'sign_up' ? (
-        <div className="space-y-2">
+        <div className="account-field-group">
           <label htmlFor="account-confirm-password" className="text-sm font-medium text-foreground">
             Confirm Password
           </label>
@@ -409,7 +648,7 @@ const EmailAuthForm: React.FC<{
       ) : null}
 
       {formError || authError ? (
-        <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div className="account-error-box">
           {formError ?? authError}
         </div>
       ) : null}
@@ -452,9 +691,9 @@ const SignInPrimaryCard: React.FC<{
   onConfirmPasswordChange,
   onEmailSubmit,
 }) => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
+  <Card className="account-surface-card">
     <SignInCardHeader />
-    <CardContent className="space-y-6">
+    <CardContent className="account-section-content">
       <Button variant="outline" className="w-full justify-center" onClick={onGoogleSignIn} disabled={isBusy}>
         <Cloud className="mr-2 h-4 w-4" />
         Continue with Google
@@ -480,34 +719,42 @@ const SignInPrimaryCard: React.FC<{
 
 /** Single supporting card for signed-out users so the page stays helpful without turning into marketing clutter. */
 const SignedOutSupportCard: React.FC = () => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
-    <CardHeader className="space-y-2">
-      <CardTitle className="text-lg">What Signing In Helps With</CardTitle>
+  <Card className="account-surface-card account-support-card">
+    <CardHeader className="account-section-header">
+      <CardTitle className="text-2xl">Why keep an account</CardTitle>
+      <CardDescription>Use hosted identity and saved defaults without changing the local-first workflow.</CardDescription>
     </CardHeader>
-    <CardContent className="space-y-4">
-      <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+    <CardContent className="account-section-content">
+      <ul className="account-support-list">
         <li>Keep your map and app preferences ready across devices.</li>
         <li>Store the forecaster name you want prefilled in discussions.</li>
         <li>Use the same account on different machines without changing the local workflow.</li>
+        <li>Upgrade later for hosted premium storage without changing what stays free.</li>
       </ul>
-      <p className="text-sm leading-relaxed text-muted-foreground">
+      <p className="account-support-copy">
         Forecasting, discussions, exports, verification, and local history remain available with or without an account.
       </p>
+      <Button asChild variant="outline" className="w-full">
+        <Link to="/pricing">
+          <Crown className="mr-2 h-4 w-4" />
+          View Pricing
+        </Link>
+      </Button>
     </CardContent>
   </Card>
 );
 
 /** Shared local-only card body used when hosted accounts are disabled. */
 const LocalOnlyCard: React.FC = () => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
-    <CardHeader className="space-y-2">
+  <Card className="account-surface-card">
+    <CardHeader className="account-section-header">
       <CardTitle className="text-2xl">Local-only mode</CardTitle>
       <CardDescription>
         Hosted accounts are turned off here, but the full local forecasting workflow is still ready to go.
       </CardDescription>
     </CardHeader>
-    <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+    <CardContent className="account-local-only-content">
+      <p className="account-support-copy">
         Forecast drawing, discussions, verification, imports, exports, and local history keep working exactly as
         expected.
       </p>
@@ -585,11 +832,11 @@ const SignedOutAccountView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="account-page-stack">
       <AccountHero description="Sign in to keep your profile and defaults ready across devices. Core forecasting stays free with or without an account." />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="account-signed-out-grid">
+        <div>
           <SignInPrimaryCard
             isBusy={isBusy}
             mode={mode}
@@ -614,7 +861,7 @@ const SignedOutAccountView: React.FC = () => {
 
 /** Local-only fallback for deployments where hosted accounts are intentionally disabled. */
 const DisabledStateView: React.FC = () => (
-  <div className="space-y-8">
+  <div className="account-page-stack">
     <AccountHero description="This deployment is running in local-only mode. You can still use every core GFC workflow without signing in." />
     <LocalOnlyCard />
   </div>
@@ -626,7 +873,7 @@ const AccountPage: React.FC = () => {
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="mx-auto max-w-7xl space-y-6 p-6 md:p-8">
+      <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-10">
         {!hostedAuthEnabled ? <DisabledStateView /> : null}
         {hostedAuthEnabled && status === 'signed_in' ? <SignedInAccountView /> : null}
         {hostedAuthEnabled && status !== 'signed_in' ? <SignedOutAccountView /> : null}

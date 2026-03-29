@@ -52,12 +52,12 @@ const WorkspaceStat: React.FC<{
   label: string;
   value: string;
 }> = ({ icon, label, value }) => (
-  <div className="rounded-2xl border border-border/80 bg-muted/25 p-4">
-    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+  <div className="home-workspace-stat">
+    <div className="home-workspace-stat-label">
       {icon}
       {label}
     </div>
-    <p className="mt-3 text-lg font-semibold text-foreground">{value}</p>
+    <p>{value}</p>
   </div>
 );
 
@@ -70,21 +70,21 @@ const CurrentCycleHeader: React.FC<{
   const copy = getWorkspaceCopy(variant);
 
   return (
-    <CardHeader className="space-y-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
+    <CardHeader className="home-workspace-header">
+      <div className="home-workspace-header-top">
+        <div className="home-workspace-copy">
           <CardTitle className="text-2xl">Current Forecast Cycle</CardTitle>
           <CardDescription className="max-w-2xl">{copy.description}</CardDescription>
         </div>
-        <div className="flex min-h-20 self-start rounded-full border border-border/80 bg-background/80 px-4 py-2 text-sm font-medium md:min-w-40 md:items-center md:justify-center">
-          <span className={cn('inline-flex items-center gap-2 text-center', isSaved ? 'text-success' : 'text-warning')}>
+        <div className="home-save-pill">
+          <span className={cn('home-save-pill-label', isSaved ? 'text-success' : 'text-warning')}>
             {isSaved ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
             {isSaved ? 'Saved locally' : 'Unsaved changes'}
           </span>
         </div>
       </div>
 
-      <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-sm text-muted-foreground">
+      <div className="home-date-pill">
         <Clock3 className="h-4 w-4 text-primary" />
         {formattedDate}
       </div>
@@ -123,12 +123,12 @@ const CycleDayGrid: React.FC<{
   onDayClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }> = ({ daysWithData, currentDay, onDayClick }) => (
   <div className="space-y-3">
-    <div className="space-y-1">
-      <h3 className="text-sm font-medium text-foreground">Jump to a forecast day</h3>
-      <p className="text-sm text-muted-foreground">Pick a day below to head straight into the map editor.</p>
+    <div className="home-day-grid-header">
+      <h3>Jump to a forecast day</h3>
+      <p>Pick a day below to head straight into the map editor.</p>
     </div>
 
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+    <div className="home-day-grid">
       {[1, 2, 3, 4, 5, 6, 7, 8].map((day) => (
         <DayButton
           key={day}
@@ -181,13 +181,13 @@ const UtilityActions: React.FC<{
   onOpenFile: () => void;
   onOpenHistory: () => void;
 }> = ({ onNewCycle, onSave, onOpenFile, onOpenHistory }) => (
-  <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/15 p-5">
-    <div className="space-y-1">
-      <h3 className="text-sm font-medium text-foreground">Cycle tools</h3>
-      <p className="text-sm text-muted-foreground">Keep the package moving without leaving the landing page.</p>
+  <div className="home-utility-card">
+    <div className="home-day-grid-header">
+      <h3>Cycle tools</h3>
+      <p>Keep the package moving without leaving the landing page.</p>
     </div>
 
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="home-utility-grid">
       <Button variant="outline" className="justify-start rounded-xl" onClick={onNewCycle}>
         <Calendar className="h-4 w-4 mr-2" />
         Start New Cycle
@@ -223,11 +223,11 @@ export const MainGrid: React.FC<Props> = ({
   onOpenFile,
   onOpenHistory,
 }) => (
-  <Card className="border-border/80 bg-card/95 shadow-sm">
+  <Card className="home-surface-card">
     <CurrentCycleHeader variant={variant} formattedDate={formattedDate} isSaved={isSaved} />
 
-    <CardContent className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+    <CardContent className="home-main-content">
+      <div className="home-main-stats-grid">
         <WorkspaceStat
           icon={<Clock3 className="h-4 w-4 text-primary" />}
           label="Active day"
