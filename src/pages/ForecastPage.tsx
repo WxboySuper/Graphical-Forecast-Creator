@@ -494,8 +494,12 @@ const parseStoredForecastPayload = (storedValue: string | null): unknown | null 
     return null;
   }
 
-  const parsed = JSON.parse(storedValue) as unknown;
-  return validateForecastData(parsed) ? parsed : null;
+  try {
+    const parsed = JSON.parse(storedValue) as unknown;
+    return validateForecastData(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 };
 
 /** Applies one stored forecast payload into Redux and restores the saved map view when present. */
