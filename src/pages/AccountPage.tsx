@@ -638,20 +638,22 @@ const SignedInAccountView: React.FC = () => {
       </AccountHero>
 
       <div className="account-signed-grid">
-        <SignedInPrimaryCard
-          email={user?.email ?? 'Unavailable'}
-          providerLabels={providerLabels}
-          defaultForecasterName={defaultForecasterName}
-          setDefaultForecasterName={setDefaultForecasterName}
-          savingDefaults={savingDefaults}
-          saveMessage={saveMessage}
-          onSaveDefaults={handleSaveDefaultsClick}
-          onSignOut={handleSignOutClick}
-        />
+        <div className="account-main-stack">
+          <SignedInPrimaryCard
+            email={user?.email ?? 'Unavailable'}
+            providerLabels={providerLabels}
+            defaultForecasterName={defaultForecasterName}
+            setDefaultForecasterName={setDefaultForecasterName}
+            savingDefaults={savingDefaults}
+            saveMessage={saveMessage}
+            onSaveDefaults={handleSaveDefaultsClick}
+            onSignOut={handleSignOutClick}
+          />
+          <CloudLibraryCard />
+        </div>
         <div className="account-side-stack">
           <MetricsCard />
           <BillingCard />
-          <CloudLibraryCard />
         </div>
       </div>
     </div>
