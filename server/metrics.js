@@ -59,6 +59,11 @@ const STORAGE_COLLECTIONS = [
   'adminDailyMetrics',
   'adminMetricDedupes',
 ];
+const STORAGE_CACHE_TTL_MS = 5 * 60 * 1000;
+let storageBytesCache = {
+  value: null,
+  expiresAt: 0,
+};
 
 /** Returns today's day key in UTC for admin and user metric rollups. */
 const getDayKey = (date = new Date()) => date.toISOString().slice(0, 10);
@@ -261,8 +266,12 @@ const getCurrentStorageBytes = async () => {
     return 0;
   }
 
+  if (storageBytesCache.value !== null && Date.now() < storageBytesCache.expiresAt) {
+    return storageBytesCache.value;
+  }
+
   const snapshots = await Promise.all(STORAGE_COLLECTIONS.map((collectionName) => db.collection(collectionName).get()));
-  return snapshots.reduce(
+  const totalBytes = snapshots.reduce(
     (total, snapshot) =>
       total + snapshot.docs.reduce((collectionTotal, docSnapshot) => {
         const data = docSnapshot.data() || {};
@@ -271,6 +280,13 @@ const getCurrentStorageBytes = async () => {
       }, 0),
     0
   );
+
+  storageBytesCache = {
+    value: totalBytes,
+    expiresAt: Date.now() + STORAGE_CACHE_TTL_MS,
+  };
+
+  return totalBytes;
 };
 
 /** Writes one product metric event into Firestore-backed user and admin aggregates. */
@@ -404,11 +420,12 @@ const readAdminMetricsWindow = async (windowSize) => {
     return [];
   }
 
-  const requestedKeys = new Set(createRequestedDayKeys(windowSize));
-  const snapshot = await db.collection('adminDailyMetrics').get();
+  const requestedKeys = createRequestedDayKeys(windowSize);
+  const refs = requestedKeys.map((dayKey) => db.collection('adminDailyMetrics').doc(dayKey));
+  const snapshots = refs.length ? await db.getAll(...refs) : [];
 
-  return snapshot.docs
-    .filter((docSnapshot) => requestedKeys.has(docSnapshot.id))
+  return snapshots
+    .filter((docSnapshot) => docSnapshot.exists)
     .map((docSnapshot) => ({
       date: docSnapshot.id,
       ...getDefaultAdminDailyMetrics(),
@@ -500,10 +517,9 @@ const handleAdminMetrics = async (req, res) => {
   }
 
   if (!isAllowedAdminUid(decodedToken.uid)) {
-    const allowlist = getAdminUidAllowlist();
     console.warn('[metrics] admin:forbidden', {
       uid: decodedToken.uid,
-      allowlistSize: allowlist.length,
+      allowlistSize: getAdminUidAllowlist().length,
     });
     res.status(403).json({ error: 'You are not authorized to view the admin dashboard.' });
     return;

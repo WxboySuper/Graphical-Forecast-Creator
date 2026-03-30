@@ -300,11 +300,7 @@ function useCloudSaveCycle({
       if (result.data) {
         setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
       }
-      queueProductMetric({
-        event: 'cloud_cycle_saved',
-        user,
-        storageBytes: JSON.stringify(payload).length,
-      });
+      queueProductMetric({ event: 'cloud_cycle_saved', user });
       updateSyncState('saved');
       return true;
     },

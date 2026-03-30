@@ -386,16 +386,28 @@ const createInvoiceEntitlementWrite = (eventType, invoice) => {
 };
 
 /** Applies the checkout-complete event to the entitlement document. */
+const recordBillingMetricEventSafely = async (eventType) => {
+  try {
+    await recordBillingMetricEvent(eventType);
+  } catch (error) {
+    console.warn('[billing] metrics:nonfatal', {
+      eventType,
+      error: error instanceof Error ? error.message : 'Unknown billing metrics failure',
+    });
+  }
+};
+
+/** Applies the checkout-complete event to the entitlement document. */
 const handleCheckoutSessionCompleted = async (session) => {
   await writeEntitlement(createCheckoutEntitlementWrite(session));
-  await recordBillingMetricEvent('premium_upgrade');
+  await recordBillingMetricEventSafely('premium_upgrade');
 };
 
 /** Applies the subscription lifecycle event to the entitlement document. */
 const handleSubscriptionEvent = async (subscription, eventType) => {
   await writeEntitlement(createSubscriptionEntitlementWrite(subscription));
   if (eventType === 'customer.subscription.deleted') {
-    await recordBillingMetricEvent('premium_cancellation');
+    await recordBillingMetricEventSafely('premium_cancellation');
   }
 };
 

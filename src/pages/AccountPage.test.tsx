@@ -8,9 +8,13 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../billing/EntitlementProvider', () => ({
   useEntitlement: jest.fn(),
 }));
+jest.mock('../metrics/useUserMetrics', () => ({
+  useUserMetrics: jest.fn(),
+}));
 
 const mockUseAuth = jest.requireMock('../auth/AuthProvider').useAuth as jest.Mock;
 const mockUseEntitlement = jest.requireMock('../billing/EntitlementProvider').useEntitlement as jest.Mock;
+const mockUseUserMetrics = jest.requireMock('../metrics/useUserMetrics').useUserMetrics as jest.Mock;
 
 describe('AccountPage', () => {
   beforeEach(() => {
@@ -32,6 +36,21 @@ describe('AccountPage', () => {
       error: null,
       openCheckout: jest.fn(),
       openBillingPortal: jest.fn(),
+    });
+    mockUseUserMetrics.mockReturnValue({
+      metrics: {
+        uid: 'user-1',
+        activeDayStreak: 4,
+        totalActiveDays: 10,
+        cyclesCreated: 3,
+        cloudCyclesSaved: 2,
+        discussionsWritten: 1,
+        verificationSessionsRun: 5,
+        lastActiveDate: '2026-03-30',
+        updatedAt: null,
+      },
+      loading: false,
+      error: null,
     });
   });
 
@@ -122,5 +141,8 @@ describe('AccountPage', () => {
     expect(screen.getByRole('button', { name: /Sign Out/i })).toBeInTheDocument();
     expect(screen.getAllByText(/^Synced$/i)).toHaveLength(1);
     expect(screen.getByRole('link', { name: /View Pricing/i })).toBeInTheDocument();
+    expect(screen.getByText(/Your Activity/i)).toBeInTheDocument();
+    expect(screen.getByText(/^4$/)).toBeInTheDocument();
+    expect(screen.getByText(/^10$/)).toBeInTheDocument();
   });
 });

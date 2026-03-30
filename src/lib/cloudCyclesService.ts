@@ -149,6 +149,15 @@ const readRequiredText = (value: unknown): string | null =>
 /** Reads a stored number field, defaulting missing values to zero. */
 const readStoredCount = (value: unknown): number => (typeof value === 'number' ? value : 0);
 
+/** Returns the serialized cloud payload plus its UTF-8 byte length for storage-safe writes. */
+const createPayloadStorageStats = (payload: GFCForecastSaveData): Pick<CloudCycleDocument, 'payloadJson' | 'payloadBytes'> => {
+  const payloadJson = JSON.stringify(payload);
+  return {
+    payloadJson,
+    payloadBytes: new TextEncoder().encode(payloadJson).length,
+  };
+};
+
 /** Normalizes stored cloud-cycle metadata into the current metadata contract. */
 const normalizeStoredMetadata = ({
   cycleId,
@@ -222,12 +231,11 @@ const normalizeCloudCycleMetadataRecord = ({
 /** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   const { payload, ...metadata } = cycle;
-  const payloadJson = JSON.stringify(payload);
+  const payloadStats = createPayloadStorageStats(payload);
 
   return {
     ...metadata,
-    payloadJson,
-    payloadBytes: payloadJson.length,
+    ...payloadStats,
   };
 };
 
@@ -424,11 +432,11 @@ export const saveCloudCycle = async (
       isReadOnly,
       payloadHash: computePayloadHash(payload),
     };
+    const payloadStats = createPayloadStorageStats(payload);
 
     await setDoc(getCloudCycleDocRef(cycleId), {
       ...metadata,
-      payloadJson: JSON.stringify(payload),
-      payloadBytes: JSON.stringify(payload).length,
+      ...payloadStats,
     });
 
     return { success: true, data: cycleId };

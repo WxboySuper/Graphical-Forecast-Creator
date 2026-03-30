@@ -13,7 +13,6 @@ export type ProductMetricEvent =
 interface RecordProductMetricOptions {
   event: ProductMetricEvent;
   user?: User | null;
-  storageBytes?: number;
 }
 
 const INSTALLATION_ID_STORAGE_KEY = 'gfcInstallationId';
@@ -42,7 +41,6 @@ const getInstallationId = (): string | null => {
 export const recordProductMetric = async ({
   event,
   user,
-  storageBytes,
 }: RecordProductMetricOptions): Promise<void> => {
   try {
     const installationId = getInstallationId();
@@ -65,7 +63,6 @@ export const recordProductMetric = async ({
       body: JSON.stringify({
         event,
         installationId,
-        ...(typeof storageBytes === 'number' ? { storageBytes } : {}),
       }),
     });
   } catch {

@@ -317,7 +317,7 @@ const AdminPage: React.FC = () => {
           <CardContent className="admin-card-content">
             <div className="admin-summary-grid admin-summary-grid-compact">
               <AdminSummaryTile label="Signups" value={`${summary.signups}`} />
-              <AdminSummaryTile label="Active devices" value={`${summary.activeDevices}`} />
+              <AdminSummaryTile label="Devices (latest day)" value={`${summary.activeDevices}`} />
               <AdminSummaryTile label="Upgrades" value={`${summary.upgrades}`} />
               <AdminSummaryTile label="Cancellations" value={`${summary.cancellations}`} />
               <AdminSummaryTile label="Cloud saves" value={`${summary.cloudSaves}`} />
