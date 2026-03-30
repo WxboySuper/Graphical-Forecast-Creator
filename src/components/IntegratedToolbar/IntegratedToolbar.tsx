@@ -97,6 +97,7 @@ interface IntegratedToolbarProps {
   onLoad: (file: File) => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   addToast: AddToastFn;
+  cloudTools: React.ReactNode;
 }
 
 /** Returns true if the given day in the forecast cycle has any outlook polygons drawn for any outlook type. */
@@ -196,6 +197,7 @@ const ToolbarTooltipButton: React.FC<{
 const ToolbarToolsSection: React.FC<{
   onSave: () => void;
   onLoadClick: () => void;
+  cloudTools: React.ReactNode;
   onInitiateExport: () => void;
   onPackageDownload: () => void;
   onOpenHistoryModal: () => void;
@@ -208,7 +210,7 @@ const ToolbarToolsSection: React.FC<{
   canRedo: boolean;
   isExporting: boolean;
   isPackageDownloading: boolean;
-}> = ({ onSave, onLoadClick, onInitiateExport, onPackageDownload, onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm, onUndo, onRedo, isSaved, canUndo, canRedo, isExporting, isPackageDownloading }) => (
+}> = ({ onSave, onLoadClick, cloudTools, onInitiateExport, onPackageDownload, onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm, onUndo, onRedo, isSaved, canUndo, canRedo, isExporting, isPackageDownloading }) => (
   <div className="flex flex-col gap-2 lg:gap-3 border-r border-border pr-2 lg:pr-4">
     <div className="flex items-center gap-2">
       <ToolbarTooltipButton
@@ -240,6 +242,9 @@ const ToolbarToolsSection: React.FC<{
         className="h-14 w-14 lg:h-16 lg:w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400"
         onClick={onLoadClick}
       />
+      {cloudTools}
+    </div>
+    <div className="flex items-center gap-2">
       <ToolbarTooltipButton
         icon={isExporting ? <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" /> : <ImageIcon className="h-6 w-6" />}
         tooltip={<p>{isExporting ? 'Exporting...' : 'Export Image'} <span className="text-muted-foreground">(⌃E)</span></p>}
@@ -247,8 +252,6 @@ const ToolbarToolsSection: React.FC<{
         onClick={onInitiateExport}
         disabled={isExporting}
       />
-    </div>
-    <div className="flex items-center gap-2">
       <ToolbarTooltipButton
         icon={<Archive className="h-6 w-6" />}
         tooltip={<p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p>}
@@ -651,6 +654,7 @@ const ToolbarModals: React.FC<{
 const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
   const {
     onSave, onLoadClick, onInitiateExport, onPackageDownload,
+    cloudTools,
     onOpenHistoryModal, onOpenCopyModal, onOpenResetConfirm,
     onUndo, onRedo,
     onDateSave, onTempDateChange, onStartDateEdit,
@@ -677,7 +681,7 @@ const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
         <div className="h-full overflow-x-auto overflow-y-hidden">
           <div className="flex items-center justify-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 h-full min-w-max">
             <ToolbarToolsSection
-              onSave={onSave} onLoadClick={onLoadClick} onInitiateExport={onInitiateExport}
+              onSave={onSave} onLoadClick={onLoadClick} cloudTools={cloudTools} onInitiateExport={onInitiateExport}
               onPackageDownload={onPackageDownload} onOpenHistoryModal={onOpenHistoryModal}
               onOpenCopyModal={onOpenCopyModal} onOpenResetConfirm={onOpenResetConfirm}
               onUndo={onUndo} onRedo={onRedo}
@@ -973,6 +977,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   onLoad,
   mapRef,
   addToast,
+  cloudTools,
 }) => {
   const dispatch = useDispatch();
   const model = useToolbarDataModel(mapRef, addToast);
@@ -998,6 +1003,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   return (
     <IntegratedToolbarView
       onSave={onSave}
+        cloudTools={cloudTools}
       onOpenHistoryModal={localUi.handleOpenHistoryModal}
       onOpenCopyModal={localUi.handleOpenCopyModal}
       onOpenResetConfirm={localUi.handleOpenResetConfirm}

@@ -1,0 +1,468 @@
+import { collection, deleteField, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { db } from './firebase';
+import { CloudCycleMetadata, CloudCycle, CloudOperationResult } from '../types/cloudCycles';
+import { GFCForecastSaveData } from '../types/outlooks';
+import { SavedCycleStats } from '../store/forecastSlice';
+import { validateForecastData } from '../utils/fileUtils';
+
+const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
+const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
+
+interface CloudCycleDocument extends CloudCycleMetadata {
+  payloadJson: string;
+}
+
+type LegacyCloudCyclesValue = string | Record<string, unknown> | undefined;
+
+type LegacyUserSettingsDocument = {
+  cloudCycles?: LegacyCloudCyclesValue;
+};
+
+/**
+ * Computes a simple hash of the cycle payload for change detection
+ * Uses a simple string hash rather than cryptographic hashing
+ */
+const computePayloadHash = (payload: GFCForecastSaveData): string => {
+  const jsonStr = JSON.stringify(payload);
+  let hash = 0;
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36).substring(0, 12);
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const parseStoredPayload = (value: unknown): GFCForecastSaveData | null => {
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return validateForecastData(parsed) ? (parsed as GFCForecastSaveData) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (validateForecastData(value)) {
+    return value as GFCForecastSaveData;
+  }
+
+  return null;
+};
+
+const getCloudCyclesCollectionRef = () => {
+  if (!db) {
+    throw new Error('Firestore is not initialized');
+  }
+
+  return collection(db, CLOUD_CYCLES_COLLECTION);
+};
+
+const getCloudCycleDocRef = (cycleId: string) => doc(getCloudCyclesCollectionRef(), cycleId);
+
+const getCloudCycleDocSnapshot = (cycleId: string) => getDoc(getCloudCycleDocRef(cycleId));
+
+const getLegacyUserSettingsRef = (userId: string) => {
+  if (!db) {
+    throw new Error('Firestore is not initialized');
+  }
+
+  return doc(db, LEGACY_USER_SETTINGS_COLLECTION, userId);
+};
+
+const readTimestampString = (value: unknown, fallback = new Date(0).toISOString()): string =>
+  typeof value === 'string' && value ? value : fallback;
+
+const normalizeStoredMetadata = (
+  cycleId: string,
+  rawMetadata: Record<string, unknown> | undefined,
+  fallbackUserId: string
+): CloudCycleMetadata | null => {
+  if (!rawMetadata) {
+    return null;
+  }
+
+  const label = typeof rawMetadata.label === 'string' && rawMetadata.label.trim() ? rawMetadata.label : null;
+  const cycleDate = typeof rawMetadata.cycleDate === 'string' && rawMetadata.cycleDate ? rawMetadata.cycleDate : null;
+
+  if (!label || !cycleDate) {
+    return null;
+  }
+
+  return {
+    id: typeof rawMetadata.id === 'string' && rawMetadata.id ? rawMetadata.id : cycleId,
+    userId: typeof rawMetadata.userId === 'string' && rawMetadata.userId ? rawMetadata.userId : fallbackUserId,
+    label,
+    cycleDate,
+    createdAt: readTimestampString(rawMetadata.createdAt),
+    updatedAt: readTimestampString(rawMetadata.updatedAt, readTimestampString(rawMetadata.createdAt)),
+    forecastDays: typeof rawMetadata.forecastDays === 'number' ? rawMetadata.forecastDays : 0,
+    totalOutlooks: typeof rawMetadata.totalOutlooks === 'number' ? rawMetadata.totalOutlooks : 0,
+    totalFeatures: typeof rawMetadata.totalFeatures === 'number' ? rawMetadata.totalFeatures : 0,
+    isReadOnly: Boolean(rawMetadata.isReadOnly),
+    payloadHash: typeof rawMetadata.payloadHash === 'string' && rawMetadata.payloadHash ? rawMetadata.payloadHash : undefined,
+  };
+};
+
+const normalizeCloudCycleRecord = (
+  cycleId: string,
+  rawRecord: unknown,
+  fallbackUserId: string
+): CloudCycle | null => {
+  if (!isPlainObject(rawRecord)) {
+    return null;
+  }
+
+  const metadataSource = isPlainObject(rawRecord.metadata) ? (rawRecord.metadata as Record<string, unknown>) : rawRecord;
+  const payload = parseStoredPayload(rawRecord.payloadJson ?? rawRecord.payload);
+
+  const metadata = normalizeStoredMetadata(cycleId, metadataSource, fallbackUserId);
+  if (!metadata || !payload) {
+    return null;
+  }
+
+  return {
+    ...metadata,
+    payload,
+  };
+};
+
+const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
+  const { payload, ...metadata } = cycle;
+
+  return {
+    ...metadata,
+    payloadJson: JSON.stringify(payload),
+  };
+};
+
+const readCloudCyclesFromQuery = (snapshot: { docs: Array<{ id: string; data: () => unknown }> }, fallbackUserId: string): CloudCycle[] =>
+  snapshot.docs
+    .map((cycleDoc) => normalizeCloudCycleRecord(cycleDoc.id, cycleDoc.data(), fallbackUserId))
+    .filter((cycle): cycle is CloudCycle => Boolean(cycle));
+
+const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
+  try {
+    const snapshot = await getDoc(getLegacyUserSettingsRef(userId));
+    const legacyData = snapshot.data() as LegacyUserSettingsDocument | undefined;
+    const rawValue = legacyData?.cloudCycles;
+
+    if (!rawValue) {
+      return [];
+    }
+
+    const rawStore = typeof rawValue === 'string'
+      ? (() => {
+          try {
+            const parsed = JSON.parse(rawValue) as unknown;
+            return isPlainObject(parsed) ? parsed : null;
+          } catch {
+            return null;
+          }
+        })()
+      : isPlainObject(rawValue)
+        ? rawValue
+        : null;
+
+    if (!rawStore) {
+      return [];
+    }
+
+    return Object.entries(rawStore)
+      .map(([cycleId, rawRecord]) => normalizeCloudCycleRecord(cycleId, rawRecord, userId))
+      .filter((cycle): cycle is CloudCycle => Boolean(cycle));
+  } catch (error) {
+    console.error('Error reading legacy cloud cycles:', error);
+    return [];
+  }
+};
+
+const migrateLegacyCloudCycles = async (userId: string, cycles: CloudCycle[]): Promise<void> => {
+  if (!cycles.length) {
+    return;
+  }
+
+  await Promise.all(
+    cycles.map(async (cycle) => {
+      await setDoc(getCloudCycleDocRef(cycle.id), serializeCloudCycleDocument(cycle));
+    })
+  );
+
+  await setDoc(
+    getLegacyUserSettingsRef(userId),
+    {
+      cloudCycles: deleteField(),
+    },
+    { merge: true }
+  );
+};
+
+const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => {
+  const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
+  const cycles = readCloudCyclesFromQuery(snapshot, userId);
+
+  if (cycles.length > 0) {
+    return cycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+  }
+
+  const legacyCycles = await readLegacyCloudCycles(userId);
+  if (legacyCycles.length > 0) {
+    await migrateLegacyCloudCycles(userId, legacyCycles);
+  }
+
+  return legacyCycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+};
+
+const fetchCloudCycleById = async (userId: string, cycleId: string): Promise<CloudCycle | null> => {
+  const docSnapshot = await getCloudCycleDocSnapshot(cycleId);
+  if (docSnapshot.exists()) {
+    const cycle = normalizeCloudCycleRecord(docSnapshot.id, docSnapshot.data(), userId);
+    if (cycle && cycle.userId === userId) {
+      return cycle;
+    }
+  }
+
+  const legacyCycles = await readLegacyCloudCycles(userId);
+  const legacyMatch = legacyCycles.find((cycle) => cycle.id === cycleId) ?? null;
+  if (legacyMatch) {
+    await migrateLegacyCloudCycles(userId, legacyCycles);
+  }
+
+  return legacyMatch;
+};
+
+const getOwnedCloudCycle = async (userId: string, cycleId: string): Promise<CloudCycle | null> => {
+  const existingSnapshot = await getCloudCycleDocSnapshot(cycleId);
+  if (!existingSnapshot.exists()) {
+    return null;
+  }
+
+  const existingCycle = normalizeCloudCycleRecord(cycleId, existingSnapshot.data(), userId);
+  if (!existingCycle || existingCycle.userId !== userId) {
+    return null;
+  }
+
+  return existingCycle;
+};
+
+/**
+ * Saves a new cloud cycle or updates an existing one
+ */
+export const saveCloudCycle = async (
+  userId: string,
+  label: string,
+  cycleDate: string,
+  stats: SavedCycleStats,
+  payload: GFCForecastSaveData,
+  isReadOnly: boolean = false,
+  existingId?: string
+): Promise<CloudOperationResult<string>> => {
+  try {
+    const cycleId = existingId || `${cycleDate}-${Date.now()}`;
+    const now = new Date().toISOString();
+    const existingCycle = existingId ? await getOwnedCloudCycle(userId, existingId) : null;
+
+    if (existingId && !existingCycle) {
+      return {
+        success: false,
+        error: 'Cloud cycle not found',
+      };
+    }
+
+    const metadata: CloudCycleMetadata = {
+      id: cycleId,
+      userId,
+      label,
+      cycleDate,
+      createdAt: existingCycle?.createdAt ?? now,
+      updatedAt: now,
+      forecastDays: stats.forecastDays,
+      totalOutlooks: stats.totalOutlooks,
+      totalFeatures: stats.totalFeatures,
+      isReadOnly,
+      payloadHash: computePayloadHash(payload),
+    };
+
+    await setDoc(getCloudCycleDocRef(cycleId), {
+      ...metadata,
+      payloadJson: JSON.stringify(payload),
+    });
+
+    return { success: true, data: cycleId };
+  } catch (error) {
+    console.error('Error saving cloud cycle:', error);
+    return {
+      success: false,
+      error: `Failed to save cloud cycle: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+};
+
+/**
+ * Loads a specific cloud cycle
+ */
+export const loadCloudCycle = async (
+  userId: string,
+  cycleId: string
+): Promise<CloudOperationResult<CloudCycle>> => {
+  try {
+    const record = await fetchCloudCycleById(userId, cycleId);
+
+    if (!record) {
+      return {
+        success: false,
+        error: 'Cloud cycle not found',
+      };
+    }
+
+    return {
+      success: true,
+      data: record,
+    };
+  } catch (error) {
+    console.error('Error loading cloud cycle:', error);
+    return {
+      success: false,
+      error: `Failed to load cloud cycle: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+};
+
+/**
+ * Deletes a cloud cycle
+ */
+export const deleteCloudCycle = async (
+  userId: string,
+  cycleId: string
+): Promise<CloudOperationResult> => {
+  try {
+    const existingCycle = await getOwnedCloudCycle(userId, cycleId);
+    if (!existingCycle) {
+      return { success: true };
+    }
+
+    await deleteDoc(getCloudCycleDocRef(cycleId));
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting cloud cycle:', error);
+    return {
+      success: false,
+      error: `Failed to delete cloud cycle: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+};
+
+/**
+ * Renames a cloud cycle
+ */
+export const renameCloudCycle = async (
+  userId: string,
+  cycleId: string,
+  newLabel: string
+): Promise<CloudOperationResult> => {
+  try {
+    const existing = await getOwnedCloudCycle(userId, cycleId);
+    if (!existing) {
+      return {
+        success: false,
+        error: 'Cloud cycle not found',
+      };
+    }
+
+    const nextMetadata: CloudCycle = {
+      ...existing,
+      label: newLabel,
+      updatedAt: new Date().toISOString(),
+      payloadHash: computePayloadHash(existing.payload),
+    };
+
+    await setDoc(getCloudCycleDocRef(cycleId), serializeCloudCycleDocument(nextMetadata));
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error renaming cloud cycle:', error);
+    return {
+      success: false,
+      error: `Failed to rename cloud cycle: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+};
+
+/**
+ * Lists all cloud cycles for a user (metadata only, not full payloads)
+ */
+export const listCloudCycles = async (
+  userId: string
+): Promise<CloudOperationResult<CloudCycleMetadata[]>> => {
+  try {
+    const cycles = await readCloudCyclesForUser(userId);
+    const metadata = cycles.map(({ payload, ...cycleMetadata }) => cycleMetadata);
+
+    return { success: true, data: metadata };
+  } catch (error) {
+    console.error('Error listing cloud cycles:', error);
+    return {
+      success: false,
+      error: `Failed to list cloud cycles: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+};
+
+/**
+ * Subscribes to cloud cycles list for real-time updates
+ */
+export const subscribeToCloudCycles = (
+  userId: string,
+  onUpdate: (cycles: CloudCycleMetadata[]) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  try {
+    const cyclesQuery = query(getCloudCyclesCollectionRef(), where('userId', '==', userId));
+
+    const unsubscribe = onSnapshot(
+      cyclesQuery,
+      async (querySnapshot) => {
+        const cycles = readCloudCyclesFromQuery(querySnapshot, userId);
+
+        if (cycles.length > 0) {
+          onUpdate(cycles.map(({ payload, ...metadata }) => metadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
+          return;
+        }
+
+        const legacyCycles = await readLegacyCloudCycles(userId);
+        if (legacyCycles.length > 0) {
+          await migrateLegacyCloudCycles(userId, legacyCycles);
+          onUpdate(legacyCycles.map(({ payload, ...metadata }) => metadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
+          return;
+        }
+
+        onUpdate([]);
+      },
+      (error) => {
+        console.error('Error subscribing to cloud cycles:', error);
+        onError?.(error as Error);
+      }
+    );
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error setting up cloud cycles subscription:', error);
+    if (onError && error instanceof Error) onError(error);
+    return () => {};
+  }
+};
+
+/**
+ * Checks if a local cycle differs from the remote version
+ */
+export const hasRemoteChanges = (
+  localPayload: GFCForecastSaveData,
+  remoteMetadata: CloudCycleMetadata
+): boolean => {
+  const localHash = computePayloadHash(localPayload);
+  return localHash !== remoteMetadata.payloadHash;
+};

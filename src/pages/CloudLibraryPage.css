@@ -1,0 +1,391 @@
+.cloud-library-page {
+  min-height: 100%;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-primary) 62%, var(--bg-primary));
+}
+
+.cloud-library-shell {
+  max-width: 84rem;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.cloud-library-hero {
+  display: grid;
+  gap: 1.6rem;
+  align-items: start;
+  padding: 2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 2rem;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-primary) 58%, var(--bg-primary));
+  box-shadow: var(--shadow-lg);
+}
+
+.cloud-library-hero-copy,
+.cloud-library-hero-text,
+.cloud-library-hero-panel,
+.cloud-library-main,
+.cloud-library-side,
+.cloud-library-list-content,
+.cloud-library-support-content,
+.cloud-cycle-main,
+.cloud-cycle-header,
+.cloud-cycle-actions,
+.cloud-cycle-rename-row,
+.cloud-library-empty-state,
+.cloud-library-empty-copy,
+.cloud-library-quick-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.cloud-library-hero-copy {
+  gap: 1rem;
+}
+
+.cloud-library-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--button-bg);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.cloud-library-hero-text {
+  gap: 0.75rem;
+}
+
+.cloud-library-hero-text h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 3.6vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.cloud-library-hero-text p {
+  margin: 0;
+  max-width: 58ch;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--text-secondary);
+}
+
+.cloud-library-hero-panel,
+.cloud-library-surface-card,
+.cloud-library-support-card,
+.cloud-library-notice-card {
+  border: 1px solid var(--border-color);
+  border-radius: 1.75rem;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.cloud-library-hero-panel {
+  gap: 1.25rem;
+  padding: 1.6rem;
+}
+
+.cloud-library-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.cloud-library-stat-grid,
+.cloud-library-support-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.cloud-library-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1.15rem;
+  background: var(--bg-secondary);
+}
+
+.cloud-library-stat span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.cloud-library-stat strong {
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.cloud-library-layout {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cloud-library-main,
+.cloud-library-side {
+  gap: 2rem;
+}
+
+.cloud-library-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 2.15rem 2.25rem 1.35rem;
+}
+
+.cloud-library-section-header h2,
+.cloud-library-section-header h3 {
+  margin: 0;
+}
+
+.cloud-library-section-header p,
+.cloud-library-support-copy,
+.cloud-library-side-note,
+.cloud-library-feedback p,
+.cloud-library-notice-content p,
+.cloud-cycle-meta,
+.cloud-library-empty-copy p {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.75;
+  color: var(--text-secondary);
+}
+
+.cloud-library-list-content,
+.cloud-library-support-content {
+  gap: 1.4rem;
+  padding: 0 2.25rem 2.25rem;
+}
+
+.cloud-library-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cloud-library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cloud-cycle-card {
+  border-radius: 1.45rem;
+}
+
+.cloud-cycle-card-content {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  padding: 1.4rem;
+}
+
+.cloud-cycle-main,
+.cloud-cycle-header,
+.cloud-cycle-actions,
+.cloud-cycle-rename-row {
+  gap: 0.9rem;
+}
+
+.cloud-cycle-title-row,
+.cloud-cycle-meta,
+.cloud-cycle-stats,
+.cloud-cycle-inline-actions,
+.cloud-library-empty-actions,
+.cloud-library-support-actions,
+.cloud-library-feedback,
+.cloud-library-notice-content {
+  display: flex;
+}
+
+.cloud-cycle-title-row,
+.cloud-cycle-meta,
+.cloud-cycle-stats,
+.cloud-library-empty-actions,
+.cloud-library-support-actions {
+  flex-wrap: wrap;
+}
+
+.cloud-cycle-title-row,
+.cloud-cycle-meta {
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cloud-cycle-title-row h3 {
+  margin: 0;
+  font-size: 1.22rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.cloud-cycle-stats {
+  gap: 0.75rem;
+}
+
+.cloud-cycle-stats .cloud-library-stat {
+  min-width: 8rem;
+  flex: 1 1 0;
+}
+
+.cloud-cycle-actions {
+  gap: 0.75rem;
+  min-width: 10rem;
+}
+
+.cloud-cycle-inline-actions {
+  gap: 0.7rem;
+}
+
+.cloud-library-empty-state {
+  gap: 1.15rem;
+  padding: 0.35rem 0 0.1rem;
+}
+
+.cloud-library-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.cloud-library-empty-copy {
+  gap: 0.6rem;
+}
+
+.cloud-library-empty-copy h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.cloud-library-empty-actions,
+.cloud-library-support-actions {
+  gap: 0.75rem;
+}
+
+.cloud-library-divider {
+  height: 1px;
+  background: var(--border-color);
+}
+
+.cloud-library-quick-actions {
+  gap: 0.75rem;
+}
+
+.cloud-library-support-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.cloud-library-support-copy {
+  font-size: 0.96rem;
+}
+
+.cloud-library-feedback,
+.cloud-library-notice-content {
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 1.4rem;
+}
+
+.cloud-library-loading,
+.cloud-library-center-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cloud-library-loading {
+  padding: 3rem 0;
+  color: var(--text-secondary);
+}
+
+.cloud-library-center-shell {
+  min-height: 100%;
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-primary) 62%, var(--bg-primary));
+}
+
+.cloud-library-auth-card {
+  width: 100%;
+  max-width: 32rem;
+}
+
+@media (min-width: 1024px) {
+  .cloud-library-hero {
+    grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.85fr);
+    align-items: stretch;
+  }
+
+  .cloud-library-layout {
+    grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.82fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 800px) {
+  .cloud-library-shell {
+    padding: 1.25rem 1rem 2rem;
+    gap: 1.5rem;
+  }
+
+  .cloud-library-hero {
+    padding: 1.45rem;
+    border-radius: 1.5rem;
+  }
+
+  .cloud-library-hero-text h1 {
+    font-size: 2.15rem;
+  }
+
+  .cloud-library-section-header {
+    padding: 1.75rem 1.5rem 1.15rem;
+  }
+
+  .cloud-library-list-content,
+  .cloud-library-support-content {
+    padding: 0 1.5rem 1.5rem;
+  }
+
+  .cloud-library-stat-grid,
+  .cloud-library-support-grid,
+  .cloud-cycle-card-content {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-cycle-actions {
+    min-width: 0;
+  }
+
+  .cloud-cycle-actions button,
+  .cloud-library-support-actions button,
+  .cloud-library-empty-actions button {
+    width: 100%;
+  }
+}
