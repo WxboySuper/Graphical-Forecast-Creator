@@ -284,7 +284,10 @@ const AdminPage: React.FC = () => {
           label="Premium subscriptions"
           value={loading ? 'Loading...' : `${summary.premiumSubscriptions}`}
         />
-        <AdminSummaryTile label="Storage footprint" value={loading ? 'Loading...' : formatBytes(summary.storageBytes)} />
+        <AdminSummaryTile
+          label="Hosted data footprint"
+          value={loading ? 'Loading...' : formatBytes(summary.storageBytes)}
+        />
       </div>
 
       <div className="admin-content-grid">

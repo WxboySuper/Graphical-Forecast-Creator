@@ -49,6 +49,15 @@ const ADMIN_RATE_LIMIT = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many admin metric requests right now. Please wait a moment and try again.' },
 });
+const STORAGE_COLLECTIONS = [
+  'cloudCycles',
+  'userProfiles',
+  'userSettings',
+  'userEntitlements',
+  'userMetrics',
+  'adminDailyMetrics',
+  'adminMetricDedupes',
+];
 
 /** Returns today's day key in UTC for admin and user metric rollups. */
 const getDayKey = (date = new Date()) => date.toISOString().slice(0, 10);
@@ -243,34 +252,23 @@ const countTotalAccounts = async () => {
   return snapshot.size;
 };
 
-/** Returns the current total stored cloud payload size across all hosted cycles. */
+/** Estimates the current hosted Firestore storage footprint across the main app collections. */
 const getCurrentStorageBytes = async () => {
   const db = getAdminDb();
   if (!db) {
     return 0;
   }
 
-  const snapshot = await db.collection('cloudCycles').get();
-  return snapshot.docs.reduce((total, docSnapshot) => {
-    const data = docSnapshot.data() || {};
-    if (typeof data.payloadBytes === 'number') {
-      return total + data.payloadBytes;
-    }
-
-    if (typeof data.payloadJson === 'string') {
-      return total + Buffer.byteLength(data.payloadJson, 'utf8');
-    }
-
-    if (typeof data.payload === 'string') {
-      return total + Buffer.byteLength(data.payload, 'utf8');
-    }
-
-    if (data.payload && typeof data.payload === 'object') {
-      return total + Buffer.byteLength(JSON.stringify(data.payload), 'utf8');
-    }
-
-    return total;
-  }, 0);
+  const snapshots = await Promise.all(STORAGE_COLLECTIONS.map((collectionName) => db.collection(collectionName).get()));
+  return snapshots.reduce(
+    (total, snapshot) =>
+      total + snapshot.docs.reduce((collectionTotal, docSnapshot) => {
+        const data = docSnapshot.data() || {};
+        const encodedData = JSON.stringify(data);
+        return collectionTotal + Buffer.byteLength(docSnapshot.id, 'utf8') + Buffer.byteLength(encodedData, 'utf8');
+      }, 0),
+    0
+  );
 };
 
 /** Writes one product metric event into Firestore-backed user and admin aggregates. */
