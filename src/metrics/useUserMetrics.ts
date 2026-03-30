@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
+import { doc, getDoc, type Timestamp } from 'firebase/firestore';
 import { db, isHostedAuthEnabled } from '../lib/firebase';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -59,6 +59,7 @@ export const useUserMetrics = (): UseUserMetricsResult => {
   const [metrics, setMetrics] = useState<UserMetricsDocument>(DEFAULT_USER_METRICS);
   const [loading, setLoading] = useState(Boolean(isHostedAuthEnabled));
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (!isHostedAuthEnabled || !db) {
@@ -81,10 +82,15 @@ export const useUserMetrics = (): UseUserMetricsResult => {
     }
 
     setLoading(true);
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
     const metricsRef = doc(db, 'userMetrics', user.uid);
-    const unsubscribe = onSnapshot(
-      metricsRef,
-      (snapshot) => {
+    getDoc(metricsRef)
+      .then((snapshot) => {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
         setMetrics(
           readUserMetricsDocument(
             snapshot.data() as Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined
@@ -92,15 +98,16 @@ export const useUserMetrics = (): UseUserMetricsResult => {
         );
         setLoading(false);
         setError(null);
-      },
-      (nextError) => {
+      })
+      .catch((nextError: Error) => {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
         setMetrics(DEFAULT_USER_METRICS);
         setLoading(false);
         setError(nextError.message);
-      }
-    );
-
-    return unsubscribe;
+      });
   }, [status, user]);
 
   return { metrics, loading, error };

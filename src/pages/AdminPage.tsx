@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { Activity, Lock, TrendingUp } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
@@ -40,6 +40,15 @@ interface ParsedAdminMetricsResponse {
 }
 
 type AdminAccessState = 'disabled' | 'auth_loading' | 'signed_out' | 'denied' | 'allowed';
+
+interface UseAdminMetricsState {
+  windowSize: AdminWindow;
+  setWindowSize: React.Dispatch<React.SetStateAction<AdminWindow>>;
+  loading: boolean;
+  error: string | null;
+  metricsResponse: AdminMetricsResponse | null;
+  accessState: AdminAccessState;
+}
 
 const DEFAULT_SUMMARY: AdminMetricsSummary = {
   totalAccounts: 0,
@@ -181,6 +190,81 @@ const fetchAdminMetrics = async (user: NonNullable<ReturnType<typeof useAuth>['u
   });
 
   return parseAdminMetricsResponse(response);
+};
+
+/** True when the in-flight admin request is still the latest one issued by the page. */
+const isLatestAdminRequest = (
+  requestId: number,
+  requestIdRef: React.MutableRefObject<number>
+) => requestId === requestIdRef.current;
+
+/** Loads and normalizes the private admin metrics window plus access state. */
+const useAdminMetricsState = (): UseAdminMetricsState => {
+  const { hostedAuthEnabled, status, user } = useAuth();
+  const [windowSize, setWindowSize] = useState<AdminWindow>(7);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [metricsResponse, setMetricsResponse] = useState<AdminMetricsResponse | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const requestIdRef = useRef(0);
+  const authLoading = status === 'loading';
+  const accessState = getAdminAccessState({
+    hostedAuthEnabled,
+    authLoading,
+    status,
+    user,
+    accessDenied,
+  });
+
+  useEffect(() => {
+    if (accessState !== 'allowed' || !user) {
+      if (accessState === 'auth_loading') {
+        setLoading(true);
+      } else {
+        setLoading(false);
+        setMetricsResponse(null);
+        setAccessDenied(false);
+      }
+      return;
+    }
+
+    let isActive = true;
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+    setLoading(true);
+    setError(null);
+    setAccessDenied(false);
+    fetchAdminMetrics(user, windowSize)
+      .then((parsedResponse) => {
+        isActive = isLatestAdminRequest(requestId, requestIdRef);
+        applyAdminMetricsSuccess({
+          parsedResponse,
+          isActive,
+          setMetricsResponse,
+          setAccessDenied,
+          setLoading,
+        });
+      })
+      .catch((nextError) => {
+        isActive = isLatestAdminRequest(requestId, requestIdRef);
+        applyAdminMetricsError({
+          nextError,
+          isActive,
+          setMetricsResponse,
+          setError,
+          setLoading,
+        });
+      });
+  }, [accessState, user, windowSize]);
+
+  return {
+    windowSize,
+    setWindowSize,
+    loading,
+    error,
+    metricsResponse,
+    accessState,
+  };
 };
 
 /** Formats aggregate byte counts into compact admin-friendly storage labels. */
@@ -391,71 +475,14 @@ const AdminDashboardContent: React.FC<{
 
 /** Hidden admin dashboard for aggregate-only hosted product health metrics. */
 const AdminPage: React.FC = () => {
-  const { hostedAuthEnabled, status, user } = useAuth();
-  const [windowSize, setWindowSize] = useState<AdminWindow>(7);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [metricsResponse, setMetricsResponse] = useState<AdminMetricsResponse | null>(null);
-  const [accessDenied, setAccessDenied] = useState(false);
-  const authLoading = status === 'loading';
-  const accessState = getAdminAccessState({
-    hostedAuthEnabled,
-    authLoading,
-    status,
-    user,
-    accessDenied,
-  });
-
-  useEffect(() => {
-    if (!hostedAuthEnabled) {
-      setLoading(false);
-      setMetricsResponse(null);
-      setAccessDenied(false);
-      return;
-    }
-
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-
-    if (status !== 'signed_in' || !user) {
-      setLoading(false);
-      setMetricsResponse(null);
-      setAccessDenied(false);
-      return;
-    }
-
-    let isActive = true;
-    setLoading(true);
-    setError(null);
-    setAccessDenied(false);
-    fetchAdminMetrics(user, windowSize)
-      .then((parsedResponse) => {
-        applyAdminMetricsSuccess({
-          parsedResponse,
-          isActive,
-          setMetricsResponse,
-          setAccessDenied,
-          setLoading,
-        });
-      })
-      .catch((nextError) => {
-        applyAdminMetricsError({
-          nextError,
-          isActive,
-          setMetricsResponse,
-          setError,
-          setLoading,
-        });
-      });
-
-    function cleanupAdminMetricsLoad() {
-      isActive = false;
-    }
-
-    return cleanupAdminMetricsLoad;
-  }, [hostedAuthEnabled, status, user, windowSize]);
+  const {
+    windowSize,
+    setWindowSize,
+    loading,
+    error,
+    metricsResponse,
+    accessState,
+  } = useAdminMetricsState();
 
   const summary = useMemo(() => metricsResponse?.summary ?? DEFAULT_SUMMARY, [metricsResponse]);
 

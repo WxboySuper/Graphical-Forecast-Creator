@@ -147,6 +147,12 @@ const getDefaultAdminDailyMetrics = () => ({
   updatedAt: new Date(),
 });
 
+/** Returns true when the daily metric event maps to one of the aggregate admin counters. */
+const hasAdminEventField = (eventType) => Boolean(ADMIN_EVENT_FIELDS[eventType]);
+
+/** Returns true when a live-summary value should overwrite the stored daily aggregate field. */
+const shouldApplyLiveSummaryValue = (value) => typeof value === 'number';
+
 /** True when the event should advance the user's active-day streak and total active-day count. */
 const countsAsActiveDay = (eventType) => ACTIVE_DAY_EVENT_TYPES.has(eventType);
 
@@ -206,15 +212,15 @@ const buildNextAdminDailyMetrics = ({
     nextMetrics.activeSignedInAccounts = Number(nextMetrics.activeSignedInAccounts || 0) + 1;
   }
 
-  if (eventField) {
+  if (hasAdminEventField(eventType) && eventField) {
     nextMetrics[eventField] = Number(nextMetrics[eventField] || 0) + 1;
   }
 
-  if (typeof premiumSubscriptions === 'number') {
+  if (shouldApplyLiveSummaryValue(premiumSubscriptions)) {
     nextMetrics.premiumSubscriptions = premiumSubscriptions;
   }
 
-  if (typeof storageBytes === 'number') {
+  if (shouldApplyLiveSummaryValue(storageBytes)) {
     nextMetrics.storageBytes = storageBytes;
   }
 
@@ -322,6 +328,45 @@ const getCurrentStorageBytes = async () => {
   return totalBytes;
 };
 
+/** Builds the Firestore refs needed to record one metric event. */
+const createMetricEventRefs = ({ db, dayKey, installationId, uid }) => {
+  const installationHash = installationId ? hashInstallationId(installationId) : null;
+
+  return {
+    dailyRef: db.collection('adminDailyMetrics').doc(dayKey),
+    deviceDedupeRef: installationHash
+      ? db.collection('adminMetricDedupes').doc(createDedupeDocId('device', dayKey, installationHash))
+      : null,
+    accountDedupeRef: uid
+      ? db.collection('adminMetricDedupes').doc(createDedupeDocId('account', dayKey, uid))
+      : null,
+    userMetricsRef: uid ? db.collection('userMetrics').doc(uid) : null,
+  };
+};
+
+/** Returns whether this event should refresh live admin headline totals. */
+const shouldRefreshLiveAdminSummary = (eventType) => eventType === 'cloud_cycle_saved';
+
+/** Loads optional live admin summary values needed for metric writes. */
+const readLiveAdminSummary = async (eventType) => {
+  if (!shouldRefreshLiveAdminSummary(eventType)) {
+    return {
+      premiumSubscriptions: undefined,
+      storageBytes: undefined,
+    };
+  }
+
+  const [premiumSubscriptions, storageBytes] = await Promise.all([
+    countPremiumSubscriptions(),
+    getCurrentStorageBytes(),
+  ]);
+
+  return {
+    premiumSubscriptions,
+    storageBytes,
+  };
+};
+
 /** Writes one product metric event into Firestore-backed user and admin aggregates. */
 const recordMetricEvent = async ({ eventType, installationId, uid }) => {
   const db = getAdminDb();
@@ -330,20 +375,13 @@ const recordMetricEvent = async ({ eventType, installationId, uid }) => {
   }
 
   const dayKey = getDayKey();
-  const dailyRef = db.collection('adminDailyMetrics').doc(dayKey);
-  const installationHash = installationId ? hashInstallationId(installationId) : null;
-  const deviceDedupeRef = installationHash
-    ? db.collection('adminMetricDedupes').doc(createDedupeDocId('device', dayKey, installationHash))
-    : null;
-  const accountDedupeRef = uid
-    ? db.collection('adminMetricDedupes').doc(createDedupeDocId('account', dayKey, uid))
-    : null;
-  const userMetricsRef = uid ? db.collection('userMetrics').doc(uid) : null;
-  const shouldRefreshLiveSummary = eventType === 'cloud_cycle_saved';
-  const [premiumSubscriptions, storageBytes] = await Promise.all([
-    shouldRefreshLiveSummary ? countPremiumSubscriptions() : Promise.resolve(),
-    shouldRefreshLiveSummary ? getCurrentStorageBytes() : Promise.resolve(),
-  ]);
+  const { dailyRef, deviceDedupeRef, accountDedupeRef, userMetricsRef } = createMetricEventRefs({
+    db,
+    dayKey,
+    installationId,
+    uid,
+  });
+  const { premiumSubscriptions, storageBytes } = await readLiveAdminSummary(eventType);
 
   await db.runTransaction(async (transaction) => {
     const [dailySnapshot, deviceDedupeSnapshot, accountDedupeSnapshot, userMetricsSnapshot] = await Promise.all([
