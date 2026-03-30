@@ -528,9 +528,9 @@ export const renameCloudCycle = async (
  * Lists all cloud cycles for a user as metadata-only objects.
  * Payload JSON is still stored in the same Firestore document today, so this avoids parse cost but not document transfer size.
  */
-export const listCloudCycles = async (
+export async function listCloudCycles(
   { userId }: ListCloudCyclesParams
-): Promise<CloudOperationResult<CloudCycleMetadata[]>> => {
+): Promise<CloudOperationResult<CloudCycleMetadata[]>> {
   try {
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
     const metadata = readCloudCycleMetadataFromQuery({ snapshot, fallbackUserId: userId });
@@ -549,7 +549,7 @@ export const listCloudCycles = async (
       error: `Failed to list cloud cycles: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
   }
-};
+}
 
 /**
  * Subscribes to cloud cycles list for real-time updates
