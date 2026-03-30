@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Cloud hosted forecasts:** Moved cloud forecast storage out of `userSettings` into a dedicated `cloudCycles` collection so forecast payloads have a long-term home separate from profile preferences.
+
 ### Fixed
 - **Billing route throttling:** Added explicit rate limiting to the Stripe billing checkout, portal, and webhook endpoints so authorization-bearing billing routes are consistently protected.
 
