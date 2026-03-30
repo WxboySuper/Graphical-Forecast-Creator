@@ -206,6 +206,26 @@ const buildNextAdminDailyMetrics = ({
   return nextMetrics;
 };
 
+/** Returns the latest-day snapshot fields that are shown as current admin headline values. */
+const getLatestAdminSummaryValues = (latestMetrics, liveSummary) => ({
+  totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
+  activeDevices: latestMetrics.activeDevices,
+  activeSignedInAccounts: latestMetrics.activeSignedInAccounts,
+  premiumSubscriptions: latestMetrics.premiumSubscriptions,
+  storageBytes: latestMetrics.storageBytes,
+});
+
+/** Adds one day's rollup values into the requested window totals. */
+const accumulateAdminWindowTotals = (totals, dayMetrics) => ({
+  ...totals,
+  signups: totals.signups + Number(dayMetrics.signups || 0),
+  signIns: totals.signIns + Number(dayMetrics.signIns || 0),
+  upgrades: totals.upgrades + Number(dayMetrics.upgrades || 0),
+  cancellations: totals.cancellations + Number(dayMetrics.cancellations || 0),
+  cloudSaves: totals.cloudSaves + Number(dayMetrics.cloudSaves || 0),
+  cloudLoads: totals.cloudLoads + Number(dayMetrics.cloudLoads || 0),
+});
+
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
 const verifyRequestUser = async (req) => {
   const authHeader = req.headers.authorization || '';
@@ -437,27 +457,10 @@ const readAdminMetricsWindow = async (windowSize) => {
 /** Builds the admin dashboard headline summary from the latest daily doc plus window totals. */
 const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
   const latestMetrics = dailyMetrics[dailyMetrics.length - 1] || getDefaultAdminDailyMetrics();
-
-  const totals = dailyMetrics.reduce(
-    (nextSummary, dayMetrics) => ({
-      totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
-      activeDevices: latestMetrics.activeDevices,
-      activeSignedInAccounts: latestMetrics.activeSignedInAccounts,
-      premiumSubscriptions: latestMetrics.premiumSubscriptions,
-      storageBytes: latestMetrics.storageBytes,
-      signups: nextSummary.signups + Number(dayMetrics.signups || 0),
-      signIns: nextSummary.signIns + Number(dayMetrics.signIns || 0),
-      upgrades: nextSummary.upgrades + Number(dayMetrics.upgrades || 0),
-      cancellations: nextSummary.cancellations + Number(dayMetrics.cancellations || 0),
-      cloudSaves: nextSummary.cloudSaves + Number(dayMetrics.cloudSaves || 0),
-      cloudLoads: nextSummary.cloudLoads + Number(dayMetrics.cloudLoads || 0),
-    }),
+  const baseSummary = getLatestAdminSummaryValues(latestMetrics, liveSummary);
+  const windowTotals = dailyMetrics.reduce(
+    accumulateAdminWindowTotals,
     {
-      totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
-      activeDevices: latestMetrics.activeDevices,
-      activeSignedInAccounts: latestMetrics.activeSignedInAccounts,
-      premiumSubscriptions: latestMetrics.premiumSubscriptions,
-      storageBytes: latestMetrics.storageBytes,
       signups: 0,
       signIns: 0,
       upgrades: 0,
@@ -469,7 +472,8 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
 
   return {
     ...(typeof liveSummary.totalAccounts === 'number' ? { totalAccounts: liveSummary.totalAccounts } : {}),
-    ...totals,
+    ...baseSummary,
+    ...windowTotals,
     ...(typeof liveSummary.premiumSubscriptions === 'number'
       ? { premiumSubscriptions: liveSummary.premiumSubscriptions }
       : {}),

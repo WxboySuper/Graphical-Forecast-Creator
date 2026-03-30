@@ -54,20 +54,51 @@ describe('AccountPage', () => {
     });
   });
 
-  test('shows the local-only fallback when hosted auth is disabled', () => {
-    mockUseAuth.mockReturnValue({
-      hostedAuthEnabled: false,
-      status: 'disabled',
-      settingsSyncStatus: 'disabled',
-      user: null,
-      syncedSettings: null,
-      error: null,
-      signInWithGoogle: jest.fn(),
-      signInWithEmail: jest.fn(),
-      signUpWithEmail: jest.fn(),
-      signOutUser: jest.fn(),
-      updateSyncedSettings: jest.fn(),
-    });
+  test.each([
+    {
+      name: 'shows the local-only fallback when hosted auth is disabled',
+      authState: {
+        hostedAuthEnabled: false,
+        status: 'disabled',
+        settingsSyncStatus: 'disabled',
+        user: null,
+        syncedSettings: null,
+        error: null,
+        signInWithGoogle: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOutUser: jest.fn(),
+        updateSyncedSettings: jest.fn(),
+      },
+      assertion: () => {
+        expect(screen.getByRole('heading', { name: /^Account$/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /Local-only mode/i })).toBeInTheDocument();
+        expect(screen.getByText(/running in local-only mode/i)).toBeInTheDocument();
+      },
+    },
+    {
+      name: 'shows confirm password only in create-account mode',
+      authState: {
+        hostedAuthEnabled: true,
+        status: 'signed_out',
+        settingsSyncStatus: 'idle',
+        user: null,
+        syncedSettings: null,
+        error: null,
+        signInWithGoogle: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOutUser: jest.fn(),
+        updateSyncedSettings: jest.fn(),
+      },
+      assertion: () => {
+        expect(screen.queryByLabelText(/Confirm Password/i)).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
+        expect(screen.getByLabelText(/Confirm Password/i)).toBeInTheDocument();
+      },
+    },
+  ])('$name', ({ authState, assertion }) => {
+    mockUseAuth.mockReturnValue(authState);
 
     render(
       <BrowserRouter>
@@ -75,37 +106,7 @@ describe('AccountPage', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByRole('heading', { name: /^Account$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Local-only mode/i })).toBeInTheDocument();
-    expect(screen.getByText(/running in local-only mode/i)).toBeInTheDocument();
-  });
-
-  test('shows confirm password only in create-account mode', () => {
-    mockUseAuth.mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'signed_out',
-      settingsSyncStatus: 'idle',
-      user: null,
-      syncedSettings: null,
-      error: null,
-      signInWithGoogle: jest.fn(),
-      signInWithEmail: jest.fn(),
-      signUpWithEmail: jest.fn(),
-      signOutUser: jest.fn(),
-      updateSyncedSettings: jest.fn(),
-    });
-
-    render(
-      <BrowserRouter>
-        <AccountPage />
-      </BrowserRouter>
-    );
-
-    expect(screen.queryByLabelText(/Confirm Password/i)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
-
-    expect(screen.getByLabelText(/Confirm Password/i)).toBeInTheDocument();
+    assertion();
   });
 
   test('shows a simplified signed-in account view with one sync status badge', () => {

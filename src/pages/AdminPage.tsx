@@ -34,6 +34,11 @@ interface AdminMetricsResponse {
   dailyMetrics: AdminDailyMetric[];
 }
 
+interface ParsedAdminMetricsResponse {
+  accessDenied: boolean;
+  metricsResponse: AdminMetricsResponse | null;
+}
+
 const DEFAULT_SUMMARY: AdminMetricsSummary = {
   totalAccounts: 0,
   activeDevices: 0,
@@ -46,6 +51,98 @@ const DEFAULT_SUMMARY: AdminMetricsSummary = {
   cancellations: 0,
   cloudSaves: 0,
   cloudLoads: 0,
+};
+
+/** Returns the normalized admin metrics payload shape from one fetch response. */
+const parseAdminMetricsResponse = async (
+  response: Response
+): Promise<ParsedAdminMetricsResponse> => {
+  const data = (await response.json().catch(() => ({}))) as Partial<AdminMetricsResponse> & { error?: string };
+
+  if (response.status === 403) {
+    return {
+      accessDenied: true,
+      metricsResponse: null,
+    };
+  }
+
+  if (!response.ok) {
+    throw new Error(typeof data.error === 'string' ? data.error : 'Unable to load admin metrics right now.');
+  }
+
+  return {
+    accessDenied: false,
+    metricsResponse: {
+      metricsEnabled: Boolean(data.metricsEnabled),
+      window: data.window === 30 ? 30 : 7,
+      summary: data.summary ? { ...DEFAULT_SUMMARY, ...data.summary } : DEFAULT_SUMMARY,
+      dailyMetrics: Array.isArray(data.dailyMetrics) ? (data.dailyMetrics as AdminDailyMetric[]) : [],
+    },
+  };
+};
+
+/** Applies one successful admin metrics response when the page is still mounted. */
+const applyAdminMetricsSuccess = ({
+  parsedResponse,
+  isActive,
+  setMetricsResponse,
+  setAccessDenied,
+  setLoading,
+}: {
+  parsedResponse: ParsedAdminMetricsResponse;
+  isActive: boolean;
+  setMetricsResponse: React.Dispatch<React.SetStateAction<AdminMetricsResponse | null>>;
+  setAccessDenied: React.Dispatch<React.SetStateAction<boolean>>;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}) => {
+  if (!isActive) {
+    return;
+  }
+
+  if (parsedResponse.accessDenied) {
+    setMetricsResponse(null);
+    setAccessDenied(true);
+    setLoading(false);
+    return;
+  }
+
+  setMetricsResponse(parsedResponse.metricsResponse);
+  setLoading(false);
+};
+
+/** Applies one admin metrics error when the page is still mounted. */
+const applyAdminMetricsError = ({
+  nextError,
+  isActive,
+  setMetricsResponse,
+  setError,
+  setLoading,
+}: {
+  nextError: unknown;
+  isActive: boolean;
+  setMetricsResponse: React.Dispatch<React.SetStateAction<AdminMetricsResponse | null>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}) => {
+  if (!isActive) {
+    return;
+  }
+
+  setMetricsResponse(null);
+  setError(nextError instanceof Error ? nextError.message : 'Unable to load admin metrics right now.');
+  setLoading(false);
+};
+
+/** Fetches the selected admin window using the signed-in user's Firebase token. */
+const fetchAdminMetrics = async (user: NonNullable<ReturnType<typeof useAuth>['user']>, windowSize: AdminWindow) => {
+  const token = await user.getIdToken();
+  const response = await fetch(`/api/admin/metrics?window=${windowSize}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return parseAdminMetricsResponse(response);
 };
 
 /** Formats aggregate byte counts into compact admin-friendly storage labels. */
@@ -160,6 +257,82 @@ const AdminHero: React.FC<{
   </section>
 );
 
+/** Main admin metrics surface after access checks have passed. */
+const AdminDashboardContent: React.FC<{
+  error: string | null;
+  loading: boolean;
+  metricsResponse: AdminMetricsResponse | null;
+  summary: AdminMetricsSummary;
+  windowSize: AdminWindow;
+  onSelectWindow: (windowSize: AdminWindow) => void;
+}> = ({ error, loading, metricsResponse, summary, windowSize, onSelectWindow }) => (
+  <div className="admin-page-shell">
+    <AdminHero windowSize={windowSize} onSelectWindow={onSelectWindow} />
+
+    {error ? (
+      <Card className="admin-surface-card">
+        <CardContent className="admin-card-content">
+          <p className="admin-error">{error}</p>
+        </CardContent>
+      </Card>
+    ) : null}
+
+    <div className="admin-summary-grid">
+      <AdminSummaryTile label="Total accounts" value={loading ? 'Loading...' : `${summary.totalAccounts}`} />
+      <AdminSummaryTile label={`Sign-ins (${windowSize}d)`} value={loading ? 'Loading...' : `${summary.signIns}`} />
+      <AdminSummaryTile
+        label="Premium subscriptions"
+        value={loading ? 'Loading...' : `${summary.premiumSubscriptions}`}
+      />
+      <AdminSummaryTile
+        label="Hosted data footprint"
+        value={loading ? 'Loading...' : formatBytes(summary.storageBytes)}
+      />
+    </div>
+
+    <div className="admin-content-grid">
+      <Card className="admin-surface-card">
+        <CardHeader className="admin-card-header">
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Window totals
+          </CardTitle>
+          <CardDescription>Aggregate product actions across the selected {windowSize}-day window.</CardDescription>
+        </CardHeader>
+        <CardContent className="admin-card-content">
+          <div className="admin-summary-grid admin-summary-grid-compact">
+            <AdminSummaryTile label="Signups" value={`${summary.signups}`} />
+            <AdminSummaryTile label="Devices (latest day)" value={`${summary.activeDevices}`} />
+            <AdminSummaryTile label="Upgrades" value={`${summary.upgrades}`} />
+            <AdminSummaryTile label="Cancellations" value={`${summary.cancellations}`} />
+            <AdminSummaryTile label="Cloud saves" value={`${summary.cloudSaves}`} />
+            <AdminSummaryTile label="Cloud loads" value={`${summary.cloudLoads}`} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="admin-surface-card">
+        <CardHeader className="admin-card-header">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Daily trend
+          </CardTitle>
+          <CardDescription>Cloud-save volume and sign-in activity for the selected window.</CardDescription>
+        </CardHeader>
+        <CardContent className="admin-card-content">
+          {loading ? (
+            <p className="admin-muted-copy">Loading daily metrics...</p>
+          ) : metricsResponse?.dailyMetrics.length ? (
+            <AdminTrendRows dailyMetrics={metricsResponse.dailyMetrics} />
+          ) : (
+            <p className="admin-muted-copy">No daily metrics have been recorded yet for this window.</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+);
+
 /** Hidden admin dashboard for aggregate-only hosted product health metrics. */
 const AdminPage: React.FC = () => {
   const { hostedAuthEnabled, status, user } = useAuth();
@@ -170,7 +343,7 @@ const AdminPage: React.FC = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const authLoading = status === 'loading';
 
-  useEffect(function loadAdminMetricsEffect() {
+  useEffect(() => {
     if (!hostedAuthEnabled) {
       setLoading(false);
       setMetricsResponse(null);
@@ -194,60 +367,27 @@ const AdminPage: React.FC = () => {
     setLoading(true);
     setError(null);
     setAccessDenied(false);
-
-    /** Loads the selected admin metrics window from the private server endpoint. */
-    const loadAdminMetrics = async () => {
-      try {
-        const token = await user.getIdToken();
-        const response = await fetch(`/api/admin/metrics?window=${windowSize}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+    fetchAdminMetrics(user, windowSize)
+      .then((parsedResponse) => {
+        applyAdminMetricsSuccess({
+          parsedResponse,
+          isActive,
+          setMetricsResponse,
+          setAccessDenied,
+          setLoading,
         });
-        const data = (await response.json().catch(() => ({}))) as Partial<AdminMetricsResponse> & { error?: string };
-
-        if (response.status === 403) {
-          if (!isActive) {
-            return;
-          }
-
-          setMetricsResponse(null);
-          setAccessDenied(true);
-          setLoading(false);
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(typeof data.error === 'string' ? data.error : 'Unable to load admin metrics right now.');
-        }
-
-        if (!isActive) {
-          return;
-        }
-
-        setMetricsResponse({
-          metricsEnabled: Boolean(data.metricsEnabled),
-          window: data.window === 30 ? 30 : 7,
-          summary: data.summary ? { ...DEFAULT_SUMMARY, ...data.summary } : DEFAULT_SUMMARY,
-          dailyMetrics: Array.isArray(data.dailyMetrics) ? (data.dailyMetrics as AdminDailyMetric[]) : [],
+      })
+      .catch((nextError) => {
+        applyAdminMetricsError({
+          nextError,
+          isActive,
+          setMetricsResponse,
+          setError,
+          setLoading,
         });
-        setLoading(false);
-      } catch (nextError) {
-        if (!isActive) {
-          return;
-        }
+      });
 
-        setMetricsResponse(null);
-        setError(nextError instanceof Error ? nextError.message : 'Unable to load admin metrics right now.');
-        setLoading(false);
-      }
-    };
-
-    loadAdminMetrics().catch(() => {
-      // loadAdminMetrics already captures user-facing error state.
-    });
-
-    return function cleanupAdminMetricsLoad() {
+    return () => {
       isActive = false;
     };
   }, [hostedAuthEnabled, status, user, windowSize]);
@@ -276,79 +416,14 @@ const AdminPage: React.FC = () => {
   }
 
   return (
-    <div className="admin-page-shell">
-      <AdminHero windowSize={windowSize} onSelectWindow={setWindowSize} />
-
-      {error ? (
-        <Card className="admin-surface-card">
-          <CardContent className="admin-card-content">
-            <p className="admin-error">{error}</p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <div className="admin-summary-grid">
-        <AdminSummaryTile label="Total accounts" value={loading ? 'Loading...' : `${summary.totalAccounts}`} />
-        <AdminSummaryTile
-          label={`Sign-ins (${windowSize}d)`}
-          value={loading ? 'Loading...' : `${summary.signIns}`}
-        />
-        <AdminSummaryTile
-          label="Premium subscriptions"
-          value={loading ? 'Loading...' : `${summary.premiumSubscriptions}`}
-        />
-        <AdminSummaryTile
-          label="Hosted data footprint"
-          value={loading ? 'Loading...' : formatBytes(summary.storageBytes)}
-        />
-      </div>
-
-      <div className="admin-content-grid">
-        <Card className="admin-surface-card">
-          <CardHeader className="admin-card-header">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Window totals
-            </CardTitle>
-            <CardDescription>
-              Aggregate product actions across the selected {windowSize}-day window.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="admin-card-content">
-            <div className="admin-summary-grid admin-summary-grid-compact">
-              <AdminSummaryTile label="Signups" value={`${summary.signups}`} />
-              <AdminSummaryTile label="Devices (latest day)" value={`${summary.activeDevices}`} />
-              <AdminSummaryTile label="Upgrades" value={`${summary.upgrades}`} />
-              <AdminSummaryTile label="Cancellations" value={`${summary.cancellations}`} />
-              <AdminSummaryTile label="Cloud saves" value={`${summary.cloudSaves}`} />
-              <AdminSummaryTile label="Cloud loads" value={`${summary.cloudLoads}`} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="admin-surface-card">
-          <CardHeader className="admin-card-header">
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Daily trend
-            </CardTitle>
-            <CardDescription>
-              Cloud-save volume and sign-in activity for the selected window.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="admin-card-content">
-            {loading ? (
-              <p className="admin-muted-copy">Loading daily metrics...</p>
-            ) : metricsResponse?.dailyMetrics.length ? (
-              <AdminTrendRows dailyMetrics={metricsResponse.dailyMetrics} />
-            ) : (
-              <p className="admin-muted-copy">No daily metrics have been recorded yet for this window.</p>
-            )}
-          </CardContent>
-        </Card>
-
-      </div>
-    </div>
+    <AdminDashboardContent
+      error={error}
+      loading={loading}
+      metricsResponse={metricsResponse}
+      summary={summary}
+      windowSize={windowSize}
+      onSelectWindow={setWindowSize}
+    />
   );
 };
 
