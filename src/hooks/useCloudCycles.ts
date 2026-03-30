@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
-import { CloudCycleMetadata, CloudCycleContext, CloudSyncState } from '../types/cloudCycles';
+import { CloudCycleMetadata, CloudCycleContext, CloudOperationResult, CloudSyncState } from '../types/cloudCycles';
 import {
   saveCloudCycle,
   loadCloudCycle,
@@ -105,6 +105,22 @@ function createCurrentCloudContext({
   return { id, label, syncState };
 }
 
+/** Returns true when the requested cycle is already the active idle cloud selection. */
+function isMatchingIdleSelection({
+  currentCloud,
+  cycleId,
+  label,
+}: {
+  currentCloud: CloudCycleContext;
+  cycleId: string;
+  label: string;
+}): boolean {
+  return currentCloud.id === cycleId
+    && currentCloud.label === label
+    && currentCloud.syncState === 'idle'
+    && !currentCloud.lastSyncError;
+}
+
 /** Updates the current cloud context when one cloud cycle is loaded. */
 function syncLoadedCloudSelection({
   cycles,
@@ -179,24 +195,60 @@ function useCloudCycleSubscription({
     }
 
     setLoading(true);
-    unsubscribeRef.current = subscribeToCloudCycles(
+    unsubscribeRef.current = subscribeToCloudCycles({
       userId,
-      (nextCycles) => {
+      onUpdate: (nextCycles) => {
         setCycles(nextCycles);
         setLoading(false);
       },
-      (nextError) => {
+      onError: (nextError) => {
         console.error('Cloud cycles subscribe error:', nextError);
         setError(nextError.message);
         setLoading(false);
-      }
-    );
+      },
+    });
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupCloudCycleSubscription() {
       unsubscribeRef.current?.();
     };
   }, [userId, setCycles, setError, setLoading, unsubscribeRef]);
+}
+
+/** Shared mutation hook for guarded cloud-cycle write actions like rename and delete. */
+function useCloudCycleMutation<TArgs extends unknown[]>({
+  userId,
+  canWrite,
+  setError,
+  action,
+  onSuccess,
+  blockedMessage = 'Action not allowed',
+  fallbackError,
+}: CloudAccessContext & Pick<CloudStateContext, 'setError'> & {
+  action: (...args: TArgs) => Promise<CloudOperationResult>;
+  onSuccess?: (...args: TArgs) => void;
+  blockedMessage?: string;
+  fallbackError: string;
+}) {
+  return useCallback(
+    async (...args: TArgs): Promise<boolean> => {
+      if (!userId || !canWrite) {
+        setError(blockedMessage);
+        return false;
+      }
+
+      setError(null);
+      const result = await action(...args);
+      if (!result.success) {
+        setError(result.error || fallbackError);
+        return false;
+      }
+
+      onSuccess?.(...args);
+      return true;
+    },
+    [action, blockedMessage, canWrite, fallbackError, onSuccess, setError, userId]
+  );
 }
 
 /** Returns the save callback for hosted cloud cycles. */
@@ -268,7 +320,7 @@ function useCloudLoadCycle({
       setError(null);
       updateSyncState('loading');
 
-      const result = await loadCloudCycle(userId, cycleId);
+      const result = await loadCloudCycle({ userId, cycleId });
       if (!result.success || !result.data) {
         setError(result.error || 'Failed to load cloud cycle');
         updateSyncState('error', result.error);
@@ -291,25 +343,16 @@ function useCloudDeleteCycle({
   setCurrentCloud,
   setError,
 }: Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
-  return useCallback(
-    async (cycleId: string): Promise<boolean> => {
-      if (!userId || !canWrite) {
-        setError('Action not allowed');
-        return false;
-      }
-
-      setError(null);
-      const result = await deleteCloudCycle(userId, cycleId);
-      if (!result.success) {
-        setError(result.error || 'Failed to delete cloud cycle');
-        return false;
-      }
-
+  return useCloudCycleMutation<[string]>({
+    userId,
+    canWrite,
+    setError,
+    fallbackError: 'Failed to delete cloud cycle',
+    action: (cycleId) => deleteCloudCycle({ userId: userId!, cycleId }),
+    onSuccess: (cycleId) => {
       clearDeletedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId });
-      return true;
     },
-    [canWrite, currentCloudRef, setCurrentCloud, setError, userId]
-  );
+  });
 }
 
 /** Returns the rename callback for hosted cloud cycles. */
@@ -320,25 +363,16 @@ function useCloudRenameCycle({
   setCurrentCloud,
   setError,
 }: Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
-  return useCallback(
-    async (cycleId: string, newLabel: string): Promise<boolean> => {
-      if (!userId || !canWrite) {
-        setError('Action not allowed');
-        return false;
-      }
-
-      setError(null);
-      const result = await renameCloudCycle(userId, cycleId, newLabel);
-      if (!result.success) {
-        setError(result.error || 'Failed to rename cloud cycle');
-        return false;
-      }
-
+  return useCloudCycleMutation<[string, string]>({
+    userId,
+    canWrite,
+    setError,
+    fallbackError: 'Failed to rename cloud cycle',
+    action: (cycleId, newLabel) => renameCloudCycle({ userId: userId!, cycleId, newLabel }),
+    onSuccess: (cycleId, newLabel) => {
       syncRenamedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId, newLabel });
-      return true;
     },
-    [canWrite, currentCloudRef, setCurrentCloud, setError, userId]
-  );
+  });
 }
 
 /** Returns the explicit refresh callback for cloud-cycle metadata. */
@@ -354,7 +388,7 @@ function useCloudRefreshCycles({
     }
 
     setLoading(true);
-    const result = await listCloudCycles(userId);
+    const result = await listCloudCycles({ userId });
     if (result.success && result.data) {
       setCycles(result.data);
     } else {
@@ -425,7 +459,7 @@ function useCurrentCloudSelectionControls(
   const markAsCurrent = useCallback((cycleId: string, label: string) => {
     setCurrentCloud((prev) => {
       const nextValue = createCurrentCloudContext({ id: cycleId, label, syncState: 'idle' });
-      if (prev?.id === cycleId && prev.label === label && prev.syncState === 'idle' && !prev.lastSyncError) {
+      if (prev && isMatchingIdleSelection({ currentCloud: prev, cycleId, label })) {
         return prev;
       }
 

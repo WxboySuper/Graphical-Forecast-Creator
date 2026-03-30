@@ -41,6 +41,20 @@ interface UserCycleLookupParams {
   cycleId: string;
 }
 
+interface ListCloudCyclesParams {
+  userId: string;
+}
+
+interface RenameCloudCycleParams extends UserCycleLookupParams {
+  newLabel: string;
+}
+
+interface CloudCycleSubscriptionParams {
+  userId: string;
+  onUpdate: (cycles: CloudCycleMetadata[]) => void;
+  onError?: (error: Error) => void;
+}
+
 interface SaveCloudCycleParams {
   userId: string;
   label: string;
@@ -238,7 +252,7 @@ const bootstrapCloudCycleSubscription = async ({
   onError?: (error: Error) => void;
 }): Promise<void> => {
   try {
-    const result = await listCloudCycles(userId);
+    const result = await listCloudCycles({ userId });
     if (!isActive()) {
       return;
     }
@@ -427,11 +441,10 @@ export const saveCloudCycle = async (
  * Loads a specific cloud cycle
  */
 export const loadCloudCycle = async (
-  userId: string,
-  cycleId: string
+  params: UserCycleLookupParams
 ): Promise<CloudOperationResult<CloudCycle>> => {
   try {
-    const record = await fetchCloudCycleById({ userId, cycleId });
+    const record = await fetchCloudCycleById(params);
 
     if (!record) {
       return {
@@ -457,16 +470,15 @@ export const loadCloudCycle = async (
  * Deletes a cloud cycle
  */
 export const deleteCloudCycle = async (
-  userId: string,
-  cycleId: string
+  params: UserCycleLookupParams
 ): Promise<CloudOperationResult> => {
   try {
-    const existingCycle = await getOwnedCloudCycle({ userId, cycleId });
+    const existingCycle = await getOwnedCloudCycle(params);
     if (!existingCycle) {
       return { success: true };
     }
 
-    await deleteDoc(getCloudCycleDocRef(cycleId));
+    await deleteDoc(getCloudCycleDocRef(params.cycleId));
 
     return { success: true };
   } catch (error) {
@@ -482,12 +494,10 @@ export const deleteCloudCycle = async (
  * Renames a cloud cycle
  */
 export const renameCloudCycle = async (
-  userId: string,
-  cycleId: string,
-  newLabel: string
+  params: RenameCloudCycleParams
 ): Promise<CloudOperationResult> => {
   try {
-    const existing = await getOwnedCloudCycle({ userId, cycleId });
+    const existing = await getOwnedCloudCycle(params);
     if (!existing) {
       return {
         success: false,
@@ -497,12 +507,12 @@ export const renameCloudCycle = async (
 
     const nextMetadata: CloudCycle = {
       ...existing,
-      label: newLabel,
+      label: params.newLabel,
       updatedAt: new Date().toISOString(),
       payloadHash: computePayloadHash(existing.payload),
     };
 
-    await setDoc(getCloudCycleDocRef(cycleId), serializeCloudCycleDocument(nextMetadata));
+    await setDoc(getCloudCycleDocRef(params.cycleId), serializeCloudCycleDocument(nextMetadata));
 
     return { success: true };
   } catch (error) {
@@ -519,7 +529,7 @@ export const renameCloudCycle = async (
  * Payload JSON is still stored in the same Firestore document today, so this avoids parse cost but not document transfer size.
  */
 export const listCloudCycles = async (
-  userId: string
+  { userId }: ListCloudCyclesParams
 ): Promise<CloudOperationResult<CloudCycleMetadata[]>> => {
   try {
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
@@ -545,9 +555,7 @@ export const listCloudCycles = async (
  * Subscribes to cloud cycles list for real-time updates
  */
 export const subscribeToCloudCycles = (
-  userId: string,
-  onUpdate: (cycles: CloudCycleMetadata[]) => void,
-  onError?: (error: Error) => void
+  { userId, onUpdate, onError }: CloudCycleSubscriptionParams
 ): (() => void) => {
   try {
     const cyclesQuery = query(getCloudCyclesCollectionRef(), where('userId', '==', userId));

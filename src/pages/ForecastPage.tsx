@@ -535,12 +535,17 @@ const clearStoredCloudSession = () => {
   sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
 };
 
+/** Returns true when stored cloud metadata includes the id and label needed to restore selection context. */
+const hasRestorableCloudSelection = (
+  cloudMeta: StoredCloudMeta | null
+): cloudMeta is Required<Pick<StoredCloudMeta, 'id' | 'label'>> => Boolean(cloudMeta?.id && cloudMeta.label);
+
 /** Notifies the forecast page about the cloud cycle that was just restored when metadata is complete. */
 const restoreCloudSelectionContext = (
   cloudMeta: StoredCloudMeta | null,
   onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
 ) => {
-  if (!cloudMeta?.id || !cloudMeta.label || !onCloudCycleLoaded) {
+  if (!onCloudCycleLoaded || !hasRestorableCloudSelection(cloudMeta)) {
     return;
   }
 
