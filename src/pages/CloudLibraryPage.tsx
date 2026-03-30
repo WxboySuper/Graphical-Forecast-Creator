@@ -229,7 +229,7 @@ const CloudCycleDeletePrompt: React.FC<{
   onConfirm: () => void;
 }> = ({ cycleLabel, isBusy, onCancel, onConfirm }) => (
   <div className="cloud-cycle-delete-prompt">
-    <p>Delete "{cycleLabel}"? This action cannot be undone.</p>
+    <p>Delete &quot;{cycleLabel}&quot;? This action cannot be undone.</p>
     <div className="cloud-cycle-inline-actions">
       <Button variant="outline" size="sm" onClick={onCancel} disabled={isBusy}>
         Keep

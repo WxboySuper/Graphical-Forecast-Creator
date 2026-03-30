@@ -225,6 +225,33 @@ const sortCloudCycleMetadata = (cycles: CloudCycleMetadata[]): CloudCycleMetadat
 const createCloudCycleId = (userId: string, cycleDate: string): string =>
   `${userId}-${cycleDate}-${uuidv4()}`;
 
+/** Performs the first metadata fetch for a cloud subscription before realtime updates attach. */
+const bootstrapCloudCycleSubscription = async ({
+  userId,
+  isActive,
+  onUpdate,
+  onError,
+}: {
+  userId: string;
+  isActive: () => boolean;
+  onUpdate: (cycles: CloudCycleMetadata[]) => void;
+  onError?: (error: Error) => void;
+}): Promise<void> => {
+  try {
+    const result = await listCloudCycles(userId);
+    if (!isActive()) {
+      return;
+    }
+
+    onUpdate(sortCloudCycleMetadata(result.success && result.data ? result.data : []));
+  } catch (error) {
+    console.error('Error bootstrapping cloud cycles:', error);
+    if (isActive()) {
+      onError?.(error as Error);
+    }
+  }
+};
+
 /** Converts a Firestore query snapshot into normalized cloud-cycle records, including payload validation. */
 const readCloudCyclesFromQuery = ({ snapshot, fallbackUserId }: ReadCloudCyclesFromQueryParams): CloudCycle[] =>
   snapshot.docs
@@ -526,20 +553,12 @@ export const subscribeToCloudCycles = (
     const cyclesQuery = query(getCloudCyclesCollectionRef(), where('userId', '==', userId));
     let isActive = true;
 
-    void listCloudCycles(userId)
-      .then((result) => {
-        if (!isActive) {
-          return;
-        }
-
-        onUpdate(sortCloudCycleMetadata(result.success && result.data ? result.data : []));
-      })
-      .catch((error) => {
-        console.error('Error bootstrapping cloud cycles:', error);
-        if (isActive) {
-          onError?.(error as Error);
-        }
-      });
+    bootstrapCloudCycleSubscription({
+      userId,
+      isActive: () => isActive,
+      onUpdate,
+      onError,
+    });
 
     const unsubscribe = onSnapshot(
       cyclesQuery,

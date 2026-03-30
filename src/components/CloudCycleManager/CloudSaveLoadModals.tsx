@@ -78,6 +78,44 @@ const CloudSaveDialogFooter: React.FC<{
   </DialogFooter>
 );
 
+/** Main content stack for the cloud save dialog. */
+const CloudSaveDialogBody: React.FC<{
+  currentLabel: string;
+  error?: string;
+  label: string;
+  isSaving: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onLabelChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}> = ({ currentLabel, error, label, isSaving, inputRef, onLabelChange, onCancel, onSave }) => (
+  <div className="cloud-save-dialog-body">
+    <CloudSaveDialogHeader />
+    <CloudSaveDialogCallout currentLabel={currentLabel} />
+    {error ? <CloudSaveDialogError error={error} /> : null}
+
+    <div className="cloud-save-dialog-field">
+      <label htmlFor="cloud-cycle-name">Cycle name</label>
+      <Input
+        ref={inputRef}
+        id="cloud-cycle-name"
+        className="cloud-save-dialog-input"
+        value={label}
+        onChange={(e) => onLabelChange(e.target.value)}
+        placeholder="e.g., March 29 - Strong Pattern"
+        disabled={isSaving}
+      />
+    </div>
+
+    <CloudSaveDialogFooter
+      isSaving={isSaving}
+      canSave={Boolean(label.trim())}
+      onCancel={onCancel}
+      onSave={onSave}
+    />
+  </div>
+);
+
 /** Creates the local state and event handlers used by the cloud save dialog. */
 const useCloudSaveDialogState = (
   open: boolean,
@@ -162,31 +200,16 @@ export const CloudSaveModal: React.FC<CloudSaveModalProps> = ({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="cloud-save-dialog">
-        <div className="cloud-save-dialog-body">
-          <CloudSaveDialogHeader />
-          <CloudSaveDialogCallout currentLabel={currentLabel} />
-          {error ? <CloudSaveDialogError error={error} /> : null}
-
-          <div className="cloud-save-dialog-field">
-            <label htmlFor="cloud-cycle-name">Cycle name</label>
-            <Input
-              ref={inputRef}
-              id="cloud-cycle-name"
-              className="cloud-save-dialog-input"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g., March 29 - Strong Pattern"
-              disabled={isSaving}
-            />
-          </div>
-
-          <CloudSaveDialogFooter
-            isSaving={isSaving}
-            canSave={Boolean(label.trim())}
-            onCancel={() => handleOpenChange(false)}
-            onSave={handleSave}
-          />
-        </div>
+        <CloudSaveDialogBody
+          currentLabel={currentLabel}
+          error={error}
+          label={label}
+          isSaving={isSaving}
+          inputRef={inputRef}
+          onLabelChange={setLabel}
+          onCancel={() => handleOpenChange(false)}
+          onSave={handleSave}
+        />
       </DialogContent>
     </Dialog>
   );
