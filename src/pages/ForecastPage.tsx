@@ -33,7 +33,7 @@ import { useCloudCycles, type UseCloudCyclesResult } from '../hooks/useCloudCycl
 import { useCloudSync } from '../hooks/useCloudSync';
 import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbarButton';
 import { countForecastMetrics } from '../utils/forecastMetrics';
-import { recordProductMetric } from '../utils/productMetrics';
+import { queueProductMetric } from '../utils/productMetrics';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -179,7 +179,7 @@ const useForecastSaveAction = (
     try {
       exportForecastToJson(forecastCycle, buildMapView(mapRef));
       dispatch(markAsSaved());
-      void recordProductMetric({ event: 'cycle_saved', user });
+      queueProductMetric({ event: 'cycle_saved', user });
       addToast('Forecast exported to JSON!', 'success');
     } catch {
       addToast('Error exporting forecast.', 'error');

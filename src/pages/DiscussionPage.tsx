@@ -17,7 +17,7 @@ import { updateDiscussion } from '../store/forecastSlice';
 import { DiscussionMode, DiscussionData, DayType } from '../types/outlooks';
 import { compileDiscussionToText, exportDiscussionToFile } from '../utils/discussionUtils';
 import { useAuth } from '../auth/AuthProvider';
-import { recordProductMetric } from '../utils/productMetrics';
+import { queueProductMetric } from '../utils/productMetrics';
 import DIYDiscussionEditor from '../components/DiscussionEditor/DIYDiscussionEditor';
 import GuidedDiscussionEditor from '../components/DiscussionEditor/GuidedDiscussionEditor';
 import { Button } from '../components/ui/button';
@@ -433,7 +433,7 @@ const useDiscussionActions = (opts: {
   const handleSave = useCallback(() => {
     dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
     clearUnsaved(false);
-    void recordProductMetric({ event: 'discussion_saved', user });
+    queueProductMetric({ event: 'discussion_saved', user });
     addToast('Discussion saved!', 'success');
   }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast, user]);
 

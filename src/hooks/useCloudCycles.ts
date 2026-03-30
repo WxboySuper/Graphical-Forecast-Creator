@@ -12,7 +12,7 @@ import {
 } from '../lib/cloudCyclesService';
 import { GFCForecastSaveData } from '../types/outlooks';
 import { SavedCycleStats } from '../store/forecastSlice';
-import { recordProductMetric } from '../utils/productMetrics';
+import { queueProductMetric } from '../utils/productMetrics';
 
 export interface UseCloudCyclesResult {
   cycles: CloudCycleMetadata[];
@@ -300,7 +300,7 @@ function useCloudSaveCycle({
       if (result.data) {
         setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
       }
-      void recordProductMetric({
+      queueProductMetric({
         event: 'cloud_cycle_saved',
         user,
         storageBytes: JSON.stringify(payload).length,
@@ -342,7 +342,7 @@ function useCloudLoadCycle({
       }
 
       syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
-      void recordProductMetric({ event: 'cloud_cycle_loaded', user });
+      queueProductMetric({ event: 'cloud_cycle_loaded', user });
       updateSyncState('saved');
       return result.data.payload;
     },

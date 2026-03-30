@@ -132,6 +132,34 @@ const AdminTrendRows: React.FC<{ dailyMetrics: AdminDailyMetric[] }> = ({ dailyM
   );
 };
 
+/** Header section for the private admin dashboard. */
+const AdminHero: React.FC<{
+  windowSize: AdminWindow;
+  onSelectWindow: (windowSize: AdminWindow) => void;
+}> = ({ windowSize, onSelectWindow }) => (
+  <section className="admin-hero">
+    <div className="admin-pill">
+      <Lock className="h-4 w-4" />
+      Private Admin
+    </div>
+    <div className="admin-hero-copy">
+      <div>
+        <h1>Hosted metrics</h1>
+        <p>Aggregate-only product health for beta operations. No user drill-down and no forecast payload content.</p>
+      </div>
+      <div className="admin-hero-actions">
+        <Badge variant="outline">Window: {windowSize} days</Badge>
+        <Button variant={windowSize === 7 ? 'default' : 'outline'} onClick={() => onSelectWindow(7)}>
+          Last 7 days
+        </Button>
+        <Button variant={windowSize === 30 ? 'default' : 'outline'} onClick={() => onSelectWindow(30)}>
+          Last 30 days
+        </Button>
+      </div>
+    </div>
+  </section>
+);
+
 /** Hidden admin dashboard for aggregate-only hosted product health metrics. */
 const AdminPage: React.FC = () => {
   const { hostedAuthEnabled, status, user } = useAuth();
@@ -142,7 +170,7 @@ const AdminPage: React.FC = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const authLoading = status === 'loading';
 
-  useEffect(() => {
+  useEffect(function loadAdminMetricsEffect() {
     if (!hostedAuthEnabled) {
       setLoading(false);
       setMetricsResponse(null);
@@ -167,6 +195,7 @@ const AdminPage: React.FC = () => {
     setError(null);
     setAccessDenied(false);
 
+    /** Loads the selected admin metrics window from the private server endpoint. */
     const loadAdminMetrics = async () => {
       try {
         const token = await user.getIdToken();
@@ -214,7 +243,9 @@ const AdminPage: React.FC = () => {
       }
     };
 
-    loadAdminMetrics().catch(() => undefined);
+    loadAdminMetrics().catch(() => {
+      // loadAdminMetrics already captures user-facing error state.
+    });
 
     return function cleanupAdminMetricsLoad() {
       isActive = false;
@@ -246,27 +277,7 @@ const AdminPage: React.FC = () => {
 
   return (
     <div className="admin-page-shell">
-      <section className="admin-hero">
-        <div className="admin-pill">
-          <Lock className="h-4 w-4" />
-          Private Admin
-        </div>
-        <div className="admin-hero-copy">
-          <div>
-            <h1>Hosted metrics</h1>
-            <p>Aggregate-only product health for beta operations. No user drill-down and no forecast payload content.</p>
-          </div>
-          <div className="admin-hero-actions">
-            <Badge variant="outline">Window: {windowSize} days</Badge>
-            <Button variant={windowSize === 7 ? 'default' : 'outline'} onClick={() => setWindowSize(7)}>
-              Last 7 days
-            </Button>
-            <Button variant={windowSize === 30 ? 'default' : 'outline'} onClick={() => setWindowSize(30)}>
-              Last 30 days
-            </Button>
-          </div>
-        </div>
-      </section>
+      <AdminHero windowSize={windowSize} onSelectWindow={setWindowSize} />
 
       {error ? (
         <Card className="admin-surface-card">

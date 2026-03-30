@@ -72,3 +72,8 @@ export const recordProductMetric = async ({
     // Metrics must never break core user flows.
   }
 };
+
+/** Queues one product metric in the background without making the caller handle Promises. */
+export const queueProductMetric = (options: RecordProductMetricOptions): void => {
+  recordProductMetric(options).catch(() => undefined);
+};

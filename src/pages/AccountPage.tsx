@@ -489,44 +489,57 @@ const BillingCard: React.FC = () => {
   );
 };
 
+/** Header block for the signed-in user's progress-only account metrics card. */
+const MetricsCardHeader: React.FC = () => (
+  <CardHeader className="account-section-header">
+    <div className="account-section-topline">
+      <div className="account-section-copy">
+        <CardTitle className="flex items-center gap-2 text-2xl">
+          <Activity className="h-6 w-6" />
+          Your Activity
+        </CardTitle>
+        <CardDescription>
+          Progress-only metrics for the work you have already put into GFC.
+        </CardDescription>
+      </div>
+    </div>
+  </CardHeader>
+);
+
+/** Main metric grid and support copy for the signed-in user's activity card. */
+const MetricsCardContent: React.FC<{
+  metrics: ReturnType<typeof useUserMetrics>['metrics'];
+  loading: boolean;
+  error: string | null;
+}> = ({ metrics, loading, error }) => (
+  <CardContent className="account-section-content">
+    <div className="account-summary-grid">
+      <SummaryTile label="Active day streak" value={loading ? 'Loading...' : `${metrics.activeDayStreak}`} />
+      <SummaryTile label="Total active days" value={loading ? 'Loading...' : `${metrics.totalActiveDays}`} />
+      <SummaryTile label="Forecast saves" value={loading ? 'Loading...' : `${metrics.cyclesCreated}`} />
+      <SummaryTile label="Cloud saves" value={loading ? 'Loading...' : `${metrics.cloudCyclesSaved}`} />
+      <SummaryTile label="Discussions saved" value={loading ? 'Loading...' : `${metrics.discussionsWritten}`} />
+      <SummaryTile
+        label="Verification runs"
+        value={loading ? 'Loading...' : `${metrics.verificationSessionsRun}`}
+      />
+    </div>
+
+    <p className="account-support-copy">
+      Last active day: <strong>{loading ? 'Loading...' : formatLastActiveDate(metrics.lastActiveDate)}</strong>
+    </p>
+    {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
+  </CardContent>
+);
+
 /** Progress-only account metrics card fed by the hosted Firestore metrics document. */
 const MetricsCard: React.FC = () => {
   const { metrics, loading, error } = useUserMetrics();
 
   return (
     <Card className="account-surface-card">
-      <CardHeader className="account-section-header">
-        <div className="account-section-topline">
-          <div className="account-section-copy">
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Activity className="h-6 w-6" />
-              Your Activity
-            </CardTitle>
-            <CardDescription>
-              Progress-only metrics for the work you have already put into GFC.
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="account-section-content">
-        <div className="account-summary-grid">
-          <SummaryTile label="Active day streak" value={loading ? 'Loading...' : `${metrics.activeDayStreak}`} />
-          <SummaryTile label="Total active days" value={loading ? 'Loading...' : `${metrics.totalActiveDays}`} />
-          <SummaryTile label="Forecast saves" value={loading ? 'Loading...' : `${metrics.cyclesCreated}`} />
-          <SummaryTile label="Cloud saves" value={loading ? 'Loading...' : `${metrics.cloudCyclesSaved}`} />
-          <SummaryTile label="Discussions saved" value={loading ? 'Loading...' : `${metrics.discussionsWritten}`} />
-          <SummaryTile
-            label="Verification runs"
-            value={loading ? 'Loading...' : `${metrics.verificationSessionsRun}`}
-          />
-        </div>
-
-        <p className="account-support-copy">
-          Last active day: <strong>{loading ? 'Loading...' : formatLastActiveDate(metrics.lastActiveDate)}</strong>
-        </p>
-        {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
-      </CardContent>
+      <MetricsCardHeader />
+      <MetricsCardContent metrics={metrics} loading={loading} error={error} />
     </Card>
   );
 };

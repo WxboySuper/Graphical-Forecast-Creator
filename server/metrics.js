@@ -290,9 +290,10 @@ const recordMetricEvent = async ({ eventType, installationId, uid }) => {
     ? db.collection('adminMetricDedupes').doc(createDedupeDocId('account', dayKey, uid))
     : null;
   const userMetricsRef = uid ? db.collection('userMetrics').doc(uid) : null;
+  const shouldRefreshLiveSummary = eventType === 'cloud_cycle_saved';
   const [premiumSubscriptions, storageBytes] = await Promise.all([
-    eventType === 'cloud_cycle_saved' ? countPremiumSubscriptions() : Promise.resolve(undefined),
-    eventType === 'cloud_cycle_saved' ? getCurrentStorageBytes() : Promise.resolve(undefined),
+    shouldRefreshLiveSummary ? countPremiumSubscriptions() : Promise.resolve(),
+    shouldRefreshLiveSummary ? getCurrentStorageBytes() : Promise.resolve(),
   ]);
 
   await db.runTransaction(async (transaction) => {
@@ -420,19 +421,19 @@ const readAdminMetricsWindow = async (windowSize) => {
 const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
   const latestMetrics = dailyMetrics[dailyMetrics.length - 1] || getDefaultAdminDailyMetrics();
 
-  const summary = dailyMetrics.reduce(
-    (summary, dayMetrics) => ({
+  const totals = dailyMetrics.reduce(
+    (nextSummary, dayMetrics) => ({
       totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
       activeDevices: latestMetrics.activeDevices,
       activeSignedInAccounts: latestMetrics.activeSignedInAccounts,
       premiumSubscriptions: latestMetrics.premiumSubscriptions,
       storageBytes: latestMetrics.storageBytes,
-      signups: summary.signups + Number(dayMetrics.signups || 0),
-      signIns: summary.signIns + Number(dayMetrics.signIns || 0),
-      upgrades: summary.upgrades + Number(dayMetrics.upgrades || 0),
-      cancellations: summary.cancellations + Number(dayMetrics.cancellations || 0),
-      cloudSaves: summary.cloudSaves + Number(dayMetrics.cloudSaves || 0),
-      cloudLoads: summary.cloudLoads + Number(dayMetrics.cloudLoads || 0),
+      signups: nextSummary.signups + Number(dayMetrics.signups || 0),
+      signIns: nextSummary.signIns + Number(dayMetrics.signIns || 0),
+      upgrades: nextSummary.upgrades + Number(dayMetrics.upgrades || 0),
+      cancellations: nextSummary.cancellations + Number(dayMetrics.cancellations || 0),
+      cloudSaves: nextSummary.cloudSaves + Number(dayMetrics.cloudSaves || 0),
+      cloudLoads: nextSummary.cloudLoads + Number(dayMetrics.cloudLoads || 0),
     }),
     {
       totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
@@ -451,7 +452,7 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
 
   return {
     ...(typeof liveSummary.totalAccounts === 'number' ? { totalAccounts: liveSummary.totalAccounts } : {}),
-    ...summary,
+    ...totals,
     ...(typeof liveSummary.premiumSubscriptions === 'number'
       ? { premiumSubscriptions: liveSummary.premiumSubscriptions }
       : {}),

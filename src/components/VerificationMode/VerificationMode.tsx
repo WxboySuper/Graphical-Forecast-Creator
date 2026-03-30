@@ -7,7 +7,7 @@ import { deserializeForecast, validateForecastData } from '../../utils/fileUtils
 import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useAuth } from '../../auth/AuthProvider';
-import { recordProductMetric } from '../../utils/productMetrics';
+import { queueProductMetric } from '../../utils/productMetrics';
 import './VerificationMode.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
@@ -257,7 +257,7 @@ const VerificationMode: React.FC = () => {
       setAvailableDays(daysWithData);
       setSelectedDay(daysWithData[0] || 1);
       setForecastLoaded(true);
-      void recordProductMetric({ event: 'verification_run', user });
+      queueProductMetric({ event: 'verification_run', user });
       addToast('Forecast loaded! Load storm reports to begin verification.', 'success');
     } catch (error) {
       const message = error instanceof Error

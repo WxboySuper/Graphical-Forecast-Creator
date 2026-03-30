@@ -22,7 +22,7 @@ import { setDarkMode } from '../store/themeSlice';
 import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled } from '../lib/firebase';
-import { recordProductMetric } from '../utils/productMetrics';
+import { queueProductMetric } from '../utils/productMetrics';
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
@@ -614,7 +614,7 @@ const useHostedAuthState = (): AuthContextValue => {
       signInWithGoogle: async () => {
         setError(null);
         const credential = await signInWithPopup(auth, googleAuthProvider);
-        void recordProductMetric({
+        queueProductMetric({
           event: getAdditionalUserInfo(credential)?.isNewUser ? 'account_signup' : 'account_signin',
           user: credential.user,
         });
@@ -622,12 +622,12 @@ const useHostedAuthState = (): AuthContextValue => {
       signInWithEmail: async (email: string, password: string) => {
         setError(null);
         const credential = await signInWithEmailAndPassword(auth, email, password);
-        void recordProductMetric({ event: 'account_signin', user: credential.user });
+        queueProductMetric({ event: 'account_signin', user: credential.user });
       },
       signUpWithEmail: async (email: string, password: string) => {
         setError(null);
         const credential = await createUserWithEmailAndPassword(auth, email, password);
-        void recordProductMetric({ event: 'account_signup', user: credential.user });
+        queueProductMetric({ event: 'account_signup', user: credential.user });
       },
       signOutUser: async () => {
         setError(null);

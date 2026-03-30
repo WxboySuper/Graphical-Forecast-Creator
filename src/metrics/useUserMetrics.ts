@@ -60,7 +60,7 @@ export const useUserMetrics = (): UseUserMetricsResult => {
   const [loading, setLoading] = useState(Boolean(isHostedAuthEnabled));
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useEffect(function subscribeUserMetricsEffect() {
     if (!isHostedAuthEnabled || !db) {
       setMetrics(DEFAULT_USER_METRICS);
       setLoading(false);

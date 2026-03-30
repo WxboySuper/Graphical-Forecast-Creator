@@ -42,7 +42,7 @@ app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, (req, res
   };
 
   try {
-    fs.appendFileSync(LOG_FILE, JSON.stringify(entry) + '\n');
+    fs.appendFileSync(LOG_FILE, `${JSON.stringify(entry)}\n`);
     res.status(204).end();
   } catch (err) {
     console.error('[analytics] failed to write log:', err);
