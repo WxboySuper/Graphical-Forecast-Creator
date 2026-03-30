@@ -18,6 +18,11 @@ type LegacyUserSettingsDocument = {
   cloudCycles?: LegacyCloudCyclesValue;
 };
 
+/** Returns a stable no-op unsubscribe callback when the Firestore subscription cannot be created. */
+function noopUnsubscribe(): void {
+  return undefined;
+}
+
 /**
  * Computes a simple hash of the cycle payload for change detection
  * Uses a simple string hash rather than cryptographic hashing
@@ -33,9 +38,11 @@ const computePayloadHash = (payload: GFCForecastSaveData): string => {
   return Math.abs(hash).toString(36).substring(0, 12);
 };
 
+/** Returns true when the value is a plain object record rather than an array or primitive. */
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+/** Reads a stored cloud payload from either a JSON string or already-parsed object value. */
 const parseStoredPayload = (value: unknown): GFCForecastSaveData | null => {
   if (typeof value === 'string') {
     try {
@@ -53,6 +60,7 @@ const parseStoredPayload = (value: unknown): GFCForecastSaveData | null => {
   return null;
 };
 
+/** Returns the shared Firestore collection reference for hosted cloud-cycle documents. */
 const getCloudCyclesCollectionRef = () => {
   if (!db) {
     throw new Error('Firestore is not initialized');
@@ -61,10 +69,13 @@ const getCloudCyclesCollectionRef = () => {
   return collection(db, CLOUD_CYCLES_COLLECTION);
 };
 
+/** Returns the Firestore document reference for a specific cloud cycle. */
 const getCloudCycleDocRef = (cycleId: string) => doc(getCloudCyclesCollectionRef(), cycleId);
 
+/** Reads the latest Firestore snapshot for one cloud cycle document. */
 const getCloudCycleDocSnapshot = (cycleId: string) => getDoc(getCloudCycleDocRef(cycleId));
 
+/** Returns the legacy user-settings document where pre-Phase 4 cloud cycles were stored. */
 const getLegacyUserSettingsRef = (userId: string) => {
   if (!db) {
     throw new Error('Firestore is not initialized');
@@ -73,9 +84,11 @@ const getLegacyUserSettingsRef = (userId: string) => {
   return doc(db, LEGACY_USER_SETTINGS_COLLECTION, userId);
 };
 
+/** Reads a timestamp-like string while falling back to a safe ISO date when missing. */
 const readTimestampString = (value: unknown, fallback = new Date(0).toISOString()): string =>
   typeof value === 'string' && value ? value : fallback;
 
+/** Normalizes stored cloud-cycle metadata into the current metadata contract. */
 const normalizeStoredMetadata = (
   cycleId: string,
   rawMetadata: Record<string, unknown> | undefined,
@@ -107,6 +120,7 @@ const normalizeStoredMetadata = (
   };
 };
 
+/** Normalizes one raw Firestore or legacy cloud-cycle record into the app's runtime shape. */
 const normalizeCloudCycleRecord = (
   cycleId: string,
   rawRecord: unknown,
@@ -130,6 +144,7 @@ const normalizeCloudCycleRecord = (
   };
 };
 
+/** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   const { payload, ...metadata } = cycle;
 
@@ -139,11 +154,16 @@ const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   };
 };
 
+/** Strips the saved payload from a cloud cycle so list views can work with metadata only. */
+const toCloudCycleMetadata = ({ payload: _payload, ...cycleMetadata }: CloudCycle): CloudCycleMetadata => cycleMetadata;
+
+/** Converts a Firestore query snapshot into normalized cloud-cycle records. */
 const readCloudCyclesFromQuery = (snapshot: { docs: Array<{ id: string; data: () => unknown }> }, fallbackUserId: string): CloudCycle[] =>
   snapshot.docs
     .map((cycleDoc) => normalizeCloudCycleRecord(cycleDoc.id, cycleDoc.data(), fallbackUserId))
     .filter((cycle): cycle is CloudCycle => Boolean(cycle));
 
+/** Reads older cloud-cycle data from the legacy user-settings document if present. */
 const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
   try {
     const snapshot = await getDoc(getLegacyUserSettingsRef(userId));
@@ -180,6 +200,7 @@ const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
   }
 };
 
+/** Migrates legacy cloud cycles into the dedicated `cloudCycles` collection and clears the old field. */
 const migrateLegacyCloudCycles = async (userId: string, cycles: CloudCycle[]): Promise<void> => {
   if (!cycles.length) {
     return;
@@ -200,6 +221,7 @@ const migrateLegacyCloudCycles = async (userId: string, cycles: CloudCycle[]): P
   );
 };
 
+/** Reads all cloud cycles for a user, transparently migrating legacy records when needed. */
 const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => {
   const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
   const cycles = readCloudCyclesFromQuery(snapshot, userId);
@@ -216,6 +238,7 @@ const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => 
   return legacyCycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 };
 
+/** Fetches one cloud cycle by id, including legacy fallback and migration support. */
 const fetchCloudCycleById = async (userId: string, cycleId: string): Promise<CloudCycle | null> => {
   const docSnapshot = await getCloudCycleDocSnapshot(cycleId);
   if (docSnapshot.exists()) {
@@ -234,6 +257,7 @@ const fetchCloudCycleById = async (userId: string, cycleId: string): Promise<Clo
   return legacyMatch;
 };
 
+/** Returns an existing cloud cycle only when it belongs to the current signed-in user. */
 const getOwnedCloudCycle = async (userId: string, cycleId: string): Promise<CloudCycle | null> => {
   const existingSnapshot = await getCloudCycleDocSnapshot(cycleId);
   if (!existingSnapshot.exists()) {
@@ -257,7 +281,7 @@ export const saveCloudCycle = async (
   cycleDate: string,
   stats: SavedCycleStats,
   payload: GFCForecastSaveData,
-  isReadOnly: boolean = false,
+  isReadOnly = false,
   existingId?: string
 ): Promise<CloudOperationResult<string>> => {
   try {
@@ -400,7 +424,7 @@ export const listCloudCycles = async (
 ): Promise<CloudOperationResult<CloudCycleMetadata[]>> => {
   try {
     const cycles = await readCloudCyclesForUser(userId);
-    const metadata = cycles.map(({ payload, ...cycleMetadata }) => cycleMetadata);
+    const metadata = cycles.map(toCloudCycleMetadata);
 
     return { success: true, data: metadata };
   } catch (error) {
@@ -429,14 +453,14 @@ export const subscribeToCloudCycles = (
         const cycles = readCloudCyclesFromQuery(querySnapshot, userId);
 
         if (cycles.length > 0) {
-          onUpdate(cycles.map(({ payload, ...metadata }) => metadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
+          onUpdate(cycles.map(toCloudCycleMetadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
           return;
         }
 
         const legacyCycles = await readLegacyCloudCycles(userId);
         if (legacyCycles.length > 0) {
           await migrateLegacyCloudCycles(userId, legacyCycles);
-          onUpdate(legacyCycles.map(({ payload, ...metadata }) => metadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
+          onUpdate(legacyCycles.map(toCloudCycleMetadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
           return;
         }
 
@@ -452,7 +476,7 @@ export const subscribeToCloudCycles = (
   } catch (error) {
     console.error('Error setting up cloud cycles subscription:', error);
     if (onError && error instanceof Error) onError(error);
-    return () => {};
+    return noopUnsubscribe;
   }
 };
 

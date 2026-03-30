@@ -17,6 +17,30 @@ interface CloudToolbarButtonProps {
   onOpenCloudLibrary: () => void;
 }
 
+/** Shared tooltip-wrapped toolbar button used by the cloud actions. */
+const CloudToolbarActionButton: React.FC<{
+  tooltip: string;
+  className: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ tooltip, className, disabled = false, onClick, children }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={onClick}
+        disabled={disabled}
+        className={className}
+      >
+        {children}
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent>{tooltip}</TooltipContent>
+  </Tooltip>
+);
+
 /**
  * Toolbar button group for cloud save/load operations.
  */
@@ -76,34 +100,22 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
   return (
     <>
       <div className="cloud-toolbar-group">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleSaveClick}
-              disabled={syncState === 'saving'}
-              className="cloud-toolbar-action cloud-toolbar-action-save h-14 w-14 lg:h-16 lg:w-16"
-            >
-              {saveIcon}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{tooltip}</TooltipContent>
-        </Tooltip>
+        <CloudToolbarActionButton
+          tooltip={tooltip}
+          disabled={syncState === 'saving'}
+          onClick={handleSaveClick}
+          className="cloud-toolbar-action cloud-toolbar-action-save h-14 w-14 lg:h-16 lg:w-16"
+        >
+          {saveIcon}
+        </CloudToolbarActionButton>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onOpenCloudLibrary}
-              className="cloud-toolbar-action cloud-toolbar-action-library h-14 w-14 lg:h-16 lg:w-16"
-            >
-              <FolderOpen className="h-6 w-6" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Open the cloud library</TooltipContent>
-        </Tooltip>
+        <CloudToolbarActionButton
+          tooltip="Open the cloud library"
+          onClick={onOpenCloudLibrary}
+          className="cloud-toolbar-action cloud-toolbar-action-library h-14 w-14 lg:h-16 lg:w-16"
+        >
+          <FolderOpen className="h-6 w-6" />
+        </CloudToolbarActionButton>
       </div>
 
       <CloudSaveModal

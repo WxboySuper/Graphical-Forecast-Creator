@@ -89,7 +89,8 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
       }
     );
 
-    return () => {
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupCloudCycleSubscription() {
       unsubscribeRef.current?.();
     };
   }, [user?.uid]);

@@ -102,7 +102,8 @@ export const useCloudSync = (
       syncTimeoutRef.current = null;
     }, SYNC_DEBOUNCE_MS);
 
-    return () => {
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupPendingCloudSync() {
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
         syncTimeoutRef.current = null;

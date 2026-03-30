@@ -256,6 +256,38 @@ const SignedInActionRow: React.FC<{
 );
 
 /** Cloud library access card for premium users. */
+const CloudLibraryCardHeader: React.FC = () => (
+  <CardHeader className="account-section-header">
+    <div className="account-section-topline">
+      <div className="account-section-copy">
+        <CardTitle className="flex items-center gap-2 text-2xl">
+          <Cloud className="h-6 w-6" />
+          Cloud Cycles
+        </CardTitle>
+        <CardDescription>
+          Access, save, and organize your forecasts in the cloud. Available on all your devices.
+        </CardDescription>
+      </div>
+    </div>
+  </CardHeader>
+);
+
+/** Body copy and CTA for the premium cloud-library account card. */
+const CloudLibraryCardContent: React.FC = () => (
+  <CardContent className="account-section-content">
+    <p className="mb-4 text-sm text-muted-foreground">
+      Your premium subscription includes hosted access to all your saved forecast cycles. Save time by reusing previous patterns and maintain consistency across multiple devices.
+    </p>
+    <Button asChild>
+      <Link to="/cloud">
+        <Cloud className="mr-2 h-4 w-4" />
+        Open Cloud Library
+      </Link>
+    </Button>
+  </CardContent>
+);
+
+/** Cloud library access card for premium users. */
 const CloudLibraryCard: React.FC = () => {
   const { premiumActive } = useEntitlement();
 
@@ -265,30 +297,8 @@ const CloudLibraryCard: React.FC = () => {
 
   return (
     <Card>
-      <CardHeader className="account-section-header">
-        <div className="account-section-topline">
-          <div className="account-section-copy">
-            <CardTitle className="text-2xl flex items-center gap-2">
-              <Cloud className="h-6 w-6" />
-              Cloud Cycles
-            </CardTitle>
-            <CardDescription>
-              Access, save, and organize your forecasts in the cloud. Available on all your devices.
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="account-section-content">
-        <p className="text-sm text-muted-foreground mb-4">
-          Your premium subscription includes hosted access to all your saved forecast cycles. Save time by reusing previous patterns and maintain consistency across multiple devices.
-        </p>
-        <Button asChild>
-          <Link to="/cloud">
-            <Cloud className="mr-2 h-4 w-4" />
-            Open Cloud Library
-          </Link>
-        </Button>
-      </CardContent>
+      <CloudLibraryCardHeader />
+      <CloudLibraryCardContent />
     </Card>
   );
 };

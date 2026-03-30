@@ -21,7 +21,7 @@ import {
   undoLastEdit,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType } from '../types/outlooks';
-import { deserializeForecast, validateForecastData, exportForecastToJson } from '../utils/fileUtils';
+import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from '../utils/featureFlagsUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useCycleHistoryPersistence } from '../utils/cycleHistoryPersistence';
@@ -33,7 +33,6 @@ import { useCloudCycles } from '../hooks/useCloudCycles';
 import { useCloudSync } from '../hooks/useCloudSync';
 import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbarButton';
 import { countForecastMetrics } from '../utils/forecastMetrics';
-import { serializeForecast } from '../utils/fileUtils';
 
 interface PageContext {
   addToast: AddToastFn;

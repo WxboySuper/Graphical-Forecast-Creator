@@ -210,6 +210,7 @@
 .cloud-cycle-meta,
 .cloud-cycle-stats,
 .cloud-cycle-inline-actions,
+.cloud-cycle-delete-prompt,
 .cloud-library-empty-actions,
 .cloud-library-support-actions,
 .cloud-library-feedback,
@@ -254,6 +255,21 @@
 
 .cloud-cycle-inline-actions {
   gap: 0.7rem;
+}
+
+.cloud-cycle-delete-prompt {
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--error-text) 18%, var(--border-color));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--error-text) 6%, var(--bg-primary));
+}
+
+.cloud-cycle-delete-prompt p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-primary);
 }
 
 .cloud-library-empty-state {

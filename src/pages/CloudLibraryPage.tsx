@@ -77,43 +77,65 @@ const ExpiredPremiumNotice: React.FC = () => (
   </Card>
 );
 
+/** Header block used by the combined cloud-library utility card. */
+const CloudLibraryUtilityHeader: React.FC = () => (
+  <CardHeader className="cloud-library-section-header">
+    <div className="cloud-library-support-title">
+      <ShieldCheck className="h-5 w-5 text-primary" />
+      <CardTitle>Storage access</CardTitle>
+    </div>
+    <CardDescription>
+      Hosted saves live here. The forecast editor, discussions, verification, and exports still stay local-first.
+    </CardDescription>
+  </CardHeader>
+);
+
+/** Context-sensitive helper copy shown in the right-side utility card. */
+const getUtilityCardCopy = (premiumActive: boolean, isExpiredPremium: boolean): string => {
+  if (premiumActive) {
+    return 'Save new versions from the toolbar and they will show up here automatically.';
+  }
+
+  if (isExpiredPremium) {
+    return 'Your saved cycles are still available to open, but writes stay off until premium is active again.';
+  }
+
+  return 'Premium unlocks hosted saves. Until then, your forecast workflow stays local.';
+};
+
+/** Support actions rendered in the right-side cloud utility card. */
+const CloudLibraryUtilityActions: React.FC<{
+  premiumActive: boolean;
+  isExpiredPremium: boolean;
+}> = ({ premiumActive, isExpiredPremium }) => (
+  <div className="cloud-library-support-actions">
+    <Button asChild variant="default">
+      <Link to="/forecast">Back to Forecast Editor</Link>
+    </Button>
+    <Button asChild variant={premiumActive ? 'outline' : 'default'}>
+      <Link to="/pricing">{premiumActive ? 'View Pricing' : 'Upgrade to Premium'}</Link>
+    </Button>
+    {isExpiredPremium ? (
+      <p className="cloud-library-side-note">Renew premium to turn cloud writes back on.</p>
+    ) : null}
+  </div>
+);
+
 /** Combined utility card for access details and next actions. */
 const CloudLibraryUtilityCard: React.FC<{
   premiumActive: boolean;
   isExpiredPremium: boolean;
 }> = ({ premiumActive, isExpiredPremium }) => (
   <Card className="cloud-library-support-card">
-    <CardHeader className="cloud-library-section-header">
-      <div className="cloud-library-support-title">
-        <ShieldCheck className="h-5 w-5 text-primary" />
-        <CardTitle>Storage access</CardTitle>
-      </div>
-      <CardDescription>Hosted saves live here. The forecast editor, discussions, verification, and exports still stay local-first.</CardDescription>
-    </CardHeader>
+    <CloudLibraryUtilityHeader />
     <CardContent className="cloud-library-support-content">
       <div className="cloud-library-support-grid">
         <CloudLibraryStat label="Mode" value={premiumActive ? 'Full access' : isExpiredPremium ? 'Read-only' : 'Locked'} />
         <CloudLibraryStat label="Library" value={premiumActive ? 'Writable' : 'Readable'} />
       </div>
-      <p className="cloud-library-support-copy">
-        {premiumActive
-          ? 'Save new versions from the toolbar and they will show up here automatically.'
-          : isExpiredPremium
-            ? 'Your saved cycles are still available to open, but writes stay off until premium is active again.'
-            : 'Premium unlocks hosted saves. Until then, your forecast workflow stays local.'}
-      </p>
+      <p className="cloud-library-support-copy">{getUtilityCardCopy(premiumActive, isExpiredPremium)}</p>
       <div className="cloud-library-divider" />
-      <div className="cloud-library-support-actions">
-        <Button asChild variant="default">
-          <Link to="/forecast">Back to Forecast Editor</Link>
-        </Button>
-        <Button asChild variant={premiumActive ? 'outline' : 'default'}>
-          <Link to="/pricing">{premiumActive ? 'View Pricing' : 'Upgrade to Premium'}</Link>
-        </Button>
-        {isExpiredPremium ? (
-          <p className="cloud-library-side-note">Renew premium to turn cloud writes back on.</p>
-        ) : null}
-      </div>
+      <CloudLibraryUtilityActions premiumActive={premiumActive} isExpiredPremium={isExpiredPremium} />
     </CardContent>
   </Card>
 );
@@ -170,6 +192,121 @@ const CycleRenameRow: React.FC<{
   </div>
 );
 
+/** Header block for one saved cloud cycle row. */
+const CloudCycleHeader: React.FC<{ cycle: CloudCycleMetadata }> = ({ cycle }) => (
+  <div className="cloud-cycle-header">
+    <div className="cloud-cycle-title-row">
+      <h3>{cycle.label}</h3>
+      {cycle.isReadOnly ? (
+        <Badge variant="outline">
+          <Lock className="mr-1 h-3.5 w-3.5" />
+          Read-only
+        </Badge>
+      ) : null}
+    </div>
+    <div className="cloud-cycle-meta">
+      <span>Cycle {cycle.cycleDate}</span>
+      <span>Updated {formatDate(cycle.updatedAt)}</span>
+    </div>
+  </div>
+);
+
+/** Stats row summarizing forecast density for one saved cloud cycle. */
+const CloudCycleStats: React.FC<{ cycle: CloudCycleMetadata }> = ({ cycle }) => (
+  <div className="cloud-cycle-stats">
+    <CloudLibraryStat label="Forecast days" value={`${cycle.forecastDays}`} />
+    <CloudLibraryStat label="Outlooks" value={`${cycle.totalOutlooks}`} />
+    <CloudLibraryStat label="Features" value={`${cycle.totalFeatures}`} />
+  </div>
+);
+
+/** Inline delete confirmation shown instead of a blocking browser confirm dialog. */
+const CloudCycleDeletePrompt: React.FC<{
+  cycleLabel: string;
+  isBusy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}> = ({ cycleLabel, isBusy, onCancel, onConfirm }) => (
+  <div className="cloud-cycle-delete-prompt">
+    <p>Delete "{cycleLabel}"? This action cannot be undone.</p>
+    <div className="cloud-cycle-inline-actions">
+      <Button variant="outline" size="sm" onClick={onCancel} disabled={isBusy}>
+        Keep
+      </Button>
+      <Button variant="destructive" size="sm" onClick={onConfirm} disabled={isBusy}>
+        {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+        Delete
+      </Button>
+    </div>
+  </div>
+);
+
+/** Action block for loading, renaming, and deleting one cloud cycle. */
+const CloudCycleActions: React.FC<{
+  canWrite: boolean;
+  loading: boolean;
+  cycle: CloudCycleMetadata;
+  isDeleting: boolean;
+  isSavingRename: boolean;
+  isRenaming: boolean;
+  confirmingDelete: boolean;
+  onLoad: () => void;
+  onStartRename: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+}> = ({
+  canWrite,
+  loading,
+  cycle,
+  isDeleting,
+  isSavingRename,
+  isRenaming,
+  confirmingDelete,
+  onLoad,
+  onStartRename,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}) => (
+  <div className="cloud-cycle-actions">
+    <Button variant="outline" onClick={onLoad} disabled={loading || isDeleting || isSavingRename}>
+      <Download className="mr-2 h-4 w-4" />
+      Load
+    </Button>
+
+    {canWrite && !cycle.isReadOnly ? (
+      <>
+        <Button
+          variant="outline"
+          onClick={onStartRename}
+          disabled={loading || isDeleting || isSavingRename || isRenaming || confirmingDelete}
+        >
+          <Edit2 className="mr-2 h-4 w-4" />
+          Rename
+        </Button>
+        {confirmingDelete ? (
+          <CloudCycleDeletePrompt
+            cycleLabel={cycle.label}
+            isBusy={loading || isDeleting}
+            onCancel={onCancelDelete}
+            onConfirm={onConfirmDelete}
+          />
+        ) : (
+          <Button
+            variant="destructive"
+            onClick={onRequestDelete}
+            disabled={loading || isDeleting || isSavingRename || isRenaming}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        )}
+      </>
+    ) : null}
+  </div>
+);
+
 interface CycleItemProps {
   cycle: CloudCycleMetadata;
   canWrite: boolean;
@@ -184,21 +321,21 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, onLoad,
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isSavingRename, setIsSavingRename] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [newLabel, setNewLabel] = useState(cycle.label);
 
+  /** Deletes the selected cloud cycle after the inline confirmation has been accepted. */
   const handleDelete = async () => {
-    if (!window.confirm(`Delete "${cycle.label}"? This action cannot be undone.`)) {
-      return;
-    }
-
     setIsDeleting(true);
     try {
       await onDelete(cycle.id);
+      setConfirmingDelete(false);
     } finally {
       setIsDeleting(false);
     }
   };
 
+  /** Saves a renamed cloud-cycle label and exits inline editing when the request completes. */
   const handleRenameSave = async () => {
     if (!newLabel.trim() || newLabel.trim() === cycle.label) {
       setIsRenaming(false);
@@ -219,21 +356,7 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, onLoad,
     <Card className="cloud-library-surface-card cloud-cycle-card">
       <CardContent className="cloud-cycle-card-content">
         <div className="cloud-cycle-main">
-          <div className="cloud-cycle-header">
-            <div className="cloud-cycle-title-row">
-              <h3>{cycle.label}</h3>
-              {cycle.isReadOnly ? (
-                <Badge variant="outline">
-                  <Lock className="mr-1 h-3.5 w-3.5" />
-                  Read-only
-                </Badge>
-              ) : null}
-            </div>
-            <div className="cloud-cycle-meta">
-              <span>Cycle {cycle.cycleDate}</span>
-              <span>Updated {formatDate(cycle.updatedAt)}</span>
-            </div>
-          </div>
+          <CloudCycleHeader cycle={cycle} />
 
           {isRenaming ? (
             <CycleRenameRow
@@ -244,57 +367,174 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, onLoad,
               onCancel={() => {
                 setIsRenaming(false);
                 setNewLabel(cycle.label);
+                setConfirmingDelete(false);
               }}
             />
           ) : null}
 
-          <div className="cloud-cycle-stats">
-            <CloudLibraryStat label="Forecast days" value={`${cycle.forecastDays}`} />
-            <CloudLibraryStat label="Outlooks" value={`${cycle.totalOutlooks}`} />
-            <CloudLibraryStat label="Features" value={`${cycle.totalFeatures}`} />
-          </div>
+          <CloudCycleStats cycle={cycle} />
         </div>
 
-        <div className="cloud-cycle-actions">
-          <Button variant="outline" onClick={() => onLoad(cycle.id)} disabled={loading || isDeleting || isSavingRename}>
-            <Download className="mr-2 h-4 w-4" />
-            Load
-          </Button>
-
-          {canWrite && !cycle.isReadOnly ? (
-            <>
-              <Button variant="outline" onClick={() => setIsRenaming(true)} disabled={loading || isDeleting || isSavingRename || isRenaming}>
-                <Edit2 className="mr-2 h-4 w-4" />
-                Rename
-              </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={loading || isDeleting || isSavingRename}>
-                {isDeleting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Delete
-              </Button>
-            </>
-          ) : null}
-        </div>
+        <CloudCycleActions
+          canWrite={canWrite}
+          loading={loading}
+          cycle={cycle}
+          isDeleting={isDeleting}
+          isSavingRename={isSavingRename}
+          isRenaming={isRenaming}
+          confirmingDelete={confirmingDelete}
+          onLoad={() => onLoad(cycle.id)}
+          onStartRename={() => {
+            setIsRenaming(true);
+            setConfirmingDelete(false);
+          }}
+          onRequestDelete={() => setConfirmingDelete(true)}
+          onCancelDelete={() => setConfirmingDelete(false)}
+          onConfirmDelete={handleDelete}
+        />
       </CardContent>
     </Card>
   );
 };
 
+/** Centered sign-in card body for the signed-out cloud-library state. */
+const CloudLibraryAuthCard: React.FC = () => (
+  <Card className="cloud-library-surface-card cloud-library-auth-card">
+    <CardHeader className="cloud-library-section-header">
+      <CardTitle>Sign in to use your cloud library</CardTitle>
+      <CardDescription>
+        Hosted cycle storage is tied to your account, so you need to sign in before opening cloud saves.
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="cloud-library-support-actions">
+      <Button asChild>
+        <Link to="/account">Sign In</Link>
+      </Button>
+    </CardContent>
+  </Card>
+);
+
 /** Sign-in gate shown when a user reaches the cloud page without auth. */
 const SignedOutGate: React.FC = () => (
   <div className="cloud-library-center-shell">
-    <Card className="cloud-library-surface-card cloud-library-auth-card">
-      <CardHeader className="cloud-library-section-header">
-        <CardTitle>Sign in to use your cloud library</CardTitle>
-        <CardDescription>
-          Hosted cycle storage is tied to your account, so you need to sign in before opening cloud saves.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="cloud-library-support-actions">
-        <Button asChild>
-          <Link to="/account">Sign In</Link>
-        </Button>
-      </CardContent>
-    </Card>
+    <CloudLibraryAuthCard />
+  </div>
+);
+
+/** Lightweight feedback banner used for transient cloud-library status or error messages. */
+const CloudLibraryFeedbackCard: React.FC<{
+  error: string | null;
+  message: string | null;
+}> = ({ error, message }) => (
+  <Card className="cloud-library-surface-card">
+    <CardContent className="cloud-library-feedback">
+      {error ? (
+        <CloudOff className="h-5 w-5 shrink-0 text-destructive" />
+      ) : (
+        <Cloud className="h-5 w-5 shrink-0 text-primary" />
+      )}
+      <p>{error ?? message}</p>
+    </CardContent>
+  </Card>
+);
+
+/** Main library card that owns the saved-cycle list, empty state, and loading state. */
+const CloudLibraryMainCard: React.FC<{
+  loading: boolean;
+  cycles: CloudCycleMetadata[];
+  premiumActive: boolean;
+  canWrite: boolean;
+  cycleCountLabel: string;
+  onLoadCycle: (cycleId: string) => Promise<void>;
+  onDeleteCycle: (cycleId: string) => Promise<void>;
+  onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
+}> = ({
+  loading,
+  cycles,
+  premiumActive,
+  canWrite,
+  cycleCountLabel,
+  onLoadCycle,
+  onDeleteCycle,
+  onRenameCycle,
+}) => (
+  <Card className="cloud-library-surface-card">
+    <CardHeader className="cloud-library-section-header">
+      <CardTitle>Your cloud cycles</CardTitle>
+      <CardDescription>Open a saved package, rename it, or clear out older copies.</CardDescription>
+    </CardHeader>
+    <CardContent className="cloud-library-list-content">
+      {loading && cycles.length === 0 ? (
+        <div className="cloud-library-loading">
+          <LoaderCircle className="h-6 w-6 animate-spin" />
+        </div>
+      ) : cycles.length === 0 ? (
+        <EmptyState premiumActive={premiumActive} />
+      ) : (
+        <>
+          <div className="cloud-library-list-header">
+            <strong>{cycleCountLabel}</strong>
+            {!premiumActive ? <Badge variant="outline">Read-only</Badge> : null}
+          </div>
+
+          <div className="cloud-library-list">
+            {cycles.map((cycle) => (
+              <CycleItem
+                key={cycle.id}
+                cycle={cycle}
+                canWrite={canWrite}
+                loading={loading}
+                onLoad={onLoadCycle}
+                onDelete={onDeleteCycle}
+                onRename={onRenameCycle}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </CardContent>
+  </Card>
+);
+
+/** Signed-in library layout tying together the main list and the utility rail. */
+const CloudLibrarySignedInLayout: React.FC<{
+  premiumActive: boolean;
+  isExpiredPremium: boolean;
+  loading: boolean;
+  cycles: CloudCycleMetadata[];
+  canWrite: boolean;
+  cycleCountLabel: string;
+  onLoadCycle: (cycleId: string) => Promise<void>;
+  onDeleteCycle: (cycleId: string) => Promise<void>;
+  onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
+}> = ({
+  premiumActive,
+  isExpiredPremium,
+  loading,
+  cycles,
+  canWrite,
+  cycleCountLabel,
+  onLoadCycle,
+  onDeleteCycle,
+  onRenameCycle,
+}) => (
+  <div className="cloud-library-layout">
+    <div className="cloud-library-main">
+      <CloudLibraryMainCard
+        loading={loading}
+        cycles={cycles}
+        premiumActive={premiumActive}
+        canWrite={canWrite}
+        cycleCountLabel={cycleCountLabel}
+        onLoadCycle={onLoadCycle}
+        onDeleteCycle={onDeleteCycle}
+        onRenameCycle={onRenameCycle}
+      />
+    </div>
+
+    <div className="cloud-library-side">
+      <CloudLibraryUtilityCard premiumActive={premiumActive} isExpiredPremium={isExpiredPremium} />
+    </div>
   </div>
 );
 
@@ -310,6 +550,7 @@ const CloudLibraryPage: React.FC = () => {
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
   const cycleCountLabel = useMemo(() => `${cycles.length} cloud cycle${cycles.length === 1 ? '' : 's'}`, [cycles.length]);
 
+  /** Loads one hosted cycle into the forecast editor and preserves its cloud metadata in session storage. */
   const handleLoadCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
     const payload = await loadCycle(cycleId);
@@ -329,6 +570,7 @@ const CloudLibraryPage: React.FC = () => {
     navigate('/forecast');
   }, [cycles, loadCycle, navigate]);
 
+  /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
   const handleDeleteCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
     const success = await deleteCycle(cycleId);
@@ -337,6 +579,7 @@ const CloudLibraryPage: React.FC = () => {
     }
   }, [deleteCycle]);
 
+  /** Persists a renamed label for one hosted cloud cycle and refreshes the list metadata. */
   const handleRenameCycle = useCallback(async (cycleId: string, newLabel: string) => {
     setMessage(null);
     const success = await renameCycle(cycleId, newLabel);
@@ -356,59 +599,19 @@ const CloudLibraryPage: React.FC = () => {
         <CloudLibraryHero premiumActive={premiumActive} cycleCount={cycles.length} isExpiredPremium={isExpiredPremium} />
 
         {isExpiredPremium ? <ExpiredPremiumNotice /> : null}
-        {error || message ? (
-          <Card className="cloud-library-surface-card">
-            <CardContent className="cloud-library-feedback">
-              {error ? <CloudOff className="h-5 w-5 text-destructive shrink-0 mt-0.5" /> : <Cloud className="h-5 w-5 text-primary shrink-0 mt-0.5" />}
-              <p>{error ?? message}</p>
-            </CardContent>
-          </Card>
-        ) : null}
+        {error || message ? <CloudLibraryFeedbackCard error={error} message={message} /> : null}
 
-        <div className="cloud-library-layout">
-          <div className="cloud-library-main">
-            <Card className="cloud-library-surface-card">
-              <CardHeader className="cloud-library-section-header">
-                <CardTitle>Your cloud cycles</CardTitle>
-                <CardDescription>Open a saved package, rename it, or clear out older copies.</CardDescription>
-              </CardHeader>
-              <CardContent className="cloud-library-list-content">
-                {loading && cycles.length === 0 ? (
-                  <div className="cloud-library-loading">
-                    <LoaderCircle className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : cycles.length === 0 ? (
-                  <EmptyState premiumActive={premiumActive} />
-                ) : (
-                  <>
-                    <div className="cloud-library-list-header">
-                      <strong>{cycleCountLabel}</strong>
-                      {!premiumActive ? <Badge variant="outline">Read-only</Badge> : null}
-                    </div>
-
-                    <div className="cloud-library-list">
-                      {cycles.map((cycle) => (
-                        <CycleItem
-                          key={cycle.id}
-                          cycle={cycle}
-                          canWrite={canWrite}
-                          loading={loading}
-                          onLoad={handleLoadCycle}
-                          onDelete={handleDeleteCycle}
-                          onRename={handleRenameCycle}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="cloud-library-side">
-            <CloudLibraryUtilityCard premiumActive={premiumActive} isExpiredPremium={isExpiredPremium} />
-          </div>
-        </div>
+        <CloudLibrarySignedInLayout
+          premiumActive={premiumActive}
+          isExpiredPremium={isExpiredPremium}
+          loading={loading}
+          cycles={cycles}
+          canWrite={canWrite}
+          cycleCountLabel={cycleCountLabel}
+          onLoadCycle={handleLoadCycle}
+          onDeleteCycle={handleDeleteCycle}
+          onRenameCycle={handleRenameCycle}
+        />
       </div>
     </div>
   );

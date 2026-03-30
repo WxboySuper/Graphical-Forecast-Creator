@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import {
   Dialog,
@@ -17,9 +17,57 @@ interface CloudSaveModalProps {
   onOpenChange: (open: boolean) => void;
   onSave: (label: string) => Promise<boolean>;
   currentLabel?: string;
-  isLoading?: boolean;
   error?: string;
 }
+
+/** Header copy used by the cloud save modal. */
+const CloudSaveDialogHeader: React.FC = () => (
+  <DialogHeader className="cloud-save-dialog-header">
+    <DialogTitle className="cloud-save-dialog-title">Save to Cloud</DialogTitle>
+    <DialogDescription className="cloud-save-dialog-description">
+      Save the current forecast package to your hosted library so it is ready from any signed-in device.
+    </DialogDescription>
+  </DialogHeader>
+);
+
+/** Compact context callout showing the current cloud save label. */
+const CloudSaveDialogCallout: React.FC<{ currentLabel: string }> = ({ currentLabel }) => (
+  <div className="cloud-save-dialog-callout">
+    <div>
+      <span>Saving as</span>
+      <strong>{currentLabel || 'Untitled Forecast'}</strong>
+    </div>
+    <div className="cloud-save-dialog-icon">
+      <Cloud className="h-5 w-5" />
+    </div>
+  </div>
+);
+
+/** Error banner shown when the current cloud save attempt fails. */
+const CloudSaveDialogError: React.FC<{ error: string }> = ({ error }) => (
+  <div className="cloud-save-dialog-error">
+    <AlertCircle className="h-5 w-5 shrink-0 text-red-600" />
+    <p>{error}</p>
+  </div>
+);
+
+/** Footer actions for canceling or confirming the cloud save. */
+const CloudSaveDialogFooter: React.FC<{
+  isSaving: boolean;
+  canSave: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}> = ({ isSaving, canSave, onCancel, onSave }) => (
+  <DialogFooter className="cloud-save-dialog-footer">
+    <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>
+      Cancel
+    </Button>
+    <Button type="button" onClick={onSave} disabled={!canSave || isSaving} className="cloud-save-dialog-primary">
+      {isSaving ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : null}
+      {isSaving ? 'Saving...' : 'Save to Cloud'}
+    </Button>
+  </DialogFooter>
+);
 
 /**
  * Modal for saving a forecast to the cloud
@@ -29,18 +77,22 @@ export const CloudSaveModal: React.FC<CloudSaveModalProps> = ({
   onOpenChange,
   onSave,
   currentLabel = '',
-  isLoading = false,
   error,
 }) => {
   const [label, setLabel] = useState(currentLabel);
   const [isSaving, setIsSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (open && !isSaving) {
       setLabel(currentLabel);
+      window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
     }
   }, [currentLabel, isSaving, open]);
 
+  /** Persists the trimmed cloud label and closes the modal on success. */
   const handleSave = async () => {
     if (!label.trim()) {
       return;
@@ -58,6 +110,7 @@ export const CloudSaveModal: React.FC<CloudSaveModalProps> = ({
     }
   };
 
+  /** Blocks closing while a save is in progress and resets stale label state on close. */
   const handleOpenChange = (newOpen: boolean) => {
     if (!isSaving) {
       onOpenChange(newOpen);
@@ -71,52 +124,29 @@ export const CloudSaveModal: React.FC<CloudSaveModalProps> = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="cloud-save-dialog">
         <div className="cloud-save-dialog-body">
-          <DialogHeader className="cloud-save-dialog-header">
-            <DialogTitle className="cloud-save-dialog-title">Save to Cloud</DialogTitle>
-            <DialogDescription className="cloud-save-dialog-description">
-              Save the current forecast package to your hosted library so it is ready from any signed-in device.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="cloud-save-dialog-callout">
-            <div>
-              <span>Saving as</span>
-              <strong>{currentLabel || 'Untitled Forecast'}</strong>
-            </div>
-            <div className="cloud-save-dialog-icon">
-              <Cloud className="h-5 w-5" />
-            </div>
-          </div>
-
-          {error && (
-            <div className="cloud-save-dialog-error">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p>{error}</p>
-            </div>
-          )}
+          <CloudSaveDialogHeader />
+          <CloudSaveDialogCallout currentLabel={currentLabel} />
+          {error ? <CloudSaveDialogError error={error} /> : null}
 
           <div className="cloud-save-dialog-field">
             <label htmlFor="cloud-cycle-name">Cycle name</label>
             <Input
+              ref={inputRef}
               id="cloud-cycle-name"
               className="cloud-save-dialog-input"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g., March 29 - Strong Pattern"
               disabled={isSaving}
-              autoFocus
             />
           </div>
 
-          <DialogFooter className="cloud-save-dialog-footer">
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleSave} disabled={!label.trim() || isSaving} className="cloud-save-dialog-primary">
-              {isSaving && <Loader className="w-4 h-4 mr-2 animate-spin" />}
-              {isSaving ? 'Saving...' : 'Save to Cloud'}
-            </Button>
-          </DialogFooter>
+          <CloudSaveDialogFooter
+            isSaving={isSaving}
+            canSave={Boolean(label.trim())}
+            onCancel={() => handleOpenChange(false)}
+            onSave={handleSave}
+          />
         </div>
       </DialogContent>
     </Dialog>
@@ -147,6 +177,7 @@ export const CloudLoadModal: React.FC<CloudLoadModalProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoadingCycle, setIsLoadingCycle] = useState(false);
 
+  /** Loads the selected cycle and closes the modal when the request succeeds. */
   const handleLoad = async () => {
     if (!selectedId) return;
 
