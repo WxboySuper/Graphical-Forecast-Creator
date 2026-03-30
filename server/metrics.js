@@ -500,9 +500,10 @@ const handleAdminMetrics = async (req, res) => {
   }
 
   if (!isAllowedAdminUid(decodedToken.uid)) {
+    const allowlist = getAdminUidAllowlist();
     console.warn('[metrics] admin:forbidden', {
       uid: decodedToken.uid,
-      allowlist: getAdminUidAllowlist(),
+      allowlistSize: allowlist.length,
     });
     res.status(403).json({ error: 'You are not authorized to view the admin dashboard.' });
     return;
