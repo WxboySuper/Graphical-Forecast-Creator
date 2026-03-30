@@ -1,4 +1,5 @@
 import { collection, deleteField, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
 import { CloudCycleMetadata, CloudCycle, CloudOperationResult } from '../types/cloudCycles';
 import { GFCForecastSaveData } from '../types/outlooks';
@@ -65,7 +66,7 @@ const computePayloadHash = (payload: GFCForecastSaveData): string => {
   for (let i = 0; i < jsonStr.length; i++) {
     const char = jsonStr.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    hash |= 0; // Force the rolling hash back into a signed 32-bit integer.
   }
   return Math.abs(hash).toString(36).substring(0, 12);
 };
@@ -196,6 +197,14 @@ const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
 /** Strips the saved payload from a cloud cycle so list views can work with metadata only. */
 const toCloudCycleMetadata = ({ payload: _payload, ...cycleMetadata }: CloudCycle): CloudCycleMetadata => cycleMetadata;
 
+/** Sorts cloud-cycle metadata from newest to oldest update time. */
+const sortCloudCycleMetadata = (cycles: CloudCycleMetadata[]): CloudCycleMetadata[] =>
+  [...cycles].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+
+/** Creates a collision-resistant id for new hosted cloud cycles. */
+const createCloudCycleId = (userId: string, cycleDate: string): string =>
+  `${userId}-${cycleDate}-${uuidv4()}`;
+
 /** Converts a Firestore query snapshot into normalized cloud-cycle records. */
 const readCloudCyclesFromQuery = ({ snapshot, fallbackUserId }: ReadCloudCyclesFromQueryParams): CloudCycle[] =>
   snapshot.docs
@@ -319,7 +328,7 @@ export const saveCloudCycle = async (
 ): Promise<CloudOperationResult<string>> => {
   try {
     const { userId, label, cycleDate, stats, payload, isReadOnly = false, existingId } = params;
-    const cycleId = existingId || `${cycleDate}-${Date.now()}`;
+    const cycleId = existingId || createCloudCycleId(userId, cycleDate);
     const now = new Date().toISOString();
     const existingCycle = existingId ? await getOwnedCloudCycle({ userId, cycleId: existingId }) : null;
 
@@ -480,25 +489,28 @@ export const subscribeToCloudCycles = (
 ): (() => void) => {
   try {
     const cyclesQuery = query(getCloudCyclesCollectionRef(), where('userId', '==', userId));
+    let isActive = true;
+
+    void readCloudCyclesForUser(userId)
+      .then((cycles) => {
+        if (!isActive) {
+          return;
+        }
+
+        onUpdate(sortCloudCycleMetadata(cycles.map(toCloudCycleMetadata)));
+      })
+      .catch((error) => {
+        console.error('Error bootstrapping cloud cycles:', error);
+        if (isActive) {
+          onError?.(error as Error);
+        }
+      });
 
     const unsubscribe = onSnapshot(
       cyclesQuery,
-      async (querySnapshot) => {
+      (querySnapshot) => {
         const cycles = readCloudCyclesFromQuery({ snapshot: querySnapshot, fallbackUserId: userId });
-
-        if (cycles.length > 0) {
-          onUpdate(cycles.map(toCloudCycleMetadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
-          return;
-        }
-
-        const legacyCycles = await readLegacyCloudCycles(userId);
-        if (legacyCycles.length > 0) {
-          await migrateLegacyCloudCycles(userId, legacyCycles);
-          onUpdate(legacyCycles.map(toCloudCycleMetadata).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
-          return;
-        }
-
-        onUpdate([]);
+        onUpdate(sortCloudCycleMetadata(cycles.map(toCloudCycleMetadata)));
       },
       (error) => {
         console.error('Error subscribing to cloud cycles:', error);
@@ -506,7 +518,10 @@ export const subscribeToCloudCycles = (
       }
     );
 
-    return unsubscribe;
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
   } catch (error) {
     console.error('Error setting up cloud cycles subscription:', error);
     if (onError && error instanceof Error) onError(error);
