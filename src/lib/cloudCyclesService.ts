@@ -25,6 +25,12 @@ interface NormalizeCloudCycleRecordParams {
   fallbackUserId: string;
 }
 
+interface NormalizeCloudCycleMetadataRecordParams {
+  cycleId: string;
+  rawRecord: unknown;
+  fallbackUserId: string;
+}
+
 interface ReadCloudCyclesFromQueryParams {
   snapshot: { docs: Array<{ id: string; data: () => unknown }> };
   fallbackUserId: string;
@@ -184,6 +190,20 @@ const normalizeCloudCycleRecord = ({
   };
 };
 
+/** Normalizes one raw Firestore cloud-cycle document into list-safe metadata without parsing the payload. */
+const normalizeCloudCycleMetadataRecord = ({
+  cycleId,
+  rawRecord,
+  fallbackUserId,
+}: NormalizeCloudCycleMetadataRecordParams): CloudCycleMetadata | null => {
+  if (!isPlainObject(rawRecord)) {
+    return null;
+  }
+
+  const metadataSource = isPlainObject(rawRecord.metadata) ? (rawRecord.metadata as Record<string, unknown>) : rawRecord;
+  return normalizeStoredMetadata({ cycleId, rawMetadata: metadataSource, fallbackUserId });
+};
+
 /** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   const { payload, ...metadata } = cycle;
@@ -194,7 +214,7 @@ const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   };
 };
 
-/** Strips the saved payload from a cloud cycle so list views can work with metadata only. */
+/** Strips the saved payload from a cloud cycle so library APIs can expose metadata-only objects. */
 const toCloudCycleMetadata = ({ payload: _payload, ...cycleMetadata }: CloudCycle): CloudCycleMetadata => cycleMetadata;
 
 /** Sorts cloud-cycle metadata from newest to oldest update time. */
@@ -205,11 +225,19 @@ const sortCloudCycleMetadata = (cycles: CloudCycleMetadata[]): CloudCycleMetadat
 const createCloudCycleId = (userId: string, cycleDate: string): string =>
   `${userId}-${cycleDate}-${uuidv4()}`;
 
-/** Converts a Firestore query snapshot into normalized cloud-cycle records. */
+/** Converts a Firestore query snapshot into normalized cloud-cycle records, including payload validation. */
 const readCloudCyclesFromQuery = ({ snapshot, fallbackUserId }: ReadCloudCyclesFromQueryParams): CloudCycle[] =>
   snapshot.docs
     .map((cycleDoc) => normalizeCloudCycleRecord({ cycleId: cycleDoc.id, rawRecord: cycleDoc.data(), fallbackUserId }))
     .filter((cycle): cycle is CloudCycle => Boolean(cycle));
+
+/** Converts a Firestore query snapshot into normalized cloud-cycle metadata without parsing payload JSON. */
+const readCloudCycleMetadataFromQuery = ({ snapshot, fallbackUserId }: ReadCloudCyclesFromQueryParams): CloudCycleMetadata[] =>
+  snapshot.docs
+    .map((cycleDoc) =>
+      normalizeCloudCycleMetadataRecord({ cycleId: cycleDoc.id, rawRecord: cycleDoc.data(), fallbackUserId })
+    )
+    .filter((cycle): cycle is CloudCycleMetadata => Boolean(cycle));
 
 /** Reads older cloud-cycle data from the legacy user-settings document if present. */
 const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
@@ -460,16 +488,23 @@ export const renameCloudCycle = async (
 };
 
 /**
- * Lists all cloud cycles for a user (metadata only, not full payloads)
+ * Lists all cloud cycles for a user as metadata-only objects.
+ * Payload JSON is still stored in the same Firestore document today, so this avoids parse cost but not document transfer size.
  */
 export const listCloudCycles = async (
   userId: string
 ): Promise<CloudOperationResult<CloudCycleMetadata[]>> => {
   try {
-    const cycles = await readCloudCyclesForUser(userId);
-    const metadata = cycles.map(toCloudCycleMetadata);
+    const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
+    const metadata = readCloudCycleMetadataFromQuery({ snapshot, fallbackUserId: userId });
 
-    return { success: true, data: metadata };
+    if (metadata.length > 0) {
+      return { success: true, data: sortCloudCycleMetadata(metadata) };
+    }
+
+    const cycles = await readCloudCyclesForUser(userId);
+
+    return { success: true, data: sortCloudCycleMetadata(cycles.map(toCloudCycleMetadata)) };
   } catch (error) {
     console.error('Error listing cloud cycles:', error);
     return {
@@ -491,13 +526,13 @@ export const subscribeToCloudCycles = (
     const cyclesQuery = query(getCloudCyclesCollectionRef(), where('userId', '==', userId));
     let isActive = true;
 
-    void readCloudCyclesForUser(userId)
-      .then((cycles) => {
+    void listCloudCycles(userId)
+      .then((result) => {
         if (!isActive) {
           return;
         }
 
-        onUpdate(sortCloudCycleMetadata(cycles.map(toCloudCycleMetadata)));
+        onUpdate(sortCloudCycleMetadata(result.success && result.data ? result.data : []));
       })
       .catch((error) => {
         console.error('Error bootstrapping cloud cycles:', error);
@@ -509,8 +544,8 @@ export const subscribeToCloudCycles = (
     const unsubscribe = onSnapshot(
       cyclesQuery,
       (querySnapshot) => {
-        const cycles = readCloudCyclesFromQuery({ snapshot: querySnapshot, fallbackUserId: userId });
-        onUpdate(sortCloudCycleMetadata(cycles.map(toCloudCycleMetadata)));
+        const metadata = readCloudCycleMetadataFromQuery({ snapshot: querySnapshot, fallbackUserId: userId });
+        onUpdate(sortCloudCycleMetadata(metadata));
       },
       (error) => {
         console.error('Error subscribing to cloud cycles:', error);

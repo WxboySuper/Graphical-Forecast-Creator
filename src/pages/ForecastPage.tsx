@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { Dispatch, UnknownAction } from 'redux';
@@ -103,6 +103,9 @@ interface StoredCloudMeta {
   id?: string;
   label?: string;
 }
+
+const CLOUD_CYCLE_PAYLOAD_KEY = 'cloudCyclePayload';
+const CLOUD_CYCLE_META_KEY = 'cloudCycleMeta';
 
 /** Reads and validates a forecast JSON file, returning the parsed payload or null on failure. */
 const parseLoadedForecast = async (
@@ -522,27 +525,32 @@ const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | nul
   }
 };
 
+/** Clears the temporary session-storage keys used for handing a cloud cycle into the editor. */
+const clearStoredCloudSession = () => {
+  sessionStorage.removeItem(CLOUD_CYCLE_PAYLOAD_KEY);
+  sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
+};
+
 /** Restores a cloud-loaded forecast from session storage when one is waiting to be opened. */
 const restoreCloudSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
   onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
 ): boolean => {
-  const cloudPayloadStr = sessionStorage.getItem('cloudCyclePayload');
+  const cloudPayloadStr = sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY);
   const data = parseStoredForecastPayload(cloudPayloadStr);
   if (!data) {
     return false;
   }
 
-  const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem('cloudCycleMeta'));
-  sessionStorage.removeItem('cloudCyclePayload');
-  sessionStorage.removeItem('cloudCycleMeta');
+  const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(CLOUD_CYCLE_META_KEY));
 
   restoreStoredForecastPayload(data, dispatch);
   if (cloudMeta?.id && cloudMeta.label && onCloudCycleLoaded) {
     onCloudCycleLoaded({ id: cloudMeta.id, label: cloudMeta.label });
   }
 
+  clearStoredCloudSession();
   addToast('Cloud forecast loaded successfully.', 'success');
   return true;
 };

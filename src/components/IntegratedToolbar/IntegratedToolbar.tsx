@@ -97,7 +97,7 @@ interface IntegratedToolbarProps {
   onLoad: (file: File) => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   addToast: AddToastFn;
-  cloudTools: React.ReactNode;
+  cloudTools?: React.ReactNode;
 }
 
 /** Returns true if the given day in the forecast cycle has any outlook polygons drawn for any outlook type. */
@@ -197,7 +197,7 @@ const ToolbarTooltipButton: React.FC<{
 const ToolbarToolsSection: React.FC<{
   onSave: () => void;
   onLoadClick: () => void;
-  cloudTools: React.ReactNode;
+  cloudTools?: React.ReactNode;
   onInitiateExport: () => void;
   onPackageDownload: () => void;
   onOpenHistoryModal: () => void;
@@ -242,7 +242,7 @@ const ToolbarToolsSection: React.FC<{
         className="h-14 w-14 lg:h-16 lg:w-16 bg-blue-500/20 hover:bg-blue-500/30 border-blue-500/50 text-blue-700 dark:!bg-blue-500/20 dark:hover:!bg-blue-500/30 dark:border-blue-500/50 dark:text-blue-400"
         onClick={onLoadClick}
       />
-      {cloudTools}
+      {cloudTools ?? null}
     </div>
     <div className="flex items-center gap-2">
       <ToolbarTooltipButton
@@ -977,7 +977,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   onLoad,
   mapRef,
   addToast,
-  cloudTools,
+  cloudTools = null,
 }) => {
   const dispatch = useDispatch();
   const model = useToolbarDataModel(mapRef, addToast);
@@ -1003,7 +1003,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   return (
     <IntegratedToolbarView
       onSave={onSave}
-        cloudTools={cloudTools}
+      cloudTools={cloudTools}
       onOpenHistoryModal={localUi.handleOpenHistoryModal}
       onOpenCopyModal={localUi.handleOpenCopyModal}
       onOpenResetConfirm={localUi.handleOpenResetConfirm}

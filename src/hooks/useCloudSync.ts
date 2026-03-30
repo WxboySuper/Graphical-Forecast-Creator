@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, type MutableRefObject } from 'react';
+import { useEffect, useRef, useCallback, useMemo, type MutableRefObject } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { serializeForecast } from '../utils/fileUtils';
@@ -93,7 +93,10 @@ export const useCloudSync = (
   const lastSyncStateRef = useRef<string | null>(null);
 
   const canSync = Boolean(currentCloud) && premiumActive;
-  const currentHash = buildCloudSyncHash(forecastCycle, mapView);
+  const currentHash = useMemo(
+    () => buildCloudSyncHash(forecastCycle, mapView),
+    [forecastCycle, mapView]
+  );
 
   const performSync = useCallback(async () => {
     await syncCurrentCloudCycle({

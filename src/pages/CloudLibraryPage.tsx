@@ -175,6 +175,7 @@ const CycleRenameRow: React.FC<{
 }> = ({ newLabel, isBusy, onLabelChange, onSave, onCancel }) => (
   <div className="cloud-cycle-rename-row">
     <Input
+      aria-label="Rename cloud cycle"
       value={newLabel}
       onChange={(e) => onLabelChange(e.target.value)}
       placeholder="Cycle name"
@@ -564,6 +565,26 @@ const useCloudLibraryActions = ({
 }): CloudLibraryActions => {
   const [message, setMessage] = useState<string | null>(null);
 
+  const persistCloudCycleToSession = useCallback(
+    (cycleId: string, label: string, payload: unknown): boolean => {
+      try {
+        sessionStorage.setItem('cloudCyclePayload', JSON.stringify(payload));
+        sessionStorage.setItem(
+          'cloudCycleMeta',
+          JSON.stringify({
+            id: cycleId,
+            label,
+          })
+        );
+        return true;
+      } catch {
+        setMessage('Unable to hand this cloud cycle off to the editor right now. Please try again.');
+        return false;
+      }
+    },
+    []
+  );
+
   /** Loads one hosted cycle into the forecast editor and preserves its cloud metadata in session storage. */
   const handleLoadCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
@@ -573,16 +594,12 @@ const useCloudLibraryActions = ({
     }
 
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
-    sessionStorage.setItem('cloudCyclePayload', JSON.stringify(payload));
-    sessionStorage.setItem(
-      'cloudCycleMeta',
-      JSON.stringify({
-        id: cycleId,
-        label: selectedCycle?.label ?? 'Cloud Forecast',
-      })
-    );
+    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
+      return;
+    }
+
     navigate('/forecast');
-  }, [cycles, loadCycle, navigate]);
+  }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
   const handleDeleteCycle = useCallback(async (cycleId: string) => {

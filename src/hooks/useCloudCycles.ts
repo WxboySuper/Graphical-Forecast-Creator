@@ -308,6 +308,17 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
     currentCloudRef.current = currentCloud;
   }, [currentCloud]);
 
+  useEffect(() => {
+    if (user?.uid) {
+      return;
+    }
+
+    setCycles([]);
+    setCurrentCloud(null);
+    setError(null);
+    currentCloudRef.current = null;
+  }, [user?.uid]);
+
   const updateSyncState = useCallback((state: CloudSyncState, syncError?: string) => {
     applySyncStateUpdate(setCurrentCloud, state, syncError);
   }, []);

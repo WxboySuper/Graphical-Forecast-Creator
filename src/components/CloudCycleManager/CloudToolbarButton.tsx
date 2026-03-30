@@ -90,14 +90,17 @@ const useCloudToolbarState = ({
 /** Shared tooltip-wrapped toolbar button used by the cloud actions. */
 const CloudToolbarActionButton: React.FC<{
   tooltip: string;
+  ariaLabel: string;
   className: string;
   disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
-}> = ({ tooltip, className, disabled = false, onClick, children }) => (
+}> = ({ tooltip, ariaLabel, className, disabled = false, onClick, children }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <Button
+        aria-label={ariaLabel}
+        title={ariaLabel}
         variant="outline"
         size="icon"
         onClick={onClick}
@@ -145,6 +148,7 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
       <div className="cloud-toolbar-group">
         <CloudToolbarActionButton
           tooltip={tooltip}
+          ariaLabel="Save forecast to cloud"
           disabled={syncState === 'saving'}
           onClick={handleSaveClick}
           className="cloud-toolbar-action cloud-toolbar-action-save h-14 w-14 lg:h-16 lg:w-16"
@@ -154,6 +158,7 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
 
         <CloudToolbarActionButton
           tooltip="Open the cloud library"
+          ariaLabel="Open cloud library"
           onClick={onOpenCloudLibrary}
           className="cloud-toolbar-action cloud-toolbar-action-library h-14 w-14 lg:h-16 lg:w-16"
         >
