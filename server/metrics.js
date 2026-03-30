@@ -469,11 +469,16 @@ const handleAdminMetrics = async (req, res) => {
 
   const decodedToken = await verifyRequestUser(req);
   if (!decodedToken) {
+    console.warn('[metrics] admin:unauthenticated');
     res.status(401).json({ error: 'Missing or invalid Firebase ID token.' });
     return;
   }
 
   if (!isAllowedAdminUid(decodedToken.uid)) {
+    console.warn('[metrics] admin:forbidden', {
+      uid: decodedToken.uid,
+      allowlist: getAdminUidAllowlist(),
+    });
     res.status(403).json({ error: 'You are not authorized to view the admin dashboard.' });
     return;
   }
