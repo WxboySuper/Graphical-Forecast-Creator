@@ -136,9 +136,22 @@ const AdminPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [metricsResponse, setMetricsResponse] = useState<AdminMetricsResponse | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
+  const authLoading = status === 'loading';
 
   useEffect(() => {
-    if (!hostedAuthEnabled || status !== 'signed_in' || !user) {
+    if (!hostedAuthEnabled) {
+      setLoading(false);
+      setMetricsResponse(null);
+      setAccessDenied(false);
+      return;
+    }
+
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (status !== 'signed_in' || !user) {
       setLoading(false);
       setMetricsResponse(null);
       setAccessDenied(false);
@@ -208,6 +221,15 @@ const AdminPage: React.FC = () => {
 
   if (!hostedAuthEnabled) {
     return <Navigate to="/" replace />;
+  }
+
+  if (authLoading) {
+    return (
+      <AdminStateCard
+        title="Checking admin access"
+        description="Verifying your hosted account before loading private metrics."
+      />
+    );
   }
 
   if (status !== 'signed_in' || !user) {
