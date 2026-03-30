@@ -17,6 +17,7 @@ import { updateDiscussion } from '../store/forecastSlice';
 import { DiscussionMode, DiscussionData, DayType } from '../types/outlooks';
 import { compileDiscussionToText, exportDiscussionToFile } from '../utils/discussionUtils';
 import { useAuth } from '../auth/AuthProvider';
+import { recordProductMetric } from '../utils/productMetrics';
 import DIYDiscussionEditor from '../components/DiscussionEditor/DIYDiscussionEditor';
 import GuidedDiscussionEditor from '../components/DiscussionEditor/GuidedDiscussionEditor';
 import { Button } from '../components/ui/button';
@@ -425,14 +426,16 @@ const useDiscussionActions = (opts: {
   buildDiscussionData: () => DiscussionData;
   clearUnsaved: (v: boolean) => void;
   addToast: AddToastFn;
+  user: ReturnType<typeof useAuth>['user'];
 }) => {
-  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast } = opts;
+  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast, user } = opts;
 
   const handleSave = useCallback(() => {
     dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
     clearUnsaved(false);
+    void recordProductMetric({ event: 'discussion_saved', user });
     addToast('Discussion saved!', 'success');
-  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast]);
+  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast, user]);
 
   const handleExport = useCallback(() => {
     exportDiscussionToFile(buildDiscussionData(), currentDay);
@@ -448,6 +451,7 @@ interface DiscussionEditorStateOptions {
   currentDay: DayType;
   dispatch: ReturnType<typeof useDispatch>;
   addToast: AddToastFn;
+  user: ReturnType<typeof useAuth>['user'];
 }
 
 /** Composes all discussion editor state — form fields, computed text, auto-save, and actions — into a single hook return value. */
@@ -457,6 +461,7 @@ const useDiscussionEditorState = ({
   currentDay,
   dispatch,
   addToast,
+  user,
 }: DiscussionEditorStateOptions): DiscussionEditorState => {
   const form = useDiscussionFormState(existingDiscussion, defaultForecasterName);
 
@@ -490,7 +495,8 @@ const useDiscussionEditorState = ({
     currentDay,
     buildDiscussionData,
     clearUnsaved: form.setHasUnsavedChanges,
-    addToast
+    addToast,
+    user,
   });
 
   return {
@@ -531,6 +537,7 @@ export const DiscussionPage: React.FC = () => {
     currentDay,
     dispatch,
     addToast,
+    user,
   });
 
   return (

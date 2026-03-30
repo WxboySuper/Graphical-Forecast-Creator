@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CircleUserRound, Cloud, Crown, LoaderCircle, LogOut, Mail } from 'lucide-react';
+import { Activity, CircleUserRound, Cloud, Crown, LoaderCircle, LogOut, Mail } from 'lucide-react';
 import { Badge, type BadgeProps } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
+import { useUserMetrics } from '../metrics/useUserMetrics';
 import './AccountPage.css';
 
 type AuthMode = 'sign_in' | 'sign_up';
@@ -120,6 +121,24 @@ const getCurrentPlanPrice = (
   }
 
   return 'Included';
+};
+
+/** Formats the last recorded active-day key into a compact account-friendly date label. */
+const formatLastActiveDate = (value: string | null): string => {
+  if (!value) {
+    return 'No activity yet';
+  }
+
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 };
 
 /** Decorative background accents shared by the account hero. */
@@ -470,6 +489,48 @@ const BillingCard: React.FC = () => {
   );
 };
 
+/** Progress-only account metrics card fed by the hosted Firestore metrics document. */
+const MetricsCard: React.FC = () => {
+  const { metrics, loading, error } = useUserMetrics();
+
+  return (
+    <Card className="account-surface-card">
+      <CardHeader className="account-section-header">
+        <div className="account-section-topline">
+          <div className="account-section-copy">
+            <CardTitle className="flex items-center gap-2 text-2xl">
+              <Activity className="h-6 w-6" />
+              Your Activity
+            </CardTitle>
+            <CardDescription>
+              Progress-only metrics for the work you have already put into GFC.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="account-section-content">
+        <div className="account-summary-grid">
+          <SummaryTile label="Active day streak" value={loading ? 'Loading...' : `${metrics.activeDayStreak}`} />
+          <SummaryTile label="Total active days" value={loading ? 'Loading...' : `${metrics.totalActiveDays}`} />
+          <SummaryTile label="Forecast saves" value={loading ? 'Loading...' : `${metrics.cyclesCreated}`} />
+          <SummaryTile label="Cloud saves" value={loading ? 'Loading...' : `${metrics.cloudCyclesSaved}`} />
+          <SummaryTile label="Discussions saved" value={loading ? 'Loading...' : `${metrics.discussionsWritten}`} />
+          <SummaryTile
+            label="Verification runs"
+            value={loading ? 'Loading...' : `${metrics.verificationSessionsRun}`}
+          />
+        </div>
+
+        <p className="account-support-copy">
+          Last active day: <strong>{loading ? 'Loading...' : formatLastActiveDate(metrics.lastActiveDate)}</strong>
+        </p>
+        {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
+      </CardContent>
+    </Card>
+  );
+};
+
 /** Signed-in primary card with the only profile setting exposed in Phase 2. */
 const SignedInPrimaryCard: React.FC<{
   email: string;
@@ -587,9 +648,11 @@ const SignedInAccountView: React.FC = () => {
           onSaveDefaults={handleSaveDefaultsClick}
           onSignOut={handleSignOutClick}
         />
-
-        <BillingCard />
-        <CloudLibraryCard />
+        <div className="account-side-stack">
+          <MetricsCard />
+          <BillingCard />
+          <CloudLibraryCard />
+        </div>
       </div>
     </div>
   );

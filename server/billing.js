@@ -4,6 +4,7 @@ const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
+const { recordBillingMetricEvent } = require('./metrics');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -385,18 +386,26 @@ const createInvoiceEntitlementWrite = (eventType, invoice) => {
 };
 
 /** Applies the checkout-complete event to the entitlement document. */
-const handleCheckoutSessionCompleted = (session) => writeEntitlement(createCheckoutEntitlementWrite(session));
+const handleCheckoutSessionCompleted = async (session) => {
+  await writeEntitlement(createCheckoutEntitlementWrite(session));
+  await recordBillingMetricEvent('premium_upgrade');
+};
 
 /** Applies the subscription lifecycle event to the entitlement document. */
-const handleSubscriptionEvent = (subscription) => writeEntitlement(createSubscriptionEntitlementWrite(subscription));
+const handleSubscriptionEvent = async (subscription, eventType) => {
+  await writeEntitlement(createSubscriptionEntitlementWrite(subscription));
+  if (eventType === 'customer.subscription.deleted') {
+    await recordBillingMetricEvent('premium_cancellation');
+  }
+};
 
 /** Applies invoice payment results to the entitlement document. */
 const handleInvoiceEvent = (eventType, invoice) => writeEntitlement(createInvoiceEntitlementWrite(eventType, invoice));
 
 const webhookHandlers = {
   'checkout.session.completed': (event) => handleCheckoutSessionCompleted(event.data.object),
-  'customer.subscription.updated': (event) => handleSubscriptionEvent(event.data.object),
-  'customer.subscription.deleted': (event) => handleSubscriptionEvent(event.data.object),
+  'customer.subscription.updated': (event) => handleSubscriptionEvent(event.data.object, event.type),
+  'customer.subscription.deleted': (event) => handleSubscriptionEvent(event.data.object, event.type),
   'invoice.paid': (event) => handleInvoiceEvent(event.type, event.data.object),
   'invoice.payment_failed': (event) => handleInvoiceEvent(event.type, event.data.object),
 };

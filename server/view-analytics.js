@@ -39,8 +39,6 @@ if (entries.length === 0) {
 
 const today = new Date().toISOString().slice(0, 10);
 const todayEntries = entries.filter(e => e.ts && e.ts.startsWith(today));
-const uniqueIps = new Set(entries.map(e => e.ip)).size;
-
 const countBy = (arr, key) => {
   const map = {};
   arr.forEach(e => {
@@ -56,7 +54,6 @@ console.log('═'.repeat(50));
 console.log('  GFC Analytics Summary');
 console.log('═'.repeat(50));
 console.log(`  Total page views (all time) : ${entries.length}`);
-console.log(`  Unique IPs (approx.)        : ${uniqueIps}`);
 console.log(`  Views today (${today})  : ${todayEntries.length}`);
 
 console.log(`\n── Top Pages ${hr.slice(12)}`);
@@ -73,7 +70,7 @@ console.log(`\n── Last 20 Views ${hr.slice(16)}`);
 [...entries].slice(-20).reverse().forEach(e => {
   const ts = (e.ts || '').slice(0, 19);
   const page = (e.page || '/').padEnd(35);
-  console.log(`  ${ts}  ${page}  ${e.ip || ''}`);
+  console.log(`  ${ts}  ${page}`);
 });
 
 console.log('═'.repeat(50));

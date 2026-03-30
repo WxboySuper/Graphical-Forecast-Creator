@@ -11,6 +11,7 @@ const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
 
 interface CloudCycleDocument extends CloudCycleMetadata {
   payloadJson: string;
+  payloadBytes: number;
 }
 
 interface NormalizeMetadataParams {
@@ -221,10 +222,12 @@ const normalizeCloudCycleMetadataRecord = ({
 /** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   const { payload, ...metadata } = cycle;
+  const payloadJson = JSON.stringify(payload);
 
   return {
     ...metadata,
-    payloadJson: JSON.stringify(payload),
+    payloadJson,
+    payloadBytes: payloadJson.length,
   };
 };
 
@@ -425,6 +428,7 @@ export const saveCloudCycle = async (
     await setDoc(getCloudCycleDocRef(cycleId), {
       ...metadata,
       payloadJson: JSON.stringify(payload),
+      payloadBytes: JSON.stringify(payload).length,
     });
 
     return { success: true, data: cycleId };
