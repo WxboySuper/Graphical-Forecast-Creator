@@ -39,6 +39,8 @@ interface ParsedAdminMetricsResponse {
   metricsResponse: AdminMetricsResponse | null;
 }
 
+type AdminAccessState = 'disabled' | 'auth_loading' | 'signed_out' | 'denied' | 'allowed';
+
 const DEFAULT_SUMMARY: AdminMetricsSummary = {
   totalAccounts: 0,
   activeDevices: 0,
@@ -51,6 +53,42 @@ const DEFAULT_SUMMARY: AdminMetricsSummary = {
   cancellations: 0,
   cloudSaves: 0,
   cloudLoads: 0,
+};
+
+/** True when there are one or more daily metric rows to render. */
+const hasDailyMetrics = (dailyMetrics: AdminDailyMetric[]): boolean => dailyMetrics.length > 0;
+
+/** Returns the current access-state branch for the admin page shell. */
+const getAdminAccessState = ({
+  hostedAuthEnabled,
+  authLoading,
+  status,
+  user,
+  accessDenied,
+}: {
+  hostedAuthEnabled: boolean;
+  authLoading: boolean;
+  status: ReturnType<typeof useAuth>['status'];
+  user: ReturnType<typeof useAuth>['user'];
+  accessDenied: boolean;
+}): AdminAccessState => {
+  if (!hostedAuthEnabled) {
+    return 'disabled';
+  }
+
+  if (authLoading) {
+    return 'auth_loading';
+  }
+
+  if (status !== 'signed_in' || !user) {
+    return 'signed_out';
+  }
+
+  if (accessDenied) {
+    return 'denied';
+  }
+
+  return 'allowed';
 };
 
 /** Returns the normalized admin metrics payload shape from one fetch response. */
@@ -180,6 +218,15 @@ const AdminSummaryTile: React.FC<{ label: string; value: string }> = ({ label, v
   </div>
 );
 
+/** Error card shown when the admin endpoint returns a recoverable failure. */
+const AdminErrorNotice: React.FC<{ error: string }> = ({ error }) => (
+  <Card className="admin-surface-card">
+    <CardContent className="admin-card-content">
+      <p className="admin-error">{error}</p>
+    </CardContent>
+  </Card>
+);
+
 /** Empty/blocked state shell used for hidden admin access states. */
 const AdminStateCard: React.FC<{
   title: string;
@@ -257,6 +304,57 @@ const AdminHero: React.FC<{
   </section>
 );
 
+/** Summary card for window-wide action totals. */
+const AdminWindowTotalsCard: React.FC<{
+  summary: AdminMetricsSummary;
+  windowSize: AdminWindow;
+}> = ({ summary, windowSize }) => (
+  <Card className="admin-surface-card">
+    <CardHeader className="admin-card-header">
+      <CardTitle className="flex items-center gap-2">
+        <TrendingUp className="h-5 w-5" />
+        Window totals
+      </CardTitle>
+      <CardDescription>Aggregate product actions across the selected {windowSize}-day window.</CardDescription>
+    </CardHeader>
+    <CardContent className="admin-card-content">
+      <div className="admin-summary-grid admin-summary-grid-compact">
+        <AdminSummaryTile label="Signups" value={`${summary.signups}`} />
+        <AdminSummaryTile label="Devices (latest day)" value={`${summary.activeDevices}`} />
+        <AdminSummaryTile label="Upgrades" value={`${summary.upgrades}`} />
+        <AdminSummaryTile label="Cancellations" value={`${summary.cancellations}`} />
+        <AdminSummaryTile label="Cloud saves" value={`${summary.cloudSaves}`} />
+        <AdminSummaryTile label="Cloud loads" value={`${summary.cloudLoads}`} />
+      </div>
+    </CardContent>
+  </Card>
+);
+
+/** Trend card for daily cloud-save and sign-in activity. */
+const AdminDailyTrendCard: React.FC<{
+  loading: boolean;
+  dailyMetrics: AdminDailyMetric[];
+}> = ({ loading, dailyMetrics }) => (
+  <Card className="admin-surface-card">
+    <CardHeader className="admin-card-header">
+      <CardTitle className="flex items-center gap-2">
+        <Activity className="h-5 w-5" />
+        Daily trend
+      </CardTitle>
+      <CardDescription>Cloud-save volume and sign-in activity for the selected window.</CardDescription>
+    </CardHeader>
+    <CardContent className="admin-card-content">
+      {loading ? (
+        <p className="admin-muted-copy">Loading daily metrics...</p>
+      ) : hasDailyMetrics(dailyMetrics) ? (
+        <AdminTrendRows dailyMetrics={dailyMetrics} />
+      ) : (
+        <p className="admin-muted-copy">No daily metrics have been recorded yet for this window.</p>
+      )}
+    </CardContent>
+  </Card>
+);
+
 /** Main admin metrics surface after access checks have passed. */
 const AdminDashboardContent: React.FC<{
   error: string | null;
@@ -269,13 +367,7 @@ const AdminDashboardContent: React.FC<{
   <div className="admin-page-shell">
     <AdminHero windowSize={windowSize} onSelectWindow={onSelectWindow} />
 
-    {error ? (
-      <Card className="admin-surface-card">
-        <CardContent className="admin-card-content">
-          <p className="admin-error">{error}</p>
-        </CardContent>
-      </Card>
-    ) : null}
+    {error ? <AdminErrorNotice error={error} /> : null}
 
     <div className="admin-summary-grid">
       <AdminSummaryTile label="Total accounts" value={loading ? 'Loading...' : `${summary.totalAccounts}`} />
@@ -291,44 +383,8 @@ const AdminDashboardContent: React.FC<{
     </div>
 
     <div className="admin-content-grid">
-      <Card className="admin-surface-card">
-        <CardHeader className="admin-card-header">
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Window totals
-          </CardTitle>
-          <CardDescription>Aggregate product actions across the selected {windowSize}-day window.</CardDescription>
-        </CardHeader>
-        <CardContent className="admin-card-content">
-          <div className="admin-summary-grid admin-summary-grid-compact">
-            <AdminSummaryTile label="Signups" value={`${summary.signups}`} />
-            <AdminSummaryTile label="Devices (latest day)" value={`${summary.activeDevices}`} />
-            <AdminSummaryTile label="Upgrades" value={`${summary.upgrades}`} />
-            <AdminSummaryTile label="Cancellations" value={`${summary.cancellations}`} />
-            <AdminSummaryTile label="Cloud saves" value={`${summary.cloudSaves}`} />
-            <AdminSummaryTile label="Cloud loads" value={`${summary.cloudLoads}`} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="admin-surface-card">
-        <CardHeader className="admin-card-header">
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Daily trend
-          </CardTitle>
-          <CardDescription>Cloud-save volume and sign-in activity for the selected window.</CardDescription>
-        </CardHeader>
-        <CardContent className="admin-card-content">
-          {loading ? (
-            <p className="admin-muted-copy">Loading daily metrics...</p>
-          ) : metricsResponse?.dailyMetrics.length ? (
-            <AdminTrendRows dailyMetrics={metricsResponse.dailyMetrics} />
-          ) : (
-            <p className="admin-muted-copy">No daily metrics have been recorded yet for this window.</p>
-          )}
-        </CardContent>
-      </Card>
+      <AdminWindowTotalsCard summary={summary} windowSize={windowSize} />
+      <AdminDailyTrendCard loading={loading} dailyMetrics={metricsResponse?.dailyMetrics ?? []} />
     </div>
   </div>
 );
@@ -342,6 +398,13 @@ const AdminPage: React.FC = () => {
   const [metricsResponse, setMetricsResponse] = useState<AdminMetricsResponse | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const authLoading = status === 'loading';
+  const accessState = getAdminAccessState({
+    hostedAuthEnabled,
+    authLoading,
+    status,
+    user,
+    accessDenied,
+  });
 
   useEffect(() => {
     if (!hostedAuthEnabled) {
@@ -387,18 +450,20 @@ const AdminPage: React.FC = () => {
         });
       });
 
-    return () => {
+    function cleanupAdminMetricsLoad() {
       isActive = false;
-    };
+    }
+
+    return cleanupAdminMetricsLoad;
   }, [hostedAuthEnabled, status, user, windowSize]);
 
   const summary = useMemo(() => metricsResponse?.summary ?? DEFAULT_SUMMARY, [metricsResponse]);
 
-  if (!hostedAuthEnabled) {
+  if (accessState === 'disabled') {
     return <Navigate to="/" replace />;
   }
 
-  if (authLoading) {
+  if (accessState === 'auth_loading') {
     return (
       <AdminStateCard
         title="Checking admin access"
@@ -407,11 +472,11 @@ const AdminPage: React.FC = () => {
     );
   }
 
-  if (status !== 'signed_in' || !user) {
+  if (accessState === 'signed_out') {
     return <Navigate to="/account" replace />;
   }
 
-  if (accessDenied) {
+  if (accessState === 'denied') {
     return <Navigate to="/" replace />;
   }
 

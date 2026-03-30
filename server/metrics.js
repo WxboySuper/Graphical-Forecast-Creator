@@ -65,6 +65,21 @@ let storageBytesCache = {
   expiresAt: 0,
 };
 
+/** True when the storage-footprint cache is still valid for reuse. */
+const hasFreshStorageCache = () =>
+  storageBytesCache.value !== null && Date.now() < storageBytesCache.expiresAt;
+
+/** Returns the cached storage byte estimate, or null when a refresh is needed. */
+const readCachedStorageBytes = () => (hasFreshStorageCache() ? storageBytesCache.value : null);
+
+/** Persists one freshly computed storage byte estimate into the short-lived cache. */
+const cacheStorageBytes = (value) => {
+  storageBytesCache = {
+    value,
+    expiresAt: Date.now() + STORAGE_CACHE_TTL_MS,
+  };
+};
+
 /** Returns today's day key in UTC for admin and user metric rollups. */
 const getDayKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
@@ -286,8 +301,9 @@ const getCurrentStorageBytes = async () => {
     return 0;
   }
 
-  if (storageBytesCache.value !== null && Date.now() < storageBytesCache.expiresAt) {
-    return storageBytesCache.value;
+  const cachedValue = readCachedStorageBytes();
+  if (typeof cachedValue === 'number') {
+    return cachedValue;
   }
 
   const snapshots = await Promise.all(STORAGE_COLLECTIONS.map((collectionName) => db.collection(collectionName).get()));
@@ -301,10 +317,7 @@ const getCurrentStorageBytes = async () => {
     0
   );
 
-  storageBytesCache = {
-    value: totalBytes,
-    expiresAt: Date.now() + STORAGE_CACHE_TTL_MS,
-  };
+  cacheStorageBytes(totalBytes);
 
   return totalBytes;
 };

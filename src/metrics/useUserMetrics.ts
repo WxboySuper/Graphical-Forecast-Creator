@@ -100,9 +100,7 @@ export const useUserMetrics = (): UseUserMetricsResult => {
       }
     );
 
-    return () => {
-      unsubscribe();
-    };
+    return unsubscribe;
   }, [status, user]);
 
   return { metrics, loading, error };
