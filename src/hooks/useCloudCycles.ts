@@ -348,7 +348,13 @@ function useCloudDeleteCycle({
     canWrite,
     setError,
     fallbackError: 'Failed to delete cloud cycle',
-    action: (cycleId) => deleteCloudCycle({ userId: userId!, cycleId }),
+    action: (cycleId) => {
+      if (!userId) {
+        return Promise.resolve({ success: false, error: 'Not signed in' });
+      }
+
+      return deleteCloudCycle({ userId, cycleId });
+    },
     onSuccess: (cycleId) => {
       clearDeletedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId });
     },
@@ -368,7 +374,13 @@ function useCloudRenameCycle({
     canWrite,
     setError,
     fallbackError: 'Failed to rename cloud cycle',
-    action: (cycleId, newLabel) => renameCloudCycle({ userId: userId!, cycleId, newLabel }),
+    action: (cycleId, newLabel) => {
+      if (!userId) {
+        return Promise.resolve({ success: false, error: 'Not signed in' });
+      }
+
+      return renameCloudCycle({ userId, cycleId, newLabel });
+    },
     onSuccess: (cycleId, newLabel) => {
       syncRenamedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId, newLabel });
     },
