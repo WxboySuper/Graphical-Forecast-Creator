@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Activity, Lock, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Activity, Lock, TrendingUp } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -306,24 +306,6 @@ const AdminPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="admin-surface-card">
-          <CardHeader className="admin-card-header">
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5" />
-              Privacy notes
-            </CardTitle>
-            <CardDescription>
-              The admin dashboard intentionally stays aggregate-only for beta operations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="admin-card-content">
-            <ul className="admin-note-list">
-              <li>No raw IP analytics are stored for product metrics.</li>
-              <li>No forecast payload contents are exposed in this dashboard.</li>
-              <li>Unique device/activity counts rely on short-lived dedupe records only.</li>
-            </ul>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

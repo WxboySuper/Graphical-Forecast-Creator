@@ -162,15 +162,6 @@
   background: linear-gradient(90deg, var(--button-bg), color-mix(in srgb, var(--button-bg) 55%, white));
 }
 
-.admin-note-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  margin: 0;
-  padding-left: 1.15rem;
-  line-height: 1.75;
-}
-
 .admin-error {
   margin: 0;
   color: var(--error-text);
@@ -179,9 +170,5 @@
 @media (min-width: 1024px) {
   .admin-content-grid {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr);
-  }
-
-  .admin-content-grid > :last-child {
-    grid-column: 1 / -1;
   }
 }
