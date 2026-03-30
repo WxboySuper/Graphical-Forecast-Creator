@@ -232,6 +232,17 @@ const countPremiumSubscriptions = async () => {
   return snapshot.size;
 };
 
+/** Returns the current total number of hosted accounts that have profile docs in Firestore. */
+const countTotalAccounts = async () => {
+  const db = getAdminDb();
+  if (!db) {
+    return 0;
+  }
+
+  const snapshot = await db.collection('userProfiles').get();
+  return snapshot.size;
+};
+
 /** Returns the current total stored cloud payload size across all hosted cycles. */
 const getCurrentStorageBytes = async () => {
   const db = getAdminDb();
@@ -247,7 +258,15 @@ const getCurrentStorageBytes = async () => {
     }
 
     if (typeof data.payloadJson === 'string') {
-      return total + data.payloadJson.length;
+      return total + Buffer.byteLength(data.payloadJson, 'utf8');
+    }
+
+    if (typeof data.payload === 'string') {
+      return total + Buffer.byteLength(data.payload, 'utf8');
+    }
+
+    if (data.payload && typeof data.payload === 'object') {
+      return total + Buffer.byteLength(JSON.stringify(data.payload), 'utf8');
     }
 
     return total;
@@ -403,6 +422,7 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
 
   const summary = dailyMetrics.reduce(
     (summary, dayMetrics) => ({
+      totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
       activeDevices: latestMetrics.activeDevices,
       activeSignedInAccounts: latestMetrics.activeSignedInAccounts,
       premiumSubscriptions: latestMetrics.premiumSubscriptions,
@@ -414,6 +434,7 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
       cloudLoads: summary.cloudLoads + Number(dayMetrics.cloudLoads || 0),
     }),
     {
+      totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
       activeDevices: latestMetrics.activeDevices,
       activeSignedInAccounts: latestMetrics.activeSignedInAccounts,
       premiumSubscriptions: latestMetrics.premiumSubscriptions,
@@ -427,6 +448,7 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
   );
 
   return {
+    ...(typeof liveSummary.totalAccounts === 'number' ? { totalAccounts: liveSummary.totalAccounts } : {}),
     ...summary,
     ...(typeof liveSummary.premiumSubscriptions === 'number'
       ? { premiumSubscriptions: liveSummary.premiumSubscriptions }
@@ -485,16 +507,18 @@ const handleAdminMetrics = async (req, res) => {
 
   const requestedWindow = Number.parseInt(String(req.query.window || '7'), 10);
   const windowSize = ADMIN_WINDOW_OPTIONS.has(requestedWindow) ? requestedWindow : 7;
-  const [dailyMetrics, premiumSubscriptions, storageBytes] = await Promise.all([
+  const [dailyMetrics, premiumSubscriptions, storageBytes, totalAccounts] = await Promise.all([
     readAdminMetricsWindow(windowSize),
     countPremiumSubscriptions(),
     getCurrentStorageBytes(),
+    countTotalAccounts(),
   ]);
 
   res.json({
     metricsEnabled: true,
     window: windowSize,
     summary: createAdminMetricsSummary(dailyMetrics, {
+      totalAccounts,
       premiumSubscriptions,
       storageBytes,
     }),

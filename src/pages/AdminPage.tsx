@@ -10,6 +10,7 @@ import './AdminPage.css';
 type AdminWindow = 7 | 30;
 
 interface AdminMetricsSummary {
+  totalAccounts: number;
   activeDevices: number;
   activeSignedInAccounts: number;
   premiumSubscriptions: number;
@@ -33,6 +34,7 @@ interface AdminMetricsResponse {
 }
 
 const DEFAULT_SUMMARY: AdminMetricsSummary = {
+  totalAccounts: 0,
   activeDevices: 0,
   activeSignedInAccounts: 0,
   premiumSubscriptions: 0,
@@ -273,7 +275,7 @@ const AdminPage: React.FC = () => {
       ) : null}
 
       <div className="admin-summary-grid">
-        <AdminSummaryTile label="Active devices" value={loading ? 'Loading...' : `${summary.activeDevices}`} />
+        <AdminSummaryTile label="Total accounts" value={loading ? 'Loading...' : `${summary.totalAccounts}`} />
         <AdminSummaryTile
           label="Active signed-in accounts"
           value={loading ? 'Loading...' : `${summary.activeSignedInAccounts}`}
@@ -301,6 +303,7 @@ const AdminPage: React.FC = () => {
               <AdminSummaryTile label="Signups" value={`${summary.signups}`} />
               <AdminSummaryTile label="Upgrades" value={`${summary.upgrades}`} />
               <AdminSummaryTile label="Cancellations" value={`${summary.cancellations}`} />
+              <AdminSummaryTile label="Active devices" value={`${summary.activeDevices}`} />
               <AdminSummaryTile label="Cloud saves" value={`${summary.cloudSaves}`} />
               <AdminSummaryTile label="Cloud loads" value={`${summary.cloudLoads}`} />
             </div>
