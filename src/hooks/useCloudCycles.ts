@@ -28,9 +28,12 @@ export interface UseCloudCyclesResult {
   updateSyncState: (state: CloudSyncState, error?: string) => void;
 }
 
-interface CloudOperationContext {
-  userId: string;
+interface CloudAccessContext {
+  userId?: string;
   canWrite: boolean;
+}
+
+interface CloudStateContext {
   cycles: CloudCycleMetadata[];
   currentCloudRef: MutableRefObject<CloudCycleContext | null>;
   setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
@@ -41,7 +44,7 @@ interface CloudOperationContext {
 }
 
 /** Returns the shared error message for cloud write actions when the user cannot save. */
-function getCloudWriteBlockedMessage(userId: string, canWrite: boolean): string {
+function getCloudWriteBlockedMessage({ userId, canWrite }: CloudAccessContext): string {
   if (!userId) {
     return 'Not signed in';
   }
@@ -49,15 +52,36 @@ function getCloudWriteBlockedMessage(userId: string, canWrite: boolean): string 
   return canWrite ? 'Action not allowed' : 'Premium subscription required to save cloud cycles';
 }
 
+/** Returns true when the requested sync state already matches the current cloud context. */
+function hasMatchingSyncState({
+  currentCloud,
+  state,
+  syncError,
+}: {
+  currentCloud: CloudCycleContext;
+  state: CloudSyncState;
+  syncError?: string;
+}): boolean {
+  return currentCloud.syncState === state && currentCloud.lastSyncError === syncError;
+}
+
 /** Updates the current cloud context when a sync state change actually changed something. */
-function applySyncStateUpdate(
-  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>,
-  state: CloudSyncState,
-  syncError?: string
-): void {
+function applySyncStateUpdate({
+  setCurrentCloud,
+  state,
+  syncError,
+}: {
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+  state: CloudSyncState;
+  syncError?: string;
+}): void {
   setCurrentCloud((prev) => {
-    if (!prev || (prev.syncState === state && prev.lastSyncError === syncError)) {
-      return prev ?? null;
+    if (!prev) {
+      return null;
+    }
+
+    if (hasMatchingSyncState({ currentCloud: prev, state, syncError })) {
+      return prev;
     }
 
     return {
@@ -69,31 +93,48 @@ function applySyncStateUpdate(
 }
 
 /** Creates the current-cloud context stored for the active forecast session. */
-function createCurrentCloudContext(id: string, label: string, syncState: CloudSyncState): CloudCycleContext {
+function createCurrentCloudContext({
+  id,
+  label,
+  syncState,
+}: {
+  id: string;
+  label: string;
+  syncState: CloudSyncState;
+}): CloudCycleContext {
   return { id, label, syncState };
 }
 
 /** Updates the current cloud context when one cloud cycle is loaded. */
-function syncLoadedCloudSelection(
-  cycles: CloudCycleMetadata[],
-  cycleId: string,
-  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>
-): void {
+function syncLoadedCloudSelection({
+  cycles,
+  cycleId,
+  setCurrentCloud,
+}: {
+  cycles: CloudCycleMetadata[];
+  cycleId: string;
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+}): void {
   const cycle = cycles.find((item) => item.id === cycleId);
   if (!cycle) {
     return;
   }
 
-  setCurrentCloud(createCurrentCloudContext(cycleId, cycle.label, 'saved'));
+  setCurrentCloud(createCurrentCloudContext({ id: cycleId, label: cycle.label, syncState: 'saved' }));
 }
 
 /** Updates the current cloud label after a successful rename when the renamed cycle is active. */
-function syncRenamedCloudSelection(
-  currentCloudRef: MutableRefObject<CloudCycleContext | null>,
-  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>,
-  cycleId: string,
-  newLabel: string
-): void {
+function syncRenamedCloudSelection({
+  currentCloudRef,
+  setCurrentCloud,
+  cycleId,
+  newLabel,
+}: {
+  currentCloudRef: MutableRefObject<CloudCycleContext | null>;
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+  cycleId: string;
+  newLabel: string;
+}): void {
   if (currentCloudRef.current?.id !== cycleId || currentCloudRef.current.label === newLabel) {
     return;
   }
@@ -102,24 +143,34 @@ function syncRenamedCloudSelection(
 }
 
 /** Clears the current cloud selection after a delete when the deleted cycle was active. */
-function clearDeletedCloudSelection(
-  currentCloudRef: MutableRefObject<CloudCycleContext | null>,
-  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>,
-  cycleId: string
-): void {
+function clearDeletedCloudSelection({
+  currentCloudRef,
+  setCurrentCloud,
+  cycleId,
+}: {
+  currentCloudRef: MutableRefObject<CloudCycleContext | null>;
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+  cycleId: string;
+}): void {
   if (currentCloudRef.current?.id === cycleId) {
     setCurrentCloud(null);
   }
 }
 
 /** Starts the realtime hosted-cycle subscription for the signed-in user. */
-function useCloudCycleSubscription(
-  userId: string | undefined,
-  setCycles: Dispatch<SetStateAction<CloudCycleMetadata[]>>,
-  setLoading: Dispatch<SetStateAction<boolean>>,
-  setError: Dispatch<SetStateAction<string | null>>,
-  unsubscribeRef: MutableRefObject<(() => void) | null>
-): void {
+function useCloudCycleSubscription({
+  userId,
+  setCycles,
+  setLoading,
+  setError,
+  unsubscribeRef,
+}: {
+  userId?: string;
+  setCycles: Dispatch<SetStateAction<CloudCycleMetadata[]>>;
+  setLoading: Dispatch<SetStateAction<boolean>>;
+  setError: Dispatch<SetStateAction<string | null>>;
+  unsubscribeRef: MutableRefObject<(() => void) | null>;
+}): void {
   useEffect(() => {
     if (!userId) {
       setCycles([]);
@@ -148,19 +199,16 @@ function useCloudCycleSubscription(
   }, [userId, setCycles, setError, setLoading, unsubscribeRef]);
 }
 
-/** Creates the hosted cloud-cycle CRUD callbacks used by the forecast and library pages. */
-function useCloudCycleOperations({
+/** Returns the save callback for hosted cloud cycles. */
+function useCloudSaveCycle({
   userId,
   canWrite,
-  cycles,
   currentCloudRef,
   setCurrentCloud,
-  setCycles,
   setError,
-  setLoading,
   updateSyncState,
-}: CloudOperationContext) {
-  const saveCycle = useCallback(
+}: CloudAccessContext & Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError' | 'updateSyncState'>) {
+  return useCallback(
     async (
       label: string,
       cycleDate: string,
@@ -168,7 +216,7 @@ function useCloudCycleOperations({
       payload: GFCForecastSaveData
     ): Promise<boolean> => {
       if (!userId || !canWrite) {
-        setError(getCloudWriteBlockedMessage(userId, canWrite));
+        setError(getCloudWriteBlockedMessage({ userId, canWrite }));
         return false;
       }
 
@@ -193,15 +241,24 @@ function useCloudCycleOperations({
       }
 
       if (result.data) {
-        setCurrentCloud(createCurrentCloudContext(result.data, label, 'saved'));
+        setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
       }
       updateSyncState('saved');
       return true;
     },
     [canWrite, currentCloudRef, setCurrentCloud, setError, updateSyncState, userId]
   );
+}
 
-  const loadCycle = useCallback(
+/** Returns the load callback for hosted cloud cycles. */
+function useCloudLoadCycle({
+  userId,
+  cycles,
+  setCurrentCloud,
+  setError,
+  updateSyncState,
+}: Pick<CloudStateContext, 'cycles' | 'setCurrentCloud' | 'setError' | 'updateSyncState'> & Pick<CloudAccessContext, 'userId'>) {
+  return useCallback(
     async (cycleId: string): Promise<GFCForecastSaveData | null> => {
       if (!userId) {
         setError('Not signed in');
@@ -218,14 +275,23 @@ function useCloudCycleOperations({
         return null;
       }
 
-      syncLoadedCloudSelection(cycles, cycleId, setCurrentCloud);
+      syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
       updateSyncState('saved');
       return result.data.payload;
     },
     [cycles, setCurrentCloud, setError, updateSyncState, userId]
   );
+}
 
-  const deleteCycleAction = useCallback(
+/** Returns the delete callback for hosted cloud cycles. */
+function useCloudDeleteCycle({
+  userId,
+  canWrite,
+  currentCloudRef,
+  setCurrentCloud,
+  setError,
+}: Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
+  return useCallback(
     async (cycleId: string): Promise<boolean> => {
       if (!userId || !canWrite) {
         setError('Action not allowed');
@@ -239,13 +305,22 @@ function useCloudCycleOperations({
         return false;
       }
 
-      clearDeletedCloudSelection(currentCloudRef, setCurrentCloud, cycleId);
+      clearDeletedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId });
       return true;
     },
     [canWrite, currentCloudRef, setCurrentCloud, setError, userId]
   );
+}
 
-  const renameCycleAction = useCallback(
+/** Returns the rename callback for hosted cloud cycles. */
+function useCloudRenameCycle({
+  userId,
+  canWrite,
+  currentCloudRef,
+  setCurrentCloud,
+  setError,
+}: Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
+  return useCallback(
     async (cycleId: string, newLabel: string): Promise<boolean> => {
       if (!userId || !canWrite) {
         setError('Action not allowed');
@@ -259,13 +334,21 @@ function useCloudCycleOperations({
         return false;
       }
 
-      syncRenamedCloudSelection(currentCloudRef, setCurrentCloud, cycleId, newLabel);
+      syncRenamedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId, newLabel });
       return true;
     },
     [canWrite, currentCloudRef, setCurrentCloud, setError, userId]
   );
+}
 
-  const refreshCycles = useCallback(async (): Promise<void> => {
+/** Returns the explicit refresh callback for cloud-cycle metadata. */
+function useCloudRefreshCycles({
+  userId,
+  setCycles,
+  setError,
+  setLoading,
+}: Pick<CloudStateContext, 'setCycles' | 'setError' | 'setLoading'> & Pick<CloudAccessContext, 'userId'>) {
+  return useCallback(async (): Promise<void> => {
     if (!userId) {
       return;
     }
@@ -279,13 +362,84 @@ function useCloudCycleOperations({
     }
     setLoading(false);
   }, [setCycles, setError, setLoading, userId]);
+}
+
+/** Creates the hosted cloud-cycle CRUD callbacks used by the forecast and library pages. */
+function useCloudCycleOperations(context: CloudAccessContext & CloudStateContext) {
+  const saveCycle = useCloudSaveCycle(context);
+  const loadCycle = useCloudLoadCycle(context);
+  const deleteCycle = useCloudDeleteCycle(context);
+  const renameCycle = useCloudRenameCycle(context);
+  const refreshCycles = useCloudRefreshCycles(context);
 
   return {
     saveCycle,
     loadCycle,
-    deleteCycle: deleteCycleAction,
-    renameCycle: renameCycleAction,
+    deleteCycle,
+    renameCycle,
     refreshCycles,
+  };
+}
+
+/** Keeps the current-cloud ref in sync with state so callbacks can read the latest selection. */
+function useCurrentCloudRef(currentCloud: CloudCycleContext | null): MutableRefObject<CloudCycleContext | null> {
+  const currentCloudRef = useRef<CloudCycleContext | null>(null);
+
+  useEffect(() => {
+    currentCloudRef.current = currentCloud;
+  }, [currentCloud]);
+
+  return currentCloudRef;
+}
+
+/** Clears cloud-library state when the user signs out so stale data never leaks across sessions. */
+function useResetCloudStateOnSignOut({
+  userId,
+  setCycles,
+  setCurrentCloud,
+  setError,
+  currentCloudRef,
+}: {
+  userId?: string;
+  setCycles: Dispatch<SetStateAction<CloudCycleMetadata[]>>;
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+  setError: Dispatch<SetStateAction<string | null>>;
+  currentCloudRef: MutableRefObject<CloudCycleContext | null>;
+}) {
+  useEffect(() => {
+    if (userId) {
+      return;
+    }
+
+    setCycles([]);
+    setCurrentCloud(null);
+    setError(null);
+    currentCloudRef.current = null;
+  }, [currentCloudRef, setCurrentCloud, setCycles, setError, userId]);
+}
+
+/** Returns the mark/clear callbacks for the currently active cloud cycle. */
+function useCurrentCloudSelectionControls(
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>
+) {
+  const markAsCurrent = useCallback((cycleId: string, label: string) => {
+    setCurrentCloud((prev) => {
+      const nextValue = createCurrentCloudContext({ id: cycleId, label, syncState: 'idle' });
+      if (prev?.id === cycleId && prev.label === label && prev.syncState === 'idle' && !prev.lastSyncError) {
+        return prev;
+      }
+
+      return nextValue;
+    });
+  }, [setCurrentCloud]);
+
+  const clearCurrent = useCallback(() => {
+    setCurrentCloud(null);
+  }, [setCurrentCloud]);
+
+  return {
+    markAsCurrent,
+    clearCurrent,
   };
 }
 
@@ -301,32 +455,31 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const currentCloudRef = useRef<CloudCycleContext | null>(null);
+  const currentCloudRef = useCurrentCloudRef(currentCloud);
   const canWrite = premiumActive;
 
-  useEffect(() => {
-    currentCloudRef.current = currentCloud;
-  }, [currentCloud]);
-
-  useEffect(() => {
-    if (user?.uid) {
-      return;
-    }
-
-    setCycles([]);
-    setCurrentCloud(null);
-    setError(null);
-    currentCloudRef.current = null;
-  }, [user?.uid]);
+  useResetCloudStateOnSignOut({
+    userId: user?.uid,
+    setCycles,
+    setCurrentCloud,
+    setError,
+    currentCloudRef,
+  });
 
   const updateSyncState = useCallback((state: CloudSyncState, syncError?: string) => {
-    applySyncStateUpdate(setCurrentCloud, state, syncError);
-  }, []);
+    applySyncStateUpdate({ setCurrentCloud, state, syncError });
+  }, [setCurrentCloud]);
 
-  useCloudCycleSubscription(user?.uid, setCycles, setLoading, setError, unsubscribeRef);
+  useCloudCycleSubscription({
+    userId: user?.uid,
+    setCycles,
+    setLoading,
+    setError,
+    unsubscribeRef,
+  });
 
   const operations = useCloudCycleOperations({
-    userId: user?.uid ?? '',
+    userId: user?.uid,
     canWrite,
     cycles,
     currentCloudRef,
@@ -337,20 +490,7 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
     updateSyncState,
   });
 
-  const markAsCurrent = useCallback((cycleId: string, label: string) => {
-    setCurrentCloud((prev) => {
-      const nextValue = createCurrentCloudContext(cycleId, label, 'idle');
-      if (prev?.id === cycleId && prev.label === label && prev.syncState === 'idle' && !prev.lastSyncError) {
-        return prev;
-      }
-
-      return nextValue;
-    });
-  }, []);
-
-  const clearCurrent = useCallback(() => {
-    setCurrentCloud(null);
-  }, []);
+  const { markAsCurrent, clearCurrent } = useCurrentCloudSelectionControls(setCurrentCloud);
 
   return {
     cycles,

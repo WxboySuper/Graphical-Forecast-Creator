@@ -242,6 +242,85 @@ const CloudCycleDeletePrompt: React.FC<{
   </div>
 );
 
+/** Delete action control that swaps between the confirm prompt and the destructive button. */
+const CloudCycleDeleteAction: React.FC<{
+  confirmingDelete: boolean;
+  cycleLabel: string;
+  isBusy: boolean;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+}> = ({
+  confirmingDelete,
+  cycleLabel,
+  isBusy,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}) => {
+  if (confirmingDelete) {
+    return (
+      <CloudCycleDeletePrompt
+        cycleLabel={cycleLabel}
+        isBusy={isBusy}
+        onCancel={onCancelDelete}
+        onConfirm={onConfirmDelete}
+      />
+    );
+  }
+
+  return (
+    <Button variant="destructive" onClick={onRequestDelete} disabled={isBusy}>
+      <Trash2 className="mr-2 h-4 w-4" />
+      Delete
+    </Button>
+  );
+};
+
+/** Rename and delete actions shown only when the current cloud cycle can be edited. */
+const CloudCycleWriteActions: React.FC<{
+  cycle: CloudCycleMetadata;
+  canWrite: boolean;
+  isBusy: boolean;
+  isRenaming: boolean;
+  confirmingDelete: boolean;
+  onStartRename: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+}> = ({
+  cycle,
+  canWrite,
+  isBusy,
+  isRenaming,
+  confirmingDelete,
+  onStartRename,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}) => {
+  if (!canWrite || cycle.isReadOnly) {
+    return null;
+  }
+
+  return (
+    <>
+      <Button variant="outline" onClick={onStartRename} disabled={isBusy || isRenaming || confirmingDelete}>
+        <Edit2 className="mr-2 h-4 w-4" />
+        Rename
+      </Button>
+      <CloudCycleDeleteAction
+        confirmingDelete={confirmingDelete}
+        cycleLabel={cycle.label}
+        isBusy={isBusy}
+        onRequestDelete={onRequestDelete}
+        onCancelDelete={onCancelDelete}
+        onConfirmDelete={onConfirmDelete}
+      />
+    </>
+  );
+};
+
 /** Action block for loading, renaming, and deleting one cloud cycle. */
 const CloudCycleActions: React.FC<{
   canWrite: boolean;
@@ -275,36 +354,17 @@ const CloudCycleActions: React.FC<{
       <Download className="mr-2 h-4 w-4" />
       Load
     </Button>
-
-    {canWrite && !cycle.isReadOnly ? (
-      <>
-        <Button
-          variant="outline"
-          onClick={onStartRename}
-          disabled={loading || isDeleting || isSavingRename || isRenaming || confirmingDelete}
-        >
-          <Edit2 className="mr-2 h-4 w-4" />
-          Rename
-        </Button>
-        {confirmingDelete ? (
-          <CloudCycleDeletePrompt
-            cycleLabel={cycle.label}
-            isBusy={loading || isDeleting}
-            onCancel={onCancelDelete}
-            onConfirm={onConfirmDelete}
-          />
-        ) : (
-          <Button
-            variant="destructive"
-            onClick={onRequestDelete}
-            disabled={loading || isDeleting || isSavingRename || isRenaming}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-      </>
-    ) : null}
+    <CloudCycleWriteActions
+      cycle={cycle}
+      canWrite={canWrite}
+      isBusy={loading || isDeleting || isSavingRename}
+      isRenaming={isRenaming}
+      confirmingDelete={confirmingDelete}
+      onStartRename={onStartRename}
+      onRequestDelete={onRequestDelete}
+      onCancelDelete={onCancelDelete}
+      onConfirmDelete={onConfirmDelete}
+    />
   </div>
 );
 

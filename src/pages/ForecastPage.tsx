@@ -531,6 +531,18 @@ const clearStoredCloudSession = () => {
   sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
 };
 
+/** Notifies the forecast page about the cloud cycle that was just restored when metadata is complete. */
+const restoreCloudSelectionContext = (
+  cloudMeta: StoredCloudMeta | null,
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+) => {
+  if (!cloudMeta?.id || !cloudMeta.label || !onCloudCycleLoaded) {
+    return;
+  }
+
+  onCloudCycleLoaded({ id: cloudMeta.id, label: cloudMeta.label });
+};
+
 /** Restores a cloud-loaded forecast from session storage when one is waiting to be opened. */
 const restoreCloudSession = (
   dispatch: ShortcutDispatch,
@@ -546,10 +558,7 @@ const restoreCloudSession = (
   const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(CLOUD_CYCLE_META_KEY));
 
   restoreStoredForecastPayload(data, dispatch);
-  if (cloudMeta?.id && cloudMeta.label && onCloudCycleLoaded) {
-    onCloudCycleLoaded({ id: cloudMeta.id, label: cloudMeta.label });
-  }
-
+  restoreCloudSelectionContext(cloudMeta, onCloudCycleLoaded);
   clearStoredCloudSession();
   addToast('Cloud forecast loaded successfully.', 'success');
   return true;
@@ -569,6 +578,20 @@ const restoreLocalSession = (
   addToast('Session restored from auto-save.', 'success');
 };
 
+/** Restores a pending cloud session first, then falls back to the local auto-save snapshot. */
+const restoreAvailableSession = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn,
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+) => {
+  const restoredCloudSession = restoreCloudSession(dispatch, addToast, onCloudCycleLoaded);
+  if (restoredCloudSession) {
+    return;
+  }
+
+  restoreLocalSession(dispatch, addToast);
+};
+
 /** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
 const useSessionRestore = (
   dispatch: ShortcutDispatch,
@@ -583,11 +606,7 @@ const useSessionRestore = (
 
   useEffect(() => {
     try {
-      if (restoreCloudSession(dispatch, addToast, onCloudCycleLoadedRef.current)) {
-        return;
-      }
-
-      restoreLocalSession(dispatch, addToast);
+      restoreAvailableSession(dispatch, addToast, onCloudCycleLoadedRef.current);
     } catch {
       // Silently skip auto-load errors to avoid disrupting initial render
     }
@@ -757,14 +776,20 @@ const renderCloudToolbar = ({
   />
 );
 
-/** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { addToast } = useOutletContext<PageContext>();
-  const mapRef = useRef<ForecastMapHandle>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+/** Composes the forecast page's cloud, file, and shortcut hooks into a single workspace model. */
+const useForecastPageWorkspace = ({
+  dispatch,
+  addToast,
+  navigate,
+  mapRef,
+  fileInputRef,
+}: {
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  navigate: ReturnType<typeof useNavigate>;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+}) => {
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const forecastCycle = useSelector(selectForecastCycle);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
@@ -781,11 +806,11 @@ export const ForecastPage: React.FC = () => {
   const { markCurrentStateSynced } = cloudSync;
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
 
-  // Hooks
   useAutoCategorical();
   useAutoSave();
   useCycleHistoryPersistence();
   useFeatureFlagSync(dispatch, featureFlags);
+
   const { handleCloudCycleLoaded, handleSaveToCloud } = useCloudForecastActions({
     addToast,
     currentMapView,
@@ -819,6 +844,43 @@ export const ForecastPage: React.FC = () => {
     currentDay: forecastCycle.currentDay,
   });
 
+  return {
+    emergencyMode,
+    handleLoad,
+    handleSave,
+    handleShortcutFileInputChange,
+    cloudTools: renderCloudToolbar({
+      premiumActive,
+      isExpiredPremium,
+      forecastCycle,
+      currentCloud,
+      onSaveToCloud: handleSaveToCloud,
+      onOpenCloudLibrary: () => navigate('/cloud'),
+    }),
+  };
+};
+
+/** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
+export const ForecastPage: React.FC = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { addToast } = useOutletContext<PageContext>();
+  const mapRef = useRef<ForecastMapHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    emergencyMode,
+    handleLoad,
+    handleSave,
+    handleShortcutFileInputChange,
+    cloudTools,
+  } = useForecastPageWorkspace({
+    dispatch,
+    addToast,
+    navigate,
+    mapRef,
+    fileInputRef,
+  });
+
   if (emergencyMode) {
     return <EmergencyModeMessage />;
   }
@@ -845,14 +907,7 @@ export const ForecastPage: React.FC = () => {
         onLoad={handleLoad}
         mapRef={mapRef}
         addToast={addToast}
-        cloudTools={renderCloudToolbar({
-          premiumActive,
-          isExpiredPremium,
-          forecastCycle,
-          currentCloud,
-          onSaveToCloud: handleSaveToCloud,
-          onOpenCloudLibrary: () => navigate('/cloud'),
-        })}
+        cloudTools={cloudTools}
       />
     </div>
   );
