@@ -17,6 +17,76 @@ interface CloudToolbarButtonProps {
   onOpenCloudLibrary: () => void;
 }
 
+/** Returns the cloud-save error shown when the user clicks save without write access. */
+const getCloudToolbarSaveError = (premiumActive: boolean, isExpiredPremium: boolean): string =>
+  premiumActive && isExpiredPremium
+    ? 'Your premium subscription has expired. Renew to save forecasts to the cloud.'
+    : 'Subscribe to premium to save forecasts to the cloud.';
+
+/** Returns the save-button tooltip for the current cloud save state. */
+const getCloudToolbarTooltip = (
+  canSave: boolean,
+  premiumActive: boolean,
+  isExpiredPremium: boolean,
+  currentCloudLabel?: string
+): string => {
+  if (!canSave) {
+    return premiumActive && isExpiredPremium
+      ? 'Premium expired. Cloud writes are read-only until you renew.'
+      : 'Subscribe to premium to save forecasts to the cloud';
+  }
+
+  return currentCloudLabel
+    ? `Save updates to "${currentCloudLabel}"`
+    : 'Save this forecast to your cloud library';
+};
+
+/** Returns the correct icon for the cloud save button based on the current sync state. */
+const renderCloudSaveIcon = (syncState: CloudSyncState) =>
+  syncState === 'saving'
+    ? <LoaderCircle className="h-6 w-6 animate-spin" />
+    : <Cloud className="h-6 w-6" />;
+
+/** Manages cloud save modal state and save errors for the toolbar button group. */
+const useCloudToolbarState = ({
+  canSave,
+  premiumActive,
+  isExpiredPremium,
+  onSaveToCloud,
+}: Pick<CloudToolbarButtonProps, 'canSave' | 'premiumActive' | 'isExpiredPremium' | 'onSaveToCloud'>) => {
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSaveClick = useCallback(() => {
+    setSaveModalOpen(true);
+    setError(canSave ? null : getCloudToolbarSaveError(premiumActive, isExpiredPremium));
+  }, [canSave, isExpiredPremium, premiumActive]);
+
+  const handleSaveToCloud = useCallback(
+    async (label: string) => {
+      try {
+        setError(null);
+        await onSaveToCloud(label);
+        setSaveModalOpen(false);
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to save to cloud';
+        setError(message);
+        return false;
+      }
+    },
+    [onSaveToCloud]
+  );
+
+  return {
+    saveModalOpen,
+    error,
+    handleSaveClick,
+    handleSaveToCloud,
+    setSaveModalOpen,
+  };
+};
+
 /** Shared tooltip-wrapped toolbar button used by the cloud actions. */
 const CloudToolbarActionButton: React.FC<{
   tooltip: string;
@@ -54,48 +124,21 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
   currentCycleDate,
   onOpenCloudLibrary,
 }) => {
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    saveModalOpen,
+    error,
+    handleSaveClick,
+    handleSaveToCloud,
+    setSaveModalOpen,
+  } = useCloudToolbarState({
+    canSave,
+    premiumActive,
+    isExpiredPremium,
+    onSaveToCloud,
+  });
 
-  const handleSaveClick = useCallback(() => {
-    if (!canSave) {
-      setError(
-        premiumActive && isExpiredPremium
-          ? 'Your premium subscription has expired. Renew to save forecasts to the cloud.'
-          : 'Subscribe to premium to save forecasts to the cloud.'
-      );
-    }
-    setSaveModalOpen(true);
-    if (canSave) {
-      setError(null);
-    }
-  }, [canSave, premiumActive, isExpiredPremium]);
-
-  const handleSaveToCloud = useCallback(
-    async (label: string) => {
-      try {
-        setError(null);
-        await onSaveToCloud(label);
-        setSaveModalOpen(false);
-        return true;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to save to cloud';
-        setError(message);
-        return false;
-      }
-    },
-    [onSaveToCloud]
-  );
-
-  const tooltip = canSave
-    ? currentCloudLabel
-      ? `Save updates to "${currentCloudLabel}"`
-      : 'Save this forecast to your cloud library'
-    : premiumActive && isExpiredPremium
-      ? 'Premium expired. Cloud writes are read-only until you renew.'
-      : 'Subscribe to premium to save forecasts to the cloud';
-
-  const saveIcon = syncState === 'saving' ? <LoaderCircle className="h-6 w-6 animate-spin" /> : <Cloud className="h-6 w-6" />;
+  const tooltip = getCloudToolbarTooltip(canSave, premiumActive, isExpiredPremium, currentCloudLabel);
+  const saveIcon = renderCloudSaveIcon(syncState);
 
   return (
     <>

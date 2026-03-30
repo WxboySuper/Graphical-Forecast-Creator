@@ -316,6 +316,14 @@ interface CycleItemProps {
   onRename: (cycleId: string, newLabel: string) => Promise<void>;
 }
 
+interface CloudLibraryActions {
+  message: string | null;
+  setMessage: React.Dispatch<React.SetStateAction<string | null>>;
+  handleLoadCycle: (cycleId: string) => Promise<void>;
+  handleDeleteCycle: (cycleId: string) => Promise<void>;
+  handleRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
+}
+
 /** One cloud cycle row inside the library list. */
 const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, onLoad, onDelete, onRename }) => {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -538,17 +546,23 @@ const CloudLibrarySignedInLayout: React.FC<{
   </div>
 );
 
-/** Production-facing page for loading and managing cloud-hosted cycles. */
-const CloudLibraryPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { premiumActive, effectiveSource } = useEntitlement();
-  const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
+/** Creates the cloud library actions used by the page and keeps transient feedback local. */
+const useCloudLibraryActions = ({
+  cycles,
+  loadCycle,
+  deleteCycle,
+  renameCycle,
+  refreshCycles,
+  navigate,
+}: {
+  cycles: CloudCycleMetadata[];
+  loadCycle: ReturnType<typeof useCloudCycles>['loadCycle'];
+  deleteCycle: ReturnType<typeof useCloudCycles>['deleteCycle'];
+  renameCycle: ReturnType<typeof useCloudCycles>['renameCycle'];
+  refreshCycles: ReturnType<typeof useCloudCycles>['refreshCycles'];
+  navigate: ReturnType<typeof useNavigate>;
+}): CloudLibraryActions => {
   const [message, setMessage] = useState<string | null>(null);
-
-  const canWrite = premiumActive;
-  const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
-  const cycleCountLabel = useMemo(() => `${cycles.length} cloud cycle${cycles.length === 1 ? '' : 's'}`, [cycles.length]);
 
   /** Loads one hosted cycle into the forecast editor and preserves its cloud metadata in session storage. */
   const handleLoadCycle = useCallback(async (cycleId: string) => {
@@ -588,6 +602,39 @@ const CloudLibraryPage: React.FC = () => {
       setMessage('Cloud cycle renamed.');
     }
   }, [refreshCycles, renameCycle]);
+
+  return {
+    message,
+    setMessage,
+    handleLoadCycle,
+    handleDeleteCycle,
+    handleRenameCycle,
+  };
+};
+
+/** Production-facing page for loading and managing cloud-hosted cycles. */
+const CloudLibraryPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { premiumActive, effectiveSource } = useEntitlement();
+  const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
+  const {
+    message,
+    handleLoadCycle,
+    handleDeleteCycle,
+    handleRenameCycle,
+  } = useCloudLibraryActions({
+    cycles,
+    loadCycle,
+    deleteCycle,
+    renameCycle,
+    refreshCycles,
+    navigate,
+  });
+
+  const canWrite = premiumActive;
+  const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
+  const cycleCountLabel = useMemo(() => `${cycles.length} cloud cycle${cycles.length === 1 ? '' : 's'}`, [cycles.length]);
 
   if (!user) {
     return <SignedOutGate />;

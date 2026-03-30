@@ -20,6 +20,15 @@ interface CloudSaveModalProps {
   error?: string;
 }
 
+interface CloudSaveDialogState {
+  label: string;
+  isSaving: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  setLabel: React.Dispatch<React.SetStateAction<string>>;
+  handleSave: () => Promise<void>;
+  handleOpenChange: (open: boolean) => void;
+}
+
 /** Header copy used by the cloud save modal. */
 const CloudSaveDialogHeader: React.FC = () => (
   <DialogHeader className="cloud-save-dialog-header">
@@ -69,27 +78,26 @@ const CloudSaveDialogFooter: React.FC<{
   </DialogFooter>
 );
 
-/**
- * Modal for saving a forecast to the cloud
- */
-export const CloudSaveModal: React.FC<CloudSaveModalProps> = ({
-  open,
-  onOpenChange,
-  onSave,
-  currentLabel = '',
-  error,
-}) => {
+/** Creates the local state and event handlers used by the cloud save dialog. */
+const useCloudSaveDialogState = (
+  open: boolean,
+  currentLabel: string,
+  onOpenChange: (open: boolean) => void,
+  onSave: (label: string) => Promise<boolean>
+): CloudSaveDialogState => {
   const [label, setLabel] = useState(currentLabel);
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (open && !isSaving) {
-      setLabel(currentLabel);
-      window.setTimeout(() => {
-        inputRef.current?.focus();
-      }, 0);
+    if (!open || isSaving) {
+      return;
     }
+
+    setLabel(currentLabel);
+    window.setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   }, [currentLabel, isSaving, open]);
 
   /** Persists the trimmed cloud label and closes the modal on success. */
@@ -112,13 +120,44 @@ export const CloudSaveModal: React.FC<CloudSaveModalProps> = ({
 
   /** Blocks closing while a save is in progress and resets stale label state on close. */
   const handleOpenChange = (newOpen: boolean) => {
-    if (!isSaving) {
-      onOpenChange(newOpen);
-      if (!newOpen) {
-        setLabel('');
-      }
+    if (isSaving) {
+      return;
+    }
+
+    onOpenChange(newOpen);
+    if (!newOpen) {
+      setLabel('');
     }
   };
+
+  return {
+    label,
+    isSaving,
+    inputRef,
+    setLabel,
+    handleSave,
+    handleOpenChange,
+  };
+};
+
+/**
+ * Modal for saving a forecast to the cloud
+ */
+export const CloudSaveModal: React.FC<CloudSaveModalProps> = ({
+  open,
+  onOpenChange,
+  onSave,
+  currentLabel = '',
+  error,
+}) => {
+  const {
+    label,
+    isSaving,
+    inputRef,
+    setLabel,
+    handleSave,
+    handleOpenChange,
+  } = useCloudSaveDialogState(open, currentLabel, onOpenChange, onSave);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

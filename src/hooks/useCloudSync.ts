@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, type MutableRefObject } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { serializeForecast } from '../utils/fileUtils';
@@ -7,6 +7,70 @@ import { useEntitlement } from '../billing/EntitlementProvider';
 import type { UseCloudCyclesResult } from './useCloudCycles';
 
 const SYNC_DEBOUNCE_MS = 5000; // 5 second debounce
+
+/** Clears a pending cloud-sync timer when one is currently scheduled. */
+const clearSyncTimeout = (syncTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>) => {
+  if (!syncTimeoutRef.current) {
+    return;
+  }
+
+  clearTimeout(syncTimeoutRef.current);
+  syncTimeoutRef.current = null;
+};
+
+/** Builds the current sync hash for the forecast and map state. */
+const buildCloudSyncHash = (
+  forecastCycle: RootState['forecast']['forecastCycle'],
+  mapView: RootState['forecast']['currentMapView']
+) => JSON.stringify({ forecastCycle, mapView });
+
+/** Runs one hosted cloud save for the active cloud cycle and updates sync state around the request. */
+const syncCurrentCloudCycle = async ({
+  canSync,
+  currentCloud,
+  saveCycle,
+  updateSyncState,
+  forecastCycle,
+  mapView,
+  setLastSyncedHash,
+  currentHash,
+}: {
+  canSync: boolean;
+  currentCloud: Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud'];
+  saveCycle: Pick<UseCloudCyclesResult, 'saveCycle'>['saveCycle'];
+  updateSyncState: Pick<UseCloudCyclesResult, 'updateSyncState'>['updateSyncState'];
+  forecastCycle: RootState['forecast']['forecastCycle'];
+  mapView: RootState['forecast']['currentMapView'];
+  setLastSyncedHash: (hash: string) => void;
+  currentHash: string;
+}) => {
+  if (!canSync || !currentCloud) {
+    return;
+  }
+
+  try {
+    updateSyncState('saving');
+
+    const payload = serializeForecast(forecastCycle, mapView);
+    const stats = countForecastMetrics(forecastCycle);
+    const success = await saveCycle(currentCloud.label, forecastCycle.cycleDate, stats, payload);
+
+    if (!success) {
+      updateSyncState('error', 'Failed to sync to cloud');
+      return;
+    }
+
+    updateSyncState('saved');
+    setLastSyncedHash(currentHash);
+  } catch (error) {
+    console.error('Error syncing to cloud:', error);
+    updateSyncState('error', error instanceof Error ? error.message : 'Unknown error');
+  }
+};
+
+/** Returns true when the current forecast state has not changed since the last successful sync. */
+const isCurrentStateSynced = (lastSyncedHash: string | null, currentHash: string): boolean =>
+  lastSyncedHash === currentHash;
 
 /**
  * Hook for managing automatic sync of the current forecast to cloud
@@ -28,104 +92,57 @@ export const useCloudSync = (
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncStateRef = useRef<string | null>(null);
 
-  // Determine if we can write to cloud
   const canSync = Boolean(currentCloud) && premiumActive;
+  const currentHash = buildCloudSyncHash(forecastCycle, mapView);
 
-  // Check if forecast has changed since last sync
-  const getCurrentStateHash = useCallback(() => {
-    return JSON.stringify({ forecastCycle, mapView });
-  }, [forecastCycle, mapView]);
-
-  // Perform the sync
   const performSync = useCallback(async () => {
-    if (!canSync || !currentCloud) return;
+    await syncCurrentCloudCycle({
+      canSync,
+      currentCloud,
+      saveCycle,
+      updateSyncState,
+      forecastCycle,
+      mapView,
+      setLastSyncedHash: (hash) => {
+        lastSyncStateRef.current = hash;
+      },
+      currentHash,
+    });
+  }, [canSync, currentCloud, currentHash, forecastCycle, mapView, saveCycle, updateSyncState]);
 
-    try {
-      updateSyncState('saving');
-
-      const payload = serializeForecast(forecastCycle, mapView);
-      const stats = countForecastMetrics(forecastCycle);
-
-      const success = await saveCycle(
-        currentCloud.label,
-        forecastCycle.cycleDate,
-        stats,
-        payload,
-      );
-
-      if (success) {
-        updateSyncState('saved');
-        lastSyncStateRef.current = getCurrentStateHash();
-      } else {
-        updateSyncState('error', 'Failed to sync to cloud');
-      }
-    } catch (error) {
-      console.error('Error syncing to cloud:', error);
-      updateSyncState('error', error instanceof Error ? error.message : 'Unknown error');
-    }
-  }, [
-    canSync,
-    currentCloud,
-    saveCycle,
-    updateSyncState,
-    forecastCycle,
-    mapView,
-    getCurrentStateHash,
-  ]);
-
-  // Set up debounced sync trigger
   useEffect(() => {
     if (!canSync) {
-      // Clear any pending sync
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-        syncTimeoutRef.current = null;
-      }
+      clearSyncTimeout(syncTimeoutRef);
       return;
     }
 
-    const currentHash = getCurrentStateHash();
-    
-    // Only sync if state has changed since last sync
-    if (currentHash === lastSyncStateRef.current) {
+    if (isCurrentStateSynced(lastSyncStateRef.current, currentHash)) {
       return;
     }
 
-    // Clear any pending sync timeout
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-
-    // Debounce the sync
+    clearSyncTimeout(syncTimeoutRef);
     syncTimeoutRef.current = setTimeout(() => {
-      performSync();
+      performSync().catch(() => undefined);
       syncTimeoutRef.current = null;
     }, SYNC_DEBOUNCE_MS);
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupPendingCloudSync() {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-        syncTimeoutRef.current = null;
-      }
+      clearSyncTimeout(syncTimeoutRef);
     };
-  }, [canSync, forecastCycle, mapView, getCurrentStateHash, performSync]);
+  }, [canSync, currentHash, performSync]);
 
-  // Manual sync trigger (immediate, not debounced)
   const syncNow = useCallback(async () => {
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-      syncTimeoutRef.current = null;
-    }
+    clearSyncTimeout(syncTimeoutRef);
     await performSync();
   }, [performSync]);
 
   const markCurrentStateSynced = useCallback(() => {
-    lastSyncStateRef.current = getCurrentStateHash();
-  }, [getCurrentStateHash]);
+    lastSyncStateRef.current = currentHash;
+  }, [currentHash]);
 
   return {
-    isSynced: lastSyncStateRef.current === getCurrentStateHash(),
+    isSynced: isCurrentStateSynced(lastSyncStateRef.current, currentHash),
     currentCloud,
     syncNow,
     markCurrentStateSynced,
