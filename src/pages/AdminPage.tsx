@@ -16,6 +16,7 @@ interface AdminMetricsSummary {
   premiumSubscriptions: number;
   storageBytes: number;
   signups: number;
+  signIns: number;
   upgrades: number;
   cancellations: number;
   cloudSaves: number;
@@ -40,6 +41,7 @@ const DEFAULT_SUMMARY: AdminMetricsSummary = {
   premiumSubscriptions: 0,
   storageBytes: 0,
   signups: 0,
+  signIns: 0,
   upgrades: 0,
   cancellations: 0,
   cloudSaves: 0,
@@ -123,7 +125,7 @@ const AdminTrendRows: React.FC<{ dailyMetrics: AdminDailyMetric[] }> = ({ dailyM
               style={{ width: `${Math.max((metric.cloudSaves / peakCloudSaves) * 100, metric.cloudSaves ? 12 : 0)}%` }}
             />
           </div>
-          <span className="admin-trend-value">{metric.activeSignedInAccounts} accounts</span>
+          <span className="admin-trend-value">{metric.signIns} sign-ins</span>
         </div>
       ))}
     </div>
@@ -277,8 +279,8 @@ const AdminPage: React.FC = () => {
       <div className="admin-summary-grid">
         <AdminSummaryTile label="Total accounts" value={loading ? 'Loading...' : `${summary.totalAccounts}`} />
         <AdminSummaryTile
-          label="Active signed-in accounts"
-          value={loading ? 'Loading...' : `${summary.activeSignedInAccounts}`}
+          label={`Sign-ins (${windowSize}d)`}
+          value={loading ? 'Loading...' : `${summary.signIns}`}
         />
         <AdminSummaryTile
           label="Premium subscriptions"
@@ -304,9 +306,9 @@ const AdminPage: React.FC = () => {
           <CardContent className="admin-card-content">
             <div className="admin-summary-grid admin-summary-grid-compact">
               <AdminSummaryTile label="Signups" value={`${summary.signups}`} />
+              <AdminSummaryTile label="Active devices" value={`${summary.activeDevices}`} />
               <AdminSummaryTile label="Upgrades" value={`${summary.upgrades}`} />
               <AdminSummaryTile label="Cancellations" value={`${summary.cancellations}`} />
-              <AdminSummaryTile label="Active devices" value={`${summary.activeDevices}`} />
               <AdminSummaryTile label="Cloud saves" value={`${summary.cloudSaves}`} />
               <AdminSummaryTile label="Cloud loads" value={`${summary.cloudLoads}`} />
             </div>
@@ -320,7 +322,7 @@ const AdminPage: React.FC = () => {
               Daily trend
             </CardTitle>
             <CardDescription>
-              Cloud-save volume and signed-in account activity for the selected window.
+              Cloud-save volume and sign-in activity for the selected window.
             </CardDescription>
           </CardHeader>
           <CardContent className="admin-card-content">

@@ -28,6 +28,7 @@ const USER_METRIC_FIELDS = {
 };
 const ADMIN_EVENT_FIELDS = {
   account_signup: 'signups',
+  account_signin: 'signIns',
   cloud_cycle_saved: 'cloudSaves',
   cloud_cycle_loaded: 'cloudLoads',
   premium_upgrade: 'upgrades',
@@ -116,6 +117,7 @@ const getDefaultAdminDailyMetrics = () => ({
   activeDevices: 0,
   activeSignedInAccounts: 0,
   signups: 0,
+  signIns: 0,
   premiumSubscriptions: 0,
   upgrades: 0,
   cancellations: 0,
@@ -426,6 +428,7 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
       premiumSubscriptions: latestMetrics.premiumSubscriptions,
       storageBytes: latestMetrics.storageBytes,
       signups: summary.signups + Number(dayMetrics.signups || 0),
+      signIns: summary.signIns + Number(dayMetrics.signIns || 0),
       upgrades: summary.upgrades + Number(dayMetrics.upgrades || 0),
       cancellations: summary.cancellations + Number(dayMetrics.cancellations || 0),
       cloudSaves: summary.cloudSaves + Number(dayMetrics.cloudSaves || 0),
@@ -438,6 +441,7 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
       premiumSubscriptions: latestMetrics.premiumSubscriptions,
       storageBytes: latestMetrics.storageBytes,
       signups: 0,
+      signIns: 0,
       upgrades: 0,
       cancellations: 0,
       cloudSaves: 0,
