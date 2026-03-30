@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Activity, Lock, ShieldCheck, TrendingUp } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -135,17 +135,20 @@ const AdminPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metricsResponse, setMetricsResponse] = useState<AdminMetricsResponse | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
     if (!hostedAuthEnabled || status !== 'signed_in' || !user) {
       setLoading(false);
       setMetricsResponse(null);
+      setAccessDenied(false);
       return;
     }
 
     let isActive = true;
     setLoading(true);
     setError(null);
+    setAccessDenied(false);
 
     const loadAdminMetrics = async () => {
       try {
@@ -156,6 +159,17 @@ const AdminPage: React.FC = () => {
           },
         });
         const data = (await response.json().catch(() => ({}))) as Partial<AdminMetricsResponse> & { error?: string };
+
+        if (response.status === 403) {
+          if (!isActive) {
+            return;
+          }
+
+          setMetricsResponse(null);
+          setAccessDenied(true);
+          setLoading(false);
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(typeof data.error === 'string' ? data.error : 'Unable to load admin metrics right now.');
@@ -193,25 +207,15 @@ const AdminPage: React.FC = () => {
   const summary = useMemo(() => metricsResponse?.summary ?? DEFAULT_SUMMARY, [metricsResponse]);
 
   if (!hostedAuthEnabled) {
-    return (
-      <AdminStateCard
-        title="Admin metrics unavailable"
-        description="This deployment is running in local-only mode, so the private hosted admin dashboard is unavailable here."
-        actionLabel="Back to Home"
-        actionHref="/"
-      />
-    );
+    return <Navigate to="/" replace />;
   }
 
   if (status !== 'signed_in' || !user) {
-    return (
-      <AdminStateCard
-        title="Sign in to continue"
-        description="The private admin dashboard is only available to signed-in allowlisted Firebase accounts."
-        actionLabel="Open Account"
-        actionHref="/account"
-      />
-    );
+    return <Navigate to="/account" replace />;
+  }
+
+  if (accessDenied) {
+    return <Navigate to="/" replace />;
   }
 
   return (
