@@ -37,6 +37,12 @@ jobs:
         env:
           # homepage in package.json is already the production URL (gfc.weatherboysuper.com)
           # so no PUBLIC_URL override is needed here.
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_MODE: false
+          VITE_BETA_INVITE_PATH: ''
           CI: false  # Prevent ESLint warnings from failing the build
 
       - name: Setup SSH agent
@@ -58,6 +64,30 @@ jobs:
         run: |
           rsync -avz --exclude='node_modules' --exclude='logs' \
             server/ root@${{ secrets.PROD_SSH_HOST }}:/opt/gfc-analytics/
+
+      - name: Write production analytics env file
+        run: |
+          cat > prod-server.env <<EOF
+          PORT=3006
+          LOG_DIR=/opt/gfc-analytics/logs
+          APP_BASE_URL=https://gfc.weatherboysuper.com
+          BETA_MODE=false
+          BETA_INVITE_TOKEN=
+          BETA_INVITE_PATH=
+          ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
+          METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.PROD_STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
+          STRIPE_PRICE_ANNUAL_STANDARD=${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
+          STRIPE_PRICE_ANNUAL_PROMO=${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
+          STRIPE_PROMO_START=
+          STRIPE_PROMO_END=
+          FIREBASE_ADMIN_PROJECT_ID=${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+          FIREBASE_ADMIN_CLIENT_EMAIL=${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+          FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+          EOF
+          rsync -avz prod-server.env root@${{ secrets.PROD_SSH_HOST }}:/opt/gfc-analytics/.env
 
       # Install prod dependencies and (re)start with PM2
       - name: Install analytics dependencies and restart

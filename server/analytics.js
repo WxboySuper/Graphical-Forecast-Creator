@@ -6,6 +6,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
+const { registerBetaRoutes } = require('./beta');
 const { registerBillingRoutes } = require('./billing');
 const { registerMetricsRoutes } = require('./metrics');
 
@@ -28,6 +29,7 @@ const collectRateLimit = rateLimit({
 
 registerBillingRoutes(app, express);
 registerMetricsRoutes(app, express);
+registerBetaRoutes(app, express);
 
 app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, (req, res) => {
   // Sanitise and cap all user-controlled fields
