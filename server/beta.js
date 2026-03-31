@@ -76,7 +76,13 @@ const grantBetaAccess = async (uid) => {
     throw new Error('Firebase Admin is not configured for beta claims.');
   }
 
-  await db.collection('userProfiles').doc(uid).set(
+  const profileRef = db.collection('userProfiles').doc(uid);
+  const profileSnapshot = await profileRef.get();
+  if (profileSnapshot.data()?.betaAccess === true) {
+    return;
+  }
+
+  await profileRef.set(
     {
       betaAccess: true,
       betaGrantedAt: new Date(),
