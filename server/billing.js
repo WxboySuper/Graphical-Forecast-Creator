@@ -260,6 +260,7 @@ const handleCheckout = async (req, res) => {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
+    allow_promotion_codes: true,
     success_url: `${baseUrl}/account?checkout=success`,
     cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
     ...(getCheckoutCustomerEmail(decodedToken) ? { customer_email: getCheckoutCustomerEmail(decodedToken) } : {}),
