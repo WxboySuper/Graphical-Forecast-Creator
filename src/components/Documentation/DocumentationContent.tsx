@@ -12,6 +12,7 @@ const CatCell: React.FC<{ v: string }> = ({ v }) => {
   return <td className={cls}>{v}</td>;
 };
 
+/** Overview tab content for the in-app documentation panel. */
 export const OverviewSection: React.FC = () => (
   <div className="doc-section">
     <h3>Graphical Forecast Creator</h3>
@@ -49,6 +50,7 @@ export const OverviewSection: React.FC = () => (
   </div>
 );
 
+/** Usage tab content covering the basic workflow and shortcuts. */
 export const UsageSection: React.FC = () => (
   <div className="doc-section">
     <h3>How to Use GFC</h3>
@@ -105,6 +107,7 @@ export const UsageSection: React.FC = () => (
   </div>
 );
 
+/** Outlook reference tab content describing supported outlook types and colors. */
 export const OutlooksSection: React.FC = () => (
   <div className="doc-section">
     <h3>Outlook Types &amp; Colors</h3>
@@ -161,7 +164,7 @@ export const OutlooksSection: React.FC = () => (
     <h4>Total Severe Outlook (Day 3 only)</h4>
     <p>Combined severe weather probability — no separate tornado/wind/hail breakdown.</p>
     <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#008b02' }}><span>5%</span></div>
+      <div className="color-item" style={{ backgroundColor: '#894826' }}><span>5%</span></div>
       <div className="color-item" style={{ backgroundColor: '#fdc900', color: '#333' }}><span>15%</span></div>
       <div className="color-item" style={{ backgroundColor: '#fe0000' }}><span>30%</span></div>
       <div className="color-item" style={{ backgroundColor: '#fe00ff' }}><span>45%</span></div>
@@ -188,6 +191,7 @@ export const OutlooksSection: React.FC = () => (
   </div>
 );
 
+/** Conversion tab content documenting probabilistic-to-categorical mappings. */
 export const CategoricalSection: React.FC = () => (
   <div className="doc-section">
     <h3>Probabilistic → Categorical Conversion</h3>

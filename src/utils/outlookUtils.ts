@@ -62,7 +62,7 @@ export const colorMappings: ColorMappings = {
     '60#': '#912bee'
   },
   totalSevere: {
-    '5%': '#008b02',
+    '5%': '#894826',
     '15%': '#fdc900',
     '30%': '#fe0000',
     '45%': '#fe00ff',
