@@ -16,6 +16,9 @@ const parseDateEnv = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+/** Returns the configured Stripe annual promo price ID, if one exists. */
+const getAnnualPromoPriceId = () => process.env.STRIPE_PRICE_ANNUAL_PROMO || '';
+
 /** Returns the public base URL used for Stripe return links. */
 const getBaseUrl = (req) =>
   process.env.APP_BASE_URL ||
@@ -24,6 +27,10 @@ const getBaseUrl = (req) =>
 
 /** True when the annual intro pricing window is currently active. */
 const isAnnualPromoActive = () => {
+  if (!getAnnualPromoPriceId()) {
+    return false;
+  }
+
   const now = new Date();
   const promoStart = parseDateEnv(process.env.STRIPE_PROMO_START);
   const promoEnd = parseDateEnv(process.env.STRIPE_PROMO_END);
@@ -38,7 +45,7 @@ const isAnnualPromoActive = () => {
 /** Returns the currently active Stripe annual price ID and matching display text. */
 const getAnnualPlanConfig = () => {
   const promoActive = isAnnualPromoActive();
-  const promoPriceId = process.env.STRIPE_PRICE_ANNUAL_PROMO || '';
+  const promoPriceId = getAnnualPromoPriceId();
   const standardPriceId = process.env.STRIPE_PRICE_ANNUAL_STANDARD || '';
 
   if (promoActive && promoPriceId) {
@@ -50,9 +57,9 @@ const getAnnualPlanConfig = () => {
   }
 
   return {
-    annualPromoActive: promoActive,
+    annualPromoActive: false,
     annualPriceId: standardPriceId,
-    annualDisplayPrice: promoActive ? ANNUAL_PROMO_DISPLAY_PRICE : ANNUAL_STANDARD_DISPLAY_PRICE,
+    annualDisplayPrice: ANNUAL_STANDARD_DISPLAY_PRICE,
   };
 };
 

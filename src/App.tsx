@@ -19,8 +19,9 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
 import { AppLayout } from './components/Layout';
-import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage, AccountPage, PricingPage, AdminPage } from './pages';
+import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage, AccountPage, PricingPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
 import CloudLibraryPage from './pages/CloudLibraryPage';
+import BetaAccessGuard from './components/Beta/BetaAccessGuard';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 
@@ -28,6 +29,7 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 // The app auto-unlocks at the launch date/time regardless of the env var.
 const LAUNCH_TIME = new Date('2026-03-01T18:00:00.000Z').getTime(); // noon CST
 const COMING_SOON_MODE = __GFC_COMING_SOON__;
+const BETA_MODE = __GFC_BETA_MODE__;
 
 // Custom hook to manage the launch gate, which checks the current date against a predefined launch time and returns whether the app has launched. It also sets up a timer to update the launched state when the launch time is reached, allowing for real-time transition from coming soon mode to live mode without needing a page refresh.
 function useLaunchGate(): boolean {
@@ -128,6 +130,9 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
 
   return (
     <Routes>
+      <Route path="beta" element={<BetaLandingPage />} />
+      <Route path="beta-access/:invitePath?" element={<BetaInvitePage />} />
+      <Route element={<BetaAccessGuard />}>
       <Route element={<AppLayout />}>
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
@@ -137,8 +142,9 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="forecast" element={<ForecastPage />} />
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
+      </Route>
+      <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />
     </Routes>
   );
 };
