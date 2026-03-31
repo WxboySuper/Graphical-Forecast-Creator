@@ -5,11 +5,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Hosted accounts and entitlements:** Added Firebase-backed account profiles, hosted sign-in, premium entitlements, and account management flows for the upcoming `v1.4.0` beta release.
+- **Cloud forecast library:** Added hosted cloud save/load support, a dedicated cloud library page, toolbar cloud actions, and read-only handling for expired premium users.
+- **User metrics and admin dashboard:** Added progress-style account metrics, aggregate admin metrics, and a hidden admin dashboard for hosted beta operations.
+- **Closed beta access flow:** Added beta-only access gating, invite onboarding, beta account activation, and deployment-specific beta access checks.
+
 ### Changed
 - **Cloud hosted forecasts:** Moved cloud forecast storage out of `userSettings` into a dedicated `cloudCycles` collection so forecast payloads have a long-term home separate from profile preferences.
+- **Pricing and account experience:** Refined the hosted pricing, account, billing, and cloud surfaces to match the newer card/surface design language used across the app.
+- **Forecast toolbar styling:** Rebalanced the forecast utility toolbar layout and brought the cloud save/cloud library buttons back into the same visual system as the rest of the tool buttons, including dark-mode compliant color treatments.
+- **Beta deployment flow:** Updated the beta and production deployment workflows to support hosted env configuration, separate beta/prod webhook secrets, and a dedicated beta backend process.
+- **Privacy disclosures:** Updated the privacy policy and in-app privacy modal to reflect hosted sync, billing metadata, beta metrics, and operational logging behavior.
 
 ### Fixed
 - **Billing route throttling:** Added explicit rate limiting to the Stripe billing checkout, portal, and webhook endpoints so authorization-bearing billing routes are consistently protected.
+- **Cloud library UX:** Rebuilt the cloud library page and save dialog into clearer operational surfaces and corrected toolbar integration issues around cloud actions.
+- **Beta backend loading:** Fixed server env loading for deployed hosted backends so colocated server `.env` files are respected on VPS deployments.
+- **Closed beta activation:** Fixed beta access routing and deployment wiring so invite claims, billing config, and other hosted `/api/*` routes can reach the beta backend correctly.
+- **Toolbar color consistency:** Corrected recent cloud-toolbar light/dark mode regressions so the hosted cloud actions follow the same custom toolbar color standards as the rest of the forecast tools.
+- **Day 3 Total Severe colors:** Corrected the Day 3 `5%` Total Severe color back to the intended brown styling instead of the incorrect green treatment.
 
 ## [1.3.0] - 2026-03-24
 

@@ -161,7 +161,7 @@ export const OutlooksSection: React.FC = () => (
     <h4>Total Severe Outlook (Day 3 only)</h4>
     <p>Combined severe weather probability — no separate tornado/wind/hail breakdown.</p>
     <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#008b02' }}><span>5%</span></div>
+      <div className="color-item" style={{ backgroundColor: '#894826' }}><span>5%</span></div>
       <div className="color-item" style={{ backgroundColor: '#fdc900', color: '#333' }}><span>15%</span></div>
       <div className="color-item" style={{ backgroundColor: '#fe0000' }}><span>30%</span></div>
       <div className="color-item" style={{ backgroundColor: '#fe00ff' }}><span>45%</span></div>
