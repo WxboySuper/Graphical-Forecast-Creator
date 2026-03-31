@@ -1,5 +1,5 @@
 **Terms of Service for Graphical Forecast Creator (GFC)**  
-**Effective Date:** April 2026
+**Effective Date:** March 31, 2026
 
 Welcome to the Graphical Forecast Creator ("GFC", "the App"). By clicking "I Agree" or by using this application, you acknowledge that you have read, understood, and agree to be bound by the following terms and conditions. If you do not agree, please refrain from using the service.
 

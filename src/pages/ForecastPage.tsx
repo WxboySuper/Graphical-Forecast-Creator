@@ -33,6 +33,7 @@ import { useCloudCycles, type UseCloudCyclesResult } from '../hooks/useCloudCycl
 import { useCloudSync } from '../hooks/useCloudSync';
 import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbarButton';
 import { countForecastMetrics } from '../utils/forecastMetrics';
+import { queueProductMetric } from '../utils/productMetrics';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -171,17 +172,19 @@ const useForecastSaveAction = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
-  mapRef: React.RefObject<ForecastMapHandle | null>
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+  user: ReturnType<typeof useAuth>['user']
 ) => {
   return useCallback(() => {
     try {
       exportForecastToJson(forecastCycle, buildMapView(mapRef));
       dispatch(markAsSaved());
+      queueProductMetric({ event: 'cycle_saved', user });
       addToast('Forecast exported to JSON!', 'success');
     } catch {
       addToast('Error exporting forecast.', 'error');
     }
-  }, [forecastCycle, dispatch, addToast, mapRef]);
+  }, [forecastCycle, dispatch, addToast, mapRef, user]);
 };
 
 /** Returns a memoized async callback that parses and imports a forecast JSON file into Redux. */
@@ -645,9 +648,10 @@ const useForecastFileActions = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
-  mapRef: React.RefObject<ForecastMapHandle | null>
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+  user: ReturnType<typeof useAuth>['user']
 ) => {
-  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef);
+  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user);
   const handleLoad = useForecastLoadAction(dispatch, addToast, mapRef);
   const handleShortcutFileInputChange = useShortcutFileInputChange(handleLoad);
 
@@ -837,7 +841,8 @@ const useForecastPageWorkspace = ({
     dispatch,
     addToast,
     forecastCycle,
-    mapRef
+    mapRef,
+    user
   );
 
   useKeyboardShortcuts({

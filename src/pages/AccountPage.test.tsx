@@ -8,9 +8,13 @@ jest.mock('../auth/AuthProvider', () => ({
 jest.mock('../billing/EntitlementProvider', () => ({
   useEntitlement: jest.fn(),
 }));
+jest.mock('../metrics/useUserMetrics', () => ({
+  useUserMetrics: jest.fn(),
+}));
 
 const mockUseAuth = jest.requireMock('../auth/AuthProvider').useAuth as jest.Mock;
 const mockUseEntitlement = jest.requireMock('../billing/EntitlementProvider').useEntitlement as jest.Mock;
+const mockUseUserMetrics = jest.requireMock('../metrics/useUserMetrics').useUserMetrics as jest.Mock;
 
 describe('AccountPage', () => {
   beforeEach(() => {
@@ -33,22 +37,68 @@ describe('AccountPage', () => {
       openCheckout: jest.fn(),
       openBillingPortal: jest.fn(),
     });
+    mockUseUserMetrics.mockReturnValue({
+      metrics: {
+        uid: 'user-1',
+        activeDayStreak: 4,
+        totalActiveDays: 10,
+        cyclesCreated: 3,
+        cloudCyclesSaved: 2,
+        discussionsWritten: 1,
+        verificationSessionsRun: 5,
+        lastActiveDate: '2026-03-30',
+        updatedAt: null,
+      },
+      loading: false,
+      error: null,
+    });
   });
 
-  test('shows the local-only fallback when hosted auth is disabled', () => {
-    mockUseAuth.mockReturnValue({
-      hostedAuthEnabled: false,
-      status: 'disabled',
-      settingsSyncStatus: 'disabled',
-      user: null,
-      syncedSettings: null,
-      error: null,
-      signInWithGoogle: jest.fn(),
-      signInWithEmail: jest.fn(),
-      signUpWithEmail: jest.fn(),
-      signOutUser: jest.fn(),
-      updateSyncedSettings: jest.fn(),
-    });
+  test.each([
+    {
+      name: 'shows the local-only fallback when hosted auth is disabled',
+      authState: {
+        hostedAuthEnabled: false,
+        status: 'disabled',
+        settingsSyncStatus: 'disabled',
+        user: null,
+        syncedSettings: null,
+        error: null,
+        signInWithGoogle: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOutUser: jest.fn(),
+        updateSyncedSettings: jest.fn(),
+      },
+      assertion: () => {
+        expect(screen.getByRole('heading', { name: /^Account$/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /Local-only mode/i })).toBeInTheDocument();
+        expect(screen.getByText(/running in local-only mode/i)).toBeInTheDocument();
+      },
+    },
+    {
+      name: 'shows confirm password only in create-account mode',
+      authState: {
+        hostedAuthEnabled: true,
+        status: 'signed_out',
+        settingsSyncStatus: 'idle',
+        user: null,
+        syncedSettings: null,
+        error: null,
+        signInWithGoogle: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOutUser: jest.fn(),
+        updateSyncedSettings: jest.fn(),
+      },
+      assertion: () => {
+        expect(screen.queryByLabelText(/Confirm Password/i)).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
+        expect(screen.getByLabelText(/Confirm Password/i)).toBeInTheDocument();
+      },
+    },
+  ])('$name', ({ authState, assertion }) => {
+    mockUseAuth.mockReturnValue(authState);
 
     render(
       <BrowserRouter>
@@ -56,37 +106,7 @@ describe('AccountPage', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByRole('heading', { name: /^Account$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Local-only mode/i })).toBeInTheDocument();
-    expect(screen.getByText(/running in local-only mode/i)).toBeInTheDocument();
-  });
-
-  test('shows confirm password only in create-account mode', () => {
-    mockUseAuth.mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'signed_out',
-      settingsSyncStatus: 'idle',
-      user: null,
-      syncedSettings: null,
-      error: null,
-      signInWithGoogle: jest.fn(),
-      signInWithEmail: jest.fn(),
-      signUpWithEmail: jest.fn(),
-      signOutUser: jest.fn(),
-      updateSyncedSettings: jest.fn(),
-    });
-
-    render(
-      <BrowserRouter>
-        <AccountPage />
-      </BrowserRouter>
-    );
-
-    expect(screen.queryByLabelText(/Confirm Password/i)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
-
-    expect(screen.getByLabelText(/Confirm Password/i)).toBeInTheDocument();
+    assertion();
   });
 
   test('shows a simplified signed-in account view with one sync status badge', () => {
@@ -122,5 +142,8 @@ describe('AccountPage', () => {
     expect(screen.getByRole('button', { name: /Sign Out/i })).toBeInTheDocument();
     expect(screen.getAllByText(/^Synced$/i)).toHaveLength(1);
     expect(screen.getByRole('link', { name: /View Pricing/i })).toBeInTheDocument();
+    expect(screen.getByText(/Your Activity/i)).toBeInTheDocument();
+    expect(screen.getByText(/^4$/)).toBeInTheDocument();
+    expect(screen.getByText(/^10$/)).toBeInTheDocument();
   });
 });

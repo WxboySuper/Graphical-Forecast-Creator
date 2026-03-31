@@ -12,6 +12,7 @@ import {
 } from '../lib/cloudCyclesService';
 import { GFCForecastSaveData } from '../types/outlooks';
 import { SavedCycleStats } from '../store/forecastSlice';
+import { queueProductMetric } from '../utils/productMetrics';
 
 export interface UseCloudCyclesResult {
   cycles: CloudCycleMetadata[];
@@ -255,11 +256,15 @@ function useCloudCycleMutation<TArgs extends unknown[]>({
 function useCloudSaveCycle({
   userId,
   canWrite,
+  user,
   currentCloudRef,
   setCurrentCloud,
   setError,
   updateSyncState,
-}: CloudAccessContext & Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError' | 'updateSyncState'>) {
+}: CloudAccessContext &
+  Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError' | 'updateSyncState'> & {
+    user: ReturnType<typeof useAuth>['user'];
+  }) {
   return useCallback(
     async (
       label: string,
@@ -295,21 +300,26 @@ function useCloudSaveCycle({
       if (result.data) {
         setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
       }
+      queueProductMetric({ event: 'cloud_cycle_saved', user });
       updateSyncState('saved');
       return true;
     },
-    [canWrite, currentCloudRef, setCurrentCloud, setError, updateSyncState, userId]
+    [canWrite, currentCloudRef, setCurrentCloud, setError, updateSyncState, user, userId]
   );
 }
 
 /** Returns the load callback for hosted cloud cycles. */
 function useCloudLoadCycle({
   userId,
+  user,
   cycles,
   setCurrentCloud,
   setError,
   updateSyncState,
-}: Pick<CloudStateContext, 'cycles' | 'setCurrentCloud' | 'setError' | 'updateSyncState'> & Pick<CloudAccessContext, 'userId'>) {
+}: Pick<CloudStateContext, 'cycles' | 'setCurrentCloud' | 'setError' | 'updateSyncState'> &
+  Pick<CloudAccessContext, 'userId'> & {
+    user: ReturnType<typeof useAuth>['user'];
+  }) {
   return useCallback(
     async (cycleId: string): Promise<GFCForecastSaveData | null> => {
       if (!userId) {
@@ -328,10 +338,11 @@ function useCloudLoadCycle({
       }
 
       syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
+      queueProductMetric({ event: 'cloud_cycle_loaded', user });
       updateSyncState('saved');
       return result.data.payload;
     },
-    [cycles, setCurrentCloud, setError, updateSyncState, userId]
+    [cycles, setCurrentCloud, setError, updateSyncState, user, userId]
   );
 }
 
@@ -527,6 +538,7 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
   const operations = useCloudCycleOperations({
     userId: user?.uid,
     canWrite,
+    user,
     cycles,
     currentCloudRef,
     setCurrentCloud,

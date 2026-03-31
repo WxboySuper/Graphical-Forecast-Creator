@@ -3,7 +3,7 @@ import './PrivacyPolicyModal.css';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.0.0';
+const PRIVACY_POLICY_VERSION = '1.1.0';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 /** Returns true if the user has accepted the current version of the Privacy Policy. */
@@ -53,6 +53,7 @@ const PrivacyPolicyContent: React.FC = () => (
       <li>Your email address.</li>
       <li>Your authentication provider (Google or Email/Password).</li>
       <li>Basic profile information (name/avatar).</li>
+      <li>Your synced settings needed to keep the hosted account experience working across devices.</li>
     </ul>
 
     <h3>3. Premium Cloud Storage &amp; Encryption</h3>
@@ -65,22 +66,45 @@ const PrivacyPolicyContent: React.FC = () => (
     <h3>4. Payment Information</h3>
     <p>
       All payments are processed securely by Stripe. GFC does not collect, process, or store your credit card numbers
-      or banking details. We only receive your subscription status and billing tier from Stripe to unlock your premium
-      features.
+      or banking details. To operate subscriptions, we store limited billing metadata such as your subscription
+      status, billing interval, renewal/cancellation state, and Stripe-linked customer or subscription identifiers
+      needed to unlock and manage premium features.
     </p>
 
-    <h3>5. Product Analytics</h3>
+    <h3>5. Product Analytics &amp; Progress Metrics</h3>
     <p>
-      To monitor the health of the application, we collect anonymous, aggregate telemetry such as daily active users,
-      total cloud saves, and verification sessions run. <strong>We do not log raw IP addresses for product analytics</strong>,
-      and your forecast payload contents are never exposed to our metrics dashboard.
+      To monitor the health of the hosted service, we collect privacy-conscious product telemetry such as signups,
+      sign-ins, cloud saves/loads, verification runs, and aggregate storage usage.{' '}
+      <strong>We do not log raw IP addresses for product analytics</strong>, and your forecast payload contents are
+      never exposed to our metrics dashboard.
+    </p>
+    <p>
+      If you are signed in, we also store limited progress metrics tied to your account so we can show you your own
+      activity inside GFC. This may include values such as active-day streak, total active days, forecast saves, cloud
+      saves, discussions written, and verification sessions run. These account metrics are visible only to you inside
+      your account view.
+    </p>
+    <p>
+      We also generate a browser-scoped anonymous installation identifier to help estimate daily active devices without
+      relying on long-term raw IP storage. Where possible, admin metrics are aggregated by day and shown only in
+      aggregate form.
+    </p>
+    <p>
+      Separately from product metrics, the hosted service may keep short operational request logs such as page path,
+      referrer, timestamp, and user-agent for maintenance and debugging. These logs are not used to inspect forecast
+      contents and are kept separate from the product metrics dashboard.
     </p>
 
     <h3>6. Data Retention &amp; Deletion</h3>
     <p>
       You own your data. You have the right to delete your account and associated cloud data at any time. Upon account
-      deletion, your cloud-hosted cycles and profile data will be permanently removed from our Firebase servers. Your
-      local, offline saves will remain completely untouched on your device.
+      deletion, your cloud-hosted cycles, profile data, synced settings, and user-linked progress metrics will be
+      permanently removed from our Firebase servers. Your local, offline saves will remain completely untouched on your
+      device.
+    </p>
+    <p>
+      Aggregate admin metrics may be retained in a non-user-specific form for product operations. Short-lived dedupe
+      records used for daily unique counts are intended to expire automatically after a limited retention window.
     </p>
 
     <h3>7. Age Restrictions</h3>
@@ -150,7 +174,7 @@ const PrivacyPolicyHeader: React.FC<{ viewOnly: boolean; onClose?: () => void }>
     <div className="privacy-modal-header-row">
       <div>
         <h2 id="privacy-title">Privacy Policy</h2>
-        <p>Please read and accept before using Graphical Forecast Creator &mdash; Last Updated March 2026</p>
+        <p>Please read and accept before using Graphical Forecast Creator &mdash; Last Updated March 30, 2026</p>
       </div>
       {viewOnly && (
         <button className="privacy-close-view-btn" onClick={onClose} aria-label="Close">

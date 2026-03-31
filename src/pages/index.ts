@@ -5,3 +5,4 @@ export { VerificationPage } from './VerificationPage';
 export { ComingSoonPage } from './ComingSoonPage';
 export { AccountPage } from './AccountPage';
 export { PricingPage } from './PricingPage';
+export { AdminPage } from './AdminPage';

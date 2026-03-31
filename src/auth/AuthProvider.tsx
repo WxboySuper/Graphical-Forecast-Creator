@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { useDispatch, useSelector } from 'react-redux';
 import {
   createUserWithEmailAndPassword,
+  getAdditionalUserInfo,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -21,6 +22,7 @@ import { setDarkMode } from '../store/themeSlice';
 import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled } from '../lib/firebase';
+import { queueProductMetric } from '../utils/productMetrics';
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
@@ -611,15 +613,21 @@ const useHostedAuthState = (): AuthContextValue => {
       hostedAuthEnabled: true,
       signInWithGoogle: async () => {
         setError(null);
-        await signInWithPopup(auth, googleAuthProvider);
+        const credential = await signInWithPopup(auth, googleAuthProvider);
+        queueProductMetric({
+          event: getAdditionalUserInfo(credential)?.isNewUser ? 'account_signup' : 'account_signin',
+          user: credential.user,
+        });
       },
       signInWithEmail: async (email: string, password: string) => {
         setError(null);
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        queueProductMetric({ event: 'account_signin', user: credential.user });
       },
       signUpWithEmail: async (email: string, password: string) => {
         setError(null);
-        await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        queueProductMetric({ event: 'account_signup', user: credential.user });
       },
       signOutUser: async () => {
         setError(null);

@@ -1,3 +1,9 @@
+## Local Workflow Preferences
+
+- Do not create a new branch unless the user explicitly asks for one.
+- Do not commit, push, or open a PR unless the user explicitly asks for it.
+- Run relevant tests/checks before suggesting a commit, but leave the actual commit to the user unless asked.
+
 ## Night Watch Skills
 
 The following Night Watch CLI commands are available. Use them when the user asks to manage PRDs, board issues, or trigger Night Watch operations.

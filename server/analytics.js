@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 const { registerBillingRoutes } = require('./billing');
+const { registerMetricsRoutes } = require('./metrics');
 
 const PORT = parseInt(process.env.PORT || '3006', 10);
 const LOG_DIR = process.env.LOG_DIR || path.join(__dirname, 'logs');
@@ -26,6 +27,7 @@ const collectRateLimit = rateLimit({
 });
 
 registerBillingRoutes(app, express);
+registerMetricsRoutes(app, express);
 
 app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, (req, res) => {
   // Sanitise and cap all user-controlled fields
@@ -40,7 +42,7 @@ app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, (req, res
   };
 
   try {
-    fs.appendFileSync(LOG_FILE, JSON.stringify(entry) + '\n');
+    fs.appendFileSync(LOG_FILE, `${JSON.stringify(entry)}\n`);
     res.status(204).end();
   } catch (err) {
     console.error('[analytics] failed to write log:', err);
