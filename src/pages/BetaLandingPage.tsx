@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { Lock, LogOut } from 'lucide-react';
 import BetaAuthCard from '../components/Beta/BetaAuthCard';
-import { BetaInfoCard, BetaPageShell, BetaStatusPanel } from '../components/Beta/BetaPageLayout';
+import { BetaHero, BetaInfoCard, BetaPageShell, BetaStatusPanel } from '../components/Beta/BetaPageLayout';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../auth/AuthProvider';
 import { isBetaModeEnabled } from '../lib/betaAccess';
@@ -101,32 +101,22 @@ const BetaLandingPage: React.FC = () => {
 
   return (
     <BetaPageShell>
-      <section className="beta-hero">
-        <div className="beta-pill">
-          <Lock className="h-4 w-4" />
-          Closed Beta
-        </div>
-
-        <div className="beta-hero-grid">
-          <div className="beta-hero-copy">
-            <h1>Closed beta sign-in</h1>
-            <p>
-              Beta access is limited to invited accounts. Sign in here if your account has already been activated,
-              or use the private onboarding link from Discord first.
-            </p>
-          </div>
-
-          {landingView === 'signed_in_locked' ? (
-            <BetaEnrollmentCard email={user?.email ?? 'this account'} onSignOut={handleSignOutClick} />
-          ) : (
-            <BetaAuthCard
-              title="Tester sign in"
-              description="Sign in with the account that already has beta access. New testers should use the private invite link first."
-              googleLabel="Sign In with Google"
-            />
-          )}
-        </div>
-      </section>
+      <BetaHero
+        icon={<Lock className="h-4 w-4" />}
+        pillLabel="Closed Beta"
+        title="Closed beta sign-in"
+        description="Beta access is limited to invited accounts. Sign in here if your account has already been activated, or use the private onboarding link from Discord first."
+      >
+        {landingView === 'signed_in_locked' ? (
+          <BetaEnrollmentCard email={user?.email ?? 'this account'} onSignOut={handleSignOutClick} />
+        ) : (
+          <BetaAuthCard
+            title="Tester sign in"
+            description="Sign in with the account that already has beta access. New testers should use the private invite link first."
+            googleLabel="Sign In with Google"
+          />
+        )}
+      </BetaHero>
 
       <BetaLandingNotes />
     </BetaPageShell>

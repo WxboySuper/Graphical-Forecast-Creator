@@ -48,6 +48,111 @@ const BetaAuthModeToggle: React.FC<{
   </div>
 );
 
+/** Main content body for the beta auth card. */
+const BetaAuthCardBody: React.FC<{
+  allowSignUp: boolean;
+  confirmPassword: string;
+  email: string;
+  error: string | null;
+  formError: string | null;
+  googleLabel: string;
+  isBusy: boolean;
+  mode: AuthMode;
+  password: string;
+  onChangeConfirmPassword: (value: string) => void;
+  onChangeEmail: (value: string) => void;
+  onChangePassword: (value: string) => void;
+  onGoogleSignIn: () => void;
+  onSelectMode: (mode: AuthMode) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}> = ({
+  allowSignUp,
+  confirmPassword,
+  email,
+  error,
+  formError,
+  googleLabel,
+  isBusy,
+  mode,
+  password,
+  onChangeConfirmPassword,
+  onChangeEmail,
+  onChangePassword,
+  onGoogleSignIn,
+  onSelectMode,
+  onSubmit,
+}) => (
+  <div className="beta-auth-content">
+    <Button variant="outline" className="w-full justify-center" onClick={onGoogleSignIn} disabled={isBusy}>
+      <Cloud className="mr-2 h-4 w-4" />
+      {googleLabel}
+    </Button>
+
+    <div className="beta-auth-divider">
+      <div className="h-px flex-1 bg-border" />
+      <span>Email / Password</span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+
+    {allowSignUp ? <BetaAuthModeToggle isBusy={isBusy} mode={mode} onSelectMode={onSelectMode} /> : null}
+
+    <form className="beta-auth-form" onSubmit={onSubmit}>
+      <div className="beta-auth-field">
+        <label htmlFor="beta-email" className="text-sm font-medium text-foreground">
+          Email
+        </label>
+        <Input
+          id="beta-email"
+          type="email"
+          value={email}
+          onChange={(event) => onChangeEmail(event.target.value)}
+          autoComplete="email"
+          required
+        />
+      </div>
+
+      <div className="beta-auth-field">
+        <label htmlFor="beta-password" className="text-sm font-medium text-foreground">
+          Password
+        </label>
+        <Input
+          id="beta-password"
+          type="password"
+          value={password}
+          onChange={(event) => onChangePassword(event.target.value)}
+          autoComplete={allowSignUp && mode === 'sign_up' ? 'new-password' : 'current-password'}
+          minLength={6}
+          required
+        />
+      </div>
+
+      {isCreateAccountMode(allowSignUp, mode) ? (
+        <div className="beta-auth-field">
+          <label htmlFor="beta-confirm-password" className="text-sm font-medium text-foreground">
+            Confirm Password
+          </label>
+          <Input
+            id="beta-confirm-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => onChangeConfirmPassword(event.target.value)}
+            autoComplete="new-password"
+            minLength={6}
+            required
+          />
+        </div>
+      ) : null}
+
+      {formError || error ? <div className="beta-auth-error">{formError ?? error}</div> : null}
+
+      <Button type="submit" disabled={isBusy}>
+        {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+        {isCreateAccountMode(allowSignUp, mode) ? 'Create Beta Account' : 'Sign In with Email'}
+      </Button>
+    </form>
+  </div>
+);
+
 /** Shared hosted-auth card used by the locked beta landing and the invite onboarding flow. */
 const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   title,
@@ -128,77 +233,23 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
 
   return (
     <BetaInfoCard title={title} description={description} className="beta-auth-card">
-      <div className="beta-auth-content">
-        <Button variant="outline" className="w-full justify-center" onClick={handleGoogleSignInClick} disabled={isBusy}>
-          <Cloud className="mr-2 h-4 w-4" />
-          {googleLabel}
-        </Button>
-
-        <div className="beta-auth-divider">
-          <div className="h-px flex-1 bg-border" />
-          <span>Email / Password</span>
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
-        {allowSignUp ? (
-          <BetaAuthModeToggle isBusy={isBusy} mode={mode} onSelectMode={setMode} />
-        ) : null}
-
-        <form className="beta-auth-form" onSubmit={handleEmailSubmit}>
-          <div className="beta-auth-field">
-            <label htmlFor="beta-email" className="text-sm font-medium text-foreground">
-              Email
-            </label>
-            <Input
-              id="beta-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              required
-            />
-          </div>
-
-          <div className="beta-auth-field">
-            <label htmlFor="beta-password" className="text-sm font-medium text-foreground">
-              Password
-            </label>
-            <Input
-              id="beta-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete={allowSignUp && mode === 'sign_up' ? 'new-password' : 'current-password'}
-              minLength={6}
-              required
-            />
-          </div>
-
-          {isCreateAccountMode(allowSignUp, mode) ? (
-            <div className="beta-auth-field">
-              <label htmlFor="beta-confirm-password" className="text-sm font-medium text-foreground">
-                Confirm Password
-              </label>
-              <Input
-                id="beta-confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                autoComplete="new-password"
-                minLength={6}
-                required
-              />
-            </div>
-          ) : null}
-
-          {formError || error ? <div className="beta-auth-error">{formError ?? error}</div> : null}
-
-          <Button type="submit" disabled={isBusy}>
-            {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-            {isCreateAccountMode(allowSignUp, mode) ? 'Create Beta Account' : 'Sign In with Email'}
-          </Button>
-        </form>
-      </div>
+      <BetaAuthCardBody
+        allowSignUp={allowSignUp}
+        confirmPassword={confirmPassword}
+        email={email}
+        error={error}
+        formError={formError}
+        googleLabel={googleLabel}
+        isBusy={isBusy}
+        mode={mode}
+        password={password}
+        onChangeConfirmPassword={setConfirmPassword}
+        onChangeEmail={setEmail}
+        onChangePassword={setPassword}
+        onGoogleSignIn={handleGoogleSignInClick}
+        onSelectMode={setMode}
+        onSubmit={handleEmailSubmit}
+      />
     </BetaInfoCard>
   );
 };

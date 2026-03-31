@@ -20,6 +20,7 @@ if (!fs.existsSync(LOG_DIR)) {
 }
 
 const app = express();
+app.set('trust proxy', 'loopback');
 const collectRateLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 60,

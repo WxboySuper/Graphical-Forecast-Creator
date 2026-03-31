@@ -6,6 +6,14 @@ interface BetaPageShellProps {
   children: React.ReactNode;
 }
 
+interface BetaHeroProps {
+  icon: React.ReactNode;
+  pillLabel: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}
+
 interface BetaInfoCardProps {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -18,6 +26,31 @@ export const BetaPageShell: React.FC<BetaPageShellProps> = ({ children }) => (
   <div className="beta-page-shell">
     <div className="beta-page-layout">{children}</div>
   </div>
+);
+
+/** Shared hero shell used by the beta landing and invite pages. */
+export const BetaHero: React.FC<BetaHeroProps> = ({
+  icon,
+  pillLabel,
+  title,
+  description,
+  children,
+}) => (
+  <section className="beta-hero">
+    <div className="beta-pill">
+      {icon}
+      {pillLabel}
+    </div>
+
+    <div className="beta-hero-grid">
+      <div className="beta-hero-copy">
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </div>
+
+      {children}
+    </div>
+  </section>
 );
 
 /** Standard information card used across the beta landing and invite flows. */

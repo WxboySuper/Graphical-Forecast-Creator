@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, KeyRound, LoaderCircle, LockKeyhole } from 'lucide-react';
 import BetaAuthCard from '../components/Beta/BetaAuthCard';
-import { BetaInfoCard, BetaPageShell } from '../components/Beta/BetaPageLayout';
+import { BetaHero, BetaInfoCard, BetaPageShell } from '../components/Beta/BetaPageLayout';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../auth/AuthProvider';
 import { getBetaInvitePath, isBetaModeEnabled } from '../lib/betaAccess';
@@ -17,6 +17,18 @@ const InvalidInviteCard: React.FC = () => (
   <BetaInfoCard
     title="Invite required"
     description="This onboarding URL is incomplete or invalid. Please use the private invite link shared in the beta Discord."
+  >
+    <Button asChild variant="outline">
+      <Link to="/beta">Back to Beta Sign In</Link>
+    </Button>
+  </BetaInfoCard>
+);
+
+/** Fallback state shown when the deployment is missing hosted-auth configuration. */
+const BetaInviteDisabledCard: React.FC = () => (
+  <BetaInfoCard
+    title="Hosted accounts are unavailable"
+    description="This beta deployment is missing hosted account configuration, so invite onboarding cannot run right now."
   >
     <Button asChild variant="outline">
       <Link to="/beta">Back to Beta Sign In</Link>
@@ -76,7 +88,7 @@ const BetaClaimCard: React.FC<{
 
 /** Beta onboarding page reached from the private Discord invite link. */
 const BetaInvitePage: React.FC = () => {
-  const { betaAccess, betaAccessLoading, refreshBetaAccess, status, user } = useAuth();
+  const { betaAccess, betaAccessLoading, hostedAuthEnabled, refreshBetaAccess, status, user } = useAuth();
   const navigate = useNavigate();
   const { invitePath } = useParams();
   const [searchParams] = useSearchParams();
@@ -138,47 +150,39 @@ const BetaInvitePage: React.FC = () => {
 
   return (
     <BetaPageShell>
-      <section className="beta-hero">
-        <div className="beta-pill">
-          <LockKeyhole className="h-4 w-4" />
-          Beta Invite
-        </div>
-
-        <div className="beta-hero-grid">
-          <div className="beta-hero-copy">
-            <h1>Activate your beta account</h1>
-            <p>
-              This invite is the one-time onboarding step for the closed beta. Sign in or create the account you
-              want to use, then activate access for that account.
-            </p>
-          </div>
-
-          {!inviteLooksValid ? (
-            <InvalidInviteCard />
-          ) : status !== 'signed_in' ? (
-            <BetaAuthCard
-              title="Sign in or create your beta account"
-              description="Use the account you want to keep for the beta. After sign-in, this invite will activate access on that account."
-              allowSignUp
-              googleLabel="Continue with Google"
-            />
-          ) : betaAccessLoading ? (
-            <BetaInfoCard
-              title="Checking current access"
-              description="Making sure this account still needs beta activation before we continue."
-            />
-          ) : betaAccess ? (
-            <BetaAlreadyActiveCard email={user?.email ?? 'This account'} />
-          ) : (
-            <BetaClaimCard
-              email={user?.email ?? 'this account'}
-              claiming={claiming}
-              claimError={claimError}
-              onClaim={handleClaimAccessClick}
-            />
-          )}
-        </div>
-      </section>
+      <BetaHero
+        icon={<LockKeyhole className="h-4 w-4" />}
+        pillLabel="Beta Invite"
+        title="Activate your beta account"
+        description="This invite is the one-time onboarding step for the closed beta. Sign in or create the account you want to use, then activate access for that account."
+      >
+        {!hostedAuthEnabled ? (
+          <BetaInviteDisabledCard />
+        ) : !inviteLooksValid ? (
+          <InvalidInviteCard />
+        ) : status !== 'signed_in' ? (
+          <BetaAuthCard
+            title="Sign in or create your beta account"
+            description="Use the account you want to keep for the beta. After sign-in, this invite will activate access on that account."
+            allowSignUp
+            googleLabel="Continue with Google"
+          />
+        ) : betaAccessLoading ? (
+          <BetaInfoCard
+            title="Checking current access"
+            description="Making sure this account still needs beta activation before we continue."
+          />
+        ) : betaAccess ? (
+          <BetaAlreadyActiveCard email={user?.email ?? 'This account'} />
+        ) : (
+          <BetaClaimCard
+            email={user?.email ?? 'this account'}
+            claiming={claiming}
+            claimError={claimError}
+            onClaim={handleClaimAccessClick}
+          />
+        )}
+      </BetaHero>
     </BetaPageShell>
   );
 };

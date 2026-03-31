@@ -25,7 +25,7 @@ const BetaAccessGuard: React.FC = () => {
   }
 
   if (!hostedAuthEnabled) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/beta" replace />;
   }
 
   if (isCheckingBetaAccess(status, betaAccessLoading)) {
