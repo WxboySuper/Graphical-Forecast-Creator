@@ -7,6 +7,8 @@ import { TextDecoder, TextEncoder } from 'util';
 
 const globalScope = globalThis as typeof globalThis & {
   __GFC_COMING_SOON__?: boolean;
+  __GFC_BETA_MODE__?: boolean;
+  __GFC_BETA_INVITE_PATH__?: string;
   __GFC_FIREBASE_API_KEY__?: string;
   __GFC_FIREBASE_AUTH_DOMAIN__?: string;
   __GFC_FIREBASE_PROJECT_ID__?: string;
@@ -26,6 +28,14 @@ if (!globalScope.TextDecoder) {
 
 if (typeof globalScope.__GFC_COMING_SOON__ === 'undefined') {
   globalScope.__GFC_COMING_SOON__ = false;
+}
+
+if (typeof globalScope.__GFC_BETA_MODE__ === 'undefined') {
+  globalScope.__GFC_BETA_MODE__ = false;
+}
+
+if (typeof globalScope.__GFC_BETA_INVITE_PATH__ === 'undefined') {
+  globalScope.__GFC_BETA_INVITE_PATH__ = '';
 }
 
 if (typeof globalScope.__GFC_FIREBASE_API_KEY__ === 'undefined') globalScope.__GFC_FIREBASE_API_KEY__ = '';

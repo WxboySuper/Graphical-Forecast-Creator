@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   createUserWithEmailAndPassword,
@@ -36,6 +36,10 @@ interface UserSettingsDocument {
   defaultForecasterName: string;
 }
 
+interface UserProfileDocument {
+  betaAccess?: boolean;
+}
+
 interface AuthContextValue {
   status: AuthStatus;
   settingsSyncStatus: SettingsSyncStatus;
@@ -43,11 +47,14 @@ interface AuthContextValue {
   syncedSettings: UserSettingsDocument | null;
   error: string | null;
   hostedAuthEnabled: boolean;
+  betaAccess: boolean;
+  betaAccessLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   updateSyncedSettings: (settings: Partial<UserSettingsDocument>) => Promise<void>;
+  refreshBetaAccess: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -129,6 +136,10 @@ const createProfilePayload = (user: User) => ({
   updatedAt: serverTimestamp(),
   createdAt: serverTimestamp(),
 });
+
+/** Reads the current beta-access flag from one hosted profile document snapshot. */
+const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
+  Boolean(value?.betaAccess);
 
 /** Normalizes update-write failures into a user-facing sync error message. */
 const getSettingsUpdateError = (error: unknown): string =>
@@ -366,11 +377,14 @@ const getDefaultContextValue = (): AuthContextValue => ({
   syncedSettings: null,
   error: null,
   hostedAuthEnabled: false,
+  betaAccess: false,
+  betaAccessLoading: false,
   signInWithGoogle: disabledAuthAction,
   signInWithEmail: disabledAuthAction,
   signUpWithEmail: disabledAuthAction,
   signOutUser: disabledAuthAction,
   updateSyncedSettings: disabledAuthAction,
+  refreshBetaAccess: disabledAuthAction,
 });
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
@@ -383,11 +397,14 @@ const useHostedAuthState = (): AuthContextValue => {
   const hasInitializedSettingsRef = useRef(false);
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const pendingSettingsWriteRef = useRef<number | null>(null);
+  const betaAccessRequestIdRef = useRef(0);
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
   const [user, setUser] = useState<User | null>(null);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [betaAccess, setBetaAccess] = useState(false);
+  const [betaAccessLoading, setBetaAccessLoading] = useState(Boolean(isHostedAuthEnabled));
 
   useEffect(() => {
     currentDarkModeRef.current = darkMode;
@@ -403,6 +420,8 @@ const useHostedAuthState = (): AuthContextValue => {
       setSettingsSyncStatus('disabled');
       setUser(null);
       setSyncedSettings(null);
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
       hasInitializedSettingsRef.current = false;
       lastSyncedSettingsRef.current = null;
       setError(null);
@@ -417,6 +436,8 @@ const useHostedAuthState = (): AuthContextValue => {
         setSettingsSyncStatus('idle');
         if (!nextUser) {
           setSyncedSettings(null);
+          setBetaAccess(false);
+          setBetaAccessLoading(false);
         }
         setError(null);
       },
@@ -425,6 +446,8 @@ const useHostedAuthState = (): AuthContextValue => {
         setStatus('error');
         setSettingsSyncStatus('error');
         setSyncedSettings(null);
+        setBetaAccess(false);
+        setBetaAccessLoading(false);
         setError(nextError.message);
       }
     );
@@ -444,6 +467,8 @@ const useHostedAuthState = (): AuthContextValue => {
         pendingSettingsWriteRef.current = null;
       }
       setSyncedSettings(null);
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
       if (status !== 'loading') {
         setSettingsSyncStatus(getDisabledSettingsStatus());
       }
@@ -498,6 +523,64 @@ const useHostedAuthState = (): AuthContextValue => {
       unsubscribeSettings?.();
     };
   }, [dispatch, status, user]);
+
+  /** Refreshes the signed-in user's beta-access flag from the hosted profile document. */
+  const refreshBetaAccess = useCallback(async (): Promise<void> => {
+    const hostedProfileUnavailable = !isHostedAuthEnabled || !db || !user;
+    if (hostedProfileUnavailable) {
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      return;
+    }
+
+    betaAccessRequestIdRef.current += 1;
+    const requestId = betaAccessRequestIdRef.current;
+    setBetaAccessLoading(true);
+
+    try {
+      const profileSnapshot = await getDoc(doc(db, 'userProfiles', user.uid));
+      if (requestId !== betaAccessRequestIdRef.current) {
+        return;
+      }
+
+      setBetaAccess(
+        readProfileBetaAccess(profileSnapshot.data() as Partial<UserProfileDocument> | undefined)
+      );
+    } catch {
+      if (requestId !== betaAccessRequestIdRef.current) {
+        return;
+      }
+
+      setBetaAccess(false);
+    } finally {
+      if (requestId === betaAccessRequestIdRef.current) {
+        setBetaAccessLoading(false);
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!isHostedAuthEnabled || !db) {
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      return;
+    }
+
+    if (status === 'loading') {
+      setBetaAccessLoading(true);
+      return;
+    }
+
+    if (!user) {
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      return;
+    }
+
+    refreshBetaAccess().catch(() => {
+      // Beta-access failures fall back to the locked beta gate.
+    });
+  }, [refreshBetaAccess, status, user]);
 
   useEffect(() => {
     const isSyncUnavailable =
@@ -611,6 +694,8 @@ const useHostedAuthState = (): AuthContextValue => {
       syncedSettings,
       error,
       hostedAuthEnabled: true,
+      betaAccess,
+      betaAccessLoading,
       signInWithGoogle: async () => {
         setError(null);
         const credential = await signInWithPopup(auth, googleAuthProvider);
@@ -634,8 +719,9 @@ const useHostedAuthState = (): AuthContextValue => {
         await signOut(auth);
       },
       updateSyncedSettings,
+      refreshBetaAccess,
     };
-  }, [error, settingsSyncStatus, status, syncedSettings, user]);
+  }, [betaAccess, betaAccessLoading, error, refreshBetaAccess, settingsSyncStatus, status, syncedSettings, user]);
 
   return value;
 };
