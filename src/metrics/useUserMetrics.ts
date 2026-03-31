@@ -33,6 +33,20 @@ const DEFAULT_USER_METRICS: UserMetricsDocument = {
   updatedAt: null,
 };
 
+/** Reads a string field from a metrics snapshot value, falling back to an empty string. */
+const readMetricsString = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+/** Reads an optional date-string field from a metrics snapshot value. */
+const readMetricsDateString = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null;
+
+/** Reads a numeric metrics counter, defaulting to zero. */
+const readMetricsCount = (value: unknown): number => (typeof value === 'number' ? value : 0);
+
+/** Reads an optional Firestore timestamp field into a native Date. */
+const readMetricsTimestamp = (value: Timestamp | null | undefined): Date | null =>
+  value?.toDate?.() ?? null;
+
 /** Normalizes one Firestore metrics document into the client-safe account metrics contract. */
 const readUserMetricsDocument = (value: Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined): UserMetricsDocument => {
   if (!value) {
@@ -40,16 +54,15 @@ const readUserMetricsDocument = (value: Partial<UserMetricsDocument & { updatedA
   }
 
   return {
-    uid: typeof value.uid === 'string' ? value.uid : '',
-    activeDayStreak: typeof value.activeDayStreak === 'number' ? value.activeDayStreak : 0,
-    totalActiveDays: typeof value.totalActiveDays === 'number' ? value.totalActiveDays : 0,
-    cyclesCreated: typeof value.cyclesCreated === 'number' ? value.cyclesCreated : 0,
-    cloudCyclesSaved: typeof value.cloudCyclesSaved === 'number' ? value.cloudCyclesSaved : 0,
-    discussionsWritten: typeof value.discussionsWritten === 'number' ? value.discussionsWritten : 0,
-    verificationSessionsRun:
-      typeof value.verificationSessionsRun === 'number' ? value.verificationSessionsRun : 0,
-    lastActiveDate: typeof value.lastActiveDate === 'string' ? value.lastActiveDate : null,
-    updatedAt: value.updatedAt?.toDate?.() ?? null,
+    uid: readMetricsString(value.uid),
+    activeDayStreak: readMetricsCount(value.activeDayStreak),
+    totalActiveDays: readMetricsCount(value.totalActiveDays),
+    cyclesCreated: readMetricsCount(value.cyclesCreated),
+    cloudCyclesSaved: readMetricsCount(value.cloudCyclesSaved),
+    discussionsWritten: readMetricsCount(value.discussionsWritten),
+    verificationSessionsRun: readMetricsCount(value.verificationSessionsRun),
+    lastActiveDate: readMetricsDateString(value.lastActiveDate),
+    updatedAt: readMetricsTimestamp(value.updatedAt),
   };
 };
 

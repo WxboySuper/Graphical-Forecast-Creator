@@ -381,7 +381,7 @@ const readLiveAdminSummary = async (eventType) => {
 };
 
 /** Reads the current metric event transaction snapshots in one parallel batch. */
-const readMetricEventSnapshots = async (transaction, {
+const readMetricEventSnapshots = (transaction, {
   dailyRef,
   deviceDedupeRef,
   accountDedupeRef,
