@@ -151,7 +151,7 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
           ariaLabel="Save forecast to cloud"
           disabled={syncState === 'saving'}
           onClick={handleSaveClick}
-          className="cloud-toolbar-action cloud-toolbar-action-save h-14 w-14 lg:h-16 lg:w-16"
+          className="cloud-toolbar-action h-14 w-14 lg:h-16 lg:w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400"
         >
           {saveIcon}
         </CloudToolbarActionButton>
@@ -160,7 +160,7 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
           tooltip="Open the cloud library"
           ariaLabel="Open cloud library"
           onClick={onOpenCloudLibrary}
-          className="cloud-toolbar-action cloud-toolbar-action-library h-14 w-14 lg:h-16 lg:w-16"
+          className="cloud-toolbar-action h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400"
         >
           <FolderOpen className="h-6 w-6" />
         </CloudToolbarActionButton>
