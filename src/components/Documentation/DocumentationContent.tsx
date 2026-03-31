@@ -12,6 +12,7 @@ const CatCell: React.FC<{ v: string }> = ({ v }) => {
   return <td className={cls}>{v}</td>;
 };
 
+/** Overview tab content for the in-app documentation panel. */
 export const OverviewSection: React.FC = () => (
   <div className="doc-section">
     <h3>Graphical Forecast Creator</h3>
@@ -49,6 +50,7 @@ export const OverviewSection: React.FC = () => (
   </div>
 );
 
+/** Usage tab content covering the basic workflow and shortcuts. */
 export const UsageSection: React.FC = () => (
   <div className="doc-section">
     <h3>How to Use GFC</h3>
@@ -105,6 +107,7 @@ export const UsageSection: React.FC = () => (
   </div>
 );
 
+/** Outlook reference tab content describing supported outlook types and colors. */
 export const OutlooksSection: React.FC = () => (
   <div className="doc-section">
     <h3>Outlook Types &amp; Colors</h3>
@@ -188,6 +191,7 @@ export const OutlooksSection: React.FC = () => (
   </div>
 );
 
+/** Conversion tab content documenting probabilistic-to-categorical mappings. */
 export const CategoricalSection: React.FC = () => (
   <div className="doc-section">
     <h3>Probabilistic → Categorical Conversion</h3>
