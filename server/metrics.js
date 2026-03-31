@@ -153,6 +153,32 @@ const hasAdminEventField = (eventType) => Boolean(ADMIN_EVENT_FIELDS[eventType])
 /** Returns true when a live-summary value should overwrite the stored daily aggregate field. */
 const shouldApplyLiveSummaryValue = (value) => typeof value === 'number';
 
+/** Applies one boolean-gated increment to an existing numeric aggregate field. */
+const incrementMetricField = (value, shouldIncrement) =>
+  shouldIncrement ? Number(value || 0) + 1 : Number(value || 0);
+
+/** Applies one event-mapped admin aggregate increment when the event has a tracked field. */
+const applyAdminEventIncrement = (nextMetrics, eventType) => {
+  const eventField = ADMIN_EVENT_FIELDS[eventType];
+  if (!hasAdminEventField(eventType) || !eventField) {
+    return nextMetrics;
+  }
+
+  return {
+    ...nextMetrics,
+    [eventField]: Number(nextMetrics[eventField] || 0) + 1,
+  };
+};
+
+/** Applies optional live-summary values onto the next admin daily metrics payload. */
+const applyLiveSummaryValues = (nextMetrics, { premiumSubscriptions, storageBytes }) => ({
+  ...nextMetrics,
+  ...(shouldApplyLiveSummaryValue(premiumSubscriptions)
+    ? { premiumSubscriptions }
+    : {}),
+  ...(shouldApplyLiveSummaryValue(storageBytes) ? { storageBytes } : {}),
+});
+
 /** True when the event should advance the user's active-day streak and total active-day count. */
 const countsAsActiveDay = (eventType) => ACTIVE_DAY_EVENT_TYPES.has(eventType);
 
@@ -200,31 +226,18 @@ const buildNextAdminDailyMetrics = ({
   const nextMetrics = {
     ...getDefaultAdminDailyMetrics(),
     ...existingData,
+    activeDevices: incrementMetricField(existingData?.activeDevices, incrementActiveDevices),
+    activeSignedInAccounts: incrementMetricField(
+      existingData?.activeSignedInAccounts,
+      incrementActiveAccounts
+    ),
     updatedAt: new Date(),
   };
-  const eventField = ADMIN_EVENT_FIELDS[eventType];
 
-  if (incrementActiveDevices) {
-    nextMetrics.activeDevices = Number(nextMetrics.activeDevices || 0) + 1;
-  }
-
-  if (incrementActiveAccounts) {
-    nextMetrics.activeSignedInAccounts = Number(nextMetrics.activeSignedInAccounts || 0) + 1;
-  }
-
-  if (hasAdminEventField(eventType) && eventField) {
-    nextMetrics[eventField] = Number(nextMetrics[eventField] || 0) + 1;
-  }
-
-  if (shouldApplyLiveSummaryValue(premiumSubscriptions)) {
-    nextMetrics.premiumSubscriptions = premiumSubscriptions;
-  }
-
-  if (shouldApplyLiveSummaryValue(storageBytes)) {
-    nextMetrics.storageBytes = storageBytes;
-  }
-
-  return nextMetrics;
+  return applyLiveSummaryValues(
+    applyAdminEventIncrement(nextMetrics, eventType),
+    { premiumSubscriptions, storageBytes }
+  );
 };
 
 /** Returns the latest-day snapshot fields that are shown as current admin headline values. */
@@ -367,6 +380,149 @@ const readLiveAdminSummary = async (eventType) => {
   };
 };
 
+/** Reads the current metric event transaction snapshots in one parallel batch. */
+const readMetricEventSnapshots = async (transaction, {
+  dailyRef,
+  deviceDedupeRef,
+  accountDedupeRef,
+  userMetricsRef,
+}) =>
+  Promise.all([
+    transaction.get(dailyRef),
+    deviceDedupeRef ? transaction.get(deviceDedupeRef) : Promise.resolve(null),
+    accountDedupeRef ? transaction.get(accountDedupeRef) : Promise.resolve(null),
+    userMetricsRef ? transaction.get(userMetricsRef) : Promise.resolve(null),
+  ]);
+
+/** Writes newly won device/account dedupe docs for the current day. */
+const writeMetricDedupeDocs = ({
+  transaction,
+  deviceDedupeRef,
+  accountDedupeRef,
+  incrementActiveDevices,
+  incrementActiveAccounts,
+  dayKey,
+  expiresAt,
+}) => {
+  if (deviceDedupeRef && incrementActiveDevices) {
+    transaction.set(deviceDedupeRef, {
+      kind: 'device',
+      dayKey,
+      expiresAt,
+      updatedAt: new Date(),
+    });
+  }
+
+  if (accountDedupeRef && incrementActiveAccounts) {
+    transaction.set(accountDedupeRef, {
+      kind: 'account',
+      dayKey,
+      expiresAt,
+      updatedAt: new Date(),
+    });
+  }
+};
+
+/** Writes the next admin daily aggregate document for the current event. */
+const writeAdminDailyMetrics = ({
+  transaction,
+  dailyRef,
+  dailySnapshot,
+  eventType,
+  storageBytes,
+  premiumSubscriptions,
+  incrementActiveDevices,
+  incrementActiveAccounts,
+}) => {
+  transaction.set(
+    dailyRef,
+    buildNextAdminDailyMetrics({
+      existingData: dailySnapshot.data() || {},
+      eventType,
+      storageBytes,
+      premiumSubscriptions,
+      incrementActiveDevices,
+      incrementActiveAccounts,
+    }),
+    { merge: true }
+  );
+};
+
+/** Writes the next signed-in user metrics document when the event is tied to an account. */
+const writeUserMetrics = ({
+  transaction,
+  userMetricsRef,
+  uid,
+  userMetricsSnapshot,
+  eventType,
+  dayKey,
+}) => {
+  if (!userMetricsRef || !uid) {
+    return;
+  }
+
+  transaction.set(
+    userMetricsRef,
+    buildNextUserMetrics({
+      uid,
+      existingData: userMetricsSnapshot?.data() || {},
+      eventType,
+      dayKey,
+    }),
+    { merge: true }
+  );
+};
+
+/** Runs the Firestore transaction that persists one product metric event. */
+const writeMetricEventTransaction = async ({
+  db,
+  refs,
+  eventType,
+  uid,
+  dayKey,
+  premiumSubscriptions,
+  storageBytes,
+}) => {
+  await db.runTransaction(async (transaction) => {
+    const [dailySnapshot, deviceDedupeSnapshot, accountDedupeSnapshot, userMetricsSnapshot] =
+      await readMetricEventSnapshots(transaction, refs);
+
+    const incrementActiveDevices = Boolean(refs.deviceDedupeRef && !deviceDedupeSnapshot?.exists);
+    const incrementActiveAccounts = Boolean(refs.accountDedupeRef && !accountDedupeSnapshot?.exists);
+    const expiresAt = getDedupeExpiryDate();
+
+    writeMetricDedupeDocs({
+      transaction,
+      deviceDedupeRef: refs.deviceDedupeRef,
+      accountDedupeRef: refs.accountDedupeRef,
+      incrementActiveDevices,
+      incrementActiveAccounts,
+      dayKey,
+      expiresAt,
+    });
+
+    writeAdminDailyMetrics({
+      transaction,
+      dailyRef: refs.dailyRef,
+      dailySnapshot,
+      eventType,
+      storageBytes,
+      premiumSubscriptions,
+      incrementActiveDevices,
+      incrementActiveAccounts,
+    });
+
+    writeUserMetrics({
+      transaction,
+      userMetricsRef: refs.userMetricsRef,
+      uid,
+      userMetricsSnapshot,
+      eventType,
+      dayKey,
+    });
+  });
+};
+
 /** Writes one product metric event into Firestore-backed user and admin aggregates. */
 const recordMetricEvent = async ({ eventType, installationId, uid }) => {
   const db = getAdminDb();
@@ -375,71 +531,21 @@ const recordMetricEvent = async ({ eventType, installationId, uid }) => {
   }
 
   const dayKey = getDayKey();
-  const { dailyRef, deviceDedupeRef, accountDedupeRef, userMetricsRef } = createMetricEventRefs({
+  const refs = createMetricEventRefs({
     db,
     dayKey,
     installationId,
     uid,
   });
   const { premiumSubscriptions, storageBytes } = await readLiveAdminSummary(eventType);
-
-  await db.runTransaction(async (transaction) => {
-    const [dailySnapshot, deviceDedupeSnapshot, accountDedupeSnapshot, userMetricsSnapshot] = await Promise.all([
-      transaction.get(dailyRef),
-      deviceDedupeRef ? transaction.get(deviceDedupeRef) : Promise.resolve(null),
-      accountDedupeRef ? transaction.get(accountDedupeRef) : Promise.resolve(null),
-      userMetricsRef ? transaction.get(userMetricsRef) : Promise.resolve(null),
-    ]);
-
-    const incrementActiveDevices = Boolean(deviceDedupeRef && !deviceDedupeSnapshot?.exists);
-    const incrementActiveAccounts = Boolean(accountDedupeRef && !accountDedupeSnapshot?.exists);
-    const expiresAt = getDedupeExpiryDate();
-
-    if (deviceDedupeRef && incrementActiveDevices) {
-      transaction.set(deviceDedupeRef, {
-        kind: 'device',
-        dayKey,
-        expiresAt,
-        updatedAt: new Date(),
-      });
-    }
-
-    if (accountDedupeRef && incrementActiveAccounts) {
-      transaction.set(accountDedupeRef, {
-        kind: 'account',
-        dayKey,
-        expiresAt,
-        updatedAt: new Date(),
-      });
-    }
-
-    transaction.set(
-      dailyRef,
-      buildNextAdminDailyMetrics({
-        existingData: dailySnapshot.data() || {},
-        eventType,
-        storageBytes,
-        premiumSubscriptions,
-        incrementActiveDevices,
-        incrementActiveAccounts,
-      }),
-      { merge: true }
-    );
-
-    if (!userMetricsRef || !uid) {
-      return;
-    }
-
-    transaction.set(
-      userMetricsRef,
-      buildNextUserMetrics({
-        uid,
-        existingData: userMetricsSnapshot?.data() || {},
-        eventType,
-        dayKey,
-      }),
-      { merge: true }
-    );
+  await writeMetricEventTransaction({
+    db,
+    refs,
+    eventType,
+    uid,
+    dayKey,
+    premiumSubscriptions,
+    storageBytes,
   });
 
   return true;
