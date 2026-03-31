@@ -45,9 +45,8 @@ const assignMissingEnvValues = (lines) => {
   }
 };
 
-/** Loads the repo-root .env file into process.env for local and VPS server runs. */
-const loadRootEnv = () => {
-  const envPath = path.resolve(__dirname, '..', '.env');
+/** Loads one .env file into process.env when the file exists. */
+const loadEnvFile = (envPath) => {
   if (!fs.existsSync(envPath)) {
     return;
   }
@@ -57,4 +56,10 @@ const loadRootEnv = () => {
   assignMissingEnvValues(lines);
 };
 
-loadRootEnv();
+/** Loads the colocated server .env first, then falls back to the repo-root .env for local runs. */
+const loadEnv = () => {
+  loadEnvFile(path.resolve(__dirname, '.env'));
+  loadEnvFile(path.resolve(__dirname, '..', '.env'));
+};
+
+loadEnv();
