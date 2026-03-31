@@ -1,9 +1,20 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { Card, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { useAuth } from '../../auth/AuthProvider';
 import { isBetaModeEnabled } from '../../lib/betaAccess';
-import '../../pages/BetaAccess.css';
+import { BetaStatusPanel } from './BetaPageLayout';
+
+/** True when the beta gate should show an access-check loading state. */
+const isCheckingBetaAccess = (
+  status: ReturnType<typeof useAuth>['status'],
+  betaAccessLoading: boolean
+): boolean => {
+  if (status === 'loading') {
+    return true;
+  }
+
+  return status === 'signed_in' ? betaAccessLoading : false;
+};
 
 /** Full-app route guard that keeps the beta deployment locked to approved accounts. */
 const BetaAccessGuard: React.FC = () => {
@@ -17,18 +28,12 @@ const BetaAccessGuard: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  if (status === 'loading' || (status === 'signed_in' && betaAccessLoading)) {
+  if (isCheckingBetaAccess(status, betaAccessLoading)) {
     return (
-      <div className="beta-page-shell">
-        <div className="beta-page-layout">
-          <Card className="beta-info-card">
-            <CardHeader className="beta-info-card-header">
-              <CardTitle>Checking beta access</CardTitle>
-              <CardDescription>Verifying whether this account can enter the closed beta.</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </div>
+      <BetaStatusPanel
+        title="Checking beta access"
+        description="Verifying whether this account can enter the closed beta."
+      />
     );
   }
 

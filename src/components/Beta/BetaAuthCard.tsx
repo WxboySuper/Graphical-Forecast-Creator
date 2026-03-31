@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
+import { BetaInfoCard } from './BetaPageLayout';
 
 type AuthMode = 'sign_in' | 'sign_up';
 
@@ -13,6 +13,40 @@ interface BetaAuthCardProps {
   allowSignUp?: boolean;
   googleLabel?: string;
 }
+
+/** True when the current form state is in create-account mode. */
+const isCreateAccountMode = (allowSignUp: boolean, mode: AuthMode): boolean =>
+  allowSignUp && mode === 'sign_up';
+
+/** Returns the validation error for the email/password form, if any. */
+const getEmailSubmitError = (opts: {
+  allowSignUp: boolean;
+  mode: AuthMode;
+  password: string;
+  confirmPassword: string;
+}): string | null => {
+  if (!isCreateAccountMode(opts.allowSignUp, opts.mode)) {
+    return null;
+  }
+
+  return opts.password === opts.confirmPassword ? null : 'Passwords do not match.';
+};
+
+/** Shared hosted-auth card used by the locked beta landing and the invite onboarding flow. */
+const BetaAuthModeToggle: React.FC<{
+  isBusy: boolean;
+  mode: AuthMode;
+  onSelectMode: (mode: AuthMode) => void;
+}> = ({ isBusy, mode, onSelectMode }) => (
+  <div className="beta-auth-mode-toggle">
+    <Button variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => onSelectMode('sign_in')} disabled={isBusy}>
+      Sign In
+    </Button>
+    <Button variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => onSelectMode('sign_up')} disabled={isBusy}>
+      Create Account
+    </Button>
+  </div>
+);
 
 /** Shared hosted-auth card used by the locked beta landing and the invite onboarding flow. */
 const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
@@ -47,15 +81,16 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     event.preventDefault();
     setFormError(null);
 
-    if (allowSignUp && mode === 'sign_up' && password !== confirmPassword) {
-      setFormError('Passwords do not match.');
+    const submitError = getEmailSubmitError({ allowSignUp, mode, password, confirmPassword });
+    if (submitError) {
+      setFormError(submitError);
       return;
     }
 
     setSubmitting(true);
 
     try {
-      if (allowSignUp && mode === 'sign_up') {
+      if (isCreateAccountMode(allowSignUp, mode)) {
         await signUpWithEmail(email, password);
       } else {
         await signInWithEmail(email, password);
@@ -92,12 +127,8 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   };
 
   return (
-    <Card className="beta-auth-card">
-      <CardHeader className="beta-auth-header">
-        <CardTitle className="text-2xl">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="beta-auth-content">
+    <BetaInfoCard title={title} description={description} className="beta-auth-card">
+      <div className="beta-auth-content">
         <Button variant="outline" className="w-full justify-center" onClick={handleGoogleSignInClick} disabled={isBusy}>
           <Cloud className="mr-2 h-4 w-4" />
           {googleLabel}
@@ -110,14 +141,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
         </div>
 
         {allowSignUp ? (
-          <div className="beta-auth-mode-toggle">
-            <Button variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setMode('sign_in')} disabled={isBusy}>
-              Sign In
-            </Button>
-            <Button variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setMode('sign_up')} disabled={isBusy}>
-              Create Account
-            </Button>
-          </div>
+          <BetaAuthModeToggle isBusy={isBusy} mode={mode} onSelectMode={setMode} />
         ) : null}
 
         <form className="beta-auth-form" onSubmit={handleEmailSubmit}>
@@ -150,7 +174,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
             />
           </div>
 
-          {allowSignUp && mode === 'sign_up' ? (
+          {isCreateAccountMode(allowSignUp, mode) ? (
             <div className="beta-auth-field">
               <label htmlFor="beta-confirm-password" className="text-sm font-medium text-foreground">
                 Confirm Password
@@ -171,13 +195,12 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
 
           <Button type="submit" disabled={isBusy}>
             {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-            {allowSignUp && mode === 'sign_up' ? 'Create Beta Account' : 'Sign In with Email'}
+            {isCreateAccountMode(allowSignUp, mode) ? 'Create Beta Account' : 'Sign In with Email'}
           </Button>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </BetaInfoCard>
   );
 };
 
 export default BetaAuthCard;
-

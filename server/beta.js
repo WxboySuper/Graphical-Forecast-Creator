@@ -37,6 +37,24 @@ const verifyRequestUser = async (req) => {
   }
 };
 
+/** True when the beta-claim endpoint is ready to accept requests on this deployment. */
+const isBetaClaimConfigured = () => hasFirebaseAdminConfig() && Boolean(getBetaInviteToken());
+
+/** Sends the disabled/not-configured beta-claim response when applicable. */
+const sendUnavailableBetaClaimResponse = (res) => {
+  if (!isBetaModeEnabled()) {
+    res.status(404).json({ error: 'Beta access claims are not enabled on this deployment.' });
+    return true;
+  }
+
+  if (!isBetaClaimConfigured()) {
+    res.status(503).json({ error: 'Beta invite claims are not configured on this deployment.' });
+    return true;
+  }
+
+  return false;
+};
+
 /** True when the submitted invite token matches the configured server-side beta secret. */
 const isValidInviteToken = (value) =>
   typeof value === 'string' && value.length > 0 && value === getBetaInviteToken();
@@ -70,13 +88,7 @@ const grantBetaAccess = async (uid) => {
 
 /** Handles one authenticated beta invite claim request. */
 const handleBetaClaim = async (req, res) => {
-  if (!isBetaModeEnabled()) {
-    res.status(404).json({ error: 'Beta access claims are not enabled on this deployment.' });
-    return;
-  }
-
-  if (!hasFirebaseAdminConfig() || !getBetaInviteToken()) {
-    res.status(503).json({ error: 'Beta invite claims are not configured on this deployment.' });
+  if (sendUnavailableBetaClaimResponse(res)) {
     return;
   }
 
@@ -110,4 +122,3 @@ const registerBetaRoutes = (app, express) => {
 module.exports = {
   registerBetaRoutes,
 };
-
