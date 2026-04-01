@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
+import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -21,8 +22,10 @@ import type { Feature as GeoJsonFeature } from 'geojson';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import { Circle, Fill as StyleFill, Stroke as StyleStroke, Style as OlStyle, Fill, Stroke, Style } from 'ol/style';
+import { apply } from 'ol-mapbox-style';
 import Legend from './Legend';
 import UnofficialBadge from './UnofficialBadge';
+import { getOpenFreeMapStyleSet, isOpenFreeMapStyle } from '../../lib/openFreeMap';
 import './ForecastMap.css';
 import { ReportType } from '../../types/stormReports';
 
@@ -51,6 +54,7 @@ interface StrokeDescriptor {
 }
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
+const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
 
 // Define specific colors for each report type
@@ -405,6 +409,9 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
   const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+  const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
+  const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
+  const vectorStyleRequestRef = useRef(0);
   const landSourceRef = useRef<VectorSource>(new VectorSource());
   const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
@@ -452,6 +459,16 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
     const baseTileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = baseTileLayer;
+    const vectorBaseGroup = new LayerGroup({
+      visible: false,
+      zIndex: 1,
+    });
+    vectorBaseGroupRef.current = vectorBaseGroup;
+    const vectorReferenceGroup = new LayerGroup({
+      visible: false,
+      zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+    });
+    vectorReferenceGroupRef.current = vectorReferenceGroup;
     // Land fill sits above the base tile layer for blank style.
     const landLayer = new VectorLayer({
       source: landSourceRef.current,
@@ -481,9 +498,11 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       target: mapElementRef.current,
       layers: [
         baseTileLayer,
+        vectorBaseGroup,
         landLayer,
         outlookLayer,
         landOutlineLayer,
+        vectorReferenceGroup,
         new VectorLayer({
           source: stormReportsSourceRef.current,
           zIndex: 4,
@@ -502,6 +521,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     return () => {
       map.setTarget();
       mapRef.current = null;
+      vectorBaseGroupRef.current = null;
+      vectorReferenceGroupRef.current = null;
     };
   }, []);
 
@@ -528,11 +549,13 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   // Swap base tile source / blank land layer when style changes
   useEffect(() => {
     const tile = tileLayerRef.current;
+    const vectorBaseGroup = vectorBaseGroupRef.current;
+    const vectorReferenceGroup = vectorReferenceGroupRef.current;
     const land = landLayerRef.current;
     const landOutline = landOutlineLayerRef.current;
     const labels = labelLayerRef.current;
     const el = mapElementRef.current;
-    if (!tile || !land || !landOutline || !labels || !el) return;
+    if (!tile || !vectorBaseGroup || !vectorReferenceGroup || !land || !landOutline || !labels || !el) return;
 
     /**
      * Load US state boundary features into the `landSourceRef` if they
@@ -570,13 +593,67 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     // Keep state outlines above outlook polygons across base-map styles.
     loadStatesBoundaries();
 
+    const hideVectorBasemapGroups = () => {
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+    };
+
     if (baseMapStyle === 'blank') {
+      hideVectorBasemapGroups();
       tile.setVisible(false);
       land.setVisible(true);
       landOutline.setVisible(true);
       labels.setVisible(false);
       el.style.backgroundColor = '#b8d4e8';
+      return;
+    }
+
+    if (isOpenFreeMapStyle(baseMapStyle)) {
+      const requestId = vectorStyleRequestRef.current + 1;
+      vectorStyleRequestRef.current = requestId;
+
+      tile.setVisible(false);
+      land.setVisible(false);
+      landOutline.setVisible(true);
+      labels.setVisible(false);
+      el.style.backgroundColor = '';
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+
+      getOpenFreeMapStyleSet(baseMapStyle)
+        .then(({ baseStyle, overlayStyle }) => Promise.all([
+          apply(vectorBaseGroup, baseStyle),
+          apply(vectorReferenceGroup, overlayStyle),
+        ]))
+        .then(() => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          vectorBaseGroup.setVisible(true);
+          vectorReferenceGroup.setVisible(true);
+        })
+        .catch(() => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          vectorBaseGroup.getLayers().clear();
+          vectorReferenceGroup.getLayers().clear();
+          tile.setSource(createVerifTileSource(baseMapStyle));
+          tile.setVisible(true);
+          const labelSource = createVerificationLabelOverlaySource(baseMapStyle);
+          if (labelSource) {
+            labels.setSource(labelSource);
+            labels.setVisible(true);
+          }
+        });
     } else {
+      hideVectorBasemapGroups();
       tile.setVisible(true);
       land.setVisible(false);
       landOutline.setVisible(true);

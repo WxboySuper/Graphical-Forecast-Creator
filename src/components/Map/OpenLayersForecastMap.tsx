@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
+import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -25,9 +26,11 @@ import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { getFeatureStyle, computeZIndex } from '../../utils/mapStyleUtils';
 import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature, GeoJsonProperties, Polygon } from 'geojson';
+import { apply } from 'ol-mapbox-style';
 import Legend from './Legend';
 import StatusOverlay from './StatusOverlay';
 import UnofficialBadge from './UnofficialBadge';
+import { getOpenFreeMapStyleSet, isOpenFreeMapStyle } from '../../lib/openFreeMap';
 import './ForecastMap.css';
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
@@ -88,6 +91,7 @@ interface HatchPatternInput {
 }
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
+const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
 
 const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
@@ -516,6 +520,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
   const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+  const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
+  const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
+  const vectorStyleRequestRef = useRef(0);
   const worldSourceRef = useRef<VectorSource>(new VectorSource());
   const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const lakesSourceRef = useRef<VectorSource>(new VectorSource());
@@ -576,6 +583,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
     const tileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = tileLayer;
+    const vectorBaseGroup = new LayerGroup({
+      visible: false,
+      zIndex: 1,
+    });
+    vectorBaseGroupRef.current = vectorBaseGroup;
+    const vectorReferenceGroup = new LayerGroup({
+      visible: false,
+      zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+    });
+    vectorReferenceGroupRef.current = vectorReferenceGroup;
     // Blank base map layers: start hidden, only one (tile vs. world+lakes+land) will be visible at a time based on baseMapStyle.
     const worldLayer = new VectorLayer({
       source: worldSourceRef.current,
@@ -640,7 +657,19 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // without needing to re-add/remove layers or features, which can be expensive.
     const map = new OLMap({
       target: mapElementRef.current,
-      layers: [tileLayer, worldLayer, lakesLayer, landLayer, ghostLayer, catLayer, vectorLayer, landOutlineLayer, labelLayer],
+      layers: [
+        tileLayer,
+        vectorBaseGroup,
+        worldLayer,
+        lakesLayer,
+        landLayer,
+        ghostLayer,
+        catLayer,
+        vectorLayer,
+        landOutlineLayer,
+        vectorReferenceGroup,
+        labelLayer,
+      ],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
         zoom: initialMapViewRef.current.zoom
@@ -814,6 +843,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       }
       map.setTarget();
       mapRef.current = null;
+      vectorBaseGroupRef.current = null;
+      vectorReferenceGroupRef.current = null;
     };
   }, [dispatch]);
 
@@ -877,13 +908,15 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   // Swap base tile source / blank land layer when style changes
   useEffect(() => {
     const tile = tileLayerRef.current;
+    const vectorBaseGroup = vectorBaseGroupRef.current;
+    const vectorReferenceGroup = vectorReferenceGroupRef.current;
     const world = worldLayerRef.current;
     const lakes = lakesLayerRef.current;
     const land = landLayerRef.current;
     const landOutline = landOutlineLayerRef.current;
     const labels = labelLayerRef.current;
     const el = mapElementRef.current;
-    if (!tile || !world || !lakes || !land || !landOutline || !labels || !el) return;
+    if (!tile || !vectorBaseGroup || !vectorReferenceGroup || !world || !lakes || !land || !landOutline || !labels || !el) return;
 
     /**
      * Ensure US states GeoJSON for the blank/base map is loaded into
@@ -907,7 +940,15 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // Keep state outlines available above outlook polygons in every map style.
     loadUsStatesBoundaries();
 
+    const hideVectorBasemapGroups = () => {
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+    };
+
     if (baseMapStyle === 'blank') {
+      hideVectorBasemapGroups();
       tile.setVisible(false);
       world.setVisible(true);
       lakes.setVisible(true);
@@ -952,7 +993,55 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       loaders.forEach((loader) => {
         ensureBlankLayerLoaded(loader).catch(() => { /* blank map layer fetch failed — non-fatal */ });
       });
+      return;
+    }
+
+    if (isOpenFreeMapStyle(baseMapStyle)) {
+      const requestId = vectorStyleRequestRef.current + 1;
+      vectorStyleRequestRef.current = requestId;
+
+      tile.setVisible(false);
+      world.setVisible(false);
+      lakes.setVisible(false);
+      land.setVisible(false);
+      landOutline.setVisible(true);
+      labels.setVisible(false);
+      el.style.backgroundColor = '';
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+
+      getOpenFreeMapStyleSet(baseMapStyle)
+        .then(({ baseStyle, overlayStyle }) => Promise.all([
+          apply(vectorBaseGroup, baseStyle),
+          apply(vectorReferenceGroup, overlayStyle),
+        ]))
+        .then(() => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          vectorBaseGroup.setVisible(true);
+          vectorReferenceGroup.setVisible(true);
+        })
+        .catch(() => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          vectorBaseGroup.getLayers().clear();
+          vectorReferenceGroup.getLayers().clear();
+          tile.setSource(createTileSource(baseMapStyle));
+          tile.setVisible(true);
+          const labelSource = createLabelOverlaySource(baseMapStyle);
+          if (labelSource) {
+            labels.setSource(labelSource);
+            labels.setVisible(true);
+          }
+        });
     } else {
+      hideVectorBasemapGroups();
       tile.setVisible(true);
       world.setVisible(false);
       lakes.setVisible(false);
