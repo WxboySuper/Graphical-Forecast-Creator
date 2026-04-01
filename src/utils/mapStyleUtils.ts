@@ -132,7 +132,7 @@ export const getFeatureStyle = (outlookType: OutlookType, probability: string): 
   // fill opacity with layer-level 0.5 opacity, so higher-risk polygons
   // completely cover lower-risk ones without color blending.
   // This value is used as a fallback / for export utilities.
-  const fillOpacity = outlookType === 'categorical' ? 0.5 : 0.3;
+  const fillOpacity = 1;
   return {
     color: '#000000',
     weight: 2,
