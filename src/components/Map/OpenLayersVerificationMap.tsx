@@ -57,6 +57,15 @@ const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
 const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
 
+/** Replaces all layers in the target group with the current layers from the source group. */
+const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+  const targetLayers = target.getLayers();
+  targetLayers.clear();
+  source.getLayers().getArray().forEach((layer) => {
+    targetLayers.push(layer);
+  });
+};
+
 // Define specific colors for each report type
 const reportColors = {
   tornado: '#FF0000', // Red for tornado
@@ -588,6 +597,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     // Keep state outlines above outlook polygons across base-map styles.
     loadStatesBoundaries();
 
+    /** Clears the split OpenFreeMap base/reference groups so non-vector styles can render normally. */
     const hideVectorBasemapGroups = () => {
       vectorBaseGroup.setVisible(false);
       vectorReferenceGroup.setVisible(false);
@@ -620,23 +630,34 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       vectorReferenceGroup.getLayers().clear();
 
       getOpenFreeMapStyleSet(baseMapStyle)
-        .then(({ baseStyle, overlayStyle }) => Promise.all([
-          apply(vectorBaseGroup, baseStyle),
-          apply(vectorReferenceGroup, overlayStyle),
-        ]))
-        .then(() => {
+        .then(({ baseStyle, overlayStyle }) => {
+          const nextBaseGroup = new LayerGroup();
+          const nextReferenceGroup = new LayerGroup();
+
+          return Promise.all([
+            apply(nextBaseGroup, baseStyle),
+            apply(nextReferenceGroup, overlayStyle),
+          ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
+        })
+        .then(({ nextBaseGroup, nextReferenceGroup }) => {
           if (vectorStyleRequestRef.current !== requestId) {
             return;
           }
 
+          replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
+          replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
           vectorBaseGroup.setVisible(true);
           vectorReferenceGroup.setVisible(true);
         })
-        .catch(() => {
+        .catch((error) => {
           if (vectorStyleRequestRef.current !== requestId) {
             return;
           }
 
+          console.warn('[verification-map] falling back to raster basemap after vector load failure', {
+            baseMapStyle,
+            error,
+          });
           vectorBaseGroup.getLayers().clear();
           vectorReferenceGroup.getLayers().clear();
           tile.setSource(createVerifTileSource(baseMapStyle));

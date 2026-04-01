@@ -68,7 +68,6 @@ interface FillBuildInput {
 
 interface LayerStyleOptions {
   isTopLayer?: boolean;
-  forCategoricalLayer?: boolean;
 }
 
 interface RgbaInput {
@@ -245,6 +244,15 @@ const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
     if ('setStyle' in feature && typeof feature.setStyle === 'function') {
       feature.setStyle(style);
     }
+  });
+};
+
+/** Replaces all layers in the target group with the current layers from the source group. */
+const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+  const targetLayers = target.getLayers();
+  targetLayers.clear();
+  source.getLayers().getArray().forEach((layer) => {
+    targetLayers.push(layer);
   });
 };
 
@@ -941,6 +949,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // Keep state outlines available above outlook polygons in every map style.
     loadUsStatesBoundaries();
 
+    /** Clears the split OpenFreeMap base/reference groups so raster and blank modes stay isolated. */
     const hideVectorBasemapGroups = () => {
       vectorBaseGroup.setVisible(false);
       vectorReferenceGroup.setVisible(false);
@@ -1014,23 +1023,34 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       vectorReferenceGroup.getLayers().clear();
 
       getOpenFreeMapStyleSet(baseMapStyle)
-        .then(({ baseStyle, overlayStyle }) => Promise.all([
-          apply(vectorBaseGroup, baseStyle),
-          apply(vectorReferenceGroup, overlayStyle),
-        ]))
-        .then(() => {
+        .then(({ baseStyle, overlayStyle }) => {
+          const nextBaseGroup = new LayerGroup();
+          const nextReferenceGroup = new LayerGroup();
+
+          return Promise.all([
+            apply(nextBaseGroup, baseStyle),
+            apply(nextReferenceGroup, overlayStyle),
+          ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
+        })
+        .then(({ nextBaseGroup, nextReferenceGroup }) => {
           if (vectorStyleRequestRef.current !== requestId) {
             return;
           }
 
+          replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
+          replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
           vectorBaseGroup.setVisible(true);
           vectorReferenceGroup.setVisible(true);
         })
-        .catch(() => {
+        .catch((error) => {
           if (vectorStyleRequestRef.current !== requestId) {
             return;
           }
 
+          console.warn('[forecast-map] falling back to raster basemap after vector load failure', {
+            baseMapStyle,
+            error,
+          });
           vectorBaseGroup.getLayers().clear();
           vectorReferenceGroup.getLayers().clear();
           tile.setSource(createTileSource(baseMapStyle));
@@ -1157,7 +1177,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       const applyProps = (f: OLFeature<Geometry>) => {
         f.setStyle(toOlStyle(
           { outlookType, probability },
-          { isTopLayer, forCategoricalLayer: isCategorical, vectorBasemapEnabled }
+          { isTopLayer, vectorBasemapEnabled }
         ));
         f.set('featureId', feature.id as string);
         f.set('outlookType', outlookType);

@@ -20,6 +20,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
   const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const activeOutlookType = activeOutlookTypeOverride || storeActiveOutlookType;
 
+  /** Renders the categorical legend swatches, matching the active map opacity mode. */
   const renderCategoricalLegend = () => (
     <>
       <h4 id="legend-title">Categorical Risk Levels</h4>
@@ -39,6 +40,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
     </>
   );
 
+  /** Renders probabilistic legend entries, including inline SVG hatch previews for CIG layers. */
   const renderProbabilisticLegend = () => {
     let probabilities: string[] = [];
     let colorMap: any;

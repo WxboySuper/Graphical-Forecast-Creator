@@ -293,6 +293,43 @@ const ToolbarToolsSection: React.FC<{
   </div>
 );
 
+/** Trigger button for the beta Labs dropdown; forwards Radix trigger props/ref to the underlying button. */
+const BetaLabsTriggerButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentPropsWithoutRef<typeof Button>
+>(({ className, ...props }, ref) => (
+  <Button
+    ref={ref}
+    variant="outline"
+    className={cn(
+      'h-14 lg:h-16 min-w-[128px] justify-start gap-2 border-sky-500/50 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:!bg-sky-500/15 dark:hover:!bg-sky-500/25 dark:border-sky-500/50 dark:text-sky-300',
+      className
+    )}
+    {...props}
+  >
+    <SlidersHorizontal className="h-4 w-4" />
+    <span>Labs</span>
+  </Button>
+));
+
+BetaLabsTriggerButton.displayName = 'BetaLabsTriggerButton';
+
+/** Beta-only Labs menu content for quickly comparing legacy and experimental map rendering. */
+const BetaLabsMenuContent: React.FC<{
+  vectorBasemapEnabled: boolean;
+  onToggleVectorBasemap: (enabled: boolean) => void;
+}> = ({ vectorBasemapEnabled, onToggleVectorBasemap }) => (
+  <DropdownMenuContent align="start" className="w-72">
+    <DropdownMenuLabel>Beta map experiments</DropdownMenuLabel>
+    <DropdownMenuCheckboxItem
+      checked={vectorBasemapEnabled}
+      onCheckedChange={(checked) => onToggleVectorBasemap(Boolean(checked))}
+    >
+      Vector basemap + opaque outlook fills
+    </DropdownMenuCheckboxItem>
+  </DropdownMenuContent>
+);
+
 /** Quick beta-only experiment menu so testers can compare old and new forecast map rendering. */
 const BetaLabsSection: React.FC<{
   vectorBasemapEnabled: boolean;
@@ -303,23 +340,12 @@ const BetaLabsSection: React.FC<{
       <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Beta Labs</label>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            className="h-14 lg:h-16 min-w-[128px] justify-start gap-2 border-sky-500/50 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:!bg-sky-500/15 dark:hover:!bg-sky-500/25 dark:border-sky-500/50 dark:text-sky-300"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span>Labs</span>
-          </Button>
+          <BetaLabsTriggerButton />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-72">
-          <DropdownMenuLabel>Beta map experiments</DropdownMenuLabel>
-          <DropdownMenuCheckboxItem
-            checked={vectorBasemapEnabled}
-            onCheckedChange={(checked) => onToggleVectorBasemap(Boolean(checked))}
-          >
-            Vector basemap + opaque outlook fills
-          </DropdownMenuCheckboxItem>
-        </DropdownMenuContent>
+        <BetaLabsMenuContent
+          vectorBasemapEnabled={vectorBasemapEnabled}
+          onToggleVectorBasemap={onToggleVectorBasemap}
+        />
       </DropdownMenu>
     </div>
   </div>
