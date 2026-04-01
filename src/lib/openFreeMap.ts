@@ -98,7 +98,10 @@ export const getOpenFreeMapStyleSet = (style: BaseMapStyle): Promise<OpenFreeMap
     return cached;
   }
 
-  const next = loadOpenFreeMapStyleSet(style);
+  const next = loadOpenFreeMapStyleSet(style).catch((error) => {
+    styleSetCache.delete(style);
+    throw error;
+  });
   styleSetCache.set(style, next);
   return next;
 };
