@@ -251,7 +251,9 @@ const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
     const sortedEntries = sortProbabilities(entries);
     // Then we loop through the sorted probabilities and render the features with styles based on the outlook type and probability.
     sortedEntries.forEach(([probability, features]) => {
-      const styleOptions = getFeatureStyle(outlookType, probability);
+      const styleOptions = getFeatureStyle(outlookType, probability, {
+        vectorBasemapEnabled: store.getState().featureFlags.vectorBasemapEnabled,
+      });
       // We add each feature as a GeoJSON layer to the map with the appropriate style.
       // This ensures that the exported image will have the same outlook layers rendered as seen in the live map.
       features.forEach(feature => {

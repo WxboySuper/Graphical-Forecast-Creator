@@ -78,7 +78,6 @@ interface RgbaInput {
 
 interface FillOpacityInput {
   fillOpacity: unknown;
-  forCategoricalLayer: boolean;
 }
 
 interface StrokeWidthInput {
@@ -172,9 +171,8 @@ const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | nu
   return ctx.createPattern(canvas, 'repeat');
 };
 
-/** Returns the fill opacity for a feature: always 1.0 for the categorical layer, otherwise the numeric opacity value or 0.25 as default. */
-const resolveFillOpacity = ({ fillOpacity, forCategoricalLayer }: FillOpacityInput): number => {
-  if (forCategoricalLayer) return 1.0;
+/** Returns the fill opacity for a feature or a sensible fallback when a style omitted it. */
+const resolveFillOpacity = ({ fillOpacity }: FillOpacityInput): number => {
   return typeof fillOpacity === 'number' ? fillOpacity : 0.25;
 };
 
@@ -283,14 +281,14 @@ const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolea
 // Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
 const toOlStyle = (
   selection: OutlookSelection,
-  options: LayerStyleOptions = {}
+  options: LayerStyleOptions & { vectorBasemapEnabled?: boolean } = {}
 ) => {
   const { outlookType, probability } = selection;
-  const { isTopLayer = false, forCategoricalLayer = false } = options;
+  const { isTopLayer = false, vectorBasemapEnabled = false } = options;
 
-  const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
+  const style = getFeatureStyle(outlookType as EditableOutlookType, probability, { vectorBasemapEnabled });
   const fillColor = String(style.fillColor || '#ffffff');
-  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity, forCategoricalLayer });
+  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity });
   const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
   const strokeColor = String(style.color || '#000000');
   const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
@@ -311,8 +309,11 @@ const toOlStyle = (
 };
 
 /** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
-const toGhostOlStyle = ({ outlookType, probability, isCategorical }: GhostSelection) => {
-  const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
+const toGhostOlStyle = (
+  { outlookType, probability, isCategorical }: GhostSelection,
+  vectorBasemapEnabled: boolean
+) => {
+  const style = getFeatureStyle(outlookType as EditableOutlookType, probability, { vectorBasemapEnabled });
   const strokeColor = String(style.color || '#000000');
   const ghostFillOpacity = isCategorical ? 0.15 : 0.15;
   const isCig = probability.startsWith('CIG');
@@ -502,6 +503,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
   const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
+  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const ghostOutlooks = useSelector((state: RootState) => state.overlays.ghostOutlooks);
   const initialMapViewRef = useRef(currentMapView);
   const currentMapViewRef = useRef(currentMapView);
@@ -624,13 +626,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       style: BLANK_LAND_OUTLINE_STYLE,
     });
     landOutlineLayerRef.current = landOutlineLayer;
-    // Categorical layer: dedicated source with per-feature full-opacity fills.
-    // Layer-level opacity (0.5) makes the basemap visible while higher-risk
-    // polygons completely cover lower-risk ones (no color blending).
+    // Categorical layer: dedicated source so the app can switch between
+    // legacy semi-transparent fills and the beta vector/opaque treatment.
     const catLayer = new VectorLayer({
       source: catSourceRef.current,
       zIndex: 3,
-      opacity: 0.5,
+      opacity: 1,
     });
     catLayerRef.current = catLayer;
     const ghostLayer = new VectorLayer({
@@ -996,7 +997,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       return;
     }
 
-    if (isOpenFreeMapStyle(baseMapStyle)) {
+    if (vectorBasemapEnabled && isOpenFreeMapStyle(baseMapStyle)) {
       const requestId = vectorStyleRequestRef.current + 1;
       vectorStyleRequestRef.current = requestId;
 
@@ -1057,7 +1058,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         labels.setVisible(false);
       }
     }
-  }, [baseMapStyle]);
+  }, [baseMapStyle, vectorBasemapEnabled]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1156,7 +1157,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       const applyProps = (f: OLFeature<Geometry>) => {
         f.setStyle(toOlStyle(
           { outlookType, probability },
-          { isTopLayer, forCategoricalLayer: isCategorical }
+          { isTopLayer, forCategoricalLayer: isCategorical, vectorBasemapEnabled }
         ));
         f.set('featureId', feature.id as string);
         f.set('outlookType', outlookType);
@@ -1191,7 +1192,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
           /** Apply ghost styling/metadata and add the feature to the ghost source. */
           const applyGhostProps = (f: OLFeature<Geometry>) => {
-            f.setStyle(toGhostOlStyle({ outlookType, probability, isCategorical }));
+            f.setStyle(toGhostOlStyle({ outlookType, probability, isCategorical }, vectorBasemapEnabled));
             f.set('featureId', feature.id as string);
             f.set('outlookType', outlookType);
             f.set('probability', probability);
@@ -1208,7 +1209,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         });
       });
     });
-  }, [serializedFeatures, outlooks, drawingState.activeOutlookType, ghostOutlooks]);
+  }, [serializedFeatures, outlooks, drawingState.activeOutlookType, ghostOutlooks, vectorBasemapEnabled]);
 
   // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
   const handleSetModePan = () => {

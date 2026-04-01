@@ -17,6 +17,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
   // Optimized: Select only activeOutlookType to avoid re-rendering on other drawing state changes (like activeProbability)
   const storeActiveOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
+  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const activeOutlookType = activeOutlookTypeOverride || storeActiveOutlookType;
 
   const renderCategoricalLegend = () => (
@@ -27,7 +28,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
           <div key={risk} className="legend-item" role="listitem">
             <div 
               className="legend-color" 
-              style={{ backgroundColor: colorMappings.categorical[risk], opacity: 0.5 }}
+              style={{ backgroundColor: colorMappings.categorical[risk], opacity: vectorBasemapEnabled ? 1 : 0.5 }}
               role="img"
               aria-label={`Color for ${getCategoricalRiskDisplayName(risk as CategoricalRiskLevel)}`}
             />

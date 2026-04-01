@@ -6,6 +6,7 @@ import {
   CloudHail, 
   LayoutGrid,
   Layers,
+  SlidersHorizontal,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +22,13 @@ import {
   Redo2,
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import {
   Tooltip,
   TooltipContent,
@@ -52,6 +60,7 @@ import {
   redoLastEdit,
   undoLastEdit,
 } from '../../store/forecastSlice';
+import { setFeatureFlag } from '../../store/featureFlagsSlice';
 import { toggleGhostOutlook } from '../../store/overlaysSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import CycleHistoryModal from '../CycleManager/CycleHistoryModal';
@@ -171,6 +180,9 @@ interface IntegratedToolbarViewProps {
   probabilityHandlers: Record<string, () => void>;
   currentColor: string;
   isLowProb: boolean;
+  showBetaLabs: boolean;
+  vectorBasemapEnabled: boolean;
+  onToggleVectorBasemap: (enabled: boolean) => void;
 }
 
 /** Toolbar actions panel: Save, Load, Export, Package download, Cycle History, Copy from Previous, and Reset buttons. */
@@ -277,6 +289,38 @@ const ToolbarToolsSection: React.FC<{
         className="h-14 w-14 lg:h-16 lg:w-16 bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-700 dark:!bg-red-500/20 dark:hover:!bg-red-500/30 dark:border-red-500/50 dark:text-red-400"
         onClick={onOpenResetConfirm}
       />
+    </div>
+  </div>
+);
+
+/** Quick beta-only experiment menu so testers can compare old and new forecast map rendering. */
+const BetaLabsSection: React.FC<{
+  vectorBasemapEnabled: boolean;
+  onToggleVectorBasemap: (enabled: boolean) => void;
+}> = ({ vectorBasemapEnabled, onToggleVectorBasemap }) => (
+  <div className="border-r border-border pr-2 lg:pr-4">
+    <div className="flex flex-col gap-3">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Beta Labs</label>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            className="h-14 lg:h-16 min-w-[128px] justify-start gap-2 border-sky-500/50 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:!bg-sky-500/15 dark:hover:!bg-sky-500/25 dark:border-sky-500/50 dark:text-sky-300"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span>Labs</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-72">
+          <DropdownMenuLabel>Beta map experiments</DropdownMenuLabel>
+          <DropdownMenuCheckboxItem
+            checked={vectorBasemapEnabled}
+            onCheckedChange={(checked) => onToggleVectorBasemap(Boolean(checked))}
+          >
+            Vector basemap + opaque outlook fills
+          </DropdownMenuCheckboxItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   </div>
 );
@@ -671,6 +715,7 @@ const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
     lowProbabilityOutlooks, visibleGhostOutlooks, outlookTypeHandlers, ghostOutlookHandlers,
     probabilities, probabilityHandlers,
     currentColor, isLowProb,
+    showBetaLabs, vectorBasemapEnabled, onToggleVectorBasemap,
   } = props;
 
   const ghostTypes = availableTypes.filter((type) => type !== activeOutlookType);
@@ -688,6 +733,12 @@ const IntegratedToolbarView: React.FC<IntegratedToolbarViewProps> = (props) => {
               isSaved={isSaved} canUndo={canUndo} canRedo={canRedo}
               isExporting={isExporting} isPackageDownloading={isPackageDownloading}
             />
+            {showBetaLabs ? (
+              <BetaLabsSection
+                vectorBasemapEnabled={vectorBasemapEnabled}
+                onToggleVectorBasemap={onToggleVectorBasemap}
+              />
+            ) : null}
             <ToolbarForecastDaySection
               isEditingDate={isEditingDate} tempDate={tempDate} cycleDate={cycleDate}
               currentDay={currentDay} days={days}
@@ -980,7 +1031,12 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
   cloudTools = null,
 }) => {
   const dispatch = useDispatch();
+  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const model = useToolbarDataModel(mapRef, addToast);
+  const showBetaLabs = __GFC_BETA_MODE__;
+  const handleToggleVectorBasemap = useCallback((enabled: boolean) => {
+    dispatch(setFeatureFlag({ feature: 'vectorBasemapEnabled', enabled }));
+  }, [dispatch]);
 
   const localUi = useToolbarLocalUi(model.cycleDate);
   const handlers = useToolbarActionHandlers({
@@ -1012,6 +1068,9 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({
       onCancelReset={localUi.handleCancelReset}
       onTempDateChange={localUi.handleTempDateChange}
       onStartDateEdit={localUi.handleStartDateEdit}
+      showBetaLabs={showBetaLabs}
+      vectorBasemapEnabled={vectorBasemapEnabled}
+      onToggleVectorBasemap={handleToggleVectorBasemap}
       {...handlers}
       {...localUi}
       {...model}
