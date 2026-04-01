@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { releaseFlags } from '../lib/releaseFlags';
 
 // Define the feature flags interface
 export interface FeatureFlags {
@@ -14,6 +15,7 @@ export interface FeatureFlags {
   // Other features
   saveLoadEnabled: boolean;
   significantThreatsEnabled: boolean;
+  vectorBasemapEnabled: boolean;
 }
 
 const initialState: FeatureFlags = {
@@ -24,6 +26,7 @@ const initialState: FeatureFlags = {
   categoricalOutlookEnabled: true,
   saveLoadEnabled: true,
   significantThreatsEnabled: true,
+  vectorBasemapEnabled: releaseFlags.vectorBasemapEnabled,
 };
 
 export const featureFlagsSlice = createSlice({

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
+import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -21,8 +22,10 @@ import type { Feature as GeoJsonFeature } from 'geojson';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import { Circle, Fill as StyleFill, Stroke as StyleStroke, Style as OlStyle, Fill, Stroke, Style } from 'ol/style';
+import { apply } from 'ol-mapbox-style';
 import Legend from './Legend';
 import UnofficialBadge from './UnofficialBadge';
+import { getOpenFreeMapStyleSet, isOpenFreeMapStyle } from '../../lib/openFreeMap';
 import './ForecastMap.css';
 import { ReportType } from '../../types/stormReports';
 
@@ -51,7 +54,17 @@ interface StrokeDescriptor {
 }
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
+const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
+
+/** Replaces all layers in the target group with the current layers from the source group. */
+const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+  const targetLayers = target.getLayers();
+  targetLayers.clear();
+  source.getLayers().getArray().forEach((layer) => {
+    targetLayers.push(layer);
+  });
+};
 
 // Define specific colors for each report type
 const reportColors = {
@@ -220,10 +233,6 @@ const FALLBACK_STROKE_COLOR = '#000000';
 const TRANSPARENT_PATTERN_FILL = 'rgba(0,0,0,0)';
 const CIG_STROKE_COLOR = '#111111';
 const CIG_STROKE_WIDTH = 1.2;
-const OUTLOOK_FILL_OPACITY: Record<string, number> = {
-  [CATEGORICAL_OUTLOOK]: 1,
-};
-
 /** Returns true if the color string uses a CSS function notation like rgb(), rgba(), hsl(), or hsla(). */
 const isFunctionColorNotation = (color: string): boolean => {
   return FUNCTION_COLOR_NOTATION_REGEX.test(color);
@@ -234,13 +243,8 @@ const coerceNumber = (value: unknown, fallback: number): number => {
   return typeof value === 'number' ? value : fallback;
 };
 
-/** Resolves fill opacity: uses the per-type override from OUTLOOK_FILL_OPACITY if present, otherwise coerces the unknown value or defaults to 0.25. */
-const resolveFillOpacity = (outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
-  const explicitTypeOpacity = OUTLOOK_FILL_OPACITY[outlookType];
-  if (typeof explicitTypeOpacity === 'number') {
-    return explicitTypeOpacity;
-  }
-
+/** Resolves fill opacity from the style payload, defaulting to 0.25 when missing. */
+const resolveFillOpacity = (_outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
   return coerceNumber(fillOpacity, 0.25);
 };
 
@@ -322,8 +326,11 @@ const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stro
 };
 
 // Function to build OpenLayers style for a given feature based on its outlook type and probability,
-const buildStyle = ({ outlookType, probability }: OutlookStyleDescriptor) => {
-  const style = getFeatureStyle(outlookType as VerificationOutlookType, probability);
+const buildStyle = (
+  { outlookType, probability }: OutlookStyleDescriptor,
+  vectorBasemapEnabled: boolean
+) => {
+  const style = getFeatureStyle(outlookType as VerificationOutlookType, probability, { vectorBasemapEnabled });
   const fillColor = String(style.fillColor || FALLBACK_FILL_COLOR);
   const strokeColor = String(style.color || FALLBACK_STROKE_COLOR);
   const fillOpacity = resolveFillOpacity(outlookType, style.fillOpacity);
@@ -405,6 +412,9 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
   const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+  const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
+  const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
+  const vectorStyleRequestRef = useRef(0);
   const landSourceRef = useRef<VectorSource>(new VectorSource());
   const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
@@ -416,6 +426,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const initialMapViewRef = useRef(mapView);
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
   const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
+  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const { reports, visible: reportsVisible, filterByType } = useSelector(
     (state: RootState) => state.stormReports
   ); // Select storm reports state
@@ -452,6 +463,16 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
     const baseTileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = baseTileLayer;
+    const vectorBaseGroup = new LayerGroup({
+      visible: false,
+      zIndex: 1,
+    });
+    vectorBaseGroupRef.current = vectorBaseGroup;
+    const vectorReferenceGroup = new LayerGroup({
+      visible: false,
+      zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+    });
+    vectorReferenceGroupRef.current = vectorReferenceGroup;
     // Land fill sits above the base tile layer for blank style.
     const landLayer = new VectorLayer({
       source: landSourceRef.current,
@@ -481,9 +502,11 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       target: mapElementRef.current,
       layers: [
         baseTileLayer,
+        vectorBaseGroup,
         landLayer,
         outlookLayer,
         landOutlineLayer,
+        vectorReferenceGroup,
         new VectorLayer({
           source: stormReportsSourceRef.current,
           zIndex: 4,
@@ -502,6 +525,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     return () => {
       map.setTarget();
       mapRef.current = null;
+      vectorBaseGroupRef.current = null;
+      vectorReferenceGroupRef.current = null;
     };
   }, []);
 
@@ -528,11 +553,13 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   // Swap base tile source / blank land layer when style changes
   useEffect(() => {
     const tile = tileLayerRef.current;
+    const vectorBaseGroup = vectorBaseGroupRef.current;
+    const vectorReferenceGroup = vectorReferenceGroupRef.current;
     const land = landLayerRef.current;
     const landOutline = landOutlineLayerRef.current;
     const labels = labelLayerRef.current;
     const el = mapElementRef.current;
-    if (!tile || !land || !landOutline || !labels || !el) return;
+    if (!tile || !vectorBaseGroup || !vectorReferenceGroup || !land || !landOutline || !labels || !el) return;
 
     /**
      * Load US state boundary features into the `landSourceRef` if they
@@ -570,13 +597,79 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     // Keep state outlines above outlook polygons across base-map styles.
     loadStatesBoundaries();
 
+    /** Clears the split OpenFreeMap base/reference groups so non-vector styles can render normally. */
+    const hideVectorBasemapGroups = () => {
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+    };
+
     if (baseMapStyle === 'blank') {
+      hideVectorBasemapGroups();
       tile.setVisible(false);
       land.setVisible(true);
       landOutline.setVisible(true);
       labels.setVisible(false);
       el.style.backgroundColor = '#b8d4e8';
+      return;
+    }
+
+    if (vectorBasemapEnabled && isOpenFreeMapStyle(baseMapStyle)) {
+      const requestId = vectorStyleRequestRef.current + 1;
+      vectorStyleRequestRef.current = requestId;
+
+      tile.setVisible(false);
+      land.setVisible(false);
+      landOutline.setVisible(true);
+      labels.setVisible(false);
+      el.style.backgroundColor = '';
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+
+      getOpenFreeMapStyleSet(baseMapStyle)
+        .then(({ baseStyle, overlayStyle }) => {
+          const nextBaseGroup = new LayerGroup();
+          const nextReferenceGroup = new LayerGroup();
+
+          return Promise.all([
+            apply(nextBaseGroup, baseStyle),
+            apply(nextReferenceGroup, overlayStyle),
+          ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
+        })
+        .then(({ nextBaseGroup, nextReferenceGroup }) => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
+          replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
+          vectorBaseGroup.setVisible(true);
+          vectorReferenceGroup.setVisible(true);
+        })
+        .catch((error) => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          console.warn('[verification-map] falling back to raster basemap after vector load failure', {
+            baseMapStyle,
+            error,
+          });
+          vectorBaseGroup.getLayers().clear();
+          vectorReferenceGroup.getLayers().clear();
+          tile.setSource(createVerifTileSource(baseMapStyle));
+          tile.setVisible(true);
+          const labelSource = createVerificationLabelOverlaySource(baseMapStyle);
+          if (labelSource) {
+            labels.setSource(labelSource);
+            labels.setVisible(true);
+          }
+        });
     } else {
+      hideVectorBasemapGroups();
       tile.setVisible(true);
       land.setVisible(false);
       landOutline.setVisible(true);
@@ -590,7 +683,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
         labels.setVisible(false);
       }
     }
-  }, [baseMapStyle]);
+  }, [baseMapStyle, vectorBasemapEnabled]);
 
   useEffect(() => {
     const outlookLayer = outlookLayerRef.current;
@@ -598,10 +691,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       return;
     }
 
-    // Match forecast map: categorical uses layer-level opacity so nested fills
-    // don't compound differently than forecast rendering.
-    outlookLayer.setOpacity(activeOutlookType === CATEGORICAL_OUTLOOK ? 0.5 : 1);
-  }, [activeOutlookType]);
+    outlookLayer.setOpacity(1);
+  }, [activeOutlookType, vectorBasemapEnabled]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;
@@ -623,15 +714,15 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
       if (Array.isArray(olFeature)) {
         olFeature.forEach((item) => {
-          item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
+          item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }, vectorBasemapEnabled));
           source.addFeature(item);
         });
       } else {
-        olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
+        olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }, vectorBasemapEnabled));
         source.addFeature(olFeature);
       }
     });
-  }, [activeFeatures, activeOutlookType]);
+  }, [activeFeatures, activeOutlookType, vectorBasemapEnabled]);
 
   useEffect(() => {
     const source = stormReportsSourceRef.current;

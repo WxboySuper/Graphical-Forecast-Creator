@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
+import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -25,9 +26,11 @@ import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { getFeatureStyle, computeZIndex } from '../../utils/mapStyleUtils';
 import type { MapAdapterHandle } from '../../maps/contracts';
 import type { Feature as GeoJsonFeature, GeoJsonProperties, Polygon } from 'geojson';
+import { apply } from 'ol-mapbox-style';
 import Legend from './Legend';
 import StatusOverlay from './StatusOverlay';
 import UnofficialBadge from './UnofficialBadge';
+import { getOpenFreeMapStyleSet, isOpenFreeMapStyle } from '../../lib/openFreeMap';
 import './ForecastMap.css';
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
@@ -65,7 +68,6 @@ interface FillBuildInput {
 
 interface LayerStyleOptions {
   isTopLayer?: boolean;
-  forCategoricalLayer?: boolean;
 }
 
 interface RgbaInput {
@@ -75,7 +77,6 @@ interface RgbaInput {
 
 interface FillOpacityInput {
   fillOpacity: unknown;
-  forCategoricalLayer: boolean;
 }
 
 interface StrokeWidthInput {
@@ -88,6 +89,7 @@ interface HatchPatternInput {
 }
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
+const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
 
 const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
@@ -168,9 +170,8 @@ const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | nu
   return ctx.createPattern(canvas, 'repeat');
 };
 
-/** Returns the fill opacity for a feature: always 1.0 for the categorical layer, otherwise the numeric opacity value or 0.25 as default. */
-const resolveFillOpacity = ({ fillOpacity, forCategoricalLayer }: FillOpacityInput): number => {
-  if (forCategoricalLayer) return 1.0;
+/** Returns the fill opacity for a feature or a sensible fallback when a style omitted it. */
+const resolveFillOpacity = ({ fillOpacity }: FillOpacityInput): number => {
   return typeof fillOpacity === 'number' ? fillOpacity : 0.25;
 };
 
@@ -246,6 +247,15 @@ const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
   });
 };
 
+/** Replaces all layers in the target group with the current layers from the source group. */
+const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+  const targetLayers = target.getLayers();
+  targetLayers.clear();
+  source.getLayers().getArray().forEach((layer) => {
+    targetLayers.push(layer);
+  });
+};
+
 /** Loads GeoJSON features into a blank-basemap VectorSource if not already populated, using an in-memory cache to avoid repeated network requests. */
 const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
   if (config.isLoaded()) return;
@@ -279,14 +289,14 @@ const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolea
 // Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
 const toOlStyle = (
   selection: OutlookSelection,
-  options: LayerStyleOptions = {}
+  options: LayerStyleOptions & { vectorBasemapEnabled?: boolean } = {}
 ) => {
   const { outlookType, probability } = selection;
-  const { isTopLayer = false, forCategoricalLayer = false } = options;
+  const { isTopLayer = false, vectorBasemapEnabled = false } = options;
 
-  const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
+  const style = getFeatureStyle(outlookType as EditableOutlookType, probability, { vectorBasemapEnabled });
   const fillColor = String(style.fillColor || '#ffffff');
-  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity, forCategoricalLayer });
+  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity });
   const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
   const strokeColor = String(style.color || '#000000');
   const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
@@ -307,8 +317,11 @@ const toOlStyle = (
 };
 
 /** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
-const toGhostOlStyle = ({ outlookType, probability, isCategorical }: GhostSelection) => {
-  const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
+const toGhostOlStyle = (
+  { outlookType, probability, isCategorical }: GhostSelection,
+  vectorBasemapEnabled: boolean
+) => {
+  const style = getFeatureStyle(outlookType as EditableOutlookType, probability, { vectorBasemapEnabled });
   const strokeColor = String(style.color || '#000000');
   const ghostFillOpacity = isCategorical ? 0.15 : 0.15;
   const isCig = probability.startsWith('CIG');
@@ -498,6 +511,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
   const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
+  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const ghostOutlooks = useSelector((state: RootState) => state.overlays.ghostOutlooks);
   const initialMapViewRef = useRef(currentMapView);
   const currentMapViewRef = useRef(currentMapView);
@@ -516,6 +530,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
   const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+  const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
+  const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
+  const vectorStyleRequestRef = useRef(0);
   const worldSourceRef = useRef<VectorSource>(new VectorSource());
   const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const lakesSourceRef = useRef<VectorSource>(new VectorSource());
@@ -576,6 +593,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
     const tileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
     tileLayerRef.current = tileLayer;
+    const vectorBaseGroup = new LayerGroup({
+      visible: false,
+      zIndex: 1,
+    });
+    vectorBaseGroupRef.current = vectorBaseGroup;
+    const vectorReferenceGroup = new LayerGroup({
+      visible: false,
+      zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+    });
+    vectorReferenceGroupRef.current = vectorReferenceGroup;
     // Blank base map layers: start hidden, only one (tile vs. world+lakes+land) will be visible at a time based on baseMapStyle.
     const worldLayer = new VectorLayer({
       source: worldSourceRef.current,
@@ -607,13 +634,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       style: BLANK_LAND_OUTLINE_STYLE,
     });
     landOutlineLayerRef.current = landOutlineLayer;
-    // Categorical layer: dedicated source with per-feature full-opacity fills.
-    // Layer-level opacity (0.5) makes the basemap visible while higher-risk
-    // polygons completely cover lower-risk ones (no color blending).
+    // Categorical layer: dedicated source so the app can switch between
+    // legacy semi-transparent fills and the beta vector/opaque treatment.
     const catLayer = new VectorLayer({
       source: catSourceRef.current,
       zIndex: 3,
-      opacity: 0.5,
+      opacity: 1,
     });
     catLayerRef.current = catLayer;
     const ghostLayer = new VectorLayer({
@@ -640,7 +666,19 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // without needing to re-add/remove layers or features, which can be expensive.
     const map = new OLMap({
       target: mapElementRef.current,
-      layers: [tileLayer, worldLayer, lakesLayer, landLayer, ghostLayer, catLayer, vectorLayer, landOutlineLayer, labelLayer],
+      layers: [
+        tileLayer,
+        vectorBaseGroup,
+        worldLayer,
+        lakesLayer,
+        landLayer,
+        ghostLayer,
+        catLayer,
+        vectorLayer,
+        landOutlineLayer,
+        vectorReferenceGroup,
+        labelLayer,
+      ],
       view: new View({
         center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
         zoom: initialMapViewRef.current.zoom
@@ -814,6 +852,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       }
       map.setTarget();
       mapRef.current = null;
+      vectorBaseGroupRef.current = null;
+      vectorReferenceGroupRef.current = null;
     };
   }, [dispatch]);
 
@@ -877,13 +917,15 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   // Swap base tile source / blank land layer when style changes
   useEffect(() => {
     const tile = tileLayerRef.current;
+    const vectorBaseGroup = vectorBaseGroupRef.current;
+    const vectorReferenceGroup = vectorReferenceGroupRef.current;
     const world = worldLayerRef.current;
     const lakes = lakesLayerRef.current;
     const land = landLayerRef.current;
     const landOutline = landOutlineLayerRef.current;
     const labels = labelLayerRef.current;
     const el = mapElementRef.current;
-    if (!tile || !world || !lakes || !land || !landOutline || !labels || !el) return;
+    if (!tile || !vectorBaseGroup || !vectorReferenceGroup || !world || !lakes || !land || !landOutline || !labels || !el) return;
 
     /**
      * Ensure US states GeoJSON for the blank/base map is loaded into
@@ -907,7 +949,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     // Keep state outlines available above outlook polygons in every map style.
     loadUsStatesBoundaries();
 
+    /** Clears the split OpenFreeMap base/reference groups so raster and blank modes stay isolated. */
+    const hideVectorBasemapGroups = () => {
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+    };
+
     if (baseMapStyle === 'blank') {
+      hideVectorBasemapGroups();
       tile.setVisible(false);
       world.setVisible(true);
       lakes.setVisible(true);
@@ -952,7 +1003,66 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       loaders.forEach((loader) => {
         ensureBlankLayerLoaded(loader).catch(() => { /* blank map layer fetch failed — non-fatal */ });
       });
+      return;
+    }
+
+    if (vectorBasemapEnabled && isOpenFreeMapStyle(baseMapStyle)) {
+      const requestId = vectorStyleRequestRef.current + 1;
+      vectorStyleRequestRef.current = requestId;
+
+      tile.setVisible(false);
+      world.setVisible(false);
+      lakes.setVisible(false);
+      land.setVisible(false);
+      landOutline.setVisible(true);
+      labels.setVisible(false);
+      el.style.backgroundColor = '';
+      vectorBaseGroup.setVisible(false);
+      vectorReferenceGroup.setVisible(false);
+      vectorBaseGroup.getLayers().clear();
+      vectorReferenceGroup.getLayers().clear();
+
+      getOpenFreeMapStyleSet(baseMapStyle)
+        .then(({ baseStyle, overlayStyle }) => {
+          const nextBaseGroup = new LayerGroup();
+          const nextReferenceGroup = new LayerGroup();
+
+          return Promise.all([
+            apply(nextBaseGroup, baseStyle),
+            apply(nextReferenceGroup, overlayStyle),
+          ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
+        })
+        .then(({ nextBaseGroup, nextReferenceGroup }) => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
+          replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
+          vectorBaseGroup.setVisible(true);
+          vectorReferenceGroup.setVisible(true);
+        })
+        .catch((error) => {
+          if (vectorStyleRequestRef.current !== requestId) {
+            return;
+          }
+
+          console.warn('[forecast-map] falling back to raster basemap after vector load failure', {
+            baseMapStyle,
+            error,
+          });
+          vectorBaseGroup.getLayers().clear();
+          vectorReferenceGroup.getLayers().clear();
+          tile.setSource(createTileSource(baseMapStyle));
+          tile.setVisible(true);
+          const labelSource = createLabelOverlaySource(baseMapStyle);
+          if (labelSource) {
+            labels.setSource(labelSource);
+            labels.setVisible(true);
+          }
+        });
     } else {
+      hideVectorBasemapGroups();
       tile.setVisible(true);
       world.setVisible(false);
       lakes.setVisible(false);
@@ -968,7 +1078,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         labels.setVisible(false);
       }
     }
-  }, [baseMapStyle]);
+  }, [baseMapStyle, vectorBasemapEnabled]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1067,7 +1177,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       const applyProps = (f: OLFeature<Geometry>) => {
         f.setStyle(toOlStyle(
           { outlookType, probability },
-          { isTopLayer, forCategoricalLayer: isCategorical }
+          { isTopLayer, vectorBasemapEnabled }
         ));
         f.set('featureId', feature.id as string);
         f.set('outlookType', outlookType);
@@ -1102,7 +1212,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
           /** Apply ghost styling/metadata and add the feature to the ghost source. */
           const applyGhostProps = (f: OLFeature<Geometry>) => {
-            f.setStyle(toGhostOlStyle({ outlookType, probability, isCategorical }));
+            f.setStyle(toGhostOlStyle({ outlookType, probability, isCategorical }, vectorBasemapEnabled));
             f.set('featureId', feature.id as string);
             f.set('outlookType', outlookType);
             f.set('probability', probability);
@@ -1119,7 +1229,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         });
       });
     });
-  }, [serializedFeatures, outlooks, drawingState.activeOutlookType, ghostOutlooks]);
+  }, [serializedFeatures, outlooks, drawingState.activeOutlookType, ghostOutlooks, vectorBasemapEnabled]);
 
   // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
   const handleSetModePan = () => {
