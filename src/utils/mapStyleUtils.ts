@@ -12,6 +12,10 @@ export type FeatureStyle = {
   fillOpacity?: number;
 };
 
+interface FeatureStyleOptions {
+  vectorBasemapEnabled?: boolean;
+}
+
 const RISK_ORDER: Record<string, number> = {
   TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 4, HIGH: 5
 };
@@ -106,7 +110,13 @@ export const computeZIndex = (outlookType: OutlookType, probability: string) => 
  * @param probability - The probability string
  * @returns A `FeatureStyle` object used by rendering code
  */
-export const getFeatureStyle = (outlookType: OutlookType, probability: string): FeatureStyle => {
+export const getFeatureStyle = (
+  outlookType: OutlookType,
+  probability: string,
+  options: FeatureStyleOptions = {}
+): FeatureStyle => {
+  const { vectorBasemapEnabled = false } = options;
+
   if (probability.startsWith('CIG')) {
     const patternMap: Record<string, string> = {
       'CIG1': 'url(#pattern-cig1)',
@@ -127,12 +137,7 @@ export const getFeatureStyle = (outlookType: OutlookType, probability: string): 
   }
 
   const color = lookupColor(outlookType, probability);
-  // Categorical polygons are nested (MRGL contains SLGT contains ENH…).
-  // On the map, a dedicated categorical VectorLayer renders them at full
-  // fill opacity with layer-level 0.5 opacity, so higher-risk polygons
-  // completely cover lower-risk ones without color blending.
-  // This value is used as a fallback / for export utilities.
-  const fillOpacity = 1;
+  const fillOpacity = vectorBasemapEnabled ? 1 : (outlookType === 'categorical' ? 0.5 : 0.3);
   return {
     color: '#000000',
     weight: 2,

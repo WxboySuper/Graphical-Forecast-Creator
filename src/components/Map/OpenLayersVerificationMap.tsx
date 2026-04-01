@@ -224,10 +224,6 @@ const FALLBACK_STROKE_COLOR = '#000000';
 const TRANSPARENT_PATTERN_FILL = 'rgba(0,0,0,0)';
 const CIG_STROKE_COLOR = '#111111';
 const CIG_STROKE_WIDTH = 1.2;
-const OUTLOOK_FILL_OPACITY: Record<string, number> = {
-  [CATEGORICAL_OUTLOOK]: 1,
-};
-
 /** Returns true if the color string uses a CSS function notation like rgb(), rgba(), hsl(), or hsla(). */
 const isFunctionColorNotation = (color: string): boolean => {
   return FUNCTION_COLOR_NOTATION_REGEX.test(color);
@@ -238,13 +234,8 @@ const coerceNumber = (value: unknown, fallback: number): number => {
   return typeof value === 'number' ? value : fallback;
 };
 
-/** Resolves fill opacity: uses the per-type override from OUTLOOK_FILL_OPACITY if present, otherwise coerces the unknown value or defaults to 0.25. */
-const resolveFillOpacity = (outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
-  const explicitTypeOpacity = OUTLOOK_FILL_OPACITY[outlookType];
-  if (typeof explicitTypeOpacity === 'number') {
-    return explicitTypeOpacity;
-  }
-
+/** Resolves fill opacity from the style payload, defaulting to 0.25 when missing. */
+const resolveFillOpacity = (_outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
   return coerceNumber(fillOpacity, 0.25);
 };
 
@@ -326,8 +317,11 @@ const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stro
 };
 
 // Function to build OpenLayers style for a given feature based on its outlook type and probability,
-const buildStyle = ({ outlookType, probability }: OutlookStyleDescriptor) => {
-  const style = getFeatureStyle(outlookType as VerificationOutlookType, probability);
+const buildStyle = (
+  { outlookType, probability }: OutlookStyleDescriptor,
+  vectorBasemapEnabled: boolean
+) => {
+  const style = getFeatureStyle(outlookType as VerificationOutlookType, probability, { vectorBasemapEnabled });
   const fillColor = String(style.fillColor || FALLBACK_FILL_COLOR);
   const strokeColor = String(style.color || FALLBACK_STROKE_COLOR);
   const fillOpacity = resolveFillOpacity(outlookType, style.fillOpacity);
@@ -423,6 +417,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const initialMapViewRef = useRef(mapView);
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
   const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
+  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const { reports, visible: reportsVisible, filterByType } = useSelector(
     (state: RootState) => state.stormReports
   ); // Select storm reports state
@@ -610,7 +605,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       return;
     }
 
-    if (isOpenFreeMapStyle(baseMapStyle)) {
+    if (vectorBasemapEnabled && isOpenFreeMapStyle(baseMapStyle)) {
       const requestId = vectorStyleRequestRef.current + 1;
       vectorStyleRequestRef.current = requestId;
 
@@ -667,7 +662,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
         labels.setVisible(false);
       }
     }
-  }, [baseMapStyle]);
+  }, [baseMapStyle, vectorBasemapEnabled]);
 
   useEffect(() => {
     const outlookLayer = outlookLayerRef.current;
@@ -675,10 +670,8 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       return;
     }
 
-    // Match forecast map: categorical uses layer-level opacity so nested fills
-    // don't compound differently than forecast rendering.
-    outlookLayer.setOpacity(activeOutlookType === CATEGORICAL_OUTLOOK ? 0.5 : 1);
-  }, [activeOutlookType]);
+    outlookLayer.setOpacity(1);
+  }, [activeOutlookType, vectorBasemapEnabled]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;
@@ -700,15 +693,15 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
       if (Array.isArray(olFeature)) {
         olFeature.forEach((item) => {
-          item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
+          item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }, vectorBasemapEnabled));
           source.addFeature(item);
         });
       } else {
-        olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
+        olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }, vectorBasemapEnabled));
         source.addFeature(olFeature);
       }
     });
-  }, [activeFeatures, activeOutlookType]);
+  }, [activeFeatures, activeOutlookType, vectorBasemapEnabled]);
 
   useEffect(() => {
     const source = stormReportsSourceRef.current;
