@@ -5,6 +5,7 @@ import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
 import { cloneForecastCycle } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
+import { getLocalCalendarDate } from '../utils/localDate';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -145,7 +146,7 @@ const initialState: ForecastState = {
       1: createEmptyOutlook(1)
     },
     currentDay: 1,
-    cycleDate: new Date().toISOString().split('T')[0]
+    cycleDate: getLocalCalendarDate()
   },
   drawingState: {
     // Start with tornado for Day 1/2 (default day)
@@ -633,8 +634,8 @@ export const forecastSlice = createSlice({
         // Ignore localStorage clear errors
       }
 
-      // Generate today's date
-      const today = new Date().toISOString().split('T')[0];
+      // Generate today's local date so rollover prompts and resets stay aligned.
+      const today = getLocalCalendarDate();
 
       // Completely replace forecastCycle to force re-render
       const newCycle: ForecastCycle = {
