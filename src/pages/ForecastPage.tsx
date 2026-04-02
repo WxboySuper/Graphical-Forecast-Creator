@@ -848,6 +848,7 @@ export const getDayRolloverPromptState = ({
   };
 };
 
+/** Saves the current session to Cycle History when needed, then resets the editor for the new local day. */
 export const runDayRolloverSaveAction = ({
   forecastCycle,
   isSaved,

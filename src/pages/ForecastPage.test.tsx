@@ -99,6 +99,21 @@ const renderForecastPage = (store: ReturnType<typeof createStore>) =>
     </MemoryRouter>
   );
 
+const getPromptStateForStore = (
+  store: ReturnType<typeof createStore>,
+  overrides: Partial<Parameters<typeof getDayRolloverPromptState>[0]> = {}
+) =>
+  getDayRolloverPromptState({
+    restoreComplete: true,
+    lastActiveDay: '2026-04-01',
+    today: '2026-04-02',
+    alreadyPromptedToday: false,
+    promptOpen: false,
+    forecastCycle: store.getState().forecast.forecastCycle,
+    isSaved: store.getState().forecast.isSaved,
+    ...overrides,
+  });
+
 describe('ForecastPage keyboard shortcuts', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -178,15 +193,7 @@ describe('ForecastPage day rollover prompt', () => {
     const store = createStore();
     store.dispatch(addFeature({ feature: createFeature('feature-1') }));
 
-    const promptState = getDayRolloverPromptState({
-      restoreComplete: true,
-      lastActiveDay: '2026-04-01',
-      today: '2026-04-02',
-      alreadyPromptedToday: false,
-      promptOpen: false,
-      forecastCycle: store.getState().forecast.forecastCycle,
-      isSaved: store.getState().forecast.isSaved,
-    });
+    const promptState = getPromptStateForStore(store);
 
     expect(promptState).toEqual({
       previousDay: '2026-04-01',
@@ -198,14 +205,9 @@ describe('ForecastPage day rollover prompt', () => {
     const store = createStore();
     store.dispatch(addFeature({ feature: createFeature('feature-1') }));
 
-    const promptState = getDayRolloverPromptState({
-      restoreComplete: true,
-      lastActiveDay: '2026-04-01',
+    const promptState = getPromptStateForStore(store, {
       today: getLocalCalendarDate(),
       alreadyPromptedToday: true,
-      promptOpen: false,
-      forecastCycle: store.getState().forecast.forecastCycle,
-      isSaved: store.getState().forecast.isSaved,
     });
 
     expect(promptState).toBeNull();
@@ -234,15 +236,7 @@ describe('ForecastPage day rollover prompt', () => {
     store.dispatch(addFeature({ feature: createFeature('feature-1') }));
     store.dispatch(markAsSaved());
 
-    const promptState = getDayRolloverPromptState({
-      restoreComplete: true,
-      lastActiveDay: '2026-04-01',
-      today: '2026-04-02',
-      alreadyPromptedToday: false,
-      promptOpen: false,
-      forecastCycle: store.getState().forecast.forecastCycle,
-      isSaved: store.getState().forecast.isSaved,
-    });
+    const promptState = getPromptStateForStore(store);
 
     expect(promptState).toBeNull();
   });
