@@ -44,6 +44,7 @@ import { useCloudCycles, type UseCloudCyclesResult } from '../hooks/useCloudCycl
 import { useCloudSync } from '../hooks/useCloudSync';
 import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbarButton';
 import { countForecastMetrics } from '../utils/forecastMetrics';
+import { getLocalCalendarDate } from '../utils/localDate';
 import { queueProductMetric } from '../utils/productMetrics';
 
 interface PageContext {
@@ -102,14 +103,6 @@ const DAY_ROLLOVER_LAST_ACTIVE_KEY = 'gfc-last-active-local-day';
 const DAY_ROLLOVER_PROMPTED_KEY = 'gfc-day-rollover-prompt-day';
 const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
 
-/** Returns the user's local calendar day in YYYY-MM-DD format. */
-const getLocalCalendarDate = (date = new Date()): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 /** Reads one stored day string from localStorage, returning null when storage is unavailable. */
 const readStoredDayValue = (key: string): string | null => {
   try {
@@ -128,10 +121,27 @@ const writeStoredDayValue = (key: string, value: string) => {
   }
 };
 
-/** Returns true when the current forecast cycle contains meaningful work worth saving during a day rollover. */
-const hasRolloverCandidateSession = (
+/** Returns true when the forecast cycle contains any drawable outlook data or saved low-probability state. */
+const hasRolloverForecastData = (
   forecastCycle: ReturnType<typeof selectForecastCycle>
 ): boolean => countForecastMetrics(forecastCycle).forecastDays > 0;
+
+/** Returns true when any forecast day already has discussion content attached. */
+const cycleHasDiscussionContent = (
+  forecastCycle: ReturnType<typeof selectForecastCycle>
+): boolean => Object.values(forecastCycle.days).some((dayData) => Boolean(dayData?.discussion));
+
+/** Returns true when the current session has unsaved work worth saving during a day rollover. */
+const hasUnsavedRolloverCandidateSession = (
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  isSaved: boolean
+): boolean => {
+  if (isSaved) {
+    return false;
+  }
+
+  return hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
+};
 
 /** Builds a short Cycle History label for one rollover save action. */
 const buildRolloverSaveLabel = (cycleDate: string): string => {
@@ -755,20 +765,125 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
   }, [isSaved]);
 };
 
+/** Returns the stored/derived day-rollover snapshot needed to decide whether a prompt should be shown. */
+const getDayRolloverSnapshot = () => {
+  const today = getLocalCalendarDate();
+  const lastActiveDay = readStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY);
+  const alreadyPromptedToday = readStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY) === today;
+
+  writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, today);
+
+  return {
+    today,
+    lastActiveDay,
+    alreadyPromptedToday,
+  };
+};
+
+/** Returns true when the day-rollover modal should not be shown for the current snapshot. */
+export const shouldSkipDayRolloverPrompt = ({
+  restoreComplete,
+  lastActiveDay,
+  today,
+  alreadyPromptedToday,
+  promptOpen,
+  hasUnsavedWork,
+}: {
+  restoreComplete: boolean;
+  lastActiveDay: string | null;
+  today: string;
+  alreadyPromptedToday: boolean;
+  promptOpen: boolean;
+  hasUnsavedWork: boolean;
+}) => {
+  if (!restoreComplete) {
+    return true;
+  }
+
+  if (!lastActiveDay || lastActiveDay === today) {
+    return true;
+  }
+
+  if (alreadyPromptedToday || promptOpen) {
+    return true;
+  }
+
+  return !hasUnsavedWork;
+};
+
+/** Saves the previous cycle when needed, resets the editor, and returns whether a history save occurred. */
+export const getDayRolloverPromptState = ({
+  restoreComplete,
+  lastActiveDay,
+  today,
+  alreadyPromptedToday,
+  promptOpen,
+  forecastCycle,
+  isSaved,
+}: {
+  restoreComplete: boolean;
+  lastActiveDay: string | null;
+  today: string;
+  alreadyPromptedToday: boolean;
+  promptOpen: boolean;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  isSaved: boolean;
+}): DayRolloverPromptState | null => {
+  const hasUnsavedWork = hasUnsavedRolloverCandidateSession(forecastCycle, isSaved);
+
+  if (shouldSkipDayRolloverPrompt({
+    restoreComplete,
+    lastActiveDay,
+    today,
+    alreadyPromptedToday,
+    promptOpen,
+    hasUnsavedWork,
+  })) {
+    return null;
+  }
+
+  return {
+    previousDay: lastActiveDay as string,
+    currentDay: today,
+  };
+};
+
+export const runDayRolloverSaveAction = ({
+  forecastCycle,
+  isSaved,
+  dispatch,
+}: {
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  isSaved: boolean;
+  dispatch: ShortcutDispatch;
+}): boolean => {
+  const didSaveSession = hasUnsavedRolloverCandidateSession(forecastCycle, isSaved);
+
+  if (didSaveSession) {
+    dispatch(saveCurrentCycle({ label: buildRolloverSaveLabel(forecastCycle.cycleDate) }));
+  }
+
+  dispatch(resetForecasts());
+  return didSaveSession;
+};
+
 /** Watches for a local calendar-day rollover and offers to save the previous session before starting a new one. */
 const useDayRolloverPrompt = ({
   restoreComplete,
   dispatch,
   addToast,
   forecastCycle,
+  isSaved,
 }: {
   restoreComplete: boolean;
   dispatch: ShortcutDispatch;
   addToast: AddToastFn;
   forecastCycle: ReturnType<typeof selectForecastCycle>;
+  isSaved: boolean;
 }) => {
   const [promptState, setPromptState] = useState<DayRolloverPromptState | null>(null);
   const forecastCycleRef = useRef(forecastCycle);
+  const isSavedRef = useRef(isSaved);
   const promptStateRef = useRef(promptState);
 
   useEffect(() => {
@@ -776,33 +891,31 @@ const useDayRolloverPrompt = ({
   }, [forecastCycle]);
 
   useEffect(() => {
+    isSavedRef.current = isSaved;
+  }, [isSaved]);
+
+  useEffect(() => {
     promptStateRef.current = promptState;
   }, [promptState]);
 
   const detectDayRollover = useCallback(() => {
-    if (!restoreComplete) {
-      return;
-    }
+    const { today, lastActiveDay, alreadyPromptedToday } = getDayRolloverSnapshot();
+    const nextPromptState = getDayRolloverPromptState({
+      restoreComplete,
+      lastActiveDay,
+      today,
+      alreadyPromptedToday,
+      promptOpen: Boolean(promptStateRef.current),
+      forecastCycle: forecastCycleRef.current,
+      isSaved: isSavedRef.current,
+    });
 
-    const today = getLocalCalendarDate();
-    const lastActiveDay = readStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY);
-    const alreadyPromptedToday = readStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY) === today;
-
-    writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, today);
-
-    if (!lastActiveDay || lastActiveDay === today || alreadyPromptedToday || promptStateRef.current) {
-      return;
-    }
-
-    if (!hasRolloverCandidateSession(forecastCycleRef.current)) {
+    if (!nextPromptState) {
       return;
     }
 
     writeStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY, today);
-    setPromptState({
-      previousDay: lastActiveDay,
-      currentDay: today,
-    });
+    setPromptState(nextPromptState);
   }, [restoreComplete]);
 
   useEffect(() => {
@@ -837,14 +950,20 @@ const useDayRolloverPrompt = ({
   }, []);
 
   const handleSaveAndStartNewDay = useCallback(() => {
-    if (hasRolloverCandidateSession(forecastCycle)) {
-      dispatch(saveCurrentCycle({ label: buildRolloverSaveLabel(forecastCycle.cycleDate) }));
-    }
+    const didSaveSession = runDayRolloverSaveAction({
+      forecastCycle,
+      isSaved,
+      dispatch,
+    });
 
-    dispatch(resetForecasts());
-    addToast('Saved the previous session to Cycle History and started a new forecast for today.', 'success');
+    addToast(
+      didSaveSession
+        ? 'Saved the previous session to Cycle History and started a new forecast for today.'
+        : 'Started a new forecast for today.',
+      'success'
+    );
     setPromptState(null);
-  }, [addToast, dispatch, forecastCycle]);
+  }, [addToast, dispatch, forecastCycle, isSaved]);
 
   return {
     promptState,
@@ -1073,6 +1192,7 @@ const useForecastPageWorkspace = ({
     dispatch,
     addToast,
     forecastCycle,
+    isSaved,
   });
 
   return {
