@@ -1,13 +1,24 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { Dispatch, UnknownAction } from 'redux';
 import ForecastMap, { ForecastMapHandle } from '../components/Map/ForecastMap';
 import { IntegratedToolbar } from '../components/IntegratedToolbar/IntegratedToolbar';
+import { Button } from '../components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { RootState } from '../store';
 import { 
   importForecastCycle, 
   markAsSaved, 
+  resetForecasts,
+  saveCurrentCycle,
   setMapView,
   setActiveOutlookType,
   setActiveProbability,
@@ -80,6 +91,102 @@ const EmergencyModeMessage: React.FC = () => (
       </p>
     </div>
   </div>
+);
+
+interface DayRolloverPromptState {
+  previousDay: string;
+  currentDay: string;
+}
+
+const DAY_ROLLOVER_LAST_ACTIVE_KEY = 'gfc-last-active-local-day';
+const DAY_ROLLOVER_PROMPTED_KEY = 'gfc-day-rollover-prompt-day';
+const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
+
+/** Returns the user's local calendar day in YYYY-MM-DD format. */
+const getLocalCalendarDate = (date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/** Reads one stored day string from localStorage, returning null when storage is unavailable. */
+const readStoredDayValue = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+/** Persists one day string into localStorage, ignoring storage errors. */
+const writeStoredDayValue = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write failures so the editor keeps functioning.
+  }
+};
+
+/** Returns true when the current forecast cycle contains meaningful work worth saving during a day rollover. */
+const hasRolloverCandidateSession = (
+  forecastCycle: ReturnType<typeof selectForecastCycle>
+): boolean => countForecastMetrics(forecastCycle).forecastDays > 0;
+
+/** Builds a short Cycle History label for one rollover save action. */
+const buildRolloverSaveLabel = (cycleDate: string): string => {
+  const parsedDate = new Date(`${cycleDate}T00:00:00`);
+  const labelDate = Number.isNaN(parsedDate.getTime())
+    ? cycleDate
+    : parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `Rollover save • ${labelDate}`;
+};
+
+/** Formats a stored YYYY-MM-DD value into a more readable date label for the dialog copy. */
+const formatRolloverDayLabel = (value: string): string => {
+  const parsedDate = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+
+  return parsedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+};
+
+/** Modal prompt shown when the editor detects the local day rolled over while an older session still has work. */
+const DayRolloverDialog: React.FC<{
+  promptState: DayRolloverPromptState | null;
+  onKeepCurrentSession: () => void;
+  onSaveAndStartNewDay: () => void;
+}> = ({
+  promptState,
+  onKeepCurrentSession,
+  onSaveAndStartNewDay,
+}) => (
+  <Dialog open={Boolean(promptState)} onOpenChange={(isOpen) => { if (!isOpen) onKeepCurrentSession(); }}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>New day detected</DialogTitle>
+        <DialogDescription>
+          {promptState ? (
+            <>
+              It looks like your current Forecast session is from {formatRolloverDayLabel(promptState.previousDay)} and today is{' '}
+              {formatRolloverDayLabel(promptState.currentDay)}. Do you want to save that session to Cycle History and start a
+              fresh forecast for today?
+            </>
+          ) : null}
+        </DialogDescription>
+      </DialogHeader>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onKeepCurrentSession}>
+          Keep Current Session
+        </Button>
+        <Button onClick={onSaveAndStartNewDay}>
+          Save Session &amp; Start New Day
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 );
 
 /** Reads the current map view (center + zoom) from the map adapter; returns defaults if no adapter is mounted. */
@@ -611,6 +718,7 @@ const useSessionRestore = (
   onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
 ) => {
   const onCloudCycleLoadedRef = useRef(onCloudCycleLoaded);
+  const [restoreComplete, setRestoreComplete] = useState(false);
 
   useEffect(() => {
     onCloudCycleLoadedRef.current = onCloudCycleLoaded;
@@ -621,8 +729,12 @@ const useSessionRestore = (
       restoreAvailableSession(dispatch, addToast, onCloudCycleLoadedRef.current);
     } catch {
       // Silently skip auto-load errors to avoid disrupting initial render
+    } finally {
+      setRestoreComplete(true);
     }
   }, [dispatch, addToast]);
+
+  return restoreComplete;
 };
 
 /** Registers a beforeunload listener to warn the user when the forecast has unsaved changes. */
@@ -641,6 +753,104 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isSaved]);
+};
+
+/** Watches for a local calendar-day rollover and offers to save the previous session before starting a new one. */
+const useDayRolloverPrompt = ({
+  restoreComplete,
+  dispatch,
+  addToast,
+  forecastCycle,
+}: {
+  restoreComplete: boolean;
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+}) => {
+  const [promptState, setPromptState] = useState<DayRolloverPromptState | null>(null);
+  const forecastCycleRef = useRef(forecastCycle);
+  const promptStateRef = useRef(promptState);
+
+  useEffect(() => {
+    forecastCycleRef.current = forecastCycle;
+  }, [forecastCycle]);
+
+  useEffect(() => {
+    promptStateRef.current = promptState;
+  }, [promptState]);
+
+  const detectDayRollover = useCallback(() => {
+    if (!restoreComplete) {
+      return;
+    }
+
+    const today = getLocalCalendarDate();
+    const lastActiveDay = readStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY);
+    const alreadyPromptedToday = readStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY) === today;
+
+    writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, today);
+
+    if (!lastActiveDay || lastActiveDay === today || alreadyPromptedToday || promptStateRef.current) {
+      return;
+    }
+
+    if (!hasRolloverCandidateSession(forecastCycleRef.current)) {
+      return;
+    }
+
+    writeStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY, today);
+    setPromptState({
+      previousDay: lastActiveDay,
+      currentDay: today,
+    });
+  }, [restoreComplete]);
+
+  useEffect(() => {
+    detectDayRollover();
+
+    /** Re-checks the local day when the tab regains focus so midnight rollovers are caught quickly. */
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        detectDayRollover();
+      }
+    };
+
+    const intervalId = window.setInterval(detectDayRollover, DAY_ROLLOVER_CHECK_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [detectDayRollover]);
+
+  useEffect(() => {
+    if (!restoreComplete) {
+      return;
+    }
+
+    writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, getLocalCalendarDate());
+  }, [restoreComplete]);
+
+  const handleKeepCurrentSession = useCallback(() => {
+    setPromptState(null);
+  }, []);
+
+  const handleSaveAndStartNewDay = useCallback(() => {
+    if (hasRolloverCandidateSession(forecastCycle)) {
+      dispatch(saveCurrentCycle({ label: buildRolloverSaveLabel(forecastCycle.cycleDate) }));
+    }
+
+    dispatch(resetForecasts());
+    addToast('Saved the previous session to Cycle History and started a new forecast for today.', 'success');
+    setPromptState(null);
+  }, [addToast, dispatch, forecastCycle]);
+
+  return {
+    promptState,
+    handleKeepCurrentSession,
+    handleSaveAndStartNewDay,
+  };
 };
 
 /** Composes save, load, and file-input-change callbacks into a single hook return. */
@@ -834,7 +1044,7 @@ const useForecastPageWorkspace = ({
     userId: user?.uid,
   });
 
-  useSessionRestore(dispatch, addToast, handleCloudCycleLoaded);
+  const restoreComplete = useSessionRestore(dispatch, addToast, handleCloudCycleLoaded);
   useUnsavedChangesWarning(isSaved);
 
   const { handleSave, handleLoad, handleShortcutFileInputChange } = useForecastFileActions(
@@ -858,11 +1068,19 @@ const useForecastPageWorkspace = ({
     currentDay: forecastCycle.currentDay,
   });
 
+  const dayRolloverPrompt = useDayRolloverPrompt({
+    restoreComplete,
+    dispatch,
+    addToast,
+    forecastCycle,
+  });
+
   return {
     emergencyMode,
     handleLoad,
     handleSave,
     handleShortcutFileInputChange,
+    dayRolloverPrompt,
     cloudTools: renderCloudToolbar({
       premiumActive,
       isExpiredPremium,
@@ -886,6 +1104,7 @@ export const ForecastPage: React.FC = () => {
     handleLoad,
     handleSave,
     handleShortcutFileInputChange,
+    dayRolloverPrompt,
     cloudTools,
   } = useForecastPageWorkspace({
     dispatch,
@@ -922,6 +1141,12 @@ export const ForecastPage: React.FC = () => {
         mapRef={mapRef}
         addToast={addToast}
         cloudTools={cloudTools}
+      />
+
+      <DayRolloverDialog
+        promptState={dayRolloverPrompt.promptState}
+        onKeepCurrentSession={dayRolloverPrompt.handleKeepCurrentSession}
+        onSaveAndStartNewDay={dayRolloverPrompt.handleSaveAndStartNewDay}
       />
     </div>
   );
