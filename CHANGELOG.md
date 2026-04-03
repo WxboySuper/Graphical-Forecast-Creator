@@ -5,8 +5,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-04-03
+
 ### Added
-- **Hosted accounts and entitlements:** Added Firebase-backed account profiles, hosted sign-in, premium entitlements, and account management flows for the upcoming `v1.4.0` beta release.
+- **Hosted accounts and entitlements:** Added Firebase-backed account profiles, hosted sign-in, premium entitlements, and account management flows for the `v1.4.0` hosted release.
 - **Cloud forecast library:** Added hosted cloud save/load support, a dedicated cloud library page, toolbar cloud actions, and read-only handling for expired premium users.
 - **User metrics and admin dashboard:** Added progress-style account metrics, aggregate admin metrics, and a hidden admin dashboard for hosted beta operations.
 - **Closed beta access flow:** Added beta-only access gating, invite onboarding, beta account activation, and deployment-specific beta access checks.
@@ -15,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - **Cloud hosted forecasts:** Moved cloud forecast storage out of `userSettings` into a dedicated `cloudCycles` collection so forecast payloads have a long-term home separate from profile preferences.
 - **Pricing and account experience:** Refined the hosted pricing, account, billing, and cloud surfaces to match the newer card/surface design language used across the app.
 - **Forecast toolbar styling:** Rebalanced the forecast utility toolbar layout and brought the cloud save/cloud library buttons back into the same visual system as the rest of the tool buttons, including dark-mode compliant color treatments.
+- **Map layer rendering:** Promoted the elevated vector/reference-layer basemap treatment into the released map stack and standardized released outlook fill rendering around the new layer model.
 - **Beta deployment flow:** Updated the beta and production deployment workflows to support hosted env configuration, separate beta/prod webhook secrets, and a dedicated beta backend process.
 - **Privacy disclosures:** Updated the privacy policy and in-app privacy modal to reflect hosted sync, billing metadata, beta metrics, and operational logging behavior.
 
