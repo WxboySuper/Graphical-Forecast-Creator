@@ -4,9 +4,9 @@
   "description": "Create and verify SPC-style severe weather outlooks",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "cloud.png",
+      "type": "image/png",
+      "sizes": "32x32"
     },
     {
       "src": "logo192.png",
