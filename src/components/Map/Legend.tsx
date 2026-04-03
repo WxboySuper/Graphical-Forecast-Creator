@@ -42,7 +42,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
   /** Renders probabilistic legend entries, including inline SVG hatch previews for CIG layers. */
   const renderProbabilisticLegend = () => {
     let probabilities: string[] = [];
-    let colorMap: any;
+    let colorMap: Record<string, string> = {};
 
     if (activeOutlookType === 'tornado') {
       probabilities = ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG1', 'CIG2', 'CIG3'];
