@@ -239,6 +239,10 @@ const sortProbabilities = (entries: [string, GeoJSON.Feature[]][]): [string, Geo
 
 // Helper: render outlooks onto a map instance
 const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
+  /** Returns export-time style options that match the released opaque map rendering mode. */
+  const getExportFeatureStyle = (outlookType: OutlookType, probability: string) =>
+    getFeatureStyle(outlookType, probability);
+
   // We want to render in a specific order to ensure proper layering
   // (e.g. categorical at bottom, then tornado/wind/hail, then totalSevere, then day4-8 on top)
   const outlookOrder: OutlookType[] = ['categorical', 'tornado', 'wind', 'hail', 'totalSevere', 'day4-8'];
@@ -251,7 +255,7 @@ const renderOutlooksToMap = (mapInstance: L.Map, outlooks: OutlookData) => {
     const sortedEntries = sortProbabilities(entries);
     // Then we loop through the sorted probabilities and render the features with styles based on the outlook type and probability.
     sortedEntries.forEach(([probability, features]) => {
-      const styleOptions = getFeatureStyle(outlookType, probability);
+      const styleOptions = getExportFeatureStyle(outlookType, probability);
       // We add each feature as a GeoJSON layer to the map with the appropriate style.
       // This ensures that the exported image will have the same outlook layers rendered as seen in the live map.
       features.forEach(feature => {

@@ -3,3 +3,8 @@ export { ForecastPage } from './ForecastPage';
 export { DiscussionPage } from './DiscussionPage';
 export { VerificationPage } from './VerificationPage';
 export { ComingSoonPage } from './ComingSoonPage';
+export { AccountPage } from './AccountPage';
+export { PricingPage } from './PricingPage';
+export { AdminPage } from './AdminPage';
+export { default as BetaLandingPage } from './BetaLandingPage';
+export { default as BetaInvitePage } from './BetaInvitePage';

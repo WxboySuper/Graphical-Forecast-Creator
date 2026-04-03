@@ -5,6 +5,7 @@ import { Navbar } from './Navbar';
 import Documentation from '../Documentation/Documentation';
 import { ToastManager } from '../Toast/Toast';
 import ToSModal from '../ToS/ToSModal';
+import PrivacyPolicyModal from '../PrivacyPolicy/PrivacyPolicyModal';
 import { AlertBanner } from '../AlertBanner';
 import { RootState } from '../../store';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,6 +39,7 @@ export const useAppLayout = () => {
 export const AppLayout: React.FC = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
   const [showTermsViewer, setShowTermsViewer] = useState(false);
+  const [showPrivacyViewer, setShowPrivacyViewer] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const navigate = useNavigate();
@@ -63,6 +65,10 @@ export const AppLayout: React.FC = () => {
     setShowTermsViewer(true);
   }, []);
 
+  const handleViewPrivacyPolicy = useCallback(() => {
+    setShowPrivacyViewer(true);
+  }, []);
+
   // Note: The ToS modal in "view-only" mode does not have an accept button, so we don't need a handler for acceptance. The user can only close the modal after viewing the terms.
   const handleCloseDocumentation = useCallback(() => {
     setShowDocumentation(false);
@@ -73,8 +79,16 @@ export const AppLayout: React.FC = () => {
     setShowTermsViewer(false);
   }, []);
 
+  const handleClosePrivacyViewer = useCallback(() => {
+    setShowPrivacyViewer(false);
+  }, []);
+
   // Example of a file load handler that could be passed down to child components (like the forecast editor)
   const handleViewOnlyToSAccept = useCallback(() => {
+    // View-only modal does not need accept behavior.
+  }, []);
+
+  const handleViewOnlyPrivacyAccept = useCallback(() => {
     // View-only modal does not need accept behavior.
   }, []);
 
@@ -151,6 +165,12 @@ export const AppLayout: React.FC = () => {
     return <ToSModal viewOnly onClose={onClose} onAccept={onAccept} />;
   };
 
+  /** Keeps the view-only privacy policy modal wiring out of the main layout JSX. */
+  const PrivacyViewer: React.FC<{ show: boolean; onClose: () => void; onAccept: () => void }> = ({ show, onClose, onAccept }) => {
+    if (!show) return null;
+    return <PrivacyPolicyModal viewOnly onClose={onClose} onAccept={onAccept} />;
+  };
+
   return (
     <AppLayoutContext.Provider value={{ addToast }}>
       <div className={cn('min-h-screen bg-background text-foreground', darkMode && 'dark-mode')}>
@@ -158,6 +178,7 @@ export const AppLayout: React.FC = () => {
           onToggleDocumentation={toggleDocumentation}
           showDocumentation={showDocumentation}
           onViewTerms={handleViewTerms}
+          onViewPrivacyPolicy={handleViewPrivacyPolicy}
         />
 
         <AlertBanner />
@@ -176,6 +197,7 @@ export const AppLayout: React.FC = () => {
         <ToastManager toasts={toasts} onDismiss={removeToast} />
 
         <TermsViewer show={showTermsViewer} onClose={handleCloseTermsViewer} onAccept={handleViewOnlyToSAccept} />
+        <PrivacyViewer show={showPrivacyViewer} onClose={handleClosePrivacyViewer} onAccept={handleViewOnlyPrivacyAccept} />
       </div>
     </AppLayoutContext.Provider>
   );

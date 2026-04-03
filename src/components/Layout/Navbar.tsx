@@ -9,6 +9,7 @@ interface NavbarProps {
   onToggleDocumentation?: () => void;
   showDocumentation?: boolean;
   onViewTerms?: () => void;
+  onViewPrivacyPolicy?: () => void;
 }
 
 // The Navbar component provides a consistent navigation interface across the application.
@@ -16,6 +17,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleDocumentation,
   showDocumentation,
   onViewTerms,
+  onViewPrivacyPolicy,
 }) => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
@@ -36,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             darkMode={darkMode}
             showDocumentation={showDocumentation}
             onViewTerms={onViewTerms}
+            onViewPrivacyPolicy={onViewPrivacyPolicy}
             onToggleDocumentation={onToggleDocumentation}
             onToggleDarkMode={handleToggleDarkMode}
           />

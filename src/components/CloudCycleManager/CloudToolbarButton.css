@@ -1,0 +1,13 @@
+.cloud-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cloud-toolbar-action {
+  border-width: 1px;
+}
+
+.cloud-toolbar-action:disabled {
+  opacity: 0.72;
+}

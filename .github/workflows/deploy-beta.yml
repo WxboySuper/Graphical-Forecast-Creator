@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -35,6 +35,12 @@ jobs:
         env:
           # Override the homepage so asset paths target the beta domain
           PUBLIC_URL: https://beta-gfc.weatherboysuper.com
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_MODE: true
+          VITE_BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
           # Prevent ESLint warnings from failing the build (arc source-map noise etc.)
           CI: false
 
@@ -50,3 +56,89 @@ jobs:
         run: |
           rsync -avz --delete \
             build/ root@${{ secrets.BETA_SSH_HOST }}:/var/www/gfc-beta/
+
+      - name: Deploy analytics server via rsync
+        run: |
+          rsync -avz --exclude='node_modules' --exclude='logs' \
+            server/ root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/
+
+      - name: Write beta analytics env file
+        run: |
+          cat > beta-server.env <<EOF
+          PORT=3007
+          LOG_DIR=/opt/gfc-beta-analytics/logs
+          APP_BASE_URL=https://beta-gfc.weatherboysuper.com
+          BETA_MODE=true
+          BETA_INVITE_TOKEN=${{ secrets.BETA_INVITE_TOKEN }}
+          BETA_INVITE_PATH=${{ secrets.BETA_INVITE_PATH }}
+          ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
+          METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
+          STRIPE_PRICE_ANNUAL_STANDARD=${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
+          STRIPE_PRICE_ANNUAL_PROMO=
+          STRIPE_PROMO_START=
+          STRIPE_PROMO_END=
+          FIREBASE_ADMIN_PROJECT_ID=${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+          FIREBASE_ADMIN_CLIENT_EMAIL=${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+          FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+          EOF
+          rsync -avz beta-server.env root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/.env
+
+      - name: Install analytics dependencies and restart
+        run: |
+          ssh root@${{ secrets.BETA_SSH_HOST }} '
+            cd /opt/gfc-beta-analytics
+            npm install --omit=dev --quiet
+            mkdir -p /opt/gfc-beta-analytics/logs
+            if pm2 describe gfc-beta-analytics > /dev/null 2>&1; then
+              pm2 restart gfc-beta-analytics
+            else
+              pm2 start analytics.js --name gfc-beta-analytics
+            fi
+            pm2 save
+          '
+
+      - name: Deploy analytics server via rsync
+        run: |
+          rsync -avz --exclude='node_modules' --exclude='logs' \
+            server/ root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/
+
+      - name: Write beta analytics env file
+        run: |
+          cat > beta-server.env <<EOF
+          PORT=3007
+          LOG_DIR=/opt/gfc-beta-analytics/logs
+          APP_BASE_URL=https://beta-gfc.weatherboysuper.com
+          BETA_MODE=true
+          BETA_INVITE_TOKEN=${{ secrets.BETA_INVITE_TOKEN }}
+          BETA_INVITE_PATH=${{ secrets.BETA_INVITE_PATH }}
+          ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
+          METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
+          STRIPE_PRICE_ANNUAL_STANDARD=${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
+          STRIPE_PRICE_ANNUAL_PROMO=
+          STRIPE_PROMO_START=
+          STRIPE_PROMO_END=
+          FIREBASE_ADMIN_PROJECT_ID=${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+          FIREBASE_ADMIN_CLIENT_EMAIL=${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+          FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+          EOF
+          rsync -avz beta-server.env root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/.env
+
+      - name: Install analytics dependencies and restart
+        run: |
+          ssh root@${{ secrets.BETA_SSH_HOST }} '
+            cd /opt/gfc-beta-analytics
+            npm install --omit=dev --quiet
+            mkdir -p /opt/gfc-beta-analytics/logs
+            if pm2 describe gfc-beta-analytics > /dev/null 2>&1; then
+              pm2 restart gfc-beta-analytics
+            else
+              pm2 start analytics.js --name gfc-beta-analytics
+            fi
+            pm2 save
+          '

@@ -99,14 +99,17 @@ export const computeZIndex = (outlookType: OutlookType, probability: string) => 
 /**
  * Create a `FeatureStyle` describing stroke/fill and z-index for a
  * specific outlook/probability combination. Handles special 'CIG'
- * pattern values and provides sensible defaults for categorical and
- * non-categorical outlooks.
+ * pattern values and uses fully opaque fills for the released map
+ * treatment.
  *
  * @param outlookType - The outlook type (e.g. 'categorical')
  * @param probability - The probability string
  * @returns A `FeatureStyle` object used by rendering code
  */
-export const getFeatureStyle = (outlookType: OutlookType, probability: string): FeatureStyle => {
+export const getFeatureStyle = (
+  outlookType: OutlookType,
+  probability: string
+): FeatureStyle => {
   if (probability.startsWith('CIG')) {
     const patternMap: Record<string, string> = {
       'CIG1': 'url(#pattern-cig1)',
@@ -127,18 +130,12 @@ export const getFeatureStyle = (outlookType: OutlookType, probability: string): 
   }
 
   const color = lookupColor(outlookType, probability);
-  // Categorical polygons are nested (MRGL contains SLGT contains ENH…).
-  // On the map, a dedicated categorical VectorLayer renders them at full
-  // fill opacity with layer-level 0.5 opacity, so higher-risk polygons
-  // completely cover lower-risk ones without color blending.
-  // This value is used as a fallback / for export utilities.
-  const fillOpacity = outlookType === 'categorical' ? 0.5 : 0.3;
   return {
     color: '#000000',
     weight: 2,
     opacity: 1,
     fillColor: color,
-    fillOpacity,
+    fillOpacity: 1,
     zIndex: computeZIndex(outlookType, probability)
   };
 };

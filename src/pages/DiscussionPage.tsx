@@ -16,6 +16,8 @@ import { RootState } from '../store';
 import { updateDiscussion } from '../store/forecastSlice';
 import { DiscussionMode, DiscussionData, DayType } from '../types/outlooks';
 import { compileDiscussionToText, exportDiscussionToFile } from '../utils/discussionUtils';
+import { useAuth } from '../auth/AuthProvider';
+import { queueProductMetric } from '../utils/productMetrics';
 import DIYDiscussionEditor from '../components/DiscussionEditor/DIYDiscussionEditor';
 import GuidedDiscussionEditor from '../components/DiscussionEditor/GuidedDiscussionEditor';
 import { Button } from '../components/ui/button';
@@ -330,15 +332,19 @@ const buildDiscussionDataFrom = (fields: {
 });
 
 // Manages the editable form state and unsaved flag; keeps setters small and focused.
-const useDiscussionFormState = (existingDiscussion?: DiscussionData) => {
+const useDiscussionFormState = (existingDiscussion: DiscussionData | undefined, defaultForecasterName: string) => {
   const defaults = getDiscussionFormDefaults(existingDiscussion);
+  const mergedDefaults = {
+    ...defaults,
+    forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName,
+  };
 
-  const [mode, setMode] = useState<DiscussionMode>(defaults.mode);
-  const [validStart, setValidStart] = useState(defaults.validStart);
-  const [validEnd, setValidEnd] = useState(defaults.validEnd);
-  const [forecasterName, setForecasterName] = useState(defaults.forecasterName);
-  const [diyContent, setDiyContent] = useState(defaults.diyContent);
-  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(defaults.guidedContent);
+  const [mode, setMode] = useState<DiscussionMode>(mergedDefaults.mode);
+  const [validStart, setValidStart] = useState(mergedDefaults.validStart);
+  const [validEnd, setValidEnd] = useState(mergedDefaults.validEnd);
+  const [forecasterName, setForecasterName] = useState(mergedDefaults.forecasterName);
+  const [diyContent, setDiyContent] = useState(mergedDefaults.diyContent);
+  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(mergedDefaults.guidedContent);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const markUnsaved = useCallback(() => setHasUnsavedChanges(true), []);
@@ -420,14 +426,16 @@ const useDiscussionActions = (opts: {
   buildDiscussionData: () => DiscussionData;
   clearUnsaved: (v: boolean) => void;
   addToast: AddToastFn;
+  user: ReturnType<typeof useAuth>['user'];
 }) => {
-  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast } = opts;
+  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast, user } = opts;
 
   const handleSave = useCallback(() => {
     dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
     clearUnsaved(false);
+    queueProductMetric({ event: 'discussion_saved', user });
     addToast('Discussion saved!', 'success');
-  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast]);
+  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast, user]);
 
   const handleExport = useCallback(() => {
     exportDiscussionToFile(buildDiscussionData(), currentDay);
@@ -437,14 +445,25 @@ const useDiscussionActions = (opts: {
   return { handleSave, handleExport } as const;
 };
 
+interface DiscussionEditorStateOptions {
+  existingDiscussion: DiscussionData | undefined;
+  defaultForecasterName: string;
+  currentDay: DayType;
+  dispatch: ReturnType<typeof useDispatch>;
+  addToast: AddToastFn;
+  user: ReturnType<typeof useAuth>['user'];
+}
+
 /** Composes all discussion editor state — form fields, computed text, auto-save, and actions — into a single hook return value. */
-const useDiscussionEditorState = (
-  existingDiscussion: DiscussionData | undefined,
-  currentDay: DayType,
-  dispatch: ReturnType<typeof useDispatch>,
-  addToast: AddToastFn
-): DiscussionEditorState => {
-  const form = useDiscussionFormState(existingDiscussion);
+const useDiscussionEditorState = ({
+  existingDiscussion,
+  defaultForecasterName,
+  currentDay,
+  dispatch,
+  addToast,
+  user,
+}: DiscussionEditorStateOptions): DiscussionEditorState => {
+  const form = useDiscussionFormState(existingDiscussion, defaultForecasterName);
 
   const buildDiscussionData = useCallback(() => buildDiscussionDataFrom({
     mode: form.mode,
@@ -476,7 +495,8 @@ const useDiscussionEditorState = (
     currentDay,
     buildDiscussionData,
     clearUnsaved: form.setHasUnsavedChanges,
-    addToast
+    addToast,
+    user,
   });
 
   return {
@@ -505,11 +525,20 @@ const useDiscussionEditorState = (
 export const DiscussionPage: React.FC = () => {
   const dispatch = useDispatch();
   const { addToast } = useOutletContext<PageContext>();
+  const { syncedSettings, user } = useAuth();
   
   const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
   const outlookDay = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]);
   const existingDiscussion = outlookDay?.discussion;
-  const editorState = useDiscussionEditorState(existingDiscussion, currentDay, dispatch, addToast);
+  const defaultForecasterName = syncedSettings?.defaultForecasterName ?? user?.displayName ?? '';
+  const editorState = useDiscussionEditorState({
+    existingDiscussion,
+    defaultForecasterName,
+    currentDay,
+    dispatch,
+    addToast,
+    user,
+  });
 
   return (
     <div className="h-full flex flex-col bg-background">

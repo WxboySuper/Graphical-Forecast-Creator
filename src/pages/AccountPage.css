@@ -1,0 +1,328 @@
+.account-page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2.75rem;
+}
+
+.account-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 2.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 2rem;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-primary) 58%, var(--bg-primary));
+  box-shadow: var(--shadow-lg);
+}
+
+.account-hero-content {
+  position: relative;
+}
+
+.account-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.account-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--button-bg);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.account-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.account-hero-text h1 {
+  margin: 0;
+  font-size: clamp(2.35rem, 4vw, 3.9rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.account-hero-text p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 1.04rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.account-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.account-chip-strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.account-sync-badge,
+.account-plan-badge {
+  padding: 0.55rem 1rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.account-signed-grid,
+.account-signed-out-grid {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.account-main-stack,
+.account-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.account-surface-card {
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-md);
+  border-radius: 1.75rem;
+}
+
+.account-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2.35rem 2.5rem 1.75rem;
+}
+
+.account-section-header h2,
+.account-section-header h3 {
+  margin: 0;
+}
+
+.account-section-topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.account-section-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.account-section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 0 2.5rem 2.5rem;
+}
+
+.account-summary-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.account-summary-tile {
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  background: var(--bg-secondary);
+}
+
+.account-summary-tile p {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.account-summary-tile strong {
+  display: block;
+  margin-top: 0.9rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.account-subsection-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1.5rem;
+  background: var(--bg-secondary);
+}
+
+.account-subsection-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.account-subsection-header h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.account-subsection-header p,
+.account-inline-message,
+.account-support-copy {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.account-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.account-action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.account-action-group,
+.account-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
+.account-email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.account-divider-label {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.account-mode-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.account-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.account-error-box {
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--error-text) 24%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--error-text) 10%, var(--bg-primary));
+  font-size: 0.95rem;
+  color: var(--error-text);
+}
+
+.account-support-card {
+  height: 100%;
+}
+
+.account-support-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--text-secondary);
+}
+
+.account-support-list li {
+  line-height: 1.75;
+}
+
+.account-local-only-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 2.5rem 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .account-page-stack {
+    gap: 3rem;
+  }
+
+  .account-hero {
+    padding: 3rem;
+  }
+
+  .account-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-action-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .account-local-only-content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+@media (min-width: 1024px) {
+  .account-signed-grid {
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+    align-items: start;
+  }
+
+  .account-signed-out-grid {
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+    align-items: start;
+  }
+}

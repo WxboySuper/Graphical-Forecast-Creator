@@ -1,13 +1,24 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { Dispatch, UnknownAction } from 'redux';
 import ForecastMap, { ForecastMapHandle } from '../components/Map/ForecastMap';
 import { IntegratedToolbar } from '../components/IntegratedToolbar/IntegratedToolbar';
+import { Button } from '../components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { RootState } from '../store';
 import { 
   importForecastCycle, 
   markAsSaved, 
+  resetForecasts,
+  saveCurrentCycle,
   setMapView,
   setActiveOutlookType,
   setActiveProbability,
@@ -21,12 +32,20 @@ import {
   undoLastEdit,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType } from '../types/outlooks';
-import { deserializeForecast, validateForecastData, exportForecastToJson } from '../utils/fileUtils';
+import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from '../utils/featureFlagsUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useCycleHistoryPersistence } from '../utils/cycleHistoryPersistence';
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import type { AddToastFn } from '../components/Layout';
+import { useAuth } from '../auth/AuthProvider';
+import { useEntitlement } from '../billing/EntitlementProvider';
+import { useCloudCycles, type UseCloudCyclesResult } from '../hooks/useCloudCycles';
+import { useCloudSync } from '../hooks/useCloudSync';
+import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbarButton';
+import { countForecastMetrics } from '../utils/forecastMetrics';
+import { getLocalCalendarDate } from '../utils/localDate';
+import { queueProductMetric } from '../utils/productMetrics';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -75,6 +94,111 @@ const EmergencyModeMessage: React.FC = () => (
   </div>
 );
 
+interface DayRolloverPromptState {
+  previousDay: string;
+  currentDay: string;
+}
+
+const DAY_ROLLOVER_LAST_ACTIVE_KEY = 'gfc-last-active-local-day';
+const DAY_ROLLOVER_PROMPTED_KEY = 'gfc-day-rollover-prompt-day';
+const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
+
+/** Reads one stored day string from localStorage, returning null when storage is unavailable. */
+const readStoredDayValue = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+/** Persists one day string into localStorage, ignoring storage errors. */
+const writeStoredDayValue = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write failures so the editor keeps functioning.
+  }
+};
+
+/** Returns true when the forecast cycle contains any drawable outlook data or saved low-probability state. */
+const hasRolloverForecastData = (
+  forecastCycle: ReturnType<typeof selectForecastCycle>
+): boolean => countForecastMetrics(forecastCycle).forecastDays > 0;
+
+/** Returns true when any forecast day already has discussion content attached. */
+const cycleHasDiscussionContent = (
+  forecastCycle: ReturnType<typeof selectForecastCycle>
+): boolean => Object.values(forecastCycle.days).some((dayData) => Boolean(dayData?.discussion));
+
+/** Returns true when the current session has unsaved work worth saving during a day rollover. */
+const hasUnsavedRolloverCandidateSession = (
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  isSaved: boolean
+): boolean => {
+  if (isSaved) {
+    return false;
+  }
+
+  return hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
+};
+
+/** Builds a short Cycle History label for one rollover save action. */
+const buildRolloverSaveLabel = (cycleDate: string): string => {
+  const parsedDate = new Date(`${cycleDate}T00:00:00`);
+  const labelDate = Number.isNaN(parsedDate.getTime())
+    ? cycleDate
+    : parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `Rollover save • ${labelDate}`;
+};
+
+/** Formats a stored YYYY-MM-DD value into a more readable date label for the dialog copy. */
+const formatRolloverDayLabel = (value: string): string => {
+  const parsedDate = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+
+  return parsedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+};
+
+/** Modal prompt shown when the editor detects the local day rolled over while an older session still has work. */
+const DayRolloverDialog: React.FC<{
+  promptState: DayRolloverPromptState | null;
+  onKeepCurrentSession: () => void;
+  onSaveAndStartNewDay: () => void;
+}> = ({
+  promptState,
+  onKeepCurrentSession,
+  onSaveAndStartNewDay,
+}) => (
+  <Dialog open={Boolean(promptState)} onOpenChange={(isOpen) => { if (!isOpen) onKeepCurrentSession(); }}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>New day detected</DialogTitle>
+        <DialogDescription>
+          {promptState ? (
+            <>
+              It looks like your current Forecast session is from {formatRolloverDayLabel(promptState.previousDay)} and today is{' '}
+              {formatRolloverDayLabel(promptState.currentDay)}. Do you want to save that session to Cycle History and start a
+              fresh forecast for today?
+            </>
+          ) : null}
+        </DialogDescription>
+      </DialogHeader>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onKeepCurrentSession}>
+          Keep Current Session
+        </Button>
+        <Button onClick={onSaveAndStartNewDay}>
+          Save Session &amp; Start New Day
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
 /** Reads the current map view (center + zoom) from the map adapter; returns defaults if no adapter is mounted. */
 const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
   const adapter = ref.current;
@@ -92,6 +216,14 @@ interface LoadedForecastPayload {
   rawData: { mapView?: { center: [number, number]; zoom: number } };
   deserializedCycle: ReturnType<typeof deserializeForecast>;
 }
+
+interface StoredCloudMeta {
+  id?: string;
+  label?: string;
+}
+
+const CLOUD_CYCLE_PAYLOAD_KEY = 'cloudCyclePayload';
+const CLOUD_CYCLE_META_KEY = 'cloudCycleMeta';
 
 /** Reads and validates a forecast JSON file, returning the parsed payload or null on failure. */
 const parseLoadedForecast = async (
@@ -157,17 +289,19 @@ const useForecastSaveAction = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
-  mapRef: React.RefObject<ForecastMapHandle | null>
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+  user: ReturnType<typeof useAuth>['user']
 ) => {
   return useCallback(() => {
     try {
       exportForecastToJson(forecastCycle, buildMapView(mapRef));
       dispatch(markAsSaved());
+      queueProductMetric({ event: 'cycle_saved', user });
       addToast('Forecast exported to JSON!', 'success');
     } catch {
       addToast('Error exporting forecast.', 'error');
     }
-  }, [forecastCycle, dispatch, addToast, mapRef]);
+  }, [forecastCycle, dispatch, addToast, mapRef, user]);
 };
 
 /** Returns a memoized async callback that parses and imports a forecast JSON file into Redux. */
@@ -474,29 +608,143 @@ const useFeatureFlagSync = (
   }, [dispatch, featureFlags]);
 };
 
+/** Reads and validates one stored forecast payload string from browser storage. */
+const parseStoredForecastPayload = (storedValue: string | null): unknown | null => {
+  if (!storedValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(storedValue) as unknown;
+    return validateForecastData(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Applies one stored forecast payload into Redux and restores the saved map view when present. */
+const restoreStoredForecastPayload = (
+  data: unknown,
+  dispatch: ShortcutDispatch
+) => {
+  const deserializedCycle = deserializeForecast(data);
+  dispatch(importForecastCycle(deserializedCycle));
+
+  const rawData = data as LoadedForecastPayload['rawData'];
+  if (rawData.mapView) {
+    dispatch(setMapView(rawData.mapView));
+  }
+};
+
+/** Reads the stored cloud-cycle metadata payload when it exists and is well-formed. */
+const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | null => {
+  if (!storedValue) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedValue) as StoredCloudMeta;
+  } catch {
+    return null;
+  }
+};
+
+/** Clears the temporary session-storage keys used for handing a cloud cycle into the editor. */
+const clearStoredCloudSession = () => {
+  sessionStorage.removeItem(CLOUD_CYCLE_PAYLOAD_KEY);
+  sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
+};
+
+/** Returns true when stored cloud metadata includes the id and label needed to restore selection context. */
+const hasRestorableCloudSelection = (
+  cloudMeta: StoredCloudMeta | null
+): cloudMeta is Required<Pick<StoredCloudMeta, 'id' | 'label'>> => Boolean(cloudMeta?.id && cloudMeta.label);
+
+/** Notifies the forecast page about the cloud cycle that was just restored when metadata is complete. */
+const restoreCloudSelectionContext = (
+  cloudMeta: StoredCloudMeta | null,
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+) => {
+  if (!onCloudCycleLoaded || !hasRestorableCloudSelection(cloudMeta)) {
+    return;
+  }
+
+  onCloudCycleLoaded({ id: cloudMeta.id, label: cloudMeta.label });
+};
+
+/** Restores a cloud-loaded forecast from session storage when one is waiting to be opened. */
+const restoreCloudSession = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn,
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+): boolean => {
+  const cloudPayloadStr = sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY);
+  const data = parseStoredForecastPayload(cloudPayloadStr);
+  if (!data) {
+    return false;
+  }
+
+  const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(CLOUD_CYCLE_META_KEY));
+
+  restoreStoredForecastPayload(data, dispatch);
+  restoreCloudSelectionContext(cloudMeta, onCloudCycleLoaded);
+  clearStoredCloudSession();
+  addToast('Cloud forecast loaded successfully.', 'success');
+  return true;
+};
+
+/** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
+const restoreLocalSession = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn
+): void => {
+  const data = parseStoredForecastPayload(localStorage.getItem('forecastData'));
+  if (!data) {
+    return;
+  }
+
+  restoreStoredForecastPayload(data, dispatch);
+  addToast('Session restored from auto-save.', 'success');
+};
+
+/** Restores a pending cloud session first, then falls back to the local auto-save snapshot. */
+const restoreAvailableSession = (
+  dispatch: ShortcutDispatch,
+  addToast: AddToastFn,
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+) => {
+  const restoredCloudSession = restoreCloudSession(dispatch, addToast, onCloudCycleLoaded);
+  if (restoredCloudSession) {
+    return;
+  }
+
+  restoreLocalSession(dispatch, addToast);
+};
+
 /** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
 const useSessionRestore = (
   dispatch: ShortcutDispatch,
-  addToast: AddToastFn
+  addToast: AddToastFn,
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
 ) => {
+  const onCloudCycleLoadedRef = useRef(onCloudCycleLoaded);
+  const [restoreComplete, setRestoreComplete] = useState(false);
+
+  useEffect(() => {
+    onCloudCycleLoadedRef.current = onCloudCycleLoaded;
+  }, [onCloudCycleLoaded]);
+
   useEffect(() => {
     try {
-      const savedData = localStorage.getItem('forecastData');
-      if (!savedData) return;
-
-      const data = JSON.parse(savedData);
-      if (!validateForecastData(data)) return;
-
-      const deserializedCycle = deserializeForecast(data);
-      dispatch(importForecastCycle(deserializedCycle));
-      if (data.mapView) {
-        dispatch(setMapView(data.mapView));
-      }
-      addToast('Session restored from auto-save.', 'success');
+      restoreAvailableSession(dispatch, addToast, onCloudCycleLoadedRef.current);
     } catch {
       // Silently skip auto-load errors to avoid disrupting initial render
+    } finally {
+      setRestoreComplete(true);
     }
   }, [dispatch, addToast]);
+
+  return restoreComplete;
 };
 
 /** Registers a beforeunload listener to warn the user when the forecast has unsaved changes. */
@@ -517,14 +765,223 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
   }, [isSaved]);
 };
 
+/** Returns the stored/derived day-rollover snapshot needed to decide whether a prompt should be shown. */
+const getDayRolloverSnapshot = () => {
+  const today = getLocalCalendarDate();
+  const lastActiveDay = readStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY);
+  const alreadyPromptedToday = readStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY) === today;
+
+  writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, today);
+
+  return {
+    today,
+    lastActiveDay,
+    alreadyPromptedToday,
+  };
+};
+
+/** Returns true when the day-rollover modal should not be shown for the current snapshot. */
+export const shouldSkipDayRolloverPrompt = ({
+  restoreComplete,
+  lastActiveDay,
+  today,
+  alreadyPromptedToday,
+  promptOpen,
+  hasUnsavedWork,
+}: {
+  restoreComplete: boolean;
+  lastActiveDay: string | null;
+  today: string;
+  alreadyPromptedToday: boolean;
+  promptOpen: boolean;
+  hasUnsavedWork: boolean;
+}) => {
+  if (!restoreComplete) {
+    return true;
+  }
+
+  if (!lastActiveDay || lastActiveDay === today) {
+    return true;
+  }
+
+  if (alreadyPromptedToday || promptOpen) {
+    return true;
+  }
+
+  return !hasUnsavedWork;
+};
+
+/** Saves the previous cycle when needed, resets the editor, and returns whether a history save occurred. */
+export const getDayRolloverPromptState = ({
+  restoreComplete,
+  lastActiveDay,
+  today,
+  alreadyPromptedToday,
+  promptOpen,
+  forecastCycle,
+  isSaved,
+}: {
+  restoreComplete: boolean;
+  lastActiveDay: string | null;
+  today: string;
+  alreadyPromptedToday: boolean;
+  promptOpen: boolean;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  isSaved: boolean;
+}): DayRolloverPromptState | null => {
+  const hasUnsavedWork = hasUnsavedRolloverCandidateSession(forecastCycle, isSaved);
+
+  if (shouldSkipDayRolloverPrompt({
+    restoreComplete,
+    lastActiveDay,
+    today,
+    alreadyPromptedToday,
+    promptOpen,
+    hasUnsavedWork,
+  })) {
+    return null;
+  }
+
+  return {
+    previousDay: lastActiveDay as string,
+    currentDay: today,
+  };
+};
+
+/** Saves the current session to Cycle History when needed, then resets the editor for the new local day. */
+export const runDayRolloverSaveAction = ({
+  forecastCycle,
+  isSaved,
+  dispatch,
+}: {
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  isSaved: boolean;
+  dispatch: ShortcutDispatch;
+}): boolean => {
+  const didSaveSession = hasUnsavedRolloverCandidateSession(forecastCycle, isSaved);
+
+  if (didSaveSession) {
+    dispatch(saveCurrentCycle({ label: buildRolloverSaveLabel(forecastCycle.cycleDate) }));
+  }
+
+  dispatch(resetForecasts());
+  return didSaveSession;
+};
+
+/** Watches for a local calendar-day rollover and offers to save the previous session before starting a new one. */
+const useDayRolloverPrompt = ({
+  restoreComplete,
+  dispatch,
+  addToast,
+  forecastCycle,
+  isSaved,
+}: {
+  restoreComplete: boolean;
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  isSaved: boolean;
+}) => {
+  const [promptState, setPromptState] = useState<DayRolloverPromptState | null>(null);
+  const forecastCycleRef = useRef(forecastCycle);
+  const isSavedRef = useRef(isSaved);
+  const promptStateRef = useRef(promptState);
+
+  useEffect(() => {
+    forecastCycleRef.current = forecastCycle;
+  }, [forecastCycle]);
+
+  useEffect(() => {
+    isSavedRef.current = isSaved;
+  }, [isSaved]);
+
+  useEffect(() => {
+    promptStateRef.current = promptState;
+  }, [promptState]);
+
+  const detectDayRollover = useCallback(() => {
+    const { today, lastActiveDay, alreadyPromptedToday } = getDayRolloverSnapshot();
+    const nextPromptState = getDayRolloverPromptState({
+      restoreComplete,
+      lastActiveDay,
+      today,
+      alreadyPromptedToday,
+      promptOpen: Boolean(promptStateRef.current),
+      forecastCycle: forecastCycleRef.current,
+      isSaved: isSavedRef.current,
+    });
+
+    if (!nextPromptState) {
+      return;
+    }
+
+    writeStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY, today);
+    setPromptState(nextPromptState);
+  }, [restoreComplete]);
+
+  useEffect(() => {
+    detectDayRollover();
+
+    /** Re-checks the local day when the tab regains focus so midnight rollovers are caught quickly. */
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        detectDayRollover();
+      }
+    };
+
+    const intervalId = window.setInterval(detectDayRollover, DAY_ROLLOVER_CHECK_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [detectDayRollover]);
+
+  useEffect(() => {
+    if (!restoreComplete) {
+      return;
+    }
+
+    writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, getLocalCalendarDate());
+  }, [restoreComplete]);
+
+  const handleKeepCurrentSession = useCallback(() => {
+    setPromptState(null);
+  }, []);
+
+  const handleSaveAndStartNewDay = useCallback(() => {
+    const didSaveSession = runDayRolloverSaveAction({
+      forecastCycle,
+      isSaved,
+      dispatch,
+    });
+
+    addToast(
+      didSaveSession
+        ? 'Saved the previous session to Cycle History and started a new forecast for today.'
+        : 'Started a new forecast for today.',
+      'success'
+    );
+    setPromptState(null);
+  }, [addToast, dispatch, forecastCycle, isSaved]);
+
+  return {
+    promptState,
+    handleKeepCurrentSession,
+    handleSaveAndStartNewDay,
+  };
+};
+
 /** Composes save, load, and file-input-change callbacks into a single hook return. */
 const useForecastFileActions = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
-  mapRef: React.RefObject<ForecastMapHandle | null>
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+  user: ReturnType<typeof useAuth>['user']
 ) => {
-  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef);
+  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user);
   const handleLoad = useForecastLoadAction(dispatch, addToast, mapRef);
   const handleShortcutFileInputChange = useShortcutFileInputChange(handleLoad);
 
@@ -582,35 +1039,140 @@ const useKeyboardShortcuts = ({
   }, [dispatch, addToast, drawingState, isSaved, canUndo, canRedo, handleSave, fileInputRef, mapRef, currentDay]);
 };
 
-/** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC = () => {
-  const dispatch = useDispatch();
-  const { addToast } = useOutletContext<PageContext>();
-  const mapRef = useRef<ForecastMapHandle>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+/** Returns the cloud-cycle restore callback and cloud-save action used by the forecast toolbar. */
+const useCloudForecastActions = ({
+  addToast,
+  currentMapView,
+  forecastCycle,
+  markAsCurrent,
+  markCurrentStateSynced,
+  saveCycle,
+  userId,
+}: {
+  addToast: AddToastFn;
+  currentMapView: RootState['forecast']['currentMapView'];
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  markAsCurrent: UseCloudCyclesResult['markAsCurrent'];
+  markCurrentStateSynced: () => void;
+  saveCycle: UseCloudCyclesResult['saveCycle'];
+  userId: string | undefined;
+}) => {
+  const handleCloudCycleLoaded = useCallback(
+    (cloudCycle: { id: string; label: string }) => {
+      markAsCurrent(cloudCycle.id, cloudCycle.label);
+      markCurrentStateSynced();
+    },
+    [markAsCurrent, markCurrentStateSynced]
+  );
 
+  const handleSaveToCloud = useCallback(
+    async (label: string) => {
+      if (!userId) {
+        throw new Error('Sign in to save forecasts to the cloud.');
+      }
+
+      const payload = serializeForecast(forecastCycle, currentMapView);
+      const stats = countForecastMetrics(forecastCycle);
+      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload);
+
+      if (!success) {
+        throw new Error('Unable to save this forecast to the cloud right now.');
+      }
+
+      markCurrentStateSynced();
+      addToast(`Saved "${label}" to the cloud.`, 'success');
+    },
+    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId]
+  );
+
+  return {
+    handleCloudCycleLoaded,
+    handleSaveToCloud,
+  };
+};
+
+/** Creates the cloud toolbar node so the page body stays focused on layout. */
+const renderCloudToolbar = ({
+  premiumActive,
+  isExpiredPremium,
+  forecastCycle,
+  currentCloud,
+  onSaveToCloud,
+  onOpenCloudLibrary,
+}: {
+  premiumActive: boolean;
+  isExpiredPremium: boolean;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  currentCloud: UseCloudCyclesResult['currentCloud'];
+  onSaveToCloud: (label: string) => Promise<void>;
+  onOpenCloudLibrary: () => void;
+}) => (
+  <CloudToolbarButton
+    canSave={premiumActive}
+    premiumActive={premiumActive}
+    isExpiredPremium={isExpiredPremium}
+    currentCycleDate={forecastCycle.cycleDate}
+    currentCloudLabel={currentCloud?.label}
+    syncState={currentCloud?.syncState}
+    onSaveToCloud={onSaveToCloud}
+    onOpenCloudLibrary={onOpenCloudLibrary}
+  />
+);
+
+/** Composes the forecast page's cloud, file, and shortcut hooks into a single workspace model. */
+const useForecastPageWorkspace = ({
+  dispatch,
+  addToast,
+  navigate,
+  mapRef,
+  fileInputRef,
+}: {
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  navigate: ReturnType<typeof useNavigate>;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+}) => {
   const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const forecastCycle = useSelector(selectForecastCycle);
+  const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const canUndo = useSelector(selectCanUndo);
   const canRedo = useSelector(selectCanRedo);
   const emergencyMode = useSelector((state: RootState) => state.forecast.emergencyMode);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+  const { user } = useAuth();
+  const { premiumActive, effectiveSource } = useEntitlement();
+  const cloudCycles = useCloudCycles();
+  const { currentCloud, saveCycle, markAsCurrent } = cloudCycles;
+  const cloudSync = useCloudSync(cloudCycles);
+  const { markCurrentStateSynced } = cloudSync;
+  const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
 
-  // Hooks
   useAutoCategorical();
   useAutoSave();
   useCycleHistoryPersistence();
-
   useFeatureFlagSync(dispatch, featureFlags);
-  useSessionRestore(dispatch, addToast);
+
+  const { handleCloudCycleLoaded, handleSaveToCloud } = useCloudForecastActions({
+    addToast,
+    currentMapView,
+    forecastCycle,
+    markAsCurrent,
+    markCurrentStateSynced,
+    saveCycle,
+    userId: user?.uid,
+  });
+
+  const restoreComplete = useSessionRestore(dispatch, addToast, handleCloudCycleLoaded);
   useUnsavedChangesWarning(isSaved);
 
   const { handleSave, handleLoad, handleShortcutFileInputChange } = useForecastFileActions(
     dispatch,
     addToast,
     forecastCycle,
-    mapRef
+    mapRef,
+    user
   );
 
   useKeyboardShortcuts({
@@ -624,6 +1186,53 @@ export const ForecastPage: React.FC = () => {
     fileInputRef,
     mapRef,
     currentDay: forecastCycle.currentDay,
+  });
+
+  const dayRolloverPrompt = useDayRolloverPrompt({
+    restoreComplete,
+    dispatch,
+    addToast,
+    forecastCycle,
+    isSaved,
+  });
+
+  return {
+    emergencyMode,
+    handleLoad,
+    handleSave,
+    handleShortcutFileInputChange,
+    dayRolloverPrompt,
+    cloudTools: renderCloudToolbar({
+      premiumActive,
+      isExpiredPremium,
+      forecastCycle,
+      currentCloud,
+      onSaveToCloud: handleSaveToCloud,
+      onOpenCloudLibrary: () => navigate('/cloud'),
+    }),
+  };
+};
+
+/** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
+export const ForecastPage: React.FC = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { addToast } = useOutletContext<PageContext>();
+  const mapRef = useRef<ForecastMapHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    emergencyMode,
+    handleLoad,
+    handleSave,
+    handleShortcutFileInputChange,
+    dayRolloverPrompt,
+    cloudTools,
+  } = useForecastPageWorkspace({
+    dispatch,
+    addToast,
+    navigate,
+    mapRef,
+    fileInputRef,
   });
 
   if (emergencyMode) {
@@ -652,6 +1261,13 @@ export const ForecastPage: React.FC = () => {
         onLoad={handleLoad}
         mapRef={mapRef}
         addToast={addToast}
+        cloudTools={cloudTools}
+      />
+
+      <DayRolloverDialog
+        promptState={dayRolloverPrompt.promptState}
+        onKeepCurrentSession={dayRolloverPrompt.handleKeepCurrentSession}
+        onSaveAndStartNewDay={dayRolloverPrompt.handleSaveAndStartNewDay}
       />
     </div>
   );

@@ -1,8 +1,10 @@
 {
   "name": "graphical-forecast-creator",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
-  "homepage": "https://gfc.weatherboysuper.com/",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "^2.19.2",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -28,18 +30,19 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cross-env": "^10.1.0",
+    "firebase": "^12.11.0",
     "html2canvas": "^1.4.1",
     "immer": "^11.1.4",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",
     "ol": "^10.8.0",
+    "ol-mapbox-style": "^13.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.13.2",
-    "react-scripts": "^5.0.1",
     "redux": "^5.0.1",
     "rollup": ">=2.80.0",
     "tailwind-merge": "^3.5.0",
@@ -63,13 +66,13 @@
     }
   },
   "scripts": {
-    "start": "cross-env DISABLE_ESLINT_PLUGIN=true react-scripts start",
-    "build": "cross-env GENERATE_SOURCEMAP=false DISABLE_ESLINT_PLUGIN=true react-scripts build",
-    "test": "react-scripts test",
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "test": "jest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "eject": "react-scripts eject",
-    "predeploy": "npm run build",
+    "predeploy": "pnpm run build",
     "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
@@ -91,15 +94,6 @@
       }
     ]
   },
-  "jest": {
-    "transformIgnorePatterns": [
-      "[/\\\\]node_modules[/\\\\](?!(@turf|polyclip|splaytree|geokdbush|tinyqueue|d3-.+|internmap|delaunator|robust-predicates|leaflet|react-leaflet|@react-leaflet|sweepline-intersections|kdbush|rbush|quickselect|bignumber\\.js|ol))"
-    ],
-    "moduleNameMapper": {
-      "\\.(css|less|sass|scss)$": "identity-obj-proxy",
-      "\\.(gif|ttf|eot|svg|png)$": "<rootDir>/src/__mocks__/fileMock.js"
-    }
-  },
   "browserslist": {
     "production": [
       ">0.2%",
@@ -113,14 +107,24 @@
     ]
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/geojson": "^7946.0.16",
     "@types/uuid": "^11.0.0",
+    "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.27",
+    "babel-jest": "^30.2.0",
     "gh-pages": "^6.3.0",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "postcss": "8",
-    "tailwindcss": "^4.2.2"
+    "tailwindcss": "^4.2.2",
+    "vite": "^7.1.11"
   },
   "overrides": {
     "immer": "^10.1.1",

@@ -6,6 +6,8 @@ import { loadVerificationForecast, clearVerificationForecast } from '../../store
 import { deserializeForecast, validateForecastData } from '../../utils/fileUtils';
 import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
+import { useAuth } from '../../auth/AuthProvider';
+import { queueProductMetric } from '../../utils/productMetrics';
 import './VerificationMode.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
@@ -229,6 +231,7 @@ const VerificationSidebar: React.FC<{
 const VerificationMode: React.FC = () => {
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
+  const { user } = useAuth();
   const mapRef = useRef<VerificationMapHandle>(null);
   const [forecastLoaded, setForecastLoaded] = useState(false);
   const [fileName, setFileName] = useState<string>('');
@@ -254,6 +257,7 @@ const VerificationMode: React.FC = () => {
       setAvailableDays(daysWithData);
       setSelectedDay(daysWithData[0] || 1);
       setForecastLoaded(true);
+      queueProductMetric({ event: 'verification_run', user });
       addToast('Forecast loaded! Load storm reports to begin verification.', 'success');
     } catch (error) {
       const message = error instanceof Error
@@ -263,7 +267,7 @@ const VerificationMode: React.FC = () => {
     } finally {
       event.target.value = '';
     }
-  }, [dispatch, addToast]);
+  }, [dispatch, addToast, user]);
 
   // Handler for when the user clicks the button to clear the loaded forecast, which opens a confirmation modal to confirm the action. If the user confirms, it dispatches an action to clear the forecast data from the Redux store and resets local state related to the loaded forecast. If the user cancels, it simply closes the confirmation modal without making any changes.
   const handleClearForecast = useCallback(() => {

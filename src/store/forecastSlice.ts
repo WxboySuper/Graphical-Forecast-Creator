@@ -3,6 +3,15 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
+import { cloneForecastCycle } from '../utils/fileUtils';
+import { countForecastMetrics } from '../utils/forecastMetrics';
+import { getLocalCalendarDate } from '../utils/localDate';
+
+export interface SavedCycleStats {
+  forecastDays: number;
+  totalOutlooks: number;
+  totalFeatures: number;
+}
 
 export interface SavedCycle {
   id: string;
@@ -10,6 +19,7 @@ export interface SavedCycle {
   cycleDate: string;
   label?: string;
   forecastCycle: ForecastCycle;
+  stats: SavedCycleStats;
 }
 
 export interface ForecastState {
@@ -136,7 +146,7 @@ const initialState: ForecastState = {
       1: createEmptyOutlook(1)
     },
     currentDay: 1,
-    cycleDate: new Date().toISOString().split('T')[0]
+    cycleDate: getLocalCalendarDate()
   },
   drawingState: {
     // Start with tornado for Day 1/2 (default day)
@@ -624,8 +634,8 @@ export const forecastSlice = createSlice({
         // Ignore localStorage clear errors
       }
 
-      // Generate today's date
-      const today = new Date().toISOString().split('T')[0];
+      // Generate today's local date so rollover prompts and resets stay aligned.
+      const today = getLocalCalendarDate();
 
       // Completely replace forecastCycle to force re-render
       const newCycle: ForecastCycle = {
@@ -702,12 +712,14 @@ export const forecastSlice = createSlice({
 
     // Cycle History Management
     saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {
+      const forecastCycleSnapshot = cloneForecastCycle(state.forecastCycle);
       const savedCycle: SavedCycle = {
         id: `${Date.now()}-${Math.random()}`,
         timestamp: new Date().toISOString(),
         cycleDate: state.forecastCycle.cycleDate,
         label: action.payload.label,
-        forecastCycle: JSON.parse(JSON.stringify(state.forecastCycle))
+        forecastCycle: forecastCycleSnapshot,
+        stats: countForecastMetrics(forecastCycleSnapshot),
       };
       state.savedCycles.push(savedCycle);
       state.isSaved = true;
@@ -717,7 +729,7 @@ export const forecastSlice = createSlice({
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
       if (savedCycle) {
-        state.forecastCycle = JSON.parse(JSON.stringify(savedCycle.forecastCycle));
+        state.forecastCycle = cloneForecastCycle(savedCycle.forecastCycle);
         clearHistory(state);
         state.isSaved = true;
       }

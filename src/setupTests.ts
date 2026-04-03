@@ -3,10 +3,103 @@
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
+import { TextDecoder, TextEncoder } from 'util';
+
+const globalScope = globalThis as typeof globalThis & {
+  __GFC_COMING_SOON__?: boolean;
+  __GFC_BETA_MODE__?: boolean;
+  __GFC_BETA_INVITE_PATH__?: string;
+  __GFC_FIREBASE_API_KEY__?: string;
+  __GFC_FIREBASE_AUTH_DOMAIN__?: string;
+  __GFC_FIREBASE_PROJECT_ID__?: string;
+  __GFC_FIREBASE_APP_ID__?: string;
+  Headers?: typeof Headers;
+  Request?: typeof Request;
+  Response?: typeof Response;
+};
+
+if (!globalScope.TextEncoder) {
+  globalScope.TextEncoder = TextEncoder as typeof globalScope.TextEncoder;
+}
+
+if (!globalScope.TextDecoder) {
+  globalScope.TextDecoder = TextDecoder as typeof globalScope.TextDecoder;
+}
+
+if (typeof globalScope.__GFC_COMING_SOON__ === 'undefined') {
+  globalScope.__GFC_COMING_SOON__ = false;
+}
+
+if (typeof globalScope.__GFC_BETA_MODE__ === 'undefined') {
+  globalScope.__GFC_BETA_MODE__ = false;
+}
+
+if (typeof globalScope.__GFC_BETA_INVITE_PATH__ === 'undefined') {
+  globalScope.__GFC_BETA_INVITE_PATH__ = '';
+}
+
+if (typeof globalScope.__GFC_FIREBASE_API_KEY__ === 'undefined') globalScope.__GFC_FIREBASE_API_KEY__ = '';
+if (typeof globalScope.__GFC_FIREBASE_AUTH_DOMAIN__ === 'undefined') globalScope.__GFC_FIREBASE_AUTH_DOMAIN__ = '';
+if (typeof globalScope.__GFC_FIREBASE_PROJECT_ID__ === 'undefined') globalScope.__GFC_FIREBASE_PROJECT_ID__ = '';
+if (typeof globalScope.__GFC_FIREBASE_APP_ID__ === 'undefined') globalScope.__GFC_FIREBASE_APP_ID__ = '';
+
+if (typeof globalScope.Headers === 'undefined') {
+  globalScope.Headers =
+    window.Headers ??
+    (function MockHeaders() {
+      return undefined;
+    } as unknown as typeof Headers);
+}
+
+if (typeof globalScope.Request === 'undefined') {
+  globalScope.Request =
+    window.Request ??
+    (class MockRequest {
+      url = '';
+      method = 'GET';
+    } as unknown as typeof Request);
+}
+
+if (typeof globalScope.Response === 'undefined') {
+  globalScope.Response =
+    window.Response ??
+    (class MockResponse {
+      ok = true;
+      status = 200;
+    } as unknown as typeof Response);
+}
+
+if (!globalScope.fetch) {
+  /** Builds a minimal Response-like object for tests that depend on common fetch response fields. */
+  const createMockResponse = () => {
+    const headers = new globalScope.Headers();
+
+    return {
+      ok: false,
+      status: 500,
+      statusText: 'Mock fetch not implemented',
+      headers,
+      redirected: false,
+      type: 'basic' as ResponseType,
+      url: '',
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      blob: () => Promise.resolve(new Blob()),
+      clone() {
+        return createMockResponse();
+      },
+    };
+  };
+
+  globalScope.fetch = jest.fn().mockResolvedValue({
+    ...createMockResponse(),
+  }) as unknown as typeof globalScope.fetch;
+}
 
 // Mock Leaflet
 jest.mock('leaflet', () => {
-  const L = {
+  const leafletMock = {
     divIcon: jest.fn(() => ({})),
     icon: jest.fn(() => ({})),
     point: jest.fn(() => ({})),
@@ -44,5 +137,5 @@ jest.mock('leaflet', () => {
       }
     },
   };
-  return L;
+  return leafletMock;
 });

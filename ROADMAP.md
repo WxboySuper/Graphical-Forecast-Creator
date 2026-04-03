@@ -123,61 +123,103 @@ This roadmap outlines the evolution of the platform into a comprehensive suite o
 
 ---
 
-## Post-v1.0: The "WarnGen" Era
+## Post-v1.0: Live Product Evolution
 
-## v1.1.0: Real-Time Data Integration
+The roadmap below reflects the product as it actually evolved after the stable `v1.0.0` release. GFC's immediate next milestone is no longer WarnGen-first; `v1.4.0` is focused on accounts, hosted sync, and sustainability so the app can keep growing without locking core forecasting behind a paywall.
+
+## v1.1.0: Workflow Reliability (Released 2026-03-07)
+
+- [x] Fix discussion auto-save so guided and DIY discussion edits persist reliably.
+- [x] Improve verification storm report loading and same-day NOAA archive handling.
+- [x] Fix dark-mode export failures and add clearer export warnings.
+- [x] Improve map label and overlay layering for readability.
+- [x] Add polygon snapping for forecast editing workflows.
+
+## v1.2.0: Editing Safety Nets (Released 2026-03-15)
+
+- [x] Add forecast-page undo/redo controls.
+- [x] Support standard undo/redo keyboard shortcuts.
+- [x] Harden related internal workflow automation around branch porting.
+
+## v1.3.0: Workflow Polish and Visibility (Released 2026-03-24)
+
+- [x] Add ghost outlook overlays for cross-hazard comparison.
+- [x] Add expanded verification storm report windows.
+- [x] Add an alert banner system for in-app messaging.
+- [x] Fix per-day undo/redo history behavior when switching days.
+
+## v1.4.0: Accounts, Cloud Sync, and Sustainability
+
+**Goal:** Make GFC sustainable and more user-friendly without violating the promise that the app stays open source and that core features remain free.
+
+Detailed planning lives in [docs/releases/v1.4.0-plan.md](docs/releases/v1.4.0-plan.md) and the linked phase PRDs under `docs/prds/`.
+
+- [ ] Add optional accounts using Firebase Auth.
+- [ ] Support Google, GitHub, and email/password sign-in.
+- [ ] Sync account profile data and app settings across devices for free users.
+- [ ] Add premium hosted cloud storage for forecast cycles and discussions.
+- [ ] Integrate Stripe billing for `$3/month`, `$25/year` intro pricing, and `$30/year` standard annual pricing.
+- [ ] Add progress-first account metrics such as streaks and output counts.
+- [ ] Add aggregate anonymous admin metrics and a minimal private dashboard.
+- [ ] Update ToS, privacy, roadmap, and release docs to explain the hosted-service model clearly.
+
+## Future WarnGen Roadmap (Version Numbers TBD After v1.4.0)
+
+WarnGen remains part of GFC's future, but the exact version numbers after `v1.4.0` are intentionally flexible while the hosted foundation lands.
+
+### Real-Time Data Integration
 
 - [ ] Integrate Iowa State Mesonet (IEM) WMS service.
 - [ ] Add "Base Reflectivity" (N0Q) layer.
 - [ ] Add "Velocity" (N0U) layer.
 - [ ] Add opacity sliders for radar layers.
 
-## v1.2.0: The WarnGen Interface
+### WarnGen Interface
 
 **Goal:** A dedicated "Operations" page, separate from the Outlook creator.
 
-- [ ] Create `WarnGenPage.tsx` (New Route).
+- [ ] Create `WarnGenPage.tsx` (new route).
 - [ ] Implement a split-screen UI (Map vs. Warning Controls).
 - [ ] Ensure map state is isolated from the Outlook Creator page.
 
-## v1.3.0: Outlook Layer Integration
+### Outlook Layer Integration
 
-**Goal:** Bringing context to the warning process.
+**Goal:** Bring outlook context into the warning process.
 
-- [ ] Add "Load Outlook JSON" button to WarnGen toolbar.
-- [ ] Render Outlook polygons as a **Reference Layer** (Read-Only/Non-Editable).
-- [ ] Ensure Outlook polygons appear *below* warning polygons (z-index).
+- [ ] Add "Load Outlook JSON" button to the WarnGen toolbar.
+- [ ] Render outlook polygons as a reference layer (read-only / non-editable).
+- [ ] Ensure outlook polygons appear below warning polygons.
 
-## v1.4.0: Warning Polygons
+### Warning Polygons
 
-- [ ] Add "Warning Type" selector (Severe Thunderstorm, Tornado, Flash Flood).
-- [ ] Implement "Warning Style" polygons (Red/Yellow outlines with drag handles).
-- [ ] Ensure WarnGen polygons are distinct from Outlook polygons.
+- [ ] Add a warning type selector (Severe Thunderstorm, Tornado, Flash Flood).
+- [ ] Implement warning-style polygons with distinct styling and drag handles.
+- [ ] Keep WarnGen polygons visually and behaviorally distinct from outlook polygons.
 
-## v1.5.0: The Timer & Status
+### Timer and Status
 
-**Goal:** Simulating the pressure of operations.
+**Goal:** Simulate the pressure of operations.
 
-- [ ] Add "Issue Time" and "Expiration Time" logic.
+- [ ] Add issue-time and expiration-time logic.
 - [ ] Implement a countdown timer for active warnings.
-- [ ] Visual cues for expiring warnings (Blinking red).
+- [ ] Add visual cues for expiring warnings.
 
-## v1.6.0: Educational Text Generation
+### Educational Text Generation
 
-**Goal:** Learning *why* we warn, not just generating products.
+**Goal:** Teach why a warning is issued, not just how to draw one.
 
-- [ ] Create the "Warning Text" modal.
-- [ ] Add "Reasoning Prompts" (Why are you issuing? What is the storm motion?).
-- [ ] Add "Hazard Tag" dropdowns (Hail size, Wind speed).
-- [ ] Generate **Educational Summary** text (different from NWS format) focusing on the "Why."
+- [ ] Create the warning text modal.
+- [ ] Add reasoning prompts.
+- [ ] Add hazard-tag dropdowns.
+- [ ] Generate educational summary text focused on the warning rationale.
 
-## v1.7.0: Warning Updates
+### Warning Updates
 
-**Goal:** Managing active events.
+**Goal:** Manage active events over time.
 
-- [ ] Implement "Edit Warning" workflow.
-- [ ] Allow shrinking/trimming active polygons (using Geoman).
-- [ ] Generate "Update Status" text (Simplified update logic, not formal SVS).
+- [ ] Implement edit-warning workflows.
+- [ ] Allow shrinking or trimming active polygons.
+- [ ] Generate simplified update-status text.
 
 ---
 

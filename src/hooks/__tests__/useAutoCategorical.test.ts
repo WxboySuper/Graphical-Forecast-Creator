@@ -86,25 +86,15 @@ describe('processOutlooksToCategorical', () => {
     };
 
     const result = processOutlooksToCategorical(outlooks);
-    // Might return 1 feature if successful
-    // result is Array<Feature>
-    // We expect at least one feature if geometry valid
-    if (result.length > 0) {
-        const props = result[0].properties;
-        expect(props?.outlookType).toBe('categorical');
-        expect(props?.probability).toBe('ENH');
-    }
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.every((feature) => feature.properties?.outlookType === 'categorical')).toBe(true);
+    expect(result.some((feature) => feature.properties?.probability === 'ENH')).toBe(true);
   });
 
   // Since we use turf intersection, robust testing requires valid geometries and turf mocking or integration.
   // The simple object identity checks are no longer valid as new features are created.
 
   test('undoing a probabilistic edit regenerates categorical output', async () => {
-    mockUuid
-      .mockImplementationOnce(() => 'categorical-1')
-      .mockImplementationOnce(() => 'categorical-2')
-      .mockImplementationOnce(() => 'categorical-3');
-
     const store = createStore();
 
     render(
@@ -120,7 +110,8 @@ describe('processOutlooksToCategorical', () => {
     });
 
     await waitFor(() => {
-      expect(getCategoricalFeatures(store)[0]?.id).toBe('categorical-1');
+      expect(getCategoricalFeatures(store).length).toBeGreaterThan(0);
+      expect((getCategoricalFeatures(store)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
     });
 
     act(() => {
@@ -128,7 +119,7 @@ describe('processOutlooksToCategorical', () => {
     });
 
     await waitFor(() => {
-      expect(getCategoricalFeatures(store)[0]?.id).toBe('categorical-2');
+      expect((getCategoricalFeatures(store)[0].geometry as Polygon).coordinates[0][0]).toEqual([3, 3]);
     });
 
     act(() => {
@@ -136,9 +127,7 @@ describe('processOutlooksToCategorical', () => {
     });
 
     await waitFor(() => {
-      expect(getCategoricalFeatures(store)[0]?.id).toBe('categorical-3');
+      expect((getCategoricalFeatures(store)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
     });
-
-    expect((getCategoricalFeatures(store)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
   });
 });
