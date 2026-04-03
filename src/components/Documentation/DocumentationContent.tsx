@@ -1,5 +1,6 @@
 // skipcq: JS-W1028
 import React from 'react';
+import { colorMappings } from '../../utils/outlookUtils';
 
 // Helper: table cell with faded categorical color
 const CatCell: React.FC<{ v: string }> = ({ v }) => {
@@ -11,6 +12,73 @@ const CatCell: React.FC<{ v: string }> = ({ v }) => {
     v === 'HIGH' ? 'cat-high' : '';
   return <td className={cls}>{v}</td>;
 };
+
+interface ColorExampleItem {
+  label: string;
+  color: string;
+  darkText?: boolean;
+}
+
+/** Shared color-swatch row that keeps documentation palette examples tied to the live map colors. */
+const ColorExamples: React.FC<{ items: ColorExampleItem[] }> = ({ items }) => (
+  <div className="color-examples">
+    {items.map(({ label, color, darkText = false }) => (
+      <div key={label} className="color-item" style={{ backgroundColor: color, color: darkText ? '#333' : undefined }}>
+        <span>{label}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const tornadoColorExamples: ColorExampleItem[] = [
+  { label: '2%', color: colorMappings.tornado['2%'] },
+  { label: '5%', color: colorMappings.tornado['5%'] },
+  { label: '10%', color: colorMappings.tornado['10%'], darkText: true },
+  { label: '15%', color: colorMappings.tornado['15%'] },
+  { label: '30%', color: colorMappings.tornado['30%'] },
+  { label: '45%', color: colorMappings.tornado['45%'] },
+  { label: '60%', color: colorMappings.tornado['60%'] },
+];
+
+const windColorExamples: ColorExampleItem[] = [
+  { label: '5%', color: colorMappings.wind['5%'] },
+  { label: '15%', color: colorMappings.wind['15%'], darkText: true },
+  { label: '30%', color: colorMappings.wind['30%'] },
+  { label: '45%', color: colorMappings.wind['45%'] },
+  { label: '60%', color: colorMappings.wind['60%'] },
+  { label: '75%', color: colorMappings.wind['75%'] },
+  { label: '90%', color: colorMappings.wind['90%'], darkText: true },
+];
+
+const hailColorExamples: ColorExampleItem[] = [
+  { label: '5%', color: colorMappings.hail['5%'] },
+  { label: '15%', color: colorMappings.hail['15%'], darkText: true },
+  { label: '30%', color: colorMappings.hail['30%'] },
+  { label: '45%', color: colorMappings.hail['45%'] },
+  { label: '60%', color: colorMappings.hail['60%'] },
+];
+
+const categoricalColorExamples: ColorExampleItem[] = [
+  { label: 'TSTM', color: colorMappings.categorical.TSTM, darkText: true },
+  { label: 'MRGL', color: colorMappings.categorical.MRGL, darkText: true },
+  { label: 'SLGT', color: colorMappings.categorical.SLGT, darkText: true },
+  { label: 'ENH', color: colorMappings.categorical.ENH, darkText: true },
+  { label: 'MDT', color: colorMappings.categorical.MDT },
+  { label: 'HIGH', color: colorMappings.categorical.HIGH },
+];
+
+const totalSevereColorExamples: ColorExampleItem[] = [
+  { label: '5%', color: colorMappings.totalSevere['5%'] },
+  { label: '15%', color: colorMappings.totalSevere['15%'], darkText: true },
+  { label: '30%', color: colorMappings.totalSevere['30%'] },
+  { label: '45%', color: colorMappings.totalSevere['45%'] },
+  { label: '60%', color: colorMappings.totalSevere['60%'] },
+];
+
+const dayFourToEightColorExamples: ColorExampleItem[] = [
+  { label: '15%', color: colorMappings['day4-8']['15%'], darkText: true },
+  { label: '30%', color: colorMappings['day4-8']['30%'] },
+];
 
 /** Overview tab content for the in-app documentation panel. */
 export const OverviewSection: React.FC = () => (
@@ -114,70 +182,32 @@ export const OutlooksSection: React.FC = () => (
 
     <h4>Tornado Outlook (Days 1–2)</h4>
     <p>Probability of a tornado within 25 miles of a point.</p>
-    <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#008b02' }}><span>2%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#89472a' }}><span>5%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fdc900', color: '#333' }}><span>10%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fe0000' }}><span>15%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fe00ff' }}><span>30%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#952ae7' }}><span>45%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#114d8c' }}><span>60%</span></div>
-    </div>
+    <ColorExamples items={tornadoColorExamples} />
     <p>Supports CIG1, CIG2, and CIG3 hatching. CIG level boosts categorical risk — see the Conversion tab for the full table.</p>
 
     <h4>Wind Outlook (Days 1–2)</h4>
     <p>Probability of damaging winds (&ge;58 mph) within 25 miles of a point.</p>
-    <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#894826' }}><span>5%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#ffc703', color: '#333' }}><span>15%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fd0100' }}><span>30%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fe00fe' }}><span>45%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#912bee' }}><span>60%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#cd00cd' }}><span>75%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#0000cd' }}><span>90%</span></div>
-    </div>
+    <ColorExamples items={windColorExamples} />
     <p>Supports CIG1, CIG2, and CIG3 hatching.</p>
 
     <h4>Hail Outlook (Days 1–2)</h4>
     <p>Probability of hail &ge;1&quot; within 25 miles of a point.</p>
-    <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#894826' }}><span>5%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#ffc703', color: '#333' }}><span>15%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fd0100' }}><span>30%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fe00fe' }}><span>45%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#912bee' }}><span>60%</span></div>
-    </div>
+    <ColorExamples items={hailColorExamples} />
     <p>Supports CIG1 and CIG2 hatching only (no CIG3).</p>
 
     <h4>Categorical Outlook (Days 1–2)</h4>
     <p>Auto-derived from Tornado, Wind, and Hail. Only TSTM is drawn manually.</p>
-    <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#bfe7bc', color: '#333' }}><span>TSTM</span></div>
-      <div className="color-item" style={{ backgroundColor: '#7dc580', color: '#333' }}><span>MRGL</span></div>
-      <div className="color-item" style={{ backgroundColor: '#f3f67d', color: '#333' }}><span>SLGT</span></div>
-      <div className="color-item" style={{ backgroundColor: '#e5c27f', color: '#333' }}><span>ENH</span></div>
-      <div className="color-item" style={{ backgroundColor: '#e67f7e' }}><span>MDT</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fe7ffe' }}><span>HIGH</span></div>
-    </div>
+    <ColorExamples items={categoricalColorExamples} />
     <p>Risk hierarchy: TSTM &lt; MRGL &lt; SLGT &lt; ENH &lt; MDT &lt; HIGH. The highest risk from any probabilistic outlook wins in overlapping areas.</p>
 
     <h4>Total Severe Outlook (Day 3 only)</h4>
     <p>Combined severe weather probability — no separate tornado/wind/hail breakdown.</p>
-    <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#894826' }}><span>5%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fdc900', color: '#333' }}><span>15%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fe0000' }}><span>30%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#fe00ff' }}><span>45%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#114d8c' }}><span>60%</span></div>
-    </div>
+    <ColorExamples items={totalSevereColorExamples} />
     <p>Supports CIG1 and CIG2 hatching. No HIGH categorical on Day 3.</p>
 
     <h4>Day 4–8 Outlook</h4>
     <p>Extended-range probabilistic outlook — two levels only, no categorical conversion.</p>
-    <div className="color-examples">
-      <div className="color-item" style={{ backgroundColor: '#FFFF00', color: '#333' }}><span>15%</span></div>
-      <div className="color-item" style={{ backgroundColor: '#FF8C00' }}><span>30%</span></div>
-    </div>
+    <ColorExamples items={dayFourToEightColorExamples} />
 
     <h4>CIG Hatching Levels</h4>
     <p>

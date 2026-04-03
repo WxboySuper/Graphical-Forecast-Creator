@@ -18,11 +18,12 @@ const clearSyncTimeout = (syncTimeoutRef: MutableRefObject<ReturnType<typeof set
   syncTimeoutRef.current = null;
 };
 
-/** Builds the current sync hash for the forecast and map state. */
-const buildCloudSyncHash = (
-  forecastCycle: RootState['forecast']['forecastCycle'],
-  mapView: RootState['forecast']['currentMapView']
-) => JSON.stringify({ forecastCycle, mapView });
+/** Builds the current sync hash from the serialized forecast payload without volatile timestamp fields. */
+const buildCloudSyncHash = (serializedPayload: ReturnType<typeof serializeForecast>) =>
+  JSON.stringify({
+    forecastCycle: serializedPayload.forecastCycle,
+    mapView: serializedPayload.mapView,
+  });
 
 /** Runs one hosted cloud save for the active cloud cycle and updates sync state around the request. */
 const syncCurrentCloudCycle = async ({
@@ -30,8 +31,9 @@ const syncCurrentCloudCycle = async ({
   currentCloud,
   saveCycle,
   updateSyncState,
+  payload,
+  cycleDate,
   forecastCycle,
-  mapView,
   setLastSyncedHash,
   currentHash,
 }: {
@@ -39,8 +41,9 @@ const syncCurrentCloudCycle = async ({
   currentCloud: Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud'];
   saveCycle: Pick<UseCloudCyclesResult, 'saveCycle'>['saveCycle'];
   updateSyncState: Pick<UseCloudCyclesResult, 'updateSyncState'>['updateSyncState'];
+  payload: ReturnType<typeof serializeForecast>;
+  cycleDate: RootState['forecast']['forecastCycle']['cycleDate'];
   forecastCycle: RootState['forecast']['forecastCycle'];
-  mapView: RootState['forecast']['currentMapView'];
   setLastSyncedHash: (hash: string) => void;
   currentHash: string;
 }) => {
@@ -51,9 +54,8 @@ const syncCurrentCloudCycle = async ({
   try {
     updateSyncState('saving');
 
-    const payload = serializeForecast(forecastCycle, mapView);
     const stats = countForecastMetrics(forecastCycle);
-    const success = await saveCycle(currentCloud.label, forecastCycle.cycleDate, stats, payload);
+    const success = await saveCycle(currentCloud.label, cycleDate, stats, payload);
 
     if (!success) {
       updateSyncState('error', 'Failed to sync to cloud');
@@ -93,9 +95,13 @@ export const useCloudSync = (
   const lastSyncStateRef = useRef<string | null>(null);
 
   const canSync = Boolean(currentCloud) && premiumActive;
-  const currentHash = useMemo(
-    () => buildCloudSyncHash(forecastCycle, mapView),
+  const serializedPayload = useMemo(
+    () => serializeForecast(forecastCycle, mapView),
     [forecastCycle, mapView]
+  );
+  const currentHash = useMemo(
+    () => buildCloudSyncHash(serializedPayload),
+    [serializedPayload]
   );
 
   const performSync = useCallback(async () => {
@@ -104,14 +110,15 @@ export const useCloudSync = (
       currentCloud,
       saveCycle,
       updateSyncState,
+      payload: serializedPayload,
+      cycleDate: forecastCycle.cycleDate,
       forecastCycle,
-      mapView,
       setLastSyncedHash: (hash) => {
         lastSyncStateRef.current = hash;
       },
       currentHash,
     });
-  }, [canSync, currentCloud, currentHash, forecastCycle, mapView, saveCycle, updateSyncState]);
+  }, [canSync, currentCloud, currentHash, forecastCycle.cycleDate, saveCycle, serializedPayload, updateSyncState]);
 
   useEffect(() => {
     if (!canSync) {

@@ -224,7 +224,7 @@ const ToSModal: React.FC<ToSModalProps> = ({ onAccept, viewOnly = false, onClose
           <div className="tos-modal-header-row">
             <div>
               <h2 id="tos-title">Terms of Service</h2>
-              <p>Please read and accept before using Graphical Forecast Creator &mdash; ToS v2, Effective April 2026</p>
+              <p>Please read and accept before using Graphical Forecast Creator &mdash; ToS v2, Effective March 31, 2026</p>
             </div>
             {viewOnly && (
               <button className="tos-close-view-btn" onClick={onClose} aria-label="Close">
