@@ -17,9 +17,8 @@ import {
   CircleUserRound,
   MoreHorizontal,
   Crown,
-  SlidersHorizontal,
 } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
 import { Button } from '../ui/button';
 import {
   Tooltip,
@@ -28,7 +27,6 @@ import {
 } from '../ui/tooltip';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -37,8 +35,6 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
-import { RootState } from '../../store';
-import { setFeatureFlag } from '../../store/featureFlagsSlice';
 
 interface ExternalActionLink {
   href: string;
@@ -180,18 +176,9 @@ const MoreActionsMenu: React.FC<{
   onViewPrivacyPolicy?: () => void;
   onToggleDocumentation?: () => void;
 }> = ({ onViewTerms, onViewPrivacyPolicy, onToggleDocumentation }) => {
-  const dispatch = useDispatch();
-  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
-  const showBetaLabs = __GFC_BETA_MODE__;
-
   /** Opens a community/resource link from the navbar overflow menu in a new tab. */
   const openExternalLink = (href: string) => {
     window.open(href, '_blank', 'noopener,noreferrer');
-  };
-
-  /** Updates the shared beta-labs vector basemap override from the global overflow menu. */
-  const handleToggleVectorBasemap = (enabled: boolean) => {
-    dispatch(setFeatureFlag({ feature: 'vectorBasemapEnabled', enabled }));
   };
 
   return (
@@ -222,19 +209,6 @@ const MoreActionsMenu: React.FC<{
             Pricing
           </NavLink>
         </DropdownMenuItem>
-        {showBetaLabs ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Beta Labs</DropdownMenuLabel>
-            <DropdownMenuCheckboxItem
-              checked={vectorBasemapEnabled}
-              onCheckedChange={(checked) => handleToggleVectorBasemap(Boolean(checked))}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Vector basemap + opaque outlook fills
-            </DropdownMenuCheckboxItem>
-          </>
-        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Community</DropdownMenuLabel>
         {externalLinks.map((link) => (

@@ -327,10 +327,9 @@ const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stro
 
 // Function to build OpenLayers style for a given feature based on its outlook type and probability,
 const buildStyle = (
-  { outlookType, probability }: OutlookStyleDescriptor,
-  vectorBasemapEnabled: boolean
+  { outlookType, probability }: OutlookStyleDescriptor
 ) => {
-  const style = getFeatureStyle(outlookType as VerificationOutlookType, probability, { vectorBasemapEnabled });
+  const style = getFeatureStyle(outlookType as VerificationOutlookType, probability);
   const fillColor = String(style.fillColor || FALLBACK_FILL_COLOR);
   const strokeColor = String(style.color || FALLBACK_STROKE_COLOR);
   const fillOpacity = resolveFillOpacity(outlookType, style.fillOpacity);
@@ -426,7 +425,6 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
   const initialMapViewRef = useRef(mapView);
   const outlooks = useSelector((state: RootState) => selectVerificationOutlooksForDay(state, selectedDay));
   const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
-  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const { reports, visible: reportsVisible, filterByType } = useSelector(
     (state: RootState) => state.stormReports
   ); // Select storm reports state
@@ -615,7 +613,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
       return;
     }
 
-    if (vectorBasemapEnabled && isOpenFreeMapStyle(baseMapStyle)) {
+    if (isOpenFreeMapStyle(baseMapStyle)) {
       const requestId = vectorStyleRequestRef.current + 1;
       vectorStyleRequestRef.current = requestId;
 
@@ -683,7 +681,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
         labels.setVisible(false);
       }
     }
-  }, [baseMapStyle, vectorBasemapEnabled]);
+  }, [baseMapStyle]);
 
   useEffect(() => {
     const outlookLayer = outlookLayerRef.current;
@@ -692,7 +690,7 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
     }
 
     outlookLayer.setOpacity(1);
-  }, [activeOutlookType, vectorBasemapEnabled]);
+  }, [activeOutlookType]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;
@@ -714,15 +712,15 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayers
 
       if (Array.isArray(olFeature)) {
         olFeature.forEach((item) => {
-          item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }, vectorBasemapEnabled));
+          item.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
           source.addFeature(item);
         });
       } else {
-        olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }, vectorBasemapEnabled));
+        olFeature.setStyle(buildStyle({ outlookType: activeOutlookType, probability }));
         source.addFeature(olFeature);
       }
     });
-  }, [activeFeatures, activeOutlookType, vectorBasemapEnabled]);
+  }, [activeFeatures, activeOutlookType]);
 
   useEffect(() => {
     const source = stormReportsSourceRef.current;
