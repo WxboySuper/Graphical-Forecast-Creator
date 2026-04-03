@@ -237,7 +237,7 @@ export const RightActions: FC<RightActionsProps> = ({
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-xs text-muted-foreground px-2 hidden sm:inline select-none">
-        v1.4.0-beta
+        v1.4.0
       </span>
 
       <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
