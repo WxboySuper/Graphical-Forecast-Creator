@@ -99,8 +99,8 @@ export const computeZIndex = (outlookType: OutlookType, probability: string) => 
 /**
  * Create a `FeatureStyle` describing stroke/fill and z-index for a
  * specific outlook/probability combination. Handles special 'CIG'
- * pattern values, keeps categorical fills fully opaque, and preserves
- * the lighter probabilistic fill treatment used elsewhere in the app.
+ * pattern values and uses fully opaque fills for the released map
+ * treatment.
  *
  * @param outlookType - The outlook type (e.g. 'categorical')
  * @param probability - The probability string
@@ -135,7 +135,7 @@ export const getFeatureStyle = (
     weight: 2,
     opacity: 1,
     fillColor: color,
-    fillOpacity: outlookType === 'categorical' ? 1 : 0.3,
+    fillOpacity: 1,
     zIndex: computeZIndex(outlookType, probability)
   };
 };
