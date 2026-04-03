@@ -19,43 +19,28 @@ export type TornadoProbability =
   | '2%'
   | '5%'
   | '10%'
-  | '10#'  // Significant tornado - 10%
   | '15%'
-  | '15#'  // Significant tornado - 15%
   | '30%'
-  | '30#'  // Significant tornado - 30%
   | '45%'
-  | '45#'  // Significant tornado - 45%
-  | '60%'
-  | '60#'; // Significant tornado - 60%
+  | '60%';
 
 // Wind Probability
 export type WindProbability = 
   | '5%'
   | '15%'
-  | '15#'
   | '30%'
-  | '30#'
   | '45%'
-  | '45#'
   | '60%'
-  | '60#'
   | '75%'
-  | '75#'
-  | '90%'
-  | '90#';
+  | '90%';
 
 // Hail Probability
 export type HailProbability = 
   | '5%'
   | '15%'
-  | '15#'
   | '30%'
-  | '30#'
   | '45%'
-  | '45#'
-  | '60%'
-  | '60#';
+  | '60%';
 
 // Day 3 Total Severe Probability (combined threat, not separate tornado/wind/hail)
 export type TotalSevereProbability =

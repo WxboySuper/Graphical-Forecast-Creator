@@ -12,10 +12,6 @@ export type FeatureStyle = {
   fillOpacity?: number;
 };
 
-interface FeatureStyleOptions {
-  vectorBasemapEnabled?: boolean;
-}
-
 const RISK_ORDER: Record<string, number> = {
   TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 4, HIGH: 5
 };
@@ -103,8 +99,8 @@ export const computeZIndex = (outlookType: OutlookType, probability: string) => 
 /**
  * Create a `FeatureStyle` describing stroke/fill and z-index for a
  * specific outlook/probability combination. Handles special 'CIG'
- * pattern values and provides sensible defaults for categorical and
- * non-categorical outlooks.
+ * pattern values, keeps categorical fills fully opaque, and preserves
+ * the lighter probabilistic fill treatment used elsewhere in the app.
  *
  * @param outlookType - The outlook type (e.g. 'categorical')
  * @param probability - The probability string
@@ -112,11 +108,8 @@ export const computeZIndex = (outlookType: OutlookType, probability: string) => 
  */
 export const getFeatureStyle = (
   outlookType: OutlookType,
-  probability: string,
-  options: FeatureStyleOptions = {}
+  probability: string
 ): FeatureStyle => {
-  const { vectorBasemapEnabled = false } = options;
-
   if (probability.startsWith('CIG')) {
     const patternMap: Record<string, string> = {
       'CIG1': 'url(#pattern-cig1)',
@@ -137,13 +130,12 @@ export const getFeatureStyle = (
   }
 
   const color = lookupColor(outlookType, probability);
-  const fillOpacity = vectorBasemapEnabled ? 1 : (outlookType === 'categorical' ? 0.5 : 0.3);
   return {
     color: '#000000',
     weight: 2,
     opacity: 1,
     fillColor: color,
-    fillOpacity,
+    fillOpacity: outlookType === 'categorical' ? 1 : 0.3,
     zIndex: computeZIndex(outlookType, probability)
   };
 };

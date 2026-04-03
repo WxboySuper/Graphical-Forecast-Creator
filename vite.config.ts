@@ -12,7 +12,6 @@ export default defineConfig(({ mode }) => {
       __GFC_COMING_SOON__: JSON.stringify(env.VITE_COMING_SOON === 'true'),
       __GFC_BETA_MODE__: JSON.stringify(env.VITE_BETA_MODE === 'true'),
       __GFC_BETA_INVITE_PATH__: JSON.stringify(env.VITE_BETA_INVITE_PATH ?? ''),
-      __GFC_FLAG_VECTOR_BASEMAP__: JSON.stringify(env.VITE_FLAG_VECTOR_BASEMAP === 'true'),
       __GFC_FIREBASE_API_KEY__: JSON.stringify(env.VITE_FIREBASE_API_KEY ?? ''),
       __GFC_FIREBASE_AUTH_DOMAIN__: JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN ?? ''),
       __GFC_FIREBASE_PROJECT_ID__: JSON.stringify(env.VITE_FIREBASE_PROJECT_ID ?? ''),

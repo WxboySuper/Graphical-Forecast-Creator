@@ -17,10 +17,9 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
   // Optimized: Select only activeOutlookType to avoid re-rendering on other drawing state changes (like activeProbability)
   const storeActiveOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
-  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
   const activeOutlookType = activeOutlookTypeOverride || storeActiveOutlookType;
 
-  /** Renders the categorical legend swatches, matching the active map opacity mode. */
+  /** Renders the categorical legend swatches using the released opaque map treatment. */
   const renderCategoricalLegend = () => (
     <>
       <h4 id="legend-title">Categorical Risk Levels</h4>
@@ -29,7 +28,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
           <div key={risk} className="legend-item" role="listitem">
             <div 
               className="legend-color" 
-              style={{ backgroundColor: colorMappings.categorical[risk], opacity: vectorBasemapEnabled ? 1 : 0.5 }}
+              style={{ backgroundColor: colorMappings.categorical[risk], opacity: 1 }}
               role="img"
               aria-label={`Color for ${getCategoricalRiskDisplayName(risk as CategoricalRiskLevel)}`}
             />
@@ -43,7 +42,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
   /** Renders probabilistic legend entries, including inline SVG hatch previews for CIG layers. */
   const renderProbabilisticLegend = () => {
     let probabilities: string[] = [];
-    let colorMap: any;
+    let colorMap: Record<string, string> = {};
 
     if (activeOutlookType === 'tornado') {
       probabilities = ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG1', 'CIG2', 'CIG3'];

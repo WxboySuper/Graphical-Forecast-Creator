@@ -14,59 +14,44 @@ import {
  */
 export const colorMappings: ColorMappings = {
   categorical: {
-    'TSTM': '#bfe7bc', // General Thunderstorm (0/5)
-    'MRGL': '#008b02', // Marginal (1/5) - Darker green
-    'SLGT': '#ffc703', // Slight (2/5) - Golden yellow
-    'ENH': '#ff6600',  // Enhanced (3/5) - Bright orange
-    'MDT': '#e60000',  // Moderate (4/5) - Red
-    'HIGH': '#ff00ff'  // High (5/5) - Magenta
+    'TSTM': '#C1E9C1', // General Thunderstorm (0/5)
+    'MRGL': '#66A366', // Marginal (1/5) - Darker green
+    'SLGT': '#FFE066', // Slight (2/5) - Golden yellow
+    'ENH': '#FFA366',  // Enhanced (3/5) - Bright orange
+    'MDT': '#E06666',  // Moderate (4/5) - Red
+    'HIGH': '#EE99EE'  // High (5/5) - Magenta
   },
   tornado: {
-    '2%': '#008b02',
-    '5%': '#89472a',
-    '10%': '#fdc900',
-    '10#': '#fdc900',
-    '15%': '#fe0000',
-    '15#': '#fe0000',
-    '30%': '#fe00ff',
-    '30#': '#fe00ff',
-    '45%': '#952ae7',
-    '45#': '#952ae7',
-    '60%': '#114d8c',
-    '60#': '#114d8c'
+    '2%': '#79BA7A',
+    '5%': '#BD998A',
+    '10%': '#FFE481',
+    '15%': '#FF8080',
+    '30%': '#FF80FF',
+    '45%': '#C896F7',
+    '60%': '#104E8B',
   },
   wind: {
-    '5%': '#894826',
-    '15%': '#ffc703',
-    '15#': '#ffc703',
-    '30%': '#fd0100',
-    '30#': '#fd0100',
-    '45%': '#fe00fe',
-    '45#': '#fe00fe',
-    '60%': '#912bee',
-    '60#': '#912bee',
-    '75%': '#cd00cd',
-    '75#': '#cd00cd',
-    '90%': '#0000cd',
-    '90#': '#0000cd'
+    '5%': '#C5A392',
+    '15%': '#FFEB7F',
+    '30%': '#FF7F7F',
+    '45%': '#FF7FFF',
+    '60%': '#C895F6',
+    '75%': '#5C85D6',
+    '90%': '#1AFFFF',
   },
   hail: {
-    '5%': '#894826',
-    '15%': '#ffc703',
-    '15#': '#ffc703',
-    '30%': '#fd0100',
-    '30#': '#fd0100',
-    '45%': '#fe00fe',
-    '45#': '#fe00fe',
-    '60%': '#912bee',
-    '60#': '#912bee'
+    '5%': '#C5A392',
+    '15%': '#FFEB7F',
+    '30%': '#FF7F7F',
+    '45%': '#FF7FFF',
+    '60%': '#C895F6',
   },
   totalSevere: {
-    '5%': '#894826',
-    '15%': '#fdc900',
-    '30%': '#fe0000',
-    '45%': '#fe00ff',
-    '60%': '#114d8c'
+    '5%': '#C5A392',
+    '15%': '#FFEB7F',
+    '30%': '#FF7F7F',
+    '45%': '#FF7FFF',
+    '60%': '#C895F6'
   },
   'day4-8': {
     '15%': '#FFFF00', // Yellow

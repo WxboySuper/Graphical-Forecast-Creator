@@ -1,4 +1,4 @@
-import React from 'react';
+import type { FC, ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Map,
@@ -17,9 +17,7 @@ import {
   CircleUserRound,
   MoreHorizontal,
   Crown,
-  SlidersHorizontal,
 } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
 import { Button } from '../ui/button';
 import {
   Tooltip,
@@ -28,7 +26,6 @@ import {
 } from '../ui/tooltip';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -37,13 +34,11 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
-import { RootState } from '../../store';
-import { setFeatureFlag } from '../../store/featureFlagsSlice';
 
 interface ExternalActionLink {
   href: string;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }
 
 interface RightActionsProps {
@@ -97,7 +92,7 @@ const getNavLinkClassName = ({ isActive }: { isActive: boolean }) =>
   );
 
 // The BrandSection component displays the application logo and name in the navbar. It uses the Cloud icon from lucide-react and shows the full name "Graphical Forecast Creator" on larger screens, while displaying "GFC" on smaller screens for better responsiveness.
-export const BrandSection: React.FC = () => (
+export const BrandSection: FC = () => (
   <div className="flex items-center gap-3">
     <div className="flex items-center gap-2 text-foreground">
       <Cloud className="h-6 w-6 text-primary" />
@@ -110,7 +105,7 @@ export const BrandSection: React.FC = () => (
 );
 
 // The MainTabs component displays the main navigation tabs in the navbar.
-export const MainTabs: React.FC = () => (
+export const MainTabs: FC = () => (
   <div className="flex items-center">
     <div className="flex items-center bg-muted rounded-lg p-1">
       {navItems.map(({ to, label, icon: Icon, shortcut }) => (
@@ -131,7 +126,7 @@ export const MainTabs: React.FC = () => (
 );
 
 // The ExternalLinkButton component displays a button for linking to external resources.
-const ExternalLinkButton: React.FC<ExternalActionLink> = ({ href, label, icon }) => (
+const ExternalLinkButton: FC<ExternalActionLink> = ({ href, label, icon }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <Button variant="ghost" size="icon" asChild aria-label={label}>
@@ -147,7 +142,7 @@ const ExternalLinkButton: React.FC<ExternalActionLink> = ({ href, label, icon })
 );
 
 /** Displays the small signed-in dot without adding more nesting to the account button. */
-const AccountIndicator: React.FC<{ showSignedInDot: boolean }> = ({ showSignedInDot }) => {
+const AccountIndicator: FC<{ showSignedInDot: boolean }> = ({ showSignedInDot }) => {
   if (!showSignedInDot) {
     return null;
   }
@@ -156,7 +151,7 @@ const AccountIndicator: React.FC<{ showSignedInDot: boolean }> = ({ showSignedIn
 };
 
 /** Keeps account access visually distinct from lower-priority utility links in the navbar. */
-const AccountButton: React.FC<{ accountLabel: string; showSignedInDot: boolean; status: string }> = ({
+const AccountButton: FC<{ accountLabel: string; showSignedInDot: boolean; status: string }> = ({
   accountLabel,
   showSignedInDot,
   status,
@@ -175,23 +170,14 @@ const AccountButton: React.FC<{ accountLabel: string; showSignedInDot: boolean; 
 };
 
 /** Groups lower-priority documentation, legal, and social links into a compact overflow menu. */
-const MoreActionsMenu: React.FC<{
+const MoreActionsMenu: FC<{
   onViewTerms?: () => void;
   onViewPrivacyPolicy?: () => void;
   onToggleDocumentation?: () => void;
 }> = ({ onViewTerms, onViewPrivacyPolicy, onToggleDocumentation }) => {
-  const dispatch = useDispatch();
-  const vectorBasemapEnabled = useSelector((state: RootState) => state.featureFlags.vectorBasemapEnabled);
-  const showBetaLabs = __GFC_BETA_MODE__;
-
   /** Opens a community/resource link from the navbar overflow menu in a new tab. */
   const openExternalLink = (href: string) => {
     window.open(href, '_blank', 'noopener,noreferrer');
-  };
-
-  /** Updates the shared beta-labs vector basemap override from the global overflow menu. */
-  const handleToggleVectorBasemap = (enabled: boolean) => {
-    dispatch(setFeatureFlag({ feature: 'vectorBasemapEnabled', enabled }));
   };
 
   return (
@@ -222,19 +208,6 @@ const MoreActionsMenu: React.FC<{
             Pricing
           </NavLink>
         </DropdownMenuItem>
-        {showBetaLabs ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Beta Labs</DropdownMenuLabel>
-            <DropdownMenuCheckboxItem
-              checked={vectorBasemapEnabled}
-              onCheckedChange={(checked) => handleToggleVectorBasemap(Boolean(checked))}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Vector basemap + opaque outlook fills
-            </DropdownMenuCheckboxItem>
-          </>
-        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Community</DropdownMenuLabel>
         {externalLinks.map((link) => (
@@ -250,7 +223,7 @@ const MoreActionsMenu: React.FC<{
 };
 
 // The RightActions component displays the action buttons on the right side of the navbar.
-export const RightActions: React.FC<RightActionsProps> = ({
+export const RightActions: FC<RightActionsProps> = ({
   darkMode,
   onViewTerms,
   onViewPrivacyPolicy,
