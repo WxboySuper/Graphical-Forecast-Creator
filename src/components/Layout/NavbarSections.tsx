@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Map,
   MessageSquare,
@@ -52,7 +52,7 @@ interface RightActionsProps {
 
 // Define the navigation items for the main tabs
 const navItems = [
-  { to: '/', label: 'Home', icon: Home, shortcut: '⌃H' },
+  { to: '/', label: 'Home', icon: Home, shortcut: '⌃H', end: true },
   { to: '/forecast', label: 'Forecast', icon: Map, shortcut: '⌃1' },
   { to: '/discussion', label: 'Discussion', icon: MessageSquare, shortcut: '⌃2' },
   { to: '/verification', label: 'Verification', icon: CheckCircle, shortcut: '⌃3' },
@@ -81,65 +81,52 @@ const externalLinks: ExternalActionLink[] = [
   },
 ];
 
-// Utility function to generate class names for NavLink based on active state
-const getNavLinkClassName = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all',
-    'hover:bg-background/50',
-    isActive
-      ? 'bg-background text-foreground shadow-sm'
-      : 'text-muted-foreground'
-  );
+const getNavLinkClassName = (isActive: boolean) =>
+  cn('app-navbar__tab', isActive && 'is-active');
 
-// The BrandSection component displays the application logo and name in the navbar. It uses the Cloud icon from lucide-react and shows the full name "Graphical Forecast Creator" on larger screens, while displaying "GFC" on smaller screens for better responsiveness.
+// The BrandSection component provides a compact product anchor without competing with the navigation.
 export const BrandSection: FC = () => (
-  <div className="flex items-center gap-3">
-    <div className="flex items-center gap-2 text-foreground">
-      <Cloud className="h-6 w-6 text-primary" />
-      <span className="font-semibold text-lg hidden sm:inline">
+  <div className="app-navbar__brand">
+    <div className="app-navbar__brandMark">
+      <Cloud className="h-4 w-4" />
+    </div>
+    <div className="app-navbar__brandText">
+      <span className="app-navbar__brandName app-navbar__brandName--full">
         Graphical Forecast Creator
       </span>
-      <span className="font-semibold text-lg sm:hidden">GFC</span>
+      <span className="app-navbar__brandName app-navbar__brandName--short">
+        GFC
+      </span>
     </div>
   </div>
 );
 
-// The MainTabs component displays the main navigation tabs in the navbar.
-export const MainTabs: FC = () => (
-  <div className="flex items-center">
-    <div className="flex items-center bg-muted rounded-lg p-1">
-      {navItems.map(({ to, label, icon: Icon, shortcut }) => (
-        <Tooltip key={to}>
-          <TooltipTrigger asChild>
-            <NavLink to={to} className={getNavLinkClassName}>
-              <Icon className="h-4 w-4" />
-              <span className="hidden md:inline">{label}</span>
-            </NavLink>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{label} <span className="text-muted-foreground ml-2">{shortcut}</span></p>
-          </TooltipContent>
-        </Tooltip>
-      ))}
-    </div>
-  </div>
-);
+// The MainTabs component keeps primary navigation next to the brand so the header reads left-to-right instead of as separate islands.
+export const MainTabs: FC = () => {
+  const { pathname } = useLocation();
 
-// The ExternalLinkButton component displays a button for linking to external resources.
-const ExternalLinkButton: FC<ExternalActionLink> = ({ href, label, icon }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <Button variant="ghost" size="icon" asChild aria-label={label}>
-        <a href={href} target="_blank" rel="noopener noreferrer">
-          {icon}
-        </a>
-      </Button>
-    </TooltipTrigger>
-    <TooltipContent>
-      <p>{label}</p>
-    </TooltipContent>
-  </Tooltip>
-);
+  return (
+    <div className="app-navbar__tabs">
+      {navItems.map(({ to, label, icon: Icon, shortcut, end }) => {
+        const isActive = end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+
+        return (
+          <Tooltip key={to}>
+            <TooltipTrigger asChild>
+              <NavLink to={to} end={end} className={getNavLinkClassName(isActive)}>
+                <Icon className="app-navbar__tabIcon h-4 w-4" />
+                <span className="app-navbar__tabLabel">{label}</span>
+              </NavLink>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{label} <span className="text-muted-foreground ml-2">{shortcut}</span></p>
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+};
 
 /** Displays the small signed-in dot without adding more nesting to the account button. */
 const AccountIndicator: FC<{ showSignedInDot: boolean }> = ({ showSignedInDot }) => {
@@ -147,23 +134,29 @@ const AccountIndicator: FC<{ showSignedInDot: boolean }> = ({ showSignedInDot })
     return null;
   }
 
-  return <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background" />;
+  return <span className="app-navbar__accountIndicator" aria-hidden="true" />;
 };
 
 /** Keeps account access visually distinct from lower-priority utility links in the navbar. */
-const AccountButton: FC<{ accountLabel: string; showSignedInDot: boolean; status: string }> = ({
+const AccountButton: FC<{ accountLabel: string; showSignedInDot: boolean }> = ({
   accountLabel,
   showSignedInDot,
-  status,
 }) => {
-  const buttonVariant = status === 'signed_in' ? 'secondary' : 'outline';
-
   return (
-    <Button variant={buttonVariant} size="sm" asChild aria-label={accountLabel} className="gap-2" title={accountLabel}>
-      <NavLink to="/account" className="relative">
-        <CircleUserRound className="h-4 w-4" />
-        <span className="hidden lg:inline">Account</span>
-        <AccountIndicator showSignedInDot={showSignedInDot} />
+    <Button
+      variant="ghost"
+      size="sm"
+      asChild
+      aria-label={accountLabel}
+      className="app-navbar__actionButton app-navbar__actionButton--account"
+      title={accountLabel}
+    >
+      <NavLink to="/account" className="app-navbar__accountLink">
+        <span className="app-navbar__accountIconWrap">
+          <CircleUserRound className="h-4 w-4" />
+          <AccountIndicator showSignedInDot={showSignedInDot} />
+        </span>
+        <span className="app-navbar__accountLabel">Account</span>
       </NavLink>
     </Button>
   );
@@ -183,7 +176,13 @@ const MoreActionsMenu: FC<{
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="More actions" title="More">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="More actions"
+          title="More"
+          className="app-navbar__actionButton app-navbar__iconButton"
+        >
           <MoreHorizontal className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
@@ -235,50 +234,44 @@ export const RightActions: FC<RightActionsProps> = ({
   const showSignedInDot = hostedAuthEnabled && status === 'signed_in';
 
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs text-muted-foreground px-2 hidden sm:inline select-none">
-        v1.4.0
-      </span>
+    <div className="app-navbar__actions">
+      <div className="app-navbar__statusMeta">
+        <span className="app-navbar__version">
+          v1.4.0
+        </span>
+        <span className="app-navbar__utilityDivider" aria-hidden="true" />
+      </div>
 
-      <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+      <div className="app-navbar__utilityCluster">
+        <AccountButton accountLabel={accountLabel} showSignedInDot={showSignedInDot} />
 
-      <AccountButton accountLabel={accountLabel} showSignedInDot={showSignedInDot} status={status} />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleDarkMode}
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="app-navbar__actionButton app-navbar__iconButton"
+            >
+              {darkMode ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{darkMode ? 'Light Mode' : 'Dark Mode'}</p>
+          </TooltipContent>
+        </Tooltip>
 
-      {externalLinks.map((link) => (
-        <div key={link.href} className="hidden md:block">
-          <ExternalLinkButton {...link} />
-        </div>
-      ))}
-
-      <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleDarkMode}
-            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {darkMode ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{darkMode ? 'Light Mode' : 'Dark Mode'}</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
-
-      <MoreActionsMenu
-        onViewTerms={onViewTerms}
-        onViewPrivacyPolicy={onViewPrivacyPolicy}
-        onToggleDocumentation={onToggleDocumentation}
-      />
+        <MoreActionsMenu
+          onViewTerms={onViewTerms}
+          onViewPrivacyPolicy={onViewPrivacyPolicy}
+          onToggleDocumentation={onToggleDocumentation}
+        />
+      </div>
     </div>
   );
 };

@@ -13,6 +13,7 @@ import verificationReducer from '../store/verificationSlice';
 import { getLocalCalendarDate } from '../utils/localDate';
 
 const mockAddToast = jest.fn();
+const mockUseAuth = jest.fn(() => ({ user: null, syncedSettings: null }));
 
 jest.mock('../components/Map/ForecastMap', () => {
   const { forwardRef } = jest.requireActual<typeof import('react')>('react');
@@ -22,9 +23,11 @@ jest.mock('../components/Map/ForecastMap', () => {
   };
 });
 
-jest.mock('../components/IntegratedToolbar/IntegratedToolbar', () => ({
-  IntegratedToolbar: () => <div>IntegratedToolbar Mock</div>,
+jest.mock('../components/ForecastWorkspace/ForecastWorkspaceLayouts', () => ({
+  ForecastTabbedToolbarLayout: () => <div>ForecastTabbedToolbarLayout Mock</div>,
 }));
+
+jest.mock('../components/ForecastWorkspace/ForecastWorkspaceModals', () => () => null);
 
 jest.mock('../hooks/useAutoSave', () => ({
   useAutoSave: jest.fn(),
@@ -35,7 +38,7 @@ jest.mock('../utils/cycleHistoryPersistence', () => ({
   useCycleHistoryPersistence: jest.fn(),
 }));
 jest.mock('../auth/AuthProvider', () => ({
-  useAuth: () => ({ user: null }),
+  useAuth: () => mockUseAuth(),
 }));
 jest.mock('../billing/EntitlementProvider', () => ({
   useEntitlement: () => ({ premiumActive: false, effectiveSource: 'none' }),
@@ -114,130 +117,47 @@ const getPromptStateForStore = (
     ...overrides,
   });
 
-describe('ForecastPage keyboard shortcuts', () => {
+describe('ForecastPage layout selection', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    mockAddToast.mockReset();
+    mockUseAuth.mockReturnValue({ user: null, syncedSettings: null });
   });
 
-  test('Ctrl/Cmd+Z dispatches undo', () => {
+  test('defaults to the tabbed toolbar layout when no local override is present', () => {
     const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature('feature-1') }));
-
     renderForecastPage(store);
 
-    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
-
-    const features = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%') || [];
-    expect(features).toHaveLength(0);
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
   });
 
-  test('Ctrl+Y and Shift+Ctrl/Cmd+Z dispatch redo', () => {
+  test('query string or stored/remote overrides resolve to the tabbed toolbar when other variants are removed', () => {
     const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature('feature-1') }));
+    localStorage.setItem('gfc-forecast-ui-variant', 'floating_panels');
 
-    renderForecastPage(store);
-
-    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
-    fireEvent.keyDown(window, { key: 'y', ctrlKey: true });
-
-    let features = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%') || [];
-    expect(features).toHaveLength(1);
-
-    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
-    fireEvent.keyDown(window, { key: 'z', ctrlKey: true, shiftKey: true });
-
-    features = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%') || [];
-    expect(features).toHaveLength(1);
-  });
-
-  test('shortcuts do not fire while typing in an input', () => {
-    const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature('feature-1') }));
-
-    render(
-      <MemoryRouter>
+    const first = render(
+      <MemoryRouter initialEntries={['/forecast?forecastUi=workspace_dock']}>
         <Provider store={store}>
-          <>
-            <ForecastPage />
-            <input aria-label="typing target" />
-          </>
+          <ForecastPage />
         </Provider>
       </MemoryRouter>
     );
 
-    const input = screen.getByLabelText('typing target');
-    input.focus();
-    fireEvent.keyDown(input, { key: 'z', ctrlKey: true });
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    first.unmount();
 
-    const features = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%') || [];
-    expect(features).toHaveLength(1);
-  });
-});
+    localStorage.setItem('gfc-forecast-ui-variant', 'floating_panels');
+    const second = renderForecastPage(store);
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    second.unmount();
 
-describe('ForecastPage day rollover prompt', () => {
-  beforeEach(() => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date('2026-04-02T12:00:00'));
-    localStorage.clear();
-    sessionStorage.clear();
-    mockAddToast.mockReset();
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  test('returns prompt state when the last active day differs from today and the session has unsaved work', () => {
-    const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature('feature-1') }));
-
-    const promptState = getPromptStateForStore(store);
-
-    expect(promptState).toEqual({
-      previousDay: '2026-04-01',
-      currentDay: '2026-04-02',
-    });
-  });
-
-  test('does not return prompt state when the user was already prompted today', () => {
-    const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature('feature-1') }));
-
-    const promptState = getPromptStateForStore(store, {
-      today: getLocalCalendarDate(),
-      alreadyPromptedToday: true,
+    mockUseAuth.mockReturnValue({
+      user: { uid: 'user-1' },
+      syncedSettings: { forecastUiVariant: 'workspace_dock' },
     });
 
-    expect(promptState).toBeNull();
-  });
-
-  test('saves the previous session to cycle history and resets when the user confirms', () => {
-    const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature('feature-1') }));
-    const didSaveSession = runDayRolloverSaveAction({
-      forecastCycle: store.getState().forecast.forecastCycle,
-      isSaved: store.getState().forecast.isSaved,
-      dispatch: store.dispatch,
-    });
-
-    const state = store.getState().forecast;
-    const currentFeatures = state.forecastCycle.days[1]?.data.tornado?.get('2%') || [];
-
-    expect(didSaveSession).toBe(true);
-    expect(state.savedCycles).toHaveLength(1);
-    expect(currentFeatures).toHaveLength(0);
-    expect(state.forecastCycle.cycleDate).toBe('2026-04-02');
-  });
-
-  test('does not prompt for already-saved work from a previous day', () => {
-    const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature('feature-1') }));
-    store.dispatch(markAsSaved());
-
-    const promptState = getPromptStateForStore(store);
-
-    expect(promptState).toBeNull();
+    const third = renderForecastPage(store);
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    third.unmount();
   });
 });

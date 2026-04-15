@@ -1,0 +1,323 @@
+.app-navbar {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid rgba(222, 226, 230, 0.95);
+  box-shadow: 0 12px 28px -24px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.dark-mode .app-navbar {
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom-color: rgba(71, 85, 105, 0.75);
+  box-shadow: 0 14px 34px -26px rgba(2, 6, 23, 0.8);
+}
+
+.app-navbar__shine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.2), transparent);
+}
+
+.app-navbar__inner {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 16px;
+  height: 64px;
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.app-navbar__left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  justify-self: start;
+}
+
+.app-navbar__center {
+  display: flex;
+  align-items: center;
+  justify-self: center;
+  min-width: 0;
+}
+
+.app-navbar__right {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  min-width: 0;
+}
+
+.app-navbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-navbar__brandMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.08);
+  color: rgb(37, 99, 235);
+}
+
+.dark-mode .app-navbar__brandMark {
+  border-color: rgba(96, 165, 250, 0.22);
+  background: rgba(59, 130, 246, 0.16);
+  color: rgb(147, 197, 253);
+}
+
+.app-navbar__brandText {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-navbar__brandName {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgb(15, 23, 42);
+  white-space: nowrap;
+}
+
+.dark-mode .app-navbar__brandName {
+  color: rgb(241, 245, 249);
+}
+
+.app-navbar__brandName--short {
+  display: none;
+}
+
+.app-navbar__tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.app-navbar__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: rgb(71, 85, 105);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.app-navbar__tab:hover {
+  background: rgba(15, 23, 42, 0.05);
+  color: rgb(15, 23, 42);
+}
+
+.app-navbar__tab.is-active {
+  background: rgba(37, 99, 235, 0.08);
+  color: rgb(15, 23, 42);
+}
+
+.app-navbar__tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(37, 99, 235);
+}
+
+.dark-mode .app-navbar__tab {
+  color: rgb(203, 213, 225);
+}
+
+.dark-mode .app-navbar__tab:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: rgb(248, 250, 252);
+}
+
+.dark-mode .app-navbar__tab.is-active {
+  background: rgba(59, 130, 246, 0.16);
+  color: rgb(248, 250, 252);
+}
+
+.dark-mode .app-navbar__tab.is-active::after {
+  background: rgb(96, 165, 250);
+}
+
+.app-navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.app-navbar__statusMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-navbar__version {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgb(156, 163, 175);
+}
+
+.dark-mode .app-navbar__version {
+  color: rgb(148, 163, 184);
+}
+
+.app-navbar__utilityDivider {
+  width: 1px;
+  height: 16px;
+  background: rgba(203, 213, 225, 0.85);
+}
+
+.dark-mode .app-navbar__utilityDivider {
+  background: rgba(71, 85, 105, 0.95);
+}
+
+.app-navbar__utilityCluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-navbar__actionButton {
+  height: 40px !important;
+  border-radius: 12px !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: rgb(15, 23, 42) !important;
+}
+
+.app-navbar__actionButton:hover {
+  background: rgba(15, 23, 42, 0.06) !important;
+}
+
+.dark-mode .app-navbar__actionButton {
+  color: rgb(241, 245, 249) !important;
+}
+
+.dark-mode .app-navbar__actionButton:hover {
+  background: rgba(148, 163, 184, 0.14) !important;
+}
+
+.app-navbar__actionButton--account {
+  padding: 0 14px !important;
+}
+
+.app-navbar__accountLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.app-navbar__accountIconWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-navbar__accountIndicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgb(59, 130, 246);
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  box-sizing: border-box;
+}
+
+.dark-mode .app-navbar__accountIndicator {
+  border-color: rgba(15, 23, 42, 0.96);
+}
+
+.app-navbar__iconButton {
+  width: 40px !important;
+  padding: 0 !important;
+}
+
+.app-navbar__accountLabel {
+  display: inline;
+}
+
+@media (max-width: 1180px) {
+  .app-navbar__statusMeta {
+    display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .app-navbar__tabLabel,
+  .app-navbar__accountLabel {
+    display: none;
+  }
+
+  .app-navbar__tab {
+    padding: 0 12px;
+  }
+
+  .app-navbar__actionButton--account {
+    width: 40px !important;
+    padding: 0 !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-navbar__inner {
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .app-navbar__brandName--full {
+    display: none;
+  }
+
+  .app-navbar__brandName--short {
+    display: block;
+  }
+
+  .app-navbar__tab {
+    padding: 0 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-navbar__tabs {
+    gap: 2px;
+    padding-left: 8px;
+  }
+
+  .app-navbar__tab {
+    padding: 0 8px;
+  }
+
+  .app-navbar__tabLabel {
+    display: none;
+  }
+}

@@ -1,9 +1,8 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import type { Dispatch, UnknownAction } from 'redux';
-import ForecastMap, { ForecastMapHandle } from '../components/Map/ForecastMap';
-import { IntegratedToolbar } from '../components/IntegratedToolbar/IntegratedToolbar';
+import { ForecastMapHandle } from '../components/Map/ForecastMap';
 import { Button } from '../components/ui/button';
 import {
   Dialog,
@@ -46,10 +45,29 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { queueProductMetric } from '../utils/productMetrics';
+import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
+import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
+import { useForecastWorkspaceController } from '../components/ForecastWorkspace/useForecastWorkspaceController';
+import {
+  readStoredForecastUiVariant,
+  resolveForecastUiVariant,
+  type ForecastUiVariant,
+} from '../utils/forecastUiVariant';
 
 interface PageContext {
   addToast: AddToastFn;
 }
+
+const renderForecastWorkspaceLayout = (
+  variant: ForecastUiVariant,
+  props: {
+    mapRef: React.RefObject<ForecastMapHandle | null>;
+    controller: ReturnType<typeof useForecastWorkspaceController>;
+  }
+) => {
+  // Only the Tabbed Toolbar variant is supported now.
+  return <ForecastTabbedToolbarLayout {...props} />;
+};
 
 // Helper to get probability list based on outlook type
 const getProbabilityList = (activeOutlookType: string) => {
@@ -321,17 +339,6 @@ const useForecastLoadAction = (
       addToast('Error reading file.', 'error');
     }
   }, [dispatch, addToast, mapRef]);
-};
-
-/** Returns a memoized file-input change handler that passes the selected file to the async load action. */
-const useShortcutFileInputChange = (handleLoad: (file: File) => Promise<void>) => {
-  return useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleLoad(file).catch(() => undefined);
-    }
-    e.target.value = '';
-  }, [handleLoad]);
 };
 
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
@@ -983,9 +990,8 @@ const useForecastFileActions = (
 ) => {
   const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user);
   const handleLoad = useForecastLoadAction(dispatch, addToast, mapRef);
-  const handleShortcutFileInputChange = useShortcutFileInputChange(handleLoad);
 
-  return { handleSave, handleLoad, handleShortcutFileInputChange };
+  return { handleSave, handleLoad };
 };
 
 interface KeyboardShortcutHookParams {
@@ -1167,7 +1173,7 @@ const useForecastPageWorkspace = ({
   const restoreComplete = useSessionRestore(dispatch, addToast, handleCloudCycleLoaded);
   useUnsavedChangesWarning(isSaved);
 
-  const { handleSave, handleLoad, handleShortcutFileInputChange } = useForecastFileActions(
+  const { handleSave, handleLoad } = useForecastFileActions(
     dispatch,
     addToast,
     forecastCycle,
@@ -1196,12 +1202,12 @@ const useForecastPageWorkspace = ({
     isSaved,
   });
 
-  return {
-    emergencyMode,
-    handleLoad,
-    handleSave,
-    handleShortcutFileInputChange,
-    dayRolloverPrompt,
+  const workspaceController = useForecastWorkspaceController({
+    onSave: handleSave,
+    onLoad: handleLoad,
+    mapRef,
+    fileInputRef,
+    addToast,
     cloudTools: renderCloudToolbar({
       premiumActive,
       isExpiredPremium,
@@ -1210,6 +1216,12 @@ const useForecastPageWorkspace = ({
       onSaveToCloud: handleSaveToCloud,
       onOpenCloudLibrary: () => navigate('/cloud'),
     }),
+  });
+
+  return {
+    emergencyMode,
+    dayRolloverPrompt,
+    workspaceController,
   };
 };
 
@@ -1217,16 +1229,15 @@ const useForecastPageWorkspace = ({
 export const ForecastPage: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useOutletContext<PageContext>();
+  const { syncedSettings } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const {
     emergencyMode,
-    handleLoad,
-    handleSave,
-    handleShortcutFileInputChange,
     dayRolloverPrompt,
-    cloudTools,
+    workspaceController,
   } = useForecastPageWorkspace({
     dispatch,
     addToast,
@@ -1239,31 +1250,22 @@ export const ForecastPage: React.FC = () => {
     return <EmergencyModeMessage />;
   }
 
+  const forecastUiVariant = resolveForecastUiVariant({
+    search: location.search,
+    syncedSettingValue: syncedSettings?.forecastUiVariant,
+    storageValue: readStoredForecastUiVariant(),
+  });
+
   return (
-    <div className="relative h-full w-full">
-      {/* Full-screen map - extends to integrated toolbar */}
-      <div className="absolute inset-x-0 top-0 bottom-[200px] z-0">
-        <ForecastMap ref={mapRef} />
-      </div>
-
-      {/* Hidden file input for keyboard shortcuts */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleShortcutFileInputChange}
-        className="hidden"
-      />
-
-      {/* Integrated Bottom Toolbar */}
-      <IntegratedToolbar
-        onSave={handleSave}
-        onLoad={handleLoad}
-        mapRef={mapRef}
-        addToast={addToast}
-        cloudTools={cloudTools}
-      />
-
+    <div
+      className="w-full overflow-hidden"
+      style={{ height: 'calc(100dvh - var(--app-header-height, 64px))' }}
+    >
+      {renderForecastWorkspaceLayout(forecastUiVariant, {
+        mapRef,
+        controller: workspaceController,
+      })}
+      <ForecastWorkspaceModals controller={workspaceController} />
       <DayRolloverDialog
         promptState={dayRolloverPrompt.promptState}
         onKeepCurrentSession={dayRolloverPrompt.handleKeepCurrentSession}

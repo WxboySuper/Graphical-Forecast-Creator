@@ -22,11 +22,11 @@
   padding: 6px 12px;
   border: 1px solid var(--border-color);
   border-radius: 3px;
-  background-color: var(--bg-primary);
+  background-color: transparent;
   color: var(--text-primary);
   cursor: pointer;
   font-size: 0.9rem;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
   min-width: 36px;
   height: 32px;
   display: flex;
@@ -35,7 +35,7 @@
 }
 
 .toolbar-button:hover {
-  background-color: var(--bg-secondary);
+  background-color: color-mix(in srgb, var(--bg-secondary) 72%, var(--bg-primary));
   border-color: var(--button-bg);
 }
 
@@ -69,8 +69,8 @@
 }
 
 .diy-textarea::placeholder {
-  color: var(--text-tertiary);
-  opacity: 0.8;
+  color: color-mix(in srgb, var(--text-secondary) var(--placeholder-mix), var(--text-tertiary));
+  opacity: 1;
 }
 
 .diy-textarea:focus {
@@ -84,4 +84,31 @@
   color: var(--text-secondary);
   font-size: 0.85rem;
   padding: 4px 8px;
+}
+
+.dark-mode .toolbar-button {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: rgb(226, 232, 240) !important;
+  box-shadow: none;
+}
+
+.dark-mode .toolbar-button:hover {
+  background: rgba(58, 58, 62, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.34) !important;
+  color: rgb(248, 250, 252) !important;
+}
+
+.dark-mode .toolbar-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.28);
+}
+
+.dark-mode .diy-textarea {
+  color: rgb(241, 245, 249);
+}
+
+.dark-mode .diy-textarea::placeholder {
+  color: color-mix(in srgb, var(--text-secondary) var(--placeholder-mix), var(--text-tertiary));
+  opacity: 1;
 }

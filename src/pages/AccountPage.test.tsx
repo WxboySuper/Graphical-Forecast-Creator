@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { AccountPage } from './AccountPage';
 
@@ -18,6 +19,7 @@ const mockUseUserMetrics = jest.requireMock('../metrics/useUserMetrics').useUser
 
 describe('AccountPage', () => {
   beforeEach(() => {
+    localStorage.clear();
     mockUseEntitlement.mockReturnValue({
       entitlementStatus: 'free',
       premiumActive: false,
@@ -114,6 +116,7 @@ describe('AccountPage', () => {
       hostedAuthEnabled: true,
       status: 'signed_in',
       settingsSyncStatus: 'synced',
+      betaAccess: false,
       user: {
         email: 'alex@example.com',
         displayName: 'Alex',
@@ -145,5 +148,44 @@ describe('AccountPage', () => {
     expect(screen.getByText(/Your Activity/i)).toBeInTheDocument();
     expect(screen.getByText(/^4$/)).toBeInTheDocument();
     expect(screen.getByText(/^10$/)).toBeInTheDocument();
+  });
+
+  test('lets beta users switch the Forecast workspace experiment from account settings', async () => {
+    const user = userEvent.setup();
+    const updateSyncedSettings = jest.fn().mockResolvedValue(undefined);
+
+    mockUseAuth.mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      settingsSyncStatus: 'synced',
+      betaAccess: true,
+      user: {
+        email: 'alex@example.com',
+        displayName: 'Alex',
+        providerData: [{ providerId: 'google.com' }],
+      },
+      syncedSettings: {
+        defaultForecasterName: 'Alex',
+        forecastUiVariant: 'integrated',
+      },
+      error: null,
+      signInWithGoogle: jest.fn(),
+      signInWithEmail: jest.fn(),
+      signUpWithEmail: jest.fn(),
+      signOutUser: jest.fn(),
+      updateSyncedSettings,
+    });
+
+    render(
+      <BrowserRouter>
+        <AccountPage />
+      </BrowserRouter>
+    );
+
+    expect(screen.getByRole('button', { name: /tabbed toolbar/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /workspace dock/i }));
+
+    expect(updateSyncedSettings).toHaveBeenCalledWith({ forecastUiVariant: 'workspace_dock' });
+    expect(await screen.findByText(/will open by default on Forecast/i)).toBeInTheDocument();
   });
 });

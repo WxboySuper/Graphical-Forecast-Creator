@@ -11,7 +11,7 @@ import { useAuth } from '../auth/AuthProvider';
 
 import { computeHomeStats, formatCycleDate } from './homeUtils';
 import { createFileHandlers } from '../hooks/useFileLoader';
-import HomeHero, { type HomeVariant } from './home/HomeHero';
+import HomeHero, { HeroSummaryCard, type HomeVariant } from './home/HomeHero';
 import Dashboard from './home/Dashboard';
 import MainGrid from './home/MainGrid';
 import RecentCycles from './home/RecentCycles';
@@ -151,20 +151,21 @@ const HomePage: React.FC = () => {
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
       <div className="home-page-shell">
-        <HomeHero
-          variant={variant}
-          formattedDate={formattedDate}
-          hasSavedCycles={savedCycles.length > 0}
-          savedCyclesCount={savedCycles.length}
-          onStart={handleNavigateForecast}
-          onWriteDiscussion={handleNavigateDiscussion}
-          onViewAccount={handleNavigateAccount}
-          onOpenHistory={handleOpenHistoryModal}
-        />
-
         {variant === 'signed_in' ? (
-          <>
-            <div className="home-primary-grid">
+          <div className="home-signed-in-grid">
+            <div className="home-signed-in-main">
+              <HomeHero
+                variant={variant}
+                formattedDate={formattedDate}
+                hasSavedCycles={savedCycles.length > 0}
+                savedCyclesCount={savedCycles.length}
+                showSummaryCard={false}
+                onStart={handleNavigateForecast}
+                onWriteDiscussion={handleNavigateDiscussion}
+                onViewAccount={handleNavigateAccount}
+                onOpenHistory={handleOpenHistoryModal}
+              />
+
               <div>
                 <MainGrid
                   variant={variant}
@@ -173,12 +174,20 @@ const HomePage: React.FC = () => {
                   forecastCycle={forecastCycle}
                   stats={stats}
                   onQuickStartClick={handleQuickStartClick}
-                  onNavigateForecast={handleNavigateForecast}
-                  onNavigateDiscussion={handleNavigateDiscussion}
                   onNewCycle={handleNewCycle}
                   onSave={handleSave}
                   onOpenFile={openFilePicker}
                   onOpenHistory={handleOpenHistoryModal}
+                />
+              </div>
+            </div>
+
+            <div className="home-signed-in-side">
+              <div className="home-surface-card home-home-summary-rail">
+                <HeroSummaryCard
+                  variant={variant}
+                  formattedDate={formattedDate}
+                  savedCyclesCount={savedCycles.length}
                 />
               </div>
               <RecentCycles
@@ -188,11 +197,20 @@ const HomePage: React.FC = () => {
                 onOpenHistory={handleOpenHistoryModal}
               />
             </div>
-
-            <Dashboard variant={variant} stats={stats} />
-          </>
+          </div>
         ) : (
           <>
+            <HomeHero
+              variant={variant}
+              formattedDate={formattedDate}
+              hasSavedCycles={savedCycles.length > 0}
+              savedCyclesCount={savedCycles.length}
+              onStart={handleNavigateForecast}
+              onWriteDiscussion={handleNavigateDiscussion}
+              onViewAccount={handleNavigateAccount}
+              onOpenHistory={handleOpenHistoryModal}
+            />
+
             <div className="home-primary-grid home-primary-grid-signed-out">
               <div>
                 <MainGrid
@@ -202,15 +220,13 @@ const HomePage: React.FC = () => {
                   forecastCycle={forecastCycle}
                   stats={stats}
                   onQuickStartClick={handleQuickStartClick}
-                  onNavigateForecast={handleNavigateForecast}
-                  onNavigateDiscussion={handleNavigateDiscussion}
                   onNewCycle={handleNewCycle}
                   onSave={handleSave}
                   onOpenFile={openFilePicker}
                   onOpenHistory={handleOpenHistoryModal}
                 />
               </div>
-              <Dashboard variant={variant} stats={stats} />
+              <Dashboard stats={stats} />
             </div>
 
             <RecentCycles

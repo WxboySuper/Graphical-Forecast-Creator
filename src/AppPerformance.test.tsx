@@ -11,7 +11,7 @@ import appModeReducer from './store/appModeSlice';
 import overlaysReducer from './store/overlaysSlice';
 import stormReportsReducer from './store/stormReportsSlice';
 import verificationReducer from './store/verificationSlice';
-import { ForecastPage } from './pages';
+import { ForecastPage } from './pages/ForecastPage';
 
 // Mock child components
 const mockForecastMap = jest.fn();
@@ -28,10 +28,36 @@ jest.mock('./components/Map/ForecastMap', () => {
 jest.mock('./components/IntegratedToolbar/IntegratedToolbar', () => ({
   IntegratedToolbar: () => require('react').createElement('div', null, 'IntegratedToolbar'),
 }));
+jest.mock('./components/ForecastWorkspace/ForecastWorkspaceModals', () => () => <div>ForecastWorkspaceModals</div>);
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation</div>);
 jest.mock('./components/Toast/Toast', () => ({
   ToastManager: () => <div>ToastManager</div>
+}));
+jest.mock('./hooks/useAutoSave', () => ({
+  useAutoSave: jest.fn(),
+}));
+jest.mock('./hooks/useAutoCategorical', () => jest.fn());
+jest.mock('./utils/cycleHistoryPersistence', () => ({
+  useCycleHistoryPersistence: jest.fn(),
+}));
+jest.mock('./auth/AuthProvider', () => ({
+  useAuth: () => ({ user: null }),
+}));
+jest.mock('./billing/EntitlementProvider', () => ({
+  useEntitlement: () => ({ premiumActive: false, effectiveSource: 'none' }),
+}));
+jest.mock('./hooks/useCloudCycles', () => ({
+  useCloudCycles: () => ({
+    currentCloud: null,
+    saveCycle: jest.fn(),
+    markAsCurrent: jest.fn(),
+  }),
+}));
+jest.mock('./hooks/useCloudSync', () => ({
+  useCloudSync: () => ({
+    markCurrentStateSynced: jest.fn(),
+  }),
 }));
 
 // Mock router outlet context

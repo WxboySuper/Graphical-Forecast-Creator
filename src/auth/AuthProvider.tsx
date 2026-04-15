@@ -23,6 +23,13 @@ import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled } from '../lib/firebase';
 import { queueProductMetric } from '../utils/productMetrics';
+import {
+  DEFAULT_FORECAST_UI_VARIANT,
+  normalizeForecastUiVariant,
+  readStoredForecastUiVariant,
+  type ForecastUiVariant,
+  writeStoredForecastUiVariant,
+} from '../utils/forecastUiVariant';
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
@@ -34,6 +41,7 @@ interface UserSettingsDocument {
   counties: boolean;
   ghostOutlooks: OverlaysState['ghostOutlooks'];
   defaultForecasterName: string;
+  forecastUiVariant: ForecastUiVariant;
 }
 
 interface UserProfileDocument {
@@ -76,7 +84,8 @@ const canSyncHostedUserDocuments = (user: User | null): user is User =>
 const createSettingsSnapshot = (
   darkMode: boolean,
   overlays: OverlaysState,
-  defaultForecasterName: string
+  defaultForecasterName: string,
+  forecastUiVariant: ForecastUiVariant
 ): UserSettingsDocument => ({
   darkMode,
   baseMapStyle: overlays.baseMapStyle,
@@ -84,6 +93,7 @@ const createSettingsSnapshot = (
   counties: overlays.counties,
   ghostOutlooks: overlays.ghostOutlooks,
   defaultForecasterName,
+  forecastUiVariant,
 });
 
 /** Validates a Firestore settings payload before the app applies it locally. */
@@ -99,6 +109,7 @@ const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): U
     counties,
     ghostOutlooks,
     defaultForecasterName,
+    forecastUiVariant,
   } = value;
 
   if (typeof darkMode !== 'boolean') {
@@ -124,6 +135,7 @@ const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): U
     counties,
     ghostOutlooks,
     defaultForecasterName,
+    forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
   };
 };
 
@@ -171,6 +183,7 @@ const areUserSettingsEqual = (
     left.stateBorders === right.stateBorders &&
     left.counties === right.counties &&
     left.defaultForecasterName === right.defaultForecasterName &&
+    left.forecastUiVariant === right.forecastUiVariant &&
     JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks)
   );
 };
@@ -224,6 +237,7 @@ const applySettingsToState = (
     );
   }
 
+  writeStoredForecastUiVariant(settings.forecastUiVariant);
   lastSyncedSettingsRef.current = settings;
   setSyncedSettings(settings);
 };
@@ -388,6 +402,289 @@ const getDefaultContextValue = (): AuthContextValue => ({
 });
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
+const useLocalAuthState = (): AuthContextValue => {
+  const dispatch = useDispatch();
+  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
+  const overlays = useSelector((state: RootState) => state.overlays);
+  const currentDarkModeRef = useRef(darkMode);
+  const currentOverlaysRef = useRef(overlays);
+  const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
+  const [status, setStatus] = useState<AuthStatus>('loading');
+  const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
+  const [user, setUser] = useState<User | null>(null);
+  const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [betaAccess, setBetaAccess] = useState(false);
+  const [betaAccessLoading, setBetaAccessLoading] = useState(false);
+
+  useEffect(() => {
+    currentDarkModeRef.current = darkMode;
+  }, [darkMode]);
+
+  useEffect(() => {
+    currentOverlaysRef.current = overlays;
+  }, [overlays]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const init = async () => {
+      try {
+        // Attempt to read an existing local session/profile from the dev server.
+        const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
+        if (!isActive) return;
+
+        if (!resp.ok) {
+          setStatus('signed_out');
+          setSettingsSyncStatus('idle');
+          setUser(null);
+          setSyncedSettings(null);
+          setBetaAccess(false);
+          setBetaAccessLoading(false);
+          setError(null);
+          return;
+        }
+
+        const data = (await resp.json().catch(() => ({}))) as any;
+        const localUser = {
+          uid: data.uid ?? 'local',
+          email: data.email ?? '',
+          displayName: data.displayName ?? '',
+          providerData: [],
+        } as unknown as User;
+
+        setUser(localUser);
+        setStatus('signed_in');
+
+        const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
+        if (remoteSettings) {
+          applySettingsToState(remoteSettings, {
+            currentDarkModeRef,
+            currentOverlaysRef,
+            dispatch,
+            setSyncedSettings,
+            lastSyncedSettingsRef,
+          });
+          setSettingsSyncStatus('synced');
+        } else {
+          setSyncedSettings(null);
+          setSettingsSyncStatus('idle');
+        }
+
+        setBetaAccess(Boolean(data.betaAccess));
+        setBetaAccessLoading(false);
+        setError(null);
+      } catch (err) {
+        if (!isActive) return;
+        setStatus('error');
+        setError(err instanceof Error ? err.message : 'Local auth initialization failed');
+        setUser(null);
+        setSyncedSettings(null);
+        setBetaAccess(false);
+        setBetaAccessLoading(false);
+      }
+    };
+
+    init();
+
+    return () => {
+      isActive = false;
+    };
+  }, [dispatch]);
+
+  const signInWithEmail = useCallback(
+    async (email: string, password: string) => {
+      setError(null);
+
+      const resp = await fetch('/api/local/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
+      });
+
+      if (!resp.ok) {
+        const body = (await resp.json().catch(() => ({ message: 'Sign in failed' }))) as any;
+        setError(body?.message ?? 'Sign in failed');
+        throw new Error(body?.message ?? 'Sign in failed');
+      }
+
+      const data = (await resp.json()) as any;
+      const localUser = {
+        uid: data.uid ?? 'local',
+        email: data.email ?? '',
+        displayName: data.displayName ?? '',
+        providerData: [],
+      } as unknown as User;
+
+      setUser(localUser);
+      setStatus('signed_in');
+
+      const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
+      if (remoteSettings) {
+        applySettingsToState(remoteSettings, {
+          currentDarkModeRef,
+          currentOverlaysRef,
+          dispatch,
+          setSyncedSettings,
+          lastSyncedSettingsRef,
+        });
+        setSettingsSyncStatus('synced');
+      }
+
+      queueProductMetric({ event: 'account_signin', user: localUser });
+    },
+    [dispatch]
+  );
+
+  const signUpWithEmail = useCallback(
+    async (email: string, password: string) => {
+      setError(null);
+
+      const resp = await fetch('/api/local/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
+      });
+
+      if (!resp.ok) {
+        const body = (await resp.json().catch(() => ({ message: 'Sign up failed' }))) as any;
+        setError(body?.message ?? 'Sign up failed');
+        throw new Error(body?.message ?? 'Sign up failed');
+      }
+
+      const data = (await resp.json()) as any;
+      const localUser = {
+        uid: data.uid ?? 'local',
+        email: data.email ?? '',
+        displayName: data.displayName ?? '',
+        providerData: [],
+      } as unknown as User;
+
+      setUser(localUser);
+      setStatus('signed_in');
+
+      const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
+      if (remoteSettings) {
+        applySettingsToState(remoteSettings, {
+          currentDarkModeRef,
+          currentOverlaysRef,
+          dispatch,
+          setSyncedSettings,
+          lastSyncedSettingsRef,
+        });
+        setSettingsSyncStatus('synced');
+      }
+
+      queueProductMetric({ event: 'account_signup', user: localUser });
+    },
+    [dispatch]
+  );
+
+  const signOutUser = useCallback(async () => {
+    setError(null);
+
+    try {
+      await fetch('/api/local/signout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // ignore local sign out errors
+    }
+
+    setUser(null);
+    setStatus('signed_out');
+    setSyncedSettings(null);
+    setSettingsSyncStatus('idle');
+    setBetaAccess(false);
+  }, []);
+
+  const refreshBetaAccess = useCallback(async (): Promise<void> => {
+    setBetaAccessLoading(true);
+
+    try {
+      const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
+      if (!resp.ok) {
+        setBetaAccess(false);
+        setBetaAccessLoading(false);
+        return;
+      }
+
+      const data = (await resp.json()) as any;
+      setBetaAccess(Boolean(data.betaAccess));
+    } catch {
+      setBetaAccess(false);
+    } finally {
+      setBetaAccessLoading(false);
+    }
+  }, []);
+
+  const updateSyncedSettings = useCallback(
+    async (settings: Partial<UserSettingsDocument>): Promise<void> => {
+      setError(null);
+
+      const resp = await fetch('/api/local/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+        credentials: 'include',
+      });
+
+      if (!resp.ok) {
+        const body = (await resp.json().catch(() => ({ message: 'Unable to update settings' }))) as any;
+        const message = body?.message ?? 'Unable to update synced settings right now.';
+        setError(message);
+        throw new Error(message);
+      }
+
+      const data = (await resp.json()) as any;
+      const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
+      if (remoteSettings) {
+        applySettingsToState(remoteSettings, {
+          currentDarkModeRef,
+          currentOverlaysRef,
+          dispatch,
+          setSyncedSettings,
+          lastSyncedSettingsRef,
+        });
+        setSettingsSyncStatus('synced');
+      }
+    },
+    [dispatch]
+  );
+
+  const value = useMemo<AuthContextValue>(() => ({
+    status,
+    settingsSyncStatus,
+    user,
+    syncedSettings,
+    error,
+    hostedAuthEnabled: true,
+    betaAccess,
+    betaAccessLoading,
+    signInWithGoogle: disabledAuthAction,
+    signInWithEmail,
+    signUpWithEmail,
+    signOutUser,
+    updateSyncedSettings,
+    refreshBetaAccess,
+  }), [
+    status,
+    settingsSyncStatus,
+    user,
+    syncedSettings,
+    error,
+    betaAccess,
+    betaAccessLoading,
+    signInWithEmail,
+    signUpWithEmail,
+    signOutUser,
+    updateSyncedSettings,
+    refreshBetaAccess,
+  ]);
+
+  return value;
+};
+
 const useHostedAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
@@ -489,7 +786,12 @@ const useHostedAuthState = (): AuthContextValue => {
 
     /** Captures the current local settings so they can seed a missing cloud document. */
     const buildLocalSettingsSnapshot = (): UserSettingsDocument =>
-      createSettingsSnapshot(currentDarkModeRef.current, currentOverlaysRef.current, user.displayName ?? '');
+      createSettingsSnapshot(
+        currentDarkModeRef.current,
+        currentOverlaysRef.current,
+        user.displayName ?? '',
+        readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT
+      );
 
     /** Applies validated remote settings into Redux and local auth state. */
     const applyRemoteSettings = (settings: UserSettingsDocument) =>
@@ -597,7 +899,8 @@ const useHostedAuthState = (): AuthContextValue => {
     const nextSettings = createSettingsSnapshot(
       darkMode,
       overlays,
-      syncedSettings?.defaultForecasterName ?? user.displayName ?? ''
+      syncedSettings?.defaultForecasterName ?? user.displayName ?? '',
+      syncedSettings?.forecastUiVariant ?? DEFAULT_FORECAST_UI_VARIANT
     );
 
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, nextSettings)) {
@@ -645,7 +948,12 @@ const useHostedAuthState = (): AuthContextValue => {
     }
 
     const settingsRef = doc(db, 'userSettings', user.uid);
-    const fallbackSettings = createSettingsSnapshot(darkMode, overlays, user.displayName ?? '');
+    const fallbackSettings = createSettingsSnapshot(
+      darkMode,
+      overlays,
+      user.displayName ?? '',
+      syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT
+    );
     const nextSettings: UserSettingsDocument = {
       ...(lastSyncedSettingsRef.current ?? fallbackSettings),
       ...settings,
@@ -673,6 +981,7 @@ const useHostedAuthState = (): AuthContextValue => {
       );
 
       setSettingsSyncStatus('synced');
+      writeStoredForecastUiVariant(nextSettings.forecastUiVariant);
     } catch (updateError) {
       lastSyncedSettingsRef.current = previousSettings;
       setSyncedSettings(previousSyncedSettings);
@@ -728,7 +1037,9 @@ const useHostedAuthState = (): AuthContextValue => {
 
 /** Provides hosted-auth state and actions while gracefully falling back to local-only mode. */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const value = useHostedAuthState();
+  const hostedValue = useHostedAuthState();
+  const localValue = useLocalAuthState();
+  const value = isHostedAuthEnabled ? hostedValue : localValue;
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

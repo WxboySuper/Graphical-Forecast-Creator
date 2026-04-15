@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { Activity, CircleUserRound, Cloud, Crown, LoaderCircle, LogOut, Mail } from 'lucide-react';
 import { Badge, type BadgeProps } from '../components/ui/badge';
@@ -8,6 +9,16 @@ import { Input } from '../components/ui/input';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { useUserMetrics } from '../metrics/useUserMetrics';
+import { cn } from '../lib/utils';
+import type { RootState } from '../store';
+import { selectForecastCycle, selectSavedCycles } from '../store/forecastSlice';
+import { computeHomeStats } from './homeUtils';
+import {
+  DEFAULT_FORECAST_UI_VARIANT,
+  FORECAST_UI_VARIANT_OPTIONS,
+  readStoredForecastUiVariant,
+  type ForecastUiVariant,
+} from '../utils/forecastUiVariant';
 import './AccountPage.css';
 
 type AuthMode = 'sign_in' | 'sign_up';
@@ -122,6 +133,15 @@ const getCurrentPlanPrice = (
 
   return 'Included';
 };
+
+/** Returns the current Forecast workspace experiment label for status copy. */
+const getForecastUiVariantLabel = (variant: ForecastUiVariant): string =>
+  FORECAST_UI_VARIANT_OPTIONS.find((option) => option.value === variant)?.label ?? variant;
+
+/** Resolves the current Forecast workspace experiment from synced settings first, then local storage, then default. */
+const getAccountForecastUiVariant = (
+  syncedSettings: ReturnType<typeof useAuth>['syncedSettings']
+): ForecastUiVariant => syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT;
 
 /** Formats the last recorded active-day key into a compact account-friendly date label. */
 const formatLastActiveDate = (value: string | null): string => {
@@ -252,13 +272,86 @@ const DiscussionDefaultsSection: React.FC<{
   </div>
 );
 
+/** Forecast beta-flag controls for switching between workspace experiments. */
+const ForecastWorkspaceExperimentSection: React.FC<{
+  forecastUiVariant: ForecastUiVariant;
+  savingForecastUiVariant: ForecastUiVariant | null;
+  forecastUiMessage: string | null;
+  onForecastUiVariantChange: (variant: ForecastUiVariant) => void;
+}> = ({
+  forecastUiVariant,
+  savingForecastUiVariant,
+  forecastUiMessage,
+  onForecastUiVariantChange,
+}) => (
+  <div className="account-subsection-card">
+    <div className="account-subsection-header">
+      <h2>Forecast beta flags</h2>
+      <p>
+        Choose which Forecast workspace experiment should open by default for this account. Query-string overrides like
+        <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">?forecastUi=tabbed_toolbar</code>
+        still work for one-off local checks.
+      </p>
+    </div>
+
+    <div className="grid gap-3">
+      {FORECAST_UI_VARIANT_OPTIONS.map((option) => {
+        const isActive = forecastUiVariant === option.value;
+        const isSaving = savingForecastUiVariant === option.value;
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onForecastUiVariantChange(option.value)}
+            disabled={Boolean(savingForecastUiVariant)}
+            className={cn(
+              'account-variant-option mode-toggle-btn rounded-2xl border px-4 py-3 text-left transition-colors',
+              isActive ? 'is-active' : 'is-inactive',
+              Boolean(savingForecastUiVariant) && !isSaving && 'opacity-70'
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
+              </div>
+              <div className="shrink-0">
+                {isSaving ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin text-primary" />
+                ) : (
+                  <span
+                    className={cn(
+                      'account-variant-status rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                      isActive ? 'is-active' : 'is-available'
+                    )}
+                  >
+                    {isActive ? 'Active' : 'Available'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+
+    <p className="account-support-copy">
+      This beta setting syncs to your account and becomes the default Forecast layout once the update completes.
+    </p>
+
+    {forecastUiMessage ? <p className="mt-3 text-sm text-muted-foreground">{forecastUiMessage}</p> : null}
+  </div>
+);
+
 /** Bottom action row for saving defaults and ending the current session. */
 const SignedInActionRow: React.FC<{
   savingDefaults: boolean;
   saveMessage: string | null;
   onSaveDefaults: () => void;
+  onOpenForecast: () => void;
   onSignOut: () => void;
-}> = ({ savingDefaults, saveMessage, onSaveDefaults, onSignOut }) => (
+}> = ({ savingDefaults, saveMessage, onSaveDefaults, onOpenForecast, onSignOut }) => (
   <div className="account-action-row">
     <div className="account-action-group">
       <Button onClick={onSaveDefaults} disabled={savingDefaults}>
@@ -267,10 +360,17 @@ const SignedInActionRow: React.FC<{
       {saveMessage ? <p className="account-inline-message">{saveMessage}</p> : null}
     </div>
 
-    <Button variant="outline" onClick={onSignOut}>
-      <LogOut className="mr-2 h-4 w-4" />
-      Sign Out
-    </Button>
+    <div className="account-button-row">
+      <Button variant="ghost" asChild>
+        <Link to="/forecast" onClick={onOpenForecast}>
+          Open Forecast
+        </Link>
+      </Button>
+      <Button variant="outline" onClick={onSignOut}>
+        <LogOut className="mr-2 h-4 w-4" />
+        Sign Out
+      </Button>
+    </div>
   </div>
 );
 
@@ -496,10 +596,10 @@ const MetricsCardHeader: React.FC = () => (
       <div className="account-section-copy">
         <CardTitle className="flex items-center gap-2 text-2xl">
           <Activity className="h-6 w-6" />
-          Your Activity
+          Forecast Workspace Stats
         </CardTitle>
         <CardDescription>
-          Progress-only metrics for the work you have already put into GFC.
+          Activity and forecasting totals for the work you have already put into GFC.
         </CardDescription>
       </div>
     </div>
@@ -509,9 +609,10 @@ const MetricsCardHeader: React.FC = () => (
 /** Main metric grid and support copy for the signed-in user's activity card. */
 const MetricsCardContent: React.FC<{
   metrics: ReturnType<typeof useUserMetrics>['metrics'];
+  localStats: ReturnType<typeof computeHomeStats>;
   loading: boolean;
   error: string | null;
-}> = ({ metrics, loading, error }) => (
+}> = ({ metrics, localStats, loading, error }) => (
   <CardContent className="account-section-content">
     <div className="account-summary-grid">
       <SummaryTile label="Active day streak" value={loading ? 'Loading...' : `${metrics.activeDayStreak}`} />
@@ -525,6 +626,19 @@ const MetricsCardContent: React.FC<{
       />
     </div>
 
+    <div className="account-subsection-card">
+      <div className="account-subsection-header">
+        <h2>Forecast workspace stats</h2>
+        <p>Local forecasting activity moved here so the Home page can stay focused on getting back into work.</p>
+      </div>
+
+      <div className="account-summary-grid">
+        <SummaryTile label="Streak" value={`${localStats.forecastStreak}`} />
+        <SummaryTile label="Total forecasts made" value={`${localStats.totalForecastsMade}`} />
+        <SummaryTile label="Total cycles made" value={`${localStats.totalCyclesMade}`} />
+      </div>
+    </div>
+
     <p className="account-support-copy">
       Last active day: <strong>{loading ? 'Loading...' : formatLastActiveDate(metrics.lastActiveDate)}</strong>
     </p>
@@ -535,11 +649,14 @@ const MetricsCardContent: React.FC<{
 /** Progress-only account metrics card fed by the hosted Firestore metrics document. */
 const MetricsCard: React.FC = () => {
   const { metrics, loading, error } = useUserMetrics();
+  const forecastCycle = useSelector(selectForecastCycle);
+  const savedCycles = useSelector((state: RootState) => selectSavedCycles(state));
+  const localStats = useMemo(() => computeHomeStats(forecastCycle, savedCycles), [forecastCycle, savedCycles]);
 
   return (
     <Card className="account-surface-card">
       <MetricsCardHeader />
-      <MetricsCardContent metrics={metrics} loading={loading} error={error} />
+      <MetricsCardContent metrics={metrics} localStats={localStats} loading={loading} error={error} />
     </Card>
   );
 };
@@ -550,18 +667,30 @@ const SignedInPrimaryCard: React.FC<{
   providerLabels: string[];
   defaultForecasterName: string;
   setDefaultForecasterName: React.Dispatch<React.SetStateAction<string>>;
+  showForecastWorkspaceExperiment: boolean;
+  forecastUiVariant: ForecastUiVariant;
+  savingForecastUiVariant: ForecastUiVariant | null;
+  forecastUiMessage: string | null;
   savingDefaults: boolean;
   saveMessage: string | null;
+  onForecastUiVariantChange: (variant: ForecastUiVariant) => void;
   onSaveDefaults: () => void;
+  onOpenForecast: () => void;
   onSignOut: () => void;
 }> = ({
   email,
   providerLabels,
   defaultForecasterName,
   setDefaultForecasterName,
+  showForecastWorkspaceExperiment,
+  forecastUiVariant,
+  savingForecastUiVariant,
+  forecastUiMessage,
   savingDefaults,
   saveMessage,
+  onForecastUiVariantChange,
   onSaveDefaults,
+  onOpenForecast,
   onSignOut,
 }) => (
   <Card className="account-surface-card">
@@ -578,10 +707,19 @@ const SignedInPrimaryCard: React.FC<{
         defaultForecasterName={defaultForecasterName}
         setDefaultForecasterName={setDefaultForecasterName}
       />
+      {showForecastWorkspaceExperiment ? (
+        <ForecastWorkspaceExperimentSection
+          forecastUiVariant={forecastUiVariant}
+          savingForecastUiVariant={savingForecastUiVariant}
+          forecastUiMessage={forecastUiMessage}
+          onForecastUiVariantChange={onForecastUiVariantChange}
+        />
+      ) : null}
       <SignedInActionRow
         savingDefaults={savingDefaults}
         saveMessage={saveMessage}
         onSaveDefaults={onSaveDefaults}
+        onOpenForecast={onOpenForecast}
         onSignOut={onSignOut}
       />
     </CardContent>
@@ -590,10 +728,13 @@ const SignedInPrimaryCard: React.FC<{
 
 /** Signed-in account experience focused on identity, defaults, and session control. */
 const SignedInAccountView: React.FC = () => {
-  const { user, signOutUser, settingsSyncStatus, syncedSettings, updateSyncedSettings } = useAuth();
+  const { user, signOutUser, settingsSyncStatus, syncedSettings, updateSyncedSettings, betaAccess } = useAuth();
   const [defaultForecasterName, setDefaultForecasterName] = useState(
     () => syncedSettings?.defaultForecasterName ?? user?.displayName ?? ''
   );
+  const [forecastUiVariant, setForecastUiVariant] = useState<ForecastUiVariant>(() => getAccountForecastUiVariant(syncedSettings));
+  const [savingForecastUiVariant, setSavingForecastUiVariant] = useState<ForecastUiVariant | null>(null);
+  const [forecastUiMessage, setForecastUiMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [savingDefaults, setSavingDefaults] = useState(false);
 
@@ -606,6 +747,10 @@ const SignedInAccountView: React.FC = () => {
   useEffect(() => {
     setDefaultForecasterName(syncedSettings?.defaultForecasterName ?? user?.displayName ?? '');
   }, [syncedSettings?.defaultForecasterName, user?.displayName]);
+
+  useEffect(() => {
+    setForecastUiVariant(getAccountForecastUiVariant(syncedSettings));
+  }, [syncedSettings?.forecastUiVariant]);
 
   /** Saves the discussion default byline into the synced user settings document. */
   const handleSaveDefaults = async () => {
@@ -624,6 +769,28 @@ const SignedInAccountView: React.FC = () => {
     }
   };
 
+  /** Updates the synced Forecast workspace experiment and mirrors it into local storage for this device. */
+  const handleForecastUiVariantChange = async (nextVariant: ForecastUiVariant) => {
+    if (savingForecastUiVariant) {
+      return;
+    }
+
+    setForecastUiVariant(nextVariant);
+    setForecastUiMessage(null);
+    setSavingForecastUiVariant(nextVariant);
+
+    try {
+      await updateSyncedSettings({ forecastUiVariant: nextVariant });
+      setForecastUiMessage(`${getForecastUiVariantLabel(nextVariant)} will open by default on Forecast.`);
+    } catch (error) {
+      setForecastUiMessage(
+        error instanceof Error ? error.message : 'Unable to update the Forecast beta flag right now.'
+      );
+    } finally {
+      setSavingForecastUiVariant(null);
+    }
+  };
+
   /** Wraps the async save action for a button click without leaking promise handling into JSX. */
   const handleSaveDefaultsClick = () => {
     handleSaveDefaults().catch(() => {
@@ -635,6 +802,17 @@ const SignedInAccountView: React.FC = () => {
   const handleSignOutClick = () => {
     signOutUser().catch(() => {
       // Auth failures surface through shared auth state.
+    });
+  };
+
+  const handleOpenForecastClick = () => {
+    setForecastUiMessage(null);
+  };
+
+  /** Wraps the async workspace-toggle action so the button handlers stay synchronous. */
+  const handleForecastUiVariantClick = (nextVariant: ForecastUiVariant) => {
+    handleForecastUiVariantChange(nextVariant).catch(() => {
+      // Beta-flag feedback is already surfaced by handleForecastUiVariantChange.
     });
   };
 
@@ -657,9 +835,15 @@ const SignedInAccountView: React.FC = () => {
             providerLabels={providerLabels}
             defaultForecasterName={defaultForecasterName}
             setDefaultForecasterName={setDefaultForecasterName}
+            showForecastWorkspaceExperiment={betaAccess}
+            forecastUiVariant={forecastUiVariant}
+            savingForecastUiVariant={savingForecastUiVariant}
+            forecastUiMessage={forecastUiMessage}
             savingDefaults={savingDefaults}
             saveMessage={saveMessage}
+            onForecastUiVariantChange={handleForecastUiVariantClick}
             onSaveDefaults={handleSaveDefaultsClick}
+            onOpenForecast={handleOpenForecastClick}
             onSignOut={handleSignOutClick}
           />
           <CloudLibraryCard />

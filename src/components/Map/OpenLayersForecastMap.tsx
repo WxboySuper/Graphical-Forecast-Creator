@@ -91,6 +91,7 @@ interface HatchPatternInput {
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
 const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
+const GHOST_REFERENCE_LAYER_Z_INDEX = TOP_OUTLINE_LAYER_Z_INDEX - 25;
 
 const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
   'categorical',
@@ -322,7 +323,7 @@ const toGhostOlStyle = (
 ) => {
   const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
   const strokeColor = String(style.color || '#000000');
-  const ghostFillOpacity = isCategorical ? 0.15 : 0.15;
+  const ghostFillOpacity = isCategorical ? 0.08 : 0.03;
   const isCig = probability.startsWith('CIG');
 
   const fill = isCig
@@ -336,10 +337,11 @@ const toGhostOlStyle = (
   return new Style({
     fill,
     stroke: new Stroke({
-      color: toRgbaColor({ color: strokeColor, alpha: 0.15 }),
-      width: 2,
+      color: toRgbaColor({ color: strokeColor, alpha: isCategorical ? 0.96 : 0.9 }),
+      width: isCategorical ? 3 : 2.5,
+      lineDash: isCig ? [4, 4] : [12, 7],
     }),
-    zIndex: computeZIndex(outlookType as EditableOutlookType, probability),
+    zIndex: computeZIndex(outlookType as EditableOutlookType, probability) + 500,
   });
 };
 
@@ -448,7 +450,7 @@ const MapStylePicker: React.FC<{
   baseMapStyle: BaseMapStyle;
   onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }> = ({ baseMapStyle, onSelect }) => (
-  <div className="absolute bottom-full mb-2 right-0 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-lg p-2 flex flex-col gap-1 min-w-[120px] z-50">
+  <div className="map-style-picker absolute bottom-full mb-2 right-0 flex min-w-[148px] flex-col gap-1 rounded-[1rem] border border-border/80 bg-background p-2 shadow-xl">
     {([
       { value: 'blank', label: 'Blank (Weather)' },
       { value: 'osm', label: 'OpenStreetMap' },
@@ -460,7 +462,7 @@ const MapStylePicker: React.FC<{
         key={value}
         data-style={value}
         type="button"
-        className={`text-left px-2 py-1 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${baseMapStyle === value ? 'font-bold bg-gray-100 dark:bg-gray-700' : ''}`}
+        className={`rounded-xl px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-accent ${baseMapStyle === value ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground'}`}
         onClick={onSelect}
       >
         {label}
@@ -492,7 +494,7 @@ const MapStylePickerButton: React.FC<{
       title="Base map style"
       aria-label="Base map style"
     >
-      Map
+      Base Map
     </button>
     {showStylePicker && (
       <MapStylePicker baseMapStyle={baseMapStyle} onSelect={onSelect} />
@@ -544,6 +546,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const ghostSourceRef = useRef<VectorSource>(new VectorSource());
   const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
   const catModifyRef = useRef<Modify | null>(null);
@@ -642,7 +645,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     catLayerRef.current = catLayer;
     const ghostLayer = new VectorLayer({
       source: ghostSourceRef.current,
-      zIndex: 2.5,
+      zIndex: GHOST_REFERENCE_LAYER_Z_INDEX,
     });
     ghostLayerRef.current = ghostLayer;
     // Probabilistic/other features layer: separate source, normal per-feature opacity
@@ -650,6 +653,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       source: vectorSourceRef.current,
       zIndex: 4,
     });
+    vectorLayerRef.current = vectorLayer;
     // Place labels/cities above outlook polygons.
     const labelLayer = new TileLayer({
       source: createLabelOverlaySource('osm') ?? undefined,
@@ -729,7 +733,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
       // Use forEachFeatureAtPixel to get the topmost feature at the clicked pixel,
       // which accounts for z-index and layer visibility.
-      const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f);
+      const feature = map.forEachFeatureAtPixel(
+        evt.pixel,
+        (f) => f,
+        {
+          layerFilter: (layer) => layer === vectorLayerRef.current || layer === catLayerRef.current,
+        }
+      );
       if (feature && overlayRef.current) {
         const outlookType = feature.get('outlookType') as string;
         const probability = feature.get('probability') as string;
@@ -852,6 +862,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       mapRef.current = null;
       vectorBaseGroupRef.current = null;
       vectorReferenceGroupRef.current = null;
+      vectorLayerRef.current = null;
     };
   }, [dispatch]);
 
@@ -1280,7 +1291,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         )}
       </div>
       <div className="map-toolbar-bottom-right">
-        <div className="flex items-center gap-1 rounded-md bg-white dark:bg-gray-800 p-1 shadow-md border border-gray-300 dark:border-gray-600">
+        <div className="map-toolbar-surface">
           <button
             type="button"
             className={`map-toolbar-button mode-pan ${interactionMode === 'pan' ? 'active' : ''}`}
@@ -1308,15 +1319,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           >
             Delete
           </button>
-          <span className="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
-          <MapStylePickerButton
-            showStylePicker={showStylePicker}
-            baseMapStyle={baseMapStyle}
-            onToggle={handleToggleStylePicker}
-            onSelect={handleBaseMapStyleSelect}
-          />
         </div>
-        <div className="max-w-[260px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-md">
+        <div className="map-toolbar-help-surface">
           {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}
           {interactionMode === 'delete' && 'Delete mode: click any polygon to remove it.'}
           {interactionMode === 'pan' && 'Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.'}
