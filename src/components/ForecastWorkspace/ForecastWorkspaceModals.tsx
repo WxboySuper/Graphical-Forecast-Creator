@@ -37,7 +37,7 @@ const ResetConfirmDialog: React.FC<{
 export const ForecastWorkspaceModals: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <>
     <input
-      ref={controller.fileInputRef}
+      ref={controller.fileInputRef as unknown as React.Ref<HTMLInputElement>}
       type="file"
       accept=".json"
       onChange={controller.onFileSelect}

@@ -200,7 +200,7 @@ const subscribeToEntitlements = (
     setError: React.Dispatch<React.SetStateAction<string | null>>;
   }
 ) => {
-  const entitlementRef = doc(db, 'userEntitlements', userId);
+  const entitlementRef = doc(db!, 'userEntitlements', userId);
 
   return onSnapshot(
     entitlementRef,
@@ -275,7 +275,7 @@ const resolveEntitlementEffect = (
     return null;
   }
 
-  return startSignedInEntitlementSubscription(args.user.uid, handlers);
+  return startSignedInEntitlementSubscription(args.user!.uid, handlers);
 };
 
 /** Converts provider state into the memoized entitlement context value. */

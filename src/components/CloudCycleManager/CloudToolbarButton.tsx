@@ -189,7 +189,7 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
         onOpenChange={setSaveModalOpen}
         onSave={handleSaveToCloud}
         currentLabel={currentCloudLabel || `${currentCycleDate} Forecast`}
-        error={error}
+        error={error ?? undefined}
       />
     </>
   );

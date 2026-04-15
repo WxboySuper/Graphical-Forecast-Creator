@@ -13,7 +13,7 @@ import verificationReducer from '../store/verificationSlice';
 import { getLocalCalendarDate } from '../utils/localDate';
 
 const mockAddToast = jest.fn();
-const mockUseAuth = jest.fn(() => ({ user: null, syncedSettings: null }));
+const mockUseAuth = jest.fn();
 
 jest.mock('../components/Map/ForecastMap', () => {
   const { forwardRef } = jest.requireActual<typeof import('react')>('react');

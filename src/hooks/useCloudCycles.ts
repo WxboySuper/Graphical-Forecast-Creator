@@ -422,7 +422,7 @@ function useCloudRefreshCycles({
 }
 
 /** Creates the hosted cloud-cycle CRUD callbacks used by the forecast and library pages. */
-function useCloudCycleOperations(context: CloudAccessContext & CloudStateContext) {
+function useCloudCycleOperations(context: CloudAccessContext & CloudStateContext & { user: ReturnType<typeof useAuth>['user'] }) {
   const saveCycle = useCloudSaveCycle(context);
   const loadCycle = useCloudLoadCycle(context);
   const deleteCycle = useCloudDeleteCycle(context);

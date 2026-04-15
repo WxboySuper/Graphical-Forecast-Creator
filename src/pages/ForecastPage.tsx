@@ -30,7 +30,7 @@ import {
   redoLastEdit,
   undoLastEdit,
 } from '../store/forecastSlice';
-import { OutlookType, Probability, DayType } from '../types/outlooks';
+import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from '../utils/featureFlagsUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
@@ -616,7 +616,7 @@ const useFeatureFlagSync = (
 };
 
 /** Reads and validates one stored forecast payload string from browser storage. */
-const parseStoredForecastPayload = (storedValue: string | null): unknown | null => {
+const parseStoredForecastPayload = (storedValue: string | null): GFCForecastSaveData | null => {
   if (!storedValue) {
     return null;
   }
@@ -631,7 +631,7 @@ const parseStoredForecastPayload = (storedValue: string | null): unknown | null 
 
 /** Applies one stored forecast payload into Redux and restores the saved map view when present. */
 const restoreStoredForecastPayload = (
-  data: unknown,
+  data: GFCForecastSaveData,
   dispatch: ShortcutDispatch
 ) => {
   const deserializedCycle = deserializeForecast(data);

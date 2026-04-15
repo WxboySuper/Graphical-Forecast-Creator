@@ -1,5 +1,6 @@
 import type { ForecastCycle, OutlookDay, DayType } from '../types/outlooks';
 import type { SavedCycle } from '../store/forecastSlice';
+import type { Feature } from 'geojson';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 
 /** Converts a YYYY-MM-DD cycle date into a stable UTC day index for day-to-day comparisons. */

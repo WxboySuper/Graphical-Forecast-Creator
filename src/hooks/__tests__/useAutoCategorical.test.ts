@@ -100,7 +100,7 @@ describe('processOutlooksToCategorical', () => {
     render(
       React.createElement(
         Provider,
-        { store },
+        { store, children: React.createElement(HookHarness) },
         React.createElement(HookHarness)
       )
     );

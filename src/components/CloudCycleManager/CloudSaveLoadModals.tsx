@@ -97,7 +97,7 @@ const CloudSaveDialogBody: React.FC<{
     <div className="cloud-save-dialog-field">
       <label htmlFor="cloud-cycle-name">Cycle name</label>
       <Input
-        ref={inputRef}
+        ref={inputRef as unknown as React.Ref<HTMLInputElement>}
         id="cloud-cycle-name"
         className="cloud-save-dialog-input"
         value={label}
