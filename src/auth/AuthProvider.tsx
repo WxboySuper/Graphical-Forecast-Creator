@@ -31,6 +31,36 @@ import {
   writeStoredForecastUiVariant,
 } from '../utils/forecastUiVariant';
 
+/**
+ * Safely parse JSON from a Response. Returns parsed value or null on failure.
+ */
+const safeParseJson = async <T = unknown>(resp: Response): Promise<T | null> => {
+  try {
+    const parsed = await resp.json();
+    return parsed as T;
+  } catch {
+    return null;
+  }
+};
+
+/** Coerce unknown value to a plain record for safe property access. */
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+
+/** Attempt to extract minimal local user fields from an unknown response. */
+const extractLocalUserFromData = (data: unknown) => {
+  const rec = asRecord(data);
+  const uid = typeof rec.uid === 'string' ? rec.uid : 'local';
+  const email = typeof rec.email === 'string' ? rec.email : '';
+  const displayName = typeof rec.displayName === 'string' ? rec.displayName : '';
+  return {
+    uid,
+    email,
+    displayName,
+    providerData: [],
+  };
+};
+
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -383,6 +413,91 @@ const runInitialHostedSync = async (opts: {
   }
 };
 
+/**
+ * Initializes local-only auth state by probing the dev server's /api/local/profile endpoint.
+ * Extracts a minimal user shape and applies any remote settings into local Redux state.
+ * This is intentionally defined outside the hook to keep useLocalAuthState's cyclomatic
+ * complexity lower for code health tools.
+ */
+const initLocalAuthState = async (opts: {
+  isActive: () => boolean;
+  dispatch: ReturnType<typeof useDispatch>;
+  currentDarkModeRef: React.MutableRefObject<boolean>;
+  currentOverlaysRef: React.MutableRefObject<OverlaysState>;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
+  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+}) => {
+  const {
+    isActive,
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSettingsSyncStatus,
+    setSyncedSettings,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+    lastSyncedSettingsRef,
+  } = opts;
+
+  try {
+    const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
+    if (!isActive()) return;
+
+    if (!resp.ok) {
+      setStatus('signed_out');
+      setSettingsSyncStatus('idle');
+      setUser(null);
+      setSyncedSettings(null);
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      setError(null);
+      return;
+    }
+
+    const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
+    const localUser = extractLocalUserFromData(data) as unknown as User;
+
+    setUser(localUser);
+    setStatus('signed_in');
+
+    const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
+    if (remoteSettings) {
+      applySettingsToState(remoteSettings, {
+        currentDarkModeRef,
+        currentOverlaysRef,
+        dispatch,
+        setSyncedSettings,
+        lastSyncedSettingsRef,
+      });
+      setSettingsSyncStatus('synced');
+    } else {
+      setSyncedSettings(null);
+      setSettingsSyncStatus('idle');
+    }
+
+    setBetaAccess(Boolean(data.betaAccess));
+    setBetaAccessLoading(false);
+    setError(null);
+  } catch (err) {
+    if (!isActive()) return;
+    setStatus('error');
+    setError(err instanceof Error ? err.message : 'Local auth initialization failed');
+    setUser(null);
+    setSyncedSettings(null);
+    setBetaAccess(false);
+    setBetaAccessLoading(false);
+  }
+};
+
 /** Returns the no-config auth context used for intentionally local-only deployments. */
 const getDefaultContextValue = (): AuthContextValue => ({
   status: 'disabled',
@@ -428,64 +543,21 @@ const useLocalAuthState = (): AuthContextValue => {
   useEffect(() => {
     let isActive = true;
 
-    const init = async () => {
-      try {
-        // Attempt to read an existing local session/profile from the dev server.
-        const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
-        if (!isActive) return;
-
-        if (!resp.ok) {
-          setStatus('signed_out');
-          setSettingsSyncStatus('idle');
-          setUser(null);
-          setSyncedSettings(null);
-          setBetaAccess(false);
-          setBetaAccessLoading(false);
-          setError(null);
-          return;
-        }
-
-        const data = (await resp.json().catch(() => ({}))) as any;
-        const localUser = {
-          uid: data.uid ?? 'local',
-          email: data.email ?? '',
-          displayName: data.displayName ?? '',
-          providerData: [],
-        } as unknown as User;
-
-        setUser(localUser);
-        setStatus('signed_in');
-
-        const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
-        if (remoteSettings) {
-          applySettingsToState(remoteSettings, {
-            currentDarkModeRef,
-            currentOverlaysRef,
-            dispatch,
-            setSyncedSettings,
-            lastSyncedSettingsRef,
-          });
-          setSettingsSyncStatus('synced');
-        } else {
-          setSyncedSettings(null);
-          setSettingsSyncStatus('idle');
-        }
-
-        setBetaAccess(Boolean(data.betaAccess));
-        setBetaAccessLoading(false);
-        setError(null);
-      } catch (err) {
-        if (!isActive) return;
-        setStatus('error');
-        setError(err instanceof Error ? err.message : 'Local auth initialization failed');
-        setUser(null);
-        setSyncedSettings(null);
-        setBetaAccess(false);
-        setBetaAccessLoading(false);
-      }
-    };
-
-    init();
+    // Delegate complex initialization to a helper to keep hook complexity low.
+    initLocalAuthState({
+      isActive: () => isActive,
+      dispatch,
+      currentDarkModeRef,
+      currentOverlaysRef,
+      setUser,
+      setStatus,
+      setSettingsSyncStatus,
+      setSyncedSettings,
+      setBetaAccess,
+      setBetaAccessLoading,
+      setError,
+      lastSyncedSettingsRef,
+    });
 
     return () => {
       isActive = false;
@@ -504,12 +576,12 @@ const useLocalAuthState = (): AuthContextValue => {
       });
 
       if (!resp.ok) {
-        const body = (await resp.json().catch(() => ({ message: 'Sign in failed' }))) as any;
+        const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign in failed' };
         setError(body?.message ?? 'Sign in failed');
         throw new Error(body?.message ?? 'Sign in failed');
       }
 
-      const data = (await resp.json()) as any;
+      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
       const localUser = {
         uid: data.uid ?? 'local',
         email: data.email ?? '',
@@ -549,12 +621,12 @@ const useLocalAuthState = (): AuthContextValue => {
       });
 
       if (!resp.ok) {
-        const body = (await resp.json().catch(() => ({ message: 'Sign up failed' }))) as any;
+        const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign up failed' };
         setError(body?.message ?? 'Sign up failed');
         throw new Error(body?.message ?? 'Sign up failed');
       }
 
-      const data = (await resp.json()) as any;
+      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
       const localUser = {
         uid: data.uid ?? 'local',
         email: data.email ?? '',
@@ -609,7 +681,7 @@ const useLocalAuthState = (): AuthContextValue => {
         return;
       }
 
-      const data = (await resp.json()) as any;
+      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
       setBetaAccess(Boolean(data.betaAccess));
     } catch {
       setBetaAccess(false);
@@ -630,13 +702,13 @@ const useLocalAuthState = (): AuthContextValue => {
       });
 
       if (!resp.ok) {
-        const body = (await resp.json().catch(() => ({ message: 'Unable to update settings' }))) as any;
+        const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Unable to update settings' };
         const message = body?.message ?? 'Unable to update synced settings right now.';
         setError(message);
         throw new Error(message);
       }
 
-      const data = (await resp.json()) as any;
+      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
       const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
       if (remoteSettings) {
         applySettingsToState(remoteSettings, {
@@ -685,6 +757,10 @@ const useLocalAuthState = (): AuthContextValue => {
   return value;
 };
 
+/**
+ * Provides hosted-auth state and actions while syncing user documents with Firestore.
+ * Handles auth state changes, settings synchronization, and beta access refresh.
+ */
 const useHostedAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
@@ -773,8 +849,8 @@ const useHostedAuthState = (): AuthContextValue => {
     }
 
     let isActive = true;
-    const settingsRef = doc(db, 'userSettings', user.uid);
-    const profileRef = doc(db, 'userProfiles', user.uid);
+    const settingsRef = doc(db!, 'userSettings', user.uid);
+    const profileRef = doc(db!, 'userProfiles', user.uid);
     let unsubscribeSettings: Unsubscribe | undefined;
     const settingsApplyContext: ApplySettingsContext = {
       currentDarkModeRef,
@@ -840,7 +916,7 @@ const useHostedAuthState = (): AuthContextValue => {
     setBetaAccessLoading(true);
 
     try {
-      const profileSnapshot = await getDoc(doc(db, 'userProfiles', user.uid));
+      const profileSnapshot = await getDoc(doc(db!, 'userProfiles', user.uid));
       if (requestId !== betaAccessRequestIdRef.current) {
         return;
       }
@@ -907,7 +983,7 @@ const useHostedAuthState = (): AuthContextValue => {
       return;
     }
 
-    const settingsRef = doc(db, 'userSettings', user.uid);
+    const settingsRef = doc(db!, 'userSettings', user.uid);
     if (pendingSettingsWriteRef.current) {
       window.clearTimeout(pendingSettingsWriteRef.current);
     }
@@ -947,7 +1023,7 @@ const useHostedAuthState = (): AuthContextValue => {
       throw new Error('Hosted accounts are not enabled for this deployment.');
     }
 
-    const settingsRef = doc(db, 'userSettings', user.uid);
+    const settingsRef = doc(db!, 'userSettings', user.uid);
     const fallbackSettings = createSettingsSnapshot(
       darkMode,
       overlays,
@@ -1007,7 +1083,7 @@ const useHostedAuthState = (): AuthContextValue => {
       betaAccessLoading,
       signInWithGoogle: async () => {
         setError(null);
-        const credential = await signInWithPopup(auth, googleAuthProvider);
+        const credential = await signInWithPopup(auth!, googleAuthProvider);
         queueProductMetric({
           event: getAdditionalUserInfo(credential)?.isNewUser ? 'account_signup' : 'account_signin',
           user: credential.user,
@@ -1015,17 +1091,17 @@ const useHostedAuthState = (): AuthContextValue => {
       },
       signInWithEmail: async (email: string, password: string) => {
         setError(null);
-        const credential = await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth!, email, password);
         queueProductMetric({ event: 'account_signin', user: credential.user });
       },
       signUpWithEmail: async (email: string, password: string) => {
         setError(null);
-        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(auth!, email, password);
         queueProductMetric({ event: 'account_signup', user: credential.user });
       },
       signOutUser: async () => {
         setError(null);
-        await signOut(auth);
+        await signOut(auth!);
       },
       updateSyncedSettings,
       refreshBetaAccess,
