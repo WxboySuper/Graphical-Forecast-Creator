@@ -154,8 +154,6 @@ interface BuildForecastWorkspaceControllerArgs {
   lowProbabilityOutlooks: OutlookType[];
   ghostOutlookState: Record<OutlookType, boolean>;
   ghostOutlookHandlers: Partial<Record<OutlookType, () => void>>;
-  currentColor: string;
-  isLowProb: boolean;
   baseMapStyle: BaseMapStyle;
   handleBaseMapStyleSelect: (style: BaseMapStyle) => void;
   handleOpenHistoryModal: () => void;
@@ -200,8 +198,6 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     lowProbabilityOutlooks,
     ghostOutlookState,
     ghostOutlookHandlers,
-    currentColor,
-    isLowProb,
     baseMapStyle,
     handleBaseMapStyleSelect,
     handleOpenHistoryModal,
@@ -214,6 +210,9 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     handleStartDateEdit,
     handlers,
   } = args;
+
+  const currentColor = getOutlookColor(panel.activeOutlookType, panel.activeProbability);
+  const isLowProb = lowProbabilityOutlooks.includes(panel.activeOutlookType);
 
   return {
     onSave,
@@ -308,14 +307,6 @@ export const useForecastWorkspaceController = ({
   const availableTypes = OUTLOOK_TYPE_ORDER.filter((type) => panel.getOutlookTypeEnabled(type));
   const ghostTypes = availableTypes.filter((type) => type !== panel.activeOutlookType);
   const ghostOutlookHandlers = useMemo(() => createGhostOutlookHandlers(dispatch, ghostOutlookState), [dispatch, ghostOutlookState]);
-  const currentColor = useMemo(
-    () => getOutlookColor(panel.activeOutlookType, panel.activeProbability),
-    [panel.activeOutlookType, panel.activeProbability]
-  );
-  const isLowProb = lowProbabilityOutlooks.includes(panel.activeOutlookType);
-  const visibleGhostOutlooks = availableTypes.filter(
-    (type) => type !== panel.activeOutlookType && ghostOutlookState[type]
-  );
 
   const {
     handleOpenHistoryModal,
@@ -384,8 +375,6 @@ export const useForecastWorkspaceController = ({
     lowProbabilityOutlooks,
     ghostOutlookState,
     ghostOutlookHandlers,
-    currentColor,
-    isLowProb,
     baseMapStyle,
     handleBaseMapStyleSelect,
     handleOpenHistoryModal,
