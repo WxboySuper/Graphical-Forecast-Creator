@@ -10,7 +10,7 @@ import {
 } from '../../store/forecastSlice';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 import type { AddToastFn } from '../Layout';
-import type { DayType } from '../../types/outlooks';
+import type { DayType, ForecastCycle } from '../../types/outlooks';
 import { useDispatch } from 'react-redux';
 
 export interface ForecastWorkspaceActionParams {
@@ -18,7 +18,7 @@ export interface ForecastWorkspaceActionParams {
   onLoad: (file: File) => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   addToast: AddToastFn;
-  forecastCycle: any;
+  forecastCycle: ForecastCycle;
   currentDay: DayType;
   canUndo: boolean;
   canRedo: boolean;

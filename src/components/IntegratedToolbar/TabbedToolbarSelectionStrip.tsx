@@ -1,6 +1,5 @@
 import React from 'react';
 import { Button } from '../ui/button';
-import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';

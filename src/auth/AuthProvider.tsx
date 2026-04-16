@@ -491,7 +491,7 @@ const initLocalAuthState = async (opts: {
 };
 
 /** Shared helper to apply a local auth response into application state. */
-const applyLocalAuthData = (
+function applyLocalAuthData(
   data: Record<string, unknown>,
   {
     dispatch,
@@ -518,7 +518,7 @@ const applyLocalAuthData = (
     setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
     setError: React.Dispatch<React.SetStateAction<string | null>>;
   }
-) => {
+) {
   const localUser = extractLocalUserFromData(data) as unknown as User;
 
   setUser(localUser);
@@ -542,7 +542,7 @@ const applyLocalAuthData = (
   setBetaAccess(Boolean(data.betaAccess));
   setBetaAccessLoading(false);
   setError(null);
-};
+}
 
 /** Returns the no-config auth context used for intentionally local-only deployments. */
 const getDefaultContextValue = (): AuthContextValue => ({
@@ -564,6 +564,7 @@ const getDefaultContextValue = (): AuthContextValue => ({
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
 /** Local-only auth action helpers (extracted to reduce hook complexity) */
+/** Local-only sign in helper: posts to /api/local/signin and applies returned auth data to state. */
 const localSignInWithEmail = async (
   email: string,
   password: string,
@@ -630,6 +631,7 @@ const localSignInWithEmail = async (
   queueProductMetric({ event: 'account_signin', user: localUser });
 };
 
+/** Local-only sign up helper: posts to /api/local/signup and applies returned auth data to state. */
 const localSignUpWithEmail = async (
   email: string,
   password: string,
@@ -696,6 +698,7 @@ const localSignUpWithEmail = async (
   queueProductMetric({ event: 'account_signup', user: localUser });
 };
 
+/** Local-only sign out helper: invalidates local session and clears local state. */
 const localSignOutUser = async (deps: {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
@@ -717,6 +720,7 @@ const localSignOutUser = async (deps: {
   setBetaAccess(false);
 };
 
+/** Refresh local-only beta access flag by querying /api/local/profile. */
 const localRefreshBetaAccess = async (deps: {
   setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
   setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
@@ -741,6 +745,7 @@ const localRefreshBetaAccess = async (deps: {
   }
 };
 
+/** Update remote synced settings for local-only auth. */
 const localUpdateSyncedSettings = async (
   settings: Partial<UserSettingsDocument>,
   deps: {
@@ -784,6 +789,7 @@ const localUpdateSyncedSettings = async (
   }
 };
 
+/** Provides local-only auth state and actions for dev servers. */
 const useLocalAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
