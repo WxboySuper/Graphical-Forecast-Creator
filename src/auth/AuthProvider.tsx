@@ -117,6 +117,7 @@ interface BuildSettingsArgs {
   defaultForecasterName: string;
   forecastUiVariant: ForecastUiVariant;
 }
+/** Builds the normalized settings document shape from current local state. */
 const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
   const { darkMode, overlays, defaultForecasterName, forecastUiVariant } = args;
   return {
@@ -794,6 +795,49 @@ const localUpdateSyncedSettings = async (
 };
 
 /** Provides local-only auth state and actions for dev servers. */
+interface LocalAuthDeps {
+  dispatch: ReturnType<typeof useDispatch>;
+  currentDarkModeRef: React.MutableRefObject<boolean>;
+  currentOverlaysRef: React.MutableRefObject<OverlaysState>;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
+  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+function buildLocalActions(deps: LocalAuthDeps) {
+  return {
+    signInWithEmail: (email: string, password: string) =>
+      localSignInWithEmail({ email, password }, deps),
+    signUpWithEmail: (email: string, password: string) =>
+      localSignUpWithEmail({ email, password }, deps),
+    signOutUser: () =>
+      localSignOutUser({
+        setUser: deps.setUser,
+        setStatus: deps.setStatus,
+        setSyncedSettings: deps.setSyncedSettings,
+        setSettingsSyncStatus: deps.setSettingsSyncStatus,
+        setBetaAccess: deps.setBetaAccess,
+      }),
+    refreshBetaAccess: (): Promise<void> =>
+      localRefreshBetaAccess({ setBetaAccess: deps.setBetaAccess, setBetaAccessLoading: deps.setBetaAccessLoading }),
+    updateSyncedSettings: (settings: Partial<UserSettingsDocument>): Promise<void> =>
+      localUpdateSyncedSettings(settings, {
+        setError: deps.setError,
+        currentDarkModeRef: deps.currentDarkModeRef,
+        currentOverlaysRef: deps.currentOverlaysRef,
+        dispatch: deps.dispatch,
+        setSyncedSettings: deps.setSyncedSettings,
+        lastSyncedSettingsRef: deps.lastSyncedSettingsRef,
+        setSettingsSyncStatus: deps.setSettingsSyncStatus,
+      }),
+  };
+}
+
 const useLocalAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
@@ -841,48 +885,21 @@ const useLocalAuthState = (): AuthContextValue => {
     };
   }, [dispatch]);
 
-  const localActions = useMemo(() => {
-    const deps = {
-      dispatch,
-      currentDarkModeRef,
-      currentOverlaysRef,
-      setUser,
-      setStatus,
-      setSyncedSettings,
-      setSettingsSyncStatus,
-      lastSyncedSettingsRef,
-      setBetaAccess,
-      setBetaAccessLoading,
-      setError,
-    } as const;
+  const deps: LocalAuthDeps = {
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    lastSyncedSettingsRef,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+  };
 
-    return {
-      signInWithEmail: async (email: string, password: string) =>
-        localSignInWithEmail({ email, password }, deps as any),
-      signUpWithEmail: async (email: string, password: string) =>
-        localSignUpWithEmail({ email, password }, deps as any),
-      signOutUser: async () =>
-        localSignOutUser({
-          setUser: deps.setUser,
-          setStatus: deps.setStatus,
-          setSyncedSettings: deps.setSyncedSettings,
-          setSettingsSyncStatus: deps.setSettingsSyncStatus,
-          setBetaAccess: deps.setBetaAccess,
-        }),
-      refreshBetaAccess: async (): Promise<void> =>
-        localRefreshBetaAccess({ setBetaAccess: deps.setBetaAccess, setBetaAccessLoading: deps.setBetaAccessLoading }),
-      updateSyncedSettings: async (settings: Partial<UserSettingsDocument>): Promise<void> =>
-        localUpdateSyncedSettings(settings, {
-          setError: deps.setError,
-          currentDarkModeRef: deps.currentDarkModeRef,
-          currentOverlaysRef: deps.currentOverlaysRef,
-          dispatch: deps.dispatch,
-          setSyncedSettings: deps.setSyncedSettings,
-          lastSyncedSettingsRef: deps.lastSyncedSettingsRef,
-          setSettingsSyncStatus: deps.setSettingsSyncStatus,
-        }),
-    };
-  }, [
+  const localActions = useMemo(() => buildLocalActions(deps), [
     dispatch,
     currentDarkModeRef,
     currentOverlaysRef,
