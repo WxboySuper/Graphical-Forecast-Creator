@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, requireDb } from '../lib/firebase';
 import { useAuth } from '../auth/AuthProvider';
 
 export type EntitlementStatus = 'disabled' | 'loading' | 'free' | 'premium' | 'error';
@@ -200,7 +200,7 @@ const subscribeToEntitlements = (
     setError: React.Dispatch<React.SetStateAction<string | null>>;
   }
 ) => {
-  const entitlementRef = doc(db!, 'userEntitlements', userId);
+  const entitlementRef = doc(requireDb(), 'userEntitlements', userId);
 
   return onSnapshot(
     entitlementRef,
@@ -275,7 +275,11 @@ const resolveEntitlementEffect = (
     return null;
   }
 
-  return startSignedInEntitlementSubscription(args.user!.uid, handlers);
+  if (!args.user) {
+    return null;
+  }
+
+  return startSignedInEntitlementSubscription(args.user.uid, handlers);
 };
 
 /** Converts provider state into the memoized entitlement context value. */

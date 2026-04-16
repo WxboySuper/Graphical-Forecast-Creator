@@ -402,7 +402,7 @@ const VerifMapStylePickerButton: React.FC<{
 
 // OpenLayers map component for verification view,
 // supporting categorical and probabilistic outlooks with storm report overlays and base map style switching.
-const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap>, OpenLayersVerificationMapProps>(({ 
+const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLayersVerificationMapProps>(({ 
   activeOutlookType = CATEGORICAL_OUTLOOK,
   selectedDay = 1
 }, ref) => {

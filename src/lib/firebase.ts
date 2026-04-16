@@ -33,3 +33,17 @@ export const app = firebaseApp;
 export const auth = firebaseAuth;
 export const db = firestoreDb;
 export const googleAuthProvider = new GoogleAuthProvider();
+
+export function requireAuth(): Auth {
+  if (!auth) {
+    throw new Error('Firebase auth is not configured. Ensure hosted auth is enabled.');
+  }
+  return auth;
+}
+
+export function requireDb(): Firestore {
+  if (!db) {
+    throw new Error('Firestore is not configured. Ensure hosted features are enabled.');
+  }
+  return db;
+}

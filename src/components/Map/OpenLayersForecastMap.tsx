@@ -503,7 +503,7 @@ const MapStylePickerButton: React.FC<{
 );
 
 // Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
-const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
+const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref) => {
   const dispatch = useDispatch();
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
   const [showStylePicker, setShowStylePicker] = useState(false);

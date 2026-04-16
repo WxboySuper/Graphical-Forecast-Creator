@@ -13,7 +13,7 @@ export const ForecastTabbedToolbarLayout: React.FC<ForecastWorkspaceLayoutProps>
   <TooltipProvider>
     <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-background via-background to-muted/10">
       <div className="relative min-h-0 flex-1">
-        <ForecastMap ref={mapRef as unknown as React.Ref<any>} />
+        <ForecastMap ref={mapRef} />
       </div>
       <TabbedIntegratedToolbar controller={controller} />
     </div>

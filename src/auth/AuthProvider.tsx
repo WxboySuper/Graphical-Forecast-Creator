@@ -21,7 +21,7 @@ import type { RootState } from '../store';
 import { setDarkMode } from '../store/themeSlice';
 import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
-import { auth, db, googleAuthProvider, isHostedAuthEnabled } from '../lib/firebase';
+import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { queueProductMetric } from '../utils/productMetrics';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
@@ -849,8 +849,8 @@ const useHostedAuthState = (): AuthContextValue => {
     }
 
     let isActive = true;
-    const settingsRef = doc(db!, 'userSettings', user.uid);
-    const profileRef = doc(db!, 'userProfiles', user.uid);
+    const settingsRef = doc(requireDb(), 'userSettings', user.uid);
+    const profileRef = doc(requireDb(), 'userProfiles', user.uid);
     let unsubscribeSettings: Unsubscribe | undefined;
     const settingsApplyContext: ApplySettingsContext = {
       currentDarkModeRef,
@@ -916,7 +916,7 @@ const useHostedAuthState = (): AuthContextValue => {
     setBetaAccessLoading(true);
 
     try {
-      const profileSnapshot = await getDoc(doc(db!, 'userProfiles', user.uid));
+      const profileSnapshot = await getDoc(doc(requireDb(), 'userProfiles', user.uid));
       if (requestId !== betaAccessRequestIdRef.current) {
         return;
       }
@@ -983,7 +983,7 @@ const useHostedAuthState = (): AuthContextValue => {
       return;
     }
 
-    const settingsRef = doc(db!, 'userSettings', user.uid);
+    const settingsRef = doc(requireDb(), 'userSettings', user.uid);
     if (pendingSettingsWriteRef.current) {
       window.clearTimeout(pendingSettingsWriteRef.current);
     }
@@ -1023,7 +1023,7 @@ const useHostedAuthState = (): AuthContextValue => {
       throw new Error('Hosted accounts are not enabled for this deployment.');
     }
 
-    const settingsRef = doc(db!, 'userSettings', user.uid);
+    const settingsRef = doc(requireDb(), 'userSettings', user.uid);
     const fallbackSettings = createSettingsSnapshot(
       darkMode,
       overlays,
@@ -1083,7 +1083,7 @@ const useHostedAuthState = (): AuthContextValue => {
       betaAccessLoading,
       signInWithGoogle: async () => {
         setError(null);
-        const credential = await signInWithPopup(auth!, googleAuthProvider);
+        const credential = await signInWithPopup(requireAuth(), googleAuthProvider);
         queueProductMetric({
           event: getAdditionalUserInfo(credential)?.isNewUser ? 'account_signup' : 'account_signin',
           user: credential.user,
@@ -1091,17 +1091,17 @@ const useHostedAuthState = (): AuthContextValue => {
       },
       signInWithEmail: async (email: string, password: string) => {
         setError(null);
-        const credential = await signInWithEmailAndPassword(auth!, email, password);
+        const credential = await signInWithEmailAndPassword(requireAuth(), email, password);
         queueProductMetric({ event: 'account_signin', user: credential.user });
       },
       signUpWithEmail: async (email: string, password: string) => {
         setError(null);
-        const credential = await createUserWithEmailAndPassword(auth!, email, password);
+        const credential = await createUserWithEmailAndPassword(requireAuth(), email, password);
         queueProductMetric({ event: 'account_signup', user: credential.user });
       },
       signOutUser: async () => {
         setError(null);
-        await signOut(auth!);
+        await signOut(requireAuth());
       },
       updateSyncedSettings,
       refreshBetaAccess,
