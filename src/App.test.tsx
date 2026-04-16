@@ -1,44 +1,30 @@
-const React = require('react');
-const { render, screen } = require('@testing-library/react');
+import { render, screen } from '@testing-library/react';
 
 // Mock pages to avoid importing heavy modules (OpenLayers / ol-mapbox-style) during App tests
-jest.mock('./pages', () => {
-  const React = require('react');
-  return {
-    HomePage: () => React.createElement('div', null, 'HomePage Mock'),
-    ForecastPage: () => React.createElement('div', null, 'ForecastPage Mock'),
-    DiscussionPage: () => React.createElement('div', null, 'DiscussionPage Mock'),
-    VerificationPage: () => React.createElement('div', null, 'VerificationPage Mock'),
-    ComingSoonPage: () => React.createElement('div', null, 'ComingSoonPage Mock'),
-    AccountPage: () => React.createElement('div', null, 'AccountPage Mock'),
-    PricingPage: () => React.createElement('div', null, 'PricingPage Mock'),
-    AdminPage: () => React.createElement('div', null, 'AdminPage Mock'),
-    BetaLandingPage: () => React.createElement('div', null, 'BetaLandingPage Mock'),
-    BetaInvitePage: () => React.createElement('div', null, 'BetaInvitePage Mock'),
-  };
-});
+jest.mock('./pages', () => ({
+  HomePage: () => <div>HomePage Mock</div>,
+  ForecastPage: () => <div>ForecastPage Mock</div>,
+  DiscussionPage: () => <div>DiscussionPage Mock</div>,
+  VerificationPage: () => <div>VerificationPage Mock</div>,
+  ComingSoonPage: () => <div>ComingSoonPage Mock</div>,
+  AccountPage: () => <div>AccountPage Mock</div>,
+  PricingPage: () => <div>PricingPage Mock</div>,
+  AdminPage: () => <div>AdminPage Mock</div>,
+  BetaLandingPage: () => <div>BetaLandingPage Mock</div>,
+  BetaInvitePage: () => <div>BetaInvitePage Mock</div>,
+}));
 
 // Mock ForecastMap to avoid Leaflet/Geoman issues
-jest.mock('./components/Map/ForecastMap', () => {
-  // skipcq: JS-0359
-  const React = require('react');
-  return React.forwardRef(() => React.createElement('div', null, 'ForecastMap Mock'));
-});
+jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
 
 // Mock other components if necessary (good practice to isolate App testing)
-jest.mock('./components/DrawingTools/DrawingTools', () => {
-  const React = require('react');
-  return () => React.createElement('div', null, 'DrawingTools Mock');
-});
-jest.mock('./components/Documentation/Documentation', () => {
-  const React = require('react');
-  return () => React.createElement('div', null, 'Documentation Mock');
-});
+jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
+jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
 
-const App = require('./App').default;
+import App from './App';
 
 test('renders Graphical Forecast Creator title', () => {
-  render(React.createElement(App));
+  render(<App />);
   const titleElements = screen.getAllByText(/Graphical Forecast Creator/i);
   expect(titleElements[0]).toBeInTheDocument();
 });

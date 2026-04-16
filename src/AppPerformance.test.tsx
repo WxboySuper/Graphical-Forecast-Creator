@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -14,19 +13,21 @@ import verificationReducer from './store/verificationSlice';
 import { ForecastPage } from './pages/ForecastPage';
 
 // Mock child components
-const mockForecastMap = jest.fn();
-
 jest.mock('./components/Map/ForecastMap', () => {
-  // skipcq: JS-0359
-  const React = require('react');
-  return React.forwardRef((props: Record<string, unknown>, _ref: unknown) => {
-    mockForecastMap(props);
-    return React.createElement('div', { 'data-testid': 'forecast-map' }, 'ForecastMap');
-  });
+  const calls: any[] = [];
+  const ForecastMapMock = (props: Record<string, unknown>) => {
+    calls.push(props);
+    return <div data-testid="forecast-map">ForecastMap</div>;
+  };
+  return {
+    __esModule: true,
+    default: ForecastMapMock,
+    getCalls: () => calls,
+  };
 });
 
 jest.mock('./components/IntegratedToolbar/IntegratedToolbar', () => ({
-  TabbedIntegratedToolbar: () => require('react').createElement('div', null, 'IntegratedToolbar'),
+  TabbedIntegratedToolbar: () => <div>IntegratedToolbar</div>,
 }));
 jest.mock('./components/ForecastWorkspace/ForecastWorkspaceModals', () => () => <div>ForecastWorkspaceModals</div>);
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools</div>);
@@ -70,7 +71,10 @@ describe('ForecastPage Performance', () => {
   let store: EnhancedStore;
 
   beforeEach(() => {
-    mockForecastMap.mockClear();
+    // Clear any previous calls recorded by the mocked ForecastMap module
+    const forecastMapMockModule = jest.requireMock('./components/Map/ForecastMap') as { getCalls: () => any[] };
+    // Reset recorded calls
+    forecastMapMockModule.getCalls().length = 0;
     store = configureStore({
       reducer: {
         forecast: forecastReducer,
@@ -98,7 +102,8 @@ describe('ForecastPage Performance', () => {
     );
 
     // Initial render(s)
-    const initialCalls = mockForecastMap.mock.calls.length;
+    const fm = jest.requireMock('./components/Map/ForecastMap') as { getCalls: () => any[] };
+    const initialCalls = fm.getCalls().length;
 
     // Dispatch an action that changes `forecast` slice but NOT the data used by ForecastPage
     // setMapView changes state.forecast.currentMapView
@@ -107,6 +112,6 @@ describe('ForecastPage Performance', () => {
     });
 
     // With optimized selector: should not cause additional re-renders
-    expect(mockForecastMap.mock.calls.length).toBeLessThanOrEqual(initialCalls + 1);
+    expect(fm.getCalls().length).toBeLessThanOrEqual(initialCalls + 1);
   });
 });
