@@ -1,28 +1,37 @@
-import React, { useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Bot } from 'lucide-react';
-import { RootState } from '../store';
-import { selectForecastCycle, setForecastDay, resetForecasts, importForecastCycle } from '../store/forecastSlice';
+import React from 'react';
 import CycleHistoryModal from '../components/CycleManager/CycleHistoryModal';
 import ConfirmationModal from '../components/DrawingTools/ConfirmationModal';
-import type { AddToastFn } from '../components/Layout';
-import { useAuth } from '../auth/AuthProvider';
-
-import { computeHomeStats, formatCycleDate } from './homeUtils';
-import { createFileHandlers } from '../hooks/useFileLoader';
-import HomeHero, { HeroSummaryCard, type HomeVariant } from './home/HomeHero';
+import HomeHero, { HeroSummaryCard } from './home/HomeHero';
 import Dashboard from './home/Dashboard';
 import MainGrid from './home/MainGrid';
 import RecentCycles from './home/RecentCycles';
-import { DayType } from '../types/outlooks';
 import './HomePage.css';
-
 import useHomePageLogic from './home/useHomePageLogic';
 import AIDisclosure from './home/AIDisclosure';
 
+type HomeLogic = ReturnType<typeof useHomePageLogic>;
+
+type HomeSectionProps = Pick<
+  HomeLogic,
+  | 'variant'
+  | 'stats'
+  | 'formattedDate'
+  | 'savedCycles'
+  | 'forecastCycle'
+  | 'isSaved'
+  | 'handleNavigateForecast'
+  | 'handleNavigateDiscussion'
+  | 'handleNavigateAccount'
+  | 'handleOpenHistoryModal'
+  | 'handleQuickStartClick'
+  | 'handleNewCycle'
+  | 'handleSave'
+  | 'openFilePicker'
+  | 'handleLoadRecentCycleClick'
+>;
+
 /** Signed-in layout (extracted to reduce HomePage function length) */
-const HomeSignedInSection: React.FC<any> = ({
+const HomeSignedInSection: React.FC<HomeSectionProps> = ({
   variant,
   stats,
   formattedDate,
@@ -88,7 +97,7 @@ const HomeSignedInSection: React.FC<any> = ({
 );
 
 /** Signed-out layout (extracted to reduce HomePage function length) */
-const HomeSignedOutSection: React.FC<any> = ({
+const HomeSignedOutSection: React.FC<HomeSectionProps> = ({
   variant,
   stats,
   formattedDate,
@@ -143,10 +152,6 @@ const HomeSignedOutSection: React.FC<any> = ({
     />
   </>
 );
-
-interface PageContext {
-  addToast: AddToastFn;
-}
 
 
 /** Main home page with auth-aware landing variants and a workflow-first forecast layout. */

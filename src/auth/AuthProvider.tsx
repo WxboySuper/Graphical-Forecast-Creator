@@ -809,6 +809,11 @@ interface LocalAuthDeps {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
+/** BuildLocalActions: creates wrapper action functions for local dev auth flows.
+ *
+ * These wrappers adapt the local helper functions (localSignInWithEmail, localSignUpWithEmail, etc.)
+ * to the shape expected by components and keep wiring centralized behind a typed LocalAuthDeps object.
+ */
 function buildLocalActions(deps: LocalAuthDeps) {
   return {
     signInWithEmail: (email: string, password: string) =>
@@ -838,6 +843,12 @@ function buildLocalActions(deps: LocalAuthDeps) {
   };
 }
 
+/** useLocalAuthState: Hook that provides local-only auth state and actions (dev-only).
+ *
+ * Exposes the same AuthContextValue shape as the hosted implementation but operates
+ * against the local /api/local/* endpoints. Intended to be used by development servers
+ * to enable beta/local-only flows without requiring hosted auth.
+ */
 const useLocalAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
