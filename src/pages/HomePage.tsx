@@ -21,6 +21,129 @@ import './HomePage.css';
 import useHomePageLogic from './home/useHomePageLogic';
 import AIDisclosure from './home/AIDisclosure';
 
+/** Signed-in layout (extracted to reduce HomePage function length) */
+const HomeSignedInSection: React.FC<any> = ({
+  variant,
+  stats,
+  formattedDate,
+  savedCycles,
+  forecastCycle,
+  isSaved,
+  handleNavigateForecast,
+  handleNavigateDiscussion,
+  handleNavigateAccount,
+  handleOpenHistoryModal,
+  handleQuickStartClick,
+  handleNewCycle,
+  handleSave,
+  openFilePicker,
+  handleLoadRecentCycleClick,
+}) => (
+  <div className="home-signed-in-grid">
+    <div className="home-signed-in-main">
+      <HomeHero
+        variant={variant}
+        formattedDate={formattedDate}
+        hasSavedCycles={savedCycles.length > 0}
+        savedCyclesCount={savedCycles.length}
+        showSummaryCard={false}
+        onStart={handleNavigateForecast}
+        onWriteDiscussion={handleNavigateDiscussion}
+        onViewAccount={handleNavigateAccount}
+        onOpenHistory={handleOpenHistoryModal}
+      />
+
+      <div>
+        <MainGrid
+          variant={variant}
+          formattedDate={formattedDate}
+          isSaved={isSaved}
+          forecastCycle={forecastCycle}
+          stats={stats}
+          onQuickStartClick={handleQuickStartClick}
+          onNewCycle={handleNewCycle}
+          onSave={handleSave}
+          onOpenFile={openFilePicker}
+          onOpenHistory={handleOpenHistoryModal}
+        />
+      </div>
+    </div>
+
+    <div className="home-signed-in-side">
+      <div className="home-surface-card home-home-summary-rail">
+        <HeroSummaryCard
+          variant={variant}
+          formattedDate={formattedDate}
+          savedCyclesCount={savedCycles.length}
+        />
+      </div>
+      <RecentCycles
+        variant="compact"
+        savedCycles={savedCycles}
+        onLoad={handleLoadRecentCycleClick}
+        onOpenHistory={handleOpenHistoryModal}
+      />
+    </div>
+  </div>
+);
+
+/** Signed-out layout (extracted to reduce HomePage function length) */
+const HomeSignedOutSection: React.FC<any> = ({
+  variant,
+  stats,
+  formattedDate,
+  savedCycles,
+  forecastCycle,
+  isSaved,
+  handleNavigateForecast,
+  handleNavigateDiscussion,
+  handleNavigateAccount,
+  handleOpenHistoryModal,
+  handleQuickStartClick,
+  handleNewCycle,
+  handleSave,
+  openFilePicker,
+  handleLoadRecentCycleClick,
+}) => (
+  <>
+    <HomeHero
+      variant={variant}
+      formattedDate={formattedDate}
+      hasSavedCycles={savedCycles.length > 0}
+      savedCyclesCount={savedCycles.length}
+      onStart={handleNavigateForecast}
+      onWriteDiscussion={handleNavigateDiscussion}
+      onViewAccount={handleNavigateAccount}
+      onOpenHistory={handleOpenHistoryModal}
+    />
+
+    <div className="home-primary-grid home-primary-grid-signed-out">
+      <div>
+        <MainGrid
+          variant={variant}
+          formattedDate={formattedDate}
+          isSaved={isSaved}
+          forecastCycle={forecastCycle}
+          stats={stats}
+          onQuickStartClick={handleQuickStartClick}
+          onNewCycle={handleNewCycle}
+          onSave={handleSave}
+          onOpenFile={openFilePicker}
+          onOpenHistory={handleOpenHistoryModal}
+        />
+      </div>
+      <Dashboard stats={stats} />
+    </div>
+
+    <RecentCycles
+      variant="section"
+      savedCycles={savedCycles}
+      onLoad={handleLoadRecentCycleClick}
+      onOpenHistory={handleOpenHistoryModal}
+    />
+  </>
+);
+
 interface PageContext {
   addToast: AddToastFn;
 }
@@ -58,90 +181,41 @@ const HomePage: React.FC = () => {
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
       <div className="home-page-shell">
         {variant === 'signed_in' ? (
-          <div className="home-signed-in-grid">
-            <div className="home-signed-in-main">
-              <HomeHero
-                variant={variant}
-                formattedDate={formattedDate}
-                hasSavedCycles={savedCycles.length > 0}
-                savedCyclesCount={savedCycles.length}
-                showSummaryCard={false}
-                onStart={handleNavigateForecast}
-                onWriteDiscussion={handleNavigateDiscussion}
-                onViewAccount={handleNavigateAccount}
-                onOpenHistory={handleOpenHistoryModal}
-              />
-
-              <div>
-                <MainGrid
-                  variant={variant}
-                  formattedDate={formattedDate}
-                  isSaved={isSaved}
-                  forecastCycle={forecastCycle}
-                  stats={stats}
-                  onQuickStartClick={handleQuickStartClick}
-                  onNewCycle={handleNewCycle}
-                  onSave={handleSave}
-                  onOpenFile={openFilePicker}
-                  onOpenHistory={handleOpenHistoryModal}
-                />
-              </div>
-            </div>
-
-            <div className="home-signed-in-side">
-              <div className="home-surface-card home-home-summary-rail">
-                <HeroSummaryCard
-                  variant={variant}
-                  formattedDate={formattedDate}
-                  savedCyclesCount={savedCycles.length}
-                />
-              </div>
-              <RecentCycles
-                variant="compact"
-                savedCycles={savedCycles}
-                onLoad={handleLoadRecentCycleClick}
-                onOpenHistory={handleOpenHistoryModal}
-              />
-            </div>
-          </div>
+          <HomeSignedInSection
+            variant={variant}
+            stats={stats}
+            formattedDate={formattedDate}
+            savedCycles={savedCycles}
+            forecastCycle={forecastCycle}
+            isSaved={isSaved}
+            handleNavigateForecast={handleNavigateForecast}
+            handleNavigateDiscussion={handleNavigateDiscussion}
+            handleNavigateAccount={handleNavigateAccount}
+            handleOpenHistoryModal={handleOpenHistoryModal}
+            handleQuickStartClick={handleQuickStartClick}
+            handleNewCycle={handleNewCycle}
+            handleSave={handleSave}
+            openFilePicker={openFilePicker}
+            handleLoadRecentCycleClick={handleLoadRecentCycleClick}
+          />
         ) : (
-          <>
-            <HomeHero
-              variant={variant}
-              formattedDate={formattedDate}
-              hasSavedCycles={savedCycles.length > 0}
-              savedCyclesCount={savedCycles.length}
-              onStart={handleNavigateForecast}
-              onWriteDiscussion={handleNavigateDiscussion}
-              onViewAccount={handleNavigateAccount}
-              onOpenHistory={handleOpenHistoryModal}
-            />
-
-            <div className="home-primary-grid home-primary-grid-signed-out">
-              <div>
-                <MainGrid
-                  variant={variant}
-                  formattedDate={formattedDate}
-                  isSaved={isSaved}
-                  forecastCycle={forecastCycle}
-                  stats={stats}
-                  onQuickStartClick={handleQuickStartClick}
-                  onNewCycle={handleNewCycle}
-                  onSave={handleSave}
-                  onOpenFile={openFilePicker}
-                  onOpenHistory={handleOpenHistoryModal}
-                />
-              </div>
-              <Dashboard stats={stats} />
-            </div>
-
-            <RecentCycles
-              variant="section"
-              savedCycles={savedCycles}
-              onLoad={handleLoadRecentCycleClick}
-              onOpenHistory={handleOpenHistoryModal}
-            />
-          </>
+          <HomeSignedOutSection
+            variant={variant}
+            stats={stats}
+            formattedDate={formattedDate}
+            savedCycles={savedCycles}
+            forecastCycle={forecastCycle}
+            isSaved={isSaved}
+            handleNavigateForecast={handleNavigateForecast}
+            handleNavigateDiscussion={handleNavigateDiscussion}
+            handleNavigateAccount={handleNavigateAccount}
+            handleOpenHistoryModal={handleOpenHistoryModal}
+            handleQuickStartClick={handleQuickStartClick}
+            handleNewCycle={handleNewCycle}
+            handleSave={handleSave}
+            openFilePicker={openFilePicker}
+            handleLoadRecentCycleClick={handleLoadRecentCycleClick}
+          />
         )}
 
         <AIDisclosure />
