@@ -126,6 +126,146 @@ interface UseForecastWorkspaceControllerOptions {
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
 
+/** Arguments required to assemble the public ForecastWorkspaceController returned by the hook. */
+interface BuildForecastWorkspaceControllerArgs {
+  onSave: () => void;
+  cloudTools: React.ReactNode;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  isSaved: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  isExporting: boolean;
+  isModalOpen: boolean;
+  initiateExport: () => void;
+  confirmExport: (title: string) => Promise<void>;
+  cancelExport: () => void;
+  isPackageDownloading: boolean;
+  showHistoryModal: boolean;
+  showCopyModal: boolean;
+  showResetConfirm: boolean;
+  isEditingDate: boolean;
+  tempDate: string;
+  cycleDate: string;
+  currentDay: DayType;
+  days: ReturnType<typeof selectForecastCycle>['days'];
+  availableTypes: OutlookType[];
+  ghostTypes: OutlookType[];
+  panel: ReturnType<typeof useOutlookPanelLogic>;
+  lowProbabilityOutlooks: OutlookType[];
+  ghostOutlookState: Record<OutlookType, boolean>;
+  ghostOutlookHandlers: Partial<Record<OutlookType, () => void>>;
+  currentColor: string;
+  isLowProb: boolean;
+  baseMapStyle: BaseMapStyle;
+  handleBaseMapStyleSelect: (style: BaseMapStyle) => void;
+  handleOpenHistoryModal: () => void;
+  handleOpenCopyModal: () => void;
+  handleOpenResetConfirm: () => void;
+  handleCloseHistoryModal: () => void;
+  handleCloseCopyModal: () => void;
+  handleCancelReset: () => void;
+  handleTempDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleStartDateEdit: () => void;
+  handlers: ReturnType<typeof useForecastWorkspaceActionHandlers>;
+}
+
+/** Build the controller object returned by useForecastWorkspaceController.
+ * Extracted to keep the hook body small for static analysis tools.
+ */
+function buildForecastWorkspaceController(args: BuildForecastWorkspaceControllerArgs): ForecastWorkspaceController {
+  const {
+    onSave,
+    cloudTools,
+    fileInputRef,
+    isSaved,
+    canUndo,
+    canRedo,
+    isExporting,
+    isModalOpen,
+    initiateExport,
+    confirmExport,
+    cancelExport,
+    isPackageDownloading,
+    showHistoryModal,
+    showCopyModal,
+    showResetConfirm,
+    isEditingDate,
+    tempDate,
+    cycleDate,
+    currentDay,
+    days,
+    availableTypes,
+    ghostTypes,
+    panel,
+    lowProbabilityOutlooks,
+    ghostOutlookState,
+    ghostOutlookHandlers,
+    currentColor,
+    isLowProb,
+    baseMapStyle,
+    handleBaseMapStyleSelect,
+    handleOpenHistoryModal,
+    handleOpenCopyModal,
+    handleOpenResetConfirm,
+    handleCloseHistoryModal,
+    handleCloseCopyModal,
+    handleCancelReset,
+    handleTempDateChange,
+    handleStartDateEdit,
+    handlers,
+  } = args;
+
+  return {
+    onSave,
+    cloudTools,
+    fileInputRef,
+    isSaved,
+    canUndo,
+    canRedo,
+    isExporting,
+    isExportModalOpen: isModalOpen,
+    onInitiateExport: initiateExport,
+    onConfirmExport: confirmExport,
+    onCancelExport: cancelExport,
+    isPackageDownloading,
+    showHistoryModal,
+    showCopyModal,
+    showResetConfirm,
+    isEditingDate,
+    tempDate,
+    cycleDate,
+    currentDay,
+    days,
+    availableTypes,
+    ghostTypes,
+    activeOutlookType: panel.activeOutlookType,
+    activeProbability: panel.activeProbability,
+    isSignificant: panel.isSignificant,
+    significantThreatsEnabled: panel.significantThreatsEnabled,
+    lowProbabilityOutlooks,
+    visibleGhostOutlooks: availableTypes.filter((type) => type !== panel.activeOutlookType && ghostOutlookState[type]),
+    ghostVisibility: ghostOutlookState,
+    outlookTypeHandlers: panel.outlookTypeHandlers,
+    ghostOutlookHandlers,
+    probabilities: panel.probabilities,
+    probabilityHandlers: panel.probabilityHandlers,
+    currentColor,
+    isLowProb,
+    baseMapStyle,
+    onBaseMapStyleSelect: handleBaseMapStyleSelect,
+    onOpenHistoryModal: handleOpenHistoryModal,
+    onOpenCopyModal: handleOpenCopyModal,
+    onOpenResetConfirm: handleOpenResetConfirm,
+    onCloseHistoryModal: handleCloseHistoryModal,
+    onCloseCopyModal: handleCloseCopyModal,
+    onCancelReset: handleCancelReset,
+    onTempDateChange: handleTempDateChange,
+    onStartDateEdit: handleStartDateEdit,
+    ...handlers,
+  };
+}
+
+
 /** Shared controller for all Forecast workspace layouts. */
 export const useForecastWorkspaceController = ({
   onSave,
@@ -217,7 +357,7 @@ export const useForecastWorkspaceController = ({
     handleCancelReset,
   });
 
-  return {
+  return buildForecastWorkspaceController({
     onSave,
     cloudTools,
     fileInputRef,
@@ -225,10 +365,10 @@ export const useForecastWorkspaceController = ({
     canUndo,
     canRedo,
     isExporting,
-    isExportModalOpen: isModalOpen,
-    onInitiateExport: initiateExport,
-    onConfirmExport: confirmExport,
-    onCancelExport: cancelExport,
+    isModalOpen,
+    initiateExport,
+    confirmExport,
+    cancelExport,
     isPackageDownloading,
     showHistoryModal,
     showCopyModal,
@@ -240,29 +380,22 @@ export const useForecastWorkspaceController = ({
     days,
     availableTypes,
     ghostTypes,
-    activeOutlookType: panel.activeOutlookType,
-    activeProbability: panel.activeProbability,
-    isSignificant: panel.isSignificant,
-    significantThreatsEnabled: panel.significantThreatsEnabled,
+    panel,
     lowProbabilityOutlooks,
-    visibleGhostOutlooks,
-    ghostVisibility: ghostOutlookState,
-    outlookTypeHandlers: panel.outlookTypeHandlers,
+    ghostOutlookState,
     ghostOutlookHandlers,
-    probabilities: panel.probabilities,
-    probabilityHandlers: panel.probabilityHandlers,
     currentColor,
     isLowProb,
     baseMapStyle,
-    onBaseMapStyleSelect: handleBaseMapStyleSelect,
-    onOpenHistoryModal: handleOpenHistoryModal,
-    onOpenCopyModal: handleOpenCopyModal,
-    onOpenResetConfirm: handleOpenResetConfirm,
-    onCloseHistoryModal: handleCloseHistoryModal,
-    onCloseCopyModal: handleCloseCopyModal,
-    onCancelReset: handleCancelReset,
-    onTempDateChange: handleTempDateChange,
-    onStartDateEdit: handleStartDateEdit,
-    ...handlers,
-  };
+    handleBaseMapStyleSelect,
+    handleOpenHistoryModal,
+    handleOpenCopyModal,
+    handleOpenResetConfirm,
+    handleCloseHistoryModal,
+    handleCloseCopyModal,
+    handleCancelReset,
+    handleTempDateChange,
+    handleStartDateEdit,
+    handlers,
+  });
 };
