@@ -464,29 +464,21 @@ const initLocalAuthState = async (opts: {
     }
 
     const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-    const localUser = extractLocalUserFromData(data) as unknown as User;
 
-    setUser(localUser);
-    setStatus('signed_in');
-
-    const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
-    if (remoteSettings) {
-      applySettingsToState(remoteSettings, {
-        currentDarkModeRef,
-        currentOverlaysRef,
-        dispatch,
-        setSyncedSettings,
-        lastSyncedSettingsRef,
-      });
-      setSettingsSyncStatus('synced');
-    } else {
-      setSyncedSettings(null);
-      setSettingsSyncStatus('idle');
-    }
-
-    setBetaAccess(Boolean(data.betaAccess));
-    setBetaAccessLoading(false);
-    setError(null);
+    // Reuse shared local-auth application logic to keep the hook body concise.
+    applyLocalAuthData(data, {
+      dispatch,
+      currentDarkModeRef,
+      currentOverlaysRef,
+      setUser,
+      setStatus,
+      setSyncedSettings,
+      setSettingsSyncStatus,
+      lastSyncedSettingsRef,
+      setBetaAccess,
+      setBetaAccessLoading,
+      setError,
+    });
   } catch (err) {
     if (!isActive()) return;
     setStatus('error');
@@ -496,6 +488,60 @@ const initLocalAuthState = async (opts: {
     setBetaAccess(false);
     setBetaAccessLoading(false);
   }
+};
+
+/** Shared helper to apply a local auth response into application state. */
+const applyLocalAuthData = (
+  data: Record<string, unknown>,
+  {
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    lastSyncedSettingsRef,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+  }: {
+    dispatch: ReturnType<typeof useDispatch>;
+    currentDarkModeRef: React.MutableRefObject<boolean>;
+    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
+    setUser: React.Dispatch<React.SetStateAction<User | null>>;
+    setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
+    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+    setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
+    setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+  }
+) => {
+  const localUser = extractLocalUserFromData(data) as unknown as User;
+
+  setUser(localUser);
+  setStatus('signed_in');
+
+  const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
+  if (remoteSettings) {
+    applySettingsToState(remoteSettings, {
+      currentDarkModeRef,
+      currentOverlaysRef,
+      dispatch,
+      setSyncedSettings,
+      lastSyncedSettingsRef,
+    });
+    setSettingsSyncStatus('synced');
+  } else {
+    setSyncedSettings(null);
+    setSettingsSyncStatus('idle');
+  }
+
+  setBetaAccess(Boolean(data.betaAccess));
+  setBetaAccessLoading(false);
+  setError(null);
 };
 
 /** Returns the no-config auth context used for intentionally local-only deployments. */
@@ -582,27 +628,21 @@ const useLocalAuthState = (): AuthContextValue => {
       }
 
       const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-      const localUser = {
-        uid: data.uid ?? 'local',
-        email: data.email ?? '',
-        displayName: data.displayName ?? '',
-        providerData: [],
-      } as unknown as User;
+      const localUser = extractLocalUserFromData(data) as unknown as User;
 
-      setUser(localUser);
-      setStatus('signed_in');
-
-      const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
-      if (remoteSettings) {
-        applySettingsToState(remoteSettings, {
-          currentDarkModeRef,
-          currentOverlaysRef,
-          dispatch,
-          setSyncedSettings,
-          lastSyncedSettingsRef,
-        });
-        setSettingsSyncStatus('synced');
-      }
+      applyLocalAuthData(data, {
+        dispatch,
+        currentDarkModeRef,
+        currentOverlaysRef,
+        setUser,
+        setStatus,
+        setSyncedSettings,
+        setSettingsSyncStatus,
+        lastSyncedSettingsRef,
+        setBetaAccess,
+        setBetaAccessLoading,
+        setError,
+      });
 
       queueProductMetric({ event: 'account_signin', user: localUser });
     },
@@ -627,27 +667,21 @@ const useLocalAuthState = (): AuthContextValue => {
       }
 
       const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-      const localUser = {
-        uid: data.uid ?? 'local',
-        email: data.email ?? '',
-        displayName: data.displayName ?? '',
-        providerData: [],
-      } as unknown as User;
+      const localUser = extractLocalUserFromData(data) as unknown as User;
 
-      setUser(localUser);
-      setStatus('signed_in');
-
-      const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
-      if (remoteSettings) {
-        applySettingsToState(remoteSettings, {
-          currentDarkModeRef,
-          currentOverlaysRef,
-          dispatch,
-          setSyncedSettings,
-          lastSyncedSettingsRef,
-        });
-        setSettingsSyncStatus('synced');
-      }
+      applyLocalAuthData(data, {
+        dispatch,
+        currentDarkModeRef,
+        currentOverlaysRef,
+        setUser,
+        setStatus,
+        setSyncedSettings,
+        setSettingsSyncStatus,
+        lastSyncedSettingsRef,
+        setBetaAccess,
+        setBetaAccessLoading,
+        setError,
+      });
 
       queueProductMetric({ event: 'account_signup', user: localUser });
     },
