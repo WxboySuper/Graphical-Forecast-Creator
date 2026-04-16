@@ -16,6 +16,46 @@ const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categoric
 
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 
+/** Helper to create ghost outlook handlers outside the hook to reduce hook length. */
+function createGhostOutlookHandlers(
+  dispatch: ReturnType<typeof useDispatch>,
+  ghostOutlookState: Record<OutlookType, boolean>
+): Partial<Record<OutlookType, () => void>> {
+  const handlers: Partial<Record<OutlookType, () => void>> = {};
+  OUTLOOK_TYPE_ORDER.forEach((type) => {
+    const nextVisibility = !ghostOutlookState[type];
+    handlers[type] = () => dispatch(setGhostOutlookVisibility({ outlookType: type, visible: nextVisibility }));
+  });
+  return handlers;
+}
+
+/** Factory for date and modal handlers to keep the hook small and focused. */
+function createDateAndModalHandlers(opts: {
+  cycleDate: string;
+  setShowHistoryModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowCopyModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowResetConfirm: React.Dispatch<React.SetStateAction<boolean>>;
+  setTempDate: React.Dispatch<React.SetStateAction<string>>;
+  setIsEditingDate: React.Dispatch<React.SetStateAction<boolean>>;
+  dispatch: ReturnType<typeof useDispatch>;
+}) {
+  const { cycleDate, setShowHistoryModal, setShowCopyModal, setShowResetConfirm, setTempDate, setIsEditingDate, dispatch } = opts;
+  return {
+    handleOpenHistoryModal: () => setShowHistoryModal(true),
+    handleOpenCopyModal: () => setShowCopyModal(true),
+    handleOpenResetConfirm: () => setShowResetConfirm(true),
+    handleCloseHistoryModal: () => setShowHistoryModal(false),
+    handleCloseCopyModal: () => setShowCopyModal(false),
+    handleCancelReset: () => setShowResetConfirm(false),
+    handleTempDateChange: (e: React.ChangeEvent<HTMLInputElement>) => setTempDate(e.target.value),
+    handleStartDateEdit: () => {
+      setTempDate(cycleDate);
+      setIsEditingDate(true);
+    },
+    handleBaseMapStyleSelect: (style: BaseMapStyle) => dispatch(setBaseMapStyle(style)),
+  };
+}
+
 export interface ForecastWorkspaceController {
   onSave: () => void;
   onLoadClick: () => void;
@@ -127,14 +167,7 @@ export const useForecastWorkspaceController = ({
 
   const availableTypes = OUTLOOK_TYPE_ORDER.filter((type) => panel.getOutlookTypeEnabled(type));
   const ghostTypes = availableTypes.filter((type) => type !== panel.activeOutlookType);
-  const ghostOutlookHandlers = useMemo(() => {
-    const handlers: Partial<Record<OutlookType, () => void>> = {};
-    OUTLOOK_TYPE_ORDER.forEach((type) => {
-      const nextVisibility = !ghostOutlookState[type];
-      handlers[type] = () => dispatch(setGhostOutlookVisibility({ outlookType: type, visible: nextVisibility }));
-    });
-    return handlers;
-  }, [dispatch, ghostOutlookState]);
+  const ghostOutlookHandlers = useMemo(() => createGhostOutlookHandlers(dispatch, ghostOutlookState), [dispatch, ghostOutlookState]);
   const currentColor = useMemo(
     () => getOutlookColor(panel.activeOutlookType, panel.activeProbability),
     [panel.activeOutlookType, panel.activeProbability]
@@ -144,20 +177,29 @@ export const useForecastWorkspaceController = ({
     (type) => type !== panel.activeOutlookType && ghostOutlookState[type]
   );
 
-  const handleOpenHistoryModal = useCallback(() => setShowHistoryModal(true), []);
-  const handleOpenCopyModal = useCallback(() => setShowCopyModal(true), []);
-  const handleOpenResetConfirm = useCallback(() => setShowResetConfirm(true), []);
-  const handleCloseHistoryModal = useCallback(() => setShowHistoryModal(false), []);
-  const handleCloseCopyModal = useCallback(() => setShowCopyModal(false), []);
-  const handleCancelReset = useCallback(() => setShowResetConfirm(false), []);
-  const handleTempDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setTempDate(e.target.value), []);
-  const handleStartDateEdit = useCallback(() => {
-    setTempDate(cycleDate);
-    setIsEditingDate(true);
-  }, [cycleDate]);
-  const handleBaseMapStyleSelect = useCallback((style: BaseMapStyle) => {
-    dispatch(setBaseMapStyle(style));
-  }, [dispatch]);
+  const {
+    handleOpenHistoryModal,
+    handleOpenCopyModal,
+    handleOpenResetConfirm,
+    handleCloseHistoryModal,
+    handleCloseCopyModal,
+    handleCancelReset,
+    handleTempDateChange,
+    handleStartDateEdit,
+    handleBaseMapStyleSelect,
+  } = useMemo(
+    () =>
+      createDateAndModalHandlers({
+        cycleDate,
+        setShowHistoryModal,
+        setShowCopyModal,
+        setShowResetConfirm,
+        setTempDate,
+        setIsEditingDate,
+        dispatch,
+      }),
+    [cycleDate, dispatch]
+  );
 
   const handlers = useForecastWorkspaceActionHandlers({
     dispatch,
