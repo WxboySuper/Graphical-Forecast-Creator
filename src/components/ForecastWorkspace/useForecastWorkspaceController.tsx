@@ -1,30 +1,20 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import {
-  redoLastEdit,
-  resetForecasts,
-  selectCanRedo,
-  selectCanUndo,
-  selectForecastCycle,
-  setCycleDate,
-  setForecastDay,
-  toggleLowProbability,
-  undoLastEdit,
-} from '../../store/forecastSlice';
+import { selectCanRedo, selectCanUndo, selectForecastCycle } from '../../store/forecastSlice';
 import { setBaseMapStyle, setGhostOutlookVisibility } from '../../store/overlaysSlice';
 import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import type { AddToastFn } from '../Layout';
 import useOutlookPanelLogic from '../OutlookPanel/useOutlookPanelLogic';
 import { useExportMap } from '../DrawingTools/useExportMap';
-import { downloadGfcPackage } from '../../utils/fileUtils';
+
 import { DayType, OutlookType } from '../../types/outlooks';
 import { getOutlookColor } from '../../utils/outlookUtils';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 
-import { ForecastWorkspaceActionParams, useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
+import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 
 export interface ForecastWorkspaceController {
   onSave: () => void;

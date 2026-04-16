@@ -21,7 +21,7 @@ import { click } from 'ol/events/condition';
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from '../../store';
 import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
-import { setBaseMapStyle } from '../../store/overlaysSlice';
+
 import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { getFeatureStyle, computeZIndex } from '../../utils/mapStyleUtils';
 import type { MapAdapterHandle } from '../../maps/contracts';
@@ -445,31 +445,7 @@ const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   }
 };
 
-// Sub-component for the base map style-picker dropdown, rendering each style option as a button.
-const MapStylePicker: React.FC<{
-  baseMapStyle: BaseMapStyle;
-  onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}> = ({ baseMapStyle, onSelect }) => (
-  <div className="map-style-picker absolute bottom-full mb-2 right-0 flex min-w-[148px] flex-col gap-1 rounded-[1rem] border border-border/80 bg-background p-2 shadow-xl">
-    {([
-      { value: 'blank', label: 'Blank (Weather)' },
-      { value: 'osm', label: 'OpenStreetMap' },
-      { value: 'carto-light', label: 'Light' },
-      { value: 'carto-dark', label: 'Dark' },
-      { value: 'esri-satellite', label: 'Satellite' },
-    ] as { value: BaseMapStyle; label: string }[]).map(({ value, label }) => (
-      <button
-        key={value}
-        data-style={value}
-        type="button"
-        className={`rounded-xl px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-accent ${baseMapStyle === value ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground'}`}
-        onClick={onSelect}
-      >
-        {label}
-      </button>
-    ))}
-  </div>
-);
+
 
 /** Sentinel value used to clear an Overlay's position, causing it to be hidden from the map. */
 const OVERLAY_HIDDEN_POSITION: Parameters<Overlay['setPosition']>[0] = undefined;

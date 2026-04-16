@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
-import ForecastPage, { getDayRolloverPromptState } from './ForecastPage';
+import ForecastPage from './ForecastPage';
 import forecastReducer from '../store/forecastSlice';
 import featureFlagsReducer from '../store/featureFlagsSlice';
 import overlaysReducer from '../store/overlaysSlice';

@@ -18,6 +18,8 @@ import RecentCycles from './home/RecentCycles';
 import { DayType } from '../types/outlooks';
 import './HomePage.css';
 
+import useHomePageLogic from './home/useHomePageLogic';
+
 interface PageContext {
   addToast: AddToastFn;
 }
@@ -55,98 +57,31 @@ const AIDisclosure: React.FC = () => (
 
 /** Main home page with auth-aware landing variants and a workflow-first forecast layout. */
 const HomePage: React.FC = () => {
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { addToast } = useOutletContext<PageContext>();
-  const { hostedAuthEnabled, status } = useAuth();
-  const forecastCycle = useSelector(selectForecastCycle);
-  const savedCycles = useSelector((state: RootState) => state.forecast.savedCycles);
-  const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
-
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [confirmNewCycle, setConfirmNewCycle] = useState(false);
-
-  const { fileInputRef, handleFileSelect, handleOpenFilePicker, handleSave: doSave } = createFileHandlers({
-    addToast,
-    dispatch,
+  const {
+    variant,
+    stats,
+    formattedDate,
+    fileInputRef,
+    handleFileSelect,
+    handleOpenFilePicker,
+    handleSave,
+    handleNavigateForecast,
+    handleNavigateDiscussion,
+    handleNavigateAccount,
+    openFilePicker,
+    showHistoryModal,
+    confirmNewCycle,
+    handleOpenHistoryModal,
+    handleCloseHistoryModal,
+    handleQuickStartClick,
+    handleLoadRecentCycleClick,
+    handleConfirmNewCycle,
+    handleCancelNewCycle,
+    handleNewCycle,
+    savedCycles,
     forecastCycle,
-  });
-
-  const stats = useMemo(() => computeHomeStats(forecastCycle, savedCycles), [forecastCycle, savedCycles]);
-  const formattedDate = useMemo(() => formatCycleDate(forecastCycle.cycleDate), [forecastCycle.cycleDate]);
-  const variant: HomeVariant = hostedAuthEnabled && status === 'signed_in' ? 'signed_in' : 'signed_out';
-
-  /** Resets the forecast cycle, prompting for confirmation if there are unsaved changes. */
-  const handleNewCycle = () => {
-    if (!isSaved) {
-      setConfirmNewCycle(true);
-      return;
-    }
-    dispatch(resetForecasts());
-    addToast('Started new forecast cycle', 'success');
-  };
-
-  /** Switches to the given day and navigates to the forecast page. */
-  const handleQuickStart = (day: DayType) => {
-    dispatch(setForecastDay(day));
-    navigate('/forecast');
-  };
-
-  /** Triggers a save of the current forecast cycle to JSON. */
-  const handleSave = () => doSave();
-
-  /** Navigates to the forecast map page. */
-  const handleNavigateForecast = () => navigate('/forecast');
-
-  /** Navigates to the discussion editor page. */
-  const handleNavigateDiscussion = () => navigate('/discussion');
-
-  /** Navigates to the account page for hosted sign-in and sync settings. */
-  const handleNavigateAccount = () => navigate('/account');
-
-  /** Opens the OS file picker to load a forecast cycle from a JSON file. */
-  const openFilePicker = () => handleOpenFilePicker();
-
-  /** Opens the cycle history modal. */
-  const handleOpenHistoryModal = () => setShowHistoryModal(true);
-
-  /** Closes the cycle history modal. */
-  const handleCloseHistoryModal = () => setShowHistoryModal(false);
-
-  /** Extracts the day from the button's data attribute and starts forecast editing for that day. */
-  const handleQuickStartClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const day = Number(e.currentTarget.dataset.day);
-    if (Number.isNaN(day)) {
-      return;
-    }
-    handleQuickStart(day as DayType);
-  };
-
-  /** Loads a recent saved cycle from the history by its ID stored on the button's data attribute. */
-  const handleLoadRecentCycleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const cycleId = e.currentTarget.dataset.cycleId;
-    if (!cycleId) {
-      return;
-    }
-
-    const cycle = savedCycles.find((item) => item.id === cycleId);
-    if (!cycle) {
-      return;
-    }
-
-    dispatch(importForecastCycle(cycle.forecastCycle));
-    addToast('Cycle loaded from history', 'success');
-  };
-
-  /** Confirms starting a new cycle after the user acknowledges unsaved changes will be lost. */
-  const handleConfirmNewCycle = () => {
-    dispatch(resetForecasts());
-    addToast('Started new forecast cycle', 'success');
-    setConfirmNewCycle(false);
-  };
-
-  /** Cancels the new cycle confirmation dialog without discarding the current cycle. */
-  const handleCancelNewCycle = () => setConfirmNewCycle(false);
+    isSaved,
+  } = useHomePageLogic();
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">

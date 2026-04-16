@@ -111,20 +111,24 @@ const canSyncHostedUserDocuments = (user: User | null): user is User =>
   Boolean(isHostedAuthEnabled && db && user);
 
 /** Builds the normalized settings document shape from current local state. */
-const createSettingsSnapshot = (
-  darkMode: boolean,
-  overlays: OverlaysState,
-  defaultForecasterName: string,
-  forecastUiVariant: ForecastUiVariant
-): UserSettingsDocument => ({
-  darkMode,
-  baseMapStyle: overlays.baseMapStyle,
-  stateBorders: overlays.stateBorders,
-  counties: overlays.counties,
-  ghostOutlooks: overlays.ghostOutlooks,
-  defaultForecasterName,
-  forecastUiVariant,
-});
+interface BuildSettingsArgs {
+  darkMode: boolean;
+  overlays: OverlaysState;
+  defaultForecasterName: string;
+  forecastUiVariant: ForecastUiVariant;
+}
+const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
+  const { darkMode, overlays, defaultForecasterName, forecastUiVariant } = args;
+  return {
+    darkMode,
+    baseMapStyle: overlays.baseMapStyle,
+    stateBorders: overlays.stateBorders,
+    counties: overlays.counties,
+    ghostOutlooks: overlays.ghostOutlooks,
+    defaultForecasterName,
+    forecastUiVariant,
+  };
+};
 
 /** Validates a Firestore settings payload before the app applies it locally. */
 const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
@@ -192,10 +196,10 @@ const getSettingsSyncError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to sync account settings right now.';
 
 /** Builds the payload used when seeding or repairing a remote settings document. */
-const getRemoteSeedPayload = (settings: UserSettingsDocument, includeCreatedAt: boolean) => ({
+const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({
   ...settings,
   updatedAt: serverTimestamp(),
-  ...(includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
+  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
 
 /** True when two normalized settings payloads contain the same user-visible values. */
@@ -320,7 +324,7 @@ const seedOrApplySettings = async (opts: {
 
   await setDoc(
     settingsRef,
-    getRemoteSeedPayload(localSettings, !settingsSnapshot.exists()),
+    getRemoteSeedPayload(localSettings, { includeCreatedAt: !settingsSnapshot.exists() }),
     { merge: true }
   );
 
@@ -566,8 +570,7 @@ const getDefaultContextValue = (): AuthContextValue => ({
 /** Local-only auth action helpers (extracted to reduce hook complexity) */
 /** Local-only sign in helper: posts to /api/local/signin and applies returned auth data to state. */
 const localSignInWithEmail = async (
-  email: string,
-  password: string,
+  creds: { email: string; password: string },
   deps: {
     dispatch: ReturnType<typeof useDispatch>;
     currentDarkModeRef: React.MutableRefObject<boolean>;
@@ -595,6 +598,7 @@ const localSignInWithEmail = async (
     setBetaAccessLoading,
     setError,
   } = deps;
+  const { email, password } = creds;
 
   setError(null);
 
@@ -633,8 +637,7 @@ const localSignInWithEmail = async (
 
 /** Local-only sign up helper: posts to /api/local/signup and applies returned auth data to state. */
 const localSignUpWithEmail = async (
-  email: string,
-  password: string,
+  creds: { email: string; password: string },
   deps: {
     dispatch: ReturnType<typeof useDispatch>;
     currentDarkModeRef: React.MutableRefObject<boolean>;
@@ -662,6 +665,7 @@ const localSignUpWithEmail = async (
     setBetaAccessLoading,
     setError,
   } = deps;
+  const { email, password } = creds;
 
   setError(null);
 
@@ -837,72 +841,62 @@ const useLocalAuthState = (): AuthContextValue => {
     };
   }, [dispatch]);
 
-  const signInWithEmail = useCallback(
-    async (email: string, password: string) => {
-      await localSignInWithEmail(email, password, {
-        dispatch,
-        currentDarkModeRef,
-        currentOverlaysRef,
-        setUser,
-        setStatus,
-        setSyncedSettings,
-        setSettingsSyncStatus,
-        lastSyncedSettingsRef,
-        setBetaAccess,
-        setBetaAccessLoading,
-        setError,
-      });
-    },
-    [dispatch]
-  );
-
-  const signUpWithEmail = useCallback(
-    async (email: string, password: string) => {
-      await localSignUpWithEmail(email, password, {
-        dispatch,
-        currentDarkModeRef,
-        currentOverlaysRef,
-        setUser,
-        setStatus,
-        setSyncedSettings,
-        setSettingsSyncStatus,
-        lastSyncedSettingsRef,
-        setBetaAccess,
-        setBetaAccessLoading,
-        setError,
-      });
-    },
-    [dispatch]
-  );
-
-  const signOutUser = useCallback(async () => {
-    await localSignOutUser({
+  const localActions = useMemo(() => {
+    const deps = {
+      dispatch,
+      currentDarkModeRef,
+      currentOverlaysRef,
       setUser,
       setStatus,
       setSyncedSettings,
       setSettingsSyncStatus,
+      lastSyncedSettingsRef,
       setBetaAccess,
-    });
-  }, []);
+      setBetaAccessLoading,
+      setError,
+    } as const;
 
-  const refreshBetaAccess = useCallback(async (): Promise<void> => {
-    await localRefreshBetaAccess({ setBetaAccess, setBetaAccessLoading });
-  }, []);
+    return {
+      signInWithEmail: async (email: string, password: string) =>
+        localSignInWithEmail({ email, password }, deps as any),
+      signUpWithEmail: async (email: string, password: string) =>
+        localSignUpWithEmail({ email, password }, deps as any),
+      signOutUser: async () =>
+        localSignOutUser({
+          setUser: deps.setUser,
+          setStatus: deps.setStatus,
+          setSyncedSettings: deps.setSyncedSettings,
+          setSettingsSyncStatus: deps.setSettingsSyncStatus,
+          setBetaAccess: deps.setBetaAccess,
+        }),
+      refreshBetaAccess: async (): Promise<void> =>
+        localRefreshBetaAccess({ setBetaAccess: deps.setBetaAccess, setBetaAccessLoading: deps.setBetaAccessLoading }),
+      updateSyncedSettings: async (settings: Partial<UserSettingsDocument>): Promise<void> =>
+        localUpdateSyncedSettings(settings, {
+          setError: deps.setError,
+          currentDarkModeRef: deps.currentDarkModeRef,
+          currentOverlaysRef: deps.currentOverlaysRef,
+          dispatch: deps.dispatch,
+          setSyncedSettings: deps.setSyncedSettings,
+          lastSyncedSettingsRef: deps.lastSyncedSettingsRef,
+          setSettingsSyncStatus: deps.setSettingsSyncStatus,
+        }),
+    };
+  }, [
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    lastSyncedSettingsRef,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+  ]);
 
-  const updateSyncedSettings = useCallback(
-    async (settings: Partial<UserSettingsDocument>): Promise<void> => {
-      await localUpdateSyncedSettings(settings, {
-        setError,
-        currentDarkModeRef,
-        currentOverlaysRef,
-        dispatch,
-        setSyncedSettings,
-        lastSyncedSettingsRef,
-        setSettingsSyncStatus,
-      });
-    },
-    [dispatch]
-  );
+  const { signInWithEmail, signUpWithEmail, signOutUser, refreshBetaAccess, updateSyncedSettings } = localActions;
 
   const value = useMemo<AuthContextValue>(() => ({
     status,
@@ -1042,12 +1036,12 @@ const useHostedAuthState = (): AuthContextValue => {
 
     /** Captures the current local settings so they can seed a missing cloud document. */
     const buildLocalSettingsSnapshot = (): UserSettingsDocument =>
-      createSettingsSnapshot(
-        currentDarkModeRef.current,
-        currentOverlaysRef.current,
-        user.displayName ?? '',
-        readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT
-      );
+      createSettingsSnapshot({
+        darkMode: currentDarkModeRef.current,
+        overlays: currentOverlaysRef.current,
+        defaultForecasterName: user.displayName ?? '',
+        forecastUiVariant: readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
+      });
 
     /** Applies validated remote settings into Redux and local auth state. */
     const applyRemoteSettings = (settings: UserSettingsDocument) =>
@@ -1152,12 +1146,12 @@ const useHostedAuthState = (): AuthContextValue => {
       return;
     }
 
-    const nextSettings = createSettingsSnapshot(
+    const nextSettings = createSettingsSnapshot({
       darkMode,
       overlays,
-      syncedSettings?.defaultForecasterName ?? user.displayName ?? '',
-      syncedSettings?.forecastUiVariant ?? DEFAULT_FORECAST_UI_VARIANT
-    );
+      defaultForecasterName: syncedSettings?.defaultForecasterName ?? user.displayName ?? '',
+      forecastUiVariant: syncedSettings?.forecastUiVariant ?? DEFAULT_FORECAST_UI_VARIANT,
+    });
 
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, nextSettings)) {
       return;
@@ -1204,12 +1198,12 @@ const useHostedAuthState = (): AuthContextValue => {
     }
 
     const settingsRef = doc(requireDb(), 'userSettings', user.uid);
-    const fallbackSettings = createSettingsSnapshot(
+    const fallbackSettings = createSettingsSnapshot({
       darkMode,
       overlays,
-      user.displayName ?? '',
-      syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT
-    );
+      defaultForecasterName: user.displayName ?? '',
+      forecastUiVariant: syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
+    });
     const nextSettings: UserSettingsDocument = {
       ...(lastSyncedSettingsRef.current ?? fallbackSettings),
       ...settings,

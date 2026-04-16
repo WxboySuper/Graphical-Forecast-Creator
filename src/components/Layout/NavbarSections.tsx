@@ -81,6 +81,7 @@ const externalLinks: ExternalActionLink[] = [
   },
 ];
 
+/** Returns the className for a navigation link given whether it is active. */
 const getNavLinkClassName = (isActive: boolean) =>
   cn('app-navbar__tab', isActive && 'is-active');
 
