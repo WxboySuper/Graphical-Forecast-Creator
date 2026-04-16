@@ -218,7 +218,7 @@ const useForecastWorkspaceActionHandlers = ({
     onUndo: handleUndo,
     onRedo: handleRedo,
     onLoadClick: handleLoadClick,
-    onPackageDownload: () => { void handlePackageDownload(); },
+    onPackageDownload: () => { handlePackageDownload().catch(() => {}); },
     onDateSave: handleDateSave,
     onDayButtonClick: handleDayButtonClick,
     onPrevDay: handlePrevDay,

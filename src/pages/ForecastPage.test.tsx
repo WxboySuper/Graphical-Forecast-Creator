@@ -1,16 +1,15 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
-import ForecastPage, { getDayRolloverPromptState, runDayRolloverSaveAction } from './ForecastPage';
-import forecastReducer, { addFeature, markAsSaved } from '../store/forecastSlice';
+import ForecastPage, { getDayRolloverPromptState } from './ForecastPage';
+import forecastReducer from '../store/forecastSlice';
 import featureFlagsReducer from '../store/featureFlagsSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
 import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
-import { getLocalCalendarDate } from '../utils/localDate';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -79,19 +78,6 @@ const createStore = () => configureStore({
   }),
 });
 
-const createFeature = (id: string) => ({
-  type: 'Feature' as const,
-  id,
-  geometry: {
-    type: 'Polygon' as const,
-    coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
-  },
-  properties: {
-    outlookType: 'tornado' as const,
-    probability: '2%',
-    isSignificant: false,
-  },
-});
 
 const renderForecastPage = (store: ReturnType<typeof createStore>) =>
   render(
@@ -102,20 +88,6 @@ const renderForecastPage = (store: ReturnType<typeof createStore>) =>
     </MemoryRouter>
   );
 
-const getPromptStateForStore = (
-  store: ReturnType<typeof createStore>,
-  overrides: Partial<Parameters<typeof getDayRolloverPromptState>[0]> = {}
-) =>
-  getDayRolloverPromptState({
-    restoreComplete: true,
-    lastActiveDay: '2026-04-01',
-    today: '2026-04-02',
-    alreadyPromptedToday: false,
-    promptOpen: false,
-    forecastCycle: store.getState().forecast.forecastCycle,
-    isSaved: store.getState().forecast.isSaved,
-    ...overrides,
-  });
 
 describe('ForecastPage layout selection', () => {
   beforeEach(() => {

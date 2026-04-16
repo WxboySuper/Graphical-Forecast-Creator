@@ -19,6 +19,7 @@ export const FORECAST_UI_VARIANT_OPTIONS: ForecastUiVariantOption[] = [
 
 const FORECAST_UI_VARIANTS = new Set<ForecastUiVariant>(['tabbed_toolbar']);
 
+/** Normalize an arbitrary string into a ForecastUiVariant or return null if invalid. */
 export const normalizeForecastUiVariant = (
   value: string | null | undefined
 ): ForecastUiVariant | null => {
@@ -29,6 +30,7 @@ export const normalizeForecastUiVariant = (
   return FORECAST_UI_VARIANTS.has(value as ForecastUiVariant) ? (value as ForecastUiVariant) : null;
 };
 
+/** Resolve the effective ForecastUiVariant by checking query, synced settings, and stored value in order. */
 export const resolveForecastUiVariant = ({
   search,
   syncedSettingValue,
@@ -57,6 +59,7 @@ export const resolveForecastUiVariant = ({
   return DEFAULT_FORECAST_UI_VARIANT;
 };
 
+/** Read the stored ForecastUiVariant from localStorage, returning null on error. */
 export const readStoredForecastUiVariant = (): ForecastUiVariant | null => {
   try {
     return normalizeForecastUiVariant(localStorage.getItem(FORECAST_UI_VARIANT_STORAGE_KEY));
@@ -65,6 +68,7 @@ export const readStoredForecastUiVariant = (): ForecastUiVariant | null => {
   }
 };
 
+/** Persist the selected ForecastUiVariant to localStorage, ignoring write failures. */
 export const writeStoredForecastUiVariant = (value: ForecastUiVariant) => {
   try {
     localStorage.setItem(FORECAST_UI_VARIANT_STORAGE_KEY, value);

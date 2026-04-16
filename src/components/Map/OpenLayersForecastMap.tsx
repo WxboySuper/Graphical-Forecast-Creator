@@ -479,34 +479,13 @@ const hideOverlay = (overlay: Overlay): void => {
   overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 
-/** Map toolbar button that toggles the base map style picker and renders the dropdown when open. */
-const MapStylePickerButton: React.FC<{
-  showStylePicker: boolean;
-  baseMapStyle: BaseMapStyle;
-  onToggle: () => void;
-  onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}> = ({ showStylePicker, baseMapStyle, onToggle, onSelect }) => (
-  <div className="relative">
-    <button
-      type="button"
-      className="map-toolbar-button"
-      onClick={onToggle}
-      title="Base map style"
-      aria-label="Base map style"
-    >
-      Base Map
-    </button>
-    {showStylePicker && (
-      <MapStylePicker baseMapStyle={baseMapStyle} onSelect={onSelect} />
-    )}
-  </div>
-);
+
 
 // Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref) => {
   const dispatch = useDispatch();
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
-  const [showStylePicker, setShowStylePicker] = useState(false);
+  
   const [popupInfo, setPopupInfo] = useState<{ outlookType: string; probability: string; isSignificant: boolean } | null>(null);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
@@ -1255,21 +1234,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
     setInteractionMode('delete');
   };
 
-  // Toggle the visibility of the base map style picker, which allows users to switch between different base map styles (e.g. blank, OSM, satellite).
-  const handleToggleStylePicker = () => {
-    setShowStylePicker((v) => !v);
-  };
-
-  // Handle selection of a base map style from the style picker, updating the Redux store and hiding the picker.
-  const handleBaseMapStyleSelect = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const style = e.currentTarget.dataset.style as BaseMapStyle | undefined;
-    if (!style) {
-      return;
-    }
-
-    dispatch(setBaseMapStyle(style));
-    setShowStylePicker(false);
-  };
+  
 
   return (
     <div className="map-container">

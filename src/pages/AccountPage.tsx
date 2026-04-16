@@ -805,7 +805,8 @@ const SignedInAccountView: React.FC = () => {
     });
   };
 
-  const handleOpenForecastClick = () => {
+  /** Clear any forecast UI message when opening forecast. */
+const handleOpenForecastClick = () => {
     setForecastUiMessage(null);
   };
 

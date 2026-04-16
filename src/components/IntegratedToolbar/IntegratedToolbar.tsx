@@ -384,6 +384,7 @@ const ToolbarCurrentSelectionSection: React.FC<{ controller: ForecastWorkspaceCo
   );
 };
 
+/** Simple pill used in the toolbar status area. */
 const ToolbarHeaderPill: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
   <div
     className={cn(
@@ -395,6 +396,7 @@ const ToolbarHeaderPill: React.FC<{ children: React.ReactNode; className?: strin
   </div>
 );
 
+/** Displays the compact selection pill showing current outlook and probability. */
 const TabbedToolbarSelectionPill: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const isDarkText =
     controller.activeOutlookType === 'categorical' &&
@@ -431,6 +433,7 @@ const tabbedToolbarTypeLabels: Partial<Record<OutlookType, string>> = {
   'day4-8': 'D4-8',
 };
 
+/** Section wrapper used inside tab rows to group related controls. */
 const TabbedToolbarStripSection: React.FC<{
   label: string;
   hint?: string;
@@ -450,6 +453,7 @@ const TabbedToolbarStripSection: React.FC<{
   </section>
 );
 
+/** Button for selecting an outlook type in the tabbed toolbar. */
 const TabbedToolbarTypeButton: React.FC<{
   controller: ForecastWorkspaceController;
   type: OutlookType;
@@ -485,6 +489,7 @@ const TabbedToolbarTypeButton: React.FC<{
   );
 };
 
+/** Probability / risk button used within the probability scale. */
 const TabbedToolbarProbabilityButton: React.FC<{
   controller: ForecastWorkspaceController;
   probability: string;
@@ -518,6 +523,7 @@ const TabbedToolbarProbabilityButton: React.FC<{
   );
 };
 
+/** Selection strip showing the current outlook/probability and quick toggles. */
 const TabbedToolbarSelectionStrip: React.FC<{
   controller: ForecastWorkspaceController;
   showToggle?: boolean;
@@ -575,12 +581,14 @@ const TabbedToolbarSelectionStrip: React.FC<{
   );
 };
 
+/** Row wrapper for tabbed toolbar sections. */
 const TabbedToolbarTabRow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="tabbed-integrated-toolbar__row h-full overflow-x-auto overflow-y-hidden">
     <div className="flex h-full min-w-max items-stretch gap-2">{children}</div>
   </div>
 );
 
+/** Small stat pill used to display compact numeric metadata. */
 const TabbedToolbarStatPill: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="tabbed-integrated-toolbar__stat-pill rounded-xl border border-border/70 bg-muted/35 px-2.5 py-2">
     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground leading-none">{label}</p>
@@ -588,6 +596,7 @@ const TabbedToolbarStatPill: React.FC<{ label: string; value: string }> = ({ lab
   </div>
 );
 
+/** Draw tab containing outlook type and probability controls. */
 const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <TabbedToolbarTabRow>
     <TabbedToolbarStripSection label="Outlook Type" hint="T / W / H / C" className="w-[316px]">
@@ -620,6 +629,7 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
   </TabbedToolbarTabRow>
 );
 
+/** Days tab for selecting cycle date and forecast day navigation. */
 const TabbedToolbarDaysTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const daysWithData = FORECAST_DAYS.filter((day) => hasDayOutlookData(controller.days, day)).length;
 
@@ -716,6 +726,7 @@ const TabbedToolbarDaysTab: React.FC<{ controller: ForecastWorkspaceController }
   );
 };
 
+/** Layers tab exposing ghost layers and base map options. */
 const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <TabbedToolbarTabRow>
     <TabbedToolbarStripSection label="Ghost Layers" hint={`Day ${controller.currentDay}`} className="min-w-[560px] flex-1">
@@ -818,6 +829,7 @@ interface TabbedToolbarActionItem {
   accentClass: string;
 }
 
+/** Helper returning the action items displayed in the Tools tab. */
 const getTabbedToolbarActionItems = (
   controller: ForecastWorkspaceController
 ): TabbedToolbarActionItem[] => [
@@ -910,6 +922,7 @@ const getTabbedToolbarActionItems = (
   },
 ];
 
+/** Action tile used to render a single workspace/tool action in the Tools tab. */
 const TabbedToolbarActionTile: React.FC<{ item: TabbedToolbarActionItem }> = ({ item }) => (
   <Tooltip>
     <TooltipTrigger asChild>
@@ -935,6 +948,7 @@ const TabbedToolbarActionTile: React.FC<{ item: TabbedToolbarActionItem }> = ({ 
   </Tooltip>
 );
 
+/** Tools tab exposing workspace actions, file actions, and cloud context. */
 const TabbedToolbarToolsTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const actionItems = getTabbedToolbarActionItems(controller);
   const historyItems = actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key));

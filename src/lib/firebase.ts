@@ -34,6 +34,7 @@ export const auth = firebaseAuth;
 export const db = firestoreDb;
 export const googleAuthProvider = new GoogleAuthProvider();
 
+/** Ensure Firebase Auth is initialized and return the Auth instance or throw a clear error. */
 export function requireAuth(): Auth {
   if (!auth) {
     throw new Error('Firebase auth is not configured. Ensure hosted auth is enabled.');
@@ -41,6 +42,7 @@ export function requireAuth(): Auth {
   return auth;
 }
 
+/** Ensure Firestore is initialized and return the Firestore instance or throw a clear error. */
 export function requireDb(): Firestore {
   if (!db) {
     throw new Error('Firestore is not configured. Ensure hosted features are enabled.');

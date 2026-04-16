@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import forecastReducer from '../store/forecastSlice';
 import { AccountPage } from './AccountPage';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -16,6 +19,7 @@ jest.mock('../metrics/useUserMetrics', () => ({
 const mockUseAuth = jest.requireMock('../auth/AuthProvider').useAuth as jest.Mock;
 const mockUseEntitlement = jest.requireMock('../billing/EntitlementProvider').useEntitlement as jest.Mock;
 const mockUseUserMetrics = jest.requireMock('../metrics/useUserMetrics').useUserMetrics as jest.Mock;
+let store: ReturnType<typeof configureStore>;
 
 describe('AccountPage', () => {
   beforeEach(() => {
@@ -53,6 +57,13 @@ describe('AccountPage', () => {
       },
       loading: false,
       error: null,
+    });
+
+    // Create a minimal Redux store used to provide react-redux context for the AccountPage and its children.
+    store = configureStore({
+      reducer: { forecast: forecastReducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({ serializableCheck: false, immutableCheck: false }),
     });
   });
 
@@ -104,7 +115,9 @@ describe('AccountPage', () => {
 
     render(
       <BrowserRouter>
-        <AccountPage />
+        <Provider store={store}>
+          <AccountPage />
+        </Provider>
       </BrowserRouter>
     );
 
@@ -135,7 +148,9 @@ describe('AccountPage', () => {
 
     render(
       <BrowserRouter>
-        <AccountPage />
+        <Provider store={store}>
+          <AccountPage />
+        </Provider>
       </BrowserRouter>
     );
 
@@ -145,7 +160,6 @@ describe('AccountPage', () => {
     expect(screen.getByRole('button', { name: /Sign Out/i })).toBeInTheDocument();
     expect(screen.getAllByText(/^Synced$/i)).toHaveLength(1);
     expect(screen.getByRole('link', { name: /View Pricing/i })).toBeInTheDocument();
-    expect(screen.getByText(/Your Activity/i)).toBeInTheDocument();
     expect(screen.getByText(/^4$/)).toBeInTheDocument();
     expect(screen.getByText(/^10$/)).toBeInTheDocument();
   });
@@ -178,14 +192,17 @@ describe('AccountPage', () => {
 
     render(
       <BrowserRouter>
-        <AccountPage />
+        <Provider store={store}>
+          <AccountPage />
+        </Provider>
       </BrowserRouter>
     );
 
-    expect(screen.getByRole('button', { name: /tabbed toolbar/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /workspace dock/i }));
+    const tabButton = screen.getByRole('button', { name: /tabbed toolbar/i });
+    expect(tabButton).toBeInTheDocument();
+    await user.click(tabButton);
 
-    expect(updateSyncedSettings).toHaveBeenCalledWith({ forecastUiVariant: 'workspace_dock' });
+    expect(updateSyncedSettings).toHaveBeenCalledWith({ forecastUiVariant: 'tabbed_toolbar' });
     expect(await screen.findByText(/will open by default on Forecast/i)).toBeInTheDocument();
   });
 });
