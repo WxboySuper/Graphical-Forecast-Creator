@@ -563,6 +563,227 @@ const getDefaultContextValue = (): AuthContextValue => ({
 });
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
+/** Local-only auth action helpers (extracted to reduce hook complexity) */
+const localSignInWithEmail = async (
+  email: string,
+  password: string,
+  deps: {
+    dispatch: ReturnType<typeof useDispatch>;
+    currentDarkModeRef: React.MutableRefObject<boolean>;
+    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
+    setUser: React.Dispatch<React.SetStateAction<User | null>>;
+    setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
+    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+    setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
+    setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+  }
+) => {
+  const {
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    lastSyncedSettingsRef,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+  } = deps;
+
+  setError(null);
+
+  const resp = await fetch('/api/local/signin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+    credentials: 'include',
+  });
+
+  if (!resp.ok) {
+    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign in failed' };
+    setError(body?.message ?? 'Sign in failed');
+    throw new Error(body?.message ?? 'Sign in failed');
+  }
+
+  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
+  const localUser = extractLocalUserFromData(data) as unknown as User;
+
+  applyLocalAuthData(data, {
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    lastSyncedSettingsRef,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+  });
+
+  queueProductMetric({ event: 'account_signin', user: localUser });
+};
+
+const localSignUpWithEmail = async (
+  email: string,
+  password: string,
+  deps: {
+    dispatch: ReturnType<typeof useDispatch>;
+    currentDarkModeRef: React.MutableRefObject<boolean>;
+    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
+    setUser: React.Dispatch<React.SetStateAction<User | null>>;
+    setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
+    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+    setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
+    setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+  }
+) => {
+  const {
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    lastSyncedSettingsRef,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+  } = deps;
+
+  setError(null);
+
+  const resp = await fetch('/api/local/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+    credentials: 'include',
+  });
+
+  if (!resp.ok) {
+    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign up failed' };
+    setError(body?.message ?? 'Sign up failed');
+    throw new Error(body?.message ?? 'Sign up failed');
+  }
+
+  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
+  const localUser = extractLocalUserFromData(data) as unknown as User;
+
+  applyLocalAuthData(data, {
+    dispatch,
+    currentDarkModeRef,
+    currentOverlaysRef,
+    setUser,
+    setStatus,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    lastSyncedSettingsRef,
+    setBetaAccess,
+    setBetaAccessLoading,
+    setError,
+  });
+
+  queueProductMetric({ event: 'account_signup', user: localUser });
+};
+
+const localSignOutUser = async (deps: {
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
+}) => {
+  const { setUser, setStatus, setSyncedSettings, setSettingsSyncStatus, setBetaAccess } = deps;
+  try {
+    await fetch('/api/local/signout', { method: 'POST', credentials: 'include' });
+  } catch {
+    // ignore local sign out errors
+  }
+
+  setUser(null);
+  setStatus('signed_out');
+  setSyncedSettings(null);
+  setSettingsSyncStatus('idle');
+  setBetaAccess(false);
+};
+
+const localRefreshBetaAccess = async (deps: {
+  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
+  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}) => {
+  const { setBetaAccess, setBetaAccessLoading } = deps;
+  setBetaAccessLoading(true);
+
+  try {
+    const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
+    if (!resp.ok) {
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      return;
+    }
+
+    const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
+    setBetaAccess(Boolean(data.betaAccess));
+  } catch {
+    setBetaAccess(false);
+  } finally {
+    setBetaAccessLoading(false);
+  }
+};
+
+const localUpdateSyncedSettings = async (
+  settings: Partial<UserSettingsDocument>,
+  deps: {
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+    currentDarkModeRef: React.MutableRefObject<boolean>;
+    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
+    dispatch: ReturnType<typeof useDispatch>;
+    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  }
+) => {
+  const { setError, currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef, setSettingsSyncStatus } = deps;
+  setError(null);
+
+  const resp = await fetch('/api/local/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings }),
+    credentials: 'include',
+  });
+
+  if (!resp.ok) {
+    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Unable to update settings' };
+    const message = body?.message ?? 'Unable to update synced settings right now.';
+    setError(message);
+    throw new Error(message);
+  }
+
+  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
+  const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
+  if (remoteSettings) {
+    applySettingsToState(remoteSettings, {
+      currentDarkModeRef,
+      currentOverlaysRef,
+      dispatch,
+      setSyncedSettings,
+      lastSyncedSettingsRef,
+    });
+    setSettingsSyncStatus('synced');
+  }
+};
+
 const useLocalAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
@@ -612,25 +833,7 @@ const useLocalAuthState = (): AuthContextValue => {
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
-      setError(null);
-
-      const resp = await fetch('/api/local/signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-      });
-
-      if (!resp.ok) {
-        const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign in failed' };
-        setError(body?.message ?? 'Sign in failed');
-        throw new Error(body?.message ?? 'Sign in failed');
-      }
-
-      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-      const localUser = extractLocalUserFromData(data) as unknown as User;
-
-      applyLocalAuthData(data, {
+      await localSignInWithEmail(email, password, {
         dispatch,
         currentDarkModeRef,
         currentOverlaysRef,
@@ -643,33 +846,13 @@ const useLocalAuthState = (): AuthContextValue => {
         setBetaAccessLoading,
         setError,
       });
-
-      queueProductMetric({ event: 'account_signin', user: localUser });
     },
     [dispatch]
   );
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string) => {
-      setError(null);
-
-      const resp = await fetch('/api/local/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-      });
-
-      if (!resp.ok) {
-        const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign up failed' };
-        setError(body?.message ?? 'Sign up failed');
-        throw new Error(body?.message ?? 'Sign up failed');
-      }
-
-      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-      const localUser = extractLocalUserFromData(data) as unknown as User;
-
-      applyLocalAuthData(data, {
+      await localSignUpWithEmail(email, password, {
         dispatch,
         currentDarkModeRef,
         currentOverlaysRef,
@@ -682,78 +865,35 @@ const useLocalAuthState = (): AuthContextValue => {
         setBetaAccessLoading,
         setError,
       });
-
-      queueProductMetric({ event: 'account_signup', user: localUser });
     },
     [dispatch]
   );
 
   const signOutUser = useCallback(async () => {
-    setError(null);
-
-    try {
-      await fetch('/api/local/signout', { method: 'POST', credentials: 'include' });
-    } catch {
-      // ignore local sign out errors
-    }
-
-    setUser(null);
-    setStatus('signed_out');
-    setSyncedSettings(null);
-    setSettingsSyncStatus('idle');
-    setBetaAccess(false);
+    await localSignOutUser({
+      setUser,
+      setStatus,
+      setSyncedSettings,
+      setSettingsSyncStatus,
+      setBetaAccess,
+    });
   }, []);
 
   const refreshBetaAccess = useCallback(async (): Promise<void> => {
-    setBetaAccessLoading(true);
-
-    try {
-      const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
-      if (!resp.ok) {
-        setBetaAccess(false);
-        setBetaAccessLoading(false);
-        return;
-      }
-
-      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-      setBetaAccess(Boolean(data.betaAccess));
-    } catch {
-      setBetaAccess(false);
-    } finally {
-      setBetaAccessLoading(false);
-    }
+    await localRefreshBetaAccess({ setBetaAccess, setBetaAccessLoading });
   }, []);
 
   const updateSyncedSettings = useCallback(
     async (settings: Partial<UserSettingsDocument>): Promise<void> => {
-      setError(null);
-
-      const resp = await fetch('/api/local/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings }),
-        credentials: 'include',
+      await localUpdateSyncedSettings(settings, {
+        setError,
+        currentDarkModeRef,
+        currentOverlaysRef,
+        dispatch,
+        setSyncedSettings,
+        lastSyncedSettingsRef,
+        setSettingsSyncStatus,
       });
-
-      if (!resp.ok) {
-        const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Unable to update settings' };
-        const message = body?.message ?? 'Unable to update synced settings right now.';
-        setError(message);
-        throw new Error(message);
-      }
-
-      const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-      const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
-      if (remoteSettings) {
-        applySettingsToState(remoteSettings, {
-          currentDarkModeRef,
-          currentOverlaysRef,
-          dispatch,
-          setSyncedSettings,
-          lastSyncedSettingsRef,
-        });
-        setSettingsSyncStatus('synced');
-      }
     },
     [dispatch]
   );
