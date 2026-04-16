@@ -166,7 +166,7 @@ describe('AccountPage', () => {
 
   test('lets beta users switch the Forecast workspace experiment from account settings', async () => {
     const user = userEvent.setup();
-    const updateSyncedSettings = jest.fn().mockResolvedValue(undefined);
+    const updateSyncedSettings = jest.fn().mockImplementation(() => Promise.resolve());
 
     mockUseAuth.mockReturnValue({
       hostedAuthEnabled: true,

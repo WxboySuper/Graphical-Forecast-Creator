@@ -1,7 +1,7 @@
-export type ForecastUiVariant = 'tabbed_toolbar';
+export type ForecastUiVariant = 'integrated' | 'workspace_dock' | 'floating_panels' | 'tabbed_toolbar';
 
 export const FORECAST_UI_VARIANT_STORAGE_KEY = 'gfc-forecast-ui-variant';
-export const DEFAULT_FORECAST_UI_VARIANT: ForecastUiVariant = 'tabbed_toolbar';
+export const DEFAULT_FORECAST_UI_VARIANT: ForecastUiVariant = 'integrated';
 
 export interface ForecastUiVariantOption {
   value: ForecastUiVariant;
@@ -11,13 +11,33 @@ export interface ForecastUiVariantOption {
 
 export const FORECAST_UI_VARIANT_OPTIONS: ForecastUiVariantOption[] = [
   {
+    value: 'integrated',
+    label: 'Integrated',
+    description: 'Integrated layout with full toolbar and panels.',
+  },
+  {
+    value: 'workspace_dock',
+    label: 'Workspace Dock',
+    description: 'Docked workspace layout with persistent panels.',
+  },
+  {
+    value: 'floating_panels',
+    label: 'Floating Panels',
+    description: 'Floating panels overlaying the map.',
+  },
+  {
     value: 'tabbed_toolbar',
     label: 'Tabbed Toolbar',
     description: 'Compact tabbed controls with Draw / Days / Layers / Tools panels.',
   },
 ];
 
-const FORECAST_UI_VARIANTS = new Set<ForecastUiVariant>(['tabbed_toolbar']);
+const FORECAST_UI_VARIANTS = new Set<ForecastUiVariant>([
+  'integrated',
+  'workspace_dock',
+  'floating_panels',
+  'tabbed_toolbar',
+]);
 
 /** Normalize an arbitrary string into a ForecastUiVariant or return null if invalid. */
 export const normalizeForecastUiVariant = (

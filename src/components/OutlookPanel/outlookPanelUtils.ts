@@ -78,7 +78,7 @@ export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, active
      textColor = '#000000';
   } else {
     // Determine color map
-    let colorMap: any;
+    let colorMap: Record<string, string>;
     if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
     else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
     else if (activeOutlookType === 'hail') colorMap = colorMappings.hail;
@@ -111,7 +111,7 @@ export const getCurrentColor = (activeOutlookType: OutlookType, activeProbabilit
       return '#e0e0e0'; // Placeholder for color preview
   }
   
-  let colorMap: any;
+  let colorMap: Record<string, string>;
   if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
   else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
   else if (activeOutlookType === 'hail') colorMap = colorMappings.hail;

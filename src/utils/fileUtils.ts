@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay } from '../types/outlooks';
+import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
 
 const CURRENT_VERSION = '0.5.0';
@@ -9,6 +9,21 @@ const mapToArray = <K, V>(m: Map<K, V>): [K, V][] => Array.from(m.entries());
 
 // Helper to convert serializable Array back to Map
 const arrayToMap = <K, V>(arr: [K, V][]): Map<K, V> => new Map(arr);
+
+// Types for serialization helper
+type SerializedDay = {
+  day: DayType;
+  metadata: {
+    issueDate: string;
+    validDate: string;
+    issuanceTime: string;
+    lowProbabilityOutlooks?: OutlookType[];
+    createdAt?: string;
+    lastModified?: string;
+  };
+  data: SerializedOutlookData;
+  discussion?: DiscussionData;
+};
 
 // Helper to create empty outlook based on day type
 const createEmptyOutlook = (day: DayType): OutlookDay => {
@@ -50,12 +65,12 @@ export const serializeForecast = (
   forecastCycle: ForecastCycle,
   mapView: { center: [number, number]; zoom: number }
 ): GFCForecastSaveData => {
-  const serializedDays: any = {};
+  const serializedDays: Partial<Record<DayType, SerializedDay>> = {};
   
   (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach(day => {
     const outlookDay = forecastCycle.days[day];
     if (outlookDay) {
-      const serializedData: any = {};
+      const serializedData: SerializedOutlookData = {};
       
       // Only serialize outlook maps that exist for this day
       if (outlookDay.data.tornado) serializedData.tornado = mapToArray(outlookDay.data.tornado);
@@ -115,16 +130,26 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
         
         days[day] = {
           day: savedDay.day,
-          metadata: {
-            issueDate: savedDay.metadata.issueDate,
-            validDate: savedDay.metadata.validDate,
-            issuanceTime: savedDay.metadata.issuanceTime,
-            lowProbabilityOutlooks: savedDay.metadata.lowProbabilityOutlooks || [],
-            createdAt: (savedDay.metadata as any).createdAt || new Date().toISOString(),
-            lastModified: (savedDay.metadata as any).lastModified || new Date().toISOString()
-          },
+          metadata: (() => {
+            const meta = savedDay.metadata as Partial<{
+              issueDate?: string;
+              validDate?: string;
+              issuanceTime?: string;
+              lowProbabilityOutlooks?: OutlookDay['metadata']['lowProbabilityOutlooks'];
+              createdAt?: string;
+              lastModified?: string;
+            }>;
+            return {
+              issueDate: meta.issueDate ?? savedDay.metadata.issueDate,
+              validDate: meta.validDate ?? savedDay.metadata.validDate,
+              issuanceTime: meta.issuanceTime ?? savedDay.metadata.issuanceTime,
+              lowProbabilityOutlooks: meta.lowProbabilityOutlooks ?? savedDay.metadata.lowProbabilityOutlooks ?? [],
+              createdAt: meta.createdAt ?? new Date().toISOString(),
+              lastModified: meta.lastModified ?? new Date().toISOString(),
+            };
+          })(),
           data: outlookData,
-          discussion: (savedDay as any).discussion
+          discussion: (savedDay as Partial<{ discussion?: DiscussionData }>).discussion
         };
       }
     });

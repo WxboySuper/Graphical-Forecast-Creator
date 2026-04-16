@@ -26,7 +26,7 @@ jest.mock('./components/Map/ForecastMap', () => {
 });
 
 jest.mock('./components/IntegratedToolbar/IntegratedToolbar', () => ({
-  IntegratedToolbar: () => require('react').createElement('div', null, 'IntegratedToolbar'),
+  TabbedIntegratedToolbar: () => require('react').createElement('div', null, 'IntegratedToolbar'),
 }));
 jest.mock('./components/ForecastWorkspace/ForecastWorkspaceModals', () => () => <div>ForecastWorkspaceModals</div>);
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools</div>);
