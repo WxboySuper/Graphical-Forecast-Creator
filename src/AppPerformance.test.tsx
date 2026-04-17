@@ -14,7 +14,7 @@ import { ForecastPage } from './pages/ForecastPage';
 
 // Mock child components
 jest.mock('./components/Map/ForecastMap', () => {
-  const calls: any[] = [];
+  const calls: Array<Record<string, unknown>> = [];
   const ForecastMapMock = (props: Record<string, unknown>) => {
     calls.push(props);
     return <div data-testid="forecast-map">ForecastMap</div>;
@@ -72,7 +72,7 @@ describe('ForecastPage Performance', () => {
 
   beforeEach(() => {
     // Clear any previous calls recorded by the mocked ForecastMap module
-    const forecastMapMockModule = jest.requireMock('./components/Map/ForecastMap') as { getCalls: () => any[] };
+    const forecastMapMockModule = jest.requireMock('./components/Map/ForecastMap') as { getCalls: () => Array<Record<string, unknown>> };
     // Reset recorded calls
     forecastMapMockModule.getCalls().length = 0;
     store = configureStore({
@@ -102,7 +102,7 @@ describe('ForecastPage Performance', () => {
     );
 
     // Initial render(s)
-    const fm = jest.requireMock('./components/Map/ForecastMap') as { getCalls: () => any[] };
+    const fm = jest.requireMock('./components/Map/ForecastMap') as { getCalls: () => Array<Record<string, unknown>> };
     const initialCalls = fm.getCalls().length;
 
     // Dispatch an action that changes `forecast` slice but NOT the data used by ForecastPage
