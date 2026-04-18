@@ -138,6 +138,14 @@ const AccountIndicator: FC<{ showSignedInDot: boolean }> = ({ showSignedInDot })
   return <span className="app-navbar__accountIndicator" aria-hidden="true" />;
 };
 
+/** Displays the small status meta block used in the navbar right actions. */
+const StatusMeta: FC = () => (
+  <div className="app-navbar__statusMeta">
+    <span className="app-navbar__version">v1.4.0</span>
+    <span className="app-navbar__utilityDivider" aria-hidden="true" />
+  </div>
+);
+
 /** Keeps account access visually distinct from lower-priority utility links in the navbar. */
 const AccountButton: FC<{ accountLabel: string; showSignedInDot: boolean }> = ({
   accountLabel,
@@ -236,12 +244,7 @@ export const RightActions: FC<RightActionsProps> = ({
 
   return (
     <div className="app-navbar__actions">
-      <div className="app-navbar__statusMeta">
-        <span className="app-navbar__version">
-          v1.4.0
-        </span>
-        <span className="app-navbar__utilityDivider" aria-hidden="true" />
-      </div>
+      <StatusMeta />
 
       <div className="app-navbar__utilityCluster">
         <AccountButton accountLabel={accountLabel} showSignedInDot={showSignedInDot} />

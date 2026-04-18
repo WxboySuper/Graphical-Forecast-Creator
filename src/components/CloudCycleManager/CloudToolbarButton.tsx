@@ -118,47 +118,50 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
   const tooltip = getCloudToolbarTooltip(canSave, premiumActive, isExpiredPremium, currentCloudLabel);
   const saveIcon = renderCloudSaveIcon(syncState);
 
+  const CloudToolbarActions: React.FC = () => (
+    <div className="flex flex-wrap items-center gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            aria-label="Save forecast to cloud"
+            title="Save forecast to cloud"
+            disabled={syncState === 'saving'}
+            onClick={handleSaveClick}
+            className="tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs bg-background tabbed-integrated-toolbar__action-tile--primary"
+          >
+            <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-green-500/15 text-green-700">
+              {saveIcon}
+            </span>
+            <span className="font-semibold">Save to Cloud</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            aria-label="Open cloud library"
+            title="Open cloud library"
+            onClick={onOpenCloudLibrary}
+            className="tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs bg-background tabbed-integrated-toolbar__action-tile--utility"
+          >
+            <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-blue-500/15 text-blue-700">
+              <FolderOpen className="h-4 w-4" />
+            </span>
+            <span className="font-semibold">Open Cloud</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Open the cloud library</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              aria-label="Save forecast to cloud"
-              title="Save forecast to cloud"
-              disabled={syncState === 'saving'}
-              onClick={handleSaveClick}
-              className="tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs bg-background tabbed-integrated-toolbar__action-tile--primary"
-            >
-              <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-green-500/15 text-green-700">
-                {saveIcon}
-              </span>
-              <span className="font-semibold">Save to Cloud</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{tooltip}</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              aria-label="Open cloud library"
-              title="Open cloud library"
-              onClick={onOpenCloudLibrary}
-              className="tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs bg-background tabbed-integrated-toolbar__action-tile--utility"
-            >
-              <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-blue-500/15 text-blue-700">
-                <FolderOpen className="h-4 w-4" />
-              </span>
-              <span className="font-semibold">Open Cloud</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Open the cloud library</TooltipContent>
-        </Tooltip>
-      </div>
-
+      <CloudToolbarActions />
       <CloudSaveModal
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}

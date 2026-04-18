@@ -1,6 +1,10 @@
 import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindProbability, HailProbability, TotalSevereProbability,Day48Probability, CIGLevel, DayType } from '../../types/outlooks';
 import { colorMappings, getOutlookConstraints } from '../../utils/outlookUtils';
 
+/**
+ * Get available probability options for a given outlook type and day.
+ * Returns a typed array of probabilities or CIG hatching options depending on outlook.
+ */
 export const getAvailableProbabilities = (activeOutlookType: OutlookType, currentDay: DayType = 1) => {
   const constraints = getOutlookConstraints(currentDay);
   const cigs = constraints.allowedCIG as CIGLevel[]; // Available hatching options based on day
@@ -51,15 +55,20 @@ export const getAvailableProbabilities = (activeOutlookType: OutlookType, curren
   }
 };
 
-// Legacy significance removed - always false
+/**
+ * Legacy significance checker. Always returns false to preserve API shape.
+ */
 export const canBeSignificant = (
-  activeOutlookType: OutlookType,
-  activeProbability: string,
-  significantThreatsEnabled: boolean
-) => {
+  _activeOutlookType: OutlookType,
+  _activeProbability: string,
+  _significantThreatsEnabled: boolean
+): boolean => {
   return false;
 };
 
+/**
+ * Returns inline style for a probability button given the active outlook type and selected probability.
+ */
 export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, activeProbability: string, prob: string) => {
   const isActive = activeProbability === prob;
   let color: string;
@@ -103,6 +112,9 @@ export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, active
   };
 };
 
+/**
+ * Returns the preview color for the currently selected outlook/probability.
+ */
 export const getCurrentColor = (activeOutlookType: OutlookType, activeProbability: string) => {
   if (activeOutlookType === 'categorical') {
     return colorMappings.categorical[activeProbability as keyof typeof colorMappings.categorical] || '#FFFFFF';

@@ -350,7 +350,7 @@ const ToolbarProbabilitySection: React.FC<{ controller: ForecastWorkspaceControl
 );
 
 /** Displays the selected outlook type's color swatch, probability, and low-probability toggle. */
-const ToolbarCurrentSelectionSection: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
+const ToolbarCurrentSelectionInner: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const isDarkText = controller.activeOutlookType === 'categorical' && ['TSTM', 'MRGL', 'SLGT'].includes(controller.activeProbability);
   const labelColorClass = isDarkText ? 'text-black' : 'text-white';
   const swatchClass = cn(
@@ -361,29 +361,33 @@ const ToolbarCurrentSelectionSection: React.FC<{ controller: ForecastWorkspaceCo
   const lowProbLabel = controller.activeOutlookType === 'categorical' ? 'No T-Storms' : 'Low Probability';
 
   return (
-    <div className="border-l border-border pl-2 lg:pl-4">
-      <div className="flex flex-col gap-3">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Current</label>
-        <div className="flex flex-col gap-1 justify-center" style={{ height: '124px' }}>
-          <div className={swatchClass} style={{ backgroundColor: controller.currentColor }}>
-            <span className={cn('text-sm font-bold whitespace-nowrap', labelColorClass)}>{outlookLabels[controller.activeOutlookType]}</span>
-            <span className={cn('text-base font-bold whitespace-nowrap', labelColorClass)}>{controller.activeProbability}{sigSuffix}</span>
-          </div>
-          <Button
-            variant={controller.isLowProb ? 'success' : 'outline'}
-            size="sm"
-            className="w-full h-8 gap-2"
-            onClick={controller.onToggleLowProbability}
-          >
-            <CheckCircle2 className={cn('h-4 w-4', controller.isLowProb ? 'text-white' : 'text-muted-foreground')} />
-            <span className="text-xs">{lowProbLabel}</span>
-          </Button>
-          <div className="text-[10px] text-center text-muted-foreground/50">T/W/H/C • ↑↓</div>
+    <div className="flex flex-col gap-3">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Current</label>
+      <div className="flex flex-col gap-1 justify-center" style={{ height: '124px' }}>
+        <div className={swatchClass} style={{ backgroundColor: controller.currentColor }}>
+          <span className={cn('text-sm font-bold whitespace-nowrap', labelColorClass)}>{outlookLabels[controller.activeOutlookType]}</span>
+          <span className={cn('text-base font-bold whitespace-nowrap', labelColorClass)}>{controller.activeProbability}{sigSuffix}</span>
         </div>
+        <Button
+          variant={controller.isLowProb ? 'success' : 'outline'}
+          size="sm"
+          className="w-full h-8 gap-2"
+          onClick={controller.onToggleLowProbability}
+        >
+          <CheckCircle2 className={cn('h-4 w-4', controller.isLowProb ? 'text-white' : 'text-muted-foreground')} />
+          <span className="text-xs">{lowProbLabel}</span>
+        </Button>
+        <div className="text-[10px] text-center text-muted-foreground/50">T/W/H/C • ↑↓</div>
       </div>
     </div>
   );
 };
+
+const ToolbarCurrentSelectionSection: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <div className="border-l border-border pl-2 lg:pl-4">
+    <ToolbarCurrentSelectionInner controller={controller} />
+  </div>
+);
 
 /** Simple pill used in the toolbar status area. */
 const ToolbarHeaderPill: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
@@ -935,79 +939,84 @@ const TabbedToolbarToolsTab: React.FC<{ controller: ForecastWorkspaceController 
 };
 
 /** Toolbar variant that keeps the original integrated-bar footprint but moves secondary controls behind tabs. */
-export const TabbedIntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller }) => (
-  <TooltipProvider>
-    <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[168px] overflow-hidden backdrop-blur">
-      <Tabs defaultValue="draw" className="flex h-full flex-col">
-        <div className="tabbed-integrated-toolbar__header px-3 pt-2 lg:px-4">
-          <div className="mb-[0px] flex flex-wrap items-end justify-between gap-3">
-            <TabsList className="tabbed-integrated-toolbar__tabs-list relative z-10 mb-[-1px] h-auto gap-1 bg-transparent p-0">
-              <TabsTrigger
-                value="draw"
-                className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-              >
-                <PenTool className="h-4 w-4" />
-                Draw
-              </TabsTrigger>
-              <TabsTrigger
-                value="days"
-                className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-              >
-                <CalendarDays className="h-4 w-4" />
-                Days
-              </TabsTrigger>
-              <TabsTrigger
-                value="layers"
-                className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-              >
-                <Layers className="h-4 w-4" />
-                Layers
-              </TabsTrigger>
-              <TabsTrigger
-                value="tools"
-                className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-              >
-                <Wrench className="h-4 w-4" />
-                Tools
-              </TabsTrigger>
-            </TabsList>
+const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ controller }) => (
+  <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[168px] overflow-hidden backdrop-blur">
+    <Tabs defaultValue="draw" className="flex h-full flex-col">
+      <div className="tabbed-integrated-toolbar__header px-3 pt-2 lg:px-4">
+        <div className="mb-[0px] flex flex-wrap items-end justify-between gap-3">
+          <TabsList className="tabbed-integrated-toolbar__tabs-list relative z-10 mb-[-1px] h-auto gap-1 bg-transparent p-0">
+            <TabsTrigger
+              value="draw"
+              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+            >
+              <PenTool className="h-4 w-4" />
+              Draw
+            </TabsTrigger>
+            <TabsTrigger
+              value="days"
+              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Days
+            </TabsTrigger>
+            <TabsTrigger
+              value="layers"
+              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+            >
+              <Layers className="h-4 w-4" />
+              Layers
+            </TabsTrigger>
+            <TabsTrigger
+              value="tools"
+              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+            >
+              <Wrench className="h-4 w-4" />
+              Tools
+            </TabsTrigger>
+          </TabsList>
 
-            <div className="tabbed-integrated-toolbar__status-bar mb-1.5 flex min-w-0 flex-wrap items-center gap-2 rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 shadow-sm h-[32px]">
-              <ToolbarHeaderPill className="tabbed-integrated-toolbar__status-pill--beta bg-background py-1 px-2.5 h-[24px]">
-                <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-primary/80 leading-none">Toolbar Beta</span>
-              </ToolbarHeaderPill>
-              <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">
-                Day {controller.currentDay}
-              </ToolbarHeaderPill>
-              <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">
-                Cycle {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </ToolbarHeaderPill>
-              <TabbedToolbarSelectionPill controller={controller} />
-            </div>
+          <div className="tabbed-integrated-toolbar__status-bar mb-1.5 flex min-w-0 flex-wrap items-center gap-2 rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 shadow-sm h-[32px]">
+            <ToolbarHeaderPill className="tabbed-integrated-toolbar__status-pill--beta bg-background py-1 px-2.5 h-[24px]">
+              <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-primary/80 leading-none">Toolbar Beta</span>
+            </ToolbarHeaderPill>
+            <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">
+              Day {controller.currentDay}
+            </ToolbarHeaderPill>
+            <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">
+              Cycle {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </ToolbarHeaderPill>
+            <TabbedToolbarSelectionPill controller={controller} />
           </div>
         </div>
+      </div>
 
-        <div className="tabbed-integrated-toolbar__tray min-h-0 flex-1 overflow-hidden border-t border-border/70 bg-background px-3 py-2 lg:px-4">
-          <TabsContent value="draw" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-            <TabbedToolbarDrawTab controller={controller} />
-          </TabsContent>
+      <div className="tabbed-integrated-toolbar__tray min-h-0 flex-1 overflow-hidden border-t border-border/70 bg-background px-3 py-2 lg:px-4">
+        <TabsContent value="draw" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+          <TabbedToolbarDrawTab controller={controller} />
+        </TabsContent>
 
-          <TabsContent value="days" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-            <TabbedToolbarDaysTab controller={controller} />
-          </TabsContent>
+        <TabsContent value="days" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+          <TabbedToolbarDaysTab controller={controller} />
+        </TabsContent>
 
-          <TabsContent value="layers" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-            <TabbedToolbarLayersTab controller={controller} />
-          </TabsContent>
+        <TabsContent value="layers" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+          <TabbedToolbarLayersTab controller={controller} />
+        </TabsContent>
 
-          <TabsContent value="tools" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-            <TabbedToolbarToolsTab controller={controller} />
-          </TabsContent>
-        </div>
-      </Tabs>
-    </div>
+        <TabsContent value="tools" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+          <TabbedToolbarToolsTab controller={controller} />
+        </TabsContent>
+      </div>
+    </Tabs>
+  </div>
+);
+
+export const TabbedIntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller }) => (
+  <TooltipProvider>
+    <TabbedIntegratedToolbarBody controller={controller} />
   </TooltipProvider>
 );
+
 
 /** Pure presentational view layer for the integrated bottom toolbar. */
 export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller }) => (

@@ -162,7 +162,6 @@ const HomePage: React.FC = () => {
     formattedDate,
     fileInputRef,
     handleFileSelect,
-    handleOpenFilePicker,
     handleSave,
     handleNavigateForecast,
     handleNavigateDiscussion,
