@@ -97,13 +97,9 @@ describe('processOutlooksToCategorical', () => {
   test('undoing a probabilistic edit regenerates categorical output', async () => {
     const store = createStore();
 
-    render(
-      React.createElement(
-        Provider,
-        { store },
-        React.createElement(HookHarness)
-      )
-    );
+    type ProviderProps = { store: ReturnType<typeof createStore>; children?: React.ReactNode };
+    const ProviderComponent = Provider as unknown as React.ComponentType<ProviderProps>;
+    render(React.createElement(ProviderComponent, { store }, React.createElement(HookHarness)));
 
     act(() => {
       store.dispatch(addFeature({ feature: makeProbabilisticFeature('feature-1', 0) }));

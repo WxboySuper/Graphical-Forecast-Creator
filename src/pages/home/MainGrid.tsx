@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, ArrowRight, Calendar, CheckCircle2, Clock3, FileText, History, Layers3, Map, Save, Upload } from 'lucide-react';
+import { AlertTriangle, Calendar, CheckCircle2, Clock3, History, Layers3, Map, Save, Upload } from 'lucide-react';
 import type { DayType, ForecastCycle } from '../../types/outlooks';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -23,8 +23,6 @@ interface Props {
   forecastCycle: ForecastCycle;
   stats: HomeStats;
   onQuickStartClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  onNavigateForecast: () => void;
-  onNavigateDiscussion: () => void;
   onNewCycle: () => void;
   onSave: () => void;
   onOpenFile: () => void;
@@ -100,15 +98,12 @@ const DayButton: React.FC<{
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }> = ({ day, hasData, isCurrent, onClick }) => (
   <button
+    type="button"
     data-day={day}
     onClick={onClick}
-    className={cn(
-      'rounded-2xl border px-3 py-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-sm',
-      hasData ? 'border-primary/30 bg-primary/8' : 'border-border/80 bg-background/70',
-      isCurrent && 'ring-2 ring-primary ring-offset-2'
-    )}
+    className={cn('home-day-button', hasData && 'is-populated', isCurrent && 'is-current')}
   >
-    <div className="space-y-1">
+    <div className="home-day-button-content">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Day</p>
       <p className="text-2xl font-bold text-foreground">{day}</p>
       <p className="text-xs text-muted-foreground">{hasData ? 'Outlooks started' : 'Ready to edit'}</p>
@@ -142,38 +137,6 @@ const CycleDayGrid: React.FC<{
   </div>
 );
 
-/** Primary workflow actions that move the user back into the main forecast flow. */
-const PrimaryActions: React.FC<{
-  variant: HomeVariant;
-  onNavigateForecast: () => void;
-  onNavigateDiscussion: () => void;
-}> = ({ variant, onNavigateForecast, onNavigateDiscussion }) => {
-  const copy = getWorkspaceCopy(variant);
-
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <Button className="h-auto justify-between rounded-2xl px-5 py-4 text-left" onClick={onNavigateForecast}>
-        <span className="flex items-center gap-3">
-          <Map className="h-4 w-4" />
-          {copy.primaryAction}
-        </span>
-        <ArrowRight className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="outline"
-        className="h-auto justify-between rounded-2xl px-5 py-4 text-left"
-        onClick={onNavigateDiscussion}
-      >
-        <span className="flex items-center gap-3">
-          <FileText className="h-4 w-4" />
-          Write Discussion
-        </span>
-        <ArrowRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-};
-
 /** Secondary utility actions for file and cycle management. */
 const UtilityActions: React.FC<{
   onNewCycle: () => void;
@@ -188,19 +151,23 @@ const UtilityActions: React.FC<{
     </div>
 
     <div className="home-utility-grid">
-      <Button variant="outline" className="justify-start rounded-xl" onClick={onNewCycle}>
+      <Button variant="outline" className="home-utility-button justify-start rounded-xl" onClick={onNewCycle}>
         <Calendar className="h-4 w-4 mr-2" />
         Start New Cycle
       </Button>
-      <Button variant="outline" className="justify-start rounded-xl" onClick={onSave}>
+      <Button
+        variant="outline"
+        className="home-utility-button home-utility-button-primary justify-start rounded-xl"
+        onClick={onSave}
+      >
         <Save className="h-4 w-4 mr-2" />
         Save Cycle File
       </Button>
-      <Button variant="outline" className="justify-start rounded-xl" onClick={onOpenFile}>
+      <Button variant="outline" className="home-utility-button justify-start rounded-xl" onClick={onOpenFile}>
         <Upload className="h-4 w-4 mr-2" />
         Load From File
       </Button>
-      <Button variant="outline" className="justify-start rounded-xl" onClick={onOpenHistory}>
+      <Button variant="outline" className="home-utility-button justify-start rounded-xl" onClick={onOpenHistory}>
         <History className="h-4 w-4 mr-2" />
         Open Cycle History
       </Button>
@@ -216,8 +183,6 @@ export const MainGrid: React.FC<Props> = ({
   forecastCycle,
   stats,
   onQuickStartClick,
-  onNavigateForecast,
-  onNavigateDiscussion,
   onNewCycle,
   onSave,
   onOpenFile,
@@ -249,12 +214,6 @@ export const MainGrid: React.FC<Props> = ({
         daysWithData={stats.daysWithData}
         currentDay={forecastCycle.currentDay}
         onDayClick={onQuickStartClick}
-      />
-
-      <PrimaryActions
-        variant={variant}
-        onNavigateForecast={onNavigateForecast}
-        onNavigateDiscussion={onNavigateDiscussion}
       />
 
       <UtilityActions

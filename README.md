@@ -97,6 +97,28 @@ Use `pnpm` consistently for this repo so the checked-in `pnpm-lock.yaml` remains
 | `pnpm run test:e2e` | Run Playwright end-to-end tests |
 | `pnpm run build` | Production build to `/build` via Vite |
 
+### Local Beta Mode (developer)
+
+Run the app with beta-only features locally (useful for testing forecast redesigns, verification flows, and discussion changes).
+
+- Start a beta dev server on a different port with the Vite env flag:
+  - Unix/mac:
+    ```sh
+    cross-env VITE_BETA_MODE=true pnpm run dev -- --port 3002
+    ```
+  - Windows (PowerShell):
+    ```ps1
+    $env:VITE_BETA_MODE='true'; pnpm run dev -- --port 3002
+    ```
+
+- Bypass hosted Firebase sign-in (local-only):
+  - Open: http://localhost:3002/?localBetaBypass=1
+  - Or set in browser console:
+    localStorage.setItem('gfc-local-beta-bypass','1')
+
+- To enable hosted auth locally, provide Firebase web config via env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID and restart the dev server.
+
+
 ---
 
 ## Project Structure

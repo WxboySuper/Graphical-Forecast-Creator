@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import type { Store } from 'redux';
+import type { RootState } from '../store';
 import { loadCycleHistory } from '../store/forecastSlice';
 import type { SavedCycle, SavedCycleStats } from '../store/forecastSlice';
 import { deserializeForecast, serializeForecast } from './fileUtils';
@@ -129,7 +131,7 @@ export const useCycleHistoryPersistence = (): void => {
  * Subscribe to Redux store changes and persist cycle history
  * Call this from the root component after store initialization
  */
-export const setupCycleHistoryListener = (store: any): void => {
+export const setupCycleHistoryListener = (store: Store<RootState>): void => {
   let previousCycles: SavedCycle[] = [];
 
   store.subscribe(() => {

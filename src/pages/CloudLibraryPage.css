@@ -136,11 +136,16 @@
   display: grid;
   gap: 2rem;
   grid-template-columns: minmax(0, 1fr);
+  align-items: start;
 }
 
 .cloud-library-main,
 .cloud-library-side {
   gap: 2rem;
+}
+
+.cloud-library-side {
+  align-self: start;
 }
 
 .cloud-library-section-header {
@@ -253,6 +258,37 @@
   min-width: 10rem;
 }
 
+.cloud-cycle-button {
+  justify-content: center;
+}
+
+.cloud-cycle-button--load {
+  background: linear-gradient(135deg, var(--button-bg), color-mix(in srgb, var(--button-bg) 82%, white));
+  color: var(--button-text);
+  border: 1px solid transparent;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--button-bg) 18%, transparent);
+}
+
+.cloud-cycle-button--load:hover:not(:disabled) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--button-bg) 92%, white), color-mix(in srgb, var(--button-bg) 70%, white));
+}
+
+.cloud-cycle-button--ghost {
+  background: transparent;
+}
+
+.cloud-cycle-button--danger {
+  color: color-mix(in srgb, var(--error-text) 82%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--error-text) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--error-text) 5%, transparent);
+}
+
+.cloud-cycle-button--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error-text) 12%, transparent);
+  border-color: color-mix(in srgb, var(--error-text) 46%, var(--border-color));
+  color: color-mix(in srgb, var(--error-text) 88%, var(--text-primary));
+}
+
 .cloud-cycle-inline-actions {
   gap: 0.7rem;
 }
@@ -286,6 +322,7 @@
   border-radius: 1.25rem;
   background: var(--bg-secondary);
   color: var(--text-primary);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
 }
 
 .cloud-library-empty-copy {
@@ -351,6 +388,54 @@
 .cloud-library-auth-card {
   width: 100%;
   max-width: 32rem;
+}
+
+.dark-mode .cloud-library-pill {
+  background: color-mix(in srgb, var(--button-bg) 18%, rgba(255, 255, 255, 0.04));
+  border-color: color-mix(in srgb, var(--button-bg) 42%, rgba(255, 255, 255, 0.12));
+  color: color-mix(in srgb, white 86%, var(--button-bg));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .cloud-cycle-button--ghost {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.dark-mode .cloud-cycle-button--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.dark-mode .cloud-cycle-button--load {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--button-bg) 78%, #8fa0ff), color-mix(in srgb, var(--button-bg) 92%, #5967f2));
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(61, 77, 214, 0.26);
+}
+
+.dark-mode .cloud-cycle-button--load:hover:not(:disabled) {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--button-bg) 86%, #9ca9ff), color-mix(in srgb, var(--button-bg) 100%, #6371ff));
+}
+
+.dark-mode .cloud-cycle-button--danger {
+  background: rgba(143, 58, 72, 0.12);
+  border-color: rgba(185, 86, 103, 0.42);
+  color: rgba(255, 186, 197, 0.92);
+}
+
+.dark-mode .cloud-cycle-button--danger:hover:not(:disabled) {
+  background: rgba(143, 58, 72, 0.22);
+  border-color: rgba(205, 98, 117, 0.56);
+  color: #ffd7de;
+}
+
+.dark-mode .cloud-library-empty-icon {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(214, 221, 255, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 @media (min-width: 1024px) {

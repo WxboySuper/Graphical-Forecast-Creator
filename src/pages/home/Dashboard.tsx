@@ -1,8 +1,6 @@
 import React from 'react';
-import { CalendarDays, Layers3, Route } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import type { DayType } from '../../types/outlooks';
-import type { HomeVariant } from './HomeHero';
 
 interface Stats {
   daysWithData: DayType[];
@@ -16,25 +14,7 @@ interface Stats {
 
 interface Props {
   stats: Stats;
-  variant: HomeVariant;
 }
-
-/** Shared compact stat card for the redesigned landing page. */
-const SnapshotCard: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-}> = ({ icon, title, value }) => (
-  <Card className="home-surface-card">
-    <CardContent className="home-stat-card">
-      <div className="home-stat-card-icon">{icon}</div>
-      <div>
-        <p className="home-stat-card-label">{title}</p>
-        <p className="home-stat-card-value">{value}</p>
-      </div>
-    </CardContent>
-  </Card>
-);
 
 /** One numbered getting-started step inside the signed-out sidebar. */
 const GettingStartedStep: React.FC<{
@@ -87,27 +67,6 @@ const GettingStartedPanel: React.FC = () => (
   </section>
 );
 
-/** Compact workflow snapshot for signed-in users returning to active work. */
-const SignedInSnapshotStrip: React.FC<{ stats: Stats }> = ({ stats }) => (
-  <div className="grid gap-4 md:grid-cols-3">
-    <SnapshotCard
-      icon={<CalendarDays className="h-5 w-5" />}
-      title="Streak"
-      value={`${stats.forecastStreak}`}
-    />
-    <SnapshotCard
-      icon={<Layers3 className="h-5 w-5" />}
-      title="Total Forecasts Made"
-      value={`${stats.totalForecastsMade}`}
-    />
-    <SnapshotCard
-      icon={<Route className="h-5 w-5" />}
-      title="Total Cycles Made"
-      value={`${stats.totalCyclesMade}`}
-    />
-  </div>
-);
-
 /** Small row inside the signed-out "At a Glance" block. */
 const AtAGlanceRow: React.FC<{ label: string; value: number }> = ({ label, value }) => (
   <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/80 px-4 py-3">
@@ -158,13 +117,7 @@ const SignedOutSidebar: React.FC<{ stats: Stats }> = ({ stats }) => (
   </Card>
 );
 
-/** Secondary home-page content that changes based on whether the user is returning to work or onboarding. */
-export const Dashboard: React.FC<Props> = ({ stats, variant }) => {
-  if (variant === 'signed_in') {
-    return <SignedInSnapshotStrip stats={stats} />;
-  }
-
-  return <SignedOutSidebar stats={stats} />;
-};
+/** Secondary signed-out sidebar that keeps guidance and local context close to onboarding actions. */
+export const Dashboard: React.FC<Props> = ({ stats }) => <SignedOutSidebar stats={stats} />;
 
 export default Dashboard;

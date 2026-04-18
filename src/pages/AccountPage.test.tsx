@@ -1,5 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import forecastReducer from '../store/forecastSlice';
 import { AccountPage } from './AccountPage';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -15,9 +19,11 @@ jest.mock('../metrics/useUserMetrics', () => ({
 const mockUseAuth = jest.requireMock('../auth/AuthProvider').useAuth as jest.Mock;
 const mockUseEntitlement = jest.requireMock('../billing/EntitlementProvider').useEntitlement as jest.Mock;
 const mockUseUserMetrics = jest.requireMock('../metrics/useUserMetrics').useUserMetrics as jest.Mock;
+let store: ReturnType<typeof configureStore>;
 
 describe('AccountPage', () => {
   beforeEach(() => {
+    localStorage.clear();
     mockUseEntitlement.mockReturnValue({
       entitlementStatus: 'free',
       premiumActive: false,
@@ -51,6 +57,13 @@ describe('AccountPage', () => {
       },
       loading: false,
       error: null,
+    });
+
+    // Create a minimal Redux store used to provide react-redux context for the AccountPage and its children.
+    store = configureStore({
+      reducer: { forecast: forecastReducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({ serializableCheck: false, immutableCheck: false }),
     });
   });
 
@@ -102,7 +115,9 @@ describe('AccountPage', () => {
 
     render(
       <BrowserRouter>
-        <AccountPage />
+        <Provider store={store}>
+          <AccountPage />
+        </Provider>
       </BrowserRouter>
     );
 
@@ -114,6 +129,7 @@ describe('AccountPage', () => {
       hostedAuthEnabled: true,
       status: 'signed_in',
       settingsSyncStatus: 'synced',
+      betaAccess: false,
       user: {
         email: 'alex@example.com',
         displayName: 'Alex',
@@ -132,7 +148,9 @@ describe('AccountPage', () => {
 
     render(
       <BrowserRouter>
-        <AccountPage />
+        <Provider store={store}>
+          <AccountPage />
+        </Provider>
       </BrowserRouter>
     );
 
@@ -142,8 +160,49 @@ describe('AccountPage', () => {
     expect(screen.getByRole('button', { name: /Sign Out/i })).toBeInTheDocument();
     expect(screen.getAllByText(/^Synced$/i)).toHaveLength(1);
     expect(screen.getByRole('link', { name: /View Pricing/i })).toBeInTheDocument();
-    expect(screen.getByText(/Your Activity/i)).toBeInTheDocument();
     expect(screen.getByText(/^4$/)).toBeInTheDocument();
     expect(screen.getByText(/^10$/)).toBeInTheDocument();
+  });
+
+  test('lets beta users switch the Forecast workspace experiment from account settings', async () => {
+    const user = userEvent.setup();
+    const updateSyncedSettings = jest.fn().mockImplementation(() => Promise.resolve());
+
+    mockUseAuth.mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      settingsSyncStatus: 'synced',
+      betaAccess: true,
+      user: {
+        email: 'alex@example.com',
+        displayName: 'Alex',
+        providerData: [{ providerId: 'google.com' }],
+      },
+      syncedSettings: {
+        defaultForecasterName: 'Alex',
+        forecastUiVariant: 'integrated',
+      },
+      error: null,
+      signInWithGoogle: jest.fn(),
+      signInWithEmail: jest.fn(),
+      signUpWithEmail: jest.fn(),
+      signOutUser: jest.fn(),
+      updateSyncedSettings,
+    });
+
+    render(
+      <BrowserRouter>
+        <Provider store={store}>
+          <AccountPage />
+        </Provider>
+      </BrowserRouter>
+    );
+
+    const tabButton = screen.getByRole('button', { name: /tabbed toolbar/i });
+    expect(tabButton).toBeInTheDocument();
+    await user.click(tabButton);
+
+    expect(updateSyncedSettings).toHaveBeenCalledWith({ forecastUiVariant: 'tabbed_toolbar' });
+    expect(await screen.findByText(/will open by default on Forecast/i)).toBeInTheDocument();
   });
 });

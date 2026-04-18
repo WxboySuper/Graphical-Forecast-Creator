@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, Cloud, CloudOff, Download, Edit2, FolderOpen, LoaderCircle, Lock, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertCircle, Cloud, CloudOff, Download, Edit2, LoaderCircle, Lock, ShieldCheck, Trash2 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -144,7 +144,7 @@ const CloudLibraryUtilityCard: React.FC<{
 const EmptyState: React.FC<{ premiumActive: boolean }> = ({ premiumActive }) => (
   <div className="cloud-library-empty-state">
     <div className="cloud-library-empty-icon">
-      <FolderOpen className="h-8 w-8" />
+      <Cloud className="h-8 w-8" />
     </div>
     <div className="cloud-library-empty-copy">
       <h2>No cloud cycles saved yet</h2>
@@ -156,7 +156,7 @@ const EmptyState: React.FC<{ premiumActive: boolean }> = ({ premiumActive }) => 
     </div>
     <div className="cloud-library-empty-actions">
       <Button asChild variant="default">
-        <Link to="/forecast">Open Forecast Editor</Link>
+        <Link to="/forecast">{premiumActive ? 'Start your first forecast' : 'Open Forecast Editor'}</Link>
       </Button>
       <Button asChild variant={premiumActive ? 'outline' : 'default'}>
         <Link to="/pricing">{premiumActive ? 'View Pricing' : 'See Premium'}</Link>
@@ -231,10 +231,10 @@ const CloudCycleDeletePrompt: React.FC<{
   <div className="cloud-cycle-delete-prompt">
     <p>Delete &quot;{cycleLabel}&quot;? This action cannot be undone.</p>
     <div className="cloud-cycle-inline-actions">
-      <Button variant="outline" size="sm" onClick={onCancel} disabled={isBusy}>
+      <Button className="cloud-cycle-button cloud-cycle-button--ghost" variant="outline" size="sm" onClick={onCancel} disabled={isBusy}>
         Keep
       </Button>
-      <Button variant="destructive" size="sm" onClick={onConfirm} disabled={isBusy}>
+      <Button className="cloud-cycle-button cloud-cycle-button--danger" variant="outline" size="sm" onClick={onConfirm} disabled={isBusy}>
         {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
         Delete
       </Button>
@@ -270,7 +270,7 @@ const CloudCycleDeleteAction: React.FC<{
   }
 
   return (
-    <Button variant="destructive" onClick={onRequestDelete} disabled={isBusy}>
+    <Button className="cloud-cycle-button cloud-cycle-button--danger" variant="outline" onClick={onRequestDelete} disabled={isBusy}>
       <Trash2 className="mr-2 h-4 w-4" />
       Delete
     </Button>
@@ -305,7 +305,12 @@ const CloudCycleWriteActions: React.FC<{
 
   return (
     <>
-      <Button variant="outline" onClick={onStartRename} disabled={isBusy || isRenaming || confirmingDelete}>
+      <Button
+        className="cloud-cycle-button cloud-cycle-button--ghost"
+        variant="outline"
+        onClick={onStartRename}
+        disabled={isBusy || isRenaming || confirmingDelete}
+      >
         <Edit2 className="mr-2 h-4 w-4" />
         Rename
       </Button>
@@ -350,7 +355,7 @@ const CloudCycleActions: React.FC<{
   onConfirmDelete,
 }) => (
   <div className="cloud-cycle-actions">
-    <Button variant="outline" onClick={onLoad} disabled={loading || isDeleting || isSavingRename}>
+    <Button className="cloud-cycle-button cloud-cycle-button--load" onClick={onLoad} disabled={loading || isDeleting || isSavingRename}>
       <Download className="mr-2 h-4 w-4" />
       Load
     </Button>

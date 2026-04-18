@@ -219,15 +219,22 @@ const PricingPlanPriceBlock: React.FC<{
   price: string;
   priceNote: string;
   description: string;
-}> = ({ price, priceNote, description }) => (
-  <div className="pricing-plan-price-block">
-    <div className="pricing-plan-price-row">
-      <span className="pricing-plan-price">{price}</span>
-      <span className="pricing-plan-price-note">{priceNote}</span>
+}> = ({ price, priceNote, description }) => {
+  const priceMatch = price.match(/^(\$\d+)(\/.+)$/);
+  const mainPrice = priceMatch ? priceMatch[1] : price;
+  const priceSuffix = priceMatch ? priceMatch[2] : null;
+
+  return (
+    <div className="pricing-plan-price-block">
+      <div className="pricing-plan-price-row">
+        <span className="pricing-plan-price">{mainPrice}</span>
+        {priceSuffix ? <span className="pricing-plan-price-modifier">{priceSuffix}</span> : null}
+        <span className="pricing-plan-price-note">{priceNote}</span>
+      </div>
+      <CardDescription>{description}</CardDescription>
     </div>
-    <CardDescription>{description}</CardDescription>
-  </div>
-);
+  );
+};
 
 /** Feature list and CTA body used by each pricing plan card. */
 const PricingPlanBody: React.FC<{

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
-import { isBetaModeEnabled } from '../../lib/betaAccess';
+import { isBetaModeEnabled, isLocalBetaBypassEnabled } from '../../lib/betaAccess';
 import { BetaStatusPanel } from './BetaPageLayout';
 
 /** True when the beta gate should show an access-check loading state. */
@@ -18,9 +18,14 @@ const isCheckingBetaAccess = (
 
 /** Full-app route guard that keeps the beta deployment locked to approved accounts. */
 const BetaAccessGuard: React.FC = () => {
+  const location = useLocation();
   const { betaAccess, betaAccessLoading, hostedAuthEnabled, status } = useAuth();
 
   if (!isBetaModeEnabled()) {
+    return <Outlet />;
+  }
+
+  if (isLocalBetaBypassEnabled(location.search)) {
     return <Outlet />;
   }
 

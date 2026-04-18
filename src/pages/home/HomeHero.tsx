@@ -9,6 +9,7 @@ interface Props {
   formattedDate: string;
   hasSavedCycles: boolean;
   savedCyclesCount: number;
+  showSummaryCard?: boolean;
   onStart: () => void;
   onWriteDiscussion: () => void;
   onViewAccount: () => void;
@@ -119,7 +120,7 @@ const HeroActions: React.FC<Props> = ({
 );
 
 /** Compact right-side summary card that gives the hero a more grounded, operational feel. */
-const HeroSummaryCard: React.FC<{
+export const HeroSummaryCard: React.FC<{
   variant: HomeVariant;
   formattedDate: string;
   savedCyclesCount: number;
@@ -220,6 +221,7 @@ export const HomeHero: React.FC<Props> = ({
   formattedDate,
   hasSavedCycles,
   savedCyclesCount,
+  showSummaryCard = true,
   onStart,
   onWriteDiscussion,
   onViewAccount,
@@ -227,7 +229,7 @@ export const HomeHero: React.FC<Props> = ({
 }) => {
   return (
     <HeroShell variant={variant}>
-      <div className="home-hero-grid">
+      <div className={showSummaryCard ? 'home-hero-grid' : 'home-hero-grid home-hero-grid-single'}>
         <HeroMainContent
           variant={variant}
           formattedDate={formattedDate}
@@ -239,9 +241,11 @@ export const HomeHero: React.FC<Props> = ({
           onOpenHistory={onOpenHistory}
         />
 
-        <div className="home-hero-side">
-          <HeroSummaryCard variant={variant} formattedDate={formattedDate} savedCyclesCount={savedCyclesCount} />
-        </div>
+        {showSummaryCard ? (
+          <div className="home-hero-side">
+            <HeroSummaryCard variant={variant} formattedDate={formattedDate} savedCyclesCount={savedCyclesCount} />
+          </div>
+        ) : null}
       </div>
     </HeroShell>
   );

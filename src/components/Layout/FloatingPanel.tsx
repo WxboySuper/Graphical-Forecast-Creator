@@ -7,7 +7,7 @@ interface FloatingPanelProps {
   title: string;
   children: React.ReactNode;
   /** Position on screen */
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'static';
   /** Default collapsed state */
   defaultCollapsed?: boolean;
   /** Whether panel can be closed */
@@ -22,6 +22,12 @@ interface FloatingPanelProps {
   visible?: boolean;
   /** Min width of panel */
   minWidth?: number;
+  /** Additional inline style for the panel shell */
+  style?: React.CSSProperties;
+  /** Additional inline style for the content area */
+  contentStyle?: React.CSSProperties;
+  /** Additional className for the content area */
+  contentClassName?: string;
 }
 
 // Define position classes for the floating panel
@@ -30,6 +36,7 @@ const positionClasses = {
   'top-right': 'top-20 right-4',
   'bottom-left': 'bottom-[100px] left-4',
   'bottom-right': 'bottom-[100px] right-4',
+  static: '',
 };
 
 // Define the FloatingPanel component
@@ -44,6 +51,9 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
   icon,
   visible = true,
   minWidth = 240,
+  style,
+  contentStyle,
+  contentClassName,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
@@ -68,13 +78,14 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
   return (
     <div
       className={cn(
-        'absolute z-panel',
+        position === 'static' ? 'relative' : 'absolute z-panel',
+        'pointer-events-auto flex flex-col overflow-hidden',
         'bg-background border border-border rounded-lg shadow-lg',
         'transition-all duration-200',
         positionClasses[position],
         className
       )}
-      style={{ minWidth }}
+      style={{ minWidth, ...style }}
     >
       {/* Header */}
       <div
@@ -122,7 +133,7 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
 
       {/* Content */}
       {!isCollapsed && (
-        <div className="p-3 animate-fade-in">
+        <div className={cn('p-3 animate-fade-in', contentClassName)} style={contentStyle}>
           {children}
         </div>
       )}
