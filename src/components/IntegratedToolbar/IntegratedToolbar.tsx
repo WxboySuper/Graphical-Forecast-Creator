@@ -383,6 +383,9 @@ const ToolbarCurrentSelectionInner: React.FC<{ controller: ForecastWorkspaceCont
   );
 };
 
+/**
+ * Displays the current selection area in the integrated toolbar (color swatch, probability, low-probability toggle).
+ */
 const ToolbarCurrentSelectionSection: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <div className="border-l border-border pl-2 lg:pl-4">
     <ToolbarCurrentSelectionInner controller={controller} />
@@ -1021,6 +1024,9 @@ const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ control
   </div>
 );
 
+/**
+ * Tabbed variant of the integrated toolbar — keeps primary footprint and moves secondary controls behind tabs.
+ */
 export const TabbedIntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller }) => (
   <TooltipProvider>
     <TabbedIntegratedToolbarBody controller={controller} />

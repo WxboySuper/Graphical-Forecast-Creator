@@ -95,6 +95,9 @@ type CloudSaveActionProps = {
   tooltip: string;
 };
 
+/**
+ * Small presentational action for the cloud save button with tooltip.
+ */
 const CloudSaveAction: React.FC<CloudSaveActionProps> = ({ saveIcon, disabled, onClick, tooltip }) => (
   <Tooltip>
     <TooltipTrigger asChild>
