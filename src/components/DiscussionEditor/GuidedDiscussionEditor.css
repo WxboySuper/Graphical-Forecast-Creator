@@ -85,8 +85,8 @@
 }
 
 .guided-textarea::placeholder {
-  color: var(--text-tertiary);
-  opacity: 0.7;
+  color: color-mix(in srgb, var(--text-secondary) var(--placeholder-mix), var(--text-tertiary));
+  opacity: 1;
   font-size: 0.9rem;
 }
 
@@ -99,4 +99,13 @@
 /* Dark mode adjustments */
 .dark-mode .guided-question-section:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .guided-textarea {
+  color: rgb(241, 245, 249);
+}
+
+.dark-mode .guided-textarea::placeholder {
+  color: color-mix(in srgb, var(--text-secondary) var(--placeholder-mix), var(--text-tertiary));
+  opacity: 1;
 }

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
+import { Eye, FileUp, Layers3 } from 'lucide-react';
 import VerificationMap, { VerificationMapHandle } from '../Map/VerificationMap';
 import VerificationPanel from '../Verification/VerificationPanel';
 import { loadVerificationForecast, clearVerificationForecast } from '../../store/verificationSlice';
@@ -46,12 +47,16 @@ const parseAndValidateForecast = async (file: File) => {
 };
 
 // Helper function to analyze verification results by comparing storm reports against the forecast outlooks, which takes in the storm reports and the outlook data for the selected day and calculates various metrics such as total reports, reports by type, and hit/miss analysis for each outlook type. It returns a structured result that can be used to display verification summaries in the UI.
-const VerificationModeHeader: React.FC = () => (
-  <div className="verification-header">
-    <h2>Forecast Verification Mode</h2>
-    <p className="verification-subtitle">
-      Load a saved forecast and compare it against actual storm reports
-    </p>
+const VerificationModeHeader: React.FC<{ forecastLoaded: boolean }> = ({ forecastLoaded }) => (
+  <div className="verification-topbar">
+    <div className="verification-topbar-copy">
+      <h2>Forecast Verification</h2>
+      <p className="verification-subtitle">
+        {forecastLoaded
+          ? 'Compare the loaded outlook against observed storm reports.'
+          : 'Load a saved forecast, then bring in storm reports to verify performance.'}
+      </p>
+    </div>
   </div>
 );
 
@@ -94,31 +99,36 @@ const OutlookTypeSelector: React.FC<{
   onSelectHail
 }) => (
   <div className="outlook-type-selector">
-    <label>View Outlook Type:</label>
-    <div className="outlook-type-buttons">
+    <label>View Outlook Type</label>
+    <div className="outlook-type-buttons" role="tablist" aria-label="Verification outlook type">
       <button
+        type="button"
         className={`outlook-type-btn ${activeOutlookType === 'categorical' ? 'active' : ''}`}
         onClick={onSelectCategorical}
       >
-        📊 Categorical
+        <Layers3 className="h-4 w-4" />
+        Categorical
       </button>
       <button
+        type="button"
         className={`outlook-type-btn ${activeOutlookType === 'tornado' ? 'active' : ''}`}
         onClick={onSelectTornado}
       >
-        🌪️ Tornado
+        Tornado
       </button>
       <button
+        type="button"
         className={`outlook-type-btn ${activeOutlookType === 'wind' ? 'active' : ''}`}
         onClick={onSelectWind}
       >
-        💨 Wind
+        Wind
       </button>
       <button
+        type="button"
         className={`outlook-type-btn ${activeOutlookType === 'hail' ? 'active' : ''}`}
         onClick={onSelectHail}
       >
-        🧊 Hail
+        Hail
       </button>
     </div>
   </div>
@@ -145,10 +155,13 @@ const ForecastLoaderSection: React.FC<{
   if (!forecastLoaded) {
     return (
       <div className="forecast-loader-section">
-        <h3>Step 1: Load Forecast</h3>
+        <div className="verification-section-header">
+          <span className="verification-section-step">Step 1</span>
+          <h3>Load Forecast</h3>
+        </div>
         <div className="file-upload-area">
           <label htmlFor="forecast-file" className="file-upload-label">
-            <div className="upload-icon">📁</div>
+            <div className="upload-icon"><FileUp className="h-4 w-4" /></div>
             <span>Choose Forecast File</span>
             <input
               type="file"
@@ -168,10 +181,13 @@ const ForecastLoaderSection: React.FC<{
 
   return (
     <div className="forecast-loader-section">
-      <h3>Step 1: Load Forecast</h3>
+      <div className="verification-section-header">
+        <span className="verification-section-step">Step 1</span>
+        <h3>Load Forecast</h3>
+      </div>
       <div className="forecast-loaded">
         <LoadedIndicator fileName={fileName} />
-        <button onClick={onClearForecast} className="clear-forecast-btn">
+        <button type="button" onClick={onClearForecast} className="clear-forecast-btn">
           Load Different Forecast
         </button>
       </div>
@@ -195,6 +211,8 @@ const VerificationSidebar: React.FC<{
   onLoadForecast,
   onClearForecast
 }) => {
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'setup' | 'analysis'>('setup');
+
   if (!forecastLoaded) {
     return (
       <div className="verification-sidebar">
@@ -213,16 +231,58 @@ const VerificationSidebar: React.FC<{
 
   return (
     <div className="verification-sidebar">
-      <ForecastLoaderSection
-        forecastLoaded={forecastLoaded}
-        fileName={fileName}
-        onLoadForecast={onLoadForecast}
-        onClearForecast={onClearForecast}
-      />
-      <div className="reports-section">
-        <h3>Step 2: Load Storm Reports</h3>
-        <VerificationPanel activeOutlookType={activeOutlookType} selectedDay={selectedDay} />
+      <div className="verification-sidebar-tabs" role="tablist" aria-label="Verification sidebar">
+        <button
+          type="button"
+          className={`verification-sidebar-tab ${activeSidebarTab === 'setup' ? 'active' : ''}`}
+          onClick={() => setActiveSidebarTab('setup')}
+        >
+          <FileUp className="h-4 w-4" />
+          Load Data
+        </button>
+        <button
+          type="button"
+          className={`verification-sidebar-tab ${activeSidebarTab === 'analysis' ? 'active' : ''}`}
+          onClick={() => setActiveSidebarTab('analysis')}
+        >
+          <Eye className="h-4 w-4" />
+          Analysis
+        </button>
       </div>
+
+      {activeSidebarTab === 'setup' ? (
+        <>
+          <ForecastLoaderSection
+            forecastLoaded={forecastLoaded}
+            fileName={fileName}
+            onLoadForecast={onLoadForecast}
+            onClearForecast={onClearForecast}
+          />
+          <div className="reports-section">
+            <div className="verification-section-header">
+              <span className="verification-section-step">Step 2</span>
+              <h3>Load Storm Reports</h3>
+            </div>
+            <VerificationPanel
+              activeOutlookType={activeOutlookType}
+              selectedDay={selectedDay}
+              activePanel="setup"
+            />
+          </div>
+        </>
+      ) : (
+        <div className="reports-section">
+          <div className="verification-section-header">
+            <span className="verification-section-step">Analysis</span>
+            <h3>Verification Results</h3>
+          </div>
+          <VerificationPanel
+            activeOutlookType={activeOutlookType}
+            selectedDay={selectedDay}
+            activePanel="analysis"
+          />
+        </div>
+      )}
     </div>
   );
 };
@@ -313,10 +373,10 @@ const VerificationMode: React.FC = () => {
 
   return (
     <div className="verification-mode">
-      <VerificationModeHeader />
+      <VerificationModeHeader forecastLoaded={forecastLoaded} />
 
       {forecastLoaded && (
-        <>
+        <div className="verification-control-rail">
           <DaySelectorSection
             selectedDay={selectedDay}
             availableDays={availableDays}
@@ -330,7 +390,7 @@ const VerificationMode: React.FC = () => {
             onSelectWind={outlookHandlers.wind}
             onSelectHail={outlookHandlers.hail}
           />
-        </>
+        </div>
       )}
 
       <div className="verification-content">

@@ -47,3 +47,8 @@ night-watch.config.json
 /instructions
 
 .env
+
+# Development server files (dev-only, never commit)
+/server/local-auth.js
+/server/local-users.json
+/server/pnpm-lock.yaml

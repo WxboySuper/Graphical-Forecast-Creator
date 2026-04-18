@@ -66,20 +66,20 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
   return (
     <div className="diy-editor">
       <div className="diy-toolbar">
-        <button onClick={handleBold} title="Bold (Ctrl+B)" className="toolbar-button">
+        <button type="button" onClick={handleBold} title="Bold (Ctrl+B)" className="toolbar-button">
           <strong>B</strong>
         </button>
-        <button onClick={handleItalic} title="Italic (Ctrl+I)" className="toolbar-button">
+        <button type="button" onClick={handleItalic} title="Italic (Ctrl+I)" className="toolbar-button">
           <em>I</em>
         </button>
         <div className="toolbar-divider" />
-        <button onClick={handleH1} title="Heading 1" className="toolbar-button">
+        <button type="button" onClick={handleH1} title="Heading 1" className="toolbar-button">
           H1
         </button>
-        <button onClick={handleH2} title="Heading 2" className="toolbar-button">
+        <button type="button" onClick={handleH2} title="Heading 2" className="toolbar-button">
           H2
         </button>
-        <button onClick={handleH3} title="Heading 3" className="toolbar-button">
+        <button type="button" onClick={handleH3} title="Heading 3" className="toolbar-button">
           H3
         </button>
       </div>

@@ -11,14 +11,13 @@ import appModeReducer from '../../store/appModeSlice';
 
 // Mock OpenLayersForecastMap so we can track renders without needing a real OL environment
 const mockOLRender = jest.fn();
-jest.mock('./OpenLayersForecastMap', () => {
-  // skipcq: JS-0359
-  const React = require('react');
-  return React.forwardRef((props: Record<string, unknown>, _ref: unknown) => {
+jest.mock('./OpenLayersForecastMap', () => ({
+  __esModule: true,
+  default: (props: Record<string, unknown>) => {
     mockOLRender(props);
-    return React.createElement('div', { 'data-testid': 'ol-forecast-map' }, 'OLForecastMap');
-  });
-});
+    return <div data-testid="ol-forecast-map">OLForecastMap</div>;
+  },
+}));
 
 // Import component AFTER mocks
 import ForecastMap from './ForecastMap';

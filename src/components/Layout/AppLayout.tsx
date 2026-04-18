@@ -10,6 +10,7 @@ import { AlertBanner } from '../AlertBanner';
 import { RootState } from '../../store';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '../../lib/utils';
+import { NAVBAR_HEIGHT } from '../../lib/uiConstants';
 
 export interface ToastItem {
   id: string;
@@ -101,6 +102,11 @@ export const AppLayout: React.FC = () => {
     }
   }, [darkMode]);
 
+  // Expose the navbar height to CSS so layouts using var(--app-header-height) stay in sync
+  useEffect(() => {
+    document.documentElement.style.setProperty('--app-header-height', NAVBAR_HEIGHT);
+  }, []);
+
   // Keyboard shortcuts for navigation
   useEffect(() => {
     // Handler for keydown events: Escape closes docs; Ctrl/Cmd+key shortcuts
@@ -143,12 +149,12 @@ export const AppLayout: React.FC = () => {
       <>
         <div
           className="fixed inset-0 z-[900] bg-black/25"
-          style={{ top: '56px' }}
+          style={{ top: NAVBAR_HEIGHT }}
           onClick={onClose}
           aria-hidden="true"
         />
         <div
-          className="fixed top-14 right-0 bottom-0 z-[901] w-[440px] max-w-[92vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
+          className="fixed right-0 bottom-0 top-16 z-[901] w-[440px] max-w-[92vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
           role="dialog"
           aria-label="Documentation"
           aria-modal="true"
@@ -173,7 +179,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <AppLayoutContext.Provider value={{ addToast }}>
-      <div className={cn('min-h-screen bg-background text-foreground', darkMode && 'dark-mode')}>
+      <div className={cn('flex min-h-screen flex-col bg-background text-foreground', darkMode && 'dark-mode')}>
         <Navbar 
           onToggleDocumentation={toggleDocumentation}
           showDocumentation={showDocumentation}
@@ -187,9 +193,7 @@ export const AppLayout: React.FC = () => {
         <DocumentationPanel show={showDocumentation} onClose={handleCloseDocumentation} />
 
         {/* Main content area - below navbar */}
-        <main className="pt-14 h-screen">
-          <AlertBanner />
-          
+        <main className="flex-1 min-h-0">
           {/* Page content via router outlet */}
           <Outlet context={{ addToast }} />
         </main>

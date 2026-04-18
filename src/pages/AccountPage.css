@@ -91,6 +91,33 @@
   text-transform: uppercase;
 }
 
+.account-variant-option {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none;
+}
+
+.account-variant-option:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 78%, var(--bg-primary)) !important;
+}
+
+.account-variant-option.is-active {
+  border-color: color-mix(in srgb, var(--button-bg) 28%, var(--border-color)) !important;
+  background: color-mix(in srgb, var(--button-bg) 8%, var(--bg-primary)) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+.account-variant-status.is-active {
+  background: var(--button-bg);
+  color: white;
+}
+
+.account-variant-status.is-available {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
 .account-signed-grid,
 .account-signed-out-grid {
   display: grid;
@@ -226,6 +253,43 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.85rem;
+}
+
+.dark-mode .account-sync-badge,
+.dark-mode .account-plan-badge {
+  border-color: rgba(74, 222, 128, 0.24) !important;
+  background: rgba(34, 197, 94, 0.14) !important;
+  color: rgb(187, 247, 208) !important;
+}
+
+.dark-mode .account-variant-option {
+  background: #2d2d30 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgb(241, 245, 249) !important;
+}
+
+.dark-mode .account-variant-option:hover {
+  background: #343438 !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.dark-mode .account-variant-option.is-inactive {
+  background: #2d2d30 !important;
+}
+
+.dark-mode .account-variant-option.is-active {
+  background: rgba(37, 99, 235, 0.18) !important;
+  border-color: rgba(96, 165, 250, 0.42) !important;
+}
+
+.dark-mode .account-variant-status.is-available {
+  background: rgba(148, 163, 184, 0.14);
+  color: rgb(203, 213, 225);
+}
+
+.dark-mode .account-variant-status.is-active {
+  background: rgba(59, 130, 246, 0.92);
+  color: white;
 }
 
 .account-email-form {

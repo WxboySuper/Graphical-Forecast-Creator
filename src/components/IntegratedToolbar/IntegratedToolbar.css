@@ -1,0 +1,212 @@
+.tabbed-integrated-toolbar__status-pill {
+  backdrop-filter: blur(8px);
+}
+
+.tabbed-integrated-toolbar__selection-toggle.is-active {
+  box-shadow: 0 10px 20px -14px rgba(37, 99, 235, 0.5);
+}
+
+.tabbed-integrated-toolbar__trigger[data-state='active'] {
+  position: relative;
+}
+
+.tabbed-integrated-toolbar__action-tile {
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.dark-mode .tabbed-integrated-toolbar {
+  background: #111215 !important;
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 -16px 42px -28px rgba(0, 0, 0, 0.78);
+}
+
+.dark-mode .tabbed-integrated-toolbar__header {
+  background: #111215;
+}
+
+.dark-mode .tabbed-integrated-toolbar__tabs-list {
+  background: transparent !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__trigger {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: rgba(226, 232, 240, 0.78) !important;
+  box-shadow: none !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__trigger:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(248, 250, 252, 0.96) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__trigger[data-state='active'] {
+  border-color: rgba(88, 96, 118, 0.95) !important;
+  border-bottom-color: #1e1f24 !important;
+  background: #1e1f24 !important;
+  color: #f8fafc !important;
+  box-shadow: none !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__tray {
+  border-top-color: rgba(88, 96, 118, 0.95) !important;
+  background: #1e1f24 !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__panel {
+  background: transparent;
+}
+
+.dark-mode .tabbed-integrated-toolbar__section {
+  border-right-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__section-label {
+  color: rgba(148, 163, 184, 0.92) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__section-hint {
+  color: rgba(148, 163, 184, 0.68) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__status-bar {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__status-pill {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(248, 250, 252, 0.96) !important;
+  box-shadow: none !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__status-pill--beta {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__stat-pill {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__shortcut-pill {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(226, 232, 240, 0.8) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__type-button,
+.dark-mode .tabbed-integrated-toolbar__day-button,
+.dark-mode .tabbed-integrated-toolbar__map-button,
+.dark-mode .tabbed-integrated-toolbar__ghost-action,
+.dark-mode .tabbed-integrated-toolbar__input,
+.dark-mode .tabbed-integrated-toolbar__date-card,
+.dark-mode .tabbed-integrated-toolbar__empty-state {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(248, 250, 252, 0.92) !important;
+  box-shadow: none !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__type-button:hover,
+.dark-mode .tabbed-integrated-toolbar__day-button:hover,
+.dark-mode .tabbed-integrated-toolbar__map-button:hover,
+.dark-mode .tabbed-integrated-toolbar__ghost-action:hover,
+.dark-mode .tabbed-integrated-toolbar__ghost-layer-button:hover {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__type-button.is-active,
+.dark-mode .tabbed-integrated-toolbar__day-button.is-active,
+.dark-mode .tabbed-integrated-toolbar__map-button.is-active {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  box-shadow: 0 16px 28px -22px rgba(0, 0, 0, 0.8) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__type-button:not(.is-active) .text-primary {
+  color: rgba(148, 163, 184, 0.76) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__selection-toggle {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(248, 250, 252, 0.9) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__selection-toggle:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__selection-toggle.is-active {
+  border-color: rgba(74, 222, 128, 0.35) !important;
+  background: rgba(34, 197, 94, 0.18) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__selection-strip .text-muted-foreground {
+  color: rgba(203, 213, 225, 0.72) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__ghost-layer-button:not(.is-active) {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(248, 250, 252, 0.9) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__ghost-layer-button.is-active {
+  box-shadow: 0 14px 24px -20px rgba(15, 23, 42, 0.95) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__probability-button.is-active {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9), 0 0 0 3px rgba(255, 255, 255, 0.16) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-group {
+  border-right-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--utility {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: rgba(241, 245, 249, 0.92) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--utility:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--utility .tabbed-integrated-toolbar__action-icon {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(226, 232, 240, 0.82) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--primary {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: rgba(241, 245, 249, 0.92) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--primary:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--primary .tabbed-integrated-toolbar__action-icon {
+  /* Keep tailwind standard accent classes */
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--danger {
+  border-color: rgba(248, 113, 113, 0.24) !important;
+  background: rgba(127, 29, 29, 0.26) !important;
+  color: #fecaca !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--danger:hover {
+  background: rgba(153, 27, 27, 0.32) !important;
+}
+
+.dark-mode .tabbed-integrated-toolbar__action-tile--danger .tabbed-integrated-toolbar__action-icon {
+  background: rgba(248, 113, 113, 0.12) !important;
+  color: #fecaca !important;
+}

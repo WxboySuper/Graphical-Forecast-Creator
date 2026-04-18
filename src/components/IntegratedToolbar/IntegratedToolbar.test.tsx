@@ -1,11 +1,14 @@
+import React, { useRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { IntegratedToolbar } from './IntegratedToolbar';
+import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, { addFeature } from '../../store/forecastSlice';
 import featureFlagsReducer from '../../store/featureFlagsSlice';
 import overlaysReducer from '../../store/overlaysSlice';
+import type { ForecastMapHandle } from '../Map/ForecastMap';
 
 jest.mock('../CycleManager/CycleHistoryModal', () => () => <div>CycleHistoryModal Mock</div>);
 jest.mock('../CycleManager/CopyFromPreviousModal', () => () => <div>CopyFromPreviousModal Mock</div>);
@@ -37,6 +40,8 @@ jest.mock('../DrawingTools/useExportMap', () => ({
   }),
 }));
 
+const mockAddToast = jest.fn();
+
 const createStore = () => configureStore({
   reducer: {
     forecast: forecastReducer,
@@ -63,18 +68,31 @@ const createFeature = () => ({
   },
 });
 
+const ToolbarHarness: React.FC = () => {
+  const mapRef = useRef<ForecastMapHandle | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const controller = useForecastWorkspaceController({
+    onSave: jest.fn(),
+    onLoad: jest.fn(),
+    mapRef,
+    fileInputRef,
+    addToast: mockAddToast,
+  });
+
+  return <IntegratedToolbar controller={controller} />;
+};
+
 describe('IntegratedToolbar undo/redo buttons', () => {
+  beforeEach(() => {
+    mockAddToast.mockReset();
+  });
+
   test('renders undo and redo buttons with disabled state from selectors', () => {
     const store = createStore();
 
     render(
       <Provider store={store}>
-        <IntegratedToolbar
-          onSave={jest.fn()}
-          onLoad={jest.fn()}
-          mapRef={{ current: null }}
-          addToast={jest.fn()}
-        />
+        <ToolbarHarness />
       </Provider>
     );
 
@@ -89,12 +107,7 @@ describe('IntegratedToolbar undo/redo buttons', () => {
 
     render(
       <Provider store={store}>
-        <IntegratedToolbar
-          onSave={jest.fn()}
-          onLoad={jest.fn()}
-          mapRef={{ current: null }}
-          addToast={jest.fn()}
-        />
+        <ToolbarHarness />
       </Provider>
     );
 

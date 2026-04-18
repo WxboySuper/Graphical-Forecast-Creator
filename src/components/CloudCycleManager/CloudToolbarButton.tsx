@@ -44,8 +44,8 @@ const getCloudToolbarTooltip = (
 /** Returns the correct icon for the cloud save button based on the current sync state. */
 const renderCloudSaveIcon = (syncState: CloudSyncState) =>
   syncState === 'saving'
-    ? <LoaderCircle className="h-6 w-6 animate-spin" />
-    : <Cloud className="h-6 w-6" />;
+    ? <LoaderCircle className="h-4 w-4 animate-spin" />
+    : <Cloud className="h-4 w-4" />;
 
 /** Manages cloud save modal state and save errors for the toolbar button group. */
 const useCloudToolbarState = ({
@@ -87,32 +87,60 @@ const useCloudToolbarState = ({
   };
 };
 
-/** Shared tooltip-wrapped toolbar button used by the cloud actions. */
-const CloudToolbarActionButton: React.FC<{
-  tooltip: string;
-  ariaLabel: string;
-  className: string;
-  disabled?: boolean;
+/** Small presentational action for the cloud save button with tooltip. */
+type CloudSaveActionProps = {
+  saveIcon: React.ReactNode;
+  disabled: boolean;
   onClick: () => void;
-  children: React.ReactNode;
-}> = ({ tooltip, ariaLabel, className, disabled = false, onClick, children }) => (
+  tooltip: string;
+};
+
+/**
+ * Small presentational action for the cloud save button with tooltip.
+ */
+const CloudSaveAction: React.FC<CloudSaveActionProps> = ({ saveIcon, disabled, onClick, tooltip }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <Button
-        aria-label={ariaLabel}
-        title={ariaLabel}
         variant="outline"
-        size="icon"
-        onClick={onClick}
+        aria-label="Save forecast to cloud"
+        title="Save forecast to cloud"
         disabled={disabled}
-        className={className}
+        onClick={onClick}
+        className="tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs bg-background tabbed-integrated-toolbar__action-tile--primary"
       >
-        {children}
+        <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-green-500/15 text-green-700">
+          {saveIcon}
+        </span>
+        <span className="font-semibold">Save to Cloud</span>
       </Button>
     </TooltipTrigger>
     <TooltipContent>{tooltip}</TooltipContent>
   </Tooltip>
 );
+
+/** Small presentational action for opening the cloud library. */
+const CloudOpenAction: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button
+        variant="outline"
+        aria-label="Open cloud library"
+        title="Open cloud library"
+        onClick={onClick}
+        className="tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs bg-background tabbed-integrated-toolbar__action-tile--utility"
+      >
+        <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-blue-500/15 text-blue-700">
+          <FolderOpen className="h-4 w-4" />
+        </span>
+        <span className="font-semibold">Open Cloud</span>
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent>Open the cloud library</TooltipContent>
+  </Tooltip>
+);
+
+
 
 /**
  * Toolbar button group for cloud save/load operations.
@@ -143,27 +171,13 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
   const tooltip = getCloudToolbarTooltip(canSave, premiumActive, isExpiredPremium, currentCloudLabel);
   const saveIcon = renderCloudSaveIcon(syncState);
 
+
+
   return (
     <>
-      <div className="cloud-toolbar-group">
-        <CloudToolbarActionButton
-          tooltip={tooltip}
-          ariaLabel="Save forecast to cloud"
-          disabled={syncState === 'saving'}
-          onClick={handleSaveClick}
-          className="cloud-toolbar-action h-14 w-14 lg:h-16 lg:w-16 bg-green-500/20 hover:bg-green-500/30 border-green-500/50 text-green-700 dark:!bg-green-500/20 dark:hover:!bg-green-500/30 dark:border-green-500/50 dark:text-green-400"
-        >
-          {saveIcon}
-        </CloudToolbarActionButton>
-
-        <CloudToolbarActionButton
-          tooltip="Open the cloud library"
-          ariaLabel="Open cloud library"
-          onClick={onOpenCloudLibrary}
-          className="cloud-toolbar-action h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400"
-        >
-          <FolderOpen className="h-6 w-6" />
-        </CloudToolbarActionButton>
+      <div className="flex flex-wrap items-center gap-2">
+        <CloudSaveAction saveIcon={saveIcon} disabled={syncState === 'saving'} onClick={handleSaveClick} tooltip={tooltip} />
+        <CloudOpenAction onClick={onOpenCloudLibrary} />
       </div>
 
       <CloudSaveModal
@@ -171,7 +185,7 @@ export const CloudToolbarButton: React.FC<CloudToolbarButtonProps> = ({
         onOpenChange={setSaveModalOpen}
         onSave={handleSaveToCloud}
         currentLabel={currentCloudLabel || `${currentCycleDate} Forecast`}
-        error={error}
+        error={error ?? undefined}
       />
     </>
   );
