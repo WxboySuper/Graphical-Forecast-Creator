@@ -617,74 +617,77 @@ const CycleDateControl: React.FC<{ controller: ForecastWorkspaceController }> = 
   );
 };
 
-const TabbedToolbarDaysTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
+/** Cycle date strip wrapper used in the Days tab. */
+const CycleDateStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <TabbedToolbarStripSection label="Cycle Date" className="w-[300px]">
+    <CycleDateControl controller={controller} />
+  </TabbedToolbarStripSection>
+);
+
+/** Forecast days strip with prev/next and day buttons. */
+const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="min-w-[680px] flex-1">
+    <div className="flex items-center gap-2">
+      <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onPrevDay} disabled={controller.currentDay === 1}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-max items-center gap-2">
+          {FORECAST_DAYS.map((day) => {
+            const isActive = controller.currentDay === day;
+            const hasData = hasDayOutlookData(controller.days, day);
+
+            return (
+              <button
+                key={day}
+                type="button"
+                data-day={day}
+                onClick={controller.onDayButtonClick}
+                className={cn(
+                  'tabbed-integrated-toolbar__day-button relative h-10 min-w-[48px] rounded-xl border px-3 text-sm font-semibold transition-colors',
+                  isActive
+                    ? 'is-active border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                    : 'border-border/80 bg-background hover:bg-accent'
+                )}
+              >
+                {day}
+                {hasData ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-success" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onNextDay} disabled={controller.currentDay === 8}>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  </TabbedToolbarStripSection>
+);
+
+/** Day status strip showing current day metadata. */
+const DayStatusStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const daysWithData = FORECAST_DAYS.filter((day) => hasDayOutlookData(controller.days, day)).length;
-
   return (
-    <TabbedToolbarTabRow>
-      <TabbedToolbarStripSection label="Cycle Date" className="w-[300px]">
-        <CycleDateControl controller={controller} />
-      </TabbedToolbarStripSection>
-
-      <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="min-w-[680px] flex-1">
-        <div className="flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="outline"
-            className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl"
-            onClick={controller.onPrevDay}
-            disabled={controller.currentDay === 1}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-max items-center gap-2">
-              {FORECAST_DAYS.map((day) => {
-                const isActive = controller.currentDay === day;
-                const hasData = hasDayOutlookData(controller.days, day);
-
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    data-day={day}
-                    onClick={controller.onDayButtonClick}
-                    className={cn(
-                      'tabbed-integrated-toolbar__day-button relative h-10 min-w-[48px] rounded-xl border px-3 text-sm font-semibold transition-colors',
-                      isActive
-                        ? 'is-active border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                        : 'border-border/80 bg-background hover:bg-accent'
-                    )}
-                  >
-                    {day}
-                    {hasData ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-success" /> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <Button
-            size="icon"
-            variant="outline"
-            className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl"
-            onClick={controller.onNextDay}
-            disabled={controller.currentDay === 8}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </TabbedToolbarStripSection>
-
-      <TabbedToolbarStripSection label="Day Status" className="w-[280px]">
-        <div className="flex flex-wrap items-center gap-2">
-          <TabbedToolbarStatPill label="Current" value={`Day ${controller.currentDay}`} />
-          <TabbedToolbarStatPill label="Data" value={`${daysWithData}/8`} />
-          <TabbedToolbarStatPill label="Jump" value="1-8" />
-        </div>
-      </TabbedToolbarStripSection>
-    </TabbedToolbarTabRow>
+    <TabbedToolbarStripSection label="Day Status" className="w-[280px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <TabbedToolbarStatPill label="Current" value={`Day ${controller.currentDay}`} />
+        <TabbedToolbarStatPill label="Data" value={`${daysWithData}/8`} />
+        <TabbedToolbarStatPill label="Jump" value="1-8" />
+      </div>
+    </TabbedToolbarStripSection>
   );
 };
+
+/**
+ * Days tab for selecting cycle date and forecast day navigation.
+ */
+const TabbedToolbarDaysTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <TabbedToolbarTabRow>
+    <CycleDateStrip controller={controller} />
+    <ForecastDaysStrip controller={controller} />
+    <DayStatusStrip controller={controller} />
+  </TabbedToolbarTabRow>
+);
 
 /** Layers tab exposing ghost layers and base map options. */
 const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
