@@ -230,52 +230,53 @@ const MoreActionsMenu: FC<{
   );
 };
 
-// The RightActions component displays the action buttons on the right side of the navbar.
-export const RightActions: FC<RightActionsProps> = ({
-  darkMode,
-  onViewTerms,
-  onViewPrivacyPolicy,
-  onToggleDocumentation,
-  onToggleDarkMode,
-}) => {
+/** Utility cluster containing account, dark-mode toggle, and overflow menu. */
+const RightUtilityCluster: FC<RightActionsProps> = ({ darkMode, onViewTerms, onViewPrivacyPolicy, onToggleDocumentation, onToggleDarkMode }) => {
   const { hostedAuthEnabled, status, user } = useAuth();
   const accountLabel = status === 'signed_in' ? `Account (${user?.email ?? 'signed in'})` : 'Account';
   const showSignedInDot = hostedAuthEnabled && status === 'signed_in';
 
   return (
+    <div className="app-navbar__utilityCluster">
+      <AccountButton accountLabel={accountLabel} showSignedInDot={showSignedInDot} />
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleDarkMode}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="app-navbar__actionButton app-navbar__iconButton"
+          >
+            {darkMode ? (
+              <Sun className="h-5 w-5" />
+            ) : (
+              <Moon className="h-5 w-5" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{darkMode ? 'Light Mode' : 'Dark Mode'}</p>
+        </TooltipContent>
+      </Tooltip>
+
+      <MoreActionsMenu
+        onViewTerms={onViewTerms}
+        onViewPrivacyPolicy={onViewPrivacyPolicy}
+        onToggleDocumentation={onToggleDocumentation}
+      />
+    </div>
+  );
+};
+
+// The RightActions component displays the action buttons on the right side of the navbar.
+export const RightActions: FC<RightActionsProps> = (props) => {
+  return (
     <div className="app-navbar__actions">
       <StatusMeta />
 
-      <div className="app-navbar__utilityCluster">
-        <AccountButton accountLabel={accountLabel} showSignedInDot={showSignedInDot} />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleDarkMode}
-              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="app-navbar__actionButton app-navbar__iconButton"
-            >
-              {darkMode ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{darkMode ? 'Light Mode' : 'Dark Mode'}</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <MoreActionsMenu
-          onViewTerms={onViewTerms}
-          onViewPrivacyPolicy={onViewPrivacyPolicy}
-          onToggleDocumentation={onToggleDocumentation}
-        />
-      </div>
+      <RightUtilityCluster {...props} />
     </div>
   );
 };

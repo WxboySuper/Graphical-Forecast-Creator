@@ -581,41 +581,49 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
   </TabbedToolbarTabRow>
 );
 
-/** Days tab for selecting cycle date and forecast day navigation. */
+/** Control for cycle date selection/editor used in the Days tab. */
+const CycleDateControl: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
+  if (controller.isEditingDate) {
+    return (
+      <div className="flex items-center gap-2">
+        <Input
+          type="date"
+          value={controller.tempDate}
+          onChange={controller.onTempDateChange}
+          className="tabbed-integrated-toolbar__input h-10 w-[170px] rounded-xl"
+        />
+        <Button className="tabbed-integrated-toolbar__primary-action h-10 rounded-xl px-3" onClick={controller.onDateSave}>
+          Save
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="tabbed-integrated-toolbar__date-card flex items-baseline gap-2 rounded-xl border border-border/80 bg-background px-3 py-[9px]">
+        <p className="text-sm font-semibold text-foreground whitespace-nowrap">
+          {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })}
+        </p>
+        <p className="text-[11px] text-muted-foreground">Cycle {controller.cycleDate}</p>
+      </div>
+      <Button variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 rounded-xl px-3" onClick={controller.onStartDateEdit}>
+        Edit
+      </Button>
+    </div>
+  );
+};
+
 const TabbedToolbarDaysTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const daysWithData = FORECAST_DAYS.filter((day) => hasDayOutlookData(controller.days, day)).length;
 
   return (
     <TabbedToolbarTabRow>
       <TabbedToolbarStripSection label="Cycle Date" className="w-[300px]">
-        {controller.isEditingDate ? (
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={controller.tempDate}
-              onChange={controller.onTempDateChange}
-              className="tabbed-integrated-toolbar__input h-10 w-[170px] rounded-xl"
-            />
-            <Button className="tabbed-integrated-toolbar__primary-action h-10 rounded-xl px-3" onClick={controller.onDateSave}>
-              Save
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <div className="tabbed-integrated-toolbar__date-card flex items-baseline gap-2 rounded-xl border border-border/80 bg-background px-3 py-[9px]">
-              <p className="text-sm font-semibold text-foreground whitespace-nowrap">
-                {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </p>
-              <p className="text-[11px] text-muted-foreground">Cycle {controller.cycleDate}</p>
-            </div>
-            <Button variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 rounded-xl px-3" onClick={controller.onStartDateEdit}>
-              Edit
-            </Button>
-          </div>
-        )}
+        <CycleDateControl controller={controller} />
       </TabbedToolbarStripSection>
 
       <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="min-w-[680px] flex-1">
@@ -975,20 +983,25 @@ const TabbedIntegratedToolbarTabsList: React.FC = () => (
   </TabsList>
 );
 
+/** Status bar for the tabbed integrated toolbar header. */
+const TabbedIntegratedToolbarStatusBar: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <div className="tabbed-integrated-toolbar__status-bar mb-1.5 flex min-w-0 flex-wrap items-center gap-2 rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 shadow-sm h-[32px]">
+    <ToolbarHeaderPill className="tabbed-integrated-toolbar__status-pill--beta bg-background py-1 px-2.5 h-[24px]">
+      <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-primary/80 leading-none">Toolbar Beta</span>
+    </ToolbarHeaderPill>
+    <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">Day {controller.currentDay}</ToolbarHeaderPill>
+    <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">Cycle {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</ToolbarHeaderPill>
+    <TabbedToolbarSelectionPill controller={controller} />
+  </div>
+);
+
 /** Header area for the tabbed integrated toolbar. */
 const TabbedIntegratedToolbarHeader: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <div className="tabbed-integrated-toolbar__header px-3 pt-2 lg:px-4">
     <div className="mb-[0px] flex flex-wrap items-end justify-between gap-3">
       <TabbedIntegratedToolbarTabsList />
 
-      <div className="tabbed-integrated-toolbar__status-bar mb-1.5 flex min-w-0 flex-wrap items-center gap-2 rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 shadow-sm h-[32px]">
-        <ToolbarHeaderPill className="tabbed-integrated-toolbar__status-pill--beta bg-background py-1 px-2.5 h-[24px]">
-          <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-primary/80 leading-none">Toolbar Beta</span>
-        </ToolbarHeaderPill>
-        <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">Day {controller.currentDay}</ToolbarHeaderPill>
-        <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">Cycle {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</ToolbarHeaderPill>
-        <TabbedToolbarSelectionPill controller={controller} />
-      </div>
+      <TabbedIntegratedToolbarStatusBar controller={controller} />
     </div>
   </div>
 );
