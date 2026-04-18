@@ -938,75 +938,85 @@ const TabbedToolbarToolsTab: React.FC<{ controller: ForecastWorkspaceController 
   );
 };
 
+/** Toolbar tabs list (extracted to reduce nesting depth in the header). */
+const TabbedIntegratedToolbarTabsList: React.FC = () => (
+  <TabsList className="tabbed-integrated-toolbar__tabs-list relative z-10 mb-[-1px] h-auto gap-1 bg-transparent p-0">
+    <TabsTrigger
+      value="draw"
+      className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+    >
+      <PenTool className="h-4 w-4" />
+      Draw
+    </TabsTrigger>
+    <TabsTrigger
+      value="days"
+      className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+    >
+      <CalendarDays className="h-4 w-4" />
+      Days
+    </TabsTrigger>
+    <TabsTrigger
+      value="layers"
+      className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+    >
+      <Layers className="h-4 w-4" />
+      Layers
+    </TabsTrigger>
+    <TabsTrigger
+      value="tools"
+      className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
+    >
+      <Wrench className="h-4 w-4" />
+      Tools
+    </TabsTrigger>
+  </TabsList>
+);
+
+/** Header area for the tabbed integrated toolbar. */
+const TabbedIntegratedToolbarHeader: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <div className="tabbed-integrated-toolbar__header px-3 pt-2 lg:px-4">
+    <div className="mb-[0px] flex flex-wrap items-end justify-between gap-3">
+      <TabbedIntegratedToolbarTabsList />
+
+      <div className="tabbed-integrated-toolbar__status-bar mb-1.5 flex min-w-0 flex-wrap items-center gap-2 rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 shadow-sm h-[32px]">
+        <ToolbarHeaderPill className="tabbed-integrated-toolbar__status-pill--beta bg-background py-1 px-2.5 h-[24px]">
+          <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-primary/80 leading-none">Toolbar Beta</span>
+        </ToolbarHeaderPill>
+        <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">Day {controller.currentDay}</ToolbarHeaderPill>
+        <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">Cycle {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</ToolbarHeaderPill>
+        <TabbedToolbarSelectionPill controller={controller} />
+      </div>
+    </div>
+  </div>
+);
+
+/** Tray area containing the tab panels. */
+const TabbedIntegratedToolbarTray: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <div className="tabbed-integrated-toolbar__tray min-h-0 flex-1 overflow-hidden border-t border-border/70 bg-background px-3 py-2 lg:px-4">
+    <TabsContent value="draw" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+      <TabbedToolbarDrawTab controller={controller} />
+    </TabsContent>
+
+    <TabsContent value="days" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+      <TabbedToolbarDaysTab controller={controller} />
+    </TabsContent>
+
+    <TabsContent value="layers" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+      <TabbedToolbarLayersTab controller={controller} />
+    </TabsContent>
+
+    <TabsContent value="tools" className="tabbed-integrated-toolbar__panel mt-0 h-full">
+      <TabbedToolbarToolsTab controller={controller} />
+    </TabsContent>
+  </div>
+);
+
 /** Toolbar variant that keeps the original integrated-bar footprint but moves secondary controls behind tabs. */
 const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ controller }) => (
   <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[168px] overflow-hidden backdrop-blur">
     <Tabs defaultValue="draw" className="flex h-full flex-col">
-      <div className="tabbed-integrated-toolbar__header px-3 pt-2 lg:px-4">
-        <div className="mb-[0px] flex flex-wrap items-end justify-between gap-3">
-          <TabsList className="tabbed-integrated-toolbar__tabs-list relative z-10 mb-[-1px] h-auto gap-1 bg-transparent p-0">
-            <TabsTrigger
-              value="draw"
-              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-            >
-              <PenTool className="h-4 w-4" />
-              Draw
-            </TabsTrigger>
-            <TabsTrigger
-              value="days"
-              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Days
-            </TabsTrigger>
-            <TabsTrigger
-              value="layers"
-              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-            >
-              <Layers className="h-4 w-4" />
-              Layers
-            </TabsTrigger>
-            <TabsTrigger
-              value="tools"
-              className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-border/70 bg-muted/35 px-3 py-1.5 text-xs font-semibold shadow-none data-[state=active]:border-b-0 data-[state=active]:bg-background sm:text-sm"
-            >
-              <Wrench className="h-4 w-4" />
-              Tools
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="tabbed-integrated-toolbar__status-bar mb-1.5 flex min-w-0 flex-wrap items-center gap-2 rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 shadow-sm h-[32px]">
-            <ToolbarHeaderPill className="tabbed-integrated-toolbar__status-pill--beta bg-background py-1 px-2.5 h-[24px]">
-              <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-primary/80 leading-none">Toolbar Beta</span>
-            </ToolbarHeaderPill>
-            <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">
-              Day {controller.currentDay}
-            </ToolbarHeaderPill>
-            <ToolbarHeaderPill className="py-1 px-2.5 h-[24px] text-[11px] leading-none">
-              Cycle {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </ToolbarHeaderPill>
-            <TabbedToolbarSelectionPill controller={controller} />
-          </div>
-        </div>
-      </div>
-
-      <div className="tabbed-integrated-toolbar__tray min-h-0 flex-1 overflow-hidden border-t border-border/70 bg-background px-3 py-2 lg:px-4">
-        <TabsContent value="draw" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-          <TabbedToolbarDrawTab controller={controller} />
-        </TabsContent>
-
-        <TabsContent value="days" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-          <TabbedToolbarDaysTab controller={controller} />
-        </TabsContent>
-
-        <TabsContent value="layers" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-          <TabbedToolbarLayersTab controller={controller} />
-        </TabsContent>
-
-        <TabsContent value="tools" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-          <TabbedToolbarToolsTab controller={controller} />
-        </TabsContent>
-      </div>
+      <TabbedIntegratedToolbarHeader controller={controller} />
+      <TabbedIntegratedToolbarTray controller={controller} />
     </Tabs>
   </div>
 );
