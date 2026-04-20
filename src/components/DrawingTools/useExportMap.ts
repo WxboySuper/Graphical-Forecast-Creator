@@ -11,49 +11,68 @@ interface UseExportMapParams {
   addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
+/**
+ * Hook to manage map export actions (open modal, generate image, download).
+ *
+ * @param param0 - mapRef, outlooks, isExportDisabled, addToast
+ * @returns { isExporting, isModalOpen, initiateExport, confirmExport, cancelExport }
+ */
 export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: UseExportMapParams) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const isLeafletMap = () => mapRef.current?.getEngine() === 'leaflet';
 
-  const initiateExport = useCallback(() => {
-    // Don't proceed if export is disabled
+  /**
+   * Returns true when the current map engine is Leaflet.
+   */
+  const isLeafletMap = useCallback((): boolean => {
+    try {
+      return !!(mapRef.current && typeof mapRef.current.getEngine === 'function' && mapRef.current.getEngine() === 'leaflet');
+    } catch {
+      return false;
+    }
+  }, [mapRef]);
+
+  /**
+   * Validate common preconditions for running an export. Shows user-facing toasts
+   * when a precondition fails.
+   */
+  const checkExportPreconditions = useCallback((): boolean => {
     if (isExportDisabled) {
       addToast('The export feature is currently unavailable due to an issue. Please check back later or visit the GitHub repository for more information.', 'warning');
-      return;
+      return false;
     }
 
     if (!mapRef.current) {
       addToast('Map reference not available. Cannot export.', 'error');
-      return;
+      return false;
     }
 
     if (!isLeafletMap()) {
       addToast('Map export is only available for Leaflet maps right now. The current OpenLayers map cannot be exported.', 'warning');
-      return;
+      return false;
     }
 
     const map = mapRef.current.getMap();
     if (!map) {
       addToast('Map not fully loaded. Please try again.', 'error');
-      return;
+      return false;
     }
 
+    return true;
+  }, [isExportDisabled, mapRef, isLeafletMap, addToast]);
+
+  const initiateExport = useCallback(() => {
+    if (!checkExportPreconditions()) return;
     // Open modal to get title
     setIsModalOpen(true);
-  }, [addToast, isExportDisabled, mapRef]);
+  }, [checkExportPreconditions]);
 
   const confirmExport = useCallback(async (title: string) => {
     setIsModalOpen(false); // Close modal
 
-    if (!mapRef.current) return;
-    if (!isLeafletMap()) {
-      addToast('Map export is only available for Leaflet maps right now. The current OpenLayers map cannot be exported.', 'warning');
-      return;
-    }
+    if (!checkExportPreconditions()) return;
 
-    const map = mapRef.current.getMap();
-    if (!map) return;
+    const map = mapRef.current!.getMap();
 
     try {
       setIsExporting(true);
@@ -76,7 +95,7 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
     } finally {
       setIsExporting(false);
     }
-  }, [addToast, mapRef, outlooks]);
+  }, [checkExportPreconditions, outlooks, addToast, mapRef]);
 
   const cancelExport = useCallback(() => {
     setIsModalOpen(false);
