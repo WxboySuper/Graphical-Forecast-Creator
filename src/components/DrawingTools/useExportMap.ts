@@ -12,6 +12,33 @@ interface UseExportMapParams {
 }
 
 /**
+ * Perform the actual export (generate image, download, and toast result).
+ * Extracted to reduce complexity inside the hook and keep side-effects isolated.
+ */
+async function performExport(
+  map: any,
+  outlooks: OutlookData,
+  title: string | undefined,
+  addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void
+): Promise<void> {
+  try {
+    const dataUrl = await exportMapAsImage(map, outlooks, {
+      title: title || undefined,
+      format: 'jpeg',
+      quality: 0.92,
+      includeLegendAndStatus: true
+    });
+
+    const filename = `forecast-outlook-${getFormattedDate()}.jpg`;
+    downloadDataUrl(dataUrl, filename);
+    addToast('Forecast exported successfully!', 'success');
+  } catch (err) {
+    addToast('Failed to export the map. Please try again.', 'error');
+    throw err;
+  }
+}
+
+/**
  * Hook to manage map export actions (open modal, generate image, download).
  *
  * @param param0 - mapRef, outlooks, isExportDisabled, addToast
@@ -26,7 +53,7 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
    */
   const isLeafletMap = useCallback((): boolean => {
     try {
-      return !!(mapRef.current && typeof mapRef.current.getEngine === 'function' && mapRef.current.getEngine() === 'leaflet');
+      return Boolean(mapRef.current && typeof mapRef.current.getEngine === 'function' && mapRef.current.getEngine() === 'leaflet');
     } catch {
       return false;
     }
@@ -42,7 +69,8 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
       return false;
     }
 
-    if (!mapRef.current) {
+    const current = mapRef.current;
+    if (!current) {
       addToast('Map reference not available. Cannot export.', 'error');
       return false;
     }
@@ -52,7 +80,7 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
       return false;
     }
 
-    const map = mapRef.current.getMap();
+    const map = current.getMap();
     if (!map) {
       addToast('Map not fully loaded. Please try again.', 'error');
       return false;
@@ -72,30 +100,21 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
 
     if (!checkExportPreconditions()) return;
 
-    const map = mapRef.current!.getMap();
+    const current = mapRef.current;
+    if (!current) return;
+
+    const map = current.getMap();
+    if (!map) return;
 
     try {
       setIsExporting(true);
-
-      // Generate the image with Redux store data
-      const dataUrl = await exportMapAsImage(map, outlooks, {
-        title: title || undefined,
-        format: 'jpeg',
-        quality: 0.92,
-        includeLegendAndStatus: true
-      });
-
-      // Download the image
-      const filename = `forecast-outlook-${getFormattedDate()}.jpg`;
-      downloadDataUrl(dataUrl, filename);
-      addToast('Forecast exported successfully!', 'success');
-
+      await performExport(map, outlooks, title || undefined, addToast);
     } catch {
-      addToast('Failed to export the map. Please try again.', 'error');
+      // performExport already handles user-facing error toasts
     } finally {
       setIsExporting(false);
     }
-  }, [checkExportPreconditions, outlooks, addToast, mapRef]);
+  }, [checkExportPreconditions, outlooks, addToast]);
 
   const cancelExport = useCallback(() => {
     setIsModalOpen(false);
