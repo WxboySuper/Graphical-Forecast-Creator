@@ -103,10 +103,8 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
   const confirmExport = useCallback(async (title: string) => {
     setIsModalOpen(false); // Close modal
 
-    if (!validateExportPreconditions(mapRef.current, isExportDisabled, addToast)) return;
-
     const current = mapRef.current;
-    if (!current) return;
+    if (!validateExportPreconditions(current, isExportDisabled, addToast)) return;
 
     const map = current.getMap();
     if (!map) return;
