@@ -116,8 +116,8 @@ importers:
         specifier: ^10.8.0
         version: 10.8.0
       ol-mapbox-style:
-        specifier: ^13.4.0
-        version: 13.4.0(ol@10.8.0)
+        specifier: ^13.4.1
+        version: 13.4.1(ol@10.8.0)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1445,8 +1445,8 @@ packages:
   '@mapbox/unitbezier@0.0.1':
     resolution: {integrity: sha512-nMkuDXFv60aBr9soUG5q+GvZYL+2KZHVvsqFCzqnkGEf46U2fvmytHaEVc1/YZbiLn8X+eR3QzX1+dwDO1lxlw==}
 
-  '@maplibre/maplibre-gl-style-spec@24.7.0':
-    resolution: {integrity: sha512-Ed7rcKYU5iELfablg9Mj+TVCsXsPBgdMyXPRAxb2v7oWg9YJnpQdZ5msDs1LESu/mtXy3Z48Vdppv2t/x5kAhw==}
+  '@maplibre/maplibre-gl-style-spec@24.8.1':
+    resolution: {integrity: sha512-zxa92qF96ZNojLxeAjnaRpjVCy+swoUNJvDhtpC90k7u5F0TMr4GmvNqMKvYrMoPB8d7gRSXbMG1hBbmgESIsw==}
     hasBin: true
 
   '@napi-rs/wasm-runtime@0.2.12':
@@ -3788,8 +3788,8 @@ packages:
   nwsapi@2.2.23:
     resolution: {integrity: sha512-7wfH4sLbt4M0gCDzGE6vzQBo0bfTKjU7Sfpqy/7gs1qBfYz2vEJH6vXcBKpO3+6Yu1telwd0t9HpyOoLEQQbIQ==}
 
-  ol-mapbox-style@13.4.0:
-    resolution: {integrity: sha512-nme+Ko+hBKpdWwPr3tBIvOxlO/qLCStVgsPL39SQtIoVNM+mFq2dkX6ty6jrGcgyXS/QvyAOImUEN8VWSViFXw==}
+  ol-mapbox-style@13.4.1:
+    resolution: {integrity: sha512-da4FKZUXoXMzK5ADeRHAXzd3bTeiKg/Y9LBOTB6qNTP62MQm93y6ISrIXzOS9atfGgQMEHJ2pCgP272IMeZCXA==}
     peerDependencies:
       ol: '*'
 
@@ -6159,7 +6159,7 @@ snapshots:
 
   '@mapbox/unitbezier@0.0.1': {}
 
-  '@maplibre/maplibre-gl-style-spec@24.7.0':
+  '@maplibre/maplibre-gl-style-spec@24.8.1':
     dependencies:
       '@mapbox/jsonlint-lines-primitives': 2.0.2
       '@mapbox/unitbezier': 0.0.1
@@ -9402,9 +9402,9 @@ snapshots:
 
   nwsapi@2.2.23: {}
 
-  ol-mapbox-style@13.4.0(ol@10.8.0):
+  ol-mapbox-style@13.4.1(ol@10.8.0):
     dependencies:
-      '@maplibre/maplibre-gl-style-spec': 24.7.0
+      '@maplibre/maplibre-gl-style-spec': 24.8.1
       mapbox-to-css-font: 3.2.0
       ol: 10.8.0
 
