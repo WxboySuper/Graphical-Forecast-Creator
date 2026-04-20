@@ -124,7 +124,7 @@
     "jest-environment-jsdom": "^30.2.0",
     "postcss": "8",
     "tailwindcss": "^4.2.2",
-    "vite": "^7.3.2"
+    "vite": "^8.0.9"
   },
   "overrides": {
     "immer": "^10.1.1",
