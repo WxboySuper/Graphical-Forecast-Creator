@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 - **Developer:** Documented local beta dev workflow and the local beta bypass option in README.md to allow running beta features locally without hosted Firebase credentials.
 
 ### Fixed
-- **Dependency/security cleanup:** Updated the Firebase/OpenLayers dependency tree and server admin stack to address the reported Dependabot vulnerabilities in protobufjs, lodash, protocol-buffers-schema, and `@tootallnate/once`."
+- **Dependency/security cleanup:** Updated the Firebase/OpenLayers dependency tree and server admin stack to address the reported Dependabot vulnerabilities in protobufjs, lodash, protocol-buffers-schema, and `@tootallnate/once`.
 - **Lucide brand icons:** Replaced Lucide brand icon usage with inline SVGs so the UI no longer depends on Lucide's removed brand set.
 - **Unused dependency cleanup:** Removed stale geoman/react-leaflet dependencies and corresponding export-only selectors that no longer matched the codebase.
 - **Map export guard:** Blocked image export on OpenLayers maps and surfaced a clear warning instead of attempting the old Leaflet export path.
