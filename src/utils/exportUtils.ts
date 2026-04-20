@@ -744,8 +744,6 @@ function buildCloneCallback(title?: string, includeLegendAndStatus = false, stat
       '.leaflet-control-container',
       '.ol-control',
       '.map-toolbar-bottom-right',
-      '.leaflet-pm-toolbar-container',
-      '.leaflet-pm-actions-container',
       // Hide original overlays; recreated below with export-safe styles.
       '.gfc-status-overlay',
       '.unofficial-badge',

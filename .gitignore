@@ -24,6 +24,7 @@ yarn-error.log*
 
 # Personal Docs
 */personal-docs/*
+*/personal/*
 
 /.idea
 
