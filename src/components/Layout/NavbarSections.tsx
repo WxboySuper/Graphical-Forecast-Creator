@@ -10,8 +10,6 @@ import {
   ExternalLink,
   Cloud,
   Home,
-  Github,
-  Twitter,
   FileText,
   Shield,
   CircleUserRound,
@@ -63,7 +61,11 @@ const externalLinks: ExternalActionLink[] = [
   {
     href: 'https://github.com/WxboySuper/Graphical-Forecast-Creator',
     label: 'GitHub Repository',
-    icon: <Github className="h-5 w-5" />,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+        <path d="M12 2C6.478 2 2 6.586 2 12.253c0 4.533 2.865 8.372 6.84 9.734.5.095.68-.22.68-.49 0-.242-.01-.88-.014-1.727-2.782.62-3.37-1.37-3.37-1.37-.454-1.18-1.11-1.494-1.11-1.494-.908-.636.069-.623.069-.623 1 .072 1.527 1.05 1.527 1.05.89 1.56 2.338 1.11 2.91.85.091-.658.35-1.11.636-1.366-2.22-.256-4.555-1.13-4.555-5.02 0-1.108.39-2.015 1.03-2.725-.103-.257-.447-1.292.098-2.693 0 0 .84-.277 2.75 1.04A9.4 9.4 0 0 1 12 6.843c.85.004 1.706.117 2.505.343 1.909-1.317 2.747-1.04 2.747-1.04.547 1.401.203 2.436.1 2.693.64.71 1.028 1.617 1.028 2.725 0 3.9-2.34 4.76-4.566 5.01.36.32.68.95.68 1.915 0 1.38-.012 2.492-.012 2.832 0 .273.18.59.688.49C19.137 20.624 22 16.786 22 12.253 22 6.586 17.522 2 12 2z" />
+      </svg>
+    ),
   },
   {
     href: 'https://discord.gg/SGk37rg8sz',
@@ -77,7 +79,11 @@ const externalLinks: ExternalActionLink[] = [
   {
     href: 'https://x.com/WeatherboySuper',
     label: 'X (@WeatherboySuper)',
-    icon: <Twitter className="h-5 w-5" />,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+        <path d="M18.244 2H21l-6.365 7.273L22 22h-6.828l-5.348-6.781L4.87 22H2l6.9-7.87L2 2h6.97l4.887 6.231L18.244 2Zm-1.2 17.2h1.93L8.72 3.864H6.67l10.374 15.336Z" />
+      </svg>
+    ),
   },
 ];
 

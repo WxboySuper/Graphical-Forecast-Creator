@@ -14,6 +14,7 @@ interface UseExportMapParams {
 export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: UseExportMapParams) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const isLeafletMap = () => mapRef.current?.getEngine() === 'leaflet';
 
   const initiateExport = useCallback(() => {
     // Don't proceed if export is disabled
@@ -24,6 +25,11 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
 
     if (!mapRef.current) {
       addToast('Map reference not available. Cannot export.', 'error');
+      return;
+    }
+
+    if (!isLeafletMap()) {
+      addToast('Map export is only available for Leaflet maps right now. The current OpenLayers map cannot be exported.', 'warning');
       return;
     }
 
@@ -41,6 +47,11 @@ export const useExportMap = ({ mapRef, outlooks, isExportDisabled, addToast }: U
     setIsModalOpen(false); // Close modal
 
     if (!mapRef.current) return;
+    if (!isLeafletMap()) {
+      addToast('Map export is only available for Leaflet maps right now. The current OpenLayers map cannot be exported.', 'warning');
+      return;
+    }
+
     const map = mapRef.current.getMap();
     if (!map) return;
 
