@@ -32,6 +32,9 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
+declare const __GFC_APP_VERSION__: string;
+
+const appVersion = typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : 'dev';
 
 interface ExternalActionLink {
   href: string;
@@ -147,7 +150,7 @@ const AccountIndicator: FC<{ showSignedInDot: boolean }> = ({ showSignedInDot })
 /** Displays the small status meta block used in the navbar right actions. */
 const StatusMeta: FC = () => (
   <div className="app-navbar__statusMeta">
-    <span className="app-navbar__version">v1.4.0</span>
+    <span className="app-navbar__version">{`v${appVersion}`}</span>
     <span className="app-navbar__utilityDivider" aria-hidden="true" />
   </div>
 );
