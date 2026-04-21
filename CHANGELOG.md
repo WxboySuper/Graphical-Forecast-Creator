@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **Discussion editor:** Neutralized colored toolbar button backgrounds in light mode for the DIY editor toolbar and leveled/centered the DIY/Guided tabs to fix alignment issues (files: src/pages/DiscussionPage.css, src/pages/DiscussionPage.tsx, src/components/DiscussionEditor/DIYDiscussionEditor.tsx).
 - **Verification header:** Compacted the verification header to reduce vertical space usage and increase map/controls visible area (file: src/components/VerificationMode/VerificationMode.css).
 - **Developer:** Documented local beta dev workflow and the local beta bypass option in README.md to allow running beta features locally without hosted Firebase credentials.
+- **Version bump:** Updated version to `1.5.0-beta.1` for the upcoming `v1.5.0` beta release.
 
 ### Fixed
 - **Dependency/security cleanup:** Updated the Firebase/OpenLayers dependency tree and server admin stack to address the reported Dependabot vulnerabilities in protobufjs, lodash, protocol-buffers-schema, and `@tootallnate/once`.
