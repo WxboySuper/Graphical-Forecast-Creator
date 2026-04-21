@@ -32,6 +32,7 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
+import pkg from '../../../package.json';
 
 interface ExternalActionLink {
   href: string;
@@ -147,7 +148,7 @@ const AccountIndicator: FC<{ showSignedInDot: boolean }> = ({ showSignedInDot })
 /** Displays the small status meta block used in the navbar right actions. */
 const StatusMeta: FC = () => (
   <div className="app-navbar__statusMeta">
-    <span className="app-navbar__version">v1.5.0-beta.1</span>
+    <span className="app-navbar__version">{`v${pkg.version}`}</span>
     <span className="app-navbar__utilityDivider" aria-hidden="true" />
   </div>
 );
