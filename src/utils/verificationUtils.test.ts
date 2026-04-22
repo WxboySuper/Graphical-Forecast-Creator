@@ -7,9 +7,9 @@ describe('verificationUtils', () => {
   });
 
   test('formatOutlookVerificationSummary includes totals and risk lines', () => {
-    const ver = { hits: 2, misses: 1, hitRate: 66.6667, byRiskLevel: { SLGT: { hits:1, misses:0, hitRate:33.3, total:3 } }, reportDetails: [] } as any;
-    const s = formatOutlookVerificationSummary('tornado', ver);
-    expect(s).toContain('Total Relevant Reports');
-    expect(s).toContain('SLGT');
+    const verification = { hits: 2, misses: 1, hitRate: 66.6667, byRiskLevel: { SLGT: { hits: 1, misses: 0, hitRate: 33.3, total: 3 } }, reportDetails: [] };
+    const summary = formatOutlookVerificationSummary('tornado', verification);
+    expect(summary).toContain('Total Relevant Reports');
+    expect(summary).toContain('SLGT');
   });
 });

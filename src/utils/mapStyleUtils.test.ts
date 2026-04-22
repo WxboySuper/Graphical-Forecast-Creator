@@ -2,19 +2,19 @@ import { sortProbabilities, getFeatureStyle } from './mapStyleUtils';
 
 describe('mapStyleUtils', () => {
   test('sortProbabilities ordering', () => {
-    const entries = [['30%', []], ['TSTM', []], ['CIG1', []], ['5%', []]] as any;
+    const entries: Array<[string, unknown[]]> = [['30%', []], ['TSTM', []], ['CIG1', []], ['5%', []]];
     const sorted = sortProbabilities(entries);
-    expect(sorted.map((e: any) => e[0])).toEqual(['TSTM', '5%', '30%', 'CIG1']);
+    expect(sorted.map(([probability]) => probability)).toEqual(['TSTM', '5%', '30%', 'CIG1']);
   });
 
   test('getFeatureStyle returns hatching for CIG', () => {
-    const s = getFeatureStyle('tornado' as any, 'CIG1');
-    expect(s.className).toBe('hatching-layer');
-    expect(s.fillColor).toContain('pattern');
+    const style = getFeatureStyle('tornado', 'CIG1');
+    expect(style.className).toBe('hatching-layer');
+    expect(style.fillColor).toContain('pattern');
   });
 
   test('getFeatureStyle returns color fill for numeric', () => {
-    const s = getFeatureStyle('categorical' as any, 'TSTM');
-    expect(s.fillColor).toBeDefined();
+    const style = getFeatureStyle('categorical', 'TSTM');
+    expect(style.fillColor).toBeDefined();
   });
 });

@@ -6,7 +6,7 @@ afterEach(() => {
 });
 
 // Mock html2canvas to call the onclone callback so onclone logic in captureContainer runs
-jest.doMock('html2canvas', () => jest.fn(async (_container: unknown, opts: { onclone?: (doc: Document) => void } | undefined) => {
+jest.doMock('html2canvas', () => jest.fn((_container: unknown, opts: { onclone?: (doc: Document) => void } | undefined) => {
   if (opts && typeof opts.onclone === 'function') {
     // call onclone with document as the cloned document for simplicity
     opts.onclone(document);
@@ -43,7 +43,7 @@ describe('captureContainer onclone behavior', () => {
     // The cloned defs should have been appended to the svg holder
     const holder = document.querySelector('#gfc-export-svg-defs-holder');
     expect(holder).toBeTruthy();
-    expect(holder!.querySelector('#test-def')).toBeTruthy();
+    expect((holder as HTMLElement | null)?.querySelector('#test-def')).toBeTruthy();
 
     // cleanup
     if (container.parentNode) {

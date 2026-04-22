@@ -1,5 +1,5 @@
 jest.mock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
-jest.mock('html2canvas', () => jest.fn(async () => ({ toDataURL: () => 'data:image/png;base64,FAKE' })));
+jest.mock('html2canvas', () => jest.fn(() => Promise.resolve({ toDataURL: () => 'data:image/png;base64,FAKE' })));
 
 import { 
   downloadDataUrl,
@@ -12,10 +12,14 @@ import {
   hideElementsInClone,
   sortProbabilities,
   captureContainer,
-  addOverlays
 } from './exportUtils';
 
 describe('exportUtils', () => {
+  type MapContainerLike = {
+    getContainer?: () => HTMLElement;
+    getTargetElement?: () => HTMLElement;
+  };
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -27,18 +31,18 @@ describe('exportUtils', () => {
 
   test('getExportContainer supports getContainer and getTargetElement', () => {
     const el = document.createElement('div');
-    const mapA = { getContainer: () => el } as any;
+    const mapA: MapContainerLike = { getContainer: () => el };
     expect(getExportContainer(mapA)).toBe(el);
 
     const el2 = document.createElement('div');
-    const mapB = { getTargetElement: () => el2 } as any;
+    const mapB: MapContainerLike = { getTargetElement: () => el2 };
     expect(getExportContainer(mapB)).toBe(el2);
 
-    expect(getExportContainer({} as any)).toBeNull();
+    expect(getExportContainer({} as never)).toBeNull();
   });
 
   test('getExportRootAndSize errors when no container', () => {
-    expect(() => getExportRootAndSize({} as any)).toThrow('Map container not available for export.');
+    expect(() => getExportRootAndSize({} as never)).toThrow('Map container not available for export.');
   });
 
   test('createTempContainer appends and sets size', () => {
@@ -47,7 +51,9 @@ describe('exportUtils', () => {
     expect(temp.style.width).toContain('120px');
     expect(temp.style.height).toContain('80px');
     // cleanup
-    try { document.body.removeChild(temp); } catch {}
+    if (temp.parentNode) {
+      temp.parentNode.removeChild(temp);
+    }
   });
 
   test('waitForImagesLoaded handles no images quickly', async () => {
@@ -67,9 +73,9 @@ describe('exportUtils', () => {
   });
 
   test('sortProbabilities ordering', () => {
-    const entries = [['30%', []], ['TSTM', []], ['CIG1', []], ['5%', []]] as any;
+    const entries: Array<[string, unknown[]]> = [['30%', []], ['TSTM', []], ['CIG1', []], ['5%', []]];
     const sorted = sortProbabilities(entries);
-    expect(sorted.map((e: any) => e[0])).toEqual(['TSTM', '5%', '30%', 'CIG1']);
+    expect(sorted.map(([probability]) => probability)).toEqual(['TSTM', '5%', '30%', 'CIG1']);
   });
 
   test('captureContainer returns data URL via html2canvas mock', async () => {
@@ -93,6 +99,6 @@ describe('exportUtils', () => {
   });
 
   test('exportMapAsImage rejects when map container missing', async () => {
-    await expect(exportMapAsImage({} as any, {} as any)).rejects.toThrow('Map container not available for export.');
+    await expect(exportMapAsImage({} as never, {} as never)).rejects.toThrow('Map container not available for export.');
   });
 });

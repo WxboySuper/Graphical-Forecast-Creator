@@ -1,12 +1,19 @@
 import { getFirstEnabledOutlookType, isAnyOutlookEnabled, isOutlookTypeEnabled } from './featureFlagsUtils';
 
 describe('featureFlagsUtils', () => {
-  const base = {
+  type FeatureFlagsState = {
+    tornadoOutlookEnabled: boolean;
+    windOutlookEnabled: boolean;
+    hailOutlookEnabled: boolean;
+    categoricalOutlookEnabled: boolean;
+  };
+
+  const base: FeatureFlagsState = {
     tornadoOutlookEnabled: false,
     windOutlookEnabled: false,
     hailOutlookEnabled: false,
     categoricalOutlookEnabled: false
-  } as any;
+  };
 
   test('getFirstEnabledOutlookType returns first enabled or categorical fallback', () => {
     expect(getFirstEnabledOutlookType({ ...base, tornadoOutlookEnabled: true })).toBe('tornado');

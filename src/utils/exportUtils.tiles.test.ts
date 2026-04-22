@@ -25,19 +25,18 @@ describe('addTilesAndWait', () => {
     // Mock leaflet to provide a simple TileLayer implementation usable in node
     jest.doMock('leaflet', () => {
       class TileLayer extends EventEmitter {
-        constructor() { super(); }
         on(evt: string, cb: (...args: unknown[]) => void) { return this.addListener(evt, cb); }
         fire(evt: string, payload?: unknown) { return this.emit(evt, payload); }
         addTo(map: MapInstanceStub) { if (map && typeof map.addLayer === 'function') map.addLayer(this as unknown as TileLayerStub); return this as unknown as TileLayerStub; }
       }
-      function tileLayer(url: string, opts: unknown) { return new TileLayer(); }
+      function tileLayer(_url: string, _opts: unknown) { return new TileLayer(); }
       return { TileLayer, tileLayer };
     });
 
-    const L = await import('leaflet');
+    const leafletModule = await import('leaflet');
     const { addTilesAndWait } = await import('./exportUtils');
 
-    const srcLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }) as unknown as TileLayerStub;
+    const srcLayer = leafletModule.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }) as unknown as TileLayerStub;
 
     const sourceMap = { eachLayer: (cb: (layer: unknown) => void) => cb(srcLayer) };
 
@@ -52,8 +51,8 @@ describe('addTilesAndWait', () => {
           mapInstance._layer.fire('tileloadstart');
           setTimeout(() => mapInstance._layer?.fire('tileload'), 20);
         }
-      } catch (err) {
-        // ignore
+      } catch {
+        void 0;
       }
     }, 20);
 
@@ -68,19 +67,18 @@ describe('addTilesAndWait', () => {
 
     jest.doMock('leaflet', () => {
       class TileLayer extends EventEmitter {
-        constructor() { super(); }
         on(evt: string, cb: (...args: unknown[]) => void) { return this.addListener(evt, cb); }
         fire(evt: string, payload?: unknown) { return this.emit(evt, payload); }
         addTo(map: MapInstanceStub) { if (map && typeof map.addLayer === 'function') map.addLayer(this as unknown as TileLayerStub); return this as unknown as TileLayerStub; }
       }
-      function tileLayer(url: string, opts: unknown) { return new TileLayer(); }
+      function tileLayer(_url: string, _opts: unknown) { return new TileLayer(); }
       return { TileLayer, tileLayer };
     });
 
-    const L = await import('leaflet');
+    const leafletModule = await import('leaflet');
     const { addTilesAndWait } = await import('./exportUtils');
 
-    const srcLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }) as unknown as TileLayerStub;
+    const srcLayer = leafletModule.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }) as unknown as TileLayerStub;
     const sourceMap = { eachLayer: (cb: (layer: unknown) => void) => cb(srcLayer) };
 
     const mapInstance: MapInstanceStub = {

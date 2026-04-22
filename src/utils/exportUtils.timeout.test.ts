@@ -6,11 +6,11 @@ afterEach(() => {
 });
 
 describe('maybeShowTileTimeoutWarning', () => {
-  test('appends and removes warning banner on timeout', () => {
+  test('appends and removes warning banner on timeout', async () => {
     jest.resetModules();
     jest.useFakeTimers();
 
-    const { maybeShowTileTimeoutWarning } = require('./exportUtils');
+    const { maybeShowTileTimeoutWarning } = await import('./exportUtils');
 
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -27,6 +27,8 @@ describe('maybeShowTileTimeoutWarning', () => {
     // (not strictly necessary here)
     expect(container.querySelector('[data-gfc-export-warning]')).toBeNull();
 
-    try { document.body.removeChild(container); } catch {}
+    if (container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
   });
 });

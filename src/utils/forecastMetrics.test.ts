@@ -14,7 +14,7 @@ describe('forecastMetrics', () => {
       },
       currentDay: 1,
       cycleDate: '2026-04-21'
-    } as any;
+    };
     const metrics = countForecastMetrics(forecast);
     expect(metrics.forecastDays).toBe(1);
     expect(metrics.totalOutlooks).toBe(1);

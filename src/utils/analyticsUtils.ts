@@ -4,10 +4,11 @@
  */
 export const shouldTrack = (hostname?: string): boolean => {
   if (typeof window === 'undefined') return false;
-  const host = hostname ?? (window.location && window.location.hostname);
+  const host = hostname ?? window.location?.hostname;
   return host !== 'localhost' && host !== '127.0.0.1';
 };
 
+/** Sends a page view to the analytics endpoint when tracking is enabled. */
 export const trackPageView = (hostname?: string): void => {
   if (!shouldTrack(hostname)) {
     return;

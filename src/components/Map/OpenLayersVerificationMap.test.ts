@@ -20,13 +20,24 @@ jest.mock('../../utils/mapStyleUtils', () => ({
   computeZIndex: jest.fn(() => 42),
 }));
 
-import * as mod from './OpenLayersVerificationMap';
 import { createCanvasStub } from '../../testUtils';
-
-type DescriptorStub = {
-  outlookType: 'categorical' | 'tornado' | 'wind' | 'hail';
-  probability: string;
-};
+import {
+  toRgbaColor,
+  createHatchPattern,
+  isFunctionColorNotation,
+  coerceNumber,
+  resolveFillOpacity,
+  resolveStrokeOpacity,
+  resolveStrokeWidth,
+  isCigProbability,
+  getVerificationStyleZIndex,
+  buildCigStyleParts,
+  createStandardFill,
+  createStandardStroke,
+  buildStyle,
+  replaceLayerGroupLayers,
+  createVerifTileSource,
+} from './OpenLayersVerificationMap';
 
 type LayerGroupLike = {
   getLayers: () => {
@@ -48,72 +59,72 @@ describe('OpenLayersVerificationMap helpers', () => {
   });
 
   test('toRgbaColor handles empty, hex (3/6), rgb/rgba and invalid values', () => {
-    expect(mod.toRgbaColor({ color: '', alpha: 0.5 })).toBe('rgba(255,255,255,0.5)');
-    expect(mod.toRgbaColor({ color: 'rgba(1,2,3,0.4)', alpha: 0.4 })).toBe('rgba(1,2,3,0.4)');
-    expect(mod.toRgbaColor({ color: 'rgb(4,5,6)', alpha: 0.8 })).toBe('rgb(4,5,6)');
-    expect(mod.toRgbaColor({ color: '#fff', alpha: 0.3 })).toBe('rgba(255, 255, 255, 0.3)');
-    expect(mod.toRgbaColor({ color: '#12ab34', alpha: 1 })).toBe('rgba(18, 171, 52, 1)');
+    expect(toRgbaColor({ color: '', alpha: 0.5 })).toBe('rgba(255,255,255,0.5)');
+    expect(toRgbaColor({ color: 'rgba(1,2,3,0.4)', alpha: 0.4 })).toBe('rgba(1,2,3,0.4)');
+    expect(toRgbaColor({ color: 'rgb(4,5,6)', alpha: 0.8 })).toBe('rgb(4,5,6)');
+    expect(toRgbaColor({ color: '#fff', alpha: 0.3 })).toBe('rgba(255, 255, 255, 0.3)');
+    expect(toRgbaColor({ color: '#12ab34', alpha: 1 })).toBe('rgba(18, 171, 52, 1)');
     // Invalid hex should return original
-    expect(mod.toRgbaColor({ color: '#zzz', alpha: 0.2 })).toBe('#zzz');
+    expect(toRgbaColor({ color: '#zzz', alpha: 0.2 })).toBe('#zzz');
   });
 
   test('createHatchPattern returns a pattern when canvas context exists', () => {
     // Stub document.createElement('canvas') to provide a 2D context with createPattern
     document.createElement = createCanvasStub(originalCreateElement);
 
-    const pattern = mod.createHatchPattern('CIG1');
+    const pattern = createHatchPattern('CIG1');
     expect(pattern).toBeTruthy();
   });
 
   test('isFunctionColorNotation and coerceNumber behave correctly', () => {
-    expect(mod.isFunctionColorNotation('rgba(1,2,3,0.4)')).toBe(true);
-    expect(mod.isFunctionColorNotation('#123')).toBe(false);
-    expect(mod.coerceNumber(5, 2)).toBe(5);
-    expect(mod.coerceNumber('a' as unknown as number, 2)).toBe(2);
+    expect(isFunctionColorNotation('rgba(1,2,3,0.4)')).toBe(true);
+    expect(isFunctionColorNotation('#123')).toBe(false);
+    expect(coerceNumber(5, 2)).toBe(5);
+    expect(coerceNumber('a' as unknown as number, 2)).toBe(2);
   });
 
   test('resolveFill/Stroke opacity and width defaults', () => {
-    expect(mod.resolveFillOpacity('categorical', 0.6)).toBe(0.6);
-    expect(mod.resolveFillOpacity('categorical', 'x' as unknown)).toBe(0.25);
-    expect(mod.resolveStrokeOpacity(0.7)).toBe(0.7);
-    expect(mod.resolveStrokeOpacity('y' as unknown)).toBe(1);
-    expect(mod.resolveStrokeWidth(4)).toBe(4);
-    expect(mod.resolveStrokeWidth('z' as unknown)).toBe(2);
+    expect(resolveFillOpacity('categorical', 0.6)).toBe(0.6);
+    expect(resolveFillOpacity('categorical', 'x' as unknown)).toBe(0.25);
+    expect(resolveStrokeOpacity(0.7)).toBe(0.7);
+    expect(resolveStrokeOpacity('y' as unknown)).toBe(1);
+    expect(resolveStrokeWidth(4)).toBe(4);
+    expect(resolveStrokeWidth('z' as unknown)).toBe(2);
   });
 
   test('isCigProbability and getVerificationStyleZIndex', () => {
-    expect(mod.isCigProbability('CIG1')).toBe(true);
-    expect(mod.isCigProbability('P10')).toBe(false);
+    expect(isCigProbability('CIG1')).toBe(true);
+    expect(isCigProbability('P10')).toBe(false);
     // Non-CIG uses computeZIndex mock (42)
-    expect(mod.getVerificationStyleZIndex({ outlookType: 'categorical', probability: 'P10' })).toBe(42);
+    expect(getVerificationStyleZIndex({ outlookType: 'categorical', probability: 'P10' })).toBe(42);
     // CIG returns 1000 + rank
-    expect(mod.getVerificationStyleZIndex({ outlookType: 'categorical', probability: 'CIG3' })).toBe(1003);
+    expect(getVerificationStyleZIndex({ outlookType: 'categorical', probability: 'CIG3' })).toBe(1003);
   });
 
   test('buildCigStyleParts returns fill and stroke', () => {
     // Stub canvas for pattern
     document.createElement = createCanvasStub(originalCreateElement);
 
-    const parts = mod.buildCigStyleParts('CIG2');
+    const parts = buildCigStyleParts('CIG2');
     expect(parts.fill).toBeTruthy();
     expect(parts.stroke).toBeTruthy();
   });
 
   test('createStandardFill/createStandardStroke return style objects', () => {
-    const f = mod.createStandardFill({ color: '#123456', alpha: 0.5 });
-    const s = mod.createStandardStroke({ color: '#abcdef', opacity: 0.6, width: 3 });
-    expect(f).toBeTruthy();
-    expect(s).toBeTruthy();
+    const fillStyle = createStandardFill({ color: '#123456', alpha: 0.5 });
+    const strokeStyle = createStandardStroke({ color: '#abcdef', opacity: 0.6, width: 3 });
+    expect(fillStyle).toBeTruthy();
+    expect(strokeStyle).toBeTruthy();
   });
 
   test('buildStyle returns an OpenLayers Style object for CIG and non-CIG', () => {
-    const s1: unknown = mod.buildStyle({ outlookType: 'categorical', probability: 'P10' });
+    const s1: unknown = buildStyle({ outlookType: 'categorical', probability: 'P10' });
     expect(s1).toBeTruthy();
     // For CIG probability
     // Stub canvas for pattern used by CIG branch
     document.createElement = createCanvasStub(originalCreateElement);
 
-    const s2: unknown = mod.buildStyle({ outlookType: 'categorical', probability: 'CIG1' });
+    const s2: unknown = buildStyle({ outlookType: 'categorical', probability: 'CIG1' });
     expect(s2).toBeTruthy();
   });
 
@@ -121,12 +132,12 @@ describe('OpenLayersVerificationMap helpers', () => {
     const pushed: unknown[] = [];
     const target: LayerGroupLike = { getLayers: () => ({ clear: () => { pushed.length = 0; }, push: (layer: unknown) => pushed.push(layer) }) };
     const source: LayerGroupLike = { getLayers: () => ({ clear: () => undefined, push: () => undefined, getArray: () => ['a', 'b'] }) };
-    mod.replaceLayerGroupLayers(target as never, source as never);
+    replaceLayerGroupLayers(target as never, source as never);
     expect(pushed).toEqual(['a', 'b']);
   });
 
   test('createVerifTileSource returns a source for known styles', () => {
-    const s = mod.createVerifTileSource('osm');
-    expect(s).toBeTruthy();
+    const tileSource = createVerifTileSource('osm');
+    expect(tileSource).toBeTruthy();
   });
 });

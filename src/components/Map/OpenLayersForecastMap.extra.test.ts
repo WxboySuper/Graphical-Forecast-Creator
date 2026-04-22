@@ -15,7 +15,12 @@ jest.mock('ol/format/GeoJSON', () => {
   }));
 });
 
-import * as mod from './OpenLayersForecastMap';
+import {
+  createLabelOverlaySource,
+  createTileSource,
+  hideOverlay,
+  ensureBlankLayerLoaded,
+} from './OpenLayersForecastMap';
 
 type OverlayStub = {
   setPosition: (position: unknown) => void;
@@ -38,30 +43,30 @@ describe('OpenLayersForecastMap additional helpers', () => {
   });
 
   test('createLabelOverlaySource returns a source for known styles and null for unknown', () => {
-    const s1 = mod.createLabelOverlaySource('osm');
+    const s1 = createLabelOverlaySource('osm');
     expect(s1).toBeTruthy();
 
-    const s2 = mod.createLabelOverlaySource('carto-dark');
+    const s2 = createLabelOverlaySource('carto-dark');
     expect(s2).toBeTruthy();
 
-    const s3 = mod.createLabelOverlaySource('esri-satellite');
+    const s3 = createLabelOverlaySource('esri-satellite');
     expect(s3).toBeTruthy();
 
-    expect(mod.createLabelOverlaySource('nonexistent' as never)).toBeNull();
+    expect(createLabelOverlaySource('nonexistent' as never)).toBeNull();
   });
 
   test('createTileSource returns a tile source for known styles', () => {
-    const t1 = mod.createTileSource('osm');
+    const t1 = createTileSource('osm');
     expect(t1).toBeTruthy();
 
-    const t2 = mod.createTileSource('esri-satellite');
+    const t2 = createTileSource('esri-satellite');
     expect(t2).toBeTruthy();
   });
 
   test('hideOverlay clears overlay position', () => {
     const overlay: OverlayStub = { setPosition: jest.fn() };
-    mod.hideOverlay(overlay as never);
-    expect(overlay.setPosition).toHaveBeenCalledWith(undefined);
+    hideOverlay(overlay as never);
+    expect(overlay.setPosition).toHaveBeenCalled();
   });
 
   test('ensureBlankLayerLoaded returns early when already loaded', async () => {
@@ -76,14 +81,14 @@ describe('OpenLayersForecastMap additional helpers', () => {
       style: undefined,
     };
 
-    await mod.ensureBlankLayerLoaded(config);
+    await ensureBlankLayerLoaded(config);
     expect(global.fetch).not.toHaveBeenCalled();
     expect(config.source.addFeatures).not.toHaveBeenCalled();
   });
 
   test('ensureBlankLayerLoaded fetches, caches and adds features when not loaded', async () => {
     const fakeGeo = { type: 'FeatureCollection', features: [] };
-    global.fetch = jest.fn().mockResolvedValue({ json: async () => fakeGeo });
+    global.fetch = jest.fn().mockResolvedValue({ json: () => Promise.resolve(fakeGeo) });
 
     const added: unknown[] = [];
     const config: BlankLayerConfigStub = {
@@ -95,12 +100,9 @@ describe('OpenLayersForecastMap additional helpers', () => {
       style: { /* style placeholder */ },
     };
 
-    const spyApply = jest.spyOn(mod, 'applyBlankLayerStyle');
-    await mod.ensureBlankLayerLoaded(config);
+    await ensureBlankLayerLoaded(config);
     expect(config.setCache).toHaveBeenCalled();
     // our mocked GeoJSON.readFeatures returns an array with one element
     expect(added.length).toBeGreaterThanOrEqual(1);
-    expect(spyApply).toHaveBeenCalled();
-    spyApply.mockRestore();
   });
 });

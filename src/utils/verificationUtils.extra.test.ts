@@ -1,9 +1,13 @@
-const turf = require('@turf/turf');
+import * as turf from '@turf/turf';
+import {
+  analyzeVerification,
+  calculatePOD,
+  formatVerificationSummary,
+  formatOutlookVerificationSummary,
+} from './verificationUtils';
 
 describe('verificationUtils', () => {
   test('analyzeVerification counts hits and byRiskLevel correctly', () => {
-    const { analyzeVerification, calculatePOD, formatVerificationSummary } = require('./verificationUtils');
-
     // Create a small square polygon that contains the report point
     const polygon = turf.polygon([[[-97.21, 33.49], [-97.19, 33.49], [-97.19, 33.51], [-97.21, 33.51], [-97.21, 33.49]]]);
 
@@ -47,8 +51,6 @@ describe('verificationUtils', () => {
   });
 
   test('formatOutlookVerificationSummary sorts risk levels highest-first and formats text', () => {
-    const { formatOutlookVerificationSummary } = require('./verificationUtils');
-
     const verification = {
       hits: 3,
       misses: 1,

@@ -22,9 +22,9 @@ afterEach(() => {
 });
 
 describe('fileUtils extra', () => {
-  test('cloneForecastCycle produces deep clone', () => {
+  test('cloneForecastCycle produces deep clone', async () => {
     jest.resetModules();
-    const { cloneForecastCycle } = require('./fileUtils');
+    const { cloneForecastCycle } = await import('./fileUtils');
 
     const original: ForecastCycle = {
       days: {
@@ -44,15 +44,15 @@ describe('fileUtils extra', () => {
     expect(copy.days[1].data.categorical instanceof Map).toBe(true);
   });
 
-  test('exportForecastToJson creates and clicks download link', () => {
+  test('exportForecastToJson creates and clicks download link', async () => {
     jest.resetModules();
-    const { exportForecastToJson } = require('./fileUtils');
+    const { exportForecastToJson } = await import('./fileUtils');
 
     const clickMock = jest.fn();
-    const origCreate = document.createElement.bind(document);
-    const createdLink = origCreate('a') as HTMLAnchorElement;
+    const originalCreate = document.createElement.bind(document);
+    const createdLink = originalCreate('a') as HTMLAnchorElement;
     createdLink.click = clickMock as () => void;
-    const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : origCreate(tagName));
+    const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : originalCreate(tagName));
 
     const urlHelpers = Object.assign((globalThis.URL || URL) as URL, {
       createObjectURL: jest.fn(() => 'blob:url'),
@@ -72,25 +72,23 @@ describe('fileUtils extra', () => {
   test('downloadGfcPackage zips and triggers download with discussions', async () => {
     jest.resetModules();
 
-    // Mock JSZip
     jest.doMock('jszip', () => {
       return class MockJSZip {
         files: Record<string, string> = {};
         file(name: string, content: string) { this.files[name] = content; }
-        async generateAsync(_opts: unknown) { return new Blob(['ZIP']); }
+        generateAsync(_opts: unknown) { return Promise.resolve(new Blob(['ZIP'])); }
       };
     });
 
-    // Mock discussion compiler
-    jest.doMock('./discussionUtils', () => ({ compileDiscussionToText: (_d: unknown, day: number) => `Discussion ${day}` }));
+    jest.doMock('./discussionUtils', () => ({ compileDiscussionToText: (_discussion: unknown, day: number) => `Discussion ${day}` }));
 
     const { downloadGfcPackage } = await import('./fileUtils');
 
     const clickMock = jest.fn();
-    const origCreate = document.createElement.bind(document);
-    const createdLink = origCreate('a') as HTMLAnchorElement;
+    const originalCreate = document.createElement.bind(document);
+    const createdLink = originalCreate('a') as HTMLAnchorElement;
     createdLink.click = clickMock as () => void;
-    const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : origCreate(tagName));
+    const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : originalCreate(tagName));
 
     const urlHelpers = Object.assign((globalThis.URL || URL) as URL, {
       createObjectURL: jest.fn(() => 'blob:url'),
@@ -104,7 +102,6 @@ describe('fileUtils extra', () => {
 
     expect(clickMock).toHaveBeenCalled();
     expect(urlHelpers.createObjectURL).toHaveBeenCalled();
-
     spy.mockRestore();
   });
 });

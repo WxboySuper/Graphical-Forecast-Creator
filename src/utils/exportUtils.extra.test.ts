@@ -95,7 +95,7 @@ describe('exportUtils additional unit tests', () => {
 
     const appended = exportContainer.querySelector('.map-legend');
     expect(appended).toBeTruthy();
-    expect(appended!.textContent).toBe('Legend here');
+    expect((appended as HTMLElement | null)?.textContent).toBe('Legend here');
   });
 
   test('getExportRootAndSize returns parent map container and sizes', async () => {

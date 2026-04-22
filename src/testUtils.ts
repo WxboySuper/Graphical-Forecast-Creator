@@ -14,10 +14,10 @@ export function createCanvasStub(originalCreateElement: typeof document.createEl
       canvas.getContext = () => ({
         strokeStyle: '',
         lineWidth: 0,
-        beginPath: () => {},
-        moveTo: () => {},
-        lineTo: () => {},
-        stroke: () => {},
+        beginPath: () => undefined,
+        moveTo: () => undefined,
+        lineTo: () => undefined,
+        stroke: () => undefined,
         createPattern: () => patternObject as unknown as CanvasPattern,
       }) as unknown as CanvasRenderingContext2D;
       return canvas as unknown as HTMLElement;
