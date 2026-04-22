@@ -1,8 +1,8 @@
 # Graphical Forecast Creator (GFC) - Development Instructions
 
 ## 🛠️ Core Directives
-2. **Process over Code**: Prioritize maintaining the development workflow and documentation standards over specific implementation details, as the codebase is dynamic.
-3. **Pnpm First**: This project uses `pnpm`. Never use `npm` or `yarn` for dependency management.
+1. **Process over Code**: Prioritize maintaining the development workflow and documentation standards over specific implementation details, as the codebase is dynamic.
+2. **Pnpm First**: This project uses `pnpm`. Never use `npm` or `yarn` for dependency management.
 
 ## 🌿 Branching & Workflow
 *   **Main Branch**: Production-ready code. Only merged from `beta`.

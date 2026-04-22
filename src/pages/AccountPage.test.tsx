@@ -208,8 +208,8 @@ describe('AccountPage', () => {
 
   test('handles premium billing, saving defaults, and sign-out actions', async () => {
     const user = userEvent.setup();
-    const signOutUser = jest.fn().mockResolvedValue(undefined);
-    const updateSyncedSettings = jest.fn().mockResolvedValue(undefined);
+    const signOutUser = jest.fn().mockResolvedValue();
+    const updateSyncedSettings = jest.fn().mockResolvedValue();
     const openBillingPortal = jest.fn().mockRejectedValue(new Error('Portal unavailable'));
 
     mockUseAuth.mockReturnValue({

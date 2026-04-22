@@ -1,6 +1,8 @@
 import { renderHook, act } from '@testing-library/react';
+import type { RefObject } from 'react';
 import { useExportMap } from './useExportMap';
 import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
+import type { ForecastMapHandle } from '../Map/ForecastMap';
 
 jest.mock('../../utils/exportUtils', () => ({
   exportMapAsImage: jest.fn(),
@@ -11,6 +13,18 @@ jest.mock('../../utils/exportUtils', () => ({
 const mockExportMapAsImage = exportMapAsImage as jest.MockedFunction<typeof exportMapAsImage>;
 const mockDownloadDataUrl = downloadDataUrl as jest.MockedFunction<typeof downloadDataUrl>;
 const mockGetFormattedDate = getFormattedDate as jest.MockedFunction<typeof getFormattedDate>;
+type MockMapHandle = {
+  getEngine: () => 'leaflet' | 'openlayers';
+  getMap: () => unknown;
+  getView: () => { center: [number, number]; zoom: number };
+};
+
+type RenderProps = {
+  disabled: boolean;
+  current: MockMapHandle | null;
+};
+
+const createMapRef = (current: MockMapHandle | null) => ({ current } as RefObject<ForecastMapHandle | null>);
 
 describe('useExportMap', () => {
   const outlooks = { tornado: new Map([['1', []]]) } as never;
@@ -22,12 +36,10 @@ describe('useExportMap', () => {
   });
 
   test('rejects disabled and invalid export preconditions', () => {
-    const mapRef = { current: null };
-
     const { result, rerender } = renderHook(
-      ({ disabled, current }) =>
+      ({ disabled, current }: RenderProps) =>
         useExportMap({
-          mapRef: { current } as React.RefObject<any>,
+          mapRef: createMapRef(current),
           outlooks,
           isExportDisabled: disabled,
           addToast,
@@ -48,6 +60,7 @@ describe('useExportMap', () => {
       current: {
         getEngine: () => 'openlayers',
         getMap: () => ({}),
+        getView: () => ({ center: [0, 0], zoom: 1 }),
       },
     });
     act(() => result.current.initiateExport());
@@ -61,6 +74,7 @@ describe('useExportMap', () => {
       current: {
         getEngine: () => 'leaflet',
         getMap: () => null,
+        getView: () => ({ center: [0, 0], zoom: 1 }),
       },
     });
     act(() => result.current.initiateExport());
@@ -69,16 +83,17 @@ describe('useExportMap', () => {
 
   test('exports successfully and closes the modal', async () => {
     const map = { id: 'map-1' };
-    const current = {
+    const current: MockMapHandle = {
       getEngine: () => 'leaflet',
       getMap: () => map,
+      getView: () => ({ center: [0, 0], zoom: 1 }),
     };
 
     mockExportMapAsImage.mockResolvedValue('data:image/jpeg;base64,abc');
 
     const { result } = renderHook(() =>
       useExportMap({
-        mapRef: { current } as React.RefObject<any>,
+        mapRef: createMapRef(current),
         outlooks,
         isExportDisabled: false,
         addToast,
@@ -113,16 +128,17 @@ describe('useExportMap', () => {
   });
 
   test('surfaces export failures', async () => {
-    const current = {
+    const current: MockMapHandle = {
       getEngine: () => 'leaflet',
       getMap: () => ({ id: 'map-1' }),
+      getView: () => ({ center: [0, 0], zoom: 1 }),
     };
 
     mockExportMapAsImage.mockRejectedValue(new Error('boom'));
 
     const { result } = renderHook(() =>
       useExportMap({
-        mapRef: { current } as React.RefObject<any>,
+        mapRef: createMapRef(current),
         outlooks,
         isExportDisabled: false,
         addToast,
@@ -137,16 +153,17 @@ describe('useExportMap', () => {
   });
 
   test('treats engine lookup errors as unsupported exports', () => {
-    const current = {
+    const current: MockMapHandle = {
       getEngine: () => {
         throw new Error('engine unavailable');
       },
       getMap: () => ({ id: 'map-1' }),
+      getView: () => ({ center: [0, 0], zoom: 1 }),
     };
 
     const { result } = renderHook(() =>
       useExportMap({
-        mapRef: { current } as React.RefObject<any>,
+        mapRef: createMapRef(current),
         outlooks,
         isExportDisabled: false,
         addToast,

@@ -75,6 +75,8 @@ const renderDrawingTools = (
 };
 
 describe('DrawingTools', () => {
+  let clickSpy: jest.SpyInstance | undefined;
+
   beforeEach(() => {
     jest.clearAllMocks();
     initiateExportMock = jest.fn();
@@ -89,6 +91,11 @@ describe('DrawingTools', () => {
     });
   });
 
+  afterEach(() => {
+    clickSpy?.mockRestore();
+    clickSpy = undefined;
+  });
+
   test('wires the primary toolbar actions and reset flow', async () => {
     const user = userEvent.setup();
     const onSave = jest.fn();
@@ -97,7 +104,7 @@ describe('DrawingTools', () => {
     const addToast = jest.fn();
     const store = buildStore({ isSaved: false });
 
-    const clickSpy = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    clickSpy = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
 
     const { container } = renderDrawingTools(store, { onSave, onLoad, onOpenDiscussion, addToast });
 
@@ -135,7 +142,6 @@ describe('DrawingTools', () => {
     expect(addToast).toHaveBeenCalledWith('Forecasts reset successfully.', 'info');
     expect(store.getState().forecast.isSaved).toBe(false);
 
-    clickSpy.mockRestore();
   });
 
   test('shows disabled helper text when feature flags are off', () => {

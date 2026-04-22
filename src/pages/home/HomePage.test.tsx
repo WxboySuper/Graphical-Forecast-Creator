@@ -68,7 +68,7 @@ describe('HomePage', () => {
       ...handlers,
     });
 
-    const { container } = render(
+    render(
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>

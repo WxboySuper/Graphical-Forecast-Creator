@@ -1,4 +1,4 @@
-import React from 'react';
+import { forwardRef } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -27,10 +27,9 @@ jest.mock('../../utils/fileUtils', () => ({
 }));
 
 jest.mock('../Map/VerificationMap', () => {
-  const React = require('react');
   return {
     __esModule: true,
-    default: React.forwardRef(
+    default: forwardRef(
       ({ activeOutlookType, selectedDay }: { activeOutlookType: string; selectedDay: number }, _ref) => (
         <div data-testid="verification-map">{`${activeOutlookType}:${selectedDay}`}</div>
       )

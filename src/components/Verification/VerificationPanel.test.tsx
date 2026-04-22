@@ -153,19 +153,27 @@ describe('VerificationPanel', () => {
   });
 
   test('shows the current-day info banner and fetch failures', async () => {
-    const store = buildStore();
-    renderPanel(store, { activePanel: 'setup' });
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 3, 20, 12, 0, 0));
 
-    const today = new Date().toISOString().split('T')[0];
-    fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: today } });
-    fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
+    try {
+      const store = buildStore();
+      renderPanel(store, { activePanel: 'setup' });
 
-    expect(screen.getByText(/Storm reports are not available for the current day until later/i)).toBeInTheDocument();
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: today } });
+      fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
 
-    mockFetchStormReports.mockRejectedValueOnce(new Error('Service unavailable'));
-    fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: '2026-04-20' } });
-    fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
+      expect(screen.getByText(/Storm reports are not available for the current day until later/i)).toBeInTheDocument();
 
-    await waitFor(() => expect(screen.getByText(/Service unavailable/i)).toBeInTheDocument());
+      mockFetchStormReports.mockRejectedValueOnce(new Error('Service unavailable'));
+      fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: '2026-04-19' } });
+      fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
+
+      await waitFor(() => expect(screen.getByText(/Service unavailable/i)).toBeInTheDocument());
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
