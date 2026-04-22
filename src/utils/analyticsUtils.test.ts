@@ -1,31 +1,32 @@
+import { JSDOM } from 'jsdom';
+import { shouldTrack } from './analyticsUtils';
+
 afterEach(() => {
   jest.resetAllMocks();
-  try { delete (navigator as any).sendBeacon; } catch {}
-  try { delete (global as any).fetch; } catch {}
+  try { delete (navigator as unknown as Record<string, unknown>)['sendBeacon']; } catch (e) { /* ignore */ }
+  try { delete ((global as unknown) as Record<string, unknown>)['fetch']; } catch (e) { /* ignore */ }
 });
-
-const { JSDOM } = require('jsdom');
 
 describe('analyticsUtils', () => {
   test('shouldTrack respects localhost and 127.0.0.1', () => {
-    const { shouldTrack } = require('./analyticsUtils');
     expect(shouldTrack('localhost')).toBe(false);
     expect(shouldTrack('127.0.0.1')).toBe(false);
     expect(shouldTrack('example.com')).toBe(true);
   });
 
-  test('trackPageView is no-op in default jsdom (localhost)', () => {
-    const origWindow: any = global.window;
-    const origDocument: any = global.document;
-    const origNavigator: any = global.navigator;
+  test('trackPageView is no-op in default jsdom (localhost)', async () => {
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origNavigator = global.navigator;
 
     // Default jest/jsdom environment usually uses localhost
     const dom = new JSDOM('');
-    global.window = dom.window as any;
-    global.document = dom.window.document as any;
-    global.navigator = dom.window.navigator as any;
+    global.window = dom.window as unknown as Window & typeof globalThis;
+    global.document = dom.window.document as unknown as Document;
+    global.navigator = dom.window.navigator as unknown as Navigator;
 
-    const { trackPageView } = require('./analyticsUtils');
+    jest.resetModules();
+    const { trackPageView } = await import('./analyticsUtils');
     expect(() => trackPageView()).not.toThrow();
 
     global.window = origWindow;
@@ -33,19 +34,20 @@ describe('analyticsUtils', () => {
     global.navigator = origNavigator;
   });
 
-  test('trackPageView does not throw if navigator.sendBeacon throws', () => {
-    const origWindow: any = global.window;
-    const origDocument: any = global.document;
-    const origNavigator: any = global.navigator;
+  test('trackPageView does not throw if navigator.sendBeacon throws', async () => {
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origNavigator = global.navigator;
 
     const dom = new JSDOM('', { url: 'http://example.com/page' });
-    global.window = dom.window as any;
-    global.document = dom.window.document as any;
-    global.navigator = dom.window.navigator as any;
+    global.window = dom.window as unknown as Window & typeof globalThis;
+    global.document = dom.window.document as unknown as Document;
+    global.navigator = dom.window.navigator as unknown as Navigator;
 
-    (navigator as any).sendBeacon = jest.fn(() => { throw new Error('boom'); });
+    (global.navigator as unknown as Record<string, unknown>)['sendBeacon'] = () => { throw new Error('boom'); };
 
-    const { trackPageView } = require('./analyticsUtils');
+    jest.resetModules();
+    const { trackPageView } = await import('./analyticsUtils');
     expect(() => trackPageView()).not.toThrow();
 
     global.window = origWindow;
@@ -54,53 +56,56 @@ describe('analyticsUtils', () => {
   });
 
   test('trackPageView uses navigator.sendBeacon when available', async () => {
-    const origWindow: any = global.window;
-    const origDocument: any = global.document;
-    const origNavigator: any = global.navigator;
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origNavigator = global.navigator;
 
     const dom = new JSDOM('', { url: 'http://example.com/page' });
-    global.window = dom.window as any;
-    global.document = dom.window.document as any;
-    global.navigator = dom.window.navigator as any;
+    global.window = dom.window as unknown as Window & typeof globalThis;
+    global.document = dom.window.document as unknown as Document;
+    global.navigator = dom.window.navigator as unknown as Navigator;
 
     const sendBeaconMock = jest.fn();
-    (navigator as any).sendBeacon = sendBeaconMock;
+    (global.navigator as unknown as Record<string, unknown>)['sendBeacon'] = sendBeaconMock;
 
     jest.resetModules();
-    const { trackPageView } = require('./analyticsUtils');
+    const { trackPageView } = await import('./analyticsUtils');
     trackPageView('example.com');
 
     expect(sendBeaconMock).toHaveBeenCalled();
-    const blob = sendBeaconMock.mock.calls[0][1];
+    const blob = (sendBeaconMock.mock.calls[0] && sendBeaconMock.mock.calls[0][1]) as unknown;
     // Older test environments may not provide Blob.text(); at minimum ensure a blob-like object was passed
     expect(sendBeaconMock.mock.calls[0][0]).toBe('/api/collect');
     expect(blob).toBeDefined();
-    if (typeof (blob as any).type === 'string') expect((blob as any).type).toBe('application/json');
+    if (typeof (blob as unknown as { type?: unknown }).type === 'string') {
+      expect((blob as unknown as { type?: string }).type).toBe('application/json');
+    }
 
     global.window = origWindow;
     global.document = origDocument;
     global.navigator = origNavigator;
   });
 
-  test('trackPageView falls back to fetch when sendBeacon not available', () => {
-    const origWindow: any = global.window;
-    const origDocument: any = global.document;
-    const origNavigator: any = global.navigator;
+  test('trackPageView falls back to fetch when sendBeacon not available', async () => {
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origNavigator = global.navigator;
 
     const dom = new JSDOM('', { url: 'http://example.com/other' });
-    global.window = dom.window as any;
-    global.document = dom.window.document as any;
-    global.navigator = dom.window.navigator as any;
+    global.window = dom.window as unknown as Window & typeof globalThis;
+    global.document = dom.window.document as unknown as Document;
+    global.navigator = dom.window.navigator as unknown as Navigator;
 
-    try { delete (navigator as any).sendBeacon; } catch {}
-    (global as any).fetch = jest.fn(() => Promise.resolve());
+    try { delete (global.navigator as unknown as Record<string, unknown>)['sendBeacon']; } catch (e) { /* ignore */ }
+    (global as unknown as Record<string, unknown>)['fetch'] = jest.fn(() => Promise.resolve());
 
     jest.resetModules();
-    const { trackPageView } = require('./analyticsUtils');
+    const { trackPageView } = await import('./analyticsUtils');
     trackPageView('example.com');
 
-    expect((global as any).fetch).toHaveBeenCalled();
-    const [url, opts] = (global as any).fetch.mock.calls[0];
+    const fetchMock = (global as unknown as Record<string, unknown>)['fetch'] as unknown as jest.Mock;
+    expect(fetchMock).toHaveBeenCalled();
+    const [url, opts] = fetchMock.mock.calls[0] as [string, any];
     expect(url).toBe('/api/collect');
     expect(opts.method).toBe('POST');
     expect(opts.headers['Content-Type']).toBe('application/json');
