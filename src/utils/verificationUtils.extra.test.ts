@@ -1,4 +1,4 @@
-import * as turf from '@turf/turf';
+import { polygon as turfPolygon } from '@turf/turf';
 import {
   analyzeVerification,
   calculatePOD,
@@ -9,7 +9,7 @@ import {
 describe('verificationUtils', () => {
   test('analyzeVerification counts hits and byRiskLevel correctly', () => {
     // Create a small square polygon that contains the report point
-    const polygon = turf.polygon([[[-97.21, 33.49], [-97.19, 33.49], [-97.19, 33.51], [-97.21, 33.51], [-97.21, 33.49]]]);
+    const polygon = turfPolygon([[[-97.21, 33.49], [-97.19, 33.49], [-97.19, 33.51], [-97.21, 33.51], [-97.21, 33.49]]]);
 
     const outlooks = {
       categorical: new Map([['ENH', [polygon]]]),

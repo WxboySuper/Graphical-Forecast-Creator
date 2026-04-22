@@ -52,7 +52,7 @@ describe('addTilesAndWait', () => {
           setTimeout(() => mapInstance._layer?.fire('tileload'), 20);
         }
       } catch {
-        void 0;
+        undefined;
       }
     }, 20);
 

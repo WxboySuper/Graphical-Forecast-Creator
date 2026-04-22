@@ -19,7 +19,7 @@ describe('outlookUtils', () => {
   });
 
   test('getHighestCategoricalRisk picks highest', () => {
-    const h = getHighestCategoricalRisk('2%', '5%', '5%');
-    expect(h).toBe('MRGL');
+    const highest = getHighestCategoricalRisk('2%', '5%', '5%');
+    expect(highest).toBe('MRGL');
   });
 });
