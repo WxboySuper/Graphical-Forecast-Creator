@@ -1,0 +1,288 @@
+PASS src/AppPerformance.test.tsx
+  ΓùÅ Console
+
+    console.error
+      Warning: Function components cannot be given refs. Attempts to access this ref will fail. Did you mean to use React.forwardRef()?
+      
+      Check the render method of `ForecastTabbedToolbarLayout`.
+          at ForecastMapMock
+          at div
+          at div
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\@radix-ui+react-context@1.1_8dbf27309bf9e46c2a345c1f72d59997\node_modules\@radix-ui\react-context\src\create-context.tsx:59:15)
+          at TooltipProvider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\@radix-ui+react-tooltip@1.2_cd76a178f1e730b8718a38f14e84fadc\node_modules\@radix-ui\react-tooltip\src\tooltip.tsx:68:5)
+          at controller (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\components\ForecastWorkspace\ForecastWorkspaceLayouts.tsx:13:87)
+          at div
+          at ForecastPage (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\pages\ForecastPage.tsx:1230:31)
+          at basenameProp (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-router@7.13.2_react-d_5aa9dd8fca2581c765354ffbf9144e38\node_modules\react-router\dist\development\chunk-GO74ODU3.js:9476:13)
+          at basename (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-router@7.13.2_react-d_5aa9dd8fca2581c765354ffbf9144e38\node_modules\react-router\dist\development\chunk-HPFFRPKK.js:272:3)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+
+      94 |
+      95 |   it('does NOT re-render children when unrelated state changes (Optimized)', () => {
+    > 96 |     render(
+         |           ^
+      97 |       <Provider store={store}>
+      98 |         <BrowserRouter>
+      99 |           <ForecastPage />
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at validateFunctionComponentInDev (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:20222:9)
+      at mountIndeterminateComponent (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:20189:7)
+      at beginWork (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:21626:16)
+      at beginWork$1 (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27465:14)
+      at performUnitOfWork (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26599:12)
+      at workLoopSync (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26505:5)
+      at renderRootSync (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26473:7)
+      at performConcurrentWorkOnRoot (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25777:74)
+      at flushActQueue (node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react.development.js:2582:11)
+      at node_modules/.pnpm/@testing-library+react@16.3_c2ecd43195fe6d7782b7a841e46e4302/node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/.pnpm/@testing-library+react@16.3_c2ecd43195fe6d7782b7a841e46e4302/node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/.pnpm/@testing-library+react@16.3_c2ecd43195fe6d7782b7a841e46e4302/node_modules/@testing-library/react/dist/pure.js:291:10)
+      at Object.<anonymous> (src/AppPerformance.test.tsx:96:11)
+
+PASS src/hooks/__tests__/useAutoCategorical.test.ts
+PASS src/App.test.tsx
+  ΓùÅ Console
+
+    console.error
+      Warning: An update to AuthProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+          at children (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\auth\AuthProvider.tsx:1317:73)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+          at useLaunchGate (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\App.tsx:154:22)
+
+      459 |
+      460 |     if (!resp.ok) {
+    > 461 |       setStatus('signed_out');
+          |       ^
+      462 |       setSettingsSyncStatus('idle');
+      463 |       setUser(null);
+      464 |       setSyncedSettings(null);
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27628:9)
+      at scheduleUpdateOnFiber (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25547:5)
+      at dispatchSetState (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:16708:7)
+      at setStatus (src/auth/AuthProvider.tsx:461:7)
+
+    console.error
+      Warning: An update to AuthProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+          at children (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\auth\AuthProvider.tsx:1317:73)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+          at useLaunchGate (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\App.tsx:154:22)
+
+      460 |     if (!resp.ok) {
+      461 |       setStatus('signed_out');
+    > 462 |       setSettingsSyncStatus('idle');
+          |       ^
+      463 |       setUser(null);
+      464 |       setSyncedSettings(null);
+      465 |       setBetaAccess(false);
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27628:9)
+      at scheduleUpdateOnFiber (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25547:5)
+      at dispatchSetState (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:16708:7)
+      at setSettingsSyncStatus (src/auth/AuthProvider.tsx:462:7)
+
+    console.error
+      Warning: An update to AuthProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+          at children (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\auth\AuthProvider.tsx:1317:73)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+          at useLaunchGate (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\App.tsx:154:22)
+
+      461 |       setStatus('signed_out');
+      462 |       setSettingsSyncStatus('idle');
+    > 463 |       setUser(null);
+          |       ^
+      464 |       setSyncedSettings(null);
+      465 |       setBetaAccess(false);
+      466 |       setBetaAccessLoading(false);
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27628:9)
+      at scheduleUpdateOnFiber (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25547:5)
+      at dispatchSetState (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:16708:7)
+      at setUser (src/auth/AuthProvider.tsx:463:7)
+
+    console.error
+      Warning: An update to AuthProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+          at children (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\auth\AuthProvider.tsx:1317:73)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+          at useLaunchGate (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\App.tsx:154:22)
+
+      462 |       setSettingsSyncStatus('idle');
+      463 |       setUser(null);
+    > 464 |       setSyncedSettings(null);
+          |       ^
+      465 |       setBetaAccess(false);
+      466 |       setBetaAccessLoading(false);
+      467 |       setError(null);
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27628:9)
+      at scheduleUpdateOnFiber (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25547:5)
+      at dispatchSetState (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:16708:7)
+      at setSyncedSettings (src/auth/AuthProvider.tsx:464:7)
+
+    console.error
+      Warning: An update to AuthProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+          at children (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\auth\AuthProvider.tsx:1317:73)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+          at useLaunchGate (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\App.tsx:154:22)
+
+      463 |       setUser(null);
+      464 |       setSyncedSettings(null);
+    > 465 |       setBetaAccess(false);
+          |       ^
+      466 |       setBetaAccessLoading(false);
+      467 |       setError(null);
+      468 |       return;
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27628:9)
+      at scheduleUpdateOnFiber (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25547:5)
+      at dispatchSetState (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:16708:7)
+      at setBetaAccess (src/auth/AuthProvider.tsx:465:7)
+
+    console.error
+      Warning: An update to AuthProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+          at children (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\auth\AuthProvider.tsx:1317:73)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+          at useLaunchGate (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\App.tsx:154:22)
+
+      464 |       setSyncedSettings(null);
+      465 |       setBetaAccess(false);
+    > 466 |       setBetaAccessLoading(false);
+          |       ^
+      467 |       setError(null);
+      468 |       return;
+      469 |     }
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27628:9)
+      at scheduleUpdateOnFiber (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25547:5)
+      at dispatchSetState (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:16708:7)
+      at setBetaAccessLoading (src/auth/AuthProvider.tsx:466:7)
+
+    console.error
+      Warning: An update to AuthProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+          at children (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\auth\AuthProvider.tsx:1317:73)
+          at Provider (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\node_modules\.pnpm\react-redux@9.2.0_@types+re_90324765f5860264fa45467b853655d7\node_modules\react-redux\src\components\Provider.tsx:60:11)
+          at useLaunchGate (C:\Users\super\Documents\projects\Graphical-Forecast-Creator\src\App.tsx:154:22)
+
+      465 |       setBetaAccess(false);
+      466 |       setBetaAccessLoading(false);
+    > 467 |       setError(null);
+          |       ^
+      468 |       return;
+      469 |     }
+      470 |
+
+      at printWarning (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:86:30)
+      at error (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:60:7)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27628:9)
+      at scheduleUpdateOnFiber (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25547:5)
+      at dispatchSetState (node_modules/.pnpm/react-dom@18.3.1_react@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:16708:7)
+      at setError (src/auth/AuthProvider.tsx:467:7)
+
+PASS src/components/ForecastWorkspace/ForecastWorkspaceLayouts.test.tsx
+PASS src/pages/AccountPage.test.tsx
+PASS src/components/IntegratedToolbar/IntegratedToolbar.test.tsx
+PASS src/store/forecastSlice.test.ts
+PASS src/pages/DiscussionPage.test.tsx
+PASS src/pages/AdminPage.test.tsx
+PASS src/components/DrawingTools/DrawingTools.test.tsx
+PASS src/pages/PricingPage.test.tsx
+PASS src/pages/ForecastPage.test.tsx
+PASS src/pages/home/HomeHero.test.tsx
+PASS src/pages/BetaInvitePage.test.tsx
+PASS src/pages/BetaLandingPage.test.tsx
+PASS src/components/Map/ForecastMapPerformance.test.tsx
+PASS src/components/Beta/BetaAccessGuard.test.tsx
+PASS src/utils/domUtils.test.ts
+PASS src/utils/exportUtils.test.ts
+PASS src/utils/forecastUiVariant.test.ts
+PASS src/lib/betaAccess.test.ts
+PASS src/store/overlaysSlice.test.ts
+----------|---------|----------|---------|---------|-------------------
+File      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+----------|---------|----------|---------|---------|-------------------
+All files |       0 |        0 |       0 |       0 |                   
+----------|---------|----------|---------|---------|-------------------
+
+Test Suites: 22 passed, 22 total
+Tests:       67 passed, 67 total
+Snapshots:   0 total
+Time:        7.188 s, estimated 12 s
+Ran all test suites.

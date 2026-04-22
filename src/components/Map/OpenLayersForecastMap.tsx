@@ -103,7 +103,7 @@ const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
 ]);
 
 // Helper to convert hex/rgb/hsl color strings to rgba with specified alpha
-const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
+export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
   if (!color) {
     return `rgba(255, 255, 255, ${alpha})`;
   }
@@ -132,7 +132,7 @@ const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
 };
 
 // Create canvas pattern for CIG hatching
-const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | null => {
+export const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | null => {
   const canvas = document.createElement('canvas');
   const size = 10;
   canvas.width = size;
@@ -172,12 +172,12 @@ const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | nu
 };
 
 /** Returns the fill opacity for a feature or a sensible fallback when a style omitted it. */
-const resolveFillOpacity = ({ fillOpacity }: FillOpacityInput): number => {
+export const resolveFillOpacity = ({ fillOpacity }: FillOpacityInput): number => {
   return typeof fillOpacity === 'number' ? fillOpacity : 0.25;
 };
 
 /** Builds an OL Fill for a given probability: solid rgba fill for standard outlooks, or a CIG hatching CanvasPattern for CIG levels. */
-const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInput): Fill => {
+export const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInput): Fill => {
   if (!probability.startsWith('CIG')) {
     return new Fill({ color: toRgbaColor({ color: fillColor, alpha: fillOpacity }) });
   }
@@ -191,13 +191,13 @@ const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInp
 };
 
 /** Returns the stroke width: 3px for the top (selected) layer, the numeric weight value otherwise, or 2 as default. */
-const resolveStrokeWidth = ({ weight, isTopLayer }: StrokeWidthInput): number => {
+export const resolveStrokeWidth = ({ weight, isTopLayer }: StrokeWidthInput): number => {
   if (isTopLayer) return 3;
   return typeof weight === 'number' ? weight : 2;
 };
 
 /** Extracts the featureId, outlookType, and probability properties from an OL feature, returning null if any are missing. */
-const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null => {
+export const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null => {
   const featureId = feature.get('featureId') as string | undefined;
   const outlookType = feature.get('outlookType') as string | undefined;
   const probability = feature.get('probability') as string | undefined;
@@ -210,7 +210,7 @@ const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null => {
 };
 
 /** Converts an OL feature back to a GeoJSON Feature object with current projection, enriched with Redux state properties. Returns null if identity or geometry cannot be extracted. */
-const toUpdatedGeoJsonFeature = (
+export const toUpdatedGeoJsonFeature = (
   feature: FeatureLike,
   format: GeoJSON,
   includeDerivedFrom: boolean
@@ -240,7 +240,7 @@ const toUpdatedGeoJsonFeature = (
 };
 
 /** Iterates over a FeatureLike array and calls setStyle on each, guarding against RenderFeature instances that lack the method. */
-const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
+export const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
   features.forEach((feature) => {
     if ('setStyle' in feature && typeof feature.setStyle === 'function') {
       feature.setStyle(style);
@@ -249,7 +249,7 @@ const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
 };
 
 /** Replaces all layers in the target group with the current layers from the source group. */
-const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+export const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
   const targetLayers = target.getLayers();
   targetLayers.clear();
   source.getLayers().getArray().forEach((layer) => {
@@ -258,7 +258,7 @@ const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
 };
 
 /** Loads GeoJSON features into a blank-basemap VectorSource if not already populated, using an in-memory cache to avoid repeated network requests. */
-const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
+export const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
   if (config.isLoaded()) return;
 
   let geoJson = config.getCache();
@@ -283,12 +283,12 @@ const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
 };
 
 /** Returns true if the given outlook type string is one of the user-editable types defined in DRAWABLE_OUTLOOK_TYPES. */
-const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolean => {
+export const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolean => {
   return DRAWABLE_OUTLOOK_TYPES.has(outlookType as EditableOutlookType);
 };
 
 // Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
-const toOlStyle = (
+export const toOlStyle = (
   selection: OutlookSelection,
   options: LayerStyleOptions = {}
 ) => {
@@ -318,7 +318,7 @@ const toOlStyle = (
 };
 
 /** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
-const toGhostOlStyle = (
+export const toGhostOlStyle = (
   { outlookType, probability, isCategorical }: GhostSelection
 ) => {
   const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
@@ -374,7 +374,7 @@ const BLANK_LAND_OUTLINE_STYLE = new Style({
 });
 
 // Creates a labels/places overlay source so cities and boundaries stay readable above polygons.
-const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
+export const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
   switch (style) {
     case 'osm':
       return new XYZ({
@@ -410,7 +410,7 @@ const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | 
 };
 
 // Helper to create tile source based on selected base map style
-const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
+export const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   switch (style) {
     case 'osm':
       return new XYZ({
@@ -451,7 +451,7 @@ const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
 const OVERLAY_HIDDEN_POSITION: Parameters<Overlay['setPosition']>[0] = undefined;
 
 /** Hides an OpenLayers Overlay by clearing its map position. */
-const hideOverlay = (overlay: Overlay): void => {
+export const hideOverlay = (overlay: Overlay): void => {
   overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 

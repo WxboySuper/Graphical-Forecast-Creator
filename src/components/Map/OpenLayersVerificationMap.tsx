@@ -58,7 +58,7 @@ const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
 
 /** Replaces all layers in the target group with the current layers from the source group. */
-const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+export const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
   const targetLayers = target.getLayers();
   targetLayers.clear();
   source.getLayers().getArray().forEach((layer) => {
@@ -150,7 +150,7 @@ const createVerificationLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blan
 };
 
 // Function to create tile source based on selected base map style for verification map
-const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
+export const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   switch (style) {
     case 'osm':
       return new XYZ({
@@ -186,7 +186,7 @@ const createVerifTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ
 };
 
 // Function to create a hatch pattern for CIG overlays based on the CIG level
-const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
+export const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   const canvas = document.createElement('canvas');
   const size = 10;
   canvas.width = size;
@@ -234,37 +234,37 @@ const TRANSPARENT_PATTERN_FILL = 'rgba(0,0,0,0)';
 const CIG_STROKE_COLOR = '#111111';
 const CIG_STROKE_WIDTH = 1.2;
 /** Returns true if the color string uses a CSS function notation like rgb(), rgba(), hsl(), or hsla(). */
-const isFunctionColorNotation = (color: string): boolean => {
+export const isFunctionColorNotation = (color: string): boolean => {
   return FUNCTION_COLOR_NOTATION_REGEX.test(color);
 };
 
 /** Returns `value` as a number if it already is one, otherwise returns `fallback`. */
-const coerceNumber = (value: unknown, fallback: number): number => {
+export const coerceNumber = (value: unknown, fallback: number): number => {
   return typeof value === 'number' ? value : fallback;
 };
 
 /** Resolves fill opacity from the style payload, defaulting to 0.25 when missing. */
-const resolveFillOpacity = (_outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
+export const resolveFillOpacity = (_outlookType: VerificationOutlookType, fillOpacity: unknown): number => {
   return coerceNumber(fillOpacity, 0.25);
 };
 
 /** Returns the stroke opacity as a number, defaulting to 1 if the value is not numeric. */
-const resolveStrokeOpacity = (opacity: unknown): number => {
+export const resolveStrokeOpacity = (opacity: unknown): number => {
   return coerceNumber(opacity, 1);
 };
 
 /** Returns the stroke width as a number, defaulting to 2 if the value is not numeric. */
-const resolveStrokeWidth = (weight: unknown): number => {
+export const resolveStrokeWidth = (weight: unknown): number => {
   return coerceNumber(weight, 2);
 };
 
 /** Returns true if the probability string begins with the CIG prefix, indicating a ceiling-opacity level. */
-const isCigProbability = (probability: string): boolean => {
+export const isCigProbability = (probability: string): boolean => {
   return probability.startsWith(CIG_PREFIX);
 };
 
 /** Computes the rendering z-index for verification features: CIG overlays use a high-based rank; regular probabilities use the shared computeZIndex utility. */
-const getVerificationStyleZIndex = ({ outlookType, probability }: OutlookStyleDescriptor): number => {
+export const getVerificationStyleZIndex = ({ outlookType, probability }: OutlookStyleDescriptor): number => {
   const regularZ = computeZIndex(outlookType as VerificationOutlookType, probability);
   const cigRank = parseInt(probability.replace(CIG_PREFIX, ''), 10) || 0;
   const cigZ = 1000 + cigRank;
@@ -275,7 +275,7 @@ const getVerificationStyleZIndex = ({ outlookType, probability }: OutlookStyleDe
 };
 
 /** Builds the OL fill and stroke style parts for a CIG probability level using a canvas hatch pattern. */
-const buildCigStyleParts = (probability: string) => {
+export const buildCigStyleParts = (probability: string) => {
   const hatchFill = createHatchPattern(probability) ?? TRANSPARENT_PATTERN_FILL;
 
   return {
@@ -288,7 +288,7 @@ const buildCigStyleParts = (probability: string) => {
 };
 
 // Utility function to convert hex or named colors to RGBA format with specified alpha for OpenLayers styles
-const toRgbaColor = ({ color, alpha }: ColorWithOpacity): string => {
+export const toRgbaColor = ({ color, alpha }: ColorWithOpacity): string => {
   if (!color) {
     return `rgba(255,255,255,${alpha})`;
   }
@@ -313,12 +313,12 @@ const toRgbaColor = ({ color, alpha }: ColorWithOpacity): string => {
 };
 
 /** Creates an OL Fill with an rgba color derived from the given hex/rgb color and alpha value. */
-const createStandardFill = ({ color, alpha }: ColorWithOpacity): Fill => {
+export const createStandardFill = ({ color, alpha }: ColorWithOpacity): Fill => {
   return new Fill({ color: toRgbaColor({ color, alpha }) });
 };
 
 /** Creates a standard OpenLayers Stroke from a color, opacity, and width descriptor. */
-const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stroke => {
+export const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stroke => {
   return new Stroke({
     color: toRgbaColor({ color, alpha: opacity }),
     width
@@ -326,7 +326,7 @@ const createStandardStroke = ({ color, opacity, width }: StrokeDescriptor): Stro
 };
 
 // Function to build OpenLayers style for a given feature based on its outlook type and probability,
-const buildStyle = (
+export const buildStyle = (
   { outlookType, probability }: OutlookStyleDescriptor
 ) => {
   const style = getFeatureStyle(outlookType as VerificationOutlookType, probability);

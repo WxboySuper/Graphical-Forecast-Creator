@@ -1,0 +1,177 @@
+[
+  {
+    "file": "src\\/src\\components\\Map\\OpenLayersForecastMap.tsx",
+    "total": 1279,
+    "covered": 0,
+    "missing": 1279,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\Map\\OpenLayersVerificationMap.tsx",
+    "total": 801,
+    "covered": 0,
+    "missing": 801,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\auth\\AuthProvider.tsx",
+    "total": 1332,
+    "covered": 544,
+    "missing": 788,
+    "pct": 40.84
+  },
+  {
+    "file": "src\\/src\\utils\\exportUtils.ts",
+    "total": 758,
+    "covered": 146,
+    "missing": 612,
+    "pct": 19.26
+  },
+  {
+    "file": "src\\/src\\pages\\CloudLibraryPage.tsx",
+    "total": 749,
+    "covered": 216,
+    "missing": 533,
+    "pct": 28.83
+  },
+  {
+    "file": "src\\/src\\hooks\\useCloudCycles.ts",
+    "total": 567,
+    "covered": 89,
+    "missing": 478,
+    "pct": 15.69
+  },
+  {
+    "file": "src\\/src\\components\\DiscussionEditor\\DiscussionEditor.tsx",
+    "total": 458,
+    "covered": 0,
+    "missing": 458,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\Verification\\VerificationPanel.tsx",
+    "total": 453,
+    "covered": 0,
+    "missing": 453,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\lib\\cloudCyclesService.ts",
+    "total": 615,
+    "covered": 191,
+    "missing": 424,
+    "pct": 31.05
+  },
+  {
+    "file": "src\\/src\\components\\VerificationMode\\VerificationMode.tsx",
+    "total": 422,
+    "covered": 0,
+    "missing": 422,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\pages\\ForecastPage.tsx",
+    "total": 1278,
+    "covered": 871,
+    "missing": 407,
+    "pct": 68.15
+  },
+  {
+    "file": "src\\/src\\components\\CycleManager\\CycleHistoryModal.tsx",
+    "total": 332,
+    "covered": 0,
+    "missing": 332,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\Toolbar\\ToolbarPanel.tsx",
+    "total": 327,
+    "covered": 0,
+    "missing": 327,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\Documentation\\DocumentationContent.tsx",
+    "total": 298,
+    "covered": 0,
+    "missing": 298,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\CycleManager\\CopyFromPreviousModal.tsx",
+    "total": 254,
+    "covered": 0,
+    "missing": 254,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\DaySelector\\DaySelectorPanel.tsx",
+    "total": 250,
+    "covered": 0,
+    "missing": 250,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\pages\\HomePage.tsx",
+    "total": 244,
+    "covered": 0,
+    "missing": 244,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\utils\\verificationUtils.ts",
+    "total": 239,
+    "covered": 0,
+    "missing": 239,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\CloudCycleManager\\CloudSaveLoadModals.tsx",
+    "total": 327,
+    "covered": 89,
+    "missing": 238,
+    "pct": 27.21
+  },
+  {
+    "file": "src\\/src\\pages\\home\\MainGrid.tsx",
+    "total": 229,
+    "covered": 0,
+    "missing": 229,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\types\\outlooks.ts",
+    "total": 221,
+    "covered": 0,
+    "missing": 221,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\utils\\fileUtils.ts",
+    "total": 265,
+    "covered": 58,
+    "missing": 207,
+    "pct": 21.88
+  },
+  {
+    "file": "src\\/src\\components\\OutlookSelector\\OutlookSelectorPanel.tsx",
+    "total": 191,
+    "covered": 0,
+    "missing": 191,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\utils\\stormReportParser.ts",
+    "total": 187,
+    "covered": 0,
+    "missing": 187,
+    "pct": 0
+  },
+  {
+    "file": "src\\/src\\components\\IntegratedToolbar\\IntegratedToolbar.tsx",
+    "total": 1071,
+    "covered": 887,
+    "missing": 184,
+    "pct": 82.81
+  }
+]
