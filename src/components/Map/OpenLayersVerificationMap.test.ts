@@ -21,6 +21,20 @@ jest.mock('../../utils/mapStyleUtils', () => ({
 }));
 
 import * as mod from './OpenLayersVerificationMap';
+import { createCanvasStub } from '../../testUtils';
+
+type DescriptorStub = {
+  outlookType: 'categorical' | 'tornado' | 'wind' | 'hail';
+  probability: string;
+};
+
+type LayerGroupLike = {
+  getLayers: () => {
+    clear: () => void;
+    push: (layer: unknown) => void;
+    getArray?: () => unknown[];
+  };
+};
 
 describe('OpenLayersVerificationMap helpers', () => {
   let originalCreateElement: typeof document.createElement;
@@ -45,22 +59,7 @@ describe('OpenLayersVerificationMap helpers', () => {
 
   test('createHatchPattern returns a pattern when canvas context exists', () => {
     // Stub document.createElement('canvas') to provide a 2D context with createPattern
-    document.createElement = ((tag: string) => {
-      if (tag === 'canvas') {
-        const canvas: any = { width: 10, height: 10 };
-        canvas.getContext = () => ({
-          strokeStyle: '',
-          lineWidth: 0,
-          beginPath: () => {},
-          moveTo: () => {},
-          lineTo: () => {},
-          stroke: () => {},
-          createPattern: () => 'pattern-object',
-        });
-        return canvas as unknown as HTMLElement;
-      }
-      return originalCreateElement.call(document, tag);
-    }) as typeof document.createElement;
+    document.createElement = createCanvasStub(originalCreateElement);
 
     const pattern = mod.createHatchPattern('CIG1');
     expect(pattern).toBeTruthy();
@@ -86,29 +85,14 @@ describe('OpenLayersVerificationMap helpers', () => {
     expect(mod.isCigProbability('CIG1')).toBe(true);
     expect(mod.isCigProbability('P10')).toBe(false);
     // Non-CIG uses computeZIndex mock (42)
-    expect(mod.getVerificationStyleZIndex({ outlookType: 'categorical' as any, probability: 'P10' })).toBe(42);
+    expect(mod.getVerificationStyleZIndex({ outlookType: 'categorical', probability: 'P10' })).toBe(42);
     // CIG returns 1000 + rank
-    expect(mod.getVerificationStyleZIndex({ outlookType: 'categorical' as any, probability: 'CIG3' })).toBe(1003);
+    expect(mod.getVerificationStyleZIndex({ outlookType: 'categorical', probability: 'CIG3' })).toBe(1003);
   });
 
   test('buildCigStyleParts returns fill and stroke', () => {
     // Stub canvas for pattern
-    document.createElement = ((tag: string) => {
-      if (tag === 'canvas') {
-        const canvas: any = { width: 10, height: 10 };
-        canvas.getContext = () => ({
-          strokeStyle: '',
-          lineWidth: 0,
-          beginPath: () => {},
-          moveTo: () => {},
-          lineTo: () => {},
-          stroke: () => {},
-          createPattern: () => 'pattern-object',
-        });
-        return canvas as unknown as HTMLElement;
-      }
-      return originalCreateElement.call(document, tag);
-    }) as typeof document.createElement;
+    document.createElement = createCanvasStub(originalCreateElement);
 
     const parts = mod.buildCigStyleParts('CIG2');
     expect(parts.fill).toBeTruthy();
@@ -123,36 +107,21 @@ describe('OpenLayersVerificationMap helpers', () => {
   });
 
   test('buildStyle returns an OpenLayers Style object for CIG and non-CIG', () => {
-    const s1 = mod.buildStyle({ outlookType: 'categorical' as any, probability: 'P10' });
+    const s1: unknown = mod.buildStyle({ outlookType: 'categorical', probability: 'P10' });
     expect(s1).toBeTruthy();
     // For CIG probability
     // Stub canvas for pattern used by CIG branch
-    document.createElement = ((tag: string) => {
-      if (tag === 'canvas') {
-        const canvas: any = { width: 10, height: 10 };
-        canvas.getContext = () => ({
-          strokeStyle: '',
-          lineWidth: 0,
-          beginPath: () => {},
-          moveTo: () => {},
-          lineTo: () => {},
-          stroke: () => {},
-          createPattern: () => 'pattern-object',
-        });
-        return canvas as unknown as HTMLElement;
-      }
-      return originalCreateElement.call(document, tag);
-    }) as typeof document.createElement;
+    document.createElement = createCanvasStub(originalCreateElement);
 
-    const s2 = mod.buildStyle({ outlookType: 'categorical' as any, probability: 'CIG1' });
+    const s2: unknown = mod.buildStyle({ outlookType: 'categorical', probability: 'CIG1' });
     expect(s2).toBeTruthy();
   });
 
   test('replaceLayerGroupLayers copies layers from source to target via layer containers', () => {
-    const pushed: any[] = [];
-    const target = { getLayers: () => ({ clear: () => (pushed.length = 0), push: (l: any) => pushed.push(l) }) };
-    const source = { getLayers: () => ({ getArray: () => ['a', 'b'] }) };
-    mod.replaceLayerGroupLayers(target as any, source as any);
+    const pushed: unknown[] = [];
+    const target: LayerGroupLike = { getLayers: () => ({ clear: () => { pushed.length = 0; }, push: (layer: unknown) => pushed.push(layer) }) };
+    const source: LayerGroupLike = { getLayers: () => ({ clear: () => undefined, push: () => undefined, getArray: () => ['a', 'b'] }) };
+    mod.replaceLayerGroupLayers(target as never, source as never);
     expect(pushed).toEqual(['a', 'b']);
   });
 

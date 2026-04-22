@@ -6,7 +6,7 @@ afterEach(() => {
 });
 
 // Mock html2canvas to call the onclone callback so onclone logic in captureContainer runs
-jest.doMock('html2canvas', () => jest.fn(async (container: any, opts: any) => {
+jest.doMock('html2canvas', () => jest.fn(async (_container: unknown, opts: { onclone?: (doc: Document) => void } | undefined) => {
   if (opts && typeof opts.onclone === 'function') {
     // call onclone with document as the cloned document for simplicity
     opts.onclone(document);
@@ -46,7 +46,11 @@ describe('captureContainer onclone behavior', () => {
     expect(holder!.querySelector('#test-def')).toBeTruthy();
 
     // cleanup
-    try { document.body.removeChild(container); } catch {}
-    try { document.body.removeChild(svg); } catch {}
+    if (container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
+    if (svg.parentNode) {
+      svg.parentNode.removeChild(svg);
+    }
   });
 });

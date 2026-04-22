@@ -1,8 +1,29 @@
 import { compileDiscussionToText, exportDiscussionToFile } from './discussionUtils';
 
+type Discussion = {
+  mode: 'guided' | 'diy';
+  guidedContent?: {
+    synopsis?: string;
+    meteorologicalSetup?: string;
+    severeWeatherExpectations?: string;
+    timing?: string;
+    regionalBreakdown?: string;
+    additionalConsiderations?: string;
+  };
+  diyContent?: string;
+  validStart: string;
+  validEnd: string;
+  forecasterName: string;
+};
+
+type UrlWithBlobHelpers = typeof URL & {
+  createObjectURL: jest.Mock<string, [Blob]>;
+  revokeObjectURL: jest.Mock<void, [string]>;
+};
+
 describe('discussionUtils extra', () => {
   test('compile guided discussion includes all sections', () => {
-    const discussion: any = {
+    const discussion: Discussion = {
       mode: 'guided',
       guidedContent: {
         synopsis: 'SYN',
@@ -33,10 +54,8 @@ describe('discussionUtils extra', () => {
     expect(text).toContain('Forecaster: Zoe');
   });
 
-  test('exportDiscussionToFile creates and clicks download link', async () => {
-    jest.resetModules();
-
-    const discussion: any = {
+  test('exportDiscussionToFile creates and clicks download link', () => {
+    const discussion: Discussion = {
       mode: 'diy',
       diyContent: 'txt',
       validStart: new Date().toISOString(),
@@ -44,22 +63,23 @@ describe('discussionUtils extra', () => {
       forecasterName: 'Zoe'
     };
 
-    // Prepare a real anchor element and spy click
     const origCreate = document.createElement.bind(document);
     const createdLink = origCreate('a') as HTMLAnchorElement;
     const clickMock = jest.fn();
-    createdLink.click = clickMock as any;
+    createdLink.click = clickMock as () => void;
     const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : origCreate(tagName));
 
-    (global as any).URL = Object.assign((global as any).URL || {}, { createObjectURL: jest.fn(() => 'blob:url'), revokeObjectURL: jest.fn() });
-    const createSpy = (global as any).URL.createObjectURL as jest.Mock;
-    const revokeSpy = (global as any).URL.revokeObjectURL as jest.Mock;
+    const urlHelpers = Object.assign((globalThis.URL || URL) as URL, {
+      createObjectURL: jest.fn(() => 'blob:url'),
+      revokeObjectURL: jest.fn()
+    }) as UrlWithBlobHelpers;
+    globalThis.URL = urlHelpers;
 
     exportDiscussionToFile(discussion, 3);
 
     expect(clickMock).toHaveBeenCalled();
-    expect(createSpy).toHaveBeenCalled();
-    expect(revokeSpy).toHaveBeenCalled();
+    expect(urlHelpers.createObjectURL).toHaveBeenCalled();
+    expect(urlHelpers.revokeObjectURL).toHaveBeenCalled();
 
     spy.mockRestore();
   });

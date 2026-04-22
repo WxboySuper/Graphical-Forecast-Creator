@@ -3,22 +3,28 @@ jest.setTimeout(10000);
 afterEach(() => {
   jest.resetModules();
   jest.restoreAllMocks();
-  try { delete (global as any).fetch; } catch {}
+  Reflect.deleteProperty(globalThis as typeof globalThis & { fetch?: unknown }, 'fetch');
 });
 
 describe('exportUtils additional unit tests', () => {
+  type MapWithLifecycle = {
+    getContainer?: () => HTMLElement;
+    once: (event: string, cb: () => void) => void;
+    added?: unknown[];
+  };
+
   test('waitForMapSettleGeneric resolves for Leaflet-like map', async () => {
     jest.resetModules();
     jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
     const { waitForMapSettleGeneric } = await import('./exportUtils');
 
-    const fakeLeafletMap: any = {
+    const fakeLeafletMap: MapWithLifecycle = {
       getContainer: () => document.createElement('div'),
       getBounds: () => ({ /* bounds placeholder */ }),
       once: (event: string, cb: () => void) => { cb(); }
     };
 
-    await expect(waitForMapSettleGeneric(fakeLeafletMap, 500)).resolves.toBeUndefined();
+    await expect(waitForMapSettleGeneric(fakeLeafletMap as never, 500)).resolves.toBeUndefined();
   });
 
   test('waitForMapSettleGeneric resolves for non-Leaflet map with rendercomplete', async () => {
@@ -26,11 +32,11 @@ describe('exportUtils additional unit tests', () => {
     jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
     const { waitForMapSettleGeneric } = await import('./exportUtils');
 
-    const fake: any = {
+    const fake: MapWithLifecycle = {
       once: (event: string, cb: () => void) => setTimeout(cb, 10)
     };
 
-    await expect(waitForMapSettleGeneric(fake, 500)).resolves.toBeUndefined();
+    await expect(waitForMapSettleGeneric(fake as never, 500)).resolves.toBeUndefined();
   });
 
   test('waitForImagesLoaded resolves when images load', async () => {
@@ -83,9 +89,9 @@ describe('exportUtils additional unit tests', () => {
     sourceContainer.className = 'map-container';
     sourceContainer.appendChild(legend);
 
-    const fakeMap: any = { getContainer: () => sourceContainer };
+    const fakeMap = { getContainer: () => sourceContainer };
 
-    cloneLegendAndStatusOverlays(fakeMap, exportContainer);
+    cloneLegendAndStatusOverlays(fakeMap as never, exportContainer);
 
     const appended = exportContainer.querySelector('.map-legend');
     expect(appended).toBeTruthy();
@@ -107,8 +113,8 @@ describe('exportUtils additional unit tests', () => {
     Object.defineProperty(outer, 'clientWidth', { value: 200, configurable: true });
     Object.defineProperty(outer, 'clientHeight', { value: 150, configurable: true });
 
-    const mapLike: any = { getContainer: () => mapContainer };
-    const res = getExportRootAndSize(mapLike);
+    const mapLike = { getContainer: () => mapContainer };
+    const res = getExportRootAndSize(mapLike as never);
     expect(res.exportRoot).toBe(outer);
     expect(res.width).toBe(200);
     expect(res.height).toBe(150);

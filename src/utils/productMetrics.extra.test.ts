@@ -1,19 +1,21 @@
+type FetchMock = jest.Mock<Promise<{ ok: boolean }>, [RequestInfo | URL, RequestInit?]>;
+
 describe('productMetrics extra', () => {
   test('recordProductMetric stores installation id and calls fetch', async () => {
     jest.resetModules();
     jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: true }));
 
-    (global as any).fetch = jest.fn(() => Promise.resolve({ ok: true }));
+    const fetchMock: FetchMock = jest.fn(() => Promise.resolve({ ok: true }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    // ensure no existing id
     window.localStorage.removeItem('gfcInstallationId');
 
-    const { recordProductMetric } = require('./productMetrics');
+    const { recordProductMetric } = await import('./productMetrics');
 
     await recordProductMetric({ event: 'cycle_saved' });
 
-    expect((global as any).fetch).toHaveBeenCalled();
-    const bodyStr = (global as any).fetch.mock.calls[0][1].body;
+    expect(fetchMock).toHaveBeenCalled();
+    const bodyStr = (fetchMock.mock.calls[0]?.[1] as RequestInit & { body: string }).body;
     const parsed = JSON.parse(bodyStr);
     expect(parsed.event).toBe('cycle_saved');
     expect(typeof window.localStorage.getItem('gfcInstallationId')).toBe('string');
@@ -24,14 +26,15 @@ describe('productMetrics extra', () => {
     jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: true }));
 
     const fakeUser = { getIdToken: jest.fn(() => Promise.resolve('tok-abc')) };
-    (global as any).fetch = jest.fn(() => Promise.resolve({ ok: true }));
+    const fetchMock: FetchMock = jest.fn(() => Promise.resolve({ ok: true }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    const { recordProductMetric } = require('./productMetrics');
+    const { recordProductMetric } = await import('./productMetrics');
 
     await recordProductMetric({ event: 'discussion_saved', user: fakeUser });
 
-    expect((global as any).fetch).toHaveBeenCalled();
-    const opts = (global as any).fetch.mock.calls[0][1];
+    expect(fetchMock).toHaveBeenCalled();
+    const opts = fetchMock.mock.calls[0]?.[1] as RequestInit & { headers: Record<string, string> };
     expect(opts.headers.Authorization).toBe('Bearer tok-abc');
   });
 });

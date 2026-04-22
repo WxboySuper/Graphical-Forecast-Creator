@@ -5,13 +5,19 @@ afterEach(() => {
 });
 
 describe('renderOutlooksToMap', () => {
+  type LeafletGeoJsonFeature = {
+    type: string;
+    properties: Record<string, unknown>;
+    geometry: { type: string; coordinates: number[][][] };
+  };
+
   test('renders geoJSON features onto map using mocked leaflet.geoJSON', async () => {
     jest.resetModules();
 
     // Mock leaflet.geoJSON to provide an addTo that records additions
     jest.doMock('leaflet', () => ({
-      geoJSON: (feature: any, opts: any) => ({
-        addTo: (map: any) => {
+      geoJSON: (feature: LeafletGeoJsonFeature, opts: { style?: () => unknown }) => ({
+        addTo: (map: { added?: unknown[] }) => {
           map.added = map.added || [];
           map.added.push({ feature, opts, style: opts && typeof opts.style === 'function' ? opts.style() : null });
           return { };
@@ -34,7 +40,7 @@ describe('renderOutlooksToMap', () => {
 
     const { renderOutlooksToMap } = await import('./exportUtils');
 
-    const mapInstance: any = {};
+    const mapInstance: { added?: unknown[] } = {};
 
     const feature = {
       type: 'Feature',
@@ -42,12 +48,12 @@ describe('renderOutlooksToMap', () => {
       geometry: { type: 'Polygon', coordinates: [[[0,0],[0,1],[1,1],[1,0],[0,0]]] }
     };
 
-    const outlooks: any = { categorical: new Map([['5%', [feature]]]) };
+    const outlooks = { categorical: new Map([['5%', [feature]]]) };
 
     renderOutlooksToMap(mapInstance, outlooks);
 
     expect(mapInstance.added).toBeTruthy();
     expect(mapInstance.added.length).toBeGreaterThan(0);
-    expect(mapInstance.added[0].feature).toBe(feature);
+    expect((mapInstance.added[0] as { feature: typeof feature }).feature).toBe(feature);
   });
 });

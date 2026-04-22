@@ -1,5 +1,21 @@
 jest.setTimeout(20000);
 
+type ForecastCycle = {
+  days: Record<number, {
+    day: number;
+    metadata: Record<string, unknown>;
+    data: { categorical: Map<string, unknown[]> };
+    discussion?: { text: string };
+  }>;
+  currentDay: number;
+  cycleDate: string;
+};
+
+type BlobUrlHelpers = typeof URL & {
+  createObjectURL: jest.Mock<string, [Blob]>;
+  revokeObjectURL: jest.Mock<void, [string]>;
+};
+
 afterEach(() => {
   jest.resetAllMocks();
   jest.restoreAllMocks();
@@ -10,11 +26,11 @@ describe('fileUtils extra', () => {
     jest.resetModules();
     const { cloneForecastCycle } = require('./fileUtils');
 
-    const original: any = {
+    const original: ForecastCycle = {
       days: {
         1: {
           day: 1,
-          metadata: { issueDate: 'x', validDate: 'y', issuanceTime: '0600', createdAt:'', lastModified:'', lowProbabilityOutlooks:[] },
+          metadata: { issueDate: 'x', validDate: 'y', issuanceTime: '0600', createdAt: '', lastModified: '', lowProbabilityOutlooks: [] },
           data: { categorical: new Map([['TSTM', [{ type: 'Feature' }]]]) }
         }
       },
@@ -35,22 +51,22 @@ describe('fileUtils extra', () => {
     const clickMock = jest.fn();
     const origCreate = document.createElement.bind(document);
     const createdLink = origCreate('a') as HTMLAnchorElement;
-    createdLink.click = clickMock as any;
+    createdLink.click = clickMock as () => void;
     const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : origCreate(tagName));
 
-    (global as any).URL = Object.assign((global as any).URL || {}, { createObjectURL: jest.fn(() => 'blob:url'), revokeObjectURL: jest.fn() });
-    const createSpy = (global as any).URL.createObjectURL as jest.Mock;
-    const revokeSpy = (global as any).URL.revokeObjectURL as jest.Mock;
+    const urlHelpers = Object.assign((globalThis.URL || URL) as URL, {
+      createObjectURL: jest.fn(() => 'blob:url'),
+      revokeObjectURL: jest.fn()
+    }) as BlobUrlHelpers;
+    globalThis.URL = urlHelpers;
 
-    const forecast: any = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() } } }, currentDay: 1, cycleDate: '2026-04-21' };
+    const forecast: ForecastCycle = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() } } }, currentDay: 1, cycleDate: '2026-04-21' };
 
-    exportForecastToJson(forecast, { center: [0,0], zoom: 0 });
+    exportForecastToJson(forecast, { center: [0, 0], zoom: 0 });
 
     expect(clickMock).toHaveBeenCalled();
-    expect(createSpy).toHaveBeenCalled();
+    expect(urlHelpers.createObjectURL).toHaveBeenCalled();
     spy.mockRestore();
-    createSpy.mockRestore();
-    revokeSpy.mockRestore();
   });
 
   test('downloadGfcPackage zips and triggers download with discussions', async () => {
@@ -59,36 +75,36 @@ describe('fileUtils extra', () => {
     // Mock JSZip
     jest.doMock('jszip', () => {
       return class MockJSZip {
-        files: any = {};
+        files: Record<string, string> = {};
         file(name: string, content: string) { this.files[name] = content; }
-        async generateAsync(opts: any) { return new Blob(['ZIP']); }
+        async generateAsync(_opts: unknown) { return new Blob(['ZIP']); }
       };
     });
 
     // Mock discussion compiler
-    jest.doMock('./discussionUtils', () => ({ compileDiscussionToText: (d: any, day: number) => `Discussion ${day}` }));
+    jest.doMock('./discussionUtils', () => ({ compileDiscussionToText: (_d: unknown, day: number) => `Discussion ${day}` }));
 
     const { downloadGfcPackage } = await import('./fileUtils');
 
     const clickMock = jest.fn();
     const origCreate = document.createElement.bind(document);
     const createdLink = origCreate('a') as HTMLAnchorElement;
-    createdLink.click = clickMock as any;
+    createdLink.click = clickMock as () => void;
     const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : origCreate(tagName));
 
-    (global as any).URL = Object.assign((global as any).URL || {}, { createObjectURL: jest.fn(() => 'blob:url'), revokeObjectURL: jest.fn() });
-    const createSpy = (global as any).URL.createObjectURL as jest.Mock;
-    const revokeSpy = (global as any).URL.revokeObjectURL as jest.Mock;
+    const urlHelpers = Object.assign((globalThis.URL || URL) as URL, {
+      createObjectURL: jest.fn(() => 'blob:url'),
+      revokeObjectURL: jest.fn()
+    }) as BlobUrlHelpers;
+    globalThis.URL = urlHelpers;
 
-    const forecast: any = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() }, discussion: { text: 'x' } } }, currentDay: 1, cycleDate: '2026-04-21' };
+    const forecast: ForecastCycle = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() }, discussion: { text: 'x' } } }, currentDay: 1, cycleDate: '2026-04-21' };
 
-    await downloadGfcPackage(forecast, { center: [0,0], zoom: 0 });
+    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 });
 
     expect(clickMock).toHaveBeenCalled();
-    expect(createSpy).toHaveBeenCalled();
+    expect(urlHelpers.createObjectURL).toHaveBeenCalled();
 
     spy.mockRestore();
-    createSpy.mockRestore();
-    revokeSpy.mockRestore();
   });
 });

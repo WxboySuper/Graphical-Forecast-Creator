@@ -60,7 +60,13 @@ describe('verificationUtils', () => {
       reportDetails: []
     };
 
-    const out = formatOutlookVerificationSummary('tornado', verification as any);
+    const out = formatOutlookVerificationSummary('tornado', verification as {
+      hits: number;
+      misses: number;
+      hitRate: number;
+      byRiskLevel: Record<string, { hits: number; misses: number; hitRate: number; total: number }>;
+      reportDetails: unknown[];
+    });
     expect(out.startsWith('TORNADO Verification:')).toBe(true);
     // HIGH should appear before TSTM in the text
     const hi = out.indexOf('HIGH:');

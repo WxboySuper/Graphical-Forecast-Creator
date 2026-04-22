@@ -17,6 +17,19 @@ jest.mock('ol/format/GeoJSON', () => {
 
 import * as mod from './OpenLayersForecastMap';
 
+type OverlayStub = {
+  setPosition: (position: unknown) => void;
+};
+
+type BlankLayerConfigStub = {
+  source: { addFeatures: (features: unknown[]) => void };
+  isLoaded: () => boolean;
+  url: string;
+  getCache: () => unknown | null;
+  setCache: (data: object) => void;
+  style?: unknown;
+};
+
 describe('OpenLayersForecastMap additional helpers', () => {
   const originalFetch = global.fetch;
 
@@ -34,7 +47,7 @@ describe('OpenLayersForecastMap additional helpers', () => {
     const s3 = mod.createLabelOverlaySource('esri-satellite');
     expect(s3).toBeTruthy();
 
-    expect(mod.createLabelOverlaySource('nonexistent' as any)).toBeNull();
+    expect(mod.createLabelOverlaySource('nonexistent' as never)).toBeNull();
   });
 
   test('createTileSource returns a tile source for known styles', () => {
@@ -46,15 +59,15 @@ describe('OpenLayersForecastMap additional helpers', () => {
   });
 
   test('hideOverlay clears overlay position', () => {
-    const overlay: any = { setPosition: jest.fn() };
-    mod.hideOverlay(overlay as any);
+    const overlay: OverlayStub = { setPosition: jest.fn() };
+    mod.hideOverlay(overlay as never);
     expect(overlay.setPosition).toHaveBeenCalledWith(undefined);
   });
 
   test('ensureBlankLayerLoaded returns early when already loaded', async () => {
     global.fetch = jest.fn();
 
-    const config: any = {
+    const config: BlankLayerConfigStub = {
       source: { addFeatures: jest.fn() },
       isLoaded: () => true,
       url: 'https://example.com/geo.json',
@@ -72,14 +85,14 @@ describe('OpenLayersForecastMap additional helpers', () => {
     const fakeGeo = { type: 'FeatureCollection', features: [] };
     global.fetch = jest.fn().mockResolvedValue({ json: async () => fakeGeo });
 
-    const added: any[] = [];
-    const config: any = {
-      source: { addFeatures: (f: any) => { added.push(...f); } },
+    const added: unknown[] = [];
+    const config: BlankLayerConfigStub = {
+      source: { addFeatures: (features: unknown[]) => { added.push(...features); } },
       isLoaded: () => false,
       url: 'https://example.com/geo.json',
       getCache: () => null,
       setCache: jest.fn(),
-      style: { /* any style object */ },
+      style: { /* style placeholder */ },
     };
 
     const spyApply = jest.spyOn(mod, 'applyBlankLayerStyle');

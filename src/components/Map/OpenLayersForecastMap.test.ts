@@ -21,6 +21,27 @@ jest.mock('../../utils/mapStyleUtils', () => ({
 }));
 
 import * as mod from './OpenLayersForecastMap';
+import { createCanvasStub } from '../../testUtils';
+
+type FeatureStub = {
+  get: (key: string) => unknown;
+  getGeometry: () => object | null;
+};
+
+type GeometryFormatStub = {
+  writeGeometryObject: (geometry: object, options: { dataProjection: string; featureProjection: string }) => {
+    type: string;
+    coordinates: unknown[];
+  };
+};
+
+type LayerGroupLike = {
+  getLayers: () => {
+    clear: () => void;
+    push: (layer: unknown) => void;
+    getArray?: () => unknown[];
+  };
+};
 
 describe('OpenLayersForecastMap helpers', () => {
   let originalCreateElement: typeof document.createElement;
@@ -44,23 +65,7 @@ describe('OpenLayersForecastMap helpers', () => {
   });
 
   test('createHatchPattern returns a pattern when canvas context exists', () => {
-    // Stub document.createElement('canvas') to provide a 2D context with createPattern
-    document.createElement = ((tag: string) => {
-      if (tag === 'canvas') {
-        const canvas: any = { width: 10, height: 10 };
-        canvas.getContext = () => ({
-          strokeStyle: '',
-          lineWidth: 0,
-          beginPath: () => {},
-          moveTo: () => {},
-          lineTo: () => {},
-          stroke: () => {},
-          createPattern: () => 'pattern-object',
-        });
-        return canvas as unknown as HTMLElement;
-      }
-      return originalCreateElement.call(document, tag);
-    }) as typeof document.createElement;
+    document.createElement = createCanvasStub(originalCreateElement);
 
     const pattern = mod.createHatchPattern({ cigLevel: 'CIG1' });
     expect(pattern).toBeTruthy();
@@ -78,22 +83,7 @@ describe('OpenLayersForecastMap helpers', () => {
     expect(f1).toBeTruthy();
 
     // For CIG, stub canvas like earlier
-    document.createElement = ((tag: string) => {
-      if (tag === 'canvas') {
-        const canvas: any = { width: 10, height: 10 };
-        canvas.getContext = () => ({
-          strokeStyle: '',
-          lineWidth: 0,
-          beginPath: () => {},
-          moveTo: () => {},
-          lineTo: () => {},
-          stroke: () => {},
-          createPattern: () => 'pattern-object',
-        });
-        return canvas as unknown as HTMLElement;
-      }
-      return originalCreateElement.call(document, tag);
-    }) as typeof document.createElement;
+    document.createElement = createCanvasStub(originalCreateElement);
 
     const f2 = mod.createOutlookFill({ probability: 'CIG1', fillColor: '#000000', fillOpacity: 0.5 });
     expect(f2).toBeTruthy();
@@ -106,42 +96,42 @@ describe('OpenLayersForecastMap helpers', () => {
   });
 
   test('getFeatureIdentity returns null when missing parts and otherwise returns identity', () => {
-    const okFeature: any = { get: (k: string) => ({ featureId: 'f1', outlookType: 'categorical', probability: 'P10' } as any)[k] };
+    const okFeature: FeatureStub = { get: (k: string) => ({ featureId: 'f1', outlookType: 'categorical', probability: 'P10' }[k as 'featureId' | 'outlookType' | 'probability']), getGeometry: () => null };
     expect(mod.getFeatureIdentity(okFeature)).toEqual({ featureId: 'f1', outlookType: 'categorical', probability: 'P10' });
 
-    const badFeature: any = { get: (k: string) => (k === 'featureId' ? undefined : 'x') };
+    const badFeature: FeatureStub = { get: (k: string) => (k === 'featureId' ? undefined : 'x'), getGeometry: () => null };
     expect(mod.getFeatureIdentity(badFeature)).toBeNull();
   });
 
   test('toUpdatedGeoJsonFeature returns null when identity or geometry missing and otherwise returns geojson feature', () => {
-    const featureWithNoId: any = { get: (k: string) => (k === 'featureId' ? undefined : 'x'), getGeometry: () => ({}) };
-    const formatStub: any = { writeGeometryObject: jest.fn(() => ({ type: 'Polygon', coordinates: [] })) };
+    const featureWithNoId: FeatureStub = { get: (k: string) => (k === 'featureId' ? undefined : 'x'), getGeometry: () => ({}) };
+    const formatStub: GeometryFormatStub = { writeGeometryObject: jest.fn(() => ({ type: 'Polygon', coordinates: [] })) };
     expect(mod.toUpdatedGeoJsonFeature(featureWithNoId, formatStub, false)).toBeNull();
 
-    const feature: any = {
+    const feature: FeatureStub = {
       get: (k: string) => (k === 'featureId' ? 'id123' : (k === 'outlookType' ? 'categorical' : 'P10')),
       getGeometry: () => ({ some: 'geom' }),
     };
 
     const result = mod.toUpdatedGeoJsonFeature(feature, formatStub, true);
     expect(result).toBeTruthy();
-    expect(result && (result as any).type).toBe('Feature');
-    expect((result as any).properties).toHaveProperty('derivedFrom');
+    expect(result?.type).toBe('Feature');
+    expect(result?.properties).toHaveProperty('derivedFrom');
   });
 
   test('applyBlankLayerStyle calls setStyle only when present', () => {
     const called: string[] = [];
-    const good: any = { setStyle: (s: any) => called.push('good') };
-    const bad: any = { notAStyle: true };
-    mod.applyBlankLayerStyle([good, bad], {} as any);
+    const good = { setStyle: (_style: unknown) => called.push('good') };
+    const bad = { notAStyle: true };
+    mod.applyBlankLayerStyle([good, bad], {} as never);
     expect(called).toEqual(['good']);
   });
 
   test('replaceLayerGroupLayers copies layers from source to target via layer containers', () => {
-    const pushed: any[] = [];
-    const target = { getLayers: () => ({ clear: () => (pushed.length = 0), push: (l: any) => pushed.push(l) }) };
-    const source = { getLayers: () => ({ getArray: () => ['a', 'b'] }) };
-    mod.replaceLayerGroupLayers(target as any, source as any);
+    const pushed: unknown[] = [];
+    const target: LayerGroupLike = { getLayers: () => ({ clear: () => { pushed.length = 0; }, push: (layer: unknown) => pushed.push(layer) }) };
+    const source: LayerGroupLike = { getLayers: () => ({ clear: () => undefined, push: () => undefined, getArray: () => ['a', 'b'] }) };
+    mod.replaceLayerGroupLayers(target as never, source as never);
     expect(pushed).toEqual(['a', 'b']);
   });
 
