@@ -46,13 +46,9 @@ describe('addTilesAndWait', () => {
 
     // Fire tile events after the layer is added to simulate network load
     setTimeout(() => {
-      try {
-        if (mapInstance._layer) {
-          mapInstance._layer.fire('tileloadstart');
-          setTimeout(() => mapInstance._layer?.fire('tileload'), 20);
-        }
-      } catch {
-        undefined;
+      if (mapInstance._layer) {
+        mapInstance._layer.fire('tileloadstart');
+        setTimeout(() => mapInstance._layer?.fire('tileload'), 20);
       }
     }, 20);
 

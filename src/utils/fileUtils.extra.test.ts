@@ -76,7 +76,7 @@ describe('fileUtils extra', () => {
       return class MockJSZip {
         files: Record<string, string> = {};
         file(name: string, content: string) { this.files[name] = content; }
-        generateAsync(_opts: unknown) { /* use this to satisfy linter */ this.files; return Promise.resolve(new Blob(['ZIP'])); }
+        generateAsync(_opts: unknown) { return Promise.resolve(new Blob([JSON.stringify(this.files)])); }
       };
     });
 
