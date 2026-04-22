@@ -34,7 +34,7 @@ import {
 /**
  * Safely parse JSON from a Response. Returns parsed value or null on failure.
  */
-const safeParseJson = async <T = unknown>(resp: Response): Promise<T | null> => {
+export const safeParseJson = async <T = unknown>(resp: Response): Promise<T | null> => {
   try {
     const parsed = await resp.json();
     return parsed as T;
@@ -44,11 +44,11 @@ const safeParseJson = async <T = unknown>(resp: Response): Promise<T | null> => 
 };
 
 /** Coerce unknown value to a plain record for safe property access. */
-const asRecord = (value: unknown): Record<string, unknown> =>
+export const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 
 /** Attempt to extract minimal local user fields from an unknown response. */
-const extractLocalUserFromData = (data: unknown) => {
+export const extractLocalUserFromData = (data: unknown) => {
   const rec = asRecord(data);
   const uid = typeof rec.uid === 'string' ? rec.uid : 'local';
   const email = typeof rec.email === 'string' ? rec.email : '';
@@ -118,7 +118,7 @@ interface BuildSettingsArgs {
   forecastUiVariant: ForecastUiVariant;
 }
 /** Builds the normalized settings document shape from current local state. */
-const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
+export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
   const { darkMode, overlays, defaultForecasterName, forecastUiVariant } = args;
   return {
     darkMode,
@@ -132,7 +132,7 @@ const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument =
 };
 
 /** Validates a Firestore settings payload before the app applies it locally. */
-const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
+export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
   if (!value) {
     return null;
   }
