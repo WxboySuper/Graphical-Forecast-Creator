@@ -1,0 +1,129 @@
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import BetaAuthCard from './BetaAuthCard';
+import { useAuth } from '../../auth/AuthProvider';
+
+// Mock useAuth
+jest.mock('../../auth/AuthProvider', () => ({
+  useAuth: jest.fn(),
+}));
+
+// Mock lucide-react
+jest.mock('lucide-react', () => ({
+  Cloud: () => <div data-testid="cloud-icon" />,
+  LoaderCircle: () => <div data-testid="loader-icon" />,
+  Mail: () => <div data-testid="mail-icon" />,
+}));
+
+describe('BetaAuthCard', () => {
+  const signInWithEmail = jest.fn();
+  const signInWithGoogle = jest.fn();
+  const signUpWithEmail = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useAuth as jest.Mock).mockReturnValue({
+      status: 'signed_out',
+      error: null,
+      signInWithEmail,
+      signInWithGoogle,
+      signUpWithEmail,
+    });
+  });
+
+  test('renders basic sign-in form', () => {
+    render(<BetaAuthCard title="Beta Title" description="Beta Desc" />);
+    expect(screen.getByText('Beta Title')).toBeInTheDocument();
+    expect(screen.getByText('Beta Desc')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Password/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Confirm Password/i)).not.toBeInTheDocument();
+  });
+
+  test('handles google sign-in success', async () => {
+    render(<BetaAuthCard title="T" description="D" />);
+    const googleButton = screen.getByText('Continue with Google');
+    
+    await act(async () => {
+      fireEvent.click(googleButton);
+    });
+
+    expect(signInWithGoogle).toHaveBeenCalled();
+  });
+
+  test('handles google sign-in failure', async () => {
+    signInWithGoogle.mockRejectedValue(new Error('Google failed'));
+    render(<BetaAuthCard title="T" description="D" />);
+    const googleButton = screen.getByText('Continue with Google');
+    
+    await act(async () => {
+      fireEvent.click(googleButton);
+    });
+
+    expect(screen.getByText('Google failed')).toBeInTheDocument();
+  });
+
+  test('handles email sign-in success', async () => {
+    render(<BetaAuthCard title="T" description="D" />);
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'test@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'password123' } });
+    
+    await act(async () => {
+      fireEvent.submit(screen.getByRole('button', { name: /Sign In with Email/i }));
+    });
+
+    expect(signInWithEmail).toHaveBeenCalledWith('test@example.com', 'password123');
+  });
+
+  test('handles email sign-up with password mismatch', async () => {
+    render(<BetaAuthCard title="T" description="D" allowSignUp={true} />);
+    
+    // Switch to Sign Up mode
+    fireEvent.click(screen.getByText('Create Account'));
+    
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'new@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'mismatch' } });
+    
+    await act(async () => {
+      fireEvent.submit(screen.getByRole('button', { name: /Create Beta Account/i }));
+    });
+
+    expect(screen.getByText('Passwords do not match.')).toBeInTheDocument();
+    expect(signUpWithEmail).not.toHaveBeenCalled();
+  });
+
+  test('handles email sign-up success', async () => {
+    render(<BetaAuthCard title="T" description="D" allowSignUp={true} />);
+    fireEvent.click(screen.getByText('Create Account'));
+    
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'new@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'password123' } });
+    
+    await act(async () => {
+      fireEvent.submit(screen.getByRole('button', { name: /Create Beta Account/i }));
+    });
+
+    expect(signUpWithEmail).toHaveBeenCalledWith('new@example.com', 'password123');
+  });
+
+  test('handles email sign-in general failure', async () => {
+    signInWithEmail.mockRejectedValue('Generic error');
+    render(<BetaAuthCard title="T" description="D" />);
+    
+    await act(async () => {
+      fireEvent.submit(screen.getByRole('button', { name: /Sign In with Email/i }));
+    });
+
+    expect(screen.getByText('Unable to complete that request right now.')).toBeInTheDocument();
+  });
+
+  test('shows loading state when busy', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      status: 'loading',
+      signInWithEmail, signInWithGoogle, signUpWithEmail
+    });
+    render(<BetaAuthCard title="T" description="D" />);
+    expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
+  });
+});

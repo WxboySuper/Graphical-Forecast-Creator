@@ -180,7 +180,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     }
 
     // Extract day keys, then filter to those with any feature maps that have size > 0
-    const keys = Object.keys(cycle.forecastCycle.days);
+    const keys = Object.keys(cycle.forecastCycle?.days || {});
     if (keys.length === 0) return 'No data';
 
     const daysWithData = keys.filter((dayKey) => {

@@ -175,8 +175,9 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
         <div className="copy-modal-body">
           <>
             <div className="copy-form-group">
-              <label>Load Forecast File:</label>
+              <label htmlFor="file-upload">Load Forecast File:</label>
               <input
+                id="file-upload"
                 ref={fileInputRef}
                 type="file"
                 accept=".json"
