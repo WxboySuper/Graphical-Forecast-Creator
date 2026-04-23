@@ -1,20 +1,10 @@
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import * as AuthProviderModule from './AuthProvider';
+import { safeParseJson, asRecord, extractLocalUserFromData, createSettingsSnapshot, readRemoteSettings, AuthProvider, useAuth } from './AuthProvider';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import featureFlagsReducer from '../store/featureFlagsSlice';
-
-const {
-  safeParseJson,
-  asRecord,
-  extractLocalUserFromData,
-  createSettingsSnapshot,
-  readRemoteSettings,
-  AuthProvider,
-  useAuth,
-} = AuthProviderModule;
 
 interface MockResponse {
   ok: boolean;
@@ -109,7 +99,7 @@ describe('AuthProvider Utils', () => {
     };
     expect(readRemoteSettings(validSettings)).toEqual(validSettings);
     expect(readRemoteSettings({ darkMode: 'not boolean' } as Record<string, unknown>)).toBeNull();
-    expect(readRemoteSettings(undefined)).toBeNull();
+    expect(readRemoteSettings()).toBeNull();
   });
 });
 

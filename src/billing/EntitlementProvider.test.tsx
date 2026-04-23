@@ -114,7 +114,7 @@ describe('EntitlementProvider', () => {
       await act(async () => {
         await result.current.openCheckout('monthly');
       });
-    } catch (e) {
+    } catch {
       // Ignore navigation error
     }
 
