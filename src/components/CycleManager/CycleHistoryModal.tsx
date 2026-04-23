@@ -174,25 +174,34 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   };
 
   /** Builds a short saved-cycle summary, preferring cached stats metadata when it is available. */
-  const getDaySummary = (cycle: SavedCycle) => {
+  const getDaySummary = (cycle: SavedCycle): string => {
     if (typeof cycle.stats?.forecastDays === 'number') {
-      return cycle.stats.forecastDays > 0 ? `${cycle.stats.forecastDays} forecast day${cycle.stats.forecastDays === 1 ? '' : 's'}` : 'No polygons';
+      if (cycle.stats.forecastDays > 0) {
+        const label = cycle.stats.forecastDays === 1 ? 'forecast day' : 'forecast days';
+        return `${cycle.stats.forecastDays} ${label}`;
+      }
+      return 'No polygons';
     }
 
-    // Extract day keys, then filter to those with any feature maps that have size > 0
-    const keys = Object.keys(cycle.forecastCycle?.days || {});
+    const days = cycle.forecastCycle?.days;
+    if (!days) return 'No data';
+
+    const keys = Object.keys(days);
     if (keys.length === 0) return 'No data';
 
-    const daysWithData = keys.filter((dayKey) => {
-      const day = cycle.forecastCycle.days[Number(dayKey) as DayType];
+    const hasData = (dayKey: string): boolean => {
+      const day = days[Number(dayKey) as DayType];
       if (!day) return false;
-      const outlookKeys = Object.keys(day.data || {});
+      const data = day.data;
+      if (!data) return false;
+      const outlookKeys = Object.keys(data);
       return outlookKeys.some((outlookKey) => {
-        const map = day.data[outlookKey as keyof OutlookData];
+        const map = data[outlookKey as keyof OutlookData];
         return Boolean(map && map.size > 0);
       });
-    });
+    };
 
+    const daysWithData = keys.filter(hasData);
     return daysWithData.length > 0 ? `Days: ${daysWithData.join(', ')}` : 'No polygons';
   };
 

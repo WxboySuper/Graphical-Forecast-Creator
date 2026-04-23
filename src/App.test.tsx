@@ -1,5 +1,6 @@
 import { render, screen, act } from '@testing-library/react';
 import App from './App';
+import { Outlet } from 'react-router-dom';
 
 // Mock pages to avoid heavy modules
 jest.mock('./pages', () => ({
@@ -17,38 +18,32 @@ jest.mock('./pages', () => ({
 
 // Mock components
 jest.mock('./components/Layout', () => ({
-  AppLayout: () => {
-    const { Outlet } = require('react-router-dom');
-    return (
-      <div>
-        <div>AppLayout Mock</div>
-        <Outlet />
-      </div>
-    );
-  }
+  AppLayout: () => (
+    <div>
+      <div>AppLayout Mock</div>
+      <Outlet />
+    </div>
+  ),
 }));
 
 jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
-jest.mock('./components/Beta/BetaAccessGuard', () => {
-  const { Outlet } = require('react-router-dom');
-  return () => <Outlet />;
-});
+jest.mock('./components/Beta/BetaAccessGuard', () => () => <Outlet />);
 jest.mock('./components/ToS/ToSModal', () => ({
   __esModule: true,
   hasAcceptedToS: () => true,
-  default: () => <div>ToSModal Mock</div>
+  default: () => <div>ToSModal Mock</div>,
 }));
 jest.mock('./components/PrivacyPolicy/PrivacyPolicyModal', () => ({
   __esModule: true,
   hasAcceptedPrivacyPolicy: () => true,
-  default: () => <div>PrivacyPolicyModal Mock</div>
+  default: () => <div>PrivacyPolicyModal Mock</div>,
 }));
 
 describe('App Simple', () => {
-  test('renders HomePage by default', async () => {
-    await act(async () => {
+  test('renders HomePage by default', () => {
+    act(() => {
       render(<App />);
     });
     expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
