@@ -22,7 +22,6 @@ jest.mock('firebase/firestore', () => ({
 }));
 
 describe('EntitlementProvider', () => {
-  const originalLocation = window.location;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -68,7 +67,7 @@ describe('EntitlementProvider', () => {
       json: () => Promise.resolve({ billingEnabled: true, checkoutEnabled: true }),
     });
 
-    const { result, unmount } = renderHook(() => useEntitlement(), {
+    const { unmount } = renderHook(() => useEntitlement(), {
       wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
     });
 

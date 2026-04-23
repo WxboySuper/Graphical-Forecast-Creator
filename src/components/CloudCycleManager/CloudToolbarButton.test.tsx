@@ -3,7 +3,7 @@ import { CloudToolbarButton } from './CloudToolbarButton';
 
 // Mock CloudSaveModal
 jest.mock('./CloudSaveLoadModals', () => ({
-  CloudSaveModal: ({ open, onSave, error }: any) => open ? (
+  CloudSaveModal: ({ open, onSave, error }: { children: React.ReactNode }) => open ? (
     <div data-testid="save-modal">
       {error && <div data-testid="modal-error">{error}</div>}
       <button onClick={() => onSave('New Label')}>Confirm Save</button>
@@ -13,15 +13,15 @@ jest.mock('./CloudSaveLoadModals', () => ({
 
 // Mock ui components to simplify testing (avoid tooltip/portal issues)
 jest.mock('../ui/button', () => ({
-  Button: ({ children, onClick, disabled, ...props }: any) => (
+  Button: ({ children, onClick, disabled, ...props }: { children: React.ReactNode }) => (
     <button onClick={onClick} disabled={disabled} {...props}>{children}</button>
   ),
 }));
 
 jest.mock('../ui/tooltip', () => ({
-  Tooltip: ({ children }: any) => <div>{children}</div>,
-  TooltipTrigger: ({ children }: any) => <div>{children}</div>,
-  TooltipContent: ({ children }: any) => <div>{children}</div>,
+  Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 describe('CloudToolbarButton', () => {
@@ -35,8 +35,8 @@ describe('CloudToolbarButton', () => {
   test('renders save and open actions', () => {
     render(
       <CloudToolbarButton
-        canSave={true}
-        premiumActive={true}
+        canSave
+        premiumActive
         isExpiredPremium={false}
         currentCycleDate="20260401"
         onSaveToCloud={onSaveToCloud}
@@ -50,8 +50,8 @@ describe('CloudToolbarButton', () => {
   test('opens save modal on click', () => {
     render(
       <CloudToolbarButton
-        canSave={true}
-        premiumActive={true}
+        canSave
+        premiumActive
         isExpiredPremium={false}
         currentCycleDate="20260401"
         onSaveToCloud={onSaveToCloud}
@@ -83,8 +83,8 @@ describe('CloudToolbarButton', () => {
     render(
       <CloudToolbarButton
         canSave={false}
-        premiumActive={true}
-        isExpiredPremium={true}
+        premiumActive
+        isExpiredPremium
         currentCycleDate="20260401"
         onSaveToCloud={onSaveToCloud}
         onOpenCloudLibrary={onOpenCloudLibrary}
@@ -96,11 +96,11 @@ describe('CloudToolbarButton', () => {
   });
 
   test('handles successful save', async () => {
-    onSaveToCloud.mockResolvedValue(undefined);
+    onSaveToCloud.mockResolvedValue();
     render(
       <CloudToolbarButton
-        canSave={true}
-        premiumActive={true}
+        canSave
+        premiumActive
         isExpiredPremium={false}
         currentCycleDate="20260401"
         onSaveToCloud={onSaveToCloud}
@@ -110,7 +110,7 @@ describe('CloudToolbarButton', () => {
     
     fireEvent.click(screen.getByText('Save to Cloud'));
     
-    await act(async () => {
+    await act(() => {
       fireEvent.click(screen.getByText('Confirm Save'));
     });
 
@@ -122,8 +122,8 @@ describe('CloudToolbarButton', () => {
     onSaveToCloud.mockRejectedValue(new Error('API Error'));
     render(
       <CloudToolbarButton
-        canSave={true}
-        premiumActive={true}
+        canSave
+        premiumActive
         isExpiredPremium={false}
         currentCycleDate="20260401"
         onSaveToCloud={onSaveToCloud}
@@ -133,7 +133,7 @@ describe('CloudToolbarButton', () => {
     
     fireEvent.click(screen.getByText('Save to Cloud'));
     
-    await act(async () => {
+    await act(() => {
       fireEvent.click(screen.getByText('Confirm Save'));
     });
 
@@ -144,8 +144,8 @@ describe('CloudToolbarButton', () => {
   test('calls onOpenCloudLibrary', () => {
     render(
       <CloudToolbarButton
-        canSave={true}
-        premiumActive={true}
+        canSave
+        premiumActive
         isExpiredPremium={false}
         currentCycleDate="20260401"
         onSaveToCloud={onSaveToCloud}
@@ -160,8 +160,8 @@ describe('CloudToolbarButton', () => {
   test('disables save button when saving', () => {
     render(
       <CloudToolbarButton
-        canSave={true}
-        premiumActive={true}
+        canSave
+        premiumActive
         isExpiredPremium={false}
         currentCycleDate="20260401"
         syncState="saving"

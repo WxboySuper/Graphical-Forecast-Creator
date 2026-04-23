@@ -78,7 +78,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={jest.fn()} />
+            <CycleHistoryModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -91,7 +91,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={jest.fn()} />
+            <CycleHistoryModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -109,7 +109,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={jest.fn()} />
+            <CycleHistoryModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -124,7 +124,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={jest.fn()} />
+            <CycleHistoryModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -151,7 +151,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={onClose} />
+            <CycleHistoryModal isOpen onClose={onClose} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -181,7 +181,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAddToast}>
-            <CycleHistoryModal isOpen={true} onClose={jest.fn()} />
+            <CycleHistoryModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -195,7 +195,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={jest.fn()} />
+            <CycleHistoryModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -211,7 +211,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={onClose} />
+            <CycleHistoryModal isOpen onClose={onClose} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -225,7 +225,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen={true} onClose={jest.fn()} />
+            <CycleHistoryModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -250,7 +250,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen={true} onClose={jest.fn()} />
+            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -262,7 +262,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen={true} onClose={jest.fn()} />
+            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -287,7 +287,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen={true} onClose={jest.fn()} />
+            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -307,7 +307,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen={true} onClose={jest.fn()} />
+            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
           </AppLayoutContext.Provider>
         </Provider>
       );
@@ -328,7 +328,7 @@ describe('CycleManager Components', () => {
       render(
         <Provider store={store}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen={true} onClose={onClose} />
+            <CopyFromPreviousModal isOpen onClose={onClose} />
           </AppLayoutContext.Provider>
         </Provider>
       );

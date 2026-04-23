@@ -189,7 +189,8 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     const keys = Object.keys(days);
     if (keys.length === 0) return 'No data';
 
-    const hasData = (dayKey: string): boolean => {
+    /** Checks if a day has any data. */
+        const hasData = (dayKey: string): boolean => {
       const day = days[Number(dayKey) as DayType];
       if (!day) return false;
       const data = day.data;

@@ -43,7 +43,7 @@ describe('BetaAuthCard', () => {
     render(<BetaAuthCard title="T" description="D" />);
     const googleButton = screen.getByText('Continue with Google');
     
-    await act(async () => {
+    await act(() => {
       fireEvent.click(googleButton);
     });
 
@@ -55,7 +55,7 @@ describe('BetaAuthCard', () => {
     render(<BetaAuthCard title="T" description="D" />);
     const googleButton = screen.getByText('Continue with Google');
     
-    await act(async () => {
+    await act(() => {
       fireEvent.click(googleButton);
     });
 
@@ -67,7 +67,7 @@ describe('BetaAuthCard', () => {
     fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'test@example.com' } });
     fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'password123' } });
     
-    await act(async () => {
+    await act(() => {
       fireEvent.submit(screen.getByRole('button', { name: /Sign In with Email/i }));
     });
 
@@ -75,7 +75,7 @@ describe('BetaAuthCard', () => {
   });
 
   test('handles email sign-up with password mismatch', async () => {
-    render(<BetaAuthCard title="T" description="D" allowSignUp={true} />);
+    render(<BetaAuthCard title="T" description="D" allowSignUp />);
     
     // Switch to Sign Up mode
     fireEvent.click(screen.getByText('Create Account'));
@@ -84,7 +84,7 @@ describe('BetaAuthCard', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
     fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'mismatch' } });
     
-    await act(async () => {
+    await act(() => {
       fireEvent.submit(screen.getByRole('button', { name: /Create Beta Account/i }));
     });
 
@@ -93,14 +93,14 @@ describe('BetaAuthCard', () => {
   });
 
   test('handles email sign-up success', async () => {
-    render(<BetaAuthCard title="T" description="D" allowSignUp={true} />);
+    render(<BetaAuthCard title="T" description="D" allowSignUp />);
     fireEvent.click(screen.getByText('Create Account'));
     
     fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'new@example.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
     fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'password123' } });
     
-    await act(async () => {
+    await act(() => {
       fireEvent.submit(screen.getByRole('button', { name: /Create Beta Account/i }));
     });
 
@@ -111,7 +111,7 @@ describe('BetaAuthCard', () => {
     signInWithEmail.mockRejectedValue('Generic error');
     render(<BetaAuthCard title="T" description="D" />);
     
-    await act(async () => {
+    await act(() => {
       fireEvent.submit(screen.getByRole('button', { name: /Sign In with Email/i }));
     });
 

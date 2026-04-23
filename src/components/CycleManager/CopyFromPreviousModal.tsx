@@ -173,7 +173,6 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
         </div>
 
         <div className="copy-modal-body">
-          <>
             <div className="copy-form-group">
               <label htmlFor="file-upload">Load Forecast File:</label>
               <input
@@ -232,7 +231,6 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
               The system will automatically convert outlook types when copying between days with different formats
               (e.g., Day 4-8 → Day 3, Day 3 → Day 2). Existing features on the target day will be replaced.
             </div>
-          </>
         </div>
 
         <div className="copy-modal-footer">

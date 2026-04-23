@@ -11,7 +11,7 @@ describe('Toast', () => {
   });
 
   test('renders message', () => {
-    render(<Toast message="Test Message" onClose={() => {}} />);
+    render(<Toast message="Test Message" onClose={() => undefined} />);
     expect(screen.getByText('Test Message')).toBeInTheDocument();
   });
 
@@ -45,7 +45,7 @@ describe('ToastManager', () => {
       { id: '1', message: 'First', type: 'info' as const },
       { id: '2', message: 'Second', type: 'success' as const },
     ];
-    render(<ToastManager toasts={toasts} onDismiss={() => {}} />);
+    render(<ToastManager toasts={toasts} onDismiss={() => undefined} />);
     
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();

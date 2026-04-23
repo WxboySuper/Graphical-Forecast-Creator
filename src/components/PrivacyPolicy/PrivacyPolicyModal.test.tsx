@@ -71,20 +71,20 @@ describe('PrivacyPolicyModal component', () => {
   });
 
   test('renders view-only mode when specified', () => {
-    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly={true} onClose={onCloseMock} />);
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
     expect(screen.getByText('Close')).toBeInTheDocument();
     expect(screen.queryByText('Accept & Continue')).not.toBeInTheDocument();
   });
 
   test('calls onClose when close button clicked in view-only mode', () => {
-    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly={true} onClose={onCloseMock} />);
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
     const closeButton = screen.getByText('Close');
     fireEvent.click(closeButton);
     expect(onCloseMock).toHaveBeenCalled();
   });
 
   test('calls onClose when top-right X is clicked in view-only mode', () => {
-    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly={true} onClose={onCloseMock} />);
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
     const xButton = screen.getByLabelText('Close');
     fireEvent.click(xButton);
     expect(onCloseMock).toHaveBeenCalled();

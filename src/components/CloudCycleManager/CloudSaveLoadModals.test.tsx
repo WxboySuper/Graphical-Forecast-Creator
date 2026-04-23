@@ -20,7 +20,7 @@ describe('CloudSaveModal', () => {
   test('renders when open', () => {
     render(
       <CloudSaveModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onSave={onSave}
         currentLabel="Test Forecast"
@@ -36,7 +36,7 @@ describe('CloudSaveModal', () => {
     onSave.mockResolvedValue(true);
     render(
       <CloudSaveModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onSave={onSave}
       />
@@ -47,7 +47,7 @@ describe('CloudSaveModal', () => {
     
     const saveButton = screen.getByRole('button', { name: 'Save to Cloud' });
     
-    await act(async () => {
+    await act(() => {
       fireEvent.click(saveButton);
     });
 
@@ -59,7 +59,7 @@ describe('CloudSaveModal', () => {
     onSave.mockResolvedValue(false);
     render(
       <CloudSaveModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onSave={onSave}
         currentLabel="Fail Test"
@@ -68,7 +68,7 @@ describe('CloudSaveModal', () => {
 
     const saveButton = screen.getByRole('button', { name: 'Save to Cloud' });
     
-    await act(async () => {
+    await act(() => {
       fireEvent.click(saveButton);
     });
 
@@ -79,7 +79,7 @@ describe('CloudSaveModal', () => {
   test('disables save button when label is empty', () => {
     render(
       <CloudSaveModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onSave={onSave}
         currentLabel=""
@@ -92,7 +92,7 @@ describe('CloudSaveModal', () => {
   test('displays error message', () => {
     render(
       <CloudSaveModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onSave={onSave}
         error="Something went wrong"
@@ -117,7 +117,7 @@ describe('CloudLoadModal', () => {
   test('renders cycles and handles selection', async () => {
     render(
       <CloudLoadModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onLoad={onLoad}
         cycles={mockCycles}
@@ -128,11 +128,11 @@ describe('CloudLoadModal', () => {
     expect(screen.getByText('Cycle 2')).toBeInTheDocument();
 
     const cycle1Button = screen.getByText('Cycle 1').closest('button');
-    fireEvent.click(cycle1Button!);
+    fireEvent.click(cycle1Button);
 
     const loadButton = screen.getByRole('button', { name: 'Load' });
     
-    await act(async () => {
+    await act(() => {
       fireEvent.click(loadButton);
     });
 
@@ -143,7 +143,7 @@ describe('CloudLoadModal', () => {
   test('shows empty message when no cycles', () => {
     render(
       <CloudLoadModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onLoad={onLoad}
         cycles={[]}
@@ -155,11 +155,11 @@ describe('CloudLoadModal', () => {
   test('shows loading indicator', () => {
     render(
       <CloudLoadModal
-        open={true}
+        open
         onOpenChange={onOpenChange}
         onLoad={onLoad}
         cycles={[]}
-        isLoading={true}
+        isLoading
       />
     );
     expect(screen.getByTestId('loader-icon')).toBeInTheDocument();

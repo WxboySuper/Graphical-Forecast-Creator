@@ -33,7 +33,7 @@ jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   Outlet: () => React.createElement('div', { 'data-testid': 'test-content' }),
   useNavigate: () => jest.fn(),
-  Link: ({ children }: any) => React.createElement('a', null, children),
+  Link: ({ children }: { children: React.ReactNode }) => React.createElement('a', null, children),
 }));
 
 jest.mock('../AlertBanner', () => ({

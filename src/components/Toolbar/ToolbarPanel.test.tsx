@@ -27,7 +27,7 @@ jest.mock('../CycleManager/CycleHistoryModal', () => () => <div data-testid="his
 jest.mock('../CycleManager/CopyFromPreviousModal', () => () => <div data-testid="copy-modal" />);
 jest.mock('../Layout', () => ({
   FloatingPanel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useAppLayout: () => ({ addToast: () => {} }),
+  useAppLayout: () => ({ addToast: () => undefined }),
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Navbar: () => <div data-testid="navbar" />,
   AddToastFn: Object,
