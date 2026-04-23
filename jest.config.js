@@ -45,6 +45,8 @@ module.exports = {
     '[/\\\\]src[/\\\\].*[/\\\\]index\\.tsx$',
     '[/\\\\]src[/\\\\].*[/\\\\]__mocks__[/\\\\].*',
     '[/\\\\]src[/\\\\].*\\.d\\.ts$',
+    '[/\\\\]src[/\\\\]maps[/\\\\].*$',
+    '[/\\\\]src[/\\\\]types[/\\\\].*$',
   ],
   coverageProvider: 'v8',
   coverageReporters: ['text', 'lcov', 'json-summary'],

@@ -142,36 +142,36 @@ function syncLoadedCloudSelection({
 
 /** Updates the current cloud label after a successful rename when the renamed cycle is active. */
 function syncRenamedCloudSelection({
-  currentCloudRef,
   setCurrentCloud,
   cycleId,
   newLabel,
 }: {
-  currentCloudRef: MutableRefObject<CloudCycleContext | null>;
   setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
   cycleId: string;
   newLabel: string;
 }): void {
-  if (currentCloudRef.current?.id !== cycleId || currentCloudRef.current.label === newLabel) {
-    return;
-  }
-
-  setCurrentCloud({ ...currentCloudRef.current, label: newLabel });
+  setCurrentCloud((prev) => {
+    if (!prev || prev.id !== cycleId || prev.label === newLabel) {
+      return prev;
+    }
+    return { ...prev, label: newLabel };
+  });
 }
 
 /** Clears the current cloud selection after a delete when the deleted cycle was active. */
 function clearDeletedCloudSelection({
-  currentCloudRef,
   setCurrentCloud,
   cycleId,
 }: {
-  currentCloudRef: MutableRefObject<CloudCycleContext | null>;
   setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
   cycleId: string;
 }): void {
-  if (currentCloudRef.current?.id === cycleId) {
-    setCurrentCloud(null);
-  }
+  setCurrentCloud((prev) => {
+    if (!prev || prev.id !== cycleId) {
+      return prev;
+    }
+    return null;
+  });
 }
 
 /** Starts the realtime hosted-cycle subscription for the signed-in user. */
@@ -350,10 +350,9 @@ function useCloudLoadCycle({
 function useCloudDeleteCycle({
   userId,
   canWrite,
-  currentCloudRef,
   setCurrentCloud,
   setError,
-}: Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
+}: Pick<CloudStateContext, 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
   return useCloudCycleMutation<[string]>({
     userId,
     canWrite,
@@ -367,7 +366,7 @@ function useCloudDeleteCycle({
       return deleteCloudCycle({ userId, cycleId });
     },
     onSuccess: (cycleId) => {
-      clearDeletedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId });
+      clearDeletedCloudSelection({ setCurrentCloud, cycleId });
     },
   });
 }
@@ -376,10 +375,9 @@ function useCloudDeleteCycle({
 function useCloudRenameCycle({
   userId,
   canWrite,
-  currentCloudRef,
   setCurrentCloud,
   setError,
-}: Pick<CloudStateContext, 'currentCloudRef' | 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
+}: Pick<CloudStateContext, 'setCurrentCloud' | 'setError'> & CloudAccessContext) {
   return useCloudCycleMutation<[string, string]>({
     userId,
     canWrite,
@@ -393,7 +391,7 @@ function useCloudRenameCycle({
       return renameCloudCycle({ userId, cycleId, newLabel });
     },
     onSuccess: (cycleId, newLabel) => {
-      syncRenamedCloudSelection({ currentCloudRef, setCurrentCloud, cycleId, newLabel });
+      syncRenamedCloudSelection({ setCurrentCloud, cycleId, newLabel });
     },
   });
 }
