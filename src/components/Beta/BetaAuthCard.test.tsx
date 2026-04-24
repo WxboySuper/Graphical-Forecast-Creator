@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BetaAuthCard from './BetaAuthCard';
 import { useAuth } from '../../auth/AuthProvider';
 
@@ -42,36 +42,30 @@ describe('BetaAuthCard', () => {
   test('handles google sign-in success', async () => {
     render(<BetaAuthCard title="T" description="D" />);
     const googleButton = screen.getByText('Continue with Google');
-    
-    await act(() => {
-      fireEvent.click(googleButton);
-    });
 
-    expect(signInWithGoogle).toHaveBeenCalled();
+    fireEvent.click(googleButton);
+
+    await waitFor(() => expect(signInWithGoogle).toHaveBeenCalled());
   });
 
   test('handles google sign-in failure', async () => {
     signInWithGoogle.mockRejectedValue(new Error('Google failed'));
     render(<BetaAuthCard title="T" description="D" />);
     const googleButton = screen.getByText('Continue with Google');
-    
-    await act(() => {
-      fireEvent.click(googleButton);
-    });
 
-    expect(screen.getByText('Google failed')).toBeInTheDocument();
+    fireEvent.click(googleButton);
+
+    await waitFor(() => expect(screen.getByText('Google failed')).toBeInTheDocument());
   });
 
   test('handles email sign-in success', async () => {
     render(<BetaAuthCard title="T" description="D" />);
     fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'test@example.com' } });
     fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'password123' } });
-    
-    await act(() => {
-      fireEvent.submit(screen.getByRole('button', { name: /Sign In with Email/i }));
-    });
 
-    expect(signInWithEmail).toHaveBeenCalledWith('test@example.com', 'password123');
+    fireEvent.click(screen.getByRole('button', { name: /Sign In with Email/i }));
+
+    await waitFor(() => expect(signInWithEmail).toHaveBeenCalledWith('test@example.com', 'password123'));
   });
 
   test('handles email sign-up with password mismatch', async () => {
@@ -84,11 +78,9 @@ describe('BetaAuthCard', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
     fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'mismatch' } });
     
-    await act(() => {
-      fireEvent.submit(screen.getByRole('button', { name: /Create Beta Account/i }));
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Create Beta Account/i }));
 
-    expect(screen.getByText('Passwords do not match.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Passwords do not match.')).toBeInTheDocument());
     expect(signUpWithEmail).not.toHaveBeenCalled();
   });
 
@@ -100,22 +92,20 @@ describe('BetaAuthCard', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
     fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'password123' } });
     
-    await act(() => {
-      fireEvent.submit(screen.getByRole('button', { name: /Create Beta Account/i }));
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Create Beta Account/i }));
 
-    expect(signUpWithEmail).toHaveBeenCalledWith('new@example.com', 'password123');
+    await waitFor(() => expect(signUpWithEmail).toHaveBeenCalledWith('new@example.com', 'password123'));
   });
 
   test('handles email sign-in general failure', async () => {
     signInWithEmail.mockRejectedValue('Generic error');
     render(<BetaAuthCard title="T" description="D" />);
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'test@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'password123' } });
     
-    await act(() => {
-      fireEvent.submit(screen.getByRole('button', { name: /Sign In with Email/i }));
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Sign In with Email/i }));
 
-    expect(screen.getByText('Unable to complete that request right now.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Unable to complete that request right now.')).toBeInTheDocument());
   });
 
   test('shows loading state when busy', () => {

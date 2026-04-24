@@ -1,5 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
-import { waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CloudToolbarButton } from './CloudToolbarButton';
 
 // Mock CloudSaveModal
@@ -111,12 +110,10 @@ describe('CloudToolbarButton', () => {
     
     fireEvent.click(screen.getByText('Save to Cloud'));
     
-    await act(() => {
-      fireEvent.click(screen.getByText('Confirm Save'));
-    });
+    fireEvent.click(screen.getByText('Confirm Save'));
 
-    expect(onSaveToCloud).toHaveBeenCalledWith('New Label');
-    expect(screen.queryByTestId('save-modal')).not.toBeInTheDocument();
+    await waitFor(() => expect(onSaveToCloud).toHaveBeenCalledWith('New Label'));
+    await waitFor(() => expect(screen.queryByTestId('save-modal')).not.toBeInTheDocument());
   });
 
   test('handles save error from callback', async () => {
@@ -134,11 +131,9 @@ describe('CloudToolbarButton', () => {
     
     fireEvent.click(screen.getByText('Save to Cloud'));
     
-    await act(() => {
-      fireEvent.click(screen.getByText('Confirm Save'));
-    });
+    fireEvent.click(screen.getByText('Confirm Save'));
 
-    expect(screen.getByTestId('modal-error')).toHaveTextContent('API Error');
+    await waitFor(() => expect(screen.getByTestId('modal-error')).toHaveTextContent('API Error'));
     expect(screen.getByTestId('save-modal')).toBeInTheDocument();
   });
 
