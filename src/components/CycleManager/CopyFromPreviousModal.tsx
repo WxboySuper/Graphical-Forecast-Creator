@@ -80,6 +80,118 @@ const parseForecastFile = async (file: File): Promise<ForecastCycle> => {
   return deserializeForecast(parsed);
 };
 
+type CopyModalHeaderProps = {
+  onClose: () => void;
+};
+
+const CopyModalHeader: React.FC<CopyModalHeaderProps> = ({ onClose }) => (
+  <div className="copy-modal-header">
+    <h2 id="copy-previous-title">Copy from Previous Cycle</h2>
+    <button className="copy-modal-close" onClick={onClose} aria-label="Close copy from previous modal">✕</button>
+  </div>
+);
+
+type CopyFileSectionProps = {
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  loadedCycle: ForecastCycle | null;
+  loadedFileName: string;
+  onFileLoad: (event: React.ChangeEvent<HTMLInputElement>) => void;
+};
+
+const CopyFileSection: React.FC<CopyFileSectionProps> = ({
+  fileInputRef,
+  loadedCycle,
+  loadedFileName,
+  onFileLoad,
+}) => (
+  <div className="copy-form-group">
+    <label htmlFor="file-upload">Load Forecast File:</label>
+    <input
+      id="file-upload"
+      ref={fileInputRef}
+      type="file"
+      accept=".json"
+      onChange={onFileLoad}
+      className="copy-file-input"
+    />
+    {loadedCycle && (
+      <div className="copy-loaded-info">
+        ✓ Loaded: {loadedFileName} (Cycle Date: {new Date(loadedCycle.cycleDate).toLocaleDateString()})
+      </div>
+    )}
+  </div>
+);
+
+type CopyDaySelectorProps = {
+  id: string;
+  label: string;
+  value: DayType;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+};
+
+const CopyDaySelector: React.FC<CopyDaySelectorProps> = ({ id, label, value, onChange }) => (
+  <div className="copy-form-group">
+    <label htmlFor={id}>{label}</label>
+    <select id={id} value={value} onChange={onChange} className="copy-select">
+      {DAYS.map((day) => (
+        <option key={day} value={day}>
+          Day {day}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+type CopyDaysSectionProps = {
+  sourceDay: DayType;
+  targetDay: DayType;
+  onSourceDayChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  onTargetDayChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+};
+
+const CopyDaysSection: React.FC<CopyDaysSectionProps> = ({
+  sourceDay,
+  targetDay,
+  onSourceDayChange,
+  onTargetDayChange,
+}) => (
+  <div className="copy-days-row">
+    <CopyDaySelector id="source-day" label="From Day:" value={sourceDay} onChange={onSourceDayChange} />
+    <div className="copy-arrow">→</div>
+    <CopyDaySelector
+      id="target-day"
+      label="To Day (Current Cycle):"
+      value={targetDay}
+      onChange={onTargetDayChange}
+    />
+  </div>
+);
+
+const CopyInfoBox: React.FC = () => (
+  <div className="copy-info-box">
+    <strong>Note:</strong> This will copy outlook features from the loaded file to your current cycle.
+    The system will automatically convert outlook types when copying between days with different formats
+    (e.g., Day 4-8 → Day 3, Day 3 → Day 2). Existing features on the target day will be replaced.
+  </div>
+);
+
+type CopyModalFooterProps = {
+  disabled: boolean;
+  onClose: () => void;
+  onCopy: () => void;
+};
+
+const CopyModalFooter: React.FC<CopyModalFooterProps> = ({ disabled, onClose, onCopy }) => (
+  <div className="copy-modal-footer">
+    <button className="copy-btn-cancel" onClick={onClose}>
+      Cancel
+    </button>
+    <button className="copy-btn-copy" onClick={onCopy} disabled={disabled}>
+      Copy Features
+    </button>
+  </div>
+);
+
 // Component for the "Copy from Previous Cycle" modal, which allows users to load a forecast file from a previous cycle and copy features from a selected day in that file to a selected day in the current cycle. The modal includes file input for loading the forecast, dropdowns for selecting source and target days, and handles the copying logic while providing feedback through toast notifications. It also implements accessibility features such as focus trapping and keyboard navigation.
 const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
@@ -167,84 +279,23 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
         aria-labelledby="copy-previous-title"
         ref={modalRef}
       >
-        <div className="copy-modal-header">
-          <h2 id="copy-previous-title">Copy from Previous Cycle</h2>
-          <button className="copy-modal-close" onClick={onClose} aria-label="Close copy from previous modal">✕</button>
-        </div>
-
+        <CopyModalHeader onClose={onClose} />
         <div className="copy-modal-body">
-            <div className="copy-form-group">
-              <label htmlFor="file-upload">Load Forecast File:</label>
-              <input
-                id="file-upload"
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleFileLoad}
-                className="copy-file-input"
-              />
-              {loadedCycle && (
-                <div className="copy-loaded-info">
-                  ✓ Loaded: {loadedFileName} (Cycle Date: {new Date(loadedCycle.cycleDate).toLocaleDateString()})
-                </div>
-              )}
-            </div>
-
-              <div className="copy-days-row">
-                <div className="copy-form-group">
-                  <label htmlFor="source-day">From Day:</label>
-                  <select
-                    id="source-day"
-                    value={sourceDay}
-                    onChange={handleSourceDayChange}
-                    className="copy-select"
-                  >
-                    {DAYS.map((day) => (
-                      <option key={day} value={day}>
-                        Day {day}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="copy-arrow">→</div>
-
-                <div className="copy-form-group">
-                  <label htmlFor="target-day">To Day (Current Cycle):</label>
-                  <select
-                    id="target-day"
-                    value={targetDay}
-                    onChange={handleTargetDayChange}
-                    className="copy-select"
-                  >
-                    {DAYS.map((day) => (
-                      <option key={day} value={day}>
-                        Day {day}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-            <div className="copy-info-box">
-              <strong>Note:</strong> This will copy outlook features from the loaded file to your current cycle.
-              The system will automatically convert outlook types when copying between days with different formats
-              (e.g., Day 4-8 → Day 3, Day 3 → Day 2). Existing features on the target day will be replaced.
-            </div>
+          <CopyFileSection
+            fileInputRef={fileInputRef}
+            loadedCycle={loadedCycle}
+            loadedFileName={loadedFileName}
+            onFileLoad={handleFileLoad}
+          />
+          <CopyDaysSection
+            sourceDay={sourceDay}
+            targetDay={targetDay}
+            onSourceDayChange={handleSourceDayChange}
+            onTargetDayChange={handleTargetDayChange}
+          />
+          <CopyInfoBox />
         </div>
-
-        <div className="copy-modal-footer">
-          <button className="copy-btn-cancel" onClick={onClose}>
-            Cancel
-          </button>
-          <button 
-            className="copy-btn-copy" 
-            onClick={handleCopy}
-            disabled={!loadedCycle}
-          >
-            Copy Features
-          </button>
-        </div>
+        <CopyModalFooter disabled={!loadedCycle} onClose={onClose} onCopy={handleCopy} />
       </div>
     </>
   );

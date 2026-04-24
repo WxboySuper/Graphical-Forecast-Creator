@@ -4,20 +4,34 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import CycleHistoryModal from './CycleHistoryModal';
 import CopyFromPreviousModal from './CopyFromPreviousModal';
-import forecastReducer from '../../store/forecastSlice';
+import forecastReducer, { type ForecastState } from '../../store/forecastSlice';
 import { AppLayoutContext } from '../Layout/AppLayout';
 
+type ConfirmationModalMockProps = {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
 // Mock child components
-jest.mock('../DrawingTools/ConfirmationModal', () => ({ isOpen, title, message, onConfirm, onCancel }: any) => 
-  isOpen ? (
-    <div data-testid="confirmation-modal">
-      <h2>{title}</h2>
-      <p>{message}</p>
-      <button onClick={onConfirm}>Confirm</button>
-      <button onClick={onCancel}>Cancel</button>
-    </div>
-  ) : null
-);
+jest.mock('../DrawingTools/ConfirmationModal', () => {
+  const ConfirmationModalMock = ({ isOpen, title, message, onConfirm, onCancel }: ConfirmationModalMockProps) =>
+    isOpen ? (
+      <div data-testid="confirmation-modal">
+        <h2>{title}</h2>
+        <p>{message}</p>
+        <button onClick={onConfirm}>Confirm</button>
+        <button onClick={onCancel}>Cancel</button>
+      </div>
+    ) : null;
+
+  return {
+    __esModule: true,
+    default: ConfirmationModalMock,
+  };
+});
 
 // Mock fileUtils
 jest.mock('../../utils/fileUtils', () => ({
@@ -31,21 +45,63 @@ jest.mock('../../utils/fileUtils', () => ({
   cloneForecastDay: jest.fn((day) => JSON.parse(JSON.stringify(day)))
 }));
 
-const buildStore = (overrides = {}) => {
+type ForecastStateOverrides = {
+  forecastCycle?: Partial<ForecastState['forecastCycle']>;
+  drawingState?: Partial<ForecastState['drawingState']>;
+  currentMapView?: Partial<ForecastState['currentMapView']>;
+  isSaved?: boolean;
+  emergencyMode?: boolean;
+  savedCycles?: ForecastState['savedCycles'];
+  historyByDay?: ForecastState['historyByDay'];
+};
+
+const baseForecastState: ForecastState = {
+  forecastCycle: {
+    currentDay: 1,
+    cycleDate: '2026-04-20',
+    days: {},
+  },
+  drawingState: {
+    activeOutlookType: 'tornado',
+    activeProbability: '2%',
+    isSignificant: false,
+  },
+  currentMapView: {
+    center: [39.8283, -98.5795],
+    zoom: 4,
+  },
+  isSaved: true,
+  emergencyMode: false,
+  savedCycles: [],
+  historyByDay: {},
+};
+
+const buildStore = (overrides: ForecastStateOverrides = {}) => {
+  const forecastState: ForecastState = {
+    ...baseForecastState,
+    ...overrides,
+    forecastCycle: {
+      ...baseForecastState.forecastCycle,
+      ...overrides.forecastCycle,
+    },
+    drawingState: {
+      ...baseForecastState.drawingState,
+      ...overrides.drawingState,
+    },
+    currentMapView: {
+      ...baseForecastState.currentMapView,
+      ...overrides.currentMapView,
+    },
+    savedCycles: overrides.savedCycles ?? baseForecastState.savedCycles,
+    historyByDay: overrides.historyByDay ?? baseForecastState.historyByDay,
+  };
+
   return configureStore({
     reducer: {
       forecast: forecastReducer,
     },
     preloadedState: {
-      forecast: {
-        forecastCycle: {
-          currentDay: 1,
-          cycleDate: '2026-04-20',
-          days: {},
-        },
-        savedCycles: [],
-        ...overrides,
-      } as any,
+      forecast: forecastState,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({ serializableCheck: false, immutableCheck: false }),
@@ -185,7 +241,8 @@ describe('CycleManager Components', () => {
           </AppLayoutContext.Provider>
         </Provider>
       );
-      // Wait, I messed up the provider value above in one place, fixing it implicitly by using the correct one here
+
+      expect(screen.getByText(/1 forecast day/i)).toBeInTheDocument();
     });
 
     it('allows deleting a cycle', () => {
@@ -274,7 +331,7 @@ describe('CycleManager Components', () => {
       fireEvent.change(input, { target: { files: [file] } });
 
       await waitFor(() => {
-        expect(screen.getByText(/✓ Loaded: forecast.json/i)).toBeInTheDocument();
+        expect(screen.getByText(/✓ Loaded: forecast.json/iu)).toBeInTheDocument();
       });
 
       // Now test copying
