@@ -203,6 +203,31 @@ const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCr
   ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
 
+type LocalPostRequestOptions = {
+  body?: unknown;
+  failureMessage: string;
+};
+
+/** Posts JSON to a local auth endpoint and normalizes non-ok responses into errors. */
+const postLocalJson = async <TResponse = Record<string, unknown>>(
+  path: string,
+  { body, failureMessage }: LocalPostRequestOptions
+): Promise<TResponse> => {
+  const resp = await fetch(path, {
+    method: 'POST',
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: 'include',
+  });
+
+  if (!resp.ok) {
+    const errorBody = (await safeParseJson<{ message?: string }>(resp)) ?? {};
+    throw new Error(errorBody.message ?? failureMessage);
+  }
+
+  return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
+};
+
 /** True when two normalized settings payloads contain the same user-visible values. */
 const areUserSettingsEqual = (
   left: UserSettingsDocument | null,
@@ -713,7 +738,7 @@ const localSignOutUser = async (deps: {
 }) => {
   const { setUser, setStatus, setSyncedSettings, setSettingsSyncStatus, setBetaAccess } = deps;
   try {
-    await fetch('/api/local/signout', { method: 'POST', credentials: 'include' });
+    await postLocalJson('/api/local/signout', { failureMessage: 'Unable to sign out right now.' });
   } catch {
     // ignore local sign out errors
   }
@@ -766,21 +791,18 @@ const localUpdateSyncedSettings = async (
   const { setError, currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef, setSettingsSyncStatus } = deps;
   setError(null);
 
-  const resp = await fetch('/api/local/profile', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ settings }),
-    credentials: 'include',
-  });
-
-  if (!resp.ok) {
-    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Unable to update settings' };
-    const message = body?.message ?? 'Unable to update synced settings right now.';
+  let data: Record<string, unknown>;
+  try {
+    data = await postLocalJson<Record<string, unknown>>('/api/local/profile', {
+      body: { settings },
+      failureMessage: 'Unable to update synced settings right now.',
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to update synced settings right now.';
     setError(message);
-    throw new Error(message);
+    throw error instanceof Error ? error : new Error(message);
   }
 
-  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
   const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
   if (remoteSettings) {
     applySettingsToState(remoteSettings, {

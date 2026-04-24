@@ -11,36 +11,21 @@ beforeEach(() => {
 });
 
 describe('DeleteConfirmation', () => {
-  it('renders nothing when isOpen is false', () => {
-    const { container } = render(
+  const renderDeleteConfirmation = (modalState: React.ComponentProps<typeof DeleteConfirmation>['modalState']) =>
+    render(
       <DeleteConfirmation
-        modalState={{ isOpen: false }}
+        modalState={modalState}
         onConfirm={mockOnConfirm}
         onCancel={mockOnCancel}
       />
     );
-    expect(container).toBeEmptyDOMElement();
-  });
 
-  it('renders nothing when outlookType is missing even if open', () => {
-    const { container } = render(
-      <DeleteConfirmation
-        modalState={{ isOpen: true, probability: '30%' }}
-        onConfirm={mockOnConfirm}
-        onCancel={mockOnCancel}
-      />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('renders nothing when probability is missing even if open', () => {
-    const { container } = render(
-      <DeleteConfirmation
-        modalState={{ isOpen: true, outlookType: 'categorical' }}
-        onConfirm={mockOnConfirm}
-        onCancel={mockOnCancel}
-      />
-    );
+  it.each([
+    ['renders nothing when isOpen is false', { isOpen: false }],
+    ['renders nothing when outlookType is missing even if open', { isOpen: true, probability: '30%' }],
+    ['renders nothing when probability is missing even if open', { isOpen: true, outlookType: 'categorical' }],
+  ])('%s', (_name, modalState) => {
+    const { container } = renderDeleteConfirmation(modalState);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -61,37 +46,18 @@ describe('DeleteConfirmation', () => {
     expect(screen.getByRole('button', { name: /keep/i })).toBeInTheDocument();
   });
 
-  it('calls onConfirm when delete button is clicked', () => {
-    render(
-      <DeleteConfirmation
-        modalState={{
-          isOpen: true,
-          outlookType: 'categorical',
-          probability: '30%',
-          featureId: 'feature-1',
-        }}
-        onConfirm={mockOnConfirm}
-        onCancel={mockOnCancel}
-      />
-    );
-    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
-    expect(mockOnConfirm).toHaveBeenCalledTimes(1);
-  });
+  it.each([
+    ['calls onConfirm when delete button is clicked', /delete/i, mockOnConfirm],
+    ['calls onCancel when keep button is clicked', /keep/i, mockOnCancel],
+  ])('%s', (_name, buttonName, handler) => {
+    renderDeleteConfirmation({
+      isOpen: true,
+      outlookType: 'categorical',
+      probability: '30%',
+      featureId: 'feature-1',
+    });
 
-  it('calls onCancel when keep button is clicked', () => {
-    render(
-      <DeleteConfirmation
-        modalState={{
-          isOpen: true,
-          outlookType: 'categorical',
-          probability: '30%',
-          featureId: 'feature-1',
-        }}
-        onConfirm={mockOnConfirm}
-        onCancel={mockOnCancel}
-      />
-    );
-    fireEvent.click(screen.getByRole('button', { name: /keep/i }));
-    expect(mockOnCancel).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: buttonName }));
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });

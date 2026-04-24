@@ -1,7 +1,14 @@
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AlertBanner from './AlertBanner';
 
 describe('AlertBanner', () => {
+  const mockBannerFetch = (config: unknown, ok = true) => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok,
+      json: () => Promise.resolve(config),
+    });
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn();
@@ -14,47 +21,34 @@ describe('AlertBanner', () => {
       type: 'warning',
       dismissible: true,
     };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockConfig),
-    });
+    mockBannerFetch(mockConfig);
 
     render(<AlertBanner />);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await waitFor(() => expect(screen.getByText('Test Alert')).toBeInTheDocument());
 
     expect(screen.getByText('Test Alert')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveClass('alert-banner--warning');
   });
 
-  test('remains hidden when disabled', async () => {
-    const mockConfig = { enabled: false, message: 'Hidden', type: 'info', dismissible: true };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockConfig),
-    });
+  it.each([
+    ['remains hidden when disabled', { enabled: false, message: 'Hidden', type: 'info', dismissible: true }, true],
+    ['remains hidden on fetch failure', new Error('Fetch failed'), false],
+    ['handles non-ok response', null, null],
+  ])('%s', async (_name, config, ok) => {
+    if (config instanceof Error) {
+      (global.fetch as jest.Mock).mockRejectedValue(config);
+    } else if (config === null) {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    } else {
+      mockBannerFetch(config, ok ?? true);
+    }
 
     render(<AlertBanner />);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
-
-    expect(screen.queryByText('Hidden')).not.toBeInTheDocument();
-  });
-
-  test('remains hidden on fetch failure', async () => {
-    (global.fetch as jest.Mock).mockRejectedValue(new Error('Fetch failed'));
-
-    render(<AlertBanner />);
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   test('can be dismissed', async () => {
@@ -64,16 +58,11 @@ describe('AlertBanner', () => {
       type: 'error',
       dismissible: true,
     };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockConfig),
-    });
+    mockBannerFetch(mockConfig);
 
     render(<AlertBanner />);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await waitFor(() => expect(screen.getByText('Dismiss me')).toBeInTheDocument());
 
     const closeButton = screen.getByLabelText('Dismiss alert');
     fireEvent.click(closeButton);
@@ -88,31 +77,12 @@ describe('AlertBanner', () => {
       type: 'info',
       dismissible: false,
     };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockConfig),
-    });
+    mockBannerFetch(mockConfig);
 
     render(<AlertBanner />);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
 
     expect(screen.queryByLabelText('Dismiss alert')).not.toBeInTheDocument();
-  });
-
-  test('handles non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-    });
-
-    render(<AlertBanner />);
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

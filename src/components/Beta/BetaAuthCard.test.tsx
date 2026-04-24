@@ -19,6 +19,11 @@ describe('BetaAuthCard', () => {
   const signInWithGoogle = jest.fn();
   const signUpWithEmail = jest.fn();
 
+  const fillEmailPassword = (email: string, password: string) => {
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: email } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: password } });
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     (useAuth as jest.Mock).mockReturnValue({
@@ -68,31 +73,21 @@ describe('BetaAuthCard', () => {
     await waitFor(() => expect(signInWithEmail).toHaveBeenCalledWith('test@example.com', 'password123'));
   });
 
-  test('handles email sign-up with password mismatch', async () => {
-    render(<BetaAuthCard title="T" description="D" allowSignUp />);
-    
-    // Switch to Sign Up mode
-    fireEvent.click(screen.getByText('Create Account'));
-    
-    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'new@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'mismatch' } });
-    
-    fireEvent.click(screen.getByRole('button', { name: /Create Beta Account/i }));
-
-    await waitFor(() => expect(screen.getByText('Passwords do not match.')).toBeInTheDocument());
-    expect(signUpWithEmail).not.toHaveBeenCalled();
-  });
-
-  test('handles email sign-up success', async () => {
+  it.each([
+    ['handles email sign-up with password mismatch', 'mismatch', 'Passwords do not match.', false],
+    ['handles email sign-up success', 'password123', null, true],
+  ])('%s', async (_name, confirmPassword, expectedError) => {
     render(<BetaAuthCard title="T" description="D" allowSignUp />);
     fireEvent.click(screen.getByText('Create Account'));
-    
-    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'new@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: 'password123' } });
-    
+    fillEmailPassword('new@example.com', 'password123');
+    fireEvent.change(screen.getByLabelText(/Confirm Password/i), { target: { value: confirmPassword } });
     fireEvent.click(screen.getByRole('button', { name: /Create Beta Account/i }));
+
+    if (expectedError) {
+      await waitFor(() => expect(screen.getByText(expectedError)).toBeInTheDocument());
+      expect(signUpWithEmail).not.toHaveBeenCalled();
+      return;
+    }
 
     await waitFor(() => expect(signUpWithEmail).toHaveBeenCalledWith('new@example.com', 'password123'));
   });

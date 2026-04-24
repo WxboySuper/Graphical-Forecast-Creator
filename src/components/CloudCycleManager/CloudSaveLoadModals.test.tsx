@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CloudSaveModal, CloudLoadModal } from './CloudSaveLoadModals';
 
 // Mock lucide-react
@@ -47,12 +47,10 @@ describe('CloudSaveModal', () => {
     
     const saveButton = screen.getByRole('button', { name: 'Save to Cloud' });
     
-    await act(() => {
-      fireEvent.click(saveButton);
-    });
+    fireEvent.click(saveButton);
 
-    expect(onSave).toHaveBeenCalledWith('New Label');
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith('New Label'));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
   test('handles save failure', async () => {
@@ -68,11 +66,9 @@ describe('CloudSaveModal', () => {
 
     const saveButton = screen.getByRole('button', { name: 'Save to Cloud' });
     
-    await act(() => {
-      fireEvent.click(saveButton);
-    });
+    fireEvent.click(saveButton);
 
-    expect(onSave).toHaveBeenCalled();
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
@@ -131,37 +127,30 @@ describe('CloudLoadModal', () => {
     fireEvent.click(cycle1Button);
 
     const loadButton = screen.getByRole('button', { name: 'Load' });
-    
-    await act(() => {
-      fireEvent.click(loadButton);
-    });
+    fireEvent.click(loadButton);
 
-    expect(onLoad).toHaveBeenCalledWith('1');
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(onLoad).toHaveBeenCalledWith('1'));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
-  test('shows empty message when no cycles', () => {
+  it.each([
+    ['shows empty message when no cycles', [], 'No cloud cycles saved yet'],
+    ['shows loading indicator', [], 'loader-icon'],
+  ])('%s', (_name, cycles, expected) => {
     render(
       <CloudLoadModal
         open
         onOpenChange={onOpenChange}
         onLoad={onLoad}
-        cycles={[]}
+        cycles={cycles}
+        isLoading={expected === 'loader-icon'}
       />
     );
-    expect(screen.getByText('No cloud cycles saved yet')).toBeInTheDocument();
-  });
 
-  test('shows loading indicator', () => {
-    render(
-      <CloudLoadModal
-        open
-        onOpenChange={onOpenChange}
-        onLoad={onLoad}
-        cycles={[]}
-        isLoading
-      />
-    );
-    expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
+    if (expected === 'loader-icon') {
+      expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
+    } else {
+      expect(screen.getByText(expected)).toBeInTheDocument();
+    }
   });
 });

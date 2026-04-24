@@ -38,82 +38,69 @@ describe('BetaAccessGuard', () => {
     );
   };
 
-  test('renders children if beta mode is disabled', () => {
-    (isBetaModeEnabled as jest.Mock).mockReturnValue(false);
-    (useAuth as jest.Mock).mockReturnValue({});
+  it.each([
+    ['renders children if beta mode is disabled', false, false, {}, 'Protected Content'],
+    ['renders children if local beta bypass is enabled', true, true, {}, 'Protected Content'],
+    [
+      'renders children if signed in and has beta access',
+      true,
+      false,
+      {
+        hostedAuthEnabled: true,
+        status: 'signed_in',
+        betaAccessLoading: false,
+        betaAccess: true,
+      },
+      'Protected Content',
+    ],
+  ])('%s', (_name, betaEnabled, bypassEnabled, authState, expectedText) => {
+    (isBetaModeEnabled as jest.Mock).mockReturnValue(betaEnabled);
+    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(bypassEnabled);
+    (useAuth as jest.Mock).mockReturnValue(authState);
 
     renderGuard();
-    expect(screen.getByText('Protected Content')).toBeInTheDocument();
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
-  test('renders children if local beta bypass is enabled', () => {
-    (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
-    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(true);
-    (useAuth as jest.Mock).mockReturnValue({});
-
-    renderGuard();
-    expect(screen.getByText('Protected Content')).toBeInTheDocument();
-  });
-
-  test('redirects to /beta if hosted auth is disabled', () => {
+  it.each([
+    [
+      'redirects to /beta if hosted auth is disabled',
+      {
+        hostedAuthEnabled: false,
+      },
+    ],
+    [
+      'redirects to /beta if signed out',
+      {
+        hostedAuthEnabled: true,
+        status: 'signed_out',
+        betaAccessLoading: false,
+      },
+    ],
+  ])('%s', (_name, authState) => {
     (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
     (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
-    (useAuth as jest.Mock).mockReturnValue({ hostedAuthEnabled: false });
+    (useAuth as jest.Mock).mockReturnValue(authState);
 
     renderGuard();
     expect(screen.getByText('Beta Page')).toBeInTheDocument();
   });
 
-  test('shows checking status when status is loading', () => {
+  it.each([
+    [
+      'shows checking status when status is loading',
+      { hostedAuthEnabled: true, status: 'loading', betaAccessLoading: false },
+    ],
+    [
+      'shows checking status when betaAccessLoading is true',
+      { hostedAuthEnabled: true, status: 'signed_in', betaAccessLoading: true },
+    ],
+  ])('%s', (_name, authState) => {
     (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
     (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
-    (useAuth as jest.Mock).mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'loading',
-      betaAccessLoading: false,
-    });
+    (useAuth as jest.Mock).mockReturnValue(authState);
 
     renderGuard();
     expect(screen.getByText('Checking beta access')).toBeInTheDocument();
-  });
-
-  test('shows checking status when betaAccessLoading is true', () => {
-    (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
-    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
-    (useAuth as jest.Mock).mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'signed_in',
-      betaAccessLoading: true,
-    });
-
-    renderGuard();
-    expect(screen.getByText('Checking beta access')).toBeInTheDocument();
-  });
-
-  test('renders children if signed in and has beta access', () => {
-    (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
-    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
-    (useAuth as jest.Mock).mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'signed_in',
-      betaAccessLoading: false,
-      betaAccess: true,
-    });
-
-    renderGuard();
-    expect(screen.getByText('Protected Content')).toBeInTheDocument();
-  });
-
-  test('redirects to /beta if signed out', () => {
-    (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
-    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
-    (useAuth as jest.Mock).mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'signed_out',
-      betaAccessLoading: false,
-    });
-
-    renderGuard();
-    expect(screen.getByText('Beta Page')).toBeInTheDocument();
   });
 });
