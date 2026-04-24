@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
+import App from './App';
+import { Outlet } from 'react-router-dom';
 
-// Mock pages to avoid importing heavy modules (OpenLayers / ol-mapbox-style) during App tests
+// Mock pages to avoid heavy modules
 jest.mock('./pages', () => ({
   HomePage: () => <div>HomePage Mock</div>,
   ForecastPage: () => <div>ForecastPage Mock</div>,
@@ -14,17 +16,36 @@ jest.mock('./pages', () => ({
   BetaInvitePage: () => <div>BetaInvitePage Mock</div>,
 }));
 
-// Mock ForecastMap to avoid Leaflet/Geoman issues
-jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
+// Mock components
+jest.mock('./components/Layout', () => ({
+  AppLayout: () => (
+    <div>
+      <div>AppLayout Mock</div>
+      <Outlet />
+    </div>
+  ),
+}));
 
-// Mock other components if necessary (good practice to isolate App testing)
+jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
+jest.mock('./components/Beta/BetaAccessGuard', () => () => <Outlet />);
+jest.mock('./components/ToS/ToSModal', () => ({
+  __esModule: true,
+  hasAcceptedToS: () => true,
+  default: () => <div>ToSModal Mock</div>,
+}));
+jest.mock('./components/PrivacyPolicy/PrivacyPolicyModal', () => ({
+  __esModule: true,
+  hasAcceptedPrivacyPolicy: () => true,
+  default: () => <div>PrivacyPolicyModal Mock</div>,
+}));
 
-import App from './App';
-
-test('renders Graphical Forecast Creator title', () => {
-  render(<App />);
-  const titleElements = screen.getAllByText(/Graphical Forecast Creator/i);
-  expect(titleElements[0]).toBeInTheDocument();
+describe('App Simple', () => {
+  test('renders HomePage by default', () => {
+    act(() => {
+      render(<App />);
+    });
+    expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
+  });
 });

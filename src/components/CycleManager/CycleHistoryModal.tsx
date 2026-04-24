@@ -8,7 +8,7 @@ import {
   deleteSavedCycle,
   SavedCycle
 } from '../../store/forecastSlice';
-import { DayType, OutlookData } from '../../types/outlooks';
+import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
 import './CycleHistoryModal.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
@@ -173,26 +173,38 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     setConfirmAction(null);
   };
 
-  /** Builds a short saved-cycle summary, preferring cached stats metadata when it is available. */
-  const getDaySummary = (cycle: SavedCycle) => {
-    if (typeof cycle.stats?.forecastDays === 'number') {
-      return cycle.stats.forecastDays > 0 ? `${cycle.stats.forecastDays} forecast day${cycle.stats.forecastDays === 1 ? '' : 's'}` : 'No polygons';
+  /** Returns true when a saved day contains at least one populated outlook map. */
+  const hasDayData = (dayKey: string, days: SavedCycle['forecastCycle']['days']): boolean => {
+    const day = days[Number(dayKey) as DayType];
+    if (!day?.data) {
+      return false;
     }
 
-    // Extract day keys, then filter to those with any feature maps that have size > 0
-    const keys = Object.keys(cycle.forecastCycle.days);
-    if (keys.length === 0) return 'No data';
+    return Object.values(day.data).some((map) => Boolean(map && map.size > 0));
+  };
 
-    const daysWithData = keys.filter((dayKey) => {
-      const day = cycle.forecastCycle.days[Number(dayKey) as DayType];
-      if (!day) return false;
-      const outlookKeys = Object.keys(day.data || {});
-      return outlookKeys.some((outlookKey) => {
-        const map = day.data[outlookKey as keyof OutlookData];
-        return Boolean(map && map.size > 0);
-      });
-    });
+  /** Formats the summary for a saved cycle using cached stats or a day-by-day fallback. */
+  const getDaySummary = (cycle: SavedCycle): string => {
+    const forecastDays = cycle.stats?.forecastDays;
+    if (typeof forecastDays === 'number') {
+      if (forecastDays > 0) {
+        const label = forecastDays === 1 ? 'forecast day' : 'forecast days';
+        return `${forecastDays} ${label}`;
+      }
+      return 'No polygons';
+    }
 
+    const days = cycle.forecastCycle?.days;
+    if (!days) {
+      return 'No data';
+    }
+
+    const keys = Object.keys(days);
+    if (keys.length === 0) {
+      return 'No data';
+    }
+
+    const daysWithData = keys.filter((dayKey) => hasDayData(dayKey, days));
     return daysWithData.length > 0 ? `Days: ${daysWithData.join(', ')}` : 'No polygons';
   };
 

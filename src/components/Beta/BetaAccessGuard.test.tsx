@@ -1,47 +1,118 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import BetaAccessGuard from './BetaAccessGuard';
+import { useAuth } from '../../auth/AuthProvider';
+import { isBetaModeEnabled, isLocalBetaBypassEnabled } from '../../lib/betaAccess';
 
+// Mock useAuth
 jest.mock('../../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
-const mockUseAuth = jest.requireMock('../../auth/AuthProvider').useAuth as jest.Mock;
+// Mock lib/betaAccess
+jest.mock('../../lib/betaAccess', () => ({
+  isBetaModeEnabled: jest.fn(),
+  isLocalBetaBypassEnabled: jest.fn(),
+}));
 
-const renderGuard = (initialEntry: string) =>
-  render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <Routes>
-        <Route path="/beta" element={<div>Beta Landing</div>} />
-        <Route element={<BetaAccessGuard />}>
-          <Route path="/forecast" element={<div>Forecast Page</div>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
-  );
+// Mock BetaPageLayout
+jest.mock('./BetaPageLayout', () => ({
+  BetaStatusPanel: ({ title }: { title: string }) => <div>{title}</div>,
+}));
 
-describe('BetaAccessGuard local bypass', () => {
+describe('BetaAccessGuard', () => {
   beforeEach(() => {
-    globalThis.__GFC_BETA_MODE__ = true;
-    localStorage.clear();
-    mockUseAuth.mockReturnValue({
-      betaAccess: false,
-      betaAccessLoading: false,
-      hostedAuthEnabled: true,
-      status: 'signed_out',
-    });
+    jest.clearAllMocks();
   });
 
-  test('allows localhost sessions through the beta gate when the local bypass query flag is enabled', () => {
-    renderGuard('/forecast?localBetaBypass=1');
+  const renderGuard = (initialEntries = ['/protected']) => {
+    return render(
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route element={<BetaAccessGuard />}>
+            <Route path="/protected" element={<div>Protected Content</div>} />
+          </Route>
+          <Route path="/beta" element={<div>Beta Page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+  };
 
-    expect(screen.getByText('Forecast Page')).toBeInTheDocument();
+  it.each([
+    {
+      name: 'renders children if beta mode is disabled',
+      betaEnabled: false,
+      bypassEnabled: false,
+      authState: {},
+      expectedText: 'Protected Content',
+    },
+    {
+      name: 'renders children if local beta bypass is enabled',
+      betaEnabled: true,
+      bypassEnabled: true,
+      authState: {},
+      expectedText: 'Protected Content',
+    },
+    {
+      name: 'renders children if signed in and has beta access',
+      betaEnabled: true,
+      bypassEnabled: false,
+      authState: {
+        hostedAuthEnabled: true,
+        status: 'signed_in',
+        betaAccessLoading: false,
+        betaAccess: true,
+      },
+      expectedText: 'Protected Content',
+    },
+  ])('$name', ({ betaEnabled, bypassEnabled, authState, expectedText }) => {
+    (isBetaModeEnabled as jest.Mock).mockReturnValue(betaEnabled);
+    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(bypassEnabled);
+    (useAuth as jest.Mock).mockReturnValue(authState);
+
+    renderGuard();
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
-  test('still redirects to the beta landing page without the local bypass', () => {
-    renderGuard('/forecast');
+  it.each([
+    [
+      'redirects to /beta if hosted auth is disabled',
+      {
+        hostedAuthEnabled: false,
+      },
+    ],
+    [
+      'redirects to /beta if signed out',
+      {
+        hostedAuthEnabled: true,
+        status: 'signed_out',
+        betaAccessLoading: false,
+      },
+    ],
+  ])('%s', (_name, authState) => {
+    (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
+    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
+    (useAuth as jest.Mock).mockReturnValue(authState);
 
-    expect(screen.getByText('Beta Landing')).toBeInTheDocument();
+    renderGuard();
+    expect(screen.getByText('Beta Page')).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      'shows checking status when status is loading',
+      { hostedAuthEnabled: true, status: 'loading', betaAccessLoading: false },
+    ],
+    [
+      'shows checking status when betaAccessLoading is true',
+      { hostedAuthEnabled: true, status: 'signed_in', betaAccessLoading: true },
+    ],
+  ])('%s', (_name, authState) => {
+    (isBetaModeEnabled as jest.Mock).mockReturnValue(true);
+    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
+    (useAuth as jest.Mock).mockReturnValue(authState);
+
+    renderGuard();
+    expect(screen.getByText('Checking beta access')).toBeInTheDocument();
   });
 });
