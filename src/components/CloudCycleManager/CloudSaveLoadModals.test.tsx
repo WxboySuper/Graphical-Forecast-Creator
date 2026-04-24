@@ -134,9 +134,9 @@ describe('CloudLoadModal', () => {
   });
 
   it.each([
-    ['shows empty message when no cycles', [], 'No cloud cycles saved yet'],
-    ['shows loading indicator', [], 'loader-icon'],
-  ])('%s', (_name, cycles, expected) => {
+    { name: 'shows empty message when no cycles', cycles: [], expected: 'No cloud cycles saved yet' },
+    { name: 'shows loading indicator', cycles: [], expected: 'loader-icon' },
+  ])('$name', ({ cycles, expected }) => {
     render(
       <CloudLoadModal
         open

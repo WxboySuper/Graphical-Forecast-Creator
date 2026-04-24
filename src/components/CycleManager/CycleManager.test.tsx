@@ -111,6 +111,39 @@ const buildStore = (overrides: ForecastStateOverrides = {}) => {
 const mockAddToast = jest.fn();
 const mockAppLayoutValue = { addToast: mockAddToast };
 
+const renderWithForecastStore = (
+  ui: React.ReactElement,
+  overrides: ForecastStateOverrides = {},
+) => {
+  const store = buildStore(overrides);
+
+  return {
+    store,
+    ...render(
+      <Provider store={store}>
+        <AppLayoutContext.Provider value={mockAppLayoutValue}>
+          {ui}
+        </AppLayoutContext.Provider>
+      </Provider>
+    ),
+  };
+};
+
+const renderCycleHistoryModal = (
+  props: Partial<React.ComponentProps<typeof CycleHistoryModal>> = {},
+  overrides: ForecastStateOverrides = {},
+) => renderWithForecastStore(
+  <CycleHistoryModal isOpen onClose={jest.fn()} {...props} />,
+  overrides,
+);
+
+const renderCopyFromPreviousModal = (onClose = jest.fn()) =>
+  renderWithForecastStore(<CopyFromPreviousModal isOpen onClose={onClose} />);
+
+const openCycleSaveForm = () => {
+  fireEvent.click(screen.getByRole('button', { name: /Save Current Cycle/i }));
+};
+
 describe('CycleManager Components', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -118,9 +151,8 @@ describe('CycleManager Components', () => {
 
   describe('CycleHistoryModal', () => {
     it('renders nothing when closed', () => {
-      const store = buildStore();
       const { container } = render(
-        <Provider store={store}>
+        <Provider store={buildStore()}>
           <AppLayoutContext.Provider value={mockAppLayoutValue}>
             <CycleHistoryModal isOpen={false} onClose={jest.fn()} />
           </AppLayoutContext.Provider>
@@ -130,29 +162,15 @@ describe('CycleManager Components', () => {
     });
 
     it('renders header and empty state when open with no cycles', () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal();
       expect(screen.getByRole('heading', { name: /Saved Cycles/i })).toBeInTheDocument();
       expect(screen.getByText(/No saved cycles yet/i)).toBeInTheDocument();
     });
 
     it('allows saving the current cycle', () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal();
 
-      fireEvent.click(screen.getByRole('button', { name: /Save Current Cycle/i }));
+      openCycleSaveForm();
       const input = screen.getByPlaceholderText(/Optional label/i);
       fireEvent.change(input, { target: { value: 'New Test Cycle' } });
       
@@ -161,31 +179,17 @@ describe('CycleManager Components', () => {
     });
 
     it('handles saving with empty label', () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal();
 
-      fireEvent.click(screen.getByRole('button', { name: /Save Current Cycle/i }));
+      openCycleSaveForm();
       fireEvent.click(screen.getByRole('button', { name: /^Save$/i }));
       expect(mockAddToast).toHaveBeenCalledWith(expect.stringContaining('saved successfully'), 'success');
     });
 
     it('allows cancelling the save form', () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal();
 
-      fireEvent.click(screen.getByRole('button', { name: /Save Current Cycle/i }));
+      openCycleSaveForm();
       fireEvent.click(screen.getByRole('button', { name: /Cancel/i }));
       expect(screen.queryByPlaceholderText(/Optional label/i)).not.toBeInTheDocument();
     });
@@ -201,16 +205,9 @@ describe('CycleManager Components', () => {
           stats: { forecastDays: 2, totalOutlooks: 1, totalFeatures: 5 },
         },
       ];
-      const store = buildStore({ savedCycles });
       const onClose = jest.fn();
       
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={onClose} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal({ onClose }, { savedCycles });
 
       expect(screen.getByText(/Test Cycle/i)).toBeInTheDocument();
       expect(screen.getByText(/2 forecast days/i)).toBeInTheDocument();
@@ -233,29 +230,15 @@ describe('CycleManager Components', () => {
           stats: { forecastDays: 1, totalOutlooks: 1, totalFeatures: 5 },
         },
       ];
-      const store = buildStore({ savedCycles });
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAddToast}>
-            <CycleHistoryModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal({}, { savedCycles });
 
       expect(screen.getByText(/1 forecast day/i)).toBeInTheDocument();
     });
 
     it('allows deleting a cycle', () => {
       const savedCycles = [{ id: 'cycle-1', timestamp: '2026-04-20T10:00:00Z', cycleDate: '2026-04-20', label: 'To Delete', forecastCycle: {}, stats: {} }];
-      const store = buildStore({ savedCycles });
       
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal({}, { savedCycles });
 
       fireEvent.click(screen.getByTitle('Delete this cycle'));
       fireEvent.click(screen.getByText('Confirm'));
@@ -264,28 +247,14 @@ describe('CycleManager Components', () => {
 
     it('handles Escape key to close modal', () => {
       const onClose = jest.fn();
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={onClose} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal({ onClose });
 
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(onClose).toHaveBeenCalled();
     });
 
     it('traps focus with Tab and Shift+Tab', () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CycleHistoryModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCycleHistoryModal();
 
       const focusable = screen.getAllByRole('button');
       const first = focusable[0];
@@ -303,26 +272,12 @@ describe('CycleManager Components', () => {
 
   describe('CopyFromPreviousModal', () => {
     it('renders file input and day selectors when open', () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCopyFromPreviousModal();
       expect(screen.getByText(/Copy from Previous Cycle/i)).toBeInTheDocument();
     });
 
     it('handles successful file loading', async () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCopyFromPreviousModal();
 
       const file = new File(['{"cycleDate": "2026-04-21"}'], 'forecast.json', { type: 'application/json' });
       const input = screen.getByLabelText(/Load Forecast File:/i);
@@ -340,14 +295,7 @@ describe('CycleManager Components', () => {
     });
 
     it('handles file parsing errors', async () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCopyFromPreviousModal();
 
       const file = new File(['invalid json'], 'bad.json', { type: 'application/json' });
       const input = screen.getByLabelText(/Load Forecast File:/i);
@@ -360,14 +308,7 @@ describe('CycleManager Components', () => {
     });
 
     it('traps focus with Tab and Shift+Tab', () => {
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen onClose={jest.fn()} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCopyFromPreviousModal();
 
       // When no cycle is loaded, only Cancel and disabled Copy are in tab order
       const cancelBtn = screen.getByRole('button', { name: /cancel/i });
@@ -381,14 +322,7 @@ describe('CycleManager Components', () => {
 
     it('closes on Escape key', () => {
       const onClose = jest.fn();
-      const store = buildStore();
-      render(
-        <Provider store={store}>
-          <AppLayoutContext.Provider value={mockAppLayoutValue}>
-            <CopyFromPreviousModal isOpen onClose={onClose} />
-          </AppLayoutContext.Provider>
-        </Provider>
-      );
+      renderCopyFromPreviousModal(onClose);
 
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(onClose).toHaveBeenCalled();

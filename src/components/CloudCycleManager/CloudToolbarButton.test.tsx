@@ -27,88 +27,58 @@ jest.mock('../ui/tooltip', () => ({
 describe('CloudToolbarButton', () => {
   const onSaveToCloud = jest.fn();
   const onOpenCloudLibrary = jest.fn();
+  const defaultToolbarProps = {
+    canSave: true,
+    premiumActive: true,
+    isExpiredPremium: false,
+    currentCycleDate: '20260401',
+    onSaveToCloud,
+    onOpenCloudLibrary,
+  };
+
+  const renderToolbar = (props: Partial<React.ComponentProps<typeof CloudToolbarButton>> = {}) =>
+    render(<CloudToolbarButton {...defaultToolbarProps} {...props} />);
+
+  const openSaveModal = () => {
+    fireEvent.click(screen.getByText('Save to Cloud'));
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   test('renders save and open actions', () => {
-    render(
-      <CloudToolbarButton
-        canSave
-        premiumActive
-        isExpiredPremium={false}
-        currentCycleDate="20260401"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar();
     expect(screen.getByText('Save to Cloud')).toBeInTheDocument();
     expect(screen.getByText('Open Cloud')).toBeInTheDocument();
   });
 
   test('opens save modal on click', () => {
-    render(
-      <CloudToolbarButton
-        canSave
-        premiumActive
-        isExpiredPremium={false}
-        currentCycleDate="20260401"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar();
     
-    fireEvent.click(screen.getByText('Save to Cloud'));
+    openSaveModal();
     expect(screen.getByTestId('save-modal')).toBeInTheDocument();
   });
 
   test('shows error in modal when canSave is false (not premium)', () => {
-    render(
-      <CloudToolbarButton
-        canSave={false}
-        premiumActive={false}
-        isExpiredPremium={false}
-        currentCycleDate="20260401"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar({ canSave: false, premiumActive: false });
     
-    fireEvent.click(screen.getByText('Save to Cloud'));
+    openSaveModal();
     expect(screen.getByTestId('modal-error')).toHaveTextContent('Subscribe to premium');
   });
 
   test('shows error in modal when premium expired', () => {
-    render(
-      <CloudToolbarButton
-        canSave={false}
-        premiumActive
-        isExpiredPremium
-        currentCycleDate="20260401"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar({ canSave: false, isExpiredPremium: true });
     
-    fireEvent.click(screen.getByText('Save to Cloud'));
+    openSaveModal();
     expect(screen.getByTestId('modal-error')).toHaveTextContent('premium subscription has expired');
   });
 
   test('handles successful save', async () => {
     onSaveToCloud.mockResolvedValue();
-    render(
-      <CloudToolbarButton
-        canSave
-        premiumActive
-        isExpiredPremium={false}
-        currentCycleDate="20260401"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar();
     
-    fireEvent.click(screen.getByText('Save to Cloud'));
+    openSaveModal();
     
     fireEvent.click(screen.getByText('Confirm Save'));
 
@@ -118,18 +88,9 @@ describe('CloudToolbarButton', () => {
 
   test('handles save error from callback', async () => {
     onSaveToCloud.mockRejectedValue(new Error('API Error'));
-    render(
-      <CloudToolbarButton
-        canSave
-        premiumActive
-        isExpiredPremium={false}
-        currentCycleDate="20260401"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar();
     
-    fireEvent.click(screen.getByText('Save to Cloud'));
+    openSaveModal();
     
     fireEvent.click(screen.getByText('Confirm Save'));
 
@@ -138,33 +99,14 @@ describe('CloudToolbarButton', () => {
   });
 
   test('calls onOpenCloudLibrary', () => {
-    render(
-      <CloudToolbarButton
-        canSave
-        premiumActive
-        isExpiredPremium={false}
-        currentCycleDate="20260401"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar();
     
     fireEvent.click(screen.getByText('Open Cloud'));
     expect(onOpenCloudLibrary).toHaveBeenCalled();
   });
 
   test('disables save button when saving', () => {
-    render(
-      <CloudToolbarButton
-        canSave
-        premiumActive
-        isExpiredPremium={false}
-        currentCycleDate="20260401"
-        syncState="saving"
-        onSaveToCloud={onSaveToCloud}
-        onOpenCloudLibrary={onOpenCloudLibrary}
-      />
-    );
+    renderToolbar({ syncState: 'saving' });
     expect(screen.getByLabelText('Save forecast to cloud')).toBeDisabled();
   });
 });

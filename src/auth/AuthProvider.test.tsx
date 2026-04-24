@@ -35,6 +35,21 @@ const createMockStore = () => configureStore({
   },
 });
 
+const renderAuthHookWithStore = (store: ReturnType<typeof createMockStore>) =>
+  renderHook(() => useAuth(), {
+    wrapper: ({ children }) => (
+      <Provider store={store}>
+        <AuthProvider>{children}</AuthProvider>
+      </Provider>
+    ),
+  });
+
+const waitForAuthEffects = async (delay = 100) => {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  });
+};
+
 describe('AuthProvider Utils', () => {
   test('safeParseJson parses valid JSON', async () => {
     const data = { foo: 'bar' };
@@ -122,17 +137,9 @@ describe('AuthProvider Local Auth', () => {
       json: () => Promise.resolve({}),
     });
 
-    const { result } = renderHook(() => useAuth(), {
-      wrapper: ({ children }) => (
-        <Provider store={store}>
-          <AuthProvider>{children}</AuthProvider>
-        </Provider>
-      ),
-    });
+    const { result } = renderAuthHookWithStore(store);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await waitForAuthEffects(0);
 
     expect(result.current.status).toBe('signed_out');
   });
@@ -158,17 +165,9 @@ describe('AuthProvider Local Auth', () => {
       json: () => Promise.resolve(mockUser),
     });
 
-    const { result } = renderHook(() => useAuth(), {
-      wrapper: ({ children }) => (
-        <Provider store={store}>
-          <AuthProvider>{children}</AuthProvider>
-        </Provider>
-      ),
-    });
+    const { result } = renderAuthHookWithStore(store);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
+    await waitForAuthEffects();
 
     expect(result.current.status).toBe('signed_in');
     expect(result.current.user?.uid).toBe('local-user');
@@ -183,13 +182,7 @@ describe('AuthProvider Local Auth', () => {
         json: () => Promise.resolve(mockUser),
       });
 
-    const { result } = renderHook(() => useAuth(), {
-      wrapper: ({ children }) => (
-        <Provider store={store}>
-          <AuthProvider>{children}</AuthProvider>
-        </Provider>
-      ),
-    });
+    const { result } = renderAuthHookWithStore(store);
 
     await act(async () => {
       await result.current.signUpWithEmail('user2@example.com', 'password');
@@ -211,17 +204,9 @@ describe('AuthProvider Local Auth', () => {
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockUser) })
       .mockResolvedValueOnce({ ok: true });
 
-    const { result } = renderHook(() => useAuth(), {
-      wrapper: ({ children }) => (
-        <Provider store={store}>
-          <AuthProvider>{children}</AuthProvider>
-        </Provider>
-      ),
-    });
+    const { result } = renderAuthHookWithStore(store);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
+    await waitForAuthEffects();
 
     expect(result.current.status).toBe('signed_in');
 
@@ -242,17 +227,9 @@ describe('AuthProvider Local Auth', () => {
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockUser) })
       .mockResolvedValueOnce({ ok: true });
 
-    const { result } = renderHook(() => useAuth(), {
-      wrapper: ({ children }) => (
-        <Provider store={store}>
-          <AuthProvider>{children}</AuthProvider>
-        </Provider>
-      ),
-    });
+    const { result } = renderAuthHookWithStore(store);
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
+    await waitForAuthEffects();
 
     await act(async () => {
       await result.current.updateSyncedSettings({ darkMode: false });
