@@ -99,15 +99,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const INITIAL_PROFILE_SYNC_STATUS: SettingsSyncStatus = isHostedAuthEnabled ? 'idle' : 'disabled';
 
 /** Rejects hosted-auth actions when the current deployment intentionally runs in local-only mode. */
-const disabledAuthAction = (): Promise<void> => {
+export const disabledAuthAction = (): Promise<void> => {
   throw new Error('Hosted accounts are not enabled for this deployment.');
 };
 
 /** Returns the settings-sync status that corresponds to the current deployment mode. */
-const getDisabledSettingsStatus = (): SettingsSyncStatus => (isHostedAuthEnabled ? 'idle' : 'disabled');
+export const getDisabledSettingsStatus = (): SettingsSyncStatus => (isHostedAuthEnabled ? 'idle' : 'disabled');
 
 /** True when the hosted settings sync has everything it needs to run for the current user. */
-const canSyncHostedUserDocuments = (user: User | null): user is User =>
+export const canSyncHostedUserDocuments = (user: User | null): user is User =>
   Boolean(isHostedAuthEnabled && db && user);
 
 /** Builds the normalized settings document shape from current local state. */
@@ -175,7 +175,7 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
 };
 
 /** Creates the user profile payload written to Firestore on hosted sign-in. */
-const createProfilePayload = (user: User) => ({
+export const createProfilePayload = (user: User) => ({
   email: user.email ?? '',
   displayName: user.displayName ?? '',
   photoURL: user.photoURL ?? '',
@@ -185,19 +185,19 @@ const createProfilePayload = (user: User) => ({
 });
 
 /** Reads the current beta-access flag from one hosted profile document snapshot. */
-const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
+export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
   Boolean(value?.betaAccess);
 
 /** Normalizes update-write failures into a user-facing sync error message. */
-const getSettingsUpdateError = (error: unknown): string =>
+export const getSettingsUpdateError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to update synced settings right now.';
 
 /** Normalizes initial/settings hydration failures into a user-facing sync error message. */
-const getSettingsSyncError = (error: unknown): string =>
+export const getSettingsSyncError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to sync account settings right now.';
 
 /** Builds the payload used when seeding or repairing a remote settings document. */
-const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({
+export const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({
   ...settings,
   updatedAt: serverTimestamp(),
   ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
@@ -209,7 +209,7 @@ type LocalPostRequestOptions = {
 };
 
 /** Posts JSON to a local auth endpoint and normalizes non-ok responses into errors. */
-const postLocalJson = async <TResponse = Record<string, unknown>>(
+export const postLocalJson = async <TResponse = Record<string, unknown>>(
   path: string,
   { body, failureMessage }: LocalPostRequestOptions
 ): Promise<TResponse> => {
@@ -229,7 +229,7 @@ const postLocalJson = async <TResponse = Record<string, unknown>>(
 };
 
 /** True when two normalized settings payloads contain the same user-visible values. */
-const areUserSettingsEqual = (
+export const areUserSettingsEqual = (
   left: UserSettingsDocument | null,
   right: UserSettingsDocument | null
 ): boolean => {
@@ -249,7 +249,7 @@ const areUserSettingsEqual = (
 };
 
 /** True when the current overlay state already matches the incoming synced overlay values. */
-const areOverlaySettingsEqual = (
+export const areOverlaySettingsEqual = (
   current: OverlaysState,
   incoming: Pick<UserSettingsDocument, 'baseMapStyle' | 'stateBorders' | 'counties' | 'ghostOutlooks'>
 ): boolean =>
@@ -267,7 +267,7 @@ interface ApplySettingsContext {
 }
 
 /** Applies a validated settings document into Redux plus local hosted-auth state. */
-const applySettingsToState = (
+export const applySettingsToState = (
   settings: UserSettingsDocument,
   { currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef }: ApplySettingsContext
 ) => {
@@ -303,7 +303,7 @@ const applySettingsToState = (
 };
 
 /** Creates or updates the hosted profile document while preserving the original creation timestamp. */
-const syncProfileDocument = async (
+export const syncProfileDocument = async (
   profileRef: ReturnType<typeof doc>,
   user: User
 ): Promise<void> => {
@@ -319,7 +319,7 @@ const syncProfileDocument = async (
 };
 
 /** Reuses remote settings when available or seeds Firestore from the current local settings snapshot. */
-const seedOrApplySettings = async (opts: {
+export const seedOrApplySettings = async (opts: {
   settingsRef: ReturnType<typeof doc>;
   settingsSnapshot: Awaited<ReturnType<typeof getDoc>>;
   localSettings: UserSettingsDocument;
@@ -363,7 +363,7 @@ const seedOrApplySettings = async (opts: {
 };
 
 /** Starts the live Firestore listener that keeps hosted settings mirrored into local app state. */
-const startSettingsSubscription = (opts: {
+export const startSettingsSubscription = (opts: {
   settingsRef: ReturnType<typeof doc>;
   isActive: () => boolean;
   applyRemoteSettings: (settings: UserSettingsDocument) => void;
@@ -390,7 +390,7 @@ const startSettingsSubscription = (opts: {
   );
 
 /** Runs the initial hosted profile/settings sync before the live subscription takes over. */
-const runInitialHostedSync = async (opts: {
+export const runInitialHostedSync = async (opts: {
   profileRef: ReturnType<typeof doc>;
   settingsRef: ReturnType<typeof doc>;
   user: User;
@@ -449,7 +449,7 @@ const runInitialHostedSync = async (opts: {
  * This is intentionally defined outside the hook to keep useLocalAuthState's cyclomatic
  * complexity lower for code health tools.
  */
-const initLocalAuthState = async (opts: {
+export const initLocalAuthState = async (opts: {
   isActive: () => boolean;
   dispatch: ReturnType<typeof useDispatch>;
   currentDarkModeRef: React.MutableRefObject<boolean>;
@@ -521,7 +521,7 @@ const initLocalAuthState = async (opts: {
 };
 
 /** Shared helper to apply a local auth response into application state. */
-function applyLocalAuthData(
+export function applyLocalAuthData(
   data: Record<string, unknown>,
   {
     dispatch,
@@ -575,7 +575,7 @@ function applyLocalAuthData(
 }
 
 /** Returns the no-config auth context used for intentionally local-only deployments. */
-const getDefaultContextValue = (): AuthContextValue => ({
+export const getDefaultContextValue = (): AuthContextValue => ({
   status: 'disabled',
   settingsSyncStatus: 'disabled',
   user: null,
@@ -595,7 +595,7 @@ const getDefaultContextValue = (): AuthContextValue => ({
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
 /** Local-only auth action helpers (extracted to reduce hook complexity) */
 /** Local-only sign in helper: posts to /api/local/signin and applies returned auth data to state. */
-const localSignInWithEmail = async (
+export const localSignInWithEmail = async (
   creds: { email: string; password: string },
   deps: {
     dispatch: ReturnType<typeof useDispatch>;
@@ -662,7 +662,7 @@ const localSignInWithEmail = async (
 };
 
 /** Local-only sign up helper: posts to /api/local/signup and applies returned auth data to state. */
-const localSignUpWithEmail = async (
+export const localSignUpWithEmail = async (
   creds: { email: string; password: string },
   deps: {
     dispatch: ReturnType<typeof useDispatch>;
@@ -729,7 +729,7 @@ const localSignUpWithEmail = async (
 };
 
 /** Local-only sign out helper: invalidates local session and clears local state. */
-const localSignOutUser = async (deps: {
+export const localSignOutUser = async (deps: {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
@@ -751,7 +751,7 @@ const localSignOutUser = async (deps: {
 };
 
 /** Refresh local-only beta access flag by querying /api/local/profile. */
-const localRefreshBetaAccess = async (deps: {
+export const localRefreshBetaAccess = async (deps: {
   setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
   setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
@@ -776,7 +776,7 @@ const localRefreshBetaAccess = async (deps: {
 };
 
 /** Update remote synced settings for local-only auth. */
-const localUpdateSyncedSettings = async (
+export const localUpdateSyncedSettings = async (
   settings: Partial<UserSettingsDocument>,
   deps: {
     setError: React.Dispatch<React.SetStateAction<string | null>>;
