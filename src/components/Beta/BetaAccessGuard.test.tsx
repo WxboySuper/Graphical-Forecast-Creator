@@ -39,21 +39,33 @@ describe('BetaAccessGuard', () => {
   };
 
   it.each([
-    ['renders children if beta mode is disabled', false, false, {}, 'Protected Content'],
-    ['renders children if local beta bypass is enabled', true, true, {}, 'Protected Content'],
-    [
-      'renders children if signed in and has beta access',
-      true,
-      false,
-      {
+    {
+      name: 'renders children if beta mode is disabled',
+      betaEnabled: false,
+      bypassEnabled: false,
+      authState: {},
+      expectedText: 'Protected Content',
+    },
+    {
+      name: 'renders children if local beta bypass is enabled',
+      betaEnabled: true,
+      bypassEnabled: true,
+      authState: {},
+      expectedText: 'Protected Content',
+    },
+    {
+      name: 'renders children if signed in and has beta access',
+      betaEnabled: true,
+      bypassEnabled: false,
+      authState: {
         hostedAuthEnabled: true,
         status: 'signed_in',
         betaAccessLoading: false,
         betaAccess: true,
       },
-      'Protected Content',
-    ],
-  ])('%s', (_name, betaEnabled, bypassEnabled, authState, expectedText) => {
+      expectedText: 'Protected Content',
+    },
+  ])('$name', ({ betaEnabled, bypassEnabled, authState, expectedText }) => {
     (isBetaModeEnabled as jest.Mock).mockReturnValue(betaEnabled);
     (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(bypassEnabled);
     (useAuth as jest.Mock).mockReturnValue(authState);
