@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { BrowserRouter } from 'react-router-dom';
@@ -40,37 +40,83 @@ jest.mock('../AlertBanner', () => ({
   AlertBanner: () => React.createElement('div', { 'data-testid': 'alert-banner' }),
 }));
 
+jest.mock('./Navbar', () => ({
+  Navbar: ({
+    onToggleDocumentation,
+    onViewTerms,
+    onViewPrivacyPolicy,
+  }: {
+    onToggleDocumentation: () => void;
+    onViewTerms: () => void;
+    onViewPrivacyPolicy: () => void;
+  }) =>
+    React.createElement('nav', { 'data-testid': 'navbar' }, [
+      React.createElement('button', { key: 'docs', onClick: onToggleDocumentation }, 'Docs'),
+      React.createElement('button', { key: 'terms', onClick: onViewTerms }, 'Terms'),
+      React.createElement('button', { key: 'privacy', onClick: onViewPrivacyPolicy }, 'Privacy'),
+    ]),
+}));
+
 jest.mock('../Documentation/Documentation', () => ({
   __esModule: true,
-  default: () => React.createElement('div', { 'data-testid': 'docs' }),
+  default: ({ onClose }: { onClose: () => void }) =>
+    React.createElement('div', { 'data-testid': 'docs' }, [
+      React.createElement('span', { key: 'label' }, 'Docs panel'),
+      React.createElement('button', { key: 'close', onClick: onClose }, 'Close Docs'),
+    ]),
 }));
 
 jest.mock('../Toast/Toast', () => ({
-  ToastManager: () => React.createElement('div', { 'data-testid': 'toast' }),
+  ToastManager: ({ toasts, onDismiss }: { toasts: Array<{ id: string; message: string }>; onDismiss: (id: string) => void }) =>
+    React.createElement('div', { 'data-testid': 'toast' }, toasts.map((toast) =>
+      React.createElement('button', { key: toast.id, onClick: () => onDismiss(toast.id) }, toast.message)
+    )),
 }));
 
 jest.mock('../ToS/ToSModal', () => ({
   __esModule: true,
-  default: () => React.createElement('div', { 'data-testid': 'tos' }),
+  default: ({ onClose }: { onClose: () => void }) =>
+    React.createElement('div', { 'data-testid': 'tos' }, React.createElement('button', { onClick: onClose }, 'Close Terms')),
 }));
 
 jest.mock('../PrivacyPolicy/PrivacyPolicyModal', () => ({
   __esModule: true,
-  default: () => React.createElement('div', { 'data-testid': 'privacy' }),
+  default: ({ onClose }: { onClose: () => void }) =>
+    React.createElement('div', { 'data-testid': 'privacy' }, React.createElement('button', { onClick: onClose }, 'Close Privacy')),
 }));
 
 describe('AppLayout', () => {
-  it.skip('renders children within the app layout', () => {
-    renderWithRouter(
-      <AppLayout>
-        <div data-testid="test-content">Test Content Here</div>
-      </AppLayout>
-    );
+  it('renders routed content within the app layout', () => {
+    renderWithRouter(<AppLayout />);
     
     expect(screen.getByTestId('test-content')).toBeInTheDocument();
   });
-  it.skip('renders the navbar', () => {
+
+  it('renders the navbar', () => {
     renderWithRouter(<AppLayout />);
     expect(screen.getByTestId('navbar')).toBeInTheDocument();
+  });
+
+  it('opens and closes documentation, terms, and privacy viewers', () => {
+    renderWithRouter(<AppLayout />);
+
+    fireEvent.click(screen.getByText('Docs'));
+    expect(screen.getByTestId('docs')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('docs')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Docs'));
+    fireEvent.click(screen.getByText('Close Docs'));
+    expect(screen.queryByTestId('docs')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Terms'));
+    expect(screen.getByTestId('tos')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Close Terms'));
+    expect(screen.queryByTestId('tos')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Privacy'));
+    expect(screen.getByTestId('privacy')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Close Privacy'));
+    expect(screen.queryByTestId('privacy')).not.toBeInTheDocument();
   });
 });

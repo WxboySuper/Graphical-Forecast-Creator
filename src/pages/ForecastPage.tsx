@@ -70,7 +70,7 @@ const renderForecastWorkspaceLayout = (
 };
 
 // Helper to get probability list based on outlook type
-const getProbabilityList = (activeOutlookType: string) => {
+export const getProbabilityList = (activeOutlookType: string) => {
   switch (activeOutlookType) {
     case 'categorical':
       return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as readonly string[];
@@ -122,7 +122,7 @@ const DAY_ROLLOVER_PROMPTED_KEY = 'gfc-day-rollover-prompt-day';
 const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
 
 /** Reads one stored day string from localStorage, returning null when storage is unavailable. */
-const readStoredDayValue = (key: string): string | null => {
+export const readStoredDayValue = (key: string): string | null => {
   try {
     return localStorage.getItem(key);
   } catch {
@@ -131,7 +131,7 @@ const readStoredDayValue = (key: string): string | null => {
 };
 
 /** Persists one day string into localStorage, ignoring storage errors. */
-const writeStoredDayValue = (key: string, value: string) => {
+export const writeStoredDayValue = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
   } catch {
@@ -140,17 +140,17 @@ const writeStoredDayValue = (key: string, value: string) => {
 };
 
 /** Returns true when the forecast cycle contains any drawable outlook data or saved low-probability state. */
-const hasRolloverForecastData = (
+export const hasRolloverForecastData = (
   forecastCycle: ReturnType<typeof selectForecastCycle>
 ): boolean => countForecastMetrics(forecastCycle).forecastDays > 0;
 
 /** Returns true when any forecast day already has discussion content attached. */
-const cycleHasDiscussionContent = (
+export const cycleHasDiscussionContent = (
   forecastCycle: ReturnType<typeof selectForecastCycle>
 ): boolean => Object.values(forecastCycle.days).some((dayData) => Boolean(dayData?.discussion));
 
 /** Returns true when the current session has unsaved work worth saving during a day rollover. */
-const hasUnsavedRolloverCandidateSession = (
+export const hasUnsavedRolloverCandidateSession = (
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   isSaved: boolean
 ): boolean => {
@@ -162,7 +162,7 @@ const hasUnsavedRolloverCandidateSession = (
 };
 
 /** Builds a short Cycle History label for one rollover save action. */
-const buildRolloverSaveLabel = (cycleDate: string): string => {
+export const buildRolloverSaveLabel = (cycleDate: string): string => {
   const parsedDate = new Date(`${cycleDate}T00:00:00`);
   const labelDate = Number.isNaN(parsedDate.getTime())
     ? cycleDate
@@ -171,7 +171,7 @@ const buildRolloverSaveLabel = (cycleDate: string): string => {
 };
 
 /** Formats a stored YYYY-MM-DD value into a more readable date label for the dialog copy. */
-const formatRolloverDayLabel = (value: string): string => {
+export const formatRolloverDayLabel = (value: string): string => {
   const parsedDate = new Date(`${value}T00:00:00`);
   if (Number.isNaN(parsedDate.getTime())) {
     return value;
@@ -218,7 +218,7 @@ const DayRolloverDialog: React.FC<{
 );
 
 /** Reads the current map view (center + zoom) from the map adapter; returns defaults if no adapter is mounted. */
-const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
+export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
   const adapter = ref.current;
   if (!adapter) {
     return {
@@ -244,7 +244,7 @@ const CLOUD_CYCLE_PAYLOAD_KEY = 'cloudCyclePayload';
 const CLOUD_CYCLE_META_KEY = 'cloudCycleMeta';
 
 /** Reads and validates a forecast JSON file, returning the parsed payload or null on failure. */
-const parseLoadedForecast = async (
+export const parseLoadedForecast = async (
   file: File,
   addToast: AddToastFn
 ): Promise<LoadedForecastPayload | null> => {
@@ -270,7 +270,7 @@ const parseLoadedForecast = async (
 };
 
 /** Returns true if the given day data object contains at least one outlook map with features. */
-const dayHasAnyFeatures = (dayData: unknown): boolean => {
+export const dayHasAnyFeatures = (dayData: unknown): boolean => {
   if (!dayData || typeof dayData !== 'object') return false;
 
   const maps = Object.values(dayData as Record<string, { size?: number } | undefined>);
@@ -372,15 +372,15 @@ const OUTLOOK_SHORTCUTS: Record<string, { type: OutlookType; label: string }> = 
 };
 
 /** Returns true if the event target is an input or textarea that should receive keyboard text. */
-const isTypingTarget = (target: EventTarget | null): boolean => {
+export const isTypingTarget = (target: EventTarget | null): boolean => {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 };
 
 /** Normalises a probability string by converting legacy `#` suffix to `%` (e.g. `"10#"` → `"10%"`). */
-const normalizeProbability = (value: string): string => value.replace('#', '%');
+export const normalizeProbability = (value: string): string => value.replace('#', '%');
 
 /** Returns true if the current outlook type and probability support toggling the significant-threat flag. */
-const canToggleSignificantForState = (
+export const canToggleSignificantForState = (
   activeOutlookType: OutlookType,
   activeProbability: string
 ): boolean => {
@@ -390,7 +390,7 @@ const canToggleSignificantForState = (
 };
 
 /** Returns true if any Ctrl / Meta / Alt / Shift modifier key is held during the event. */
-const hasAnyModifierKey = (e: KeyboardEvent): boolean => {
+export const hasAnyModifierKey = (e: KeyboardEvent): boolean => {
   return MODIFIER_KEYS.some((modifier) => e[modifier]);
 };
 
@@ -419,7 +419,7 @@ const isCommandShortcutKey = (key: string): key is CommandShortcutKey => {
 type UndoRedoAction = 'undo' | 'redo' | null;
 
 /** Resolves whether the current modifier/key combination should undo, redo, or do nothing. */
-const getUndoRedoAction = (e: KeyboardEvent, key: string): UndoRedoAction => {
+export const getUndoRedoAction = (e: KeyboardEvent, key: string): UndoRedoAction => {
   if (!(e.ctrlKey || e.metaKey)) return null;
   if (key === 'y') return 'redo';
   if (key !== 'z') return null;
@@ -588,7 +588,7 @@ const handleStandardShortcuts = (
 };
 
 /** Central keydown router: runs command shortcuts first, then standard shortcuts, skipping typing targets. */
-const processShortcutKeyDown = (
+export const processShortcutKeyDown = (
   e: KeyboardEvent,
   context: KeyboardShortcutContext
 ) => {
@@ -616,7 +616,7 @@ const useFeatureFlagSync = (
 };
 
 /** Reads and validates one stored forecast payload string from browser storage. */
-const parseStoredForecastPayload = (storedValue: string | null): GFCForecastSaveData | null => {
+export const parseStoredForecastPayload = (storedValue: string | null): GFCForecastSaveData | null => {
   if (!storedValue) {
     return null;
   }
@@ -644,7 +644,7 @@ const restoreStoredForecastPayload = (
 };
 
 /** Reads the stored cloud-cycle metadata payload when it exists and is well-formed. */
-const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | null => {
+export const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | null => {
   if (!storedValue) {
     return null;
   }
@@ -657,13 +657,13 @@ const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | nul
 };
 
 /** Clears the temporary session-storage keys used for handing a cloud cycle into the editor. */
-const clearStoredCloudSession = () => {
+export const clearStoredCloudSession = () => {
   sessionStorage.removeItem(CLOUD_CYCLE_PAYLOAD_KEY);
   sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
 };
 
 /** Returns true when stored cloud metadata includes the id and label needed to restore selection context. */
-const hasRestorableCloudSelection = (
+export const hasRestorableCloudSelection = (
   cloudMeta: StoredCloudMeta | null
 ): cloudMeta is Required<Pick<StoredCloudMeta, 'id' | 'label'>> => Boolean(cloudMeta?.id && cloudMeta.label);
 
