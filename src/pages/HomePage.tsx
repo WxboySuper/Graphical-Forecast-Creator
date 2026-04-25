@@ -241,6 +241,7 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
   );
 };
 
+/** Home route that can render either the current concept or classic fallback. */
 const HomePage: React.FC = () => {
   const logic = useHomePageLogic();
   const {

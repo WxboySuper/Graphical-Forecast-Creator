@@ -5,7 +5,6 @@ import {
   Calendar,
   CheckCircle2,
   Clock3,
-  Cloud,
   Edit3,
   FileText,
   Folder,
@@ -49,7 +48,7 @@ const featureItems = [
   {
     icon: MessageSquare,
     title: 'Discuss & collaborate',
-    body: "Share your thoughts and get feedback when you're ready.",
+    body: 'Share your thoughts and get feedback when you are ready.',
   },
   {
     icon: ShieldCheck,
@@ -73,6 +72,7 @@ const accountBenefits = [
   },
 ];
 
+/** Formats a saved cycle timestamp for the recent-cycle timeline. */
 const formatRecentTimestamp = (timestamp: string) => {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
@@ -88,6 +88,7 @@ const formatRecentTimestamp = (timestamp: string) => {
   });
 };
 
+/** Returns a friendly time-of-day label for a saved cycle timestamp. */
 const getCyclePeriod = (timestamp: string) => {
   const hour = new Date(timestamp).getHours();
   if (Number.isNaN(hour)) {
@@ -102,6 +103,7 @@ const getCyclePeriod = (timestamp: string) => {
   return 'Evening';
 };
 
+/** Decorative contour-line background used by the home concept layout. */
 const ConceptBackground: React.FC = () => (
   <div className="home-concept-map-bg" aria-hidden="true">
     <svg viewBox="0 0 1100 420" preserveAspectRatio="none">
@@ -113,6 +115,7 @@ const ConceptBackground: React.FC = () => (
   </div>
 );
 
+/** Reusable large action button for the concept hero areas. */
 const HeroActionButton: React.FC<{
   icon: React.ElementType;
   label: string;
@@ -134,6 +137,30 @@ const HeroActionButton: React.FC<{
   </button>
 );
 
+/** Single saved-cycle row in the recent-cycle timeline. */
+const RecentCycleButton: React.FC<{
+  cycle: SavedCycle;
+  isActive: boolean;
+  onLoad: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}> = ({ cycle, isActive, onLoad }) => (
+  <button
+    type="button"
+    className="home-concept-cycle-row"
+    data-cycle-id={cycle.id}
+    onClick={onLoad}
+  >
+    <span className={isActive ? 'home-concept-dot is-active' : 'home-concept-dot'} />
+    <span className="home-concept-cycle-copy">
+      <strong>{cycle.cycleDate}</strong>
+      <small>{formatRecentTimestamp(cycle.timestamp)}</small>
+      <small>{getCyclePeriod(cycle.timestamp)}</small>
+    </span>
+    {isActive ? <span className="home-concept-resume">Resume</span> : null}
+    <ArrowRight className="h-4 w-4" />
+  </button>
+);
+
+/** Lists the most recent saved cycles and exposes the full history action. */
 const RecentTimeline: React.FC<{
   cycles: SavedCycle[];
   onLoad: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -147,22 +174,7 @@ const RecentTimeline: React.FC<{
       {recentCycles.length > 0 ? (
         <div className="home-concept-timeline">
           {recentCycles.map((cycle, index) => (
-            <button
-              type="button"
-              className="home-concept-cycle-row"
-              key={cycle.id}
-              data-cycle-id={cycle.id}
-              onClick={onLoad}
-            >
-              <span className={index === 0 ? 'home-concept-dot is-active' : 'home-concept-dot'} />
-              <span className="home-concept-cycle-copy">
-                <strong>{cycle.cycleDate}</strong>
-                <small>{formatRecentTimestamp(cycle.timestamp)}</small>
-                <small>{getCyclePeriod(cycle.timestamp)}</small>
-              </span>
-              {index === 0 ? <span className="home-concept-resume">Resume</span> : null}
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            <RecentCycleButton cycle={cycle} isActive={index === 0} key={cycle.id} onLoad={onLoad} />
           ))}
         </div>
       ) : (
@@ -176,6 +188,7 @@ const RecentTimeline: React.FC<{
   );
 };
 
+/** Shows quick cycle facts for the signed-in concept sidebar. */
 const AtAGlance: React.FC<{
   formattedDate: string;
   savedCyclesCount: number;
@@ -200,6 +213,60 @@ const AtAGlance: React.FC<{
   </section>
 );
 
+/** Top active-cycle action bar for signed-in users. */
+const SignedInCycleBar: React.FC<{
+  formattedDate: string;
+  isSaved: boolean;
+  onResumeForecast: () => void;
+  onOpenHistory: () => void;
+}> = ({ formattedDate, isSaved, onResumeForecast, onOpenHistory }) => (
+  <section className="home-concept-cycle-bar" aria-label="Active cycle">
+    <div className="home-concept-cycle-meta">
+      <span className="home-concept-icon-chip"><Calendar className="h-5 w-5" /></span>
+      <div>
+        <p>Active cycle</p>
+        <h1>{formattedDate}</h1>
+      </div>
+      {!isSaved && <span className="home-concept-unsaved">Unsaved changes</span>}
+    </div>
+    <div className="home-concept-cycle-actions">
+      <button type="button" className="home-concept-top-primary" onClick={onResumeForecast}>
+        Resume Forecast
+        <ArrowRight className="h-5 w-5" />
+      </button>
+      <button type="button" className="home-concept-top-secondary" onClick={onOpenHistory}>
+        <Calendar className="h-5 w-5" />
+        Switch Day
+      </button>
+      <button type="button" className="home-concept-top-secondary" onClick={onOpenHistory}>
+        <MoreVertical className="h-5 w-5" />
+        More
+      </button>
+    </div>
+  </section>
+);
+
+/** Main signed-in hero panel with resume, history, and new-cycle actions. */
+const SignedInContinuePanel: React.FC<{
+  onResumeForecast: () => void;
+  onOpenHistory: () => void;
+  onNewCycle: () => void;
+}> = ({ onResumeForecast, onOpenHistory, onNewCycle }) => (
+  <section className="home-concept-continue">
+    <h2>
+      <span>Continue your</span>
+      <span className="home-concept-heading-line">forecast <Zap className="h-10 w-10" /></span>
+    </h2>
+    <p>Pick up right where you left off. Continue editing, verify your work, and publish with confidence.</p>
+    <div className="home-concept-continue-actions">
+      <HeroActionButton icon={PlayCircle} label="Resume Forecast" onClick={onResumeForecast} primary />
+      <HeroActionButton icon={Folder} label="Open another saved cycle" onClick={onOpenHistory} />
+      <HeroActionButton icon={PlusCircle} label="Start a new forecast cycle" onClick={onNewCycle} />
+    </div>
+  </section>
+);
+
+/** Signed-in concept home screen. */
 const SignedInConcept: React.FC<HomeConceptPageProps> = ({
   formattedDate,
   savedCycles,
@@ -211,45 +278,19 @@ const SignedInConcept: React.FC<HomeConceptPageProps> = ({
 }) => (
   <main className="home-concept-shell home-concept-shell-signed-in">
     <ConceptBackground />
-    <section className="home-concept-cycle-bar" aria-label="Active cycle">
-      <div className="home-concept-cycle-meta">
-        <span className="home-concept-icon-chip"><Calendar className="h-5 w-5" /></span>
-        <div>
-          <p>Active cycle</p>
-          <h1>{formattedDate}</h1>
-        </div>
-        {!isSaved && <span className="home-concept-unsaved">Unsaved changes</span>}
-      </div>
-      <div className="home-concept-cycle-actions">
-        <button type="button" className="home-concept-top-primary" onClick={onResumeForecast}>
-          Resume Forecast
-          <ArrowRight className="h-5 w-5" />
-        </button>
-        <button type="button" className="home-concept-top-secondary" onClick={onOpenHistory}>
-          <Calendar className="h-5 w-5" />
-          Switch Day
-        </button>
-        <button type="button" className="home-concept-top-secondary" onClick={onOpenHistory}>
-          <MoreVertical className="h-5 w-5" />
-          More
-        </button>
-      </div>
-    </section>
+    <SignedInCycleBar
+      formattedDate={formattedDate}
+      isSaved={isSaved}
+      onResumeForecast={onResumeForecast}
+      onOpenHistory={onOpenHistory}
+    />
 
     <div className="home-concept-signed-in-grid">
-      <section className="home-concept-continue">
-        <h2>
-          <span>Continue your</span>
-          <span className="home-concept-heading-line">forecast <Zap className="h-10 w-10" /></span>
-        </h2>
-        <p>Pick up right where you left off. Continue editing, verify your work, and publish with confidence.</p>
-        <div className="home-concept-continue-actions">
-          <HeroActionButton icon={PlayCircle} label="Resume Forecast" onClick={onResumeForecast} primary />
-          <HeroActionButton icon={Folder} label="Open another saved cycle" onClick={onOpenHistory} />
-          <HeroActionButton icon={PlusCircle} label="Start a new forecast cycle" onClick={onNewCycle} />
-        </div>
-      </section>
-
+      <SignedInContinuePanel
+        onResumeForecast={onResumeForecast}
+        onOpenHistory={onOpenHistory}
+        onNewCycle={onNewCycle}
+      />
       <aside className="home-concept-side-rail">
         <AtAGlance
           formattedDate={formattedDate}
@@ -262,6 +303,106 @@ const SignedInConcept: React.FC<HomeConceptPageProps> = ({
   </main>
 );
 
+/** Signed-out hero panel with start, load, and account entry points. */
+const SignedOutHero: React.FC<{
+  onResumeForecast: () => void;
+  onOpenFile: () => void;
+  onNavigateAccount: () => void;
+}> = ({ onResumeForecast, onOpenFile, onNavigateAccount }) => (
+  <section className="home-concept-landing-hero">
+    <h1>
+      <span>Create forecasts.</span>
+      <span className="home-concept-heading-line">Your way. <Zap className="h-12 w-12" /></span>
+    </h1>
+    <p>Draw, organize, and verify forecasts faster with intuitive mapping tools built for weather forecasters.</p>
+    <div className="home-concept-pill">
+      <Sparkles className="h-4 w-4" />
+      No account required - start forecasting right away.
+    </div>
+    <div className="home-concept-start-row">
+      <HeroActionButton icon={Edit3} label="Start a new forecast" sublabel="Jump right in" onClick={onResumeForecast} primary />
+      <HeroActionButton icon={Folder} label="Open a saved forecast" sublabel="From your device" onClick={onOpenFile} />
+    </div>
+    <div className="home-concept-account-strip">
+      <span className="home-concept-icon-chip"><Map className="h-6 w-6" /></span>
+      <div>
+        <strong>Create a free account to track your forecasts</strong>
+        <p>See your history, view statistics, and access your work anywhere.</p>
+      </div>
+      <button type="button" className="home-concept-link" onClick={onNavigateAccount}>
+        Create a free account
+        <ArrowRight className="h-4 w-4" />
+      </button>
+    </div>
+    <div className="home-concept-quick-notes">
+      <span><CheckCircle2 className="h-4 w-4" />Always free to forecast</span>
+      <span><BarChart3 className="h-4 w-4" />Track your performance</span>
+      <span><Upload className="h-4 w-4" />Sync settings across devices</span>
+    </div>
+  </section>
+);
+
+/** Single tool feature row in the signed-out rail. */
+const FeatureItem: React.FC<{
+  icon: React.ElementType;
+  title: string;
+  body: string;
+}> = ({ icon: Icon, title, body }) => (
+  <div className="home-concept-feature">
+    <span className="home-concept-icon-chip"><Icon className="h-8 w-8" /></span>
+    <div>
+      <h3>{title}</h3>
+      <p>{body}</p>
+    </div>
+  </div>
+);
+
+/** Single account benefit row in the signed-out rail. */
+const AccountBenefitItem: React.FC<{
+  icon: React.ElementType;
+  title: string;
+  body: string;
+  badge: string;
+}> = ({ icon: Icon, title, body, badge }) => (
+  <div className="home-concept-benefit">
+    <span className="home-concept-icon-chip"><Icon className="h-6 w-6" /></span>
+    <div>
+      <strong>{title}</strong>
+      <p>{body}</p>
+    </div>
+    <span className="home-concept-badge">{badge}</span>
+  </div>
+);
+
+/** Supporting signed-out feature and account benefit rail. */
+const SignedOutToolRail: React.FC<{
+  onNavigateAccount: () => void;
+}> = ({ onNavigateAccount }) => (
+  <aside className="home-concept-tool-rail">
+    <section className="home-concept-feature-list">
+      <h2>Powerful tools for every step</h2>
+      {featureItems.map(({ icon: Icon, title, body }) => (
+        <FeatureItem icon={Icon} title={title} body={body} key={title} />
+      ))}
+    </section>
+
+    <section className="home-concept-account-card">
+      <h2>More with an account</h2>
+      {accountBenefits.map(({ icon: Icon, title, body, badge }) => (
+        <AccountBenefitItem icon={Icon} title={title} body={body} badge={badge} key={title} />
+      ))}
+      <p>Create an account to unlock these benefits.</p>
+      <button type="button" className="home-concept-link" onClick={onNavigateAccount}>
+        Create a free account
+        <ArrowRight className="h-4 w-4" />
+      </button>
+    </section>
+
+    <p className="home-concept-privacy"><Lock className="h-4 w-4" />Your data is private. You&apos;re in control.</p>
+  </aside>
+);
+
+/** Signed-out concept home screen. */
 const SignedOutConcept: React.FC<HomeConceptPageProps> = ({
   onResumeForecast,
   onOpenFile,
@@ -270,77 +411,17 @@ const SignedOutConcept: React.FC<HomeConceptPageProps> = ({
   <main className="home-concept-shell home-concept-shell-signed-out">
     <ConceptBackground />
     <div className="home-concept-landing-grid">
-      <section className="home-concept-landing-hero">
-        <h1>
-          <span>Create forecasts.</span>
-          <span className="home-concept-heading-line">Your way. <Zap className="h-12 w-12" /></span>
-        </h1>
-        <p>Draw, organize, and verify forecasts faster with intuitive mapping tools built for weather forecasters.</p>
-        <div className="home-concept-pill">
-          <Sparkles className="h-4 w-4" />
-          No account required - start forecasting right away.
-        </div>
-        <div className="home-concept-start-row">
-          <HeroActionButton icon={Edit3} label="Start a new forecast" sublabel="Jump right in" onClick={onResumeForecast} primary />
-          <HeroActionButton icon={Folder} label="Open a saved forecast" sublabel="From your device" onClick={onOpenFile} />
-        </div>
-        <div className="home-concept-account-strip">
-          <span className="home-concept-icon-chip"><Map className="h-6 w-6" /></span>
-          <div>
-            <strong>Create a free account to track your forecasts</strong>
-            <p>See your history, view statistics, and access your work anywhere.</p>
-          </div>
-          <button type="button" className="home-concept-link" onClick={onNavigateAccount}>
-            Create a free account
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="home-concept-quick-notes">
-          <span><CheckCircle2 className="h-4 w-4" />Always free to forecast</span>
-          <span><BarChart3 className="h-4 w-4" />Track your performance</span>
-          <span><Upload className="h-4 w-4" />Sync settings across devices</span>
-        </div>
-      </section>
-
-      <aside className="home-concept-tool-rail">
-        <section className="home-concept-feature-list">
-          <h2>Powerful tools for every step</h2>
-          {featureItems.map(({ icon: Icon, title, body }) => (
-            <div className="home-concept-feature" key={title}>
-              <span className="home-concept-icon-chip"><Icon className="h-8 w-8" /></span>
-              <div>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section className="home-concept-account-card">
-          <h2>More with an account</h2>
-          {accountBenefits.map(({ icon: Icon, title, body, badge }) => (
-            <div className="home-concept-benefit" key={title}>
-              <span className="home-concept-icon-chip"><Icon className="h-6 w-6" /></span>
-              <div>
-                <strong>{title}</strong>
-                <p>{body}</p>
-              </div>
-              <span className="home-concept-badge">{badge}</span>
-            </div>
-          ))}
-          <p>Create an account to unlock these benefits.</p>
-          <button type="button" className="home-concept-link" onClick={onNavigateAccount}>
-            Create a free account
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </section>
-
-        <p className="home-concept-privacy"><Lock className="h-4 w-4" />Your data is private. You're in control.</p>
-      </aside>
+      <SignedOutHero
+        onResumeForecast={onResumeForecast}
+        onOpenFile={onOpenFile}
+        onNavigateAccount={onNavigateAccount}
+      />
+      <SignedOutToolRail onNavigateAccount={onNavigateAccount} />
     </div>
   </main>
 );
 
+/** Switches between the signed-in and signed-out home concept variants. */
 const HomeConceptPage: React.FC<HomeConceptPageProps> = (props) => (
   <div className="home-concept-page">
     {props.variant === 'signed_in' ? <SignedInConcept {...props} /> : <SignedOutConcept {...props} />}
