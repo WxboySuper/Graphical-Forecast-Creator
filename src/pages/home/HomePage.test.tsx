@@ -37,9 +37,10 @@ const baseForecastCycle = {
 describe('HomePage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.history.pushState({}, '', '/');
   });
 
-  test('renders the signed-out landing view', () => {
+  test('renders the signed-out concept view', () => {
     const handlers = {
       handleNavigateForecast: jest.fn(),
       handleNavigateDiscussion: jest.fn(),
@@ -74,31 +75,29 @@ describe('HomePage', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/Build outlook packages without fighting the tooling/i)).toBeInTheDocument();
-    expect(screen.getByText(/GFC keeps drawing, cycle management, discussions, and verification in one place/i)).toBeInTheDocument();
-    expect(screen.getByText(/Still Local-First/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/days with outlooks/i).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Recent Cycles/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Create forecasts/i)).toBeInTheDocument();
+    expect(screen.getByText(/No account required/i)).toBeInTheDocument();
+    expect(screen.getByText(/Powerful tools for every step/i)).toBeInTheDocument();
+    expect(screen.getByText(/More with an account/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Start Forecast/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Start a new forecast/i }));
     expect(handlers.handleNavigateForecast).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /Write Discussion/i }));
-    expect(handlers.handleNavigateDiscussion).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Open a saved forecast/i }));
+    expect(handlers.openFilePicker).toHaveBeenCalled();
 
-    expect(screen.getByRole('button', { name: /Start New Cycle/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Load From File/i })).toBeInTheDocument();
-    expect(screen.getByText(/AI Development Disclosure/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /GitHub Issues/i })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /Create a free account/i })[0]);
+    expect(handlers.handleNavigateAccount).toHaveBeenCalled();
   });
 
-  test('renders the signed-in workspace and wires core actions', () => {
+  test('renders the signed-in concept workspace and wires core actions', () => {
     const quickStart = jest.fn();
     const loadRecent = jest.fn();
     const openHistory = jest.fn();
     const openFilePicker = jest.fn();
     const save = jest.fn();
     const loadFile = jest.fn();
+    const navigateForecast = jest.fn();
 
     mockUseHomePageLogic.mockReturnValue({
       variant: 'signed_in',
@@ -151,7 +150,7 @@ describe('HomePage', () => {
       ],
       forecastCycle: baseForecastCycle,
       isSaved: true,
-      handleNavigateForecast: jest.fn(),
+      handleNavigateForecast: navigateForecast,
       handleNavigateDiscussion: jest.fn(),
       handleNavigateAccount: jest.fn(),
       handleOpenHistoryModal: openHistory,
@@ -171,22 +170,20 @@ describe('HomePage', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/Current Forecast Cycle/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Continue your forecast/i })).toBeInTheDocument();
+    expect(screen.getByText(/At A Glance/i)).toBeInTheDocument();
     expect(screen.getByText(/Recent Cycles/i)).toBeInTheDocument();
     expect(screen.getByText(/Cycle history modal open/i)).toBeInTheDocument();
     expect(screen.getByText(/Confirm start new cycle modal open/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /View Full History/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /View full history/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Day 4/i }));
-    expect(quickStart).toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button', { name: /Resume Forecast/i })[0]);
+    expect(navigateForecast).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /Cycle 1/i }));
+    fireEvent.click(screen.getByRole('button', { name: /2026-03-25/i }));
     expect(loadRecent).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /Save Cycle File/i }));
-    expect(save).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: /Open Cycle History/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Switch Day/i }));
     expect(openHistory).toHaveBeenCalled();
 
     const fileInput = container.querySelector('input[type="file"]');
@@ -199,5 +196,48 @@ describe('HomePage', () => {
       });
     }
     expect(loadFile).toHaveBeenCalled();
+    expect(quickStart).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(openFilePicker).not.toHaveBeenCalled();
+  });
+
+  test('keeps the classic home page available with a query switch', () => {
+    window.history.pushState({}, '', '/?home=classic');
+    const handlers = {
+      handleNavigateForecast: jest.fn(),
+      handleNavigateDiscussion: jest.fn(),
+      handleNavigateAccount: jest.fn(),
+      handleOpenHistoryModal: jest.fn(),
+      handleQuickStartClick: jest.fn(),
+      handleNewCycle: jest.fn(),
+      handleSave: jest.fn(),
+      openFilePicker: jest.fn(),
+      handleLoadRecentCycleClick: jest.fn(),
+      handleConfirmNewCycle: jest.fn(),
+      handleCancelNewCycle: jest.fn(),
+      handleFileSelect: jest.fn(),
+    };
+
+    mockUseHomePageLogic.mockReturnValue({
+      variant: 'signed_out',
+      stats: baseStats,
+      formattedDate: 'Friday, March 27, 2026',
+      fileInputRef: { current: null },
+      showHistoryModal: false,
+      confirmNewCycle: false,
+      savedCycles: [],
+      forecastCycle: baseForecastCycle,
+      isSaved: false,
+      ...handlers,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/Build outlook packages without fighting the tooling/i)).toBeInTheDocument();
+    expect(screen.getByText(/AI Development Disclosure/i)).toBeInTheDocument();
   });
 });
