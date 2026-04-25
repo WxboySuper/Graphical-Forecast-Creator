@@ -1,20 +1,20 @@
 import React from 'react';
+import * as mockReact from 'react';
 import { render, screen } from '@testing-library/react';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from './popover';
 
 jest.mock('@radix-ui/react-popover', () => {
-  const React = require('react');
   return {
-    Root: ({ children }: { children: React.ReactNode }) => <div data-testid="root">{children}</div>,
-    Trigger: React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
+    Root: ({ children }: { children: mockReact.ReactNode }) => <div data-testid="root">{children}</div>,
+    Trigger: mockReact.forwardRef<HTMLButtonElement, mockReact.ButtonHTMLAttributes<HTMLButtonElement>>(
       (props, ref) => <button ref={ref} {...props} />
     ),
-    Anchor: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+    Anchor: mockReact.forwardRef<HTMLDivElement, mockReact.HTMLAttributes<HTMLDivElement>>(
       (props, ref) => <div ref={ref} data-testid="anchor" {...props} />
     ),
-    Portal: ({ children }: { children: React.ReactNode }) => <div data-testid="portal">{children}</div>,
+    Portal: ({ children }: { children: mockReact.ReactNode }) => <div data-testid="portal">{children}</div>,
     Content: Object.assign(
-      React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { align?: string; sideOffset?: number }>(
+      mockReact.forwardRef<HTMLDivElement, mockReact.HTMLAttributes<HTMLDivElement> & { align?: string; sideOffset?: number }>(
         ({ align, sideOffset, ...props }, ref) => (
           <div ref={ref} data-align={align} data-side-offset={sideOffset} {...props} />
         )

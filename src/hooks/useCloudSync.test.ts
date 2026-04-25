@@ -4,6 +4,7 @@ import { useEntitlement } from '../billing/EntitlementProvider';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { serializeForecast } from '../utils/fileUtils';
 import { useCloudSync } from './useCloudSync';
+import { RootState } from '../store';
 
 jest.mock('react-redux', () => ({
   useSelector: jest.fn(),
@@ -39,12 +40,12 @@ describe('useCloudSync', () => {
     mockUseEntitlement.mockReturnValue({ premiumActive: true } as ReturnType<typeof useEntitlement>);
     mockSerializeForecast.mockReturnValue(payload as never);
     mockCountForecastMetrics.mockReturnValue({ forecastDays: 1, totalOutlooks: 2, totalFeatures: 3 });
-    mockUseSelector.mockImplementation((selector: any) => selector({
+    mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => selector({
       forecast: {
         forecastCycle,
         currentMapView: mapView,
       },
-    }));
+    } as RootState));
     saveCycle.mockResolvedValue(true);
   });
 

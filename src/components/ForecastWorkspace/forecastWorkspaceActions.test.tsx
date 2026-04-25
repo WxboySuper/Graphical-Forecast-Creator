@@ -49,7 +49,7 @@ const setup = (overrides: Partial<Parameters<typeof useForecastWorkspaceActionHa
 describe('useForecastWorkspaceActionHandlers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (downloadGfcPackage as jest.Mock).mockResolvedValue(undefined);
+    (downloadGfcPackage as jest.Mock).mockResolvedValue();
   });
 
   test('dispatches core workspace actions and respects history availability', () => {

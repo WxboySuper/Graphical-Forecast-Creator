@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import * as firestore from 'firebase/firestore';
+import { getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import {
   applySettingsToState,
   areOverlaySettingsEqual,
@@ -200,7 +200,12 @@ describe('AuthProvider Utils', () => {
     expect(dispatch).toHaveBeenCalledTimes(2);
     expect(setSyncedSettings).toHaveBeenCalledWith(expect.objectContaining({ darkMode: true, counties: true }));
 
-    applySettingsToState(lastSyncedSettingsRef.current!, {
+    expect(lastSyncedSettingsRef.current).not.toBeNull();
+    const syncedSettings = lastSyncedSettingsRef.current;
+    if (!syncedSettings) {
+      throw new Error('Expected synced settings to be populated');
+    }
+    applySettingsToState(syncedSettings, {
       currentDarkModeRef: { current: true },
       currentOverlaysRef: { current: { ...overlays, counties: true } },
       dispatch,
@@ -215,7 +220,7 @@ describe('AuthProvider Utils', () => {
     expect(getDefaultContextValue()).toEqual(expect.objectContaining({ status: 'disabled', hostedAuthEnabled: false }));
     expect(canSyncHostedUserDocuments(null)).toBe(false);
     expect(readProfileBetaAccess({ betaAccess: true })).toBe(true);
-    expect(readProfileBetaAccess(undefined)).toBe(false);
+    expect(readProfileBetaAccess()).toBe(false);
     expect(getSettingsUpdateError(new Error('Update failed'))).toBe('Update failed');
     expect(getSettingsUpdateError('bad')).toBe('Unable to update synced settings right now.');
     expect(getSettingsSyncError(new Error('Sync failed'))).toBe('Sync failed');
@@ -432,9 +437,9 @@ describe('AuthProvider Utils', () => {
       defaultForecasterName: 'Remote',
       forecastUiVariant: 'workspace_dock' as const,
     };
-    const getDocSpy = jest.spyOn(firestore, 'getDoc');
-    const setDocSpy = jest.spyOn(firestore, 'setDoc').mockResolvedValue(undefined as never);
-    const onSnapshotSpy = jest.spyOn(firestore, 'onSnapshot');
+    const getDocSpy = jest.mocked(getDoc);
+    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
+    const onSnapshotSpy = jest.mocked(onSnapshot);
 
     getDocSpy.mockResolvedValueOnce({
       exists: () => false,
@@ -481,8 +486,8 @@ describe('AuthProvider Utils', () => {
     );
     expect(setSyncedSettings).toHaveBeenCalledWith(settings);
 
-    let snapshotHandler: (snapshot: { data: () => typeof settings }) => void;
-    let errorHandler: (error: Error) => void;
+    let snapshotHandler: ((snapshot: { data: () => typeof settings }) => void) | null = null;
+    let errorHandler: ((error: Error) => void) | null = null;
     const unsubscribe = jest.fn();
     onSnapshotSpy.mockImplementation((ref, next, error) => {
       snapshotHandler = next as typeof snapshotHandler;
@@ -498,9 +503,17 @@ describe('AuthProvider Utils', () => {
       setSettingsSyncStatus,
       setError,
     });
-    snapshotHandler!({ data: () => settings });
+    expect(snapshotHandler).not.toBeNull();
+    if (!snapshotHandler) {
+      throw new Error('Expected snapshot handler to be registered');
+    }
+    snapshotHandler({ data: () => settings });
     expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
-    errorHandler!(new Error('listener failed'));
+    expect(errorHandler).not.toBeNull();
+    if (!errorHandler) {
+      throw new Error('Expected error handler to be registered');
+    }
+    errorHandler(new Error('listener failed'));
     expect(setError).toHaveBeenCalledWith('listener failed');
     subscription();
     expect(unsubscribe).toHaveBeenCalled();

@@ -7,9 +7,9 @@ describe('firebase configuration', () => {
     globalThis.__GFC_FIREBASE_APP_ID__ = '';
   });
 
-  test('keeps hosted Firebase disabled when required config is missing', () => {
-    jest.isolateModules(() => {
-      const firebase = require('./firebase') as typeof import('./firebase');
+  test('keeps hosted Firebase disabled when required config is missing', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const firebase = await import('./firebase');
 
       expect(firebase.isHostedAuthEnabled).toBe(false);
       expect(firebase.app).toBeNull();
@@ -20,7 +20,7 @@ describe('firebase configuration', () => {
     });
   });
 
-  test('initializes hosted Firebase when all config values are present', () => {
+  test('initializes hosted Firebase when all config values are present', async () => {
     const initializeApp = jest.fn(() => ({ name: 'app' }));
     const getApp = jest.fn(() => ({ name: 'existing' }));
     const getApps = jest.fn(() => []);
@@ -37,8 +37,8 @@ describe('firebase configuration', () => {
     globalThis.__GFC_FIREBASE_PROJECT_ID__ = 'project';
     globalThis.__GFC_FIREBASE_APP_ID__ = 'app-id';
 
-    jest.isolateModules(() => {
-      const firebase = require('./firebase') as typeof import('./firebase');
+    await jest.isolateModulesAsync(async () => {
+      const firebase = await import('./firebase');
 
       expect(firebase.isHostedAuthEnabled).toBe(true);
       expect(initializeApp).toHaveBeenCalledWith({

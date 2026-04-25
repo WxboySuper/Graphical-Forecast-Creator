@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import StatusOverlay from './StatusOverlay';
+import { RootState } from '../../store';
 
 jest.mock('react-redux', () => ({
   useSelector: jest.fn(),
@@ -10,7 +11,7 @@ jest.mock('react-redux', () => ({
 const mockUseSelector = useSelector as jest.MockedFunction<typeof useSelector>;
 
 function mockState(isLow: boolean, activeOutlookType = 'tornado') {
-  mockUseSelector.mockImplementation((selector: any) => {
+  mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => {
     if (selector.name === 'selectIsLowProbability') {
       return isLow;
     }
@@ -18,7 +19,7 @@ function mockState(isLow: boolean, activeOutlookType = 'tornado') {
       forecast: {
         drawingState: { activeOutlookType },
       },
-    });
+    } as RootState);
   });
 }
 

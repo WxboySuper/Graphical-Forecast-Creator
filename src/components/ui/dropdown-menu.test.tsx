@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import * as mockReact from 'react';
 import {
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
@@ -11,14 +12,13 @@ import {
 } from './dropdown-menu';
 
 jest.mock('@radix-ui/react-dropdown-menu', () => {
-  const React = require('react');
   const forward =
     (tag: keyof JSX.IntrinsicElements) =>
-    React.forwardRef(({ children, ...props }: React.HTMLAttributes<HTMLElement>, ref: React.Ref<HTMLElement>) =>
-      React.createElement(tag, { ...props, ref }, children)
+    mockReact.forwardRef(({ children, ...props }: mockReact.HTMLAttributes<HTMLElement>, ref: mockReact.Ref<HTMLElement>) =>
+      mockReact.createElement(tag, { ...props, ref }, children)
     );
 
-  const passthrough = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  const passthrough = ({ children }: { children: mockReact.ReactNode }) => <div>{children}</div>;
 
   return {
     Root: passthrough,
