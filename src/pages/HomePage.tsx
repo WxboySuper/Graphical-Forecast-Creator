@@ -5,6 +5,7 @@ import HomeHero, { HeroSummaryCard } from './home/HomeHero';
 import Dashboard from './home/Dashboard';
 import MainGrid from './home/MainGrid';
 import RecentCycles from './home/RecentCycles';
+import HomeConceptPage from './home/HomeConceptPage';
 import './HomePage.css';
 import useHomePageLogic from './home/useHomePageLogic';
 import AIDisclosure from './home/AIDisclosure';
@@ -155,7 +156,7 @@ const HomeSignedOutSection: React.FC<HomeSectionProps> = ({
 
 
 /** Main home page with auth-aware landing variants and a workflow-first forecast layout. */
-const HomePage: React.FC = () => {
+const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
   const {
     variant,
     stats,
@@ -179,7 +180,7 @@ const HomePage: React.FC = () => {
     savedCycles,
     forecastCycle,
     isSaved,
-  } = useHomePageLogic();
+  } = logic;
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -227,6 +228,64 @@ const HomePage: React.FC = () => {
 
       <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" />
 
+      <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
+      <ConfirmationModal
+        isOpen={confirmNewCycle}
+        title="Start New Cycle"
+        message="You have unsaved changes. Start a new cycle anyway?"
+        onConfirm={handleConfirmNewCycle}
+        onCancel={handleCancelNewCycle}
+        confirmLabel="Start New Cycle"
+      />
+    </div>
+  );
+};
+
+const HomePage: React.FC = () => {
+  const logic = useHomePageLogic();
+  const {
+    variant,
+    formattedDate,
+    fileInputRef,
+    handleFileSelect,
+    handleNavigateForecast,
+    handleNavigateAccount,
+    openFilePicker,
+    showHistoryModal,
+    confirmNewCycle,
+    handleCloseHistoryModal,
+    handleLoadRecentCycleClick,
+    handleConfirmNewCycle,
+    handleCancelNewCycle,
+    handleNewCycle,
+    savedCycles,
+    forecastCycle,
+    isSaved,
+  } = logic;
+
+  const isClassicHome = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('home') === 'classic';
+
+  if (isClassicHome) {
+    return <LegacyHomePage logic={logic} />;
+  }
+
+  return (
+    <div className="h-full overflow-auto bg-background">
+      <HomeConceptPage
+        variant={variant}
+        formattedDate={formattedDate}
+        savedCycles={savedCycles}
+        forecastCycle={forecastCycle}
+        isSaved={isSaved}
+        onResumeForecast={handleNavigateForecast}
+        onOpenHistory={logic.handleOpenHistoryModal}
+        onOpenFile={openFilePicker}
+        onNewCycle={handleNewCycle}
+        onLoadRecentCycle={handleLoadRecentCycleClick}
+        onNavigateAccount={handleNavigateAccount}
+      />
+      <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" />
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
       <ConfirmationModal
         isOpen={confirmNewCycle}
