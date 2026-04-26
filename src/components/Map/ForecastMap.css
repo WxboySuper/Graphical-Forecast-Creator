@@ -260,6 +260,10 @@
   background-color: #047857;
 }
 
+.map-key-popout-button {
+  display: none;
+}
+
 .dark-mode .map-toolbar-button {
   color: #f8fafc;
 }
@@ -324,14 +328,79 @@
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
   .map-toolbar-bottom-right {
-    bottom: 52px;
-    right: 12px;
+    top: 12px;
+    bottom: auto;
+    right: 8px;
+    max-width: calc(100vw - 16px);
   }
 
   .map-toolbar-help-surface {
-    max-width: 240px;
+    display: none;
+  }
+
+  .map-toolbar-surface {
+    gap: 2px;
+    padding: 3px;
+    border-radius: 12px;
+  }
+
+  .map-toolbar-button {
+    min-width: 44px;
+    min-height: 36px;
+    padding: 8px 8px;
+    border-radius: 9px;
+    font-size: 0.74rem;
+  }
+
+  .map-toolbar-button.mode-key {
+    display: none;
+  }
+
+  .map-key-popout-button {
+    position: absolute;
+    left: 12px;
+    top: 132px;
+    bottom: auto;
+    z-index: 1201;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #f8fafc;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .map-key-popout-button.active {
+    background: rgba(37, 99, 235, 0.94);
+    border-color: rgba(191, 219, 254, 0.5);
+  }
+
+  .map-container .ol-zoom {
+    top: 10px;
+    left: 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .map-toolbar-bottom-right {
+    top: 10px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .map-key-popout-button {
+    top: 106px;
+    left: 12px;
+    bottom: auto;
   }
 }
 

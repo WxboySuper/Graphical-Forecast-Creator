@@ -23,9 +23,53 @@
   overflow: auto;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .map-legend,
   .forecast-floating-panels-layout .map-legend {
     display: none;
+  }
+
+  .map-legend.map-legend--mobile-open {
+    display: block;
+    left: 12px;
+    right: auto;
+    top: 176px;
+    bottom: auto;
+    z-index: 1200;
+    max-width: min(210px, calc(100vw - 24px));
+    max-height: min(42dvh, 300px);
+    overflow: auto;
+    padding: 10px;
+    font-size: 0.82rem;
+  }
+
+  .map-legend.map-legend--mobile-open h4 {
+    font-size: 0.88rem;
+    margin-bottom: 7px;
+  }
+
+  .map-legend.map-legend--mobile-open .legend-items {
+    gap: 3px;
+  }
+
+  .map-legend.map-legend--mobile-open .legend-color,
+  .map-legend.map-legend--mobile-open svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .map-legend.map-legend--mobile-open .legend-item span {
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .map-legend.map-legend--mobile-open {
+    top: 106px;
+    left: 86px;
+    bottom: auto;
+    max-width: min(240px, calc(100vw - 110px));
+    max-height: calc(100dvh - var(--app-header-height, 64px) - 218px);
   }
 }
 

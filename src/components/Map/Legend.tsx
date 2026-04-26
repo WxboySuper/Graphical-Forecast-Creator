@@ -10,10 +10,11 @@ type LegendOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail' | 'totalSev
 
 interface LegendProps {
   activeOutlookType?: LegendOutlookType;
+  mobileOpen?: boolean;
 }
 
 // Optimized: Memoized to prevent re-renders when parent re-renders
-const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOutlookTypeOverride }) => {
+const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOutlookTypeOverride, mobileOpen = false }) => {
   // Optimized: Select only activeOutlookType to avoid re-rendering on other drawing state changes (like activeProbability)
   const storeActiveOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
@@ -131,7 +132,7 @@ const Legend: React.FC<LegendProps> = React.memo(({ activeOutlookType: activeOut
   };
 
   return (
-    <div className="map-legend" role="complementary" aria-label="Map Legend">
+    <div className={`map-legend ${mobileOpen ? 'map-legend--mobile-open' : ''}`} role="complementary" aria-label="Map Legend">
       {activeOutlookType === 'categorical' ? renderCategoricalLegend() : renderProbabilisticLegend()}
     </div>
   );

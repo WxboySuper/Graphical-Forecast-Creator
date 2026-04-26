@@ -321,3 +321,110 @@
     display: none;
   }
 }
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .app-navbar__inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    height: 56px;
+    padding: 0 12px;
+  }
+
+  .app-navbar__brandName--full {
+    display: none;
+  }
+
+  .app-navbar__brandName--short {
+    display: block;
+  }
+
+  .app-navbar__statusMeta,
+  .app-navbar__tabLabel,
+  .app-navbar__accountLabel {
+    display: none;
+  }
+
+  .app-navbar__tab {
+    height: 40px;
+    padding: 0 10px;
+  }
+
+  .app-navbar__actionButton--account {
+    width: 40px !important;
+    padding: 0 !important;
+  }
+
+  .app-navbar__utilityCluster {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 460px) {
+  .app-navbar__inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 0 8px;
+  }
+
+  .app-navbar__brand {
+    gap: 6px;
+  }
+
+  .app-navbar__brandMark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .app-navbar__center {
+    justify-self: stretch;
+    overflow: hidden;
+  }
+
+  .app-navbar__tabs {
+    width: 100%;
+    justify-content: center;
+    gap: 0;
+    padding-left: 0;
+  }
+
+  .app-navbar__tab {
+    height: 40px;
+    min-width: 34px;
+    padding: 0 8px;
+  }
+
+  .app-navbar__utilityCluster {
+    gap: 2px;
+  }
+
+  .app-navbar__actionButton,
+  .app-navbar__iconButton {
+    width: 36px !important;
+    height: 40px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-navbar__inner {
+    gap: 4px;
+    padding: 0 6px;
+  }
+
+  .app-navbar__brandMark {
+    display: none;
+  }
+
+  .app-navbar__brandName--short {
+    font-size: 14px;
+  }
+
+  .app-navbar__tab {
+    min-width: 32px;
+    padding: 0 6px;
+  }
+
+  .app-navbar__actionButton--account {
+    display: none !important;
+  }
+}

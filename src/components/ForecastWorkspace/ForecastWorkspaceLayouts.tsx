@@ -12,8 +12,8 @@ export interface ForecastWorkspaceLayoutProps {
 /** ForecastTabbedToolbarLayout renders the Forecast map and the tabbed integrated toolbar. */
 export const ForecastTabbedToolbarLayout: React.FC<ForecastWorkspaceLayoutProps> = ({ controller, mapRef }) => (
   <TooltipProvider>
-    <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-background via-background to-muted/10">
-      <div className="relative min-h-0 flex-1">
+    <div className="forecast-workspace-layout flex h-full min-h-0 flex-col bg-gradient-to-b from-background via-background to-muted/10">
+      <div className="forecast-workspace-layout__map relative min-h-0 flex-1">
         <ForecastMap ref={mapRef} />
       </div>
       <TabbedIntegratedToolbar controller={controller} />
