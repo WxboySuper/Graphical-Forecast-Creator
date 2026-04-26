@@ -99,9 +99,10 @@ test.describe('App smoke tests', () => {
 
     const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
     const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
-    expect(legendBox).not.toBeNull();
-    expect(toolbarBox).not.toBeNull();
-    expect(legendBox!.y + legendBox!.height).toBeLessThanOrEqual(toolbarBox!.y + 1);
+    if (!legendBox || !toolbarBox) {
+      throw new Error('Expected the mobile key popout and toolbar to have measurable bounds.');
+    }
+    expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
 
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: /Undo/i }).first()).toBeVisible();
