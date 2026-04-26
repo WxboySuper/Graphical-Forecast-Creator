@@ -6,27 +6,123 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('App smoke tests', () => {
+  const bypassLocalBeta = async (page: import('@playwright/test').Page) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('gfc-local-beta-bypass', 'true');
+    });
+  };
+
+  const acceptAgreementsIfPresent = async (page: import('@playwright/test').Page) => {
+    for (let i = 0; i < 2; i += 1) {
+      const agreementCheckbox = page.getByRole('checkbox', { name: /I have read and agree/i });
+      if (!(await agreementCheckbox.isVisible().catch(() => false))) break;
+
+      await agreementCheckbox.check();
+      await page.getByRole('button', { name: /Accept & Continue/i }).click();
+    }
+  };
+
   test('homepage loads with correct title', async ({ page }) => {
-    await page.goto('/');
+    await bypassLocalBeta(page);
+    await page.goto('/?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+
     await expect(page).toHaveTitle(/Graphical Forecast Creator/);
-    // Use level:1 to avoid strict-mode conflict with the welcome card h2
-    await expect(page.getByRole('heading', { level: 1, name: /Graphical Forecast Creator/i })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Create forecasts/i })).toBeVisible();
   });
 
   test('navbar is visible on homepage', async ({ page }) => {
-    await page.goto('/');
-    // Version badge
-    await expect(page.getByText('v1.0.0')).toBeVisible();
+    await bypassLocalBeta(page);
+    await page.goto('/?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+
+    await expect(page.getByRole('navigation')).toBeVisible();
+    await expect(page.locator('.app-navbar__brandName--full')).toBeVisible();
   });
 
   test('forecast page loads without crashing', async ({ page }) => {
-    await page.goto('/forecast');
+    await page.goto('/forecast?localBetaBypass=true');
     // The OpenLayers map container renders with class .map-container
     await expect(page.locator('.map-container')).toBeVisible({ timeout: 10000 });
   });
 
+  test('forecast editor is usable at mobile width', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bypassLocalBeta(page);
+    await page.goto('/forecast?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+
+    await expect(page.locator('.map-container')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.tabbed-integrated-toolbar')).toBeVisible();
+    await expect(page.getByRole('complementary', { name: /map legend/i })).not.toBeVisible();
+    await page.getByRole('button', { name: /show map key/i }).click();
+    await expect(page.getByRole('complementary', { name: /map legend/i })).toBeVisible();
+
+    const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(documentOverflow).toBeLessThanOrEqual(1);
+
+    for (const tabName of ['Draw', 'Days', 'Layers', 'Tools']) {
+      await page.getByRole('tab', { name: tabName }).click();
+      await expect(page.getByRole('tab', { name: tabName })).toHaveAttribute('aria-selected', 'true');
+    }
+
+    await page.getByRole('tab', { name: 'Draw' }).click();
+    await expect(page.getByRole('button', { name: /wind/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /15%/i }).first()).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Days' }).click();
+    await expect(page.getByRole('button', { name: '2' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Tools' }).click();
+    await expect(page.getByRole('button', { name: /Save/i }).first()).toBeVisible();
+
+    const mobileToolbarRow = page.locator('.tabbed-integrated-toolbar__row');
+    await mobileToolbarRow.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect(page.getByRole('button', { name: /Reset All/i }).first()).toBeVisible();
+  });
+
+  test('forecast editor uses mobile controls in landscape phone view', async ({ page }) => {
+    await page.setViewportSize({ width: 932, height: 430 });
+    await bypassLocalBeta(page);
+    await page.goto('/forecast?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+
+    await expect(page.locator('.map-container')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.tabbed-integrated-toolbar__status-bar')).not.toBeVisible();
+    await expect(page.locator('.map-toolbar-help-surface')).not.toBeVisible();
+    await expect(page.getByRole('button', { name: /show map key/i })).toBeVisible();
+
+    await page.getByRole('button', { name: /show map key/i }).click();
+    await expect(page.getByRole('complementary', { name: /map legend/i })).toBeVisible();
+
+    const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
+    const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
+    if (!legendBox || !toolbarBox) {
+      throw new Error('Expected the mobile key popout and toolbar to have measurable bounds.');
+    }
+    expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
+
+    await page.getByRole('tab', { name: 'Tools' }).click();
+    await expect(page.getByRole('button', { name: /Undo/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /History/i }).first()).toBeVisible();
+
+    const landscapeToolbarRow = page.locator('.tabbed-integrated-toolbar__row');
+    await landscapeToolbarRow.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect(page.getByRole('button', { name: /Reset All/i }).first()).toBeVisible();
+
+    const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(documentOverflow).toBeLessThanOrEqual(1);
+  });
+
   test('verification page loads without crashing', async ({ page }) => {
-    await page.goto('/verification');
+    await bypassLocalBeta(page);
+    await page.goto('/verification?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+
     await expect(page.getByRole('heading', { name: /Verification/i })).toBeVisible({ timeout: 10000 });
   });
 

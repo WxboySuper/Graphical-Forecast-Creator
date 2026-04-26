@@ -1258,8 +1258,8 @@ export const ForecastPage: React.FC = () => {
 
   return (
     <div
-      className="w-full overflow-hidden"
-      style={{ height: 'calc(100dvh - var(--app-header-height, 64px))' }}
+      className="forecast-page-shell w-full overflow-hidden"
+      style={{ height: 'calc(100dvh - var(--app-header-height, 64px))', maxHeight: 'calc(100dvh - var(--app-header-height, 64px))' }}
     >
       {renderForecastWorkspaceLayout(forecastUiVariant, {
         mapRef,

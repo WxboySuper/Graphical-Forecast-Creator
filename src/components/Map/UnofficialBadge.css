@@ -33,3 +33,9 @@
   background: #f59e0b;
   flex-shrink: 0;
 }
+
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .unofficial-badge {
+    bottom: 18px;
+  }
+}

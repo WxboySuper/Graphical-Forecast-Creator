@@ -240,4 +240,88 @@ describe('HomePage', () => {
     expect(screen.getByText(/Build outlook packages without fighting the tooling/i)).toBeInTheDocument();
     expect(screen.getByText(/AI Development Disclosure/i)).toBeInTheDocument();
   });
+
+  test('renders the classic signed-in workspace and wires its actions', () => {
+    window.history.pushState({}, '', '/?home=classic');
+    const handlers = {
+      handleNavigateForecast: jest.fn(),
+      handleNavigateDiscussion: jest.fn(),
+      handleNavigateAccount: jest.fn(),
+      handleOpenHistoryModal: jest.fn(),
+      handleQuickStartClick: jest.fn(),
+      handleNewCycle: jest.fn(),
+      handleSave: jest.fn(),
+      openFilePicker: jest.fn(),
+      handleLoadRecentCycleClick: jest.fn(),
+      handleConfirmNewCycle: jest.fn(),
+      handleCancelNewCycle: jest.fn(),
+      handleFileSelect: jest.fn(),
+      handleCloseHistoryModal: jest.fn(),
+    };
+
+    mockUseHomePageLogic.mockReturnValue({
+      variant: 'signed_in',
+      stats: baseStats,
+      formattedDate: 'Friday, March 27, 2026',
+      fileInputRef: { current: null },
+      showHistoryModal: true,
+      confirmNewCycle: true,
+      savedCycles: [
+        {
+          id: 'cycle-1',
+          timestamp: '2026-03-25T12:00:00Z',
+          cycleDate: '2026-03-25',
+          label: 'Cycle 1',
+          forecastCycle: baseForecastCycle,
+          stats: { forecastDays: 1, totalOutlooks: 1, totalFeatures: 1 },
+        },
+      ],
+      forecastCycle: baseForecastCycle,
+      isSaved: false,
+      ...handlers,
+    });
+
+    const { container } = render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/Cycle history modal open/i)).toBeInTheDocument();
+    expect(screen.getByText(/Confirm start new cycle modal open/i)).toBeInTheDocument();
+    expect(screen.getByText(/AI Development Disclosure/i)).toBeInTheDocument();
+    expect(screen.getByText(/Recent Cycles/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Continue Forecast/i }));
+    expect(handlers.handleNavigateForecast).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Write Discussion/i }));
+    expect(handlers.handleNavigateDiscussion).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Open Saved Cycles/i }));
+    expect(handlers.handleOpenHistoryModal).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start New Cycle/i }));
+    expect(handlers.handleNewCycle).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Save Cycle File/i }));
+    expect(handlers.handleSave).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Load From File/i }));
+    expect(handlers.openFilePicker).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Cycle 1/i }));
+    expect(handlers.handleLoadRecentCycleClick).toHaveBeenCalled();
+
+    const fileInput = container.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    if (fileInput) {
+      fireEvent.change(fileInput, {
+        target: {
+          files: [new File(['{}'], 'classic-forecast.json', { type: 'application/json' })],
+        },
+      });
+    }
+    expect(handlers.handleFileSelect).toHaveBeenCalled();
+  });
 });

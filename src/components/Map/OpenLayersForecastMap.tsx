@@ -463,6 +463,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
   
   const [popupInfo, setPopupInfo] = useState<{ outlookType: string; probability: string; isSignificant: boolean } | null>(null);
+  const [showMobileLegend, setShowMobileLegend] = useState(false);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
@@ -1260,6 +1261,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
           >
             Delete
           </button>
+          <button
+            type="button"
+            className={`map-toolbar-button mode-key ${showMobileLegend ? 'active' : ''}`}
+            onClick={() => setShowMobileLegend((isVisible) => !isVisible)}
+            title={showMobileLegend ? 'Hide map key' : 'Show map key'}
+            aria-label={showMobileLegend ? 'Hide map key' : 'Show map key'}
+            aria-expanded={showMobileLegend}
+          >
+            Key
+          </button>
         </div>
         <div className="map-toolbar-help-surface">
           {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}
@@ -1267,7 +1278,18 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
           {interactionMode === 'pan' && 'Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.'}
         </div>
       </div>
-      <Legend />
+      <Legend mobileOpen={showMobileLegend} />
+      <button
+        type="button"
+        className={`map-key-popout-button ${showMobileLegend ? 'active' : ''}`}
+        onClick={() => setShowMobileLegend((isVisible) => !isVisible)}
+        title={showMobileLegend ? 'Hide map key' : 'Show map key'}
+        aria-label={showMobileLegend ? 'Hide map key' : 'Show map key'}
+        aria-expanded={showMobileLegend}
+      >
+        <span aria-hidden="true">{showMobileLegend ? '▾' : '▴'}</span>
+        Key
+      </button>
       <StatusOverlay />
       <UnofficialBadge />
     </div>
