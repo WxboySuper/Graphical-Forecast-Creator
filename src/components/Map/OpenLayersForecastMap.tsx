@@ -463,6 +463,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
   
   const [popupInfo, setPopupInfo] = useState<{ outlookType: string; probability: string; isSignificant: boolean } | null>(null);
+  const [showDesktopLegend, setShowDesktopLegend] = useState(true);
   const [showMobileLegend, setShowMobileLegend] = useState(false);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
@@ -1263,11 +1264,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
           </button>
           <button
             type="button"
-            className={`map-toolbar-button mode-key ${showMobileLegend ? 'active' : ''}`}
-            onClick={() => setShowMobileLegend((isVisible) => !isVisible)}
-            title={showMobileLegend ? 'Hide map key' : 'Show map key'}
-            aria-label={showMobileLegend ? 'Hide map key' : 'Show map key'}
-            aria-expanded={showMobileLegend}
+            className={`map-toolbar-button mode-key ${showDesktopLegend ? 'active' : ''}`}
+            onClick={() => setShowDesktopLegend((isVisible) => !isVisible)}
+            title={showDesktopLegend ? 'Hide map key' : 'Show map key'}
+            aria-label={showDesktopLegend ? 'Hide map key' : 'Show map key'}
+            aria-expanded={showDesktopLegend}
           >
             Key
           </button>
@@ -1278,7 +1279,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
           {interactionMode === 'pan' && 'Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.'}
         </div>
       </div>
-      <Legend mobileOpen={showMobileLegend} />
+      <Legend desktopOpen={showDesktopLegend} mobileOpen={showMobileLegend} />
       <button
         type="button"
         className={`map-key-popout-button ${showMobileLegend ? 'active' : ''}`}
