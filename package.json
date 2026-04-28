@@ -112,7 +112,7 @@
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
     "@playwright/test": "^1.59.1",
-    "@tailwindcss/postcss": "^4.2.2",
+    "@tailwindcss/postcss": "^4.2.4",
     "@types/geojson": "^7946.0.16",
     "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^5.0.4",
