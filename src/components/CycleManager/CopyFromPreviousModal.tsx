@@ -84,6 +84,7 @@ type CopyModalHeaderProps = {
   onClose: () => void;
 };
 
+/** Renders the copy-modal title bar and close control. */
 const CopyModalHeader: React.FC<CopyModalHeaderProps> = ({ onClose }) => (
   <div className="copy-modal-header">
     <h2 id="copy-previous-title">Copy from Previous Cycle</h2>
@@ -98,6 +99,7 @@ type CopyFileSectionProps = {
   onFileLoad: (event: React.ChangeEvent<HTMLInputElement>) => void;
 };
 
+/** Renders the forecast-file picker and loaded-file summary. */
 const CopyFileSection: React.FC<CopyFileSectionProps> = ({
   fileInputRef,
   loadedCycle,
@@ -129,6 +131,7 @@ type CopyDaySelectorProps = {
   onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 };
 
+/** Renders one day selector used by the source and target copy controls. */
 const CopyDaySelector: React.FC<CopyDaySelectorProps> = ({ id, label, value, onChange }) => (
   <div className="copy-form-group">
     <label htmlFor={id}>{label}</label>
@@ -149,6 +152,7 @@ type CopyDaysSectionProps = {
   onTargetDayChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 };
 
+/** Renders the paired source and target day selectors. */
 const CopyDaysSection: React.FC<CopyDaysSectionProps> = ({
   sourceDay,
   targetDay,
@@ -167,6 +171,7 @@ const CopyDaysSection: React.FC<CopyDaysSectionProps> = ({
   </div>
 );
 
+/** Renders the conversion note shown before copying previous-cycle features. */
 const CopyInfoBox: React.FC = () => (
   <div className="copy-info-box">
     <strong>Note:</strong> This will copy outlook features from the loaded file to your current cycle.
@@ -181,6 +186,7 @@ type CopyModalFooterProps = {
   onCopy: () => void;
 };
 
+/** Renders cancel and copy actions for the copy-modal footer. */
 const CopyModalFooter: React.FC<CopyModalFooterProps> = ({ disabled, onClose, onCopy }) => (
   <div className="copy-modal-footer">
     <button className="copy-btn-cancel" onClick={onClose}>
