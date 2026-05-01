@@ -21,7 +21,7 @@ import { click } from 'ol/events/condition';
 import { v4 as uuidv4 } from 'uuid';
 import { RootState } from '../../store';
 import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
-import { setBaseMapStyle } from '../../store/overlaysSlice';
+
 import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { getFeatureStyle, computeZIndex } from '../../utils/mapStyleUtils';
 import type { MapAdapterHandle } from '../../maps/contracts';
@@ -91,6 +91,7 @@ interface HatchPatternInput {
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
 const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
+const GHOST_REFERENCE_LAYER_Z_INDEX = TOP_OUTLINE_LAYER_Z_INDEX - 25;
 
 const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
   'categorical',
@@ -102,7 +103,7 @@ const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
 ]);
 
 // Helper to convert hex/rgb/hsl color strings to rgba with specified alpha
-const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
+export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
   if (!color) {
     return `rgba(255, 255, 255, ${alpha})`;
   }
@@ -131,7 +132,7 @@ const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
 };
 
 // Create canvas pattern for CIG hatching
-const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | null => {
+export const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | null => {
   const canvas = document.createElement('canvas');
   const size = 10;
   canvas.width = size;
@@ -171,12 +172,12 @@ const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | nu
 };
 
 /** Returns the fill opacity for a feature or a sensible fallback when a style omitted it. */
-const resolveFillOpacity = ({ fillOpacity }: FillOpacityInput): number => {
+export const resolveFillOpacity = ({ fillOpacity }: FillOpacityInput): number => {
   return typeof fillOpacity === 'number' ? fillOpacity : 0.25;
 };
 
 /** Builds an OL Fill for a given probability: solid rgba fill for standard outlooks, or a CIG hatching CanvasPattern for CIG levels. */
-const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInput): Fill => {
+export const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInput): Fill => {
   if (!probability.startsWith('CIG')) {
     return new Fill({ color: toRgbaColor({ color: fillColor, alpha: fillOpacity }) });
   }
@@ -190,13 +191,13 @@ const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInp
 };
 
 /** Returns the stroke width: 3px for the top (selected) layer, the numeric weight value otherwise, or 2 as default. */
-const resolveStrokeWidth = ({ weight, isTopLayer }: StrokeWidthInput): number => {
+export const resolveStrokeWidth = ({ weight, isTopLayer }: StrokeWidthInput): number => {
   if (isTopLayer) return 3;
   return typeof weight === 'number' ? weight : 2;
 };
 
 /** Extracts the featureId, outlookType, and probability properties from an OL feature, returning null if any are missing. */
-const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null => {
+export const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null => {
   const featureId = feature.get('featureId') as string | undefined;
   const outlookType = feature.get('outlookType') as string | undefined;
   const probability = feature.get('probability') as string | undefined;
@@ -209,7 +210,7 @@ const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null => {
 };
 
 /** Converts an OL feature back to a GeoJSON Feature object with current projection, enriched with Redux state properties. Returns null if identity or geometry cannot be extracted. */
-const toUpdatedGeoJsonFeature = (
+export const toUpdatedGeoJsonFeature = (
   feature: FeatureLike,
   format: GeoJSON,
   includeDerivedFrom: boolean
@@ -239,7 +240,7 @@ const toUpdatedGeoJsonFeature = (
 };
 
 /** Iterates over a FeatureLike array and calls setStyle on each, guarding against RenderFeature instances that lack the method. */
-const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
+export const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
   features.forEach((feature) => {
     if ('setStyle' in feature && typeof feature.setStyle === 'function') {
       feature.setStyle(style);
@@ -248,7 +249,7 @@ const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
 };
 
 /** Replaces all layers in the target group with the current layers from the source group. */
-const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+export const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
   const targetLayers = target.getLayers();
   targetLayers.clear();
   source.getLayers().getArray().forEach((layer) => {
@@ -257,7 +258,7 @@ const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
 };
 
 /** Loads GeoJSON features into a blank-basemap VectorSource if not already populated, using an in-memory cache to avoid repeated network requests. */
-const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
+export const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
   if (config.isLoaded()) return;
 
   let geoJson = config.getCache();
@@ -282,12 +283,12 @@ const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
 };
 
 /** Returns true if the given outlook type string is one of the user-editable types defined in DRAWABLE_OUTLOOK_TYPES. */
-const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolean => {
+export const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolean => {
   return DRAWABLE_OUTLOOK_TYPES.has(outlookType as EditableOutlookType);
 };
 
 // Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
-const toOlStyle = (
+export const toOlStyle = (
   selection: OutlookSelection,
   options: LayerStyleOptions = {}
 ) => {
@@ -317,12 +318,12 @@ const toOlStyle = (
 };
 
 /** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
-const toGhostOlStyle = (
+export const toGhostOlStyle = (
   { outlookType, probability, isCategorical }: GhostSelection
 ) => {
   const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
   const strokeColor = String(style.color || '#000000');
-  const ghostFillOpacity = isCategorical ? 0.15 : 0.15;
+  const ghostFillOpacity = isCategorical ? 0.08 : 0.03;
   const isCig = probability.startsWith('CIG');
 
   const fill = isCig
@@ -336,10 +337,11 @@ const toGhostOlStyle = (
   return new Style({
     fill,
     stroke: new Stroke({
-      color: toRgbaColor({ color: strokeColor, alpha: 0.15 }),
-      width: 2,
+      color: toRgbaColor({ color: strokeColor, alpha: isCategorical ? 0.96 : 0.9 }),
+      width: isCategorical ? 3 : 2.5,
+      lineDash: isCig ? [4, 4] : [12, 7],
     }),
-    zIndex: computeZIndex(outlookType as EditableOutlookType, probability),
+    zIndex: computeZIndex(outlookType as EditableOutlookType, probability) + 500,
   });
 };
 
@@ -372,7 +374,7 @@ const BLANK_LAND_OUTLINE_STYLE = new Style({
 });
 
 // Creates a labels/places overlay source so cities and boundaries stay readable above polygons.
-const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
+export const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
   switch (style) {
     case 'osm':
       return new XYZ({
@@ -408,7 +410,7 @@ const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | 
 };
 
 // Helper to create tile source based on selected base map style
-const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
+export const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   switch (style) {
     case 'osm':
       return new XYZ({
@@ -443,69 +445,26 @@ const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
   }
 };
 
-// Sub-component for the base map style-picker dropdown, rendering each style option as a button.
-const MapStylePicker: React.FC<{
-  baseMapStyle: BaseMapStyle;
-  onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}> = ({ baseMapStyle, onSelect }) => (
-  <div className="absolute bottom-full mb-2 right-0 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-lg p-2 flex flex-col gap-1 min-w-[120px] z-50">
-    {([
-      { value: 'blank', label: 'Blank (Weather)' },
-      { value: 'osm', label: 'OpenStreetMap' },
-      { value: 'carto-light', label: 'Light' },
-      { value: 'carto-dark', label: 'Dark' },
-      { value: 'esri-satellite', label: 'Satellite' },
-    ] as { value: BaseMapStyle; label: string }[]).map(({ value, label }) => (
-      <button
-        key={value}
-        data-style={value}
-        type="button"
-        className={`text-left px-2 py-1 rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${baseMapStyle === value ? 'font-bold bg-gray-100 dark:bg-gray-700' : ''}`}
-        onClick={onSelect}
-      >
-        {label}
-      </button>
-    ))}
-  </div>
-);
+
 
 /** Sentinel value used to clear an Overlay's position, causing it to be hidden from the map. */
 const OVERLAY_HIDDEN_POSITION: Parameters<Overlay['setPosition']>[0] = undefined;
 
 /** Hides an OpenLayers Overlay by clearing its map position. */
-const hideOverlay = (overlay: Overlay): void => {
+export const hideOverlay = (overlay: Overlay): void => {
   overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 
-/** Map toolbar button that toggles the base map style picker and renders the dropdown when open. */
-const MapStylePickerButton: React.FC<{
-  showStylePicker: boolean;
-  baseMapStyle: BaseMapStyle;
-  onToggle: () => void;
-  onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}> = ({ showStylePicker, baseMapStyle, onToggle, onSelect }) => (
-  <div className="relative">
-    <button
-      type="button"
-      className="map-toolbar-button"
-      onClick={onToggle}
-      title="Base map style"
-      aria-label="Base map style"
-    >
-      Map
-    </button>
-    {showStylePicker && (
-      <MapStylePicker baseMapStyle={baseMapStyle} onSelect={onSelect} />
-    )}
-  </div>
-);
+
 
 // Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
-const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
+const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref) => {
   const dispatch = useDispatch();
   const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
-  const [showStylePicker, setShowStylePicker] = useState(false);
+  
   const [popupInfo, setPopupInfo] = useState<{ outlookType: string; probability: string; isSignificant: boolean } | null>(null);
+  const [showDesktopLegend, setShowDesktopLegend] = useState(true);
+  const [showMobileLegend, setShowMobileLegend] = useState(false);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
@@ -544,6 +503,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
   const ghostSourceRef = useRef<VectorSource>(new VectorSource());
   const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
   const catModifyRef = useRef<Modify | null>(null);
@@ -642,7 +602,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     catLayerRef.current = catLayer;
     const ghostLayer = new VectorLayer({
       source: ghostSourceRef.current,
-      zIndex: 2.5,
+      zIndex: GHOST_REFERENCE_LAYER_Z_INDEX,
     });
     ghostLayerRef.current = ghostLayer;
     // Probabilistic/other features layer: separate source, normal per-feature opacity
@@ -650,6 +610,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       source: vectorSourceRef.current,
       zIndex: 4,
     });
+    vectorLayerRef.current = vectorLayer;
     // Place labels/cities above outlook polygons.
     const labelLayer = new TileLayer({
       source: createLabelOverlaySource('osm') ?? undefined,
@@ -729,7 +690,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
 
       // Use forEachFeatureAtPixel to get the topmost feature at the clicked pixel,
       // which accounts for z-index and layer visibility.
-      const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f);
+      const feature = map.forEachFeatureAtPixel(
+        evt.pixel,
+        (f) => f,
+        {
+          layerFilter: (layer) => layer === vectorLayerRef.current || layer === catLayerRef.current,
+        }
+      );
       if (feature && overlayRef.current) {
         const outlookType = feature.get('outlookType') as string;
         const probability = feature.get('probability') as string;
@@ -852,6 +819,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
       mapRef.current = null;
       vectorBaseGroupRef.current = null;
       vectorReferenceGroupRef.current = null;
+      vectorLayerRef.current = null;
     };
   }, [dispatch]);
 
@@ -1244,21 +1212,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
     setInteractionMode('delete');
   };
 
-  // Toggle the visibility of the base map style picker, which allows users to switch between different base map styles (e.g. blank, OSM, satellite).
-  const handleToggleStylePicker = () => {
-    setShowStylePicker((v) => !v);
-  };
-
-  // Handle selection of a base map style from the style picker, updating the Redux store and hiding the picker.
-  const handleBaseMapStyleSelect = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const style = e.currentTarget.dataset.style as BaseMapStyle | undefined;
-    if (!style) {
-      return;
-    }
-
-    dispatch(setBaseMapStyle(style));
-    setShowStylePicker(false);
-  };
+  
 
   return (
     <div className="map-container">
@@ -1280,7 +1234,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
         )}
       </div>
       <div className="map-toolbar-bottom-right">
-        <div className="flex items-center gap-1 rounded-md bg-white dark:bg-gray-800 p-1 shadow-md border border-gray-300 dark:border-gray-600">
+        <div className="map-toolbar-surface">
           <button
             type="button"
             className={`map-toolbar-button mode-pan ${interactionMode === 'pan' ? 'active' : ''}`}
@@ -1308,21 +1262,35 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap>>((_, ref) => {
           >
             Delete
           </button>
-          <span className="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
-          <MapStylePickerButton
-            showStylePicker={showStylePicker}
-            baseMapStyle={baseMapStyle}
-            onToggle={handleToggleStylePicker}
-            onSelect={handleBaseMapStyleSelect}
-          />
+          <button
+            type="button"
+            className={`map-toolbar-button mode-key ${showDesktopLegend ? 'active' : ''}`}
+            onClick={() => setShowDesktopLegend((isVisible) => !isVisible)}
+            title={showDesktopLegend ? 'Hide map key' : 'Show map key'}
+            aria-label={showDesktopLegend ? 'Hide map key' : 'Show map key'}
+            aria-expanded={showDesktopLegend}
+          >
+            Key
+          </button>
         </div>
-        <div className="max-w-[260px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 shadow-md">
+        <div className="map-toolbar-help-surface">
           {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}
           {interactionMode === 'delete' && 'Delete mode: click any polygon to remove it.'}
           {interactionMode === 'pan' && 'Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.'}
         </div>
       </div>
-      <Legend />
+      <Legend desktopOpen={showDesktopLegend} mobileOpen={showMobileLegend} />
+      <button
+        type="button"
+        className={`map-key-popout-button ${showMobileLegend ? 'active' : ''}`}
+        onClick={() => setShowMobileLegend((isVisible) => !isVisible)}
+        title={showMobileLegend ? 'Hide map key' : 'Show map key'}
+        aria-label={showMobileLegend ? 'Hide map key' : 'Show map key'}
+        aria-expanded={showMobileLegend}
+      >
+        <span aria-hidden="true">{showMobileLegend ? '▾' : '▴'}</span>
+        Key
+      </button>
       <StatusOverlay />
       <UnofficialBadge />
     </div>

@@ -2,7 +2,11 @@ import React from 'react';
 import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
-import useAutoCategorical, { processOutlooksToCategorical } from '../useAutoCategorical';
+import useAutoCategorical, {
+  processDay12OutlooksToCategorical,
+  processDay3OutlooksToCategorical,
+  processOutlooksToCategorical,
+} from '../useAutoCategorical';
 import { OutlookData } from '../../types/outlooks';
 import { Feature, Polygon } from 'geojson';
 import forecastReducer, { addFeature, undoLastEdit, updateFeature } from '../../store/forecastSlice';
@@ -91,19 +95,62 @@ describe('processOutlooksToCategorical', () => {
     expect(result.some((feature) => feature.properties?.probability === 'ENH')).toBe(true);
   });
 
+  test('ignores day 4-8 and missing day 3 total severe data', () => {
+    const outlooks: OutlookData = {
+      tornado: new Map([['30%', [makeFeature('t1')]]]),
+      wind: new Map(),
+      hail: new Map(),
+      categorical: new Map()
+    };
+
+    expect(processOutlooksToCategorical(outlooks, 4)).toEqual([]);
+    expect(processDay3OutlooksToCategorical(outlooks)).toEqual([]);
+  });
+
+  test('converts day 3 total severe and filters invalid geometries', () => {
+    mockUuid.mockReturnValueOnce('day3-id');
+    const outlooks: OutlookData = {
+      tornado: new Map(),
+      wind: new Map(),
+      hail: new Map(),
+      categorical: new Map(),
+      totalSevere: new Map([
+        ['30%', [makeFeature('valid'), { type: 'Feature', id: 'bad', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} } as never]],
+      ]),
+    };
+
+    const result = processDay3OutlooksToCategorical(outlooks);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0].id).toBe('day3-id');
+    expect(result[0].properties?.outlookType).toBe('categorical');
+  });
+
+  test('handles hatching intersections and union fallbacks for day 1 and day 2', () => {
+    const outlooks: OutlookData = {
+      tornado: new Map(),
+      wind: new Map([
+        ['30%', [makeFeature('wind')]],
+        ['CIG1', [makeFeature('wind-hatch')]],
+      ]),
+      hail: new Map([
+        ['30%', [makeFeature('hail-a'), makeFeature('hail-b')]],
+      ]),
+      categorical: new Map()
+    };
+
+    expect(processDay12OutlooksToCategorical(outlooks).length).toBeGreaterThan(0);
+    expect(processOutlooksToCategorical(outlooks, 2).length).toBeGreaterThan(0);
+  });
+
   // Since we use turf intersection, robust testing requires valid geometries and turf mocking or integration.
   // The simple object identity checks are no longer valid as new features are created.
 
   test('undoing a probabilistic edit regenerates categorical output', async () => {
     const store = createStore();
 
-    render(
-      React.createElement(
-        Provider,
-        { store },
-        React.createElement(HookHarness)
-      )
-    );
+    type ProviderProps = { store: ReturnType<typeof createStore>; children?: React.ReactNode };
+    const ProviderComponent = Provider as unknown as React.ComponentType<ProviderProps>;
+    render(React.createElement(ProviderComponent, { store }, React.createElement(HookHarness)));
 
     act(() => {
       store.dispatch(addFeature({ feature: makeProbabilisticFeature('feature-1', 0) }));
@@ -128,6 +175,29 @@ describe('processOutlooksToCategorical', () => {
 
     await waitFor(() => {
       expect((getCategoricalFeatures(store)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
+    });
+  });
+
+  test('preserves manual TSTM geometry when regenerating categorical output', async () => {
+    const store = createStore();
+    type ProviderProps = { store: ReturnType<typeof createStore>; children?: React.ReactNode };
+    const ProviderComponent = Provider as unknown as React.ComponentType<ProviderProps>;
+    render(React.createElement(ProviderComponent, { store }, React.createElement(HookHarness)));
+
+    act(() => {
+      store.dispatch(addFeature({
+        feature: {
+          ...makeFeature('manual-tstm'),
+          properties: { outlookType: 'categorical', probability: 'TSTM' },
+        }
+      }));
+      store.dispatch(addFeature({ feature: makeProbabilisticFeature('feature-1', 0) }));
+    });
+
+    await waitFor(() => {
+      const categorical = store.getState().forecast.forecastCycle.days[1]?.data.categorical;
+      expect(categorical?.get('TSTM')?.[0].id).toBe('manual-tstm');
+      expect(categorical?.get('ENH')?.length).toBeGreaterThan(0);
     });
   });
 });

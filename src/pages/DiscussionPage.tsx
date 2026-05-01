@@ -25,6 +25,7 @@ import { Input } from '../components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
 import type { AddToastFn } from '../components/Layout';
+import './DiscussionPage.css';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -176,8 +177,8 @@ const MetadataSection: React.FC<{
   };
 
   return (
-    <div className="flex-shrink-0 p-4 bg-muted/30 border-b border-border">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="discussion-top-rail">
+    <div className="discussion-metadata-grid">
       <div className="space-y-1">
         <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
           <Calendar className="h-3 w-3" />
@@ -222,7 +223,7 @@ const MetadataSection: React.FC<{
       </div>
     </div>
 
-    <div className="mt-3 flex items-center gap-2 text-sm text-orange-900 dark:text-warning-foreground bg-warning/20 px-3 py-2 rounded-md">
+    <div className="discussion-warning-banner mt-3 flex items-center gap-2 text-sm text-orange-900 dark:text-warning-foreground bg-warning/20 px-3 py-2 rounded-md">
       <AlertTriangle className="h-4 w-4 flex-shrink-0" />
       <span><strong>UNOFFICIAL OUTLOOK</strong> - For educational purposes only.</span>
     </div>
@@ -242,15 +243,15 @@ const DiscussionTabsSection: React.FC<{
   <Tabs
     value={mode}
     onValueChange={onModeChange}
-    className="flex-1 flex flex-col overflow-hidden"
+    className="discussion-editor-shell flex-1 flex flex-col overflow-hidden"
   >
-    <div className="flex-shrink-0 px-4 pt-4">
-      <TabsList className="grid w-full max-w-xs grid-cols-2">
-        <TabsTrigger value="diy" className="flex items-center gap-2">
+    <div className="discussion-mode-toggle-wrap flex-shrink-0 px-4 pt-4">
+      <TabsList className="discussion-mode-toggle w-full max-w-sm">
+        <TabsTrigger value="diy" className="discussion-mode-toggle-button flex h-full items-center justify-center gap-2 leading-none">
           <Edit3 className="h-4 w-4" />
           DIY Editor
         </TabsTrigger>
-        <TabsTrigger value="guided" className="flex items-center gap-2">
+        <TabsTrigger value="guided" className="discussion-mode-toggle-button flex h-full items-center justify-center gap-2 leading-none">
           <Wand2 className="h-4 w-4" />
           Guided
         </TabsTrigger>
@@ -292,8 +293,8 @@ const DiscussionStatusBar: React.FC<{ wordCount: number; lastModified?: string }
 // showing a live preview of the compiled discussion text based on the current editor content and metadata.
 const DiscussionPreviewCard: React.FC<{ compiledText: string }> = ({ compiledText }) => (
   <div className="flex-1 overflow-auto p-4">
-    <div className="p-4 bg-card rounded-md">
-      <pre className="whitespace-pre-wrap font-mono text-sm text-foreground leading-relaxed">
+    <div className="discussion-preview-card p-4 bg-card rounded-md">
+      <pre className="discussion-preview-text whitespace-pre-wrap font-mono text-sm text-foreground leading-relaxed">
         {compiledText}
       </pre>
     </div>
@@ -302,8 +303,8 @@ const DiscussionPreviewCard: React.FC<{ compiledText: string }> = ({ compiledTex
 
 // The DiscussionPreviewPane component renders the right-hand pane of the discussion page,
 const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledText }) => (
-  <div className="w-[45%] flex-shrink-0 flex flex-col overflow-hidden bg-muted/20">
-    <div className="flex-shrink-0 px-4 py-3 border-b border-border flex items-center gap-2">
+  <div className="discussion-preview-pane flex-shrink-0 flex flex-col overflow-hidden bg-muted/20">
+    <div className="discussion-top-rail discussion-preview-header flex-shrink-0 flex items-center gap-2 border-b border-border">
       <Eye className="h-4 w-4 text-muted-foreground" />
       <span className="font-medium text-sm">Live Preview</span>
     </div>
@@ -549,8 +550,8 @@ export const DiscussionPage: React.FC = () => {
         onSave={editorState.handleSave}
       />
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
+      <div className="discussion-layout flex-1 flex overflow-hidden">
+        <div className="discussion-editor-pane flex flex-col overflow-hidden border-r border-border">
           <MetadataSection
             validStart={editorState.validStart}
             validEnd={editorState.validEnd}

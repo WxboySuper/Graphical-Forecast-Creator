@@ -3,12 +3,78 @@
   bottom: 20px;
   left: 20px;
   z-index: 1000;
-  background-color: rgba(255, 255, 255, 0.9);
-  padding: 10px;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  background-color: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
   max-width: 300px;
   font-size: 0.9rem;
+}
+
+.map-legend.map-legend--desktop-hidden {
+  display: none;
+}
+
+.forecast-floating-panels-layout .map-legend {
+  left: auto;
+  right: 16px;
+  bottom: 112px;
+  max-width: 220px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+}
+
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .map-legend,
+  .forecast-floating-panels-layout .map-legend {
+    display: none;
+  }
+
+  .map-legend.map-legend--mobile-open {
+    display: block;
+    left: 12px;
+    right: auto;
+    top: 176px;
+    bottom: auto;
+    z-index: 1200;
+    max-width: min(210px, calc(100vw - 24px));
+    max-height: min(42dvh, 300px);
+    overflow: auto;
+    padding: 10px;
+    font-size: 0.82rem;
+  }
+
+  .map-legend.map-legend--mobile-open h4 {
+    font-size: 0.88rem;
+    margin-bottom: 7px;
+  }
+
+  .map-legend.map-legend--mobile-open .legend-items {
+    gap: 3px;
+  }
+
+  .map-legend.map-legend--mobile-open .legend-color,
+  .map-legend.map-legend--mobile-open svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .map-legend.map-legend--mobile-open .legend-item span {
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .map-legend.map-legend--mobile-open {
+    top: 106px;
+    left: 86px;
+    bottom: auto;
+    max-width: min(240px, calc(100vw - 110px));
+    max-height: calc(100dvh - var(--app-header-height, 64px) - 218px);
+  }
 }
 
 .map-legend h4 {
@@ -44,7 +110,8 @@
 
 /* Dark mode overrides for legend */
 .dark-mode .map-legend {
-  background-color: rgba(26, 26, 26, 0.92);
+  background-color: rgba(15, 23, 42, 0.78);
+  border-color: rgba(148, 163, 184, 0.2);
 }
 
 .dark-mode .map-legend h4 {

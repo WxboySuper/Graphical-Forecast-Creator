@@ -171,42 +171,77 @@
 
 .map-toolbar-bottom-right {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: 40px;
+  right: 16px;
   z-index: 900;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+}
+
+.map-toolbar-surface,
+.map-toolbar-help-surface {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(14px);
+}
+
+.map-toolbar-surface {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 18px;
+  padding: 6px;
+}
+
+.map-toolbar-help-surface {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  border-radius: 18px;
+  padding: 10px 12px;
+  font-size: 0.75rem;
+  color: var(--text-primary, #1f2937);
 }
 
 .map-toolbar-button {
-  background: none;
+  background-color: transparent;
   border: none;
   cursor: pointer;
-  padding: 6px;
-  border-radius: 4px;
-  color: #333;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: var(--text-primary, #1f2937);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s;
+}
+
+.map-toolbar-surface .map-toolbar-button:last-child {
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .map-toolbar-button:hover {
-  background-color: #f0f0f0;
+  background-color: rgba(148, 163, 184, 0.18);
 }
 
 .map-toolbar-button:active {
-  background-color: #e0e0e0;
+  transform: translateY(1px);
 }
 
 .map-toolbar-button.active {
-  background-color: #2563eb;
-  color: white;
+  background-color: var(--text-primary, #374151);
+  color: var(--bg-primary, #ffffff);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.15);
 }
 
 .map-toolbar-button.active:hover {
-  background-color: #1d4ed8;
+  background-color: var(--text-secondary, #1f2937);
 }
 
 .map-toolbar-button.mode-delete.active {
@@ -223,6 +258,150 @@
 
 .map-toolbar-button.mode-draw.active:hover {
   background-color: #047857;
+}
+
+.map-key-popout-button {
+  display: none;
+}
+
+.dark-mode .map-toolbar-button {
+  color: #f8fafc;
+}
+
+.dark-mode .map-toolbar-button.active {
+  background-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.dark-mode .map-toolbar-button.active:hover {
+  background-color: #f1f5f9;
+}
+
+.dark-mode .map-toolbar-button:hover {
+  background-color: rgba(148, 163, 184, 0.2);
+}
+
+.dark-mode .map-toolbar-surface,
+.dark-mode .map-toolbar-help-surface,
+.dark-mode .map-style-picker {
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(100, 116, 139, 0.35);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.42);
+}
+
+.map-container .ol-zoom {
+  top: calc(var(--app-header-height, 64px) + 12px);
+  left: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+  padding: 4px;
+}
+
+.map-container .ol-zoom button {
+  margin: 0;
+  border: none;
+  background-color: transparent !important;
+  color: var(--text-primary, #1f2937);
+  border-radius: 12px;
+}
+
+.map-container .ol-zoom button:hover {
+  background-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+.dark-mode .map-container .ol-zoom {
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(100, 116, 139, 0.35);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.42);
+}
+
+.dark-mode .map-container .ol-zoom button {
+  color: #f8fafc;
+  background-color: transparent !important;
+}
+
+.dark-mode .map-container .ol-zoom button:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .map-toolbar-bottom-right {
+    top: 12px;
+    bottom: auto;
+    right: 8px;
+    max-width: calc(100vw - 16px);
+  }
+
+  .map-toolbar-help-surface {
+    display: none;
+  }
+
+  .map-toolbar-surface {
+    gap: 2px;
+    padding: 3px;
+    border-radius: 12px;
+  }
+
+  .map-toolbar-button {
+    min-width: 44px;
+    min-height: 36px;
+    padding: 8px 8px;
+    border-radius: 9px;
+    font-size: 0.74rem;
+  }
+
+  .map-toolbar-button.mode-key {
+    display: none;
+  }
+
+  .map-key-popout-button {
+    position: absolute;
+    left: 12px;
+    top: 132px;
+    bottom: auto;
+    z-index: 1201;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #f8fafc;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .map-key-popout-button.active {
+    background: rgba(37, 99, 235, 0.94);
+    border-color: rgba(191, 219, 254, 0.5);
+  }
+
+  .map-container .ol-zoom {
+    top: 10px;
+    left: 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .map-toolbar-bottom-right {
+    top: 10px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .map-key-popout-button {
+    top: 106px;
+    left: 12px;
+    bottom: auto;
+  }
 }
 
 /* OpenLayers popup styling */

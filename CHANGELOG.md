@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Forecast Page nitpicks:** Fixed UI alignment on the forecast Draw tab (spacing for sections/menus and Current Selection breathing room), ensured the tab bar touches its bottom tray properly, expanded the Cycle Date fields horizontally on the Days tab, improved Ghost Layers labels placement, eliminated duplicated basemap dropdowns favoring the toolbar, standardized tools buttons on the right side to match the new Integrated Toolbar format, and gave map control buttons neutral hover colors.
+- **Home forecast workspace:** Refined the current cycle card with clearer header hierarchy, stronger status/date chips, and more balanced day and utility action tiles to reduce the cramped feel in the landing page layout.
+- **Discussion editor:** Neutralized colored toolbar button backgrounds in light mode for the DIY editor toolbar and leveled/centered the DIY/Guided tabs to fix alignment issues (files: src/pages/DiscussionPage.css, src/pages/DiscussionPage.tsx, src/components/DiscussionEditor/DIYDiscussionEditor.tsx).
+- **Verification header:** Compacted the verification header to reduce vertical space usage and increase map/controls visible area (file: src/components/VerificationMode/VerificationMode.css).
+- **Developer:** Documented local beta dev workflow and the local beta bypass option in README.md to allow running beta features locally without hosted Firebase credentials.
+- **Version bump:** Updated version to `1.5.0-beta.1` for the upcoming `v1.5.0` beta release.
+
+### Fixed
+- **Dependency/security cleanup:** Updated the Firebase/OpenLayers dependency tree and server admin stack to address the reported Dependabot vulnerabilities in protobufjs, lodash, protocol-buffers-schema, and `@tootallnate/once`.
+- **Lucide brand icons:** Replaced Lucide brand icon usage with inline SVGs so the UI no longer depends on Lucide's removed brand set.
+- **Unused dependency cleanup:** Removed stale geoman/react-leaflet dependencies and corresponding export-only selectors that no longer matched the codebase.
+- **Map export guard:** Blocked image export on OpenLayers maps and surfaced a clear warning instead of attempting the old Leaflet export path.
+
 ## [1.4.0] - 2026-04-03
 
 ### Added

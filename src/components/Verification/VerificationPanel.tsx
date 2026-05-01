@@ -20,6 +20,7 @@ import './VerificationPanel.css';
 interface VerificationPanelProps {
   activeOutlookType?: 'categorical' | 'tornado' | 'wind' | 'hail';
   selectedDay?: DayType;
+  activePanel?: 'setup' | 'analysis';
 }
 
 type ActiveOutlookType = NonNullable<VerificationPanelProps['activeOutlookType']>;
@@ -182,36 +183,21 @@ const RiskLevelStatRow: React.FC<{ level: string; hitRate: number; hits: number 
   </div>
 );
 
-// The VerificationMetricRow component is a reusable component for displaying a single metric
-// (like hit rate, hits, or misses) in the verification analysis section,
-const VerificationMetricRow: React.FC<{
-  label: string;
-  value: string | number;
-  valueClassName?: string;
-}> = ({ label, value, valueClassName = 'metric-value' }) => (
-  <div className="metric">
-    <span className="metric-label">{label}</span>
-    <span className={valueClassName}>{value}</span>
-  </div>
-);
-
 // The VerificationMetrics component displays the key metrics (hit rate, hits, misses) for the active outlook type,
 const VerificationMetrics: React.FC<{ activeVerification: OutlookTypeVerification }> = ({ activeVerification }) => (
   <div className="verification-metrics">
-    <VerificationMetricRow
-      label="Hit Rate:"
-      value={`${activeVerification.hitRate.toFixed(1)}%`}
-    />
-    <VerificationMetricRow
-      label="Hits:"
-      value={activeVerification.hits}
-      valueClassName="metric-value hit"
-    />
-    <VerificationMetricRow
-      label="Misses:"
-      value={activeVerification.misses}
-      valueClassName="metric-value miss"
-    />
+    <div className="verification-stat-card verification-stat-card-primary">
+      <span className="verification-stat-label">Hit Rate</span>
+      <strong className="verification-stat-number">{activeVerification.hitRate.toFixed(1)}%</strong>
+    </div>
+    <div className="verification-stat-card verification-stat-card-hit">
+      <span className="verification-stat-label">Hits</span>
+      <strong className="verification-stat-number">{activeVerification.hits}</strong>
+    </div>
+    <div className="verification-stat-card verification-stat-card-miss">
+      <span className="verification-stat-label">Misses</span>
+      <strong className="verification-stat-number">{activeVerification.misses}</strong>
+    </div>
   </div>
 );
 
@@ -291,7 +277,8 @@ const VerificationAnalysisSection: React.FC<{
 // and it uses local state for managing the selected date for report loading.
 const VerificationPanel: React.FC<VerificationPanelProps> = ({ 
   activeOutlookType = 'categorical',
-  selectedDay = 1
+  selectedDay = 1,
+  activePanel = 'setup',
 }) => {
   const dispatch = useDispatch();
   // Select storm report data and UI state from the Redux store.
@@ -381,37 +368,40 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
   const totalReports = reports.length;
   const hasReports = totalReports > 0;
   
+  const showSetupPanel = activePanel === 'setup';
+  const showAnalysisPanel = activePanel === 'analysis';
+
   return (
     <div className="verification-panel">
-      <h2>Storm Reports Verification</h2>
-      
-      <div className="verification-section">
-        <h3>Load Reports</h3>
-        <div className="date-selector">
-          <label htmlFor="report-date">
-            Select Date:
-            <input
-              type="date"
-              id="report-date"
-              value={selectedDate}
-              onChange={handleSelectedDateChange}
+      {showSetupPanel ? (
+        <div className="verification-section">
+          <div className="date-selector">
+            <label htmlFor="report-date">
+              Select Date
+              <input
+                type="date"
+                id="report-date"
+                value={selectedDate}
+                onChange={handleSelectedDateChange}
+                disabled={loading}
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleLoadReports}
               disabled={loading}
-              max={new Date().toISOString().split('T')[0]}
-            />
-          </label>
-          <button
-            onClick={handleLoadReports}
-            disabled={loading}
-            className="load-button"
-          >
-            {loading ? 'Loading...' : 'Load Reports'}
-          </button>
+              className="load-button"
+            >
+              {loading ? 'Loading...' : 'Load Reports'}
+            </button>
+          </div>
+
+          {error && <ErrorBanner error={error} />}
         </div>
+      ) : null}
 
-        {error && <ErrorBanner error={error} />}
-      </div>
-
-      {hasReports && (
+      {hasReports && showAnalysisPanel && (
         <>
           <ReportSummarySection
             date={date}
@@ -440,6 +430,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
 
           <div className="verification-section">
             <button
+              type="button"
               onClick={handleClearReports}
               className="clear-button"
             >

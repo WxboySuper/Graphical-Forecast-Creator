@@ -31,6 +31,7 @@
   --metric-bg: #f8f9fa;
   --overlay-control-bg: #ffffff;
   --overlay-control-hover: #f5f5f5;
+  --placeholder-mix: 82%;
 }
 
 .dark-mode {
@@ -48,8 +49,10 @@
   --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.5);
   --input-bg: #2d2d2d;
   --input-border: #404040;
-  --button-bg: #0d6efd;
-  --button-hover: #0b5ed7;
+  --button-bg: #2563eb;
+  --button-hover: #1d4ed8;
+  --button-dark-default-bg: #2f3744;
+  --button-dark-default-hover: #3a4555;
   --success-bg: #1a3328;
   --success-border: #2d5a3f;
   --success-text: #75b798;
@@ -64,6 +67,7 @@
   --metric-bg: #2d2d2d;
   --overlay-control-bg: #2d2d2d;
   --overlay-control-hover: #3a3a3a;
+  --placeholder-mix: 56%;
 }
 
 /* Apply dark mode to body */
@@ -122,13 +126,13 @@
 }
 
 /* Buttons */
-.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):not(.dark-mode-toggle-btn):not(.day-btn):not(.day-tab) {
-  background-color: var(--button-bg);
-  color: white;
+.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):not(.dark-mode-toggle-btn):not(.day-btn):not(.day-tab):not(.home-day-button):not(.home-cycle-button):not(.home-utility-button):not(.home-concept-action):not(.home-concept-top-primary):not(.home-concept-top-secondary):not(.home-concept-link):not(.ui-button):not(.map-toolbar-button):not(.ol-zoom-in):not(.ol-zoom-out):not(.tabbed-integrated-toolbar__action-tile) {
+  background-color: var(--button-dark-default-bg);
+  color: var(--text-primary);
 }
 
-.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):not(.dark-mode-toggle-btn):not(.day-btn):not(.day-tab):hover:not(:disabled) {
-  background-color: var(--button-hover);
+.dark-mode button:not(.outlook-type-btn):not(.mode-toggle-btn):not(.dark-mode-toggle-btn):not(.day-btn):not(.day-tab):not(.home-day-button):not(.home-cycle-button):not(.home-utility-button):not(.home-concept-action):not(.home-concept-top-primary):not(.home-concept-top-secondary):not(.home-concept-link):not(.ui-button):not(.map-toolbar-button):not(.ol-zoom-in):not(.ol-zoom-out):not(.tabbed-integrated-toolbar__action-tile):hover:not(:disabled) {
+  background-color: var(--button-dark-default-hover);
 }
 
 /* Toolbar Button Colors - Maintain variety in dark mode */

@@ -2,12 +2,15 @@
  * Fire-and-forget page view tracking.
  * No-ops silently in dev (localhost) and never throws — analytics must not break the app.
  */
-export const trackPageView = (): void => {
-  if (
-    typeof window === 'undefined' ||
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1'
-  ) {
+export const shouldTrack = (hostname?: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = hostname ?? window.location?.hostname;
+  return host !== 'localhost' && host !== '127.0.0.1';
+};
+
+/** Sends a page view to the analytics endpoint when tracking is enabled. */
+export const trackPageView = (hostname?: string): void => {
+  if (!shouldTrack(hostname)) {
     return;
   }
 

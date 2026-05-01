@@ -4,6 +4,7 @@ import { toggleDarkMode } from '../../store/themeSlice';
 import { RootState } from '../../store';
 import { TooltipProvider } from '../ui/tooltip';
 import { BrandSection, MainTabs, RightActions } from './NavbarSections';
+import './Navbar.css';
 
 interface NavbarProps {
   onToggleDocumentation?: () => void;
@@ -23,25 +24,33 @@ export const Navbar: React.FC<NavbarProps> = ({
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
 
   /** Dispatches the toggleDarkMode action to switch between light and dark themes. */
-  /** Dispatches the toggleDarkMode action to switch between light and dark themes. */
   const handleToggleDarkMode = () => {
     dispatch(toggleDarkMode());
   };
 
   return (
     <TooltipProvider>
-      <header className="fixed top-0 left-0 right-0 z-panel h-14 bg-background border-b border-border">
-        <nav className="h-full max-w-full mx-auto px-4 flex items-center justify-between">
-          <BrandSection />
-          <MainTabs />
-          <RightActions
-            darkMode={darkMode}
-            showDocumentation={showDocumentation}
-            onViewTerms={onViewTerms}
-            onViewPrivacyPolicy={onViewPrivacyPolicy}
-            onToggleDocumentation={onToggleDocumentation}
-            onToggleDarkMode={handleToggleDarkMode}
-          />
+      <header className="app-navbar sticky top-0 z-panel">
+        <div className="app-navbar__shine" />
+        <nav className="app-navbar__inner">
+          <div className="app-navbar__left">
+            <BrandSection />
+          </div>
+
+          <div className="app-navbar__center">
+            <MainTabs />
+          </div>
+
+          <div className="app-navbar__right">
+            <RightActions
+              darkMode={darkMode}
+              showDocumentation={showDocumentation}
+              onViewTerms={onViewTerms}
+              onViewPrivacyPolicy={onViewPrivacyPolicy}
+              onToggleDocumentation={onToggleDocumentation}
+              onToggleDarkMode={handleToggleDarkMode}
+            />
+          </div>
         </nav>
       </header>
     </TooltipProvider>

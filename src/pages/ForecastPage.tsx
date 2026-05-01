@@ -1,9 +1,8 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import type { Dispatch, UnknownAction } from 'redux';
-import ForecastMap, { ForecastMapHandle } from '../components/Map/ForecastMap';
-import { IntegratedToolbar } from '../components/IntegratedToolbar/IntegratedToolbar';
+import { ForecastMapHandle } from '../components/Map/ForecastMap';
 import { Button } from '../components/ui/button';
 import {
   Dialog,
@@ -31,7 +30,7 @@ import {
   redoLastEdit,
   undoLastEdit,
 } from '../store/forecastSlice';
-import { OutlookType, Probability, DayType } from '../types/outlooks';
+import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from '../utils/featureFlagsUtils';
 import { useAutoSave } from '../hooks/useAutoSave';
@@ -46,13 +45,32 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { queueProductMetric } from '../utils/productMetrics';
+import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
+import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
+import { useForecastWorkspaceController } from '../components/ForecastWorkspace/useForecastWorkspaceController';
+import {
+  readStoredForecastUiVariant,
+  resolveForecastUiVariant,
+  type ForecastUiVariant,
+} from '../utils/forecastUiVariant';
 
 interface PageContext {
   addToast: AddToastFn;
 }
 
+const renderForecastWorkspaceLayout = (
+  variant: ForecastUiVariant,
+  props: {
+    mapRef: React.RefObject<ForecastMapHandle | null>;
+    controller: ReturnType<typeof useForecastWorkspaceController>;
+  }
+) => {
+  // Only the Tabbed Toolbar variant is supported now.
+  return <ForecastTabbedToolbarLayout {...props} />;
+};
+
 // Helper to get probability list based on outlook type
-const getProbabilityList = (activeOutlookType: string) => {
+export const getProbabilityList = (activeOutlookType: string) => {
   switch (activeOutlookType) {
     case 'categorical':
       return ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'] as readonly string[];
@@ -104,7 +122,7 @@ const DAY_ROLLOVER_PROMPTED_KEY = 'gfc-day-rollover-prompt-day';
 const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
 
 /** Reads one stored day string from localStorage, returning null when storage is unavailable. */
-const readStoredDayValue = (key: string): string | null => {
+export const readStoredDayValue = (key: string): string | null => {
   try {
     return localStorage.getItem(key);
   } catch {
@@ -113,7 +131,7 @@ const readStoredDayValue = (key: string): string | null => {
 };
 
 /** Persists one day string into localStorage, ignoring storage errors. */
-const writeStoredDayValue = (key: string, value: string) => {
+export const writeStoredDayValue = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
   } catch {
@@ -122,17 +140,17 @@ const writeStoredDayValue = (key: string, value: string) => {
 };
 
 /** Returns true when the forecast cycle contains any drawable outlook data or saved low-probability state. */
-const hasRolloverForecastData = (
+export const hasRolloverForecastData = (
   forecastCycle: ReturnType<typeof selectForecastCycle>
 ): boolean => countForecastMetrics(forecastCycle).forecastDays > 0;
 
 /** Returns true when any forecast day already has discussion content attached. */
-const cycleHasDiscussionContent = (
+export const cycleHasDiscussionContent = (
   forecastCycle: ReturnType<typeof selectForecastCycle>
 ): boolean => Object.values(forecastCycle.days).some((dayData) => Boolean(dayData?.discussion));
 
 /** Returns true when the current session has unsaved work worth saving during a day rollover. */
-const hasUnsavedRolloverCandidateSession = (
+export const hasUnsavedRolloverCandidateSession = (
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   isSaved: boolean
 ): boolean => {
@@ -144,7 +162,7 @@ const hasUnsavedRolloverCandidateSession = (
 };
 
 /** Builds a short Cycle History label for one rollover save action. */
-const buildRolloverSaveLabel = (cycleDate: string): string => {
+export const buildRolloverSaveLabel = (cycleDate: string): string => {
   const parsedDate = new Date(`${cycleDate}T00:00:00`);
   const labelDate = Number.isNaN(parsedDate.getTime())
     ? cycleDate
@@ -153,7 +171,7 @@ const buildRolloverSaveLabel = (cycleDate: string): string => {
 };
 
 /** Formats a stored YYYY-MM-DD value into a more readable date label for the dialog copy. */
-const formatRolloverDayLabel = (value: string): string => {
+export const formatRolloverDayLabel = (value: string): string => {
   const parsedDate = new Date(`${value}T00:00:00`);
   if (Number.isNaN(parsedDate.getTime())) {
     return value;
@@ -200,7 +218,7 @@ const DayRolloverDialog: React.FC<{
 );
 
 /** Reads the current map view (center + zoom) from the map adapter; returns defaults if no adapter is mounted. */
-const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
+export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
   const adapter = ref.current;
   if (!adapter) {
     return {
@@ -226,7 +244,7 @@ const CLOUD_CYCLE_PAYLOAD_KEY = 'cloudCyclePayload';
 const CLOUD_CYCLE_META_KEY = 'cloudCycleMeta';
 
 /** Reads and validates a forecast JSON file, returning the parsed payload or null on failure. */
-const parseLoadedForecast = async (
+export const parseLoadedForecast = async (
   file: File,
   addToast: AddToastFn
 ): Promise<LoadedForecastPayload | null> => {
@@ -252,7 +270,7 @@ const parseLoadedForecast = async (
 };
 
 /** Returns true if the given day data object contains at least one outlook map with features. */
-const dayHasAnyFeatures = (dayData: unknown): boolean => {
+export const dayHasAnyFeatures = (dayData: unknown): boolean => {
   if (!dayData || typeof dayData !== 'object') return false;
 
   const maps = Object.values(dayData as Record<string, { size?: number } | undefined>);
@@ -323,17 +341,6 @@ const useForecastLoadAction = (
   }, [dispatch, addToast, mapRef]);
 };
 
-/** Returns a memoized file-input change handler that passes the selected file to the async load action. */
-const useShortcutFileInputChange = (handleLoad: (file: File) => Promise<void>) => {
-  return useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleLoad(file).catch(() => undefined);
-    }
-    e.target.value = '';
-  }, [handleLoad]);
-};
-
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
 const INCREASE_PROBABILITY_KEYS = new Set(['arrowup', 'arrowright']);
 const MODIFIER_KEYS: Array<keyof Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>> = ['ctrlKey', 'metaKey', 'altKey', 'shiftKey'];
@@ -365,15 +372,15 @@ const OUTLOOK_SHORTCUTS: Record<string, { type: OutlookType; label: string }> = 
 };
 
 /** Returns true if the event target is an input or textarea that should receive keyboard text. */
-const isTypingTarget = (target: EventTarget | null): boolean => {
+export const isTypingTarget = (target: EventTarget | null): boolean => {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 };
 
 /** Normalises a probability string by converting legacy `#` suffix to `%` (e.g. `"10#"` → `"10%"`). */
-const normalizeProbability = (value: string): string => value.replace('#', '%');
+export const normalizeProbability = (value: string): string => value.replace('#', '%');
 
 /** Returns true if the current outlook type and probability support toggling the significant-threat flag. */
-const canToggleSignificantForState = (
+export const canToggleSignificantForState = (
   activeOutlookType: OutlookType,
   activeProbability: string
 ): boolean => {
@@ -383,7 +390,7 @@ const canToggleSignificantForState = (
 };
 
 /** Returns true if any Ctrl / Meta / Alt / Shift modifier key is held during the event. */
-const hasAnyModifierKey = (e: KeyboardEvent): boolean => {
+export const hasAnyModifierKey = (e: KeyboardEvent): boolean => {
   return MODIFIER_KEYS.some((modifier) => e[modifier]);
 };
 
@@ -412,7 +419,7 @@ const isCommandShortcutKey = (key: string): key is CommandShortcutKey => {
 type UndoRedoAction = 'undo' | 'redo' | null;
 
 /** Resolves whether the current modifier/key combination should undo, redo, or do nothing. */
-const getUndoRedoAction = (e: KeyboardEvent, key: string): UndoRedoAction => {
+export const getUndoRedoAction = (e: KeyboardEvent, key: string): UndoRedoAction => {
   if (!(e.ctrlKey || e.metaKey)) return null;
   if (key === 'y') return 'redo';
   if (key !== 'z') return null;
@@ -581,7 +588,7 @@ const handleStandardShortcuts = (
 };
 
 /** Central keydown router: runs command shortcuts first, then standard shortcuts, skipping typing targets. */
-const processShortcutKeyDown = (
+export const processShortcutKeyDown = (
   e: KeyboardEvent,
   context: KeyboardShortcutContext
 ) => {
@@ -609,7 +616,7 @@ const useFeatureFlagSync = (
 };
 
 /** Reads and validates one stored forecast payload string from browser storage. */
-const parseStoredForecastPayload = (storedValue: string | null): unknown | null => {
+export const parseStoredForecastPayload = (storedValue: string | null): GFCForecastSaveData | null => {
   if (!storedValue) {
     return null;
   }
@@ -624,7 +631,7 @@ const parseStoredForecastPayload = (storedValue: string | null): unknown | null 
 
 /** Applies one stored forecast payload into Redux and restores the saved map view when present. */
 const restoreStoredForecastPayload = (
-  data: unknown,
+  data: GFCForecastSaveData,
   dispatch: ShortcutDispatch
 ) => {
   const deserializedCycle = deserializeForecast(data);
@@ -637,7 +644,7 @@ const restoreStoredForecastPayload = (
 };
 
 /** Reads the stored cloud-cycle metadata payload when it exists and is well-formed. */
-const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | null => {
+export const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | null => {
   if (!storedValue) {
     return null;
   }
@@ -650,13 +657,13 @@ const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMeta | nul
 };
 
 /** Clears the temporary session-storage keys used for handing a cloud cycle into the editor. */
-const clearStoredCloudSession = () => {
+export const clearStoredCloudSession = () => {
   sessionStorage.removeItem(CLOUD_CYCLE_PAYLOAD_KEY);
   sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
 };
 
 /** Returns true when stored cloud metadata includes the id and label needed to restore selection context. */
-const hasRestorableCloudSelection = (
+export const hasRestorableCloudSelection = (
   cloudMeta: StoredCloudMeta | null
 ): cloudMeta is Required<Pick<StoredCloudMeta, 'id' | 'label'>> => Boolean(cloudMeta?.id && cloudMeta.label);
 
@@ -983,9 +990,8 @@ const useForecastFileActions = (
 ) => {
   const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user);
   const handleLoad = useForecastLoadAction(dispatch, addToast, mapRef);
-  const handleShortcutFileInputChange = useShortcutFileInputChange(handleLoad);
 
-  return { handleSave, handleLoad, handleShortcutFileInputChange };
+  return { handleSave, handleLoad };
 };
 
 interface KeyboardShortcutHookParams {
@@ -1167,7 +1173,7 @@ const useForecastPageWorkspace = ({
   const restoreComplete = useSessionRestore(dispatch, addToast, handleCloudCycleLoaded);
   useUnsavedChangesWarning(isSaved);
 
-  const { handleSave, handleLoad, handleShortcutFileInputChange } = useForecastFileActions(
+  const { handleSave, handleLoad } = useForecastFileActions(
     dispatch,
     addToast,
     forecastCycle,
@@ -1196,12 +1202,12 @@ const useForecastPageWorkspace = ({
     isSaved,
   });
 
-  return {
-    emergencyMode,
-    handleLoad,
-    handleSave,
-    handleShortcutFileInputChange,
-    dayRolloverPrompt,
+  const workspaceController = useForecastWorkspaceController({
+    onSave: handleSave,
+    onLoad: handleLoad,
+    mapRef,
+    fileInputRef,
+    addToast,
     cloudTools: renderCloudToolbar({
       premiumActive,
       isExpiredPremium,
@@ -1210,6 +1216,12 @@ const useForecastPageWorkspace = ({
       onSaveToCloud: handleSaveToCloud,
       onOpenCloudLibrary: () => navigate('/cloud'),
     }),
+  });
+
+  return {
+    emergencyMode,
+    dayRolloverPrompt,
+    workspaceController,
   };
 };
 
@@ -1217,16 +1229,15 @@ const useForecastPageWorkspace = ({
 export const ForecastPage: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useOutletContext<PageContext>();
+  const { syncedSettings } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const {
     emergencyMode,
-    handleLoad,
-    handleSave,
-    handleShortcutFileInputChange,
     dayRolloverPrompt,
-    cloudTools,
+    workspaceController,
   } = useForecastPageWorkspace({
     dispatch,
     addToast,
@@ -1239,31 +1250,22 @@ export const ForecastPage: React.FC = () => {
     return <EmergencyModeMessage />;
   }
 
+  const forecastUiVariant = resolveForecastUiVariant({
+    search: location.search,
+    syncedSettingValue: syncedSettings?.forecastUiVariant,
+    storageValue: readStoredForecastUiVariant(),
+  });
+
   return (
-    <div className="relative h-full w-full">
-      {/* Full-screen map - extends to integrated toolbar */}
-      <div className="absolute inset-x-0 top-0 bottom-[200px] z-0">
-        <ForecastMap ref={mapRef} />
-      </div>
-
-      {/* Hidden file input for keyboard shortcuts */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleShortcutFileInputChange}
-        className="hidden"
-      />
-
-      {/* Integrated Bottom Toolbar */}
-      <IntegratedToolbar
-        onSave={handleSave}
-        onLoad={handleLoad}
-        mapRef={mapRef}
-        addToast={addToast}
-        cloudTools={cloudTools}
-      />
-
+    <div
+      className="forecast-page-shell w-full overflow-hidden"
+      style={{ height: 'calc(100dvh - var(--app-header-height, 64px))', maxHeight: 'calc(100dvh - var(--app-header-height, 64px))' }}
+    >
+      {renderForecastWorkspaceLayout(forecastUiVariant, {
+        mapRef,
+        controller: workspaceController,
+      })}
+      <ForecastWorkspaceModals controller={workspaceController} />
       <DayRolloverDialog
         promptState={dayRolloverPrompt.promptState}
         onKeepCurrentSession={dayRolloverPrompt.handleKeepCurrentSession}

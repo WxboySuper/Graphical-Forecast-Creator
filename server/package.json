@@ -9,9 +9,14 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "firebase-admin": "^13.6.0",
+    "firebase-admin": "^13.8.0",
     "stripe": "^18.4.0",
     "express-rate-limit": "^8.3.1"
+  },
+  "overrides": {
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "@tootallnate/once": "3.0.1"
   },
   "engines": {
     "node": ">=18"
