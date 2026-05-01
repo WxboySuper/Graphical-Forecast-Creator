@@ -668,6 +668,25 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
 
     mapRef.current = map;
 
+    // Some browsers/devices (notably some Chromebooks) can mount the map into a container
+    // that temporarily measures 0x0 due to flex/layout timing. OpenLayers logs a warning
+    // and may not render until updateSize() is called after layout stabilizes.
+    const targetEl = mapElementRef.current;
+    const updateSizeSafely = () => {
+      try {
+        map.updateSize();
+      } catch {
+        // Non-fatal: map may be disposing.
+      }
+    };
+    const raf1 = window.requestAnimationFrame(updateSizeSafely);
+    const raf2 = window.requestAnimationFrame(updateSizeSafely);
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && targetEl) {
+      resizeObserver = new ResizeObserver(() => updateSizeSafely());
+      resizeObserver.observe(targetEl);
+    }
+
     // Create popup overlay
     if (popupRef.current) {
       const overlay = new Overlay({
@@ -794,6 +813,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref
     selectRef.current = select;
 
     return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (drawRef.current) {
         map.removeInteraction(drawRef.current);
       }

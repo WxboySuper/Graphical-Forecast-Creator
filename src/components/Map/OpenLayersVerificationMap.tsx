@@ -520,7 +520,29 @@ const OpenLayersVerificationMap = forwardRef<MapAdapterHandle<OLMap> | null, Ope
 
     mapRef.current = map;
 
+    // As with the forecast map, ensure we recover if the target container is 0x0 at mount.
+    const targetEl = mapElementRef.current;
+    const updateSizeSafely = () => {
+      try {
+        map.updateSize();
+      } catch {
+        // ignore
+      }
+    };
+    const raf1 = window.requestAnimationFrame(updateSizeSafely);
+    const raf2 = window.requestAnimationFrame(updateSizeSafely);
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && targetEl) {
+      resizeObserver = new ResizeObserver(() => updateSizeSafely());
+      resizeObserver.observe(targetEl);
+    }
+
     return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       map.setTarget();
       mapRef.current = null;
       vectorBaseGroupRef.current = null;
