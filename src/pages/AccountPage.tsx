@@ -26,12 +26,6 @@ import { useUserMetrics } from "../metrics/useUserMetrics";
 import type { RootState } from "../store";
 import { selectForecastCycle, selectSavedCycles } from "../store/forecastSlice";
 import { computeHomeStats } from "./homeUtils";
-import {
-  DEFAULT_FORECAST_UI_VARIANT,
-  FORECAST_UI_VARIANT_OPTIONS,
-  readStoredForecastUiVariant,
-  type ForecastUiVariant,
-} from "../utils/forecastUiVariant";
 import "./AccountPage.css";
 
 type AuthMode = "sign_in" | "sign_up";
@@ -754,7 +748,6 @@ const SignedInAccountView: React.FC = () => {
     settingsSyncStatus,
     syncedSettings,
     updateSyncedSettings,
-    betaAccess,
   } = useAuth();
   const [defaultForecasterName, setDefaultForecasterName] = useState(
     () => syncedSettings?.defaultForecasterName ?? user?.displayName ?? "",
