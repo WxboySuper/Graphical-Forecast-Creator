@@ -3,7 +3,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## v1.5.1
+
+### Fixed
+- Fixed an issue where maps wouldn't render on Chromebooks
+- Updated package version to v1.5.1
+- Removed old beta selector from account screen
+
+## v1.5.0
 
 ### Changed
 - **Forecast Page nitpicks:** Fixed UI alignment on the forecast Draw tab (spacing for sections/menus and Current Selection breathing room), ensured the tab bar touches its bottom tray properly, expanded the Cycle Date fields horizontally on the Days tab, improved Ghost Layers labels placement, eliminated duplicated basemap dropdowns favoring the toolbar, standardized tools buttons on the right side to match the new Integrated Toolbar format, and gave map control buttons neutral hover colors.
