@@ -707,7 +707,6 @@ const SignedInPrimaryCard: React.FC<{
   providerLabels,
   defaultForecasterName,
   setDefaultForecasterName,
-  forecastUiMessage,
   savingDefaults,
   saveMessage,
   onSaveDefaults,
