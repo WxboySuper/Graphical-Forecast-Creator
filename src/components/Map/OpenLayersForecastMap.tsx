@@ -1,40 +1,66 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import 'ol/ol.css';
-import OLMap from 'ol/Map';
-import View from 'ol/View';
-import LayerGroup from 'ol/layer/Group';
-import TileLayer from 'ol/layer/Tile';
-import VectorLayer from 'ol/layer/Vector';
-import VectorSource from 'ol/source/Vector';
-import OSM from 'ol/source/OSM';
-import XYZ from 'ol/source/XYZ';
-import GeoJSON from 'ol/format/GeoJSON';
-import { Draw, Modify, Select, Snap } from 'ol/interaction';
-import { Fill, Stroke, Style } from 'ol/style';
-import { fromLonLat, toLonLat } from 'ol/proj';
-import Overlay from 'ol/Overlay';
-import type { FeatureLike } from 'ol/Feature';
-import type OLFeature from 'ol/Feature';
-import type Geometry from 'ol/geom/Geometry';
-import { click } from 'ol/events/condition';
-import { v4 as uuidv4 } from 'uuid';
-import { RootState } from '../../store';
-import { addFeature, removeFeature, selectCurrentOutlooks, setMapView, updateFeature } from '../../store/forecastSlice';
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useDispatch, useSelector } from "react-redux";
+import "ol/ol.css";
+import OLMap from "ol/Map";
+import View from "ol/View";
+import LayerGroup from "ol/layer/Group";
+import TileLayer from "ol/layer/Tile";
+import VectorLayer from "ol/layer/Vector";
+import VectorSource from "ol/source/Vector";
+import OSM from "ol/source/OSM";
+import XYZ from "ol/source/XYZ";
+import GeoJSON from "ol/format/GeoJSON";
+import { Draw, Modify, Select, Snap } from "ol/interaction";
+import { Fill, Stroke, Style } from "ol/style";
+import { fromLonLat, toLonLat } from "ol/proj";
+import Overlay from "ol/Overlay";
+import type { FeatureLike } from "ol/Feature";
+import type OLFeature from "ol/Feature";
+import type Geometry from "ol/geom/Geometry";
+import { click } from "ol/events/condition";
+import { v4 as uuidv4 } from "uuid";
+import { RootState } from "../../store";
+import {
+  addFeature,
+  removeFeature,
+  selectCurrentOutlooks,
+  setMapView,
+  updateFeature,
+} from "../../store/forecastSlice";
 
-import type { BaseMapStyle } from '../../store/overlaysSlice';
-import { getFeatureStyle, computeZIndex } from '../../utils/mapStyleUtils';
-import type { MapAdapterHandle } from '../../maps/contracts';
-import type { Feature as GeoJsonFeature, GeoJsonProperties, Polygon } from 'geojson';
-import { apply } from 'ol-mapbox-style';
-import Legend from './Legend';
-import StatusOverlay from './StatusOverlay';
-import UnofficialBadge from './UnofficialBadge';
-import { getOpenFreeMapStyleSet, isOpenFreeMapStyle } from '../../lib/openFreeMap';
-import './ForecastMap.css';
+import type { BaseMapStyle } from "../../store/overlaysSlice";
+import { getFeatureStyle, computeZIndex } from "../../utils/mapStyleUtils";
+import type { MapAdapterHandle } from "../../maps/contracts";
+import type {
+  Feature as GeoJsonFeature,
+  GeoJsonProperties,
+  Polygon,
+} from "geojson";
+import { apply } from "ol-mapbox-style";
+import Legend from "./Legend";
+import StatusOverlay from "./StatusOverlay";
+import UnofficialBadge from "./UnofficialBadge";
+import {
+  getOpenFreeMapStyleSet,
+  isOpenFreeMapStyle,
+} from "../../lib/openFreeMap";
+import "./ForecastMap.css";
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
-type EditableOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail' | 'totalSevere' | 'day4-8';
+type EditableOutlookType =
+  | "categorical"
+  | "tornado"
+  | "wind"
+  | "hail"
+  | "totalSevere"
+  | "day4-8";
 
 interface FeatureIdentity {
   featureId: string;
@@ -94,12 +120,12 @@ const TOP_LABEL_LAYER_Z_INDEX = 1100;
 const GHOST_REFERENCE_LAYER_Z_INDEX = TOP_OUTLINE_LAYER_Z_INDEX - 25;
 
 const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
-  'categorical',
-  'tornado',
-  'wind',
-  'hail',
-  'totalSevere',
-  'day4-8',
+  "categorical",
+  "tornado",
+  "wind",
+  "hail",
+  "totalSevere",
+  "day4-8",
 ]);
 
 // Helper to convert hex/rgb/hsl color strings to rgba with specified alpha
@@ -108,18 +134,22 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
     return `rgba(255, 255, 255, ${alpha})`;
   }
 
-  if (color.startsWith('rgba(') || color.startsWith('hsla(')) {
+  if (color.startsWith("rgba(") || color.startsWith("hsla(")) {
     return color;
   }
 
-  if (color.startsWith('rgb(') || color.startsWith('hsl(')) {
+  if (color.startsWith("rgb(") || color.startsWith("hsl(")) {
     return color;
   }
 
-  const hex = color.replace('#', '');
-  const normalized = hex.length === 3
-    ? hex.split('').map((char) => `${char}${char}`).join('')
-    : hex;
+  const hex = color.replace("#", "");
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((char) => `${char}${char}`)
+          .join("")
+      : hex;
 
   if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
     return color;
@@ -132,19 +162,21 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
 };
 
 // Create canvas pattern for CIG hatching
-export const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPattern | null => {
-  const canvas = document.createElement('canvas');
+export const createHatchPattern = ({
+  cigLevel,
+}: HatchPatternInput): CanvasPattern | null => {
+  const canvas = document.createElement("canvas");
   const size = 10;
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  
+  const ctx = canvas.getContext("2d");
+
   if (!ctx) return null;
-  
-  ctx.strokeStyle = '#000000';
+
+  ctx.strokeStyle = "#000000";
   ctx.lineWidth = 1;
-  
-  if (cigLevel === 'CIG1') {
+
+  if (cigLevel === "CIG1") {
     // Broken diagonal lines
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -152,13 +184,13 @@ export const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPatte
     ctx.moveTo(5, 5);
     ctx.lineTo(10, 10);
     ctx.stroke();
-  } else if (cigLevel === 'CIG2') {
+  } else if (cigLevel === "CIG2") {
     // Solid diagonal
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(size, size);
     ctx.stroke();
-  } else if (cigLevel === 'CIG3') {
+  } else if (cigLevel === "CIG3") {
     // Crosshatch
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -167,19 +199,27 @@ export const createHatchPattern = ({ cigLevel }: HatchPatternInput): CanvasPatte
     ctx.lineTo(size, 0);
     ctx.stroke();
   }
-  
-  return ctx.createPattern(canvas, 'repeat');
+
+  return ctx.createPattern(canvas, "repeat");
 };
 
 /** Returns the fill opacity for a feature or a sensible fallback when a style omitted it. */
-export const resolveFillOpacity = ({ fillOpacity }: FillOpacityInput): number => {
-  return typeof fillOpacity === 'number' ? fillOpacity : 0.25;
+export const resolveFillOpacity = ({
+  fillOpacity,
+}: FillOpacityInput): number => {
+  return typeof fillOpacity === "number" ? fillOpacity : 0.25;
 };
 
 /** Builds an OL Fill for a given probability: solid rgba fill for standard outlooks, or a CIG hatching CanvasPattern for CIG levels. */
-export const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillBuildInput): Fill => {
-  if (!probability.startsWith('CIG')) {
-    return new Fill({ color: toRgbaColor({ color: fillColor, alpha: fillOpacity }) });
+export const createOutlookFill = ({
+  probability,
+  fillColor,
+  fillOpacity,
+}: FillBuildInput): Fill => {
+  if (!probability.startsWith("CIG")) {
+    return new Fill({
+      color: toRgbaColor({ color: fillColor, alpha: fillOpacity }),
+    });
   }
 
   const pattern = createHatchPattern({ cigLevel: probability });
@@ -187,20 +227,25 @@ export const createOutlookFill = ({ probability, fillColor, fillOpacity }: FillB
     return new Fill({ color: pattern as CanvasPattern });
   }
 
-  return new Fill({ color: 'rgba(0, 0, 0, 0)' });
+  return new Fill({ color: "rgba(0, 0, 0, 0)" });
 };
 
 /** Returns the stroke width: 3px for the top (selected) layer, the numeric weight value otherwise, or 2 as default. */
-export const resolveStrokeWidth = ({ weight, isTopLayer }: StrokeWidthInput): number => {
+export const resolveStrokeWidth = ({
+  weight,
+  isTopLayer,
+}: StrokeWidthInput): number => {
   if (isTopLayer) return 3;
-  return typeof weight === 'number' ? weight : 2;
+  return typeof weight === "number" ? weight : 2;
 };
 
 /** Extracts the featureId, outlookType, and probability properties from an OL feature, returning null if any are missing. */
-export const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null => {
-  const featureId = feature.get('featureId') as string | undefined;
-  const outlookType = feature.get('outlookType') as string | undefined;
-  const probability = feature.get('probability') as string | undefined;
+export const getFeatureIdentity = (
+  feature: FeatureLike,
+): FeatureIdentity | null => {
+  const featureId = feature.get("featureId") as string | undefined;
+  const outlookType = feature.get("outlookType") as string | undefined;
+  const probability = feature.get("probability") as string | undefined;
 
   if (!featureId) return null;
   if (!outlookType) return null;
@@ -213,7 +258,7 @@ export const getFeatureIdentity = (feature: FeatureLike): FeatureIdentity | null
 export const toUpdatedGeoJsonFeature = (
   feature: FeatureLike,
   format: GeoJSON,
-  includeDerivedFrom: boolean
+  includeDerivedFrom: boolean,
 ): GeoJsonFeature | null => {
   const identity = getFeatureIdentity(feature);
   if (!identity) return null;
@@ -222,39 +267,47 @@ export const toUpdatedGeoJsonFeature = (
   if (!geometry) return null;
 
   const geoJsonGeometry = format.writeGeometryObject(geometry as Geometry, {
-    dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857'
+    dataProjection: "EPSG:4326",
+    featureProjection: "EPSG:3857",
   });
 
   return {
-    type: 'Feature',
+    type: "Feature",
     id: identity.featureId,
     geometry: geoJsonGeometry as Polygon,
     properties: {
       outlookType: identity.outlookType,
       probability: identity.probability,
-      isSignificant: Boolean(feature.get('isSignificant')),
-      ...(includeDerivedFrom ? { derivedFrom: feature.get('derivedFrom') } : {})
-    }
+      isSignificant: Boolean(feature.get("isSignificant")),
+      ...(includeDerivedFrom
+        ? { derivedFrom: feature.get("derivedFrom") }
+        : {}),
+    },
   };
 };
 
 /** Iterates over a FeatureLike array and calls setStyle on each, guarding against RenderFeature instances that lack the method. */
 export const applyBlankLayerStyle = (features: FeatureLike[], style: Style) => {
   features.forEach((feature) => {
-    if ('setStyle' in feature && typeof feature.setStyle === 'function') {
+    if ("setStyle" in feature && typeof feature.setStyle === "function") {
       feature.setStyle(style);
     }
   });
 };
 
 /** Replaces all layers in the target group with the current layers from the source group. */
-export const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+export const replaceLayerGroupLayers = (
+  target: LayerGroup,
+  source: LayerGroup,
+) => {
   const targetLayers = target.getLayers();
   targetLayers.clear();
-  source.getLayers().getArray().forEach((layer) => {
-    targetLayers.push(layer);
-  });
+  source
+    .getLayers()
+    .getArray()
+    .forEach((layer) => {
+      targetLayers.push(layer);
+    });
 };
 
 /** Loads GeoJSON features into a blank-basemap VectorSource if not already populated, using an in-memory cache to avoid repeated network requests. */
@@ -264,7 +317,7 @@ export const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
   let geoJson = config.getCache();
   if (!geoJson) {
     const response = await fetch(config.url);
-    geoJson = await response.json() as object;
+    geoJson = (await response.json()) as object;
     config.setCache(geoJson);
   }
 
@@ -272,8 +325,8 @@ export const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
 
   const format = new GeoJSON();
   const features = format.readFeatures(geoJson, {
-    dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857',
+    dataProjection: "EPSG:4326",
+    featureProjection: "EPSG:3857",
   });
 
   if (config.style) {
@@ -283,23 +336,30 @@ export const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
 };
 
 /** Returns true if the given outlook type string is one of the user-editable types defined in DRAWABLE_OUTLOOK_TYPES. */
-export const isDrawableOutlookType = ({ outlookType }: { outlookType: string }): boolean => {
+export const isDrawableOutlookType = ({
+  outlookType,
+}: {
+  outlookType: string;
+}): boolean => {
   return DRAWABLE_OUTLOOK_TYPES.has(outlookType as EditableOutlookType);
 };
 
 // Convert outlook type and probability to an OpenLayers style, including handling CIG hatching patterns
 export const toOlStyle = (
   selection: OutlookSelection,
-  options: LayerStyleOptions = {}
+  options: LayerStyleOptions = {},
 ) => {
   const { outlookType, probability } = selection;
   const { isTopLayer = false } = options;
 
-  const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
-  const fillColor = String(style.fillColor || '#ffffff');
+  const style = getFeatureStyle(
+    outlookType as EditableOutlookType,
+    probability,
+  );
+  const fillColor = String(style.fillColor || "#ffffff");
   const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity });
-  const strokeOpacity = typeof style.opacity === 'number' ? style.opacity : 1;
-  const strokeColor = String(style.color || '#000000');
+  const strokeOpacity = typeof style.opacity === "number" ? style.opacity : 1;
+  const strokeColor = String(style.color || "#000000");
   const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
   const fill = createOutlookFill({ probability, fillColor, fillOpacity });
   const strokeWidth = resolveStrokeWidth({ weight: style.weight, isTopLayer });
@@ -311,37 +371,46 @@ export const toOlStyle = (
     fill,
     stroke: new Stroke({
       color: toRgbaColor({ color: strokeColor, alpha: strokeOpacity }),
-      width: strokeWidth
+      width: strokeWidth,
     }),
-    zIndex
+    zIndex,
   });
 };
 
 /** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
-export const toGhostOlStyle = (
-  { outlookType, probability, isCategorical }: GhostSelection
-) => {
-  const style = getFeatureStyle(outlookType as EditableOutlookType, probability);
-  const strokeColor = String(style.color || '#000000');
+export const toGhostOlStyle = ({
+  outlookType,
+  probability,
+  isCategorical,
+}: GhostSelection) => {
+  const style = getFeatureStyle(
+    outlookType as EditableOutlookType,
+    probability,
+  );
+  const strokeColor = String(style.color || "#000000");
   const ghostFillOpacity = isCategorical ? 0.08 : 0.03;
-  const isCig = probability.startsWith('CIG');
+  const isCig = probability.startsWith("CIG");
 
   const fill = isCig
-    ? new Fill({ color: 'rgba(0,0,0,0)' })
+    ? new Fill({ color: "rgba(0,0,0,0)" })
     : createOutlookFill({
         probability,
-        fillColor: String(style.fillColor || '#ffffff'),
+        fillColor: String(style.fillColor || "#ffffff"),
         fillOpacity: ghostFillOpacity,
       });
 
   return new Style({
     fill,
     stroke: new Stroke({
-      color: toRgbaColor({ color: strokeColor, alpha: isCategorical ? 0.96 : 0.9 }),
+      color: toRgbaColor({
+        color: strokeColor,
+        alpha: isCategorical ? 0.96 : 0.9,
+      }),
       width: isCategorical ? 3 : 2.5,
       lineDash: isCig ? [4, 4] : [12, 7],
     }),
-    zIndex: computeZIndex(outlookType as EditableOutlookType, probability) + 500,
+    zIndex:
+      computeZIndex(outlookType as EditableOutlookType, probability) + 500,
   });
 };
 
@@ -352,57 +421,59 @@ let cachedLakesGeoJSON: object | null = null;
 
 // Gray style for world landmass (Canada, Mexico, etc.)
 const BLANK_WORLD_STYLE = new Style({
-  fill: new Fill({ color: '#808080' }),
-  stroke: new Stroke({ color: '#555555', width: 0.5 }),
+  fill: new Fill({ color: "#808080" }),
+  stroke: new Stroke({ color: "#555555", width: 0.5 }),
 });
 
 // Blue style for lakes (Great Lakes, etc.) — renders above world, below US states
 const BLANK_LAKE_STYLE = new Style({
-  fill: new Fill({ color: '#7BA0C8' }),
-  stroke: new Stroke({ color: '#5585b5', width: 0.5 }),
+  fill: new Fill({ color: "#7BA0C8" }),
+  stroke: new Stroke({ color: "#5585b5", width: 0.5 }),
 });
 
 // Cream fill for US land.
 const BLANK_LAND_FILL_STYLE = new Style({
-  fill: new Fill({ color: '#f2ede2' }),
+  fill: new Fill({ color: "#f2ede2" }),
 });
 
 // Outline-only style for US state borders rendered above outlook polygons.
 const BLANK_LAND_OUTLINE_STYLE = new Style({
-  fill: new Fill({ color: 'rgba(0, 0, 0, 0)' }),
-  stroke: new Stroke({ color: '#333333', width: 1 }),
+  fill: new Fill({ color: "rgba(0, 0, 0, 0)" }),
+  stroke: new Stroke({ color: "#333333", width: 1 }),
 });
 
 // Creates a labels/places overlay source so cities and boundaries stay readable above polygons.
-export const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>): XYZ | null => {
+export const createLabelOverlaySource = (
+  style: Exclude<BaseMapStyle, "blank">,
+): XYZ | null => {
   switch (style) {
-    case 'osm':
+    case "osm":
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        url: "https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png",
+        attributions: "&copy; OpenStreetMap &copy; CARTO",
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
-    case 'carto-light':
+    case "carto-light":
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
-        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        url: "https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
+        attributions: "&copy; OpenStreetMap &copy; CARTO",
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
-    case 'carto-dark':
+    case "carto-dark":
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
-        attributions: '&copy; OpenStreetMap &copy; CARTO',
+        url: "https://{a-d}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",
+        attributions: "&copy; OpenStreetMap &copy; CARTO",
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
-    case 'esri-satellite':
+    case "esri-satellite":
       return new XYZ({
-        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-        attributions: 'Tiles &copy; Esri',
+        url: "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+        attributions: "Tiles &copy; Esri",
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
     default:
       return null;
@@ -410,917 +481,1030 @@ export const createLabelOverlaySource = (style: Exclude<BaseMapStyle, 'blank'>):
 };
 
 // Helper to create tile source based on selected base map style
-export const createTileSource = (style: Exclude<BaseMapStyle, 'blank'>): OSM | XYZ => {
+export const createTileSource = (
+  style: Exclude<BaseMapStyle, "blank">,
+): OSM | XYZ => {
   switch (style) {
-    case 'osm':
+    case "osm":
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
-        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        url: "https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
+        attributions:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
-    case 'carto-light':
+    case "carto-light":
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        url: "https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+        attributions:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
-    case 'carto-dark':
+    case "carto-dark":
       return new XYZ({
-        url: 'https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        url: "https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+        attributions:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
-    case 'esri-satellite':
+    case "esri-satellite":
       return new XYZ({
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attributions: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attributions:
+          "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP",
         maxZoom: 19,
-        crossOrigin: 'anonymous',
+        crossOrigin: "anonymous",
       });
     default:
-      return new OSM({ crossOrigin: 'anonymous' });
+      return new OSM({ crossOrigin: "anonymous" });
   }
 };
 
-
-
 /** Sentinel value used to clear an Overlay's position, causing it to be hidden from the map. */
-const OVERLAY_HIDDEN_POSITION: Parameters<Overlay['setPosition']>[0] = undefined;
+const OVERLAY_HIDDEN_POSITION: Parameters<Overlay["setPosition"]>[0] =
+  undefined;
 
 /** Hides an OpenLayers Overlay by clearing its map position. */
 export const hideOverlay = (overlay: Overlay): void => {
   overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 
-
-
 // Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
-const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>((_, ref) => {
-  const dispatch = useDispatch();
-  const [interactionMode, setInteractionMode] = useState<'pan' | 'draw' | 'delete'>('pan');
-  
-  const [popupInfo, setPopupInfo] = useState<{ outlookType: string; probability: string; isSignificant: boolean } | null>(null);
-  const [showDesktopLegend, setShowDesktopLegend] = useState(true);
-  const [showMobileLegend, setShowMobileLegend] = useState(false);
-  const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
-  const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
-  const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
-  const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
-  const ghostOutlooks = useSelector((state: RootState) => state.overlays.ghostOutlooks);
-  const initialMapViewRef = useRef(currentMapView);
-  const currentMapViewRef = useRef(currentMapView);
-  const popupRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<Overlay | null>(null);
-  const interactionModeRef = useRef(interactionMode);
+const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
+  (_, ref) => {
+    const dispatch = useDispatch();
+    const [interactionMode, setInteractionMode] = useState<
+      "pan" | "draw" | "delete"
+    >("pan");
 
-  useEffect(() => {
-    interactionModeRef.current = interactionMode;
-  }, [interactionMode]);
+    const [popupInfo, setPopupInfo] = useState<{
+      outlookType: string;
+      probability: string;
+      isSignificant: boolean;
+    } | null>(null);
+    const [showDesktopLegend, setShowDesktopLegend] = useState(true);
+    const [showMobileLegend, setShowMobileLegend] = useState(false);
+    const drawingState = useSelector(
+      (state: RootState) => state.forecast.drawingState,
+    );
+    const currentMapView = useSelector(
+      (state: RootState) => state.forecast.currentMapView,
+    );
+    const outlooks = useSelector(selectCurrentOutlooks) as OutlookMapLike;
+    const baseMapStyle = useSelector(
+      (state: RootState) => state.overlays.baseMapStyle,
+    );
+    const ghostOutlooks = useSelector(
+      (state: RootState) => state.overlays.ghostOutlooks,
+    );
+    const initialMapViewRef = useRef(currentMapView);
+    const currentMapViewRef = useRef(currentMapView);
+    const popupRef = useRef<HTMLDivElement>(null);
+    const overlayRef = useRef<Overlay | null>(null);
+    const interactionModeRef = useRef(interactionMode);
 
-  useEffect(() => {
-    currentMapViewRef.current = currentMapView;
-  }, [currentMapView]);
+    useEffect(() => {
+      interactionModeRef.current = interactionMode;
+    }, [interactionMode]);
 
-  const mapElementRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<OLMap | null>(null);
-  const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
-  const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
-  const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
-  const vectorStyleRequestRef = useRef(0);
-  const worldSourceRef = useRef<VectorSource>(new VectorSource());
-  const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-  const lakesSourceRef = useRef<VectorSource>(new VectorSource());
-  const lakesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-  const landSourceRef = useRef<VectorSource>(new VectorSource());
-  const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-  const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-  const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
-  const vectorSourceRef = useRef<VectorSource>(new VectorSource());
-  const catSourceRef = useRef<VectorSource>(new VectorSource());
-  const ghostSourceRef = useRef<VectorSource>(new VectorSource());
-  const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-  const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-  const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-  const drawRef = useRef<Draw | null>(null);
-  const modifyRef = useRef<Modify | null>(null);
-  const catModifyRef = useRef<Modify | null>(null);
-  const snapRef = useRef<Snap | null>(null);
-  const catSnapRef = useRef<Snap | null>(null);
-  const ghostSnapRef = useRef<Snap | null>(null);
-  const selectRef = useRef<Select | null>(null);
-  const isApplyingExternalViewRef = useRef(false);
+    useEffect(() => {
+      currentMapViewRef.current = currentMapView;
+    }, [currentMapView]);
 
-  // Serialize features from the Redux store into a flat array for rendering on the map.
-  const serializedFeatures = useMemo(() => {
-    const items: Array<{ outlookType: string; probability: string; feature: GeoJsonFeature }> = [];
-    Object.entries(outlooks).forEach(([outlookType, probs]) => {
-      if (outlookType !== drawingState.activeOutlookType) {
-        return;
-      }
+    const mapElementRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<OLMap | null>(null);
+    const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+    const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
+    const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
+    const vectorStyleRequestRef = useRef(0);
+    const worldSourceRef = useRef<VectorSource>(new VectorSource());
+    const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const lakesSourceRef = useRef<VectorSource>(new VectorSource());
+    const lakesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const landSourceRef = useRef<VectorSource>(new VectorSource());
+    const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
+    const vectorSourceRef = useRef<VectorSource>(new VectorSource());
+    const catSourceRef = useRef<VectorSource>(new VectorSource());
+    const ghostSourceRef = useRef<VectorSource>(new VectorSource());
+    const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const drawRef = useRef<Draw | null>(null);
+    const modifyRef = useRef<Modify | null>(null);
+    const catModifyRef = useRef<Modify | null>(null);
+    const snapRef = useRef<Snap | null>(null);
+    const catSnapRef = useRef<Snap | null>(null);
+    const ghostSnapRef = useRef<Snap | null>(null);
+    const selectRef = useRef<Select | null>(null);
+    const isApplyingExternalViewRef = useRef(false);
 
-      if (!(probs instanceof Map)) return;
-      probs.forEach((features: GeoJsonFeature[], probability: string) => {
-        features.forEach((feature: GeoJsonFeature) => {
-          items.push({ outlookType, probability, feature });
+    // Serialize features from the Redux store into a flat array for rendering on the map.
+    const serializedFeatures = useMemo(() => {
+      const items: Array<{
+        outlookType: string;
+        probability: string;
+        feature: GeoJsonFeature;
+      }> = [];
+      Object.entries(outlooks).forEach(([outlookType, probs]) => {
+        if (outlookType !== drawingState.activeOutlookType) {
+          return;
+        }
+
+        if (!(probs instanceof Map)) return;
+        probs.forEach((features: GeoJsonFeature[], probability: string) => {
+          features.forEach((feature: GeoJsonFeature) => {
+            items.push({ outlookType, probability, feature });
+          });
         });
       });
-    });
-    return items;
-  }, [outlooks, drawingState.activeOutlookType]);
+      return items;
+    }, [outlooks, drawingState.activeOutlookType]);
 
-  useImperativeHandle(ref, () => ({
-    getMap: () => mapRef.current,
-    getEngine: () => 'openlayers',
-    getView: () => {
-      if (!mapRef.current) {
-        return { center: [39.8283, -98.5795] as [number, number], zoom: 4 };
-      }
-      const view = mapRef.current.getView();
-      const center = view.getCenter();
-      const zoom = view.getZoom() || 4;
-      const lonLat = center ? (toLonLat(center) as [number, number]) : ([-98.5795, 39.8283] as [number, number]);
-      return { center: [lonLat[1], lonLat[0]], zoom };
-    }
-  }), []);
-
-  useEffect(() => {
-    if (!mapElementRef.current || mapRef.current) return undefined;
-
-    const tileLayer = new TileLayer({ source: new OSM({ crossOrigin: 'anonymous' }) });
-    tileLayerRef.current = tileLayer;
-    const vectorBaseGroup = new LayerGroup({
-      visible: false,
-      zIndex: 1,
-    });
-    vectorBaseGroupRef.current = vectorBaseGroup;
-    const vectorReferenceGroup = new LayerGroup({
-      visible: false,
-      zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
-    });
-    vectorReferenceGroupRef.current = vectorReferenceGroup;
-    // Blank base map layers: start hidden, only one (tile vs. world+lakes+land) will be visible at a time based on baseMapStyle.
-    const worldLayer = new VectorLayer({
-      source: worldSourceRef.current,
-      visible: false,
-      zIndex: 1,
-    });
-    worldLayerRef.current = worldLayer;
-    // Lakes layer sits above world layer to provide better definition of coastlines and inland water bodies,
-    // especially when using blank basemap style.
-    const lakesLayer = new VectorLayer({
-      source: lakesSourceRef.current,
-      visible: false,
-      zIndex: 1.5,
-    });
-    lakesLayerRef.current = lakesLayer;
-    // Land fill sits above world and lakes, below outlook polygons.
-    const landLayer = new VectorLayer({
-      source: landSourceRef.current,
-      visible: false,
-      zIndex: 2,
-      style: BLANK_LAND_FILL_STYLE,
-    });
-    landLayerRef.current = landLayer;
-    // Land outlines sit above outlook polygons so borders remain visible.
-    const landOutlineLayer = new VectorLayer({
-      source: landSourceRef.current,
-      visible: false,
-      zIndex: TOP_OUTLINE_LAYER_Z_INDEX,
-      style: BLANK_LAND_OUTLINE_STYLE,
-    });
-    landOutlineLayerRef.current = landOutlineLayer;
-    // Categorical features stay in a dedicated source so their edit flow
-    // remains separate from probabilistic outlook layers.
-    const catLayer = new VectorLayer({
-      source: catSourceRef.current,
-      zIndex: 3,
-      opacity: 1,
-    });
-    catLayerRef.current = catLayer;
-    const ghostLayer = new VectorLayer({
-      source: ghostSourceRef.current,
-      zIndex: GHOST_REFERENCE_LAYER_Z_INDEX,
-    });
-    ghostLayerRef.current = ghostLayer;
-    // Probabilistic/other features layer: separate source, normal per-feature opacity
-    const vectorLayer = new VectorLayer({
-      source: vectorSourceRef.current,
-      zIndex: 4,
-    });
-    vectorLayerRef.current = vectorLayer;
-    // Place labels/cities above outlook polygons.
-    const labelLayer = new TileLayer({
-      source: createLabelOverlaySource('osm') ?? undefined,
-      visible: true,
-      zIndex: TOP_LABEL_LAYER_Z_INDEX,
-    });
-    labelLayerRef.current = labelLayer;
-
-    // Initialize the map with all layers, but only the tile layer visible by default.
-    // The blank basemap layers will be toggled on if the user selects the blank style.
-    // This allows us to keep all layers in place and just switch visibility/styles
-    // without needing to re-add/remove layers or features, which can be expensive.
-    const map = new OLMap({
-      target: mapElementRef.current,
-      layers: [
-        tileLayer,
-        vectorBaseGroup,
-        worldLayer,
-        lakesLayer,
-        landLayer,
-        ghostLayer,
-        catLayer,
-        vectorLayer,
-        landOutlineLayer,
-        vectorReferenceGroup,
-        labelLayer,
-      ],
-      view: new View({
-        center: fromLonLat([initialMapViewRef.current.center[1], initialMapViewRef.current.center[0]]),
-        zoom: initialMapViewRef.current.zoom
-      })
-    });
-
-    map.on('moveend', () => {
-      if (isApplyingExternalViewRef.current) {
-        return;
-      }
-
-      const view = map.getView();
-      const center = view.getCenter();
-      if (!center) return;
-      const [lon, lat] = toLonLat(center);
-      const nextCenter: [number, number] = [lat, lon];
-      const nextZoom = view.getZoom() || 4;
-      const [stateLat, stateLon] = currentMapViewRef.current.center;
-      const stateZoom = currentMapViewRef.current.zoom;
-
-      const centerChanged = Math.abs(stateLat - nextCenter[0]) > 0.000001 || Math.abs(stateLon - nextCenter[1]) > 0.000001;
-      const zoomChanged = Math.abs(stateZoom - nextZoom) > 0.000001;
-
-      if (centerChanged || zoomChanged) {
-        dispatch(setMapView({ center: nextCenter, zoom: nextZoom }));
-      }
-    });
-
-    mapRef.current = map;
-
-    // Some browsers/devices (notably some Chromebooks) can mount the map into a container
-    // that temporarily measures 0x0 due to flex/layout timing. OpenLayers logs a warning
-    // and may not render until updateSize() is called after layout stabilizes.
-    const targetEl = mapElementRef.current;
-    const updateSizeSafely = () => {
-      try {
-        map.updateSize();
-      } catch {
-        // Non-fatal: map may be disposing.
-      }
-    };
-    const raf1 = window.requestAnimationFrame(updateSizeSafely);
-    const raf2 = window.requestAnimationFrame(updateSizeSafely);
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && targetEl) {
-      resizeObserver = new ResizeObserver(() => updateSizeSafely());
-      resizeObserver.observe(targetEl);
-    }
-
-    // Create popup overlay
-    if (popupRef.current) {
-      const overlay = new Overlay({
-        element: popupRef.current,
-        autoPan: {
-          animation: {
-            duration: 250,
-          },
+    useImperativeHandle(
+      ref,
+      () => ({
+        getMap: () => mapRef.current,
+        getEngine: () => "openlayers",
+        getView: () => {
+          if (!mapRef.current) {
+            return { center: [39.8283, -98.5795] as [number, number], zoom: 4 };
+          }
+          const view = mapRef.current.getView();
+          const center = view.getCenter();
+          const zoom = view.getZoom() || 4;
+          const lonLat = center
+            ? (toLonLat(center) as [number, number])
+            : ([-98.5795, 39.8283] as [number, number]);
+          return { center: [lonLat[1], lonLat[0]], zoom };
         },
-      });
-      map.addOverlay(overlay);
-      overlayRef.current = overlay;
-    }
+      }),
+      [],
+    );
 
-    // Add click handler for pan mode
-    map.on('click', (evt) => {
-      if (interactionModeRef.current !== 'pan') {
-        return;
+    useEffect(() => {
+      if (!mapElementRef.current || mapRef.current) return undefined;
+
+      const tileLayer = new TileLayer({
+        source: new OSM({ crossOrigin: "anonymous" }),
+      });
+      tileLayerRef.current = tileLayer;
+      const vectorBaseGroup = new LayerGroup({
+        visible: false,
+        zIndex: 1,
+      });
+      vectorBaseGroupRef.current = vectorBaseGroup;
+      const vectorReferenceGroup = new LayerGroup({
+        visible: false,
+        zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+      });
+      vectorReferenceGroupRef.current = vectorReferenceGroup;
+      // Blank base map layers: start hidden, only one (tile vs. world+lakes+land) will be visible at a time based on baseMapStyle.
+      const worldLayer = new VectorLayer({
+        source: worldSourceRef.current,
+        visible: false,
+        zIndex: 1,
+      });
+      worldLayerRef.current = worldLayer;
+      // Lakes layer sits above world layer to provide better definition of coastlines and inland water bodies,
+      // especially when using blank basemap style.
+      const lakesLayer = new VectorLayer({
+        source: lakesSourceRef.current,
+        visible: false,
+        zIndex: 1.5,
+      });
+      lakesLayerRef.current = lakesLayer;
+      // Land fill sits above world and lakes, below outlook polygons.
+      const landLayer = new VectorLayer({
+        source: landSourceRef.current,
+        visible: false,
+        zIndex: 2,
+        style: BLANK_LAND_FILL_STYLE,
+      });
+      landLayerRef.current = landLayer;
+      // Land outlines sit above outlook polygons so borders remain visible.
+      const landOutlineLayer = new VectorLayer({
+        source: landSourceRef.current,
+        visible: false,
+        zIndex: TOP_OUTLINE_LAYER_Z_INDEX,
+        style: BLANK_LAND_OUTLINE_STYLE,
+      });
+      landOutlineLayerRef.current = landOutlineLayer;
+      // Categorical features stay in a dedicated source so their edit flow
+      // remains separate from probabilistic outlook layers.
+      const catLayer = new VectorLayer({
+        source: catSourceRef.current,
+        zIndex: 3,
+        opacity: 1,
+      });
+      catLayerRef.current = catLayer;
+      const ghostLayer = new VectorLayer({
+        source: ghostSourceRef.current,
+        zIndex: GHOST_REFERENCE_LAYER_Z_INDEX,
+      });
+      ghostLayerRef.current = ghostLayer;
+      // Probabilistic/other features layer: separate source, normal per-feature opacity
+      const vectorLayer = new VectorLayer({
+        source: vectorSourceRef.current,
+        zIndex: 4,
+      });
+      vectorLayerRef.current = vectorLayer;
+      // Place labels/cities above outlook polygons.
+      const labelLayer = new TileLayer({
+        source: createLabelOverlaySource("osm") ?? undefined,
+        visible: true,
+        zIndex: TOP_LABEL_LAYER_Z_INDEX,
+      });
+      labelLayerRef.current = labelLayer;
+
+      // Initialize the map with all layers, but only the tile layer visible by default.
+      // The blank basemap layers will be toggled on if the user selects the blank style.
+      // This allows us to keep all layers in place and just switch visibility/styles
+      // without needing to re-add/remove layers or features, which can be expensive.
+      const map = new OLMap({
+        target: mapElementRef.current,
+        layers: [
+          tileLayer,
+          vectorBaseGroup,
+          worldLayer,
+          lakesLayer,
+          landLayer,
+          ghostLayer,
+          catLayer,
+          vectorLayer,
+          landOutlineLayer,
+          vectorReferenceGroup,
+          labelLayer,
+        ],
+        view: new View({
+          center: fromLonLat([
+            initialMapViewRef.current.center[1],
+            initialMapViewRef.current.center[0],
+          ]),
+          zoom: initialMapViewRef.current.zoom,
+        }),
+      });
+
+      map.on("moveend", () => {
+        if (isApplyingExternalViewRef.current) {
+          return;
+        }
+
+        const view = map.getView();
+        const center = view.getCenter();
+        if (!center) return;
+        const [lon, lat] = toLonLat(center);
+        const nextCenter: [number, number] = [lat, lon];
+        const nextZoom = view.getZoom() || 4;
+        const [stateLat, stateLon] = currentMapViewRef.current.center;
+        const stateZoom = currentMapViewRef.current.zoom;
+
+        const centerChanged =
+          Math.abs(stateLat - nextCenter[0]) > 0.000001 ||
+          Math.abs(stateLon - nextCenter[1]) > 0.000001;
+        const zoomChanged = Math.abs(stateZoom - nextZoom) > 0.000001;
+
+        if (centerChanged || zoomChanged) {
+          dispatch(setMapView({ center: nextCenter, zoom: nextZoom }));
+        }
+      });
+
+      mapRef.current = map;
+
+      // Some browsers/devices (notably some Chromebooks) can mount the map into a container
+      // that temporarily measures 0x0 due to flex/layout timing. OpenLayers logs a warning
+      // and may not render until updateSize() is called after layout stabilizes.
+      const targetEl = mapElementRef.current;
+      // Safely update the map size when flex/layout timing occurs incorrectly
+      const updateSizeSafely = () => {
+        try {
+          map.updateSize();
+        } catch {
+          // Non-fatal: map may be disposing.
+        }
+      };
+      // Double requestAnimationFrame calls back to back for layout stabilization
+      const raf1 = window.requestAnimationFrame(() => {
+        updateSizeSafely();
+        requestAnimationFrame(updateSizeSafely);
+      });
+      let resizeObserver: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== "undefined" && targetEl) {
+        resizeObserver = new ResizeObserver(() => updateSizeSafely());
+        resizeObserver.observe(targetEl);
       }
 
-      // Use forEachFeatureAtPixel to get the topmost feature at the clicked pixel,
-      // which accounts for z-index and layer visibility.
-      const feature = map.forEachFeatureAtPixel(
-        evt.pixel,
-        (f) => f,
-        {
-          layerFilter: (layer) => layer === vectorLayerRef.current || layer === catLayerRef.current,
-        }
-      );
-      if (feature && overlayRef.current) {
-        const outlookType = feature.get('outlookType') as string;
-        const probability = feature.get('probability') as string;
-        const isSignificant = feature.get('isSignificant') as boolean;
-        
-        setPopupInfo({ outlookType, probability, isSignificant });
-        overlayRef.current.setPosition(evt.coordinate);
-      } else if (overlayRef.current) {
-        hideOverlay(overlayRef.current);
-        setPopupInfo(null);
+      // Create popup overlay
+      if (popupRef.current) {
+        const overlay = new Overlay({
+          element: popupRef.current,
+          autoPan: {
+            animation: {
+              duration: 250,
+            },
+          },
+        });
+        map.addOverlay(overlay);
+        overlayRef.current = overlay;
       }
-    });
 
-    const modify = new Modify({ source: vectorSourceRef.current });
+      // Add click handler for pan mode
+      map.on("click", (evt) => {
+        if (interactionModeRef.current !== "pan") {
+          return;
+        }
 
-    modify.on('modifyend', (event) => {
-      const format = new GeoJSON();
-      event.features.forEach((feature) => {
-        const updatedFeature = toUpdatedGeoJsonFeature(feature, format, false);
-        if (updatedFeature) {
-          dispatch(updateFeature({ feature: updatedFeature }));
+        // Use forEachFeatureAtPixel to get the topmost feature at the clicked pixel,
+        // which accounts for z-index and layer visibility.
+        const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f, {
+          layerFilter: (layer) =>
+            layer === vectorLayerRef.current || layer === catLayerRef.current,
+        });
+        if (feature && overlayRef.current) {
+          const outlookType = feature.get("outlookType") as string;
+          const probability = feature.get("probability") as string;
+          const isSignificant = feature.get("isSignificant") as boolean;
+
+          setPopupInfo({ outlookType, probability, isSignificant });
+          overlayRef.current.setPosition(evt.coordinate);
+        } else if (overlayRef.current) {
+          hideOverlay(overlayRef.current);
+          setPopupInfo(null);
         }
       });
-    });
-    map.addInteraction(modify);
-    modifyRef.current = modify;
 
-    // Separate modify interaction for categorical layer to handle its unique properties
-    // and to prevent accidental edits of auto-generated categorical features.
-    const catModify = new Modify({ source: catSourceRef.current });
-    catModify.on('modifyend', (event) => {
-      const format = new GeoJSON();
-      event.features.forEach((feature) => {
-        const derivedFrom = feature.get('derivedFrom') as string | undefined;
-        if (derivedFrom !== 'auto-generated') {
-          const updatedFeature = toUpdatedGeoJsonFeature(feature, format, true);
+      const modify = new Modify({ source: vectorSourceRef.current });
+
+      modify.on("modifyend", (event) => {
+        const format = new GeoJSON();
+        event.features.forEach((feature) => {
+          const updatedFeature = toUpdatedGeoJsonFeature(
+            feature,
+            format,
+            false,
+          );
           if (updatedFeature) {
             dispatch(updateFeature({ feature: updatedFeature }));
           }
-        }
+        });
       });
-    });
-    map.addInteraction(catModify);
-    catModifyRef.current = catModify;
+      map.addInteraction(modify);
+      modifyRef.current = modify;
 
-    const snap = new Snap({ source: vectorSourceRef.current });
-    map.addInteraction(snap);
-    snapRef.current = snap;
+      // Separate modify interaction for categorical layer to handle its unique properties
+      // and to prevent accidental edits of auto-generated categorical features.
+      const catModify = new Modify({ source: catSourceRef.current });
+      catModify.on("modifyend", (event) => {
+        const format = new GeoJSON();
+        event.features.forEach((feature) => {
+          const derivedFrom = feature.get("derivedFrom") as string | undefined;
+          if (derivedFrom !== "auto-generated") {
+            const updatedFeature = toUpdatedGeoJsonFeature(
+              feature,
+              format,
+              true,
+            );
+            if (updatedFeature) {
+              dispatch(updateFeature({ feature: updatedFeature }));
+            }
+          }
+        });
+      });
+      map.addInteraction(catModify);
+      catModifyRef.current = catModify;
 
-    const catSnap = new Snap({ source: catSourceRef.current });
-    map.addInteraction(catSnap);
-    catSnapRef.current = catSnap;
+      const snap = new Snap({ source: vectorSourceRef.current });
+      map.addInteraction(snap);
+      snapRef.current = snap;
 
-    const ghostSnap = new Snap({ source: ghostSourceRef.current });
-    map.addInteraction(ghostSnap);
-    ghostSnapRef.current = ghostSnap;
+      const catSnap = new Snap({ source: catSourceRef.current });
+      map.addInteraction(catSnap);
+      catSnapRef.current = catSnap;
 
-    // Limit delete picking to editable outlook layers so top overlays (state outlines/labels)
-    // do not intercept clicks and prevent polygon deletion.
-    const select = new Select({ condition: click, layers: [vectorLayer, catLayer] });
-    select.setActive(false);
-    select.on('select', (event) => {
-      const selected = event.selected[0];
-      if (!selected) {
-        return;
-      }
+      const ghostSnap = new Snap({ source: ghostSourceRef.current });
+      map.addInteraction(ghostSnap);
+      ghostSnapRef.current = ghostSnap;
 
-      const outlookType = selected.get('outlookType') as string | undefined;
-      const derivedFrom = selected.get('derivedFrom') as string | undefined;
+      // Limit delete picking to editable outlook layers so top overlays (state outlines/labels)
+      // do not intercept clicks and prevent polygon deletion.
+      const select = new Select({
+        condition: click,
+        layers: [vectorLayer, catLayer],
+      });
+      select.setActive(false);
+      select.on("select", (event) => {
+        const selected = event.selected[0];
+        if (!selected) {
+          return;
+        }
 
-      // Auto-generated categorical polygons are derived from probabilistic outlooks.
-      // Keep them read-only here; users should edit tornado/wind/hail/totalSevere
-      // (or draw/delete TSTM manually) and let auto-categorical regenerate.
-      if (outlookType === 'categorical' && derivedFrom === 'auto-generated') {
+        const outlookType = selected.get("outlookType") as string | undefined;
+        const derivedFrom = selected.get("derivedFrom") as string | undefined;
+
+        // Auto-generated categorical polygons are derived from probabilistic outlooks.
+        // Keep them read-only here; users should edit tornado/wind/hail/totalSevere
+        // (or draw/delete TSTM manually) and let auto-categorical regenerate.
+        if (outlookType === "categorical" && derivedFrom === "auto-generated") {
+          select.getFeatures().clear();
+          return;
+        }
+
+        const identity = getFeatureIdentity(selected);
+        if (!identity) {
+          select.getFeatures().clear();
+          return;
+        }
+
+        dispatch(
+          removeFeature({
+            outlookType: identity.outlookType as EditableOutlookType,
+            probability: identity.probability,
+            featureId: identity.featureId,
+          }),
+        );
+
         select.getFeatures().clear();
         return;
-      }
+      });
+      map.addInteraction(select);
+      selectRef.current = select;
 
-      const identity = getFeatureIdentity(selected);
-      if (!identity) {
-        select.getFeatures().clear();
+      return () => {
+        window.cancelAnimationFrame(raf1);
+        if (resizeObserver) {
+          resizeObserver.disconnect();
+        }
+        if (drawRef.current) {
+          map.removeInteraction(drawRef.current);
+        }
+        if (modifyRef.current) {
+          map.removeInteraction(modifyRef.current);
+        }
+        if (catModifyRef.current) {
+          map.removeInteraction(catModifyRef.current);
+        }
+        if (snapRef.current) {
+          map.removeInteraction(snapRef.current);
+        }
+        if (catSnapRef.current) {
+          map.removeInteraction(catSnapRef.current);
+        }
+        if (ghostSnapRef.current) {
+          map.removeInteraction(ghostSnapRef.current);
+        }
+        if (selectRef.current) {
+          map.removeInteraction(selectRef.current);
+        }
+        map.setTarget();
+        mapRef.current = null;
+        vectorBaseGroupRef.current = null;
+        vectorReferenceGroupRef.current = null;
+        vectorLayerRef.current = null;
+      };
+    }, [dispatch]);
+
+    useEffect(() => {
+      if (!selectRef.current) {
         return;
       }
 
-      dispatch(removeFeature({
-        outlookType: identity.outlookType as EditableOutlookType,
-        probability: identity.probability,
-        featureId: identity.featureId
-      }));
+      selectRef.current.setActive(interactionMode === "delete");
+      if (interactionMode !== "delete") {
+        selectRef.current.getFeatures().clear();
+      }
 
-      select.getFeatures().clear();
-      return;
-    });
-    map.addInteraction(select);
-    selectRef.current = select;
+      // Hide popup when not in pan mode
+      if (interactionMode !== "pan") {
+        if (overlayRef.current) {
+          hideOverlay(overlayRef.current);
+        }
+        setPopupInfo(null);
+      }
+    }, [interactionMode]);
 
-    return () => {
-      window.cancelAnimationFrame(raf1);
-      window.cancelAnimationFrame(raf2);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-      if (drawRef.current) {
-        map.removeInteraction(drawRef.current);
-      }
-      if (modifyRef.current) {
-        map.removeInteraction(modifyRef.current);
-      }
-      if (catModifyRef.current) {
-        map.removeInteraction(catModifyRef.current);
-      }
+    useEffect(() => {
+      // Keep snapping enabled outside delete mode for draw/modify workflows.
+      const enableSnap = interactionMode !== "delete";
       if (snapRef.current) {
-        map.removeInteraction(snapRef.current);
+        snapRef.current.setActive(enableSnap);
       }
       if (catSnapRef.current) {
-        map.removeInteraction(catSnapRef.current);
+        catSnapRef.current.setActive(enableSnap);
       }
       if (ghostSnapRef.current) {
-        map.removeInteraction(ghostSnapRef.current);
+        ghostSnapRef.current.setActive(enableSnap);
       }
-      if (selectRef.current) {
-        map.removeInteraction(selectRef.current);
+    }, [interactionMode]);
+
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      const view = map.getView();
+      const targetCenter = fromLonLat([
+        currentMapView.center[1],
+        currentMapView.center[0],
+      ]);
+      const currentCenter = view.getCenter();
+      const currentZoom = view.getZoom() || 4;
+
+      const centerChanged =
+        !currentCenter ||
+        Math.abs(currentCenter[0] - targetCenter[0]) > 0.01 ||
+        Math.abs(currentCenter[1] - targetCenter[1]) > 0.01;
+      const zoomChanged =
+        Math.abs(currentZoom - currentMapView.zoom) > 0.000001;
+
+      if (!centerChanged && !zoomChanged) {
+        return;
       }
-      map.setTarget();
-      mapRef.current = null;
-      vectorBaseGroupRef.current = null;
-      vectorReferenceGroupRef.current = null;
-      vectorLayerRef.current = null;
-    };
-  }, [dispatch]);
 
-  useEffect(() => {
-    if (!selectRef.current) {
-      return;
-    }
+      isApplyingExternalViewRef.current = true;
+      view.setCenter(targetCenter);
+      view.setZoom(currentMapView.zoom);
+      setTimeout(() => {
+        isApplyingExternalViewRef.current = false;
+      }, 0);
+    }, [currentMapView.center, currentMapView.zoom]);
 
-    selectRef.current.setActive(interactionMode === 'delete');
-    if (interactionMode !== 'delete') {
-      selectRef.current.getFeatures().clear();
-    }
+    // Swap base tile source / blank land layer when style changes
+    useEffect(() => {
+      const tile = tileLayerRef.current;
+      const vectorBaseGroup = vectorBaseGroupRef.current;
+      const vectorReferenceGroup = vectorReferenceGroupRef.current;
+      const world = worldLayerRef.current;
+      const lakes = lakesLayerRef.current;
+      const land = landLayerRef.current;
+      const landOutline = landOutlineLayerRef.current;
+      const labels = labelLayerRef.current;
+      const el = mapElementRef.current;
+      if (
+        !tile ||
+        !vectorBaseGroup ||
+        !vectorReferenceGroup ||
+        !world ||
+        !lakes ||
+        !land ||
+        !landOutline ||
+        !labels ||
+        !el
+      )
+        return;
 
-    // Hide popup when not in pan mode
-    if (interactionMode !== 'pan') {
-      if (overlayRef.current) {
-        hideOverlay(overlayRef.current);
-      }
-      setPopupInfo(null);
-    }
-  }, [interactionMode]);
-
-  useEffect(() => {
-    // Keep snapping enabled outside delete mode for draw/modify workflows.
-    const enableSnap = interactionMode !== 'delete';
-    if (snapRef.current) {
-      snapRef.current.setActive(enableSnap);
-    }
-    if (catSnapRef.current) {
-      catSnapRef.current.setActive(enableSnap);
-    }
-    if (ghostSnapRef.current) {
-      ghostSnapRef.current.setActive(enableSnap);
-    }
-  }, [interactionMode]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const view = map.getView();
-    const targetCenter = fromLonLat([currentMapView.center[1], currentMapView.center[0]]);
-    const currentCenter = view.getCenter();
-    const currentZoom = view.getZoom() || 4;
-
-    const centerChanged = !currentCenter || Math.abs(currentCenter[0] - targetCenter[0]) > 0.01 || Math.abs(currentCenter[1] - targetCenter[1]) > 0.01;
-    const zoomChanged = Math.abs(currentZoom - currentMapView.zoom) > 0.000001;
-
-    if (!centerChanged && !zoomChanged) {
-      return;
-    }
-
-    isApplyingExternalViewRef.current = true;
-    view.setCenter(targetCenter);
-    view.setZoom(currentMapView.zoom);
-    setTimeout(() => {
-      isApplyingExternalViewRef.current = false;
-    }, 0);
-  }, [currentMapView.center, currentMapView.zoom]);
-
-  // Swap base tile source / blank land layer when style changes
-  useEffect(() => {
-    const tile = tileLayerRef.current;
-    const vectorBaseGroup = vectorBaseGroupRef.current;
-    const vectorReferenceGroup = vectorReferenceGroupRef.current;
-    const world = worldLayerRef.current;
-    const lakes = lakesLayerRef.current;
-    const land = landLayerRef.current;
-    const landOutline = landOutlineLayerRef.current;
-    const labels = labelLayerRef.current;
-    const el = mapElementRef.current;
-    if (!tile || !vectorBaseGroup || !vectorReferenceGroup || !world || !lakes || !land || !landOutline || !labels || !el) return;
-
-    /**
-     * Ensure US states GeoJSON for the blank/base map is loaded into
-     * the `landSourceRef` so state outlines can be rendered above
-     * outlook polygons. Fetches data once and caches it in
-     * `cachedUsStatesGeoJSON`.
-     */
-    const loadUsStatesBoundaries = () => {
-      const landLoader: BlankLayerConfig = {
-        source: landSourceRef.current,
-        isLoaded: () => landSourceRef.current.getFeatures().length > 0,
-        url: 'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json',
-        getCache: () => cachedUsStatesGeoJSON,
-        setCache: (data) => {
-          cachedUsStatesGeoJSON = data;
-        },
-      };
-      ensureBlankLayerLoaded(landLoader).catch(() => { /* US states outline fetch failed — non-fatal */ });
-    };
-
-    // Keep state outlines available above outlook polygons in every map style.
-    loadUsStatesBoundaries();
-
-    /** Clears the split OpenFreeMap base/reference groups so raster and blank modes stay isolated. */
-    const hideVectorBasemapGroups = () => {
-      vectorBaseGroup.setVisible(false);
-      vectorReferenceGroup.setVisible(false);
-      vectorBaseGroup.getLayers().clear();
-      vectorReferenceGroup.getLayers().clear();
-    };
-
-    if (baseMapStyle === 'blank') {
-      hideVectorBasemapGroups();
-      tile.setVisible(false);
-      world.setVisible(true);
-      lakes.setVisible(true);
-      land.setVisible(true);
-      landOutline.setVisible(true);
-      labels.setVisible(false);
-      // Deeper ocean blue
-      el.style.backgroundColor = '#7BA0C8';
-
-      const loaders: BlankLayerConfig[] = [
-        {
-          source: worldSourceRef.current,
-          isLoaded: () => worldSourceRef.current.getFeatures().length > 0,
-          url: 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson',
-          getCache: () => cachedWorldCountriesGeoJSON,
-          setCache: (data) => {
-            cachedWorldCountriesGeoJSON = data;
-          },
-          style: BLANK_WORLD_STYLE,
-        },
-        {
-          source: lakesSourceRef.current,
-          isLoaded: () => lakesSourceRef.current.getFeatures().length > 0,
-          url: 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_lakes.geojson',
-          getCache: () => cachedLakesGeoJSON,
-          setCache: (data) => {
-            cachedLakesGeoJSON = data;
-          },
-          style: BLANK_LAKE_STYLE,
-        },
-        {
+      /**
+       * Ensure US states GeoJSON for the blank/base map is loaded into
+       * the `landSourceRef` so state outlines can be rendered above
+       * outlook polygons. Fetches data once and caches it in
+       * `cachedUsStatesGeoJSON`.
+       */
+      const loadUsStatesBoundaries = () => {
+        const landLoader: BlankLayerConfig = {
           source: landSourceRef.current,
           isLoaded: () => landSourceRef.current.getFeatures().length > 0,
-          url: 'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json',
+          url: "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json",
           getCache: () => cachedUsStatesGeoJSON,
           setCache: (data) => {
             cachedUsStatesGeoJSON = data;
           },
-        },
-      ];
-
-      loaders.forEach((loader) => {
-        ensureBlankLayerLoaded(loader).catch(() => { /* blank map layer fetch failed — non-fatal */ });
-      });
-      return;
-    }
-
-    if (isOpenFreeMapStyle(baseMapStyle)) {
-      const requestId = vectorStyleRequestRef.current + 1;
-      vectorStyleRequestRef.current = requestId;
-
-      tile.setVisible(false);
-      world.setVisible(false);
-      lakes.setVisible(false);
-      land.setVisible(false);
-      landOutline.setVisible(true);
-      labels.setVisible(false);
-      el.style.backgroundColor = '';
-      vectorBaseGroup.setVisible(false);
-      vectorReferenceGroup.setVisible(false);
-      vectorBaseGroup.getLayers().clear();
-      vectorReferenceGroup.getLayers().clear();
-
-      getOpenFreeMapStyleSet(baseMapStyle)
-        .then(({ baseStyle, overlayStyle }) => {
-          const nextBaseGroup = new LayerGroup();
-          const nextReferenceGroup = new LayerGroup();
-
-          return Promise.all([
-            apply(nextBaseGroup, baseStyle),
-            apply(nextReferenceGroup, overlayStyle),
-          ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
-        })
-        .then(({ nextBaseGroup, nextReferenceGroup }) => {
-          if (vectorStyleRequestRef.current !== requestId) {
-            return;
-          }
-
-          replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
-          replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
-          vectorBaseGroup.setVisible(true);
-          vectorReferenceGroup.setVisible(true);
-        })
-        .catch((error) => {
-          if (vectorStyleRequestRef.current !== requestId) {
-            return;
-          }
-
-          console.warn('[forecast-map] falling back to raster basemap after vector load failure', {
-            baseMapStyle,
-            error,
-          });
-          vectorBaseGroup.getLayers().clear();
-          vectorReferenceGroup.getLayers().clear();
-          tile.setSource(createTileSource(baseMapStyle));
-          tile.setVisible(true);
-          const labelSource = createLabelOverlaySource(baseMapStyle);
-          if (labelSource) {
-            labels.setSource(labelSource);
-            labels.setVisible(true);
-          }
+        };
+        ensureBlankLayerLoaded(landLoader).catch(() => {
+          /* US states outline fetch failed — non-fatal */
         });
-    } else {
-      hideVectorBasemapGroups();
-      tile.setVisible(true);
-      world.setVisible(false);
-      lakes.setVisible(false);
-      land.setVisible(false);
-      landOutline.setVisible(true);
-      el.style.backgroundColor = '';
-      tile.setSource(createTileSource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>));
-      const labelSource = createLabelOverlaySource(baseMapStyle as Exclude<BaseMapStyle, 'blank'>);
-      if (labelSource) {
-        labels.setSource(labelSource);
-        labels.setVisible(true);
-      } else {
+      };
+
+      // Keep state outlines available above outlook polygons in every map style.
+      loadUsStatesBoundaries();
+
+      /** Clears the split OpenFreeMap base/reference groups so raster and blank modes stay isolated. */
+      const hideVectorBasemapGroups = () => {
+        vectorBaseGroup.setVisible(false);
+        vectorReferenceGroup.setVisible(false);
+        vectorBaseGroup.getLayers().clear();
+        vectorReferenceGroup.getLayers().clear();
+      };
+
+      if (baseMapStyle === "blank") {
+        hideVectorBasemapGroups();
+        tile.setVisible(false);
+        world.setVisible(true);
+        lakes.setVisible(true);
+        land.setVisible(true);
+        landOutline.setVisible(true);
         labels.setVisible(false);
-      }
-    }
-  }, [baseMapStyle]);
+        // Deeper ocean blue
+        el.style.backgroundColor = "#7BA0C8";
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
+        const loaders: BlankLayerConfig[] = [
+          {
+            source: worldSourceRef.current,
+            isLoaded: () => worldSourceRef.current.getFeatures().length > 0,
+            url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson",
+            getCache: () => cachedWorldCountriesGeoJSON,
+            setCache: (data) => {
+              cachedWorldCountriesGeoJSON = data;
+            },
+            style: BLANK_WORLD_STYLE,
+          },
+          {
+            source: lakesSourceRef.current,
+            isLoaded: () => lakesSourceRef.current.getFeatures().length > 0,
+            url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_lakes.geojson",
+            getCache: () => cachedLakesGeoJSON,
+            setCache: (data) => {
+              cachedLakesGeoJSON = data;
+            },
+            style: BLANK_LAKE_STYLE,
+          },
+          {
+            source: landSourceRef.current,
+            isLoaded: () => landSourceRef.current.getFeatures().length > 0,
+            url: "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json",
+            getCache: () => cachedUsStatesGeoJSON,
+            setCache: (data) => {
+              cachedUsStatesGeoJSON = data;
+            },
+          },
+        ];
 
-    if (drawRef.current) {
-      map.removeInteraction(drawRef.current);
-      drawRef.current = null;
-    }
-
-    if (interactionMode !== 'draw') {
-      return;
-    }
-
-    if (!isDrawableOutlookType({ outlookType: drawingState.activeOutlookType })) {
-      return;
-    }
-
-    const drawSource = drawingState.activeOutlookType === 'categorical' ? catSourceRef.current : vectorSourceRef.current;
-    const draw = new Draw({ source: drawSource, type: 'Polygon' });
-    draw.on('drawend', (event) => {
-      const format = new GeoJSON();
-      const olGeometry = event.feature.getGeometry();
-      if (!olGeometry) {
-        return;
-      }
-
-      // Convert the drawn geometry to GeoJSON format with the correct projections for storage in Redux.
-      const geometry = format.writeGeometryObject(olGeometry, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
-      });
-      // Create a new feature object with the drawn geometry and current drawing state properties,
-      // then dispatch an action to add it to the Redux store.
-      const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
-        type: 'Feature',
-        id: uuidv4(),
-        geometry: geometry as Polygon,
-        properties: {
-          outlookType: drawingState.activeOutlookType,
-          probability: drawingState.activeProbability,
-          isSignificant: drawingState.isSignificant
-        }
-      };
-      dispatch(addFeature({ feature }));
-    });
-    map.addInteraction(draw);
-    drawRef.current = draw;
-
-    // OpenLayers evaluates interactions in reverse insertion order.
-    // Re-adding snap interactions here ensures snap runs before draw,
-    // so the cursor actually snaps instead of only showing a snap hint.
-    if (snapRef.current) {
-      map.removeInteraction(snapRef.current);
-      map.addInteraction(snapRef.current);
-    }
-    if (catSnapRef.current) {
-      map.removeInteraction(catSnapRef.current);
-      map.addInteraction(catSnapRef.current);
-    }
-    if (ghostSnapRef.current) {
-      map.removeInteraction(ghostSnapRef.current);
-      map.addInteraction(ghostSnapRef.current);
-    }
-  }, [dispatch, drawingState.activeOutlookType, drawingState.activeProbability, drawingState.isSignificant, interactionMode]);
-
-  useEffect(() => {
-    const source = vectorSourceRef.current;
-    const catSource = catSourceRef.current;
-    const ghostSource = ghostSourceRef.current;
-    source.clear();
-    catSource.clear();
-    ghostSource.clear();
-    const format = new GeoJSON();
-
-    // Find the maximum z-index for bold styling
-    let maxZIndex = -Infinity;
-    serializedFeatures.forEach(({ outlookType, probability }) => {
-      const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
-      if (zIndex > maxZIndex) maxZIndex = zIndex;
-    });
-
-    serializedFeatures.forEach(({ outlookType, probability, feature }) => {
-      const isCategorical = outlookType === 'categorical';
-      const targetSource = isCategorical ? catSource : source;
-
-      const olFeature = format.readFeature(feature, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
-      });
-
-      const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
-      const isTopLayer = zIndex === maxZIndex;
-
-      // Apply styles and properties to the feature, then add it to the appropriate source.
-      const applyProps = (f: OLFeature<Geometry>) => {
-        f.setStyle(toOlStyle(
-          { outlookType, probability },
-          { isTopLayer }
-        ));
-        f.set('featureId', feature.id as string);
-        f.set('outlookType', outlookType);
-        f.set('probability', probability);
-        f.set('isSignificant', Boolean(feature.properties?.isSignificant));
-        f.set('derivedFrom', feature.properties?.derivedFrom);
-        targetSource.addFeature(f);
-      };
-
-      if (Array.isArray(olFeature)) {
-        olFeature.forEach((item: FeatureLike) => applyProps(item as OLFeature<Geometry>));
-      } else {
-        applyProps(olFeature as OLFeature<Geometry>);
-      }
-    });
-
-    Object.entries(outlooks).forEach(([outlookType, probs]) => {
-      if (outlookType === drawingState.activeOutlookType || !ghostOutlooks[outlookType as EditableOutlookType]) {
-        return;
-      }
-
-      if (!(probs instanceof Map)) return;
-
-      probs.forEach((features: GeoJsonFeature[], probability: string) => {
-        const isCategorical = outlookType === 'categorical';
-
-        features.forEach((feature) => {
-          const olFeature = format.readFeature(feature, {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857'
+        loaders.forEach((loader) => {
+          ensureBlankLayerLoaded(loader).catch(() => {
+            /* blank map layer fetch failed — non-fatal */
           });
+        });
+        return;
+      }
 
-          /** Apply ghost styling/metadata and add the feature to the ghost source. */
-          const applyGhostProps = (f: OLFeature<Geometry>) => {
-            f.setStyle(toGhostOlStyle({ outlookType, probability, isCategorical }));
-            f.set('featureId', feature.id as string);
-            f.set('outlookType', outlookType);
-            f.set('probability', probability);
-            f.set('isSignificant', Boolean(feature.properties?.isSignificant));
-            f.set('derivedFrom', feature.properties?.derivedFrom);
-            ghostSource.addFeature(f);
-          };
+      if (isOpenFreeMapStyle(baseMapStyle)) {
+        const requestId = vectorStyleRequestRef.current + 1;
+        vectorStyleRequestRef.current = requestId;
 
-          if (Array.isArray(olFeature)) {
-            olFeature.forEach((item: FeatureLike) => applyGhostProps(item as OLFeature<Geometry>));
-          } else {
-            applyGhostProps(olFeature as OLFeature<Geometry>);
-          }
+        tile.setVisible(false);
+        world.setVisible(false);
+        lakes.setVisible(false);
+        land.setVisible(false);
+        landOutline.setVisible(true);
+        labels.setVisible(false);
+        el.style.backgroundColor = "";
+        vectorBaseGroup.setVisible(false);
+        vectorReferenceGroup.setVisible(false);
+        vectorBaseGroup.getLayers().clear();
+        vectorReferenceGroup.getLayers().clear();
+
+        getOpenFreeMapStyleSet(baseMapStyle)
+          .then(({ baseStyle, overlayStyle }) => {
+            const nextBaseGroup = new LayerGroup();
+            const nextReferenceGroup = new LayerGroup();
+
+            return Promise.all([
+              apply(nextBaseGroup, baseStyle),
+              apply(nextReferenceGroup, overlayStyle),
+            ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
+          })
+          .then(({ nextBaseGroup, nextReferenceGroup }) => {
+            if (vectorStyleRequestRef.current !== requestId) {
+              return;
+            }
+
+            replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
+            replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
+            vectorBaseGroup.setVisible(true);
+            vectorReferenceGroup.setVisible(true);
+          })
+          .catch((error) => {
+            if (vectorStyleRequestRef.current !== requestId) {
+              return;
+            }
+
+            console.warn(
+              "[forecast-map] falling back to raster basemap after vector load failure",
+              {
+                baseMapStyle,
+                error,
+              },
+            );
+            vectorBaseGroup.getLayers().clear();
+            vectorReferenceGroup.getLayers().clear();
+            tile.setSource(createTileSource(baseMapStyle));
+            tile.setVisible(true);
+            const labelSource = createLabelOverlaySource(baseMapStyle);
+            if (labelSource) {
+              labels.setSource(labelSource);
+              labels.setVisible(true);
+            }
+          });
+      } else {
+        hideVectorBasemapGroups();
+        tile.setVisible(true);
+        world.setVisible(false);
+        lakes.setVisible(false);
+        land.setVisible(false);
+        landOutline.setVisible(true);
+        el.style.backgroundColor = "";
+        tile.setSource(
+          createTileSource(baseMapStyle as Exclude<BaseMapStyle, "blank">),
+        );
+        const labelSource = createLabelOverlaySource(
+          baseMapStyle as Exclude<BaseMapStyle, "blank">,
+        );
+        if (labelSource) {
+          labels.setSource(labelSource);
+          labels.setVisible(true);
+        } else {
+          labels.setVisible(false);
+        }
+      }
+    }, [baseMapStyle]);
+
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      if (drawRef.current) {
+        map.removeInteraction(drawRef.current);
+        drawRef.current = null;
+      }
+
+      if (interactionMode !== "draw") {
+        return;
+      }
+
+      if (
+        !isDrawableOutlookType({ outlookType: drawingState.activeOutlookType })
+      ) {
+        return;
+      }
+
+      const drawSource =
+        drawingState.activeOutlookType === "categorical"
+          ? catSourceRef.current
+          : vectorSourceRef.current;
+      const draw = new Draw({ source: drawSource, type: "Polygon" });
+      draw.on("drawend", (event) => {
+        const format = new GeoJSON();
+        const olGeometry = event.feature.getGeometry();
+        if (!olGeometry) {
+          return;
+        }
+
+        // Convert the drawn geometry to GeoJSON format with the correct projections for storage in Redux.
+        const geometry = format.writeGeometryObject(olGeometry, {
+          dataProjection: "EPSG:4326",
+          featureProjection: "EPSG:3857",
+        });
+        // Create a new feature object with the drawn geometry and current drawing state properties,
+        // then dispatch an action to add it to the Redux store.
+        const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
+          type: "Feature",
+          id: uuidv4(),
+          geometry: geometry as Polygon,
+          properties: {
+            outlookType: drawingState.activeOutlookType,
+            probability: drawingState.activeProbability,
+            isSignificant: drawingState.isSignificant,
+          },
+        };
+        dispatch(addFeature({ feature }));
+      });
+      map.addInteraction(draw);
+      drawRef.current = draw;
+
+      // OpenLayers evaluates interactions in reverse insertion order.
+      // Re-adding snap interactions here ensures snap runs before draw,
+      // so the cursor actually snaps instead of only showing a snap hint.
+      if (snapRef.current) {
+        map.removeInteraction(snapRef.current);
+        map.addInteraction(snapRef.current);
+      }
+      if (catSnapRef.current) {
+        map.removeInteraction(catSnapRef.current);
+        map.addInteraction(catSnapRef.current);
+      }
+      if (ghostSnapRef.current) {
+        map.removeInteraction(ghostSnapRef.current);
+        map.addInteraction(ghostSnapRef.current);
+      }
+    }, [
+      dispatch,
+      drawingState.activeOutlookType,
+      drawingState.activeProbability,
+      drawingState.isSignificant,
+      interactionMode,
+    ]);
+
+    useEffect(() => {
+      const source = vectorSourceRef.current;
+      const catSource = catSourceRef.current;
+      const ghostSource = ghostSourceRef.current;
+      source.clear();
+      catSource.clear();
+      ghostSource.clear();
+      const format = new GeoJSON();
+
+      // Find the maximum z-index for bold styling
+      let maxZIndex = -Infinity;
+      serializedFeatures.forEach(({ outlookType, probability }) => {
+        const zIndex = computeZIndex(
+          outlookType as EditableOutlookType,
+          probability,
+        );
+        if (zIndex > maxZIndex) maxZIndex = zIndex;
+      });
+
+      serializedFeatures.forEach(({ outlookType, probability, feature }) => {
+        const isCategorical = outlookType === "categorical";
+        const targetSource = isCategorical ? catSource : source;
+
+        const olFeature = format.readFeature(feature, {
+          dataProjection: "EPSG:4326",
+          featureProjection: "EPSG:3857",
+        });
+
+        const zIndex = computeZIndex(
+          outlookType as EditableOutlookType,
+          probability,
+        );
+        const isTopLayer = zIndex === maxZIndex;
+
+        // Apply styles and properties to the feature, then add it to the appropriate source.
+        const applyProps = (f: OLFeature<Geometry>) => {
+          f.setStyle(toOlStyle({ outlookType, probability }, { isTopLayer }));
+          f.set("featureId", feature.id as string);
+          f.set("outlookType", outlookType);
+          f.set("probability", probability);
+          f.set("isSignificant", Boolean(feature.properties?.isSignificant));
+          f.set("derivedFrom", feature.properties?.derivedFrom);
+          targetSource.addFeature(f);
+        };
+
+        if (Array.isArray(olFeature)) {
+          olFeature.forEach((item: FeatureLike) =>
+            applyProps(item as OLFeature<Geometry>),
+          );
+        } else {
+          applyProps(olFeature as OLFeature<Geometry>);
+        }
+      });
+
+      Object.entries(outlooks).forEach(([outlookType, probs]) => {
+        if (
+          outlookType === drawingState.activeOutlookType ||
+          !ghostOutlooks[outlookType as EditableOutlookType]
+        ) {
+          return;
+        }
+
+        if (!(probs instanceof Map)) return;
+
+        probs.forEach((features: GeoJsonFeature[], probability: string) => {
+          const isCategorical = outlookType === "categorical";
+
+          features.forEach((feature) => {
+            const olFeature = format.readFeature(feature, {
+              dataProjection: "EPSG:4326",
+              featureProjection: "EPSG:3857",
+            });
+
+            /** Apply ghost styling/metadata and add the feature to the ghost source. */
+            const applyGhostProps = (f: OLFeature<Geometry>) => {
+              f.setStyle(
+                toGhostOlStyle({ outlookType, probability, isCategorical }),
+              );
+              f.set("featureId", feature.id as string);
+              f.set("outlookType", outlookType);
+              f.set("probability", probability);
+              f.set(
+                "isSignificant",
+                Boolean(feature.properties?.isSignificant),
+              );
+              f.set("derivedFrom", feature.properties?.derivedFrom);
+              ghostSource.addFeature(f);
+            };
+
+            if (Array.isArray(olFeature)) {
+              olFeature.forEach((item: FeatureLike) =>
+                applyGhostProps(item as OLFeature<Geometry>),
+              );
+            } else {
+              applyGhostProps(olFeature as OLFeature<Geometry>);
+            }
+          });
         });
       });
-    });
-  }, [serializedFeatures, outlooks, drawingState.activeOutlookType, ghostOutlooks]);
+    }, [
+      serializedFeatures,
+      outlooks,
+      drawingState.activeOutlookType,
+      ghostOutlooks,
+    ]);
 
-  // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
-  const handleSetModePan = () => {
-    setInteractionMode('pan');
-  };
+    // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
+    const handleSetModePan = () => {
+      setInteractionMode("pan");
+    };
 
-  // Draw mode allows users to draw new polygons on the map, which are then added to the Redux store and rendered on the map.
-  const handleSetModeDraw = () => {
-    setInteractionMode('draw');
-  };
+    // Draw mode allows users to draw new polygons on the map, which are then added to the Redux store and rendered on the map.
+    const handleSetModeDraw = () => {
+      setInteractionMode("draw");
+    };
 
-  // Delete mode allows users to click on existing polygons to remove them from the map and the Redux store.
-  const handleSetModeDelete = () => {
-    setInteractionMode('delete');
-  };
+    // Delete mode allows users to click on existing polygons to remove them from the map and the Redux store.
+    const handleSetModeDelete = () => {
+      setInteractionMode("delete");
+    };
 
-  
-
-  return (
-    <div className="map-container">
-      <div ref={mapElementRef} style={{ width: '100%', height: '100%' }} />
-      <div
-        ref={popupRef}
-        className="ol-popup"
-        style={{
-          display: popupInfo ? 'block' : 'none',
-        }}
-      >
-        {popupInfo && (
-          <div className="ol-popup-content">
-            <div className="text-sm font-semibold capitalize">{popupInfo.outlookType}</div>
-            <div className="text-xs">
-              {popupInfo.probability}{popupInfo.isSignificant ? ' (Significant)' : ''}
+    return (
+      <div className="map-container">
+        <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
+        <div
+          ref={popupRef}
+          className="ol-popup"
+          style={{
+            display: popupInfo ? "block" : "none",
+          }}
+        >
+          {popupInfo && (
+            <div className="ol-popup-content">
+              <div className="text-sm font-semibold capitalize">
+                {popupInfo.outlookType}
+              </div>
+              <div className="text-xs">
+                {popupInfo.probability}
+                {popupInfo.isSignificant ? " (Significant)" : ""}
+              </div>
             </div>
+          )}
+        </div>
+        <div className="map-toolbar-bottom-right">
+          <div className="map-toolbar-surface">
+            <button
+              type="button"
+              className={`map-toolbar-button mode-pan ${interactionMode === "pan" ? "active" : ""}`}
+              onClick={handleSetModePan}
+              title="Pan map"
+              aria-label="Pan map"
+            >
+              Pan
+            </button>
+            <button
+              type="button"
+              onClick={handleSetModeDraw}
+              className={`map-toolbar-button mode-draw ${interactionMode === "draw" ? "active" : ""}`}
+              title="Draw polygons"
+              aria-label="Draw polygons"
+            >
+              Draw
+            </button>
+            <button
+              type="button"
+              onClick={handleSetModeDelete}
+              className={`map-toolbar-button mode-delete ${interactionMode === "delete" ? "active" : ""}`}
+              title="Delete polygons"
+              aria-label="Delete polygons"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className={`map-toolbar-button mode-key ${showDesktopLegend ? "active" : ""}`}
+              onClick={() => setShowDesktopLegend((isVisible) => !isVisible)}
+              title={showDesktopLegend ? "Hide map key" : "Show map key"}
+              aria-label={showDesktopLegend ? "Hide map key" : "Show map key"}
+              aria-expanded={showDesktopLegend}
+            >
+              Key
+            </button>
           </div>
-        )}
-      </div>
-      <div className="map-toolbar-bottom-right">
-        <div className="map-toolbar-surface">
-          <button
-            type="button"
-            className={`map-toolbar-button mode-pan ${interactionMode === 'pan' ? 'active' : ''}`}
-            onClick={handleSetModePan}
-            title="Pan map"
-            aria-label="Pan map"
-          >
-            Pan
-          </button>
-          <button
-            type="button"
-            onClick={handleSetModeDraw}
-            className={`map-toolbar-button mode-draw ${interactionMode === 'draw' ? 'active' : ''}`}
-            title="Draw polygons"
-            aria-label="Draw polygons"
-          >
-            Draw
-          </button>
-          <button
-            type="button"
-            onClick={handleSetModeDelete}
-            className={`map-toolbar-button mode-delete ${interactionMode === 'delete' ? 'active' : ''}`}
-            title="Delete polygons"
-            aria-label="Delete polygons"
-          >
-            Delete
-          </button>
-          <button
-            type="button"
-            className={`map-toolbar-button mode-key ${showDesktopLegend ? 'active' : ''}`}
-            onClick={() => setShowDesktopLegend((isVisible) => !isVisible)}
-            title={showDesktopLegend ? 'Hide map key' : 'Show map key'}
-            aria-label={showDesktopLegend ? 'Hide map key' : 'Show map key'}
-            aria-expanded={showDesktopLegend}
-          >
-            Key
-          </button>
+          <div className="map-toolbar-help-surface">
+            {interactionMode === "draw" &&
+              "Draw mode: click to place points, double-click to finish polygon."}
+            {interactionMode === "delete" &&
+              "Delete mode: click any polygon to remove it."}
+            {interactionMode === "pan" &&
+              "Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details."}
+          </div>
         </div>
-        <div className="map-toolbar-help-surface">
-          {interactionMode === 'draw' && 'Draw mode: click to place points, double-click to finish polygon.'}
-          {interactionMode === 'delete' && 'Delete mode: click any polygon to remove it.'}
-          {interactionMode === 'pan' && 'Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.'}
-        </div>
+        <Legend desktopOpen={showDesktopLegend} mobileOpen={showMobileLegend} />
+        <button
+          type="button"
+          className={`map-key-popout-button ${showMobileLegend ? "active" : ""}`}
+          onClick={() => setShowMobileLegend((isVisible) => !isVisible)}
+          title={showMobileLegend ? "Hide map key" : "Show map key"}
+          aria-label={showMobileLegend ? "Hide map key" : "Show map key"}
+          aria-expanded={showMobileLegend}
+        >
+          <span aria-hidden="true">{showMobileLegend ? "▾" : "▴"}</span>
+          Key
+        </button>
+        <StatusOverlay />
+        <UnofficialBadge />
       </div>
-      <Legend desktopOpen={showDesktopLegend} mobileOpen={showMobileLegend} />
-      <button
-        type="button"
-        className={`map-key-popout-button ${showMobileLegend ? 'active' : ''}`}
-        onClick={() => setShowMobileLegend((isVisible) => !isVisible)}
-        title={showMobileLegend ? 'Hide map key' : 'Show map key'}
-        aria-label={showMobileLegend ? 'Hide map key' : 'Show map key'}
-        aria-expanded={showMobileLegend}
-      >
-        <span aria-hidden="true">{showMobileLegend ? '▾' : '▴'}</span>
-        Key
-      </button>
-      <StatusOverlay />
-      <UnofficialBadge />
-    </div>
-  );
-});
+    );
+  },
+);
 
-OpenLayersForecastMap.displayName = 'OpenLayersForecastMap';
+OpenLayersForecastMap.displayName = "OpenLayersForecastMap";
 
 export default OpenLayersForecastMap;
