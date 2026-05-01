@@ -787,9 +787,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         }
       };
       // Double requestAnimationFrame calls back to back for layout stabilization
+      let raf2: number | null = null;
       const raf1 = window.requestAnimationFrame(() => {
         updateSizeSafely();
-        requestAnimationFrame(updateSizeSafely);
+        raf2 = requestAnimationFrame(updateSizeSafely);
       });
       let resizeObserver: ResizeObserver | null = null;
       if (typeof ResizeObserver !== "undefined" && targetEl) {
@@ -934,6 +935,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
 
       return () => {
         window.cancelAnimationFrame(raf1);
+        if (raf2 !== null) window.cancelAnimationFrame(raf2);
         if (resizeObserver) {
           resizeObserver.disconnect();
         }
