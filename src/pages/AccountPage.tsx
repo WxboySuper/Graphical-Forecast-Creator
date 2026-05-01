@@ -23,7 +23,6 @@ import { Input } from "../components/ui/input";
 import { useAuth } from "../auth/AuthProvider";
 import { useEntitlement } from "../billing/EntitlementProvider";
 import { useUserMetrics } from "../metrics/useUserMetrics";
-import { cn } from "../lib/utils";
 import type { RootState } from "../store";
 import { selectForecastCycle, selectSavedCycles } from "../store/forecastSlice";
 import { computeHomeStats } from "./homeUtils";
@@ -154,19 +153,6 @@ const getCurrentPlanPrice = (
 
   return "Included";
 };
-
-/** Returns the current Forecast workspace experiment label for status copy. */
-const getForecastUiVariantLabel = (variant: ForecastUiVariant): string =>
-  FORECAST_UI_VARIANT_OPTIONS.find((option) => option.value === variant)
-    ?.label ?? variant;
-
-/** Resolves the current Forecast workspace experiment from synced settings first, then local storage, then default. */
-const getAccountForecastUiVariant = (
-  syncedSettings: ReturnType<typeof useAuth>["syncedSettings"],
-): ForecastUiVariant =>
-  syncedSettings?.forecastUiVariant ??
-  readStoredForecastUiVariant() ??
-  DEFAULT_FORECAST_UI_VARIANT;
 
 /** Formats the last recorded active-day key into a compact account-friendly date label. */
 const formatLastActiveDate = (value: string | null): string => {
@@ -716,13 +702,9 @@ const SignedInPrimaryCard: React.FC<{
   providerLabels: string[];
   defaultForecasterName: string;
   setDefaultForecasterName: React.Dispatch<React.SetStateAction<string>>;
-  showForecastWorkspaceExperiment: boolean;
-  forecastUiVariant: ForecastUiVariant;
-  savingForecastUiVariant: ForecastUiVariant | null;
   forecastUiMessage: string | null;
   savingDefaults: boolean;
   saveMessage: string | null;
-  onForecastUiVariantChange: (variant: ForecastUiVariant) => void;
   onSaveDefaults: () => void;
   onOpenForecast: () => void;
   onSignOut: () => void;
@@ -731,13 +713,9 @@ const SignedInPrimaryCard: React.FC<{
   providerLabels,
   defaultForecasterName,
   setDefaultForecasterName,
-  showForecastWorkspaceExperiment,
-  forecastUiVariant,
-  savingForecastUiVariant,
   forecastUiMessage,
   savingDefaults,
   saveMessage,
-  onForecastUiVariantChange,
   onSaveDefaults,
   onOpenForecast,
   onSignOut,
@@ -781,11 +759,6 @@ const SignedInAccountView: React.FC = () => {
   const [defaultForecasterName, setDefaultForecasterName] = useState(
     () => syncedSettings?.defaultForecasterName ?? user?.displayName ?? "",
   );
-  const [forecastUiVariant, setForecastUiVariant] = useState<ForecastUiVariant>(
-    () => getAccountForecastUiVariant(syncedSettings),
-  );
-  const [savingForecastUiVariant, setSavingForecastUiVariant] =
-    useState<ForecastUiVariant | null>(null);
   const [forecastUiMessage, setForecastUiMessage] = useState<string | null>(
     null,
   );
@@ -807,10 +780,6 @@ const SignedInAccountView: React.FC = () => {
     );
   }, [syncedSettings?.defaultForecasterName, user?.displayName]);
 
-  useEffect(() => {
-    setForecastUiVariant(getAccountForecastUiVariant(syncedSettings));
-  }, [syncedSettings?.forecastUiVariant]);
-
   /** Saves the discussion default byline into the synced user settings document. */
   const handleSaveDefaults = async () => {
     setSavingDefaults(true);
@@ -827,34 +796,6 @@ const SignedInAccountView: React.FC = () => {
       );
     } finally {
       setSavingDefaults(false);
-    }
-  };
-
-  /** Updates the synced Forecast workspace experiment and mirrors it into local storage for this device. */
-  const handleForecastUiVariantChange = async (
-    nextVariant: ForecastUiVariant,
-  ) => {
-    if (savingForecastUiVariant) {
-      return;
-    }
-
-    setForecastUiVariant(nextVariant);
-    setForecastUiMessage(null);
-    setSavingForecastUiVariant(nextVariant);
-
-    try {
-      await updateSyncedSettings({ forecastUiVariant: nextVariant });
-      setForecastUiMessage(
-        `${getForecastUiVariantLabel(nextVariant)} will open by default on Forecast.`,
-      );
-    } catch (error) {
-      setForecastUiMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to update the Forecast beta flag right now.",
-      );
-    } finally {
-      setSavingForecastUiVariant(null);
     }
   };
 
@@ -877,13 +818,6 @@ const SignedInAccountView: React.FC = () => {
     setForecastUiMessage(null);
   };
 
-  /** Wraps the async workspace-toggle action so the button handlers stay synchronous. */
-  const handleForecastUiVariantClick = (nextVariant: ForecastUiVariant) => {
-    handleForecastUiVariantChange(nextVariant).catch(() => {
-      // Beta-flag feedback is already surfaced by handleForecastUiVariantChange.
-    });
-  };
-
   return (
     <div className="account-page-stack">
       <AccountHero description="Keep your profile and app defaults ready across devices while the core forecasting workflow stays yours.">
@@ -901,13 +835,9 @@ const SignedInAccountView: React.FC = () => {
             providerLabels={providerLabels}
             defaultForecasterName={defaultForecasterName}
             setDefaultForecasterName={setDefaultForecasterName}
-            showForecastWorkspaceExperiment={betaAccess}
-            forecastUiVariant={forecastUiVariant}
-            savingForecastUiVariant={savingForecastUiVariant}
             forecastUiMessage={forecastUiMessage}
             savingDefaults={savingDefaults}
             saveMessage={saveMessage}
-            onForecastUiVariantChange={handleForecastUiVariantClick}
             onSaveDefaults={handleSaveDefaultsClick}
             onOpenForecast={handleOpenForecastClick}
             onSignOut={handleSignOutClick}
