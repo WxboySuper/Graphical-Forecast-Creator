@@ -40,17 +40,6 @@ async function performExport(
 }
 
 /**
- * Returns true when the given adapter reports a Leaflet engine.
- */
-const isMapEngineLeaflet = (current: MapAdapterHandle<unknown> | null): boolean => {
-  try {
-    return Boolean(current && typeof current.getEngine === 'function' && current.getEngine() === 'leaflet');
-  } catch {
-    return false;
-  }
-};
-
-/**
  * Validate common preconditions for running an export. Shows user-facing toasts
  * when a precondition fails. Kept as a top-level function to reduce hook complexity
  * and keep branching out of the hook body for easier testing.
@@ -67,11 +56,6 @@ const validateExportPreconditions = (
 
   if (!current) {
     addToast('Map reference not available. Cannot export.', 'error');
-    return false;
-  }
-
-  if (!isMapEngineLeaflet(current)) {
-    addToast('Map export is only available for Leaflet maps right now. The current OpenLayers map cannot be exported.', 'warning');
     return false;
   }
 

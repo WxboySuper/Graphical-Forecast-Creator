@@ -59,15 +59,12 @@ describe('useExportMap', () => {
       disabled: false,
       current: {
         getEngine: () => 'openlayers',
-        getMap: () => ({}),
+        getMap: () => null,
         getView: () => ({ center: [0, 0], zoom: 1 }),
       },
     });
     act(() => result.current.initiateExport());
-    expect(addToast).toHaveBeenCalledWith(
-      'Map export is only available for Leaflet maps right now. The current OpenLayers map cannot be exported.',
-      'warning'
-    );
+    expect(addToast).toHaveBeenCalledWith('Map not fully loaded. Please try again.', 'error');
 
     rerender({
       disabled: false,
@@ -172,10 +169,6 @@ describe('useExportMap', () => {
 
     act(() => result.current.initiateExport());
 
-    expect(addToast).toHaveBeenCalledWith(
-      'Map export is only available for Leaflet maps right now. The current OpenLayers map cannot be exported.',
-      'warning'
-    );
-    expect(result.current.isModalOpen).toBe(false);
+    expect(result.current.isModalOpen).toBe(true);
   });
 });
