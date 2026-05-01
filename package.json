@@ -1,6 +1,6 @@
 {
   "name": "graphical-forecast-creator",
-  "version": "1.5.0-beta.3",
+  "version": "1.5.1",
   "private": true,
   "engines": {
     "node": ">=22.12.0 <23 || >=24 <26"

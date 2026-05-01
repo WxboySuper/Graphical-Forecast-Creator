@@ -1,41 +1,55 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
-import { Activity, CircleUserRound, Cloud, Crown, LoaderCircle, LogOut, Mail } from 'lucide-react';
-import { Badge, type BadgeProps } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Input } from '../components/ui/input';
-import { useAuth } from '../auth/AuthProvider';
-import { useEntitlement } from '../billing/EntitlementProvider';
-import { useUserMetrics } from '../metrics/useUserMetrics';
-import { cn } from '../lib/utils';
-import type { RootState } from '../store';
-import { selectForecastCycle, selectSavedCycles } from '../store/forecastSlice';
-import { computeHomeStats } from './homeUtils';
+import React, { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import {
+  Activity,
+  CircleUserRound,
+  Cloud,
+  Crown,
+  LoaderCircle,
+  LogOut,
+  Mail,
+} from "lucide-react";
+import { Badge, type BadgeProps } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { useAuth } from "../auth/AuthProvider";
+import { useEntitlement } from "../billing/EntitlementProvider";
+import { useUserMetrics } from "../metrics/useUserMetrics";
+import { cn } from "../lib/utils";
+import type { RootState } from "../store";
+import { selectForecastCycle, selectSavedCycles } from "../store/forecastSlice";
+import { computeHomeStats } from "./homeUtils";
 import {
   DEFAULT_FORECAST_UI_VARIANT,
   FORECAST_UI_VARIANT_OPTIONS,
   readStoredForecastUiVariant,
   type ForecastUiVariant,
-} from '../utils/forecastUiVariant';
-import './AccountPage.css';
+} from "../utils/forecastUiVariant";
+import "./AccountPage.css";
 
-type AuthMode = 'sign_in' | 'sign_up';
-type SyncStatus = ReturnType<typeof useAuth>['settingsSyncStatus'];
+type AuthMode = "sign_in" | "sign_up";
+type SyncStatus = ReturnType<typeof useAuth>["settingsSyncStatus"];
 
 interface SyncStatusMeta {
   label: string;
-  variant: BadgeProps['variant'];
+  variant: BadgeProps["variant"];
 }
 
 /** Maps Firebase provider ids to short labels for the account UI. */
 const getProviderLabel = (providerId: string): string => {
   switch (providerId) {
-    case 'google.com':
-      return 'Google';
-    case 'password':
-      return 'Email / Password';
+    case "google.com":
+      return "Google";
+    case "password":
+      return "Email / Password";
     default:
       return providerId;
   }
@@ -44,24 +58,28 @@ const getProviderLabel = (providerId: string): string => {
 /** Converts the raw settings status into the one compact badge shown on the signed-in account page. */
 const getSyncStatusMeta = (settingsSyncStatus: SyncStatus): SyncStatusMeta => {
   switch (settingsSyncStatus) {
-    case 'synced':
-      return { label: 'Synced', variant: 'success' };
-    case 'syncing':
-      return { label: 'Syncing', variant: 'secondary' };
-    case 'error':
-      return { label: 'Needs Attention', variant: 'warning' };
-    case 'disabled':
-      return { label: 'Local Only', variant: 'outline' };
-    case 'idle':
+    case "synced":
+      return { label: "Synced", variant: "success" };
+    case "syncing":
+      return { label: "Syncing", variant: "secondary" };
+    case "error":
+      return { label: "Needs Attention", variant: "warning" };
+    case "disabled":
+      return { label: "Local Only", variant: "outline" };
+    case "idle":
     default:
-      return { label: 'Ready', variant: 'secondary' };
+      return { label: "Ready", variant: "secondary" };
   }
 };
 
 /** Renders the save button label while optionally showing a loading spinner. */
-const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode => (
+const renderSaveDefaultsButtonLabel = (
+  savingDefaults: boolean,
+): React.ReactNode => (
   <>
-    {savingDefaults ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+    {savingDefaults ? (
+      <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+    ) : null}
     Save Changes
   </>
 );
@@ -69,84 +87,91 @@ const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode
 /** Returns the user-facing current plan price based on the active entitlement interval. */
 const getPlanLabel = (
   premiumActive: boolean,
-  planInterval: ReturnType<typeof useEntitlement>['planInterval'],
-  effectiveSource: ReturnType<typeof useEntitlement>['effectiveSource']
+  planInterval: ReturnType<typeof useEntitlement>["planInterval"],
+  effectiveSource: ReturnType<typeof useEntitlement>["effectiveSource"],
 ): string => {
   if (!premiumActive) {
-    return 'Free Plan';
+    return "Free Plan";
   }
 
-  if (planInterval === 'annual') {
-    return 'Premium Annual';
+  if (planInterval === "annual") {
+    return "Premium Annual";
   }
 
-  if (planInterval === 'monthly') {
-    return 'Premium Monthly';
+  if (planInterval === "monthly") {
+    return "Premium Monthly";
   }
 
-  return effectiveSource === 'beta_override' ? 'Premium Beta Access' : 'Premium';
+  return effectiveSource === "beta_override"
+    ? "Premium Beta Access"
+    : "Premium";
 };
 
 /** Returns the short helper copy used under the billing summary grid. */
 const getBillingSupportCopy = (
-  effectiveSource: ReturnType<typeof useEntitlement>['effectiveSource'],
+  effectiveSource: ReturnType<typeof useEntitlement>["effectiveSource"],
   premiumActive: boolean,
-  annualPromoActive: boolean
+  annualPromoActive: boolean,
 ): string | null => {
-  if (effectiveSource === 'beta_override') {
-    return 'Premium is currently being granted through the beta override path, so no live Stripe subscription is required yet.';
+  if (effectiveSource === "beta_override") {
+    return "Premium is currently being granted through the beta override path, so no live Stripe subscription is required yet.";
   }
 
   if (!premiumActive) {
-    return 'If premium lapses later, cloud writes and background sync will be disabled while local work remains fully available.';
+    return "If premium lapses later, cloud writes and background sync will be disabled while local work remains fully available.";
   }
 
   if (annualPromoActive) {
-    return 'Annual intro pricing is currently active on this deployment.';
+    return "Annual intro pricing is currently active on this deployment.";
   }
 
   return null;
 };
 
 /** Returns the CTA variant for the pricing button based on current entitlement state. */
-const getPricingButtonVariant = (premiumActive: boolean): 'outline' | 'default' =>
-  premiumActive ? 'outline' : 'default';
+const getPricingButtonVariant = (
+  premiumActive: boolean,
+): "outline" | "default" => (premiumActive ? "outline" : "default");
 
 /** Returns the current plan price shown in the billing summary card. */
 const getCurrentPlanPrice = (
   premiumActive: boolean,
-  planInterval: ReturnType<typeof useEntitlement>['planInterval'],
+  planInterval: ReturnType<typeof useEntitlement>["planInterval"],
   monthlyDisplayPrice: string,
-  annualDisplayPrice: string
+  annualDisplayPrice: string,
 ): string => {
   if (!premiumActive) {
-    return '$0';
+    return "$0";
   }
 
-  if (planInterval === 'annual') {
+  if (planInterval === "annual") {
     return annualDisplayPrice;
   }
 
-  if (planInterval === 'monthly') {
+  if (planInterval === "monthly") {
     return monthlyDisplayPrice;
   }
 
-  return 'Included';
+  return "Included";
 };
 
 /** Returns the current Forecast workspace experiment label for status copy. */
 const getForecastUiVariantLabel = (variant: ForecastUiVariant): string =>
-  FORECAST_UI_VARIANT_OPTIONS.find((option) => option.value === variant)?.label ?? variant;
+  FORECAST_UI_VARIANT_OPTIONS.find((option) => option.value === variant)
+    ?.label ?? variant;
 
 /** Resolves the current Forecast workspace experiment from synced settings first, then local storage, then default. */
 const getAccountForecastUiVariant = (
-  syncedSettings: ReturnType<typeof useAuth>['syncedSettings']
-): ForecastUiVariant => syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT;
+  syncedSettings: ReturnType<typeof useAuth>["syncedSettings"],
+): ForecastUiVariant =>
+  syncedSettings?.forecastUiVariant ??
+  readStoredForecastUiVariant() ??
+  DEFAULT_FORECAST_UI_VARIANT;
 
 /** Formats the last recorded active-day key into a compact account-friendly date label. */
 const formatLastActiveDate = (value: string | null): string => {
   if (!value) {
-    return 'No activity yet';
+    return "No activity yet";
   }
 
   const parsed = new Date(`${value}T00:00:00`);
@@ -155,9 +180,9 @@ const formatLastActiveDate = (value: string | null): string => {
   }
 
   return parsed.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 };
 
@@ -196,7 +221,9 @@ const AccountHero: React.FC<{
 }> = ({ description, children }) => (
   <section className="account-hero">
     <AccountHeroBackdrop />
-    <AccountHeroContent description={description}>{children}</AccountHeroContent>
+    <AccountHeroContent description={description}>
+      {children}
+    </AccountHeroContent>
   </section>
 );
 
@@ -222,7 +249,10 @@ const AccountIdentityChips: React.FC<{
 );
 
 /** Small summary tile that keeps the profile card readable and compact. */
-const SummaryTile: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+const SummaryTile: React.FC<{ label: string; value: string }> = ({
+  label,
+  value,
+}) => (
   <div className="account-summary-tile">
     <p>{label}</p>
     <strong>{value}</strong>
@@ -238,7 +268,9 @@ const ProfileSummaryGrid: React.FC<{
     <SummaryTile label="Email" value={email} />
     <SummaryTile
       label="Sign-in Method"
-      value={providerLabels.length > 0 ? providerLabels.join(', ') : 'Unavailable'}
+      value={
+        providerLabels.length > 0 ? providerLabels.join(", ") : "Unavailable"
+      }
     />
   </div>
 );
@@ -252,12 +284,16 @@ const DiscussionDefaultsSection: React.FC<{
     <div className="account-subsection-header">
       <h2>Discussion defaults</h2>
       <p>
-        Set the name that should prefill the forecaster field when you write a discussion.
+        Set the name that should prefill the forecaster field when you write a
+        discussion.
       </p>
     </div>
 
     <div className="account-field-group">
-      <label htmlFor="default-forecaster-name" className="text-sm font-medium text-foreground">
+      <label
+        htmlFor="default-forecaster-name"
+        className="text-sm font-medium text-foreground"
+      >
         Default forecaster name
       </label>
       <Input
@@ -272,78 +308,6 @@ const DiscussionDefaultsSection: React.FC<{
   </div>
 );
 
-/** Forecast beta-flag controls for switching between workspace experiments. */
-const ForecastWorkspaceExperimentSection: React.FC<{
-  forecastUiVariant: ForecastUiVariant;
-  savingForecastUiVariant: ForecastUiVariant | null;
-  forecastUiMessage: string | null;
-  onForecastUiVariantChange: (variant: ForecastUiVariant) => void;
-}> = ({
-  forecastUiVariant,
-  savingForecastUiVariant,
-  forecastUiMessage,
-  onForecastUiVariantChange,
-}) => (
-  <div className="account-subsection-card">
-    <div className="account-subsection-header">
-      <h2>Forecast beta flags</h2>
-      <p>
-        Choose which Forecast workspace experiment should open by default for this account. Query-string overrides like
-        <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">?forecastUi=tabbed_toolbar</code>
-        still work for one-off local checks.
-      </p>
-    </div>
-
-    <div className="grid gap-3">
-      {FORECAST_UI_VARIANT_OPTIONS.map((option) => {
-        const isActive = forecastUiVariant === option.value;
-        const isSaving = savingForecastUiVariant === option.value;
-
-        return (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onForecastUiVariantChange(option.value)}
-            disabled={Boolean(savingForecastUiVariant)}
-            className={cn(
-              'account-variant-option mode-toggle-btn rounded-2xl border px-4 py-3 text-left transition-colors',
-              isActive ? 'is-active' : 'is-inactive',
-              Boolean(savingForecastUiVariant) && !isSaving && 'opacity-70'
-            )}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
-              </div>
-              <div className="shrink-0">
-                {isSaving ? (
-                  <LoaderCircle className="h-4 w-4 animate-spin text-primary" />
-                ) : (
-                  <span
-                    className={cn(
-                      'account-variant-status rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide',
-                      isActive ? 'is-active' : 'is-available'
-                    )}
-                  >
-                    {isActive ? 'Active' : 'Available'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </button>
-        );
-      })}
-    </div>
-
-    <p className="account-support-copy">
-      This beta setting syncs to your account and becomes the default Forecast layout once the update completes.
-    </p>
-
-    {forecastUiMessage ? <p className="mt-3 text-sm text-muted-foreground">{forecastUiMessage}</p> : null}
-  </div>
-);
-
 /** Bottom action row for saving defaults and ending the current session. */
 const SignedInActionRow: React.FC<{
   savingDefaults: boolean;
@@ -351,13 +315,21 @@ const SignedInActionRow: React.FC<{
   onSaveDefaults: () => void;
   onOpenForecast: () => void;
   onSignOut: () => void;
-}> = ({ savingDefaults, saveMessage, onSaveDefaults, onOpenForecast, onSignOut }) => (
+}> = ({
+  savingDefaults,
+  saveMessage,
+  onSaveDefaults,
+  onOpenForecast,
+  onSignOut,
+}) => (
   <div className="account-action-row">
     <div className="account-action-group">
       <Button onClick={onSaveDefaults} disabled={savingDefaults}>
         {renderSaveDefaultsButtonLabel(savingDefaults)}
       </Button>
-      {saveMessage ? <p className="account-inline-message">{saveMessage}</p> : null}
+      {saveMessage ? (
+        <p className="account-inline-message">{saveMessage}</p>
+      ) : null}
     </div>
 
     <div className="account-button-row">
@@ -384,7 +356,8 @@ const CloudLibraryCardHeader: React.FC = () => (
           Cloud Cycles
         </CardTitle>
         <CardDescription>
-          Access, save, and organize your forecasts in the cloud. Available on all your devices.
+          Access, save, and organize your forecasts in the cloud. Available on
+          all your devices.
         </CardDescription>
       </div>
     </div>
@@ -395,7 +368,9 @@ const CloudLibraryCardHeader: React.FC = () => (
 const CloudLibraryCardContent: React.FC = () => (
   <CardContent className="account-section-content">
     <p className="mb-4 text-sm text-muted-foreground">
-      Your premium subscription includes hosted access to all your saved forecast cycles. Save time by reusing previous patterns and maintain consistency across multiple devices.
+      Your premium subscription includes hosted access to all your saved
+      forecast cycles. Save time by reusing previous patterns and maintain
+      consistency across multiple devices.
     </p>
     <Button asChild>
       <Link to="/cloud">
@@ -432,10 +407,14 @@ const BillingCardHeader: React.FC<{
       <div className="account-section-copy">
         <CardTitle className="text-2xl">Billing & Premium</CardTitle>
         <CardDescription>
-          Premium funds hosted sync and storage. Core forecasting workflows remain free.
+          Premium funds hosted sync and storage. Core forecasting workflows
+          remain free.
         </CardDescription>
       </div>
-      <Badge variant={premiumActive ? 'success' : 'outline'} className="account-plan-badge">
+      <Badge
+        variant={premiumActive ? "success" : "outline"}
+        className="account-plan-badge"
+      >
         {planLabel}
       </Badge>
     </div>
@@ -448,7 +427,7 @@ const BillingSummaryGrid: React.FC<{
   currentPlanPrice: string;
 }> = ({ billingStatus, currentPlanPrice }) => (
   <div className="account-summary-grid">
-    <SummaryTile label="Billing status" value={billingStatus || 'inactive'} />
+    <SummaryTile label="Billing status" value={billingStatus || "inactive"} />
     <SummaryTile label="Current plan price" value={currentPlanPrice} />
   </div>
 );
@@ -460,11 +439,19 @@ const BillingActionRow: React.FC<{
   openingPortal: boolean;
   premiumActive: boolean;
   onOpenPortal: () => void;
-}> = ({ stripeCustomerId, billingEnabled, openingPortal, premiumActive, onOpenPortal }) => (
+}> = ({
+  stripeCustomerId,
+  billingEnabled,
+  openingPortal,
+  premiumActive,
+  onOpenPortal,
+}) => (
   <div className="account-button-row">
     {stripeCustomerId && billingEnabled ? (
       <Button variant="outline" onClick={onOpenPortal} disabled={openingPortal}>
-        {openingPortal ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+        {openingPortal ? (
+          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+        ) : null}
         Manage Subscription
       </Button>
     ) : null}
@@ -485,8 +472,12 @@ const BillingCardMessages: React.FC<{
   error: string | null;
 }> = ({ supportCopy, portalMessage, error }) => (
   <>
-    {supportCopy ? <p className="text-sm text-muted-foreground">{supportCopy}</p> : null}
-    {portalMessage || error ? <p className="text-sm text-destructive">{portalMessage ?? error}</p> : null}
+    {supportCopy ? (
+      <p className="text-sm text-muted-foreground">{supportCopy}</p>
+    ) : null}
+    {portalMessage || error ? (
+      <p className="text-sm text-destructive">{portalMessage ?? error}</p>
+    ) : null}
   </>
 );
 
@@ -515,8 +506,15 @@ const BillingCardContent: React.FC<{
   onOpenPortal,
 }) => (
   <CardContent className="account-section-content">
-    <BillingSummaryGrid billingStatus={billingStatus} currentPlanPrice={currentPlanPrice} />
-    <BillingCardMessages supportCopy={supportCopy} portalMessage={portalMessage} error={error} />
+    <BillingSummaryGrid
+      billingStatus={billingStatus}
+      currentPlanPrice={currentPlanPrice}
+    />
+    <BillingCardMessages
+      supportCopy={supportCopy}
+      portalMessage={portalMessage}
+      error={error}
+    />
     <BillingActionRow
       stripeCustomerId={stripeCustomerId}
       billingEnabled={billingEnabled}
@@ -545,9 +543,18 @@ const BillingCard: React.FC = () => {
   const [portalMessage, setPortalMessage] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
 
-  const currentPlanPrice = getCurrentPlanPrice(premiumActive, planInterval, monthlyDisplayPrice, annualDisplayPrice);
+  const currentPlanPrice = getCurrentPlanPrice(
+    premiumActive,
+    planInterval,
+    monthlyDisplayPrice,
+    annualDisplayPrice,
+  );
   const planLabel = getPlanLabel(premiumActive, planInterval, effectiveSource);
-  const supportCopy = getBillingSupportCopy(effectiveSource, premiumActive, annualPromoActive);
+  const supportCopy = getBillingSupportCopy(
+    effectiveSource,
+    premiumActive,
+    annualPromoActive,
+  );
 
   /** Opens the Stripe billing portal and surfaces any failure as local account feedback. */
   const handleOpenPortal = async () => {
@@ -557,7 +564,11 @@ const BillingCard: React.FC = () => {
     try {
       await openBillingPortal();
     } catch (nextError) {
-      setPortalMessage(nextError instanceof Error ? nextError.message : 'Unable to open billing management right now.');
+      setPortalMessage(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to open billing management right now.",
+      );
     } finally {
       setOpeningPortal(false);
     }
@@ -599,7 +610,8 @@ const MetricsCardHeader: React.FC = () => (
           Forecast Workspace Stats
         </CardTitle>
         <CardDescription>
-          Activity and forecasting totals for the work you have already put into GFC.
+          Activity and forecasting totals for the work you have already put into
+          GFC.
         </CardDescription>
       </div>
     </div>
@@ -608,39 +620,66 @@ const MetricsCardHeader: React.FC = () => (
 
 /** Main metric grid and support copy for the signed-in user's activity card. */
 const MetricsCardContent: React.FC<{
-  metrics: ReturnType<typeof useUserMetrics>['metrics'];
+  metrics: ReturnType<typeof useUserMetrics>["metrics"];
   localStats: ReturnType<typeof computeHomeStats>;
   loading: boolean;
   error: string | null;
 }> = ({ metrics, localStats, loading, error }) => (
   <CardContent className="account-section-content">
     <div className="account-summary-grid">
-      <SummaryTile label="Active day streak" value={loading ? 'Loading...' : `${metrics.activeDayStreak}`} />
-      <SummaryTile label="Total active days" value={loading ? 'Loading...' : `${metrics.totalActiveDays}`} />
-      <SummaryTile label="Forecast saves" value={loading ? 'Loading...' : `${metrics.cyclesCreated}`} />
-      <SummaryTile label="Cloud saves" value={loading ? 'Loading...' : `${metrics.cloudCyclesSaved}`} />
-      <SummaryTile label="Discussions saved" value={loading ? 'Loading...' : `${metrics.discussionsWritten}`} />
+      <SummaryTile
+        label="Active day streak"
+        value={loading ? "Loading..." : `${metrics.activeDayStreak}`}
+      />
+      <SummaryTile
+        label="Total active days"
+        value={loading ? "Loading..." : `${metrics.totalActiveDays}`}
+      />
+      <SummaryTile
+        label="Forecast saves"
+        value={loading ? "Loading..." : `${metrics.cyclesCreated}`}
+      />
+      <SummaryTile
+        label="Cloud saves"
+        value={loading ? "Loading..." : `${metrics.cloudCyclesSaved}`}
+      />
+      <SummaryTile
+        label="Discussions saved"
+        value={loading ? "Loading..." : `${metrics.discussionsWritten}`}
+      />
       <SummaryTile
         label="Verification runs"
-        value={loading ? 'Loading...' : `${metrics.verificationSessionsRun}`}
+        value={loading ? "Loading..." : `${metrics.verificationSessionsRun}`}
       />
     </div>
 
     <div className="account-subsection-card">
       <div className="account-subsection-header">
         <h2>Forecast workspace stats</h2>
-        <p>Local forecasting activity moved here so the Home page can stay focused on getting back into work.</p>
+        <p>
+          Local forecasting activity moved here so the Home page can stay
+          focused on getting back into work.
+        </p>
       </div>
 
       <div className="account-summary-grid">
         <SummaryTile label="Streak" value={`${localStats.forecastStreak}`} />
-        <SummaryTile label="Total forecasts made" value={`${localStats.totalForecastsMade}`} />
-        <SummaryTile label="Total cycles made" value={`${localStats.totalCyclesMade}`} />
+        <SummaryTile
+          label="Total forecasts made"
+          value={`${localStats.totalForecastsMade}`}
+        />
+        <SummaryTile
+          label="Total cycles made"
+          value={`${localStats.totalCyclesMade}`}
+        />
       </div>
     </div>
 
     <p className="account-support-copy">
-      Last active day: <strong>{loading ? 'Loading...' : formatLastActiveDate(metrics.lastActiveDate)}</strong>
+      Last active day:{" "}
+      <strong>
+        {loading ? "Loading..." : formatLastActiveDate(metrics.lastActiveDate)}
+      </strong>
     </p>
     {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
   </CardContent>
@@ -650,13 +689,23 @@ const MetricsCardContent: React.FC<{
 const MetricsCard: React.FC = () => {
   const { metrics, loading, error } = useUserMetrics();
   const forecastCycle = useSelector(selectForecastCycle);
-  const savedCycles = useSelector((state: RootState) => selectSavedCycles(state));
-  const localStats = useMemo(() => computeHomeStats(forecastCycle, savedCycles), [forecastCycle, savedCycles]);
+  const savedCycles = useSelector((state: RootState) =>
+    selectSavedCycles(state),
+  );
+  const localStats = useMemo(
+    () => computeHomeStats(forecastCycle, savedCycles),
+    [forecastCycle, savedCycles],
+  );
 
   return (
     <Card className="account-surface-card">
       <MetricsCardHeader />
-      <MetricsCardContent metrics={metrics} localStats={localStats} loading={loading} error={error} />
+      <MetricsCardContent
+        metrics={metrics}
+        localStats={localStats}
+        loading={loading}
+        error={error}
+      />
     </Card>
   );
 };
@@ -697,7 +746,8 @@ const SignedInPrimaryCard: React.FC<{
     <CardHeader className="account-section-header">
       <CardTitle className="text-2xl">Profile & Preferences</CardTitle>
       <CardDescription>
-        Keep your sign-in details and your default discussion byline ready wherever you open GFC.
+        Keep your sign-in details and your default discussion byline ready
+        wherever you open GFC.
       </CardDescription>
       <ProfileSummaryGrid email={email} providerLabels={providerLabels} />
     </CardHeader>
@@ -707,14 +757,6 @@ const SignedInPrimaryCard: React.FC<{
         defaultForecasterName={defaultForecasterName}
         setDefaultForecasterName={setDefaultForecasterName}
       />
-      {showForecastWorkspaceExperiment ? (
-        <ForecastWorkspaceExperimentSection
-          forecastUiVariant={forecastUiVariant}
-          savingForecastUiVariant={savingForecastUiVariant}
-          forecastUiMessage={forecastUiMessage}
-          onForecastUiVariantChange={onForecastUiVariantChange}
-        />
-      ) : null}
       <SignedInActionRow
         savingDefaults={savingDefaults}
         saveMessage={saveMessage}
@@ -728,24 +770,41 @@ const SignedInPrimaryCard: React.FC<{
 
 /** Signed-in account experience focused on identity, defaults, and session control. */
 const SignedInAccountView: React.FC = () => {
-  const { user, signOutUser, settingsSyncStatus, syncedSettings, updateSyncedSettings, betaAccess } = useAuth();
+  const {
+    user,
+    signOutUser,
+    settingsSyncStatus,
+    syncedSettings,
+    updateSyncedSettings,
+    betaAccess,
+  } = useAuth();
   const [defaultForecasterName, setDefaultForecasterName] = useState(
-    () => syncedSettings?.defaultForecasterName ?? user?.displayName ?? ''
+    () => syncedSettings?.defaultForecasterName ?? user?.displayName ?? "",
   );
-  const [forecastUiVariant, setForecastUiVariant] = useState<ForecastUiVariant>(() => getAccountForecastUiVariant(syncedSettings));
-  const [savingForecastUiVariant, setSavingForecastUiVariant] = useState<ForecastUiVariant | null>(null);
-  const [forecastUiMessage, setForecastUiMessage] = useState<string | null>(null);
+  const [forecastUiVariant, setForecastUiVariant] = useState<ForecastUiVariant>(
+    () => getAccountForecastUiVariant(syncedSettings),
+  );
+  const [savingForecastUiVariant, setSavingForecastUiVariant] =
+    useState<ForecastUiVariant | null>(null);
+  const [forecastUiMessage, setForecastUiMessage] = useState<string | null>(
+    null,
+  );
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [savingDefaults, setSavingDefaults] = useState(false);
 
   const providerLabels = useMemo(
-    () => (user?.providerData ?? []).map((provider) => getProviderLabel(provider.providerId)).filter(Boolean),
-    [user]
+    () =>
+      (user?.providerData ?? [])
+        .map((provider) => getProviderLabel(provider.providerId))
+        .filter(Boolean),
+    [user],
   );
   const statusMeta = getSyncStatusMeta(settingsSyncStatus);
 
   useEffect(() => {
-    setDefaultForecasterName(syncedSettings?.defaultForecasterName ?? user?.displayName ?? '');
+    setDefaultForecasterName(
+      syncedSettings?.defaultForecasterName ?? user?.displayName ?? "",
+    );
   }, [syncedSettings?.defaultForecasterName, user?.displayName]);
 
   useEffect(() => {
@@ -761,16 +820,20 @@ const SignedInAccountView: React.FC = () => {
       await updateSyncedSettings({
         defaultForecasterName: defaultForecasterName.trim(),
       });
-      setSaveMessage('Saved to your account.');
+      setSaveMessage("Saved to your account.");
     } catch (error) {
-      setSaveMessage(error instanceof Error ? error.message : 'Unable to save right now.');
+      setSaveMessage(
+        error instanceof Error ? error.message : "Unable to save right now.",
+      );
     } finally {
       setSavingDefaults(false);
     }
   };
 
   /** Updates the synced Forecast workspace experiment and mirrors it into local storage for this device. */
-  const handleForecastUiVariantChange = async (nextVariant: ForecastUiVariant) => {
+  const handleForecastUiVariantChange = async (
+    nextVariant: ForecastUiVariant,
+  ) => {
     if (savingForecastUiVariant) {
       return;
     }
@@ -781,10 +844,14 @@ const SignedInAccountView: React.FC = () => {
 
     try {
       await updateSyncedSettings({ forecastUiVariant: nextVariant });
-      setForecastUiMessage(`${getForecastUiVariantLabel(nextVariant)} will open by default on Forecast.`);
+      setForecastUiMessage(
+        `${getForecastUiVariantLabel(nextVariant)} will open by default on Forecast.`,
+      );
     } catch (error) {
       setForecastUiMessage(
-        error instanceof Error ? error.message : 'Unable to update the Forecast beta flag right now.'
+        error instanceof Error
+          ? error.message
+          : "Unable to update the Forecast beta flag right now.",
       );
     } finally {
       setSavingForecastUiVariant(null);
@@ -806,7 +873,7 @@ const SignedInAccountView: React.FC = () => {
   };
 
   /** Clear any forecast UI message when opening forecast. */
-const handleOpenForecastClick = () => {
+  const handleOpenForecastClick = () => {
     setForecastUiMessage(null);
   };
 
@@ -819,11 +886,9 @@ const handleOpenForecastClick = () => {
 
   return (
     <div className="account-page-stack">
-      <AccountHero
-        description="Keep your profile and app defaults ready across devices while the core forecasting workflow stays yours."
-      >
+      <AccountHero description="Keep your profile and app defaults ready across devices while the core forecasting workflow stays yours.">
         <AccountIdentityChips
-          email={user?.email ?? 'Unavailable'}
+          email={user?.email ?? "Unavailable"}
           providerLabels={providerLabels}
           statusMeta={statusMeta}
         />
@@ -832,7 +897,7 @@ const handleOpenForecastClick = () => {
       <div className="account-signed-grid">
         <div className="account-main-stack">
           <SignedInPrimaryCard
-            email={user?.email ?? 'Unavailable'}
+            email={user?.email ?? "Unavailable"}
             providerLabels={providerLabels}
             defaultForecasterName={defaultForecasterName}
             setDefaultForecasterName={setDefaultForecasterName}
@@ -863,7 +928,8 @@ const SignInCardHeader: React.FC = () => (
   <CardHeader className="account-section-header">
     <CardTitle className="text-2xl">Sign in or create an account</CardTitle>
     <CardDescription>
-      Keep your profile and app defaults ready across devices. Signing in is optional, and core forecasting stays free.
+      Keep your profile and app defaults ready across devices. Signing in is
+      optional, and core forecasting stays free.
     </CardDescription>
   </CardHeader>
 );
@@ -904,17 +970,28 @@ const EmailAuthForm: React.FC<{
     </div>
 
     <div className="account-mode-toggle">
-      <Button variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => onModeChange('sign_in')} disabled={isBusy}>
+      <Button
+        variant={mode === "sign_in" ? "default" : "outline"}
+        onClick={() => onModeChange("sign_in")}
+        disabled={isBusy}
+      >
         Sign In
       </Button>
-      <Button variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => onModeChange('sign_up')} disabled={isBusy}>
+      <Button
+        variant={mode === "sign_up" ? "default" : "outline"}
+        onClick={() => onModeChange("sign_up")}
+        disabled={isBusy}
+      >
         Create Account
       </Button>
     </div>
 
     <form className="account-form-fields" onSubmit={onEmailSubmit}>
       <div className="account-field-group">
-        <label htmlFor="account-email" className="text-sm font-medium text-foreground">
+        <label
+          htmlFor="account-email"
+          className="text-sm font-medium text-foreground"
+        >
           Email
         </label>
         <Input
@@ -928,7 +1005,10 @@ const EmailAuthForm: React.FC<{
       </div>
 
       <div className="account-field-group">
-        <label htmlFor="account-password" className="text-sm font-medium text-foreground">
+        <label
+          htmlFor="account-password"
+          className="text-sm font-medium text-foreground"
+        >
           Password
         </label>
         <Input
@@ -936,15 +1016,20 @@ const EmailAuthForm: React.FC<{
           type="password"
           value={password}
           onChange={(e) => onPasswordChange(e.target.value)}
-          autoComplete={mode === 'sign_in' ? 'current-password' : 'new-password'}
+          autoComplete={
+            mode === "sign_in" ? "current-password" : "new-password"
+          }
           minLength={6}
           required
         />
       </div>
 
-      {mode === 'sign_up' ? (
+      {mode === "sign_up" ? (
         <div className="account-field-group">
-          <label htmlFor="account-confirm-password" className="text-sm font-medium text-foreground">
+          <label
+            htmlFor="account-confirm-password"
+            className="text-sm font-medium text-foreground"
+          >
             Confirm Password
           </label>
           <Input
@@ -960,14 +1045,16 @@ const EmailAuthForm: React.FC<{
       ) : null}
 
       {formError || authError ? (
-        <div className="account-error-box">
-          {formError ?? authError}
-        </div>
+        <div className="account-error-box">{formError ?? authError}</div>
       ) : null}
 
       <Button type="submit" disabled={isBusy}>
-        {isBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-        {mode === 'sign_in' ? 'Sign In with Email' : 'Create Account'}
+        {isBusy ? (
+          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <Mail className="mr-2 h-4 w-4" />
+        )}
+        {mode === "sign_in" ? "Sign In with Email" : "Create Account"}
       </Button>
     </form>
   </div>
@@ -1006,7 +1093,12 @@ const SignInPrimaryCard: React.FC<{
   <Card className="account-surface-card">
     <SignInCardHeader />
     <CardContent className="account-section-content">
-      <Button variant="outline" className="w-full justify-center" onClick={onGoogleSignIn} disabled={isBusy}>
+      <Button
+        variant="outline"
+        className="w-full justify-center"
+        onClick={onGoogleSignIn}
+        disabled={isBusy}
+      >
         <Cloud className="mr-2 h-4 w-4" />
         Continue with Google
       </Button>
@@ -1034,17 +1126,27 @@ const SignedOutSupportCard: React.FC = () => (
   <Card className="account-surface-card account-support-card">
     <CardHeader className="account-section-header">
       <CardTitle className="text-2xl">Why keep an account</CardTitle>
-      <CardDescription>Use hosted identity and saved defaults without changing the local-first workflow.</CardDescription>
+      <CardDescription>
+        Use hosted identity and saved defaults without changing the local-first
+        workflow.
+      </CardDescription>
     </CardHeader>
     <CardContent className="account-section-content">
       <ul className="account-support-list">
         <li>Keep your map and app preferences ready across devices.</li>
         <li>Store the forecaster name you want prefilled in discussions.</li>
-        <li>Use the same account on different machines without changing the local workflow.</li>
-        <li>Upgrade later for hosted premium storage without changing what stays free.</li>
+        <li>
+          Use the same account on different machines without changing the local
+          workflow.
+        </li>
+        <li>
+          Upgrade later for hosted premium storage without changing what stays
+          free.
+        </li>
       </ul>
       <p className="account-support-copy">
-        Forecasting, discussions, exports, verification, and local history remain available with or without an account.
+        Forecasting, discussions, exports, verification, and local history
+        remain available with or without an account.
       </p>
       <Button asChild variant="outline" className="w-full">
         <Link to="/pricing">
@@ -1062,13 +1164,14 @@ const LocalOnlyCard: React.FC = () => (
     <CardHeader className="account-section-header">
       <CardTitle className="text-2xl">Local-only mode</CardTitle>
       <CardDescription>
-        Hosted accounts are turned off here, but the full local forecasting workflow is still ready to go.
+        Hosted accounts are turned off here, but the full local forecasting
+        workflow is still ready to go.
       </CardDescription>
     </CardHeader>
     <CardContent className="account-local-only-content">
       <p className="account-support-copy">
-        Forecast drawing, discussions, verification, imports, exports, and local history keep working exactly as
-        expected.
+        Forecast drawing, discussions, verification, imports, exports, and local
+        history keep working exactly as expected.
       </p>
       <Button asChild variant="outline">
         <Link to="/">Back to Home</Link>
@@ -1079,19 +1182,20 @@ const LocalOnlyCard: React.FC = () => (
 
 /** Signed-out account experience focused on a clean auth flow plus one concise reassurance card. */
 const SignedOutAccountView: React.FC = () => {
-  const { signInWithEmail, signInWithGoogle, signUpWithEmail, error, status } = useAuth();
-  const [mode, setMode] = useState<AuthMode>('sign_in');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const { signInWithEmail, signInWithGoogle, signUpWithEmail, error, status } =
+    useAuth();
+  const [mode, setMode] = useState<AuthMode>("sign_in");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isBusy = submitting || status === 'loading';
+  const isBusy = submitting || status === "loading";
 
   useEffect(() => {
-    if (mode === 'sign_in') {
-      setConfirmPassword('');
+    if (mode === "sign_in") {
+      setConfirmPassword("");
     }
   }, [mode]);
 
@@ -1100,23 +1204,27 @@ const SignedOutAccountView: React.FC = () => {
     e.preventDefault();
     setFormError(null);
 
-    if (mode === 'sign_up' && password !== confirmPassword) {
-      setFormError('Passwords do not match.');
+    if (mode === "sign_up" && password !== confirmPassword) {
+      setFormError("Passwords do not match.");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      if (mode === 'sign_in') {
+      if (mode === "sign_in") {
         await signInWithEmail(email, password);
       } else {
         await signUpWithEmail(email, password);
       }
-      setPassword('');
-      setConfirmPassword('');
+      setPassword("");
+      setConfirmPassword("");
     } catch (nextError) {
-      setFormError(nextError instanceof Error ? nextError.message : 'Unable to complete that request right now.');
+      setFormError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to complete that request right now.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1130,7 +1238,11 @@ const SignedOutAccountView: React.FC = () => {
     try {
       await signInWithGoogle();
     } catch (nextError) {
-      setFormError(nextError instanceof Error ? nextError.message : 'Unable to start Google sign-in right now.');
+      setFormError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to start Google sign-in right now.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1187,8 +1299,12 @@ const AccountPage: React.FC = () => {
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
       <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-10">
         {!hostedAuthEnabled ? <DisabledStateView /> : null}
-        {hostedAuthEnabled && status === 'signed_in' ? <SignedInAccountView /> : null}
-        {hostedAuthEnabled && status !== 'signed_in' ? <SignedOutAccountView /> : null}
+        {hostedAuthEnabled && status === "signed_in" ? (
+          <SignedInAccountView />
+        ) : null}
+        {hostedAuthEnabled && status !== "signed_in" ? (
+          <SignedOutAccountView />
+        ) : null}
       </div>
     </div>
   );
