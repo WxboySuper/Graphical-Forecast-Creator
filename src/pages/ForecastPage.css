@@ -1,0 +1,16 @@
+.forecast-page-shell {
+  width: 100%;
+  overflow: hidden;
+
+  /* Fallback for browsers that don't support dynamic viewport units (dvh). */
+  height: calc(100vh - var(--app-header-height, 64px));
+  max-height: calc(100vh - var(--app-header-height, 64px));
+}
+
+@supports (height: 100dvh) {
+  .forecast-page-shell {
+    height: calc(100dvh - var(--app-header-height, 64px));
+    max-height: calc(100dvh - var(--app-header-height, 64px));
+  }
+}
+

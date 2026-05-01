@@ -53,6 +53,7 @@ import {
   resolveForecastUiVariant,
   type ForecastUiVariant,
 } from '../utils/forecastUiVariant';
+import './ForecastPage.css';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -1257,10 +1258,7 @@ export const ForecastPage: React.FC = () => {
   });
 
   return (
-    <div
-      className="forecast-page-shell w-full overflow-hidden"
-      style={{ height: 'calc(100dvh - var(--app-header-height, 64px))', maxHeight: 'calc(100dvh - var(--app-header-height, 64px))' }}
-    >
+    <div className="forecast-page-shell">
       {renderForecastWorkspaceLayout(forecastUiVariant, {
         mapRef,
         controller: workspaceController,
