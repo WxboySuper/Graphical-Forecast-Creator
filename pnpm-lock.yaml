@@ -147,11 +147,7 @@ importers:
         specifier: ^14.0.0
         version: 14.0.0
       web-vitals:
-<<<<<<< dependabot/npm_and_yarn/vite-8.0.10
-        specifier: ^5.1.0
-=======
         specifier: ^5.2.0
->>>>>>> main
         version: 5.2.0
       xml2js:
         specifier: ^0.6.2
