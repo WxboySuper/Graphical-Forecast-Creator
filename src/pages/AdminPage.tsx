@@ -128,24 +128,13 @@ const parseAdminMetricsResponse = async (
   };
 };
 
-/** Applies one successful admin metrics response when the page is still mounted. */
-const applyAdminMetricsSuccess = ({
-  parsedResponse,
-  isActive,
-  setMetricsResponse,
-  setAccessDenied,
-  setLoading,
-}: {
-  parsedResponse: ParsedAdminMetricsResponse;
-  isActive: boolean;
-  setMetricsResponse: React.Dispatch<React.SetStateAction<AdminMetricsResponse | null>>;
-  setAccessDenied: React.Dispatch<React.SetStateAction<boolean>>;
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-}) => {
-  if (!isActive) {
-    return;
-  }
-
+/** Applies one successful admin metrics response. */
+const applyAdminMetricsSuccess = (
+  parsedResponse: ParsedAdminMetricsResponse,
+  setMetricsResponse: React.Dispatch<React.SetStateAction<AdminMetricsResponse | null>>,
+  setAccessDenied: React.Dispatch<React.SetStateAction<boolean>>,
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>
+) => {
   if (parsedResponse.accessDenied) {
     setMetricsResponse(null);
     setAccessDenied(true);
@@ -157,24 +146,13 @@ const applyAdminMetricsSuccess = ({
   setLoading(false);
 };
 
-/** Applies one admin metrics error when the page is still mounted. */
-const applyAdminMetricsError = ({
-  nextError,
-  isActive,
-  setMetricsResponse,
-  setError,
-  setLoading,
-}: {
-  nextError: unknown;
-  isActive: boolean;
-  setMetricsResponse: React.Dispatch<React.SetStateAction<AdminMetricsResponse | null>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-}) => {
-  if (!isActive) {
-    return;
-  }
-
+/** Applies one admin metrics error. */
+const applyAdminMetricsError = (
+  nextError: unknown,
+  setMetricsResponse: React.Dispatch<React.SetStateAction<AdminMetricsResponse | null>>,
+  setError: React.Dispatch<React.SetStateAction<string | null>>,
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>
+) => {
   setMetricsResponse(null);
   setError(nextError instanceof Error ? nextError.message : 'Unable to load admin metrics right now.');
   setLoading(false);
@@ -198,6 +176,70 @@ const isLatestAdminRequest = (
   requestIdRef: React.MutableRefObject<number>
 ) => requestId === requestIdRef.current;
 
+type AdminMetricsSetters = {
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setMetricsResponse: React.Dispatch<React.SetStateAction<AdminMetricsResponse | null>>;
+  setAccessDenied: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+/** Syncs loading and metrics state when admin access is blocked or still resolving. */
+const syncAdminMetricsForAccessState = (accessState: AdminAccessState, setters: AdminMetricsSetters) => {
+  if (accessState === 'auth_loading') {
+    setters.setLoading(true);
+    return;
+  }
+
+  if (accessState === 'denied') {
+    return;
+  }
+
+  setters.setLoading(false);
+  setters.setMetricsResponse(null);
+  setters.setAccessDenied(false);
+};
+
+/** Starts one admin metrics request and returns an unmount cleanup handler. */
+const subscribeAdminMetrics = (
+  user: NonNullable<ReturnType<typeof useAuth>['user']>,
+  windowSize: AdminWindow,
+  requestIdRef: React.MutableRefObject<number>,
+  setters: AdminMetricsSetters
+) => {
+  let isMounted = true;
+  requestIdRef.current += 1;
+  const requestId = requestIdRef.current;
+
+  setters.setLoading(true);
+  setters.setError(null);
+  setters.setAccessDenied(false);
+
+  fetchAdminMetrics(user, windowSize)
+    .then((parsedResponse) => {
+      if (!isMounted || !isLatestAdminRequest(requestId, requestIdRef)) {
+        return;
+      }
+
+      applyAdminMetricsSuccess(
+        parsedResponse,
+        setters.setMetricsResponse,
+        setters.setAccessDenied,
+        setters.setLoading
+      );
+    })
+    .catch((nextError) => {
+      if (!isMounted || !isLatestAdminRequest(requestId, requestIdRef)) {
+        return;
+      }
+
+      applyAdminMetricsError(nextError, setters.setMetricsResponse, setters.setError, setters.setLoading);
+    });
+
+  return () => {
+    isMounted = false;
+  };
+};
+
 /** Loads and normalizes the private admin metrics window plus access state. */
 const useAdminMetricsState = (): UseAdminMetricsState => {
   const { hostedAuthEnabled, status, user } = useAuth();
@@ -217,54 +259,19 @@ const useAdminMetricsState = (): UseAdminMetricsState => {
   });
 
   useEffect(() => {
+    const setters: AdminMetricsSetters = {
+      setLoading,
+      setError,
+      setMetricsResponse,
+      setAccessDenied,
+    };
+
     if (accessState !== 'allowed' || !user) {
-      if (accessState === 'auth_loading') {
-        setLoading(true);
-      } else if (accessState !== 'denied') {
-        setLoading(false);
-        setMetricsResponse(null);
-        setAccessDenied(false);
-      }
-      return;
+      syncAdminMetricsForAccessState(accessState, setters);
+      return undefined;
     }
 
-    let isMounted = true;
-    requestIdRef.current += 1;
-    const requestId = requestIdRef.current;
-    setLoading(true);
-    setError(null);
-    setAccessDenied(false);
-    fetchAdminMetrics(user, windowSize)
-      .then((parsedResponse) => {
-        if (!isMounted || !isLatestAdminRequest(requestId, requestIdRef)) {
-          return;
-        }
-
-        applyAdminMetricsSuccess({
-          parsedResponse,
-          isActive: true,
-          setMetricsResponse,
-          setAccessDenied,
-          setLoading,
-        });
-      })
-      .catch((nextError) => {
-        if (!isMounted || !isLatestAdminRequest(requestId, requestIdRef)) {
-          return;
-        }
-
-        applyAdminMetricsError({
-          nextError,
-          isActive: true,
-          setMetricsResponse,
-          setError,
-          setLoading,
-        });
-      });
-
-    return () => {
-      isMounted = false;
-    };
+    return subscribeAdminMetrics(user, windowSize, requestIdRef, setters);
   }, [accessState, user, windowSize]);
 
   return {
