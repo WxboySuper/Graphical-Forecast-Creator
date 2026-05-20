@@ -220,7 +220,7 @@ const useAdminMetricsState = (): UseAdminMetricsState => {
     if (accessState !== 'allowed' || !user) {
       if (accessState === 'auth_loading') {
         setLoading(true);
-      } else {
+      } else if (accessState !== 'denied') {
         setLoading(false);
         setMetricsResponse(null);
         setAccessDenied(false);
@@ -228,7 +228,7 @@ const useAdminMetricsState = (): UseAdminMetricsState => {
       return;
     }
 
-    let isActive = true;
+    let isMounted = true;
     requestIdRef.current += 1;
     const requestId = requestIdRef.current;
     setLoading(true);
@@ -236,25 +236,35 @@ const useAdminMetricsState = (): UseAdminMetricsState => {
     setAccessDenied(false);
     fetchAdminMetrics(user, windowSize)
       .then((parsedResponse) => {
-        isActive = isLatestAdminRequest(requestId, requestIdRef);
+        if (!isMounted || !isLatestAdminRequest(requestId, requestIdRef)) {
+          return;
+        }
+
         applyAdminMetricsSuccess({
           parsedResponse,
-          isActive,
+          isActive: true,
           setMetricsResponse,
           setAccessDenied,
           setLoading,
         });
       })
       .catch((nextError) => {
-        isActive = isLatestAdminRequest(requestId, requestIdRef);
+        if (!isMounted || !isLatestAdminRequest(requestId, requestIdRef)) {
+          return;
+        }
+
         applyAdminMetricsError({
           nextError,
-          isActive,
+          isActive: true,
           setMetricsResponse,
           setError,
           setLoading,
         });
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, [accessState, user, windowSize]);
 
   return {
