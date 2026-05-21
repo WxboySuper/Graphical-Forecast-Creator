@@ -52,6 +52,7 @@
   /* Make tooltips take the same space as buttons would */
   flex: 1;
   flex-basis: 0;
+  min-width: 100px;
   display: flex;
 }
 
@@ -105,6 +106,8 @@
   position: relative;
   cursor: not-allowed;
   opacity: 0.8;
+  flex: 1;
+  flex-basis: 0;
 }
 
 .maintenance-badge {
