@@ -2,6 +2,9 @@
 
 require('./load-env');
 
+const { initSentry, setupExpressErrorHandler } = require('./sentry');
+initSentry();
+
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
@@ -52,6 +55,8 @@ app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, (req, res
     res.status(500).end();
   }
 });
+
+setupExpressErrorHandler(app);
 
 // Reject everything else quietly
 app.use((_req, res) => res.status(404).end());
