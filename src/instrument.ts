@@ -41,6 +41,7 @@ export function initSentry(): void {
     dsn: getSentryDsn(),
     environment: getEnvironment(),
     release: getRelease(),
+    // Intentional: correlate errors with authenticated sessions (IP/cookies on error events).
     sendDefaultPii: true,
     enableLogs: true,
     normalizeDepth: 10,
