@@ -41,8 +41,8 @@ export function initSentry(): void {
     dsn: getSentryDsn(),
     environment: getEnvironment(),
     release: getRelease(),
-    // Intentional: correlate errors with authenticated sessions (IP/cookies on error events).
-    sendDefaultPii: true,
+    // Privacy policy: no raw IP in product analytics; keep false until policy covers Sentry PII.
+    sendDefaultPii: false,
     enableLogs: true,
     normalizeDepth: 10,
     integrations: [

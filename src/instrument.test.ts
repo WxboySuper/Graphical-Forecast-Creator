@@ -41,7 +41,7 @@ describe('instrument', () => {
           dsn: 'https://example@o0.ingest.sentry.io/0',
           environment: 'production',
           release: 'graphical-forecast-creator@1.0.0',
-          sendDefaultPii: true,
+          sendDefaultPii: false,
           enableLogs: true,
           normalizeDepth: 10,
           tracesSampleRate: 0.1,
