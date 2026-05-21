@@ -9,14 +9,17 @@ function initSentry() {
 
   const Sentry = require('@sentry/node');
   const release = (process.env.SENTRY_RELEASE || '').trim() || undefined;
-  const environment = (process.env.SENTRY_ENVIRONMENT || 'production').trim();
-  const tracesSampleRate = Number.parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1');
+  const environment = (process.env.SENTRY_ENVIRONMENT || 'production').trim() || 'production';
+  const parsedTracesSampleRate = Number.parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1');
+  const tracesSampleRate = Number.isFinite(parsedTracesSampleRate)
+    ? Math.max(0, Math.min(1, parsedTracesSampleRate))
+    : 0.1;
 
   Sentry.init({
     dsn,
     environment,
     release,
-    tracesSampleRate: Number.isFinite(tracesSampleRate) ? tracesSampleRate : 0.1,
+    tracesSampleRate,
   });
 
   return true;
