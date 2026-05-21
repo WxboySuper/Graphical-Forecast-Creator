@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
+import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -18,7 +19,9 @@ import type { AppDispatch, RootState } from '../../store';
 import { setMonitorMapView } from '../../store/monitorSlice';
 import type { MonitorMapView } from '../../monitor/types';
 import type { WmsLayerConfig } from '../../monitor/wms';
-import { createLabelOverlaySource, toOlStyle } from '../Map/OpenLayersForecastMap';
+import { getOpenFreeMapStyleSet } from '../../lib/openFreeMap';
+import { apply } from 'ol-mapbox-style';
+import { toOlStyle } from '../Map/OpenLayersForecastMap';
 
 interface MonitorMapProps {
   mapView: MonitorMapView;
@@ -30,21 +33,31 @@ interface MonitorMapProps {
 }
 
 const BASE_LAYER_Z_INDEX = 0;
-const SATELLITE_LAYER_Z_INDEX = 10;
+const REFERENCE_LAYER_Z_INDEX = 12;
+const SATELLITE_LAYER_Z_INDEX = 15;
 const RADAR_LAYER_Z_INDEX = 20;
 const OUTLOOK_LAYER_Z_INDEX = 100;
 const STATE_OUTLINE_LAYER_Z_INDEX = 110;
-const LABEL_LAYER_Z_INDEX = 120;
 
 const US_STATES_GEOJSON_URL =
   'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json';
 
-const createBaseSource = () => new XYZ({
-  url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
+const createBaseSource = (darkMode: boolean) => new XYZ({
+  url: darkMode
+    ? 'https://{a-d}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png'
+    : 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
   attributions: '&copy; OpenStreetMap &copy; CARTO',
   crossOrigin: 'anonymous',
   maxZoom: 19,
 });
+
+const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
+  const targetLayers = target.getLayers();
+  targetLayers.clear();
+  source.getLayers().getArray().forEach((layer) => {
+    targetLayers.push(layer);
+  });
+};
 
 const createStateOutlineStyle = (darkMode: boolean) => new Style({
   fill: new Fill({ color: 'rgba(0, 0, 0, 0)' }),
@@ -159,14 +172,14 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   const mapRef = useRef<OLMap | null>(null);
   const radarLayerRef = useRef<TileLayer<TileWMS> | null>(null);
   const satelliteLayerRef = useRef<TileLayer<TileWMS> | null>(null);
-  const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
+  const vectorStyleRequestRef = useRef(0);
   const radarLayerKeyRef = useRef<string | null>(null);
   const satelliteLayerKeyRef = useRef<string | null>(null);
   const outlookSourceRef = useRef(new VectorSource());
   const stateOutlineSourceRef = useRef(new VectorSource());
   const applyingExternalViewRef = useRef(false);
   const serializedFeatures = useMemo(() => flattenOutlookFeatures(outlookData), [outlookData]);
-  const labelStyle = darkMode ? 'carto-dark' : 'osm';
 
   useEffect(() => {
     if (!mapElementRef.current) {
@@ -174,8 +187,12 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     }
 
     const baseLayer = new TileLayer({
-      source: createBaseSource(),
+      source: createBaseSource(darkMode),
       zIndex: BASE_LAYER_Z_INDEX,
+    });
+    const vectorReferenceGroup = new LayerGroup({
+      visible: false,
+      zIndex: REFERENCE_LAYER_Z_INDEX,
     });
     const satelliteLayerInstance = new TileLayer<TileWMS>({
       visible: false,
@@ -196,21 +213,16 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
       source: stateOutlineSourceRef.current,
       zIndex: STATE_OUTLINE_LAYER_Z_INDEX,
     });
-    const labelLayer = new TileLayer({
-      source: createLabelOverlaySource(labelStyle) ?? undefined,
-      visible: true,
-      zIndex: LABEL_LAYER_Z_INDEX,
-    });
 
     const map = new OLMap({
       target: mapElementRef.current,
       layers: [
         baseLayer,
+        vectorReferenceGroup,
         satelliteLayerInstance,
         radarLayerInstance,
         outlookLayer,
         stateOutlineLayer,
-        labelLayer,
       ],
       view: new View({
         center: fromLonLat([mapView.center[1], mapView.center[0]]),
@@ -243,11 +255,31 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     mapRef.current = map;
     radarLayerRef.current = radarLayerInstance;
     satelliteLayerRef.current = satelliteLayerInstance;
-    labelLayerRef.current = labelLayer;
+    vectorReferenceGroupRef.current = vectorReferenceGroup;
 
     loadUsStateOutlines(stateOutlineSourceRef.current, darkMode).catch(() => {
       // State outlines are optional reference context.
     });
+
+    const requestId = vectorStyleRequestRef.current + 1;
+    vectorStyleRequestRef.current = requestId;
+
+    getOpenFreeMapStyleSet('osm')
+      .then(({ overlayStyle }) => {
+        const nextReferenceGroup = new LayerGroup();
+        return apply(nextReferenceGroup, overlayStyle).then(() => nextReferenceGroup);
+      })
+      .then((nextReferenceGroup) => {
+        if (vectorStyleRequestRef.current !== requestId || !vectorReferenceGroupRef.current) {
+          return;
+        }
+
+        replaceLayerGroupLayers(vectorReferenceGroupRef.current, nextReferenceGroup);
+        vectorReferenceGroupRef.current.setVisible(true);
+      })
+      .catch(() => {
+        // Vector roads/labels are optional reference context.
+      });
 
     return () => {
       map.un('moveend', handleMoveEnd);
@@ -255,20 +287,11 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
       mapRef.current = null;
       radarLayerRef.current = null;
       satelliteLayerRef.current = null;
-      labelLayerRef.current = null;
+      vectorReferenceGroupRef.current = null;
       radarLayerKeyRef.current = null;
       satelliteLayerKeyRef.current = null;
     };
-  }, [dispatch, labelStyle]);
-
-  useEffect(() => {
-    const labelLayer = labelLayerRef.current;
-    if (!labelLayer) {
-      return;
-    }
-
-    labelLayer.setSource(createLabelOverlaySource(labelStyle) ?? undefined);
-  }, [labelStyle]);
+  }, [darkMode, dispatch]);
 
   useEffect(() => {
     const source = stateOutlineSourceRef.current;

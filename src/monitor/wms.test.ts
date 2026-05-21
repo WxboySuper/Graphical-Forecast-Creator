@@ -33,6 +33,7 @@ describe('WMS helpers', () => {
     expect(buildRadarLayerConfig({ radarMode: 'site', radarProduct: 'sr-bvel', radarSite: 'KTLX' })).toEqual(
       expect.objectContaining({ layer: 'ktlx_sr_bvel' })
     );
+    expect(buildRadarLayerConfig({ radarMode: 'site', radarProduct: 'sr-bref', radarSite: 'KT' })).toBeNull();
     expect(buildSatelliteLayerConfig('none')).toBeNull();
     expect(buildSatelliteLayerConfig('goes-visible')).toEqual(expect.objectContaining({ layer: 'goes_visible_imagery' }));
   });

@@ -56,7 +56,7 @@ describe('MonitorControls', () => {
     expect(screen.getByPlaceholderText(/Search KTLX/i)).toBeInTheDocument();
     expect(screen.getByDisplayValue('Base Reflectivity')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Radar site'), { target: { value: 'KDVN' } });
+    fireEvent.input(screen.getByLabelText('Radar site'), { target: { value: 'KDVN' } });
     expect(baseProps.onRadarSiteChange).toHaveBeenCalledWith('KDVN');
 
     fireEvent.click(screen.getByLabelText('Refresh live layers'));

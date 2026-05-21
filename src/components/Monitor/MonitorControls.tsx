@@ -117,8 +117,9 @@ const MonitorControls: React.FC<MonitorControlsProps> = ({
               list="monitor-radar-site-list"
               maxLength={4}
               placeholder="Search KTLX, KOUN…"
-              onChange={(event) => onRadarSiteChange(event.target.value.toUpperCase())}
+              onInput={(event) => onRadarSiteChange(event.currentTarget.value)}
               aria-label="Radar site"
+              autoComplete="off"
             />
             <datalist id="monitor-radar-site-list">
               {radarSiteOptions.map((site) => (
@@ -236,14 +237,14 @@ const MonitorControls: React.FC<MonitorControlsProps> = ({
         </div>
         <label>
           Speed
-          <input
-            type="range"
-            min="250"
-            max="3000"
-            step="250"
-            value={settings.animationSpeedMs}
-            onChange={(event) => onAnimationSpeedChange(Number(event.target.value))}
-          />
+        <input
+          type="range"
+          min="150"
+          max="2000"
+          step="100"
+          value={settings.animationSpeedMs}
+          onChange={(event) => onAnimationSpeedChange(Number(event.target.value))}
+        />
         </label>
       </section>
     </aside>

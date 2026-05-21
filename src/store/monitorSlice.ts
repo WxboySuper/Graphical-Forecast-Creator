@@ -24,10 +24,13 @@ const monitorSlice = createSlice({
       state.radarProduct = resolveRadarProductForMode(state.radarMode, action.payload);
     },
     setRadarSite: (state, action: PayloadAction<string>) => {
-      const nextSite = action.payload.trim().toUpperCase();
-      if (/^K[A-Z0-9]{3}$/.test(nextSite)) {
-        state.radarSite = nextSite;
+      const cleaned = action.payload.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+      if (!cleaned) {
+        state.radarSite = '';
+        return;
       }
+
+      state.radarSite = cleaned.startsWith('K') ? cleaned : `K${cleaned}`.slice(0, 4);
     },
     setRadarOpacity: (state, action: PayloadAction<number>) => {
       state.radarOpacity = Math.min(1, Math.max(0, action.payload));
@@ -48,7 +51,7 @@ const monitorSlice = createSlice({
       state.animationEnabled = action.payload;
     },
     setAnimationSpeedMs: (state, action: PayloadAction<number>) => {
-      state.animationSpeedMs = Math.min(3000, Math.max(250, action.payload));
+      state.animationSpeedMs = Math.min(2000, Math.max(150, action.payload));
     },
   },
 });

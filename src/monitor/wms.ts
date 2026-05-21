@@ -120,13 +120,18 @@ export const buildRadarLayerConfig = ({
   }
 
   const siteProduct = resolveRadarProductForMode('site', radarProduct);
-  const site = radarSite.trim().toLowerCase();
+  const site = radarSite.trim().toUpperCase();
+  if (!/^K[A-Z0-9]{3}$/.test(site)) {
+    return null;
+  }
+
+  const siteKey = site.toLowerCase();
   const suffix = siteProduct === 'sr-bvel'
     ? SITE_LAYER_SUFFIX_BY_PRODUCT['sr-bvel']
     : SITE_LAYER_SUFFIX_BY_PRODUCT['sr-bref'];
   return {
-    url: `https://opengeo.ncep.noaa.gov/geoserver/${site}/ows`,
-    layer: `${site}_${suffix}`,
+    url: `https://opengeo.ncep.noaa.gov/geoserver/${siteKey}/ows`,
+    layer: `${siteKey}_${suffix}`,
   };
 };
 

@@ -1,5 +1,5 @@
 import { DEFAULT_MONITOR_SETTINGS, normalizeMonitorSettings } from './types';
-import monitorReducer, { setRadarMode } from '../store/monitorSlice';
+import monitorReducer, { setRadarMode, setRadarSite } from '../store/monitorSlice';
 import { readStoredMonitorSettings, writeStoredMonitorSettings, MONITOR_SETTINGS_STORAGE_KEY } from './storage';
 
 describe('monitor settings', () => {
@@ -32,8 +32,13 @@ describe('monitor settings', () => {
       outlookSource: { kind: 'local-cycle', id: 'cycle-1' },
       mapView: { center: [90, -180], zoom: 14 },
       animationEnabled: true,
-      animationSpeedMs: 250,
+      animationSpeedMs: 150,
     });
+  });
+
+  test('allows partial radar site ids while typing', () => {
+    const state = monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite('KT'));
+    expect(state.radarSite).toBe('KT');
   });
 
   test('coerces radar product when switching source mode', () => {

@@ -45,7 +45,7 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
     zoom: 4,
   },
   animationEnabled: false,
-  animationSpeedMs: 800,
+  animationSpeedMs: 400,
 };
 
 const RADAR_MODES: MonitorRadarMode[] = ['none', 'mrms-conus', 'site'];
@@ -129,7 +129,7 @@ export const normalizeMonitorSettings = (value: unknown): MonitorSettings => {
     animationEnabled: typeof value.animationEnabled === 'boolean'
       ? value.animationEnabled
       : DEFAULT_MONITOR_SETTINGS.animationEnabled,
-    animationSpeedMs: readNumber(value.animationSpeedMs, DEFAULT_MONITOR_SETTINGS.animationSpeedMs, 250, 3000),
+    animationSpeedMs: readNumber(value.animationSpeedMs, DEFAULT_MONITOR_SETTINGS.animationSpeedMs, 150, 2000),
   };
 };
 
