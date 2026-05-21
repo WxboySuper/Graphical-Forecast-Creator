@@ -1,5 +1,6 @@
 'use strict';
 
+/** Returns the POST /collect handler that appends sanitized entries to the log file. */
 function createCollectHandler(fs, LOG_FILE) {
   return (req, res) => {
     // Sanitise and cap all user-controlled fields
@@ -23,6 +24,7 @@ function createCollectHandler(fs, LOG_FILE) {
   };
 }
 
+/** Registers middleware, billing/metrics/beta routes, and the collect endpoint. */
 function configureApp(app, express, fs, LOG_FILE) {
   const rateLimit = require('express-rate-limit');
   const { registerBetaRoutes } = require('./beta');
@@ -48,6 +50,7 @@ function configureApp(app, express, fs, LOG_FILE) {
   app.use((_req, res) => res.status(404).end());
 }
 
+/** Loads env vars, creates the Express app, and binds the analytics server. */
 async function start() {
   const loadEnv = require('./load-env');
   await loadEnv();
