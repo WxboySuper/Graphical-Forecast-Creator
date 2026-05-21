@@ -15,6 +15,20 @@ const mockUseAuth = jest.requireMock('../auth/AuthProvider').useAuth as jest.Moc
 const mockIsSentryEnabled = jest.requireMock('../instrument').isSentryEnabled as jest.Mock;
 const mockFetch = jest.fn();
 
+const DEFAULT_ADMIN_SUMMARY = {
+  totalAccounts: 0,
+  activeDevices: 0,
+  activeSignedInAccounts: 0,
+  premiumSubscriptions: 0,
+  storageBytes: 0,
+  signups: 0,
+  signIns: 0,
+  upgrades: 0,
+  cancellations: 0,
+  cloudSaves: 0,
+  cloudLoads: 0,
+};
+
 const renderAdminPage = () =>
   render(
     <MemoryRouter initialEntries={['/admin']}>
@@ -141,17 +155,3 @@ describe('AdminPage', () => {
     expect(await screen.findByRole('button', { name: 'Send Sentry test error' })).toBeInTheDocument();
   });
 });
-
-const DEFAULT_ADMIN_SUMMARY = {
-  totalAccounts: 0,
-  activeDevices: 0,
-  activeSignedInAccounts: 0,
-  premiumSubscriptions: 0,
-  storageBytes: 0,
-  signups: 0,
-  signIns: 0,
-  upgrades: 0,
-  cancellations: 0,
-  cloudSaves: 0,
-  cloudLoads: 0,
-};
