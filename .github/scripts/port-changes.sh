@@ -60,8 +60,15 @@ fi
 
 FAILURES=()
 CONFLICT_PR_URLS=()
+PRESERVED_PORT_BRANCHES=()
 SUCCESS_COUNT=0
 SKIPPED_COUNT=0
+
+record_preserved_port_branch() {
+  local target="$1"
+  local port_branch="$2"
+  PRESERVED_PORT_BRANCHES+=("${target}|${port_branch}|$(compare_url_for_port_branch "${target}" "${port_branch}")")
+}
 
 compare_url_for_port_branch() {
   local target="$1"
@@ -173,6 +180,7 @@ EOF
   fi
 
   CONFLICT_PR_URLS+=("${target}|${pr_url}|${conflict_files}")
+  record_preserved_port_branch "${target}" "${port_branch}"
   FAILURES+=("${target}")
 }
 
@@ -314,9 +322,9 @@ for TARGET in "${TARGETS[@]}"; do
     --base "${TARGET}" \
     --title "[Port] ${PR_TITLE} to ${TARGET}" \
     --body "${PR_BODY}"; then
-    echo "::warning title=Port PR not created::Could not open a port PR for ${TARGET} (branch ${PORT_BRANCH} was pushed)."
+    echo "::warning title=Port PR not created::Could not open a port PR for ${TARGET}. Remote branch ${PORT_BRANCH} was kept for manual fallback."
+    record_preserved_port_branch "${TARGET}" "${PORT_BRANCH}"
     FAILURES+=("${TARGET}")
-    git push origin --delete "${PORT_BRANCH}" || true
   else
     echo "Successfully created port PR for ${TARGET} using ${PORT_BRANCH}"
     SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
@@ -361,6 +369,18 @@ for f in "${FAILURES[@]}"; do
   fi
 done
 
+if [[ ${#PRESERVED_PORT_BRANCHES[@]} -gt 0 ]]; then
+  append_summary ""
+  append_summary "### Fallback port branches (kept on origin)"
+  append_summary ""
+  append_summary "| Target | Branch | Open PR from branch |"
+  append_summary "| --- | --- | --- |"
+  for entry in "${PRESERVED_PORT_BRANCHES[@]}"; do
+    IFS='|' read -r t branch url <<< "${entry}"
+    append_summary "| \`${t}\` | \`${branch}\` | [compare & open PR](${url}) |"
+  done
+fi
+
 ISSUE_TITLE="[Port] Conflict resolution needed for PR #${PR_NUMBER}"
 ISSUE_BODY="$(cat <<EOF
 ## Automated porting could not finish cleanly
@@ -380,6 +400,16 @@ for f in "${FAILURES[@]}"; do
     ISSUE_BODY+=$'\n'"| \`${f}\` | Check the [failed workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) |"
   fi
 done
+if [[ ${#PRESERVED_PORT_BRANCHES[@]} -gt 0 ]]; then
+  ISSUE_BODY+=$'\n\n'"### Fallback port branches (left on origin)
+
+| Target | Branch | Action |
+| --- | --- | --- |"
+  for entry in "${PRESERVED_PORT_BRANCHES[@]}"; do
+    IFS='|' read -r t branch url <<< "${entry}"
+    ISSUE_BODY+=$'\n'"| \`${t}\` | \`${branch}\` | [Open a PR from this branch](${url}) |"
+  done
+fi
 ISSUE_BODY+=$'\n\n'"Author: @${PR_AUTHOR}
 
 When these draft PRs are merged, \`${BASE_BRANCH}\` changes will stay aligned across active feature and hotfix branches."
@@ -427,6 +457,14 @@ for f in "${FAILURES[@]}"; do
     FAILURE_COMMENT+="- \`${f}\`: port PR could not be created (see [workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))\n"
   fi
 done
+
+if [[ ${#PRESERVED_PORT_BRANCHES[@]} -gt 0 ]]; then
+  FAILURE_COMMENT+="\n**Fallback port branches were left on origin** (open a PR manually if automation did not):\n\n"
+  for entry in "${PRESERVED_PORT_BRANCHES[@]}"; do
+    IFS='|' read -r t branch url <<< "${entry}"
+    FAILURE_COMMENT+="- \`${t}\`: \`${branch}\` → ${url}\n"
+  done
+fi
 
 FAILURE_COMMENT+="\nTracking issue: ${ISSUE_URL}\n\nWorkflow summary: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
