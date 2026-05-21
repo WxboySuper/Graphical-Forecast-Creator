@@ -67,7 +67,9 @@ describe('AdminPage', () => {
 
     renderAdminPage();
 
-    await waitFor(() => expect(screen.getByText('Home Page')).toBeInTheDocument());
+    expect(await screen.findByText('Home Page')).toBeInTheDocument();
+    expect(screen.queryByText('Loading daily metrics...')).not.toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalled();
   });
 
   test('renders summary data for allowlisted admins', async () => {
