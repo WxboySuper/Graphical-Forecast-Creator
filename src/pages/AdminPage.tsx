@@ -191,6 +191,7 @@ const syncAdminMetricsForAccessState = (accessState: AdminAccessState, setters: 
   }
 
   if (accessState === 'denied') {
+    setters.setLoading(false);
     return;
   }
 

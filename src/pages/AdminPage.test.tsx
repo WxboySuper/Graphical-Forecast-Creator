@@ -68,6 +68,7 @@ describe('AdminPage', () => {
     renderAdminPage();
 
     expect(await screen.findByText('Home Page')).toBeInTheDocument();
+    expect(screen.queryByText('Loading daily metrics...')).not.toBeInTheDocument();
     expect(mockFetch).toHaveBeenCalled();
   });
 
