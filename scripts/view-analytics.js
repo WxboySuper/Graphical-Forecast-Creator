@@ -11,70 +11,104 @@
 const fs = require('fs');
 const path = require('path');
 
-const LOG_FILE =
-  process.argv[2] ||
-  path.join(__dirname, '..', 'server', 'logs', 'analytics.log');
-
-if (!fs.existsSync(LOG_FILE)) {
-  console.error(`No log file found at: ${LOG_FILE}`);
-  console.error('Pass the path as an argument: node scripts/view-analytics.js /path/to/analytics.log');
-  process.exit(1);
+/** Resolves the analytics log path from CLI args or the default server log location. */
+function resolveLogPath(args) {
+  return args[2] || path.join(__dirname, '..', 'server', 'logs', 'analytics.log');
 }
 
-const raw = fs.readFileSync(LOG_FILE, 'utf8').trim();
-if (!raw) {
-  console.log('Log file is empty — no views recorded yet.');
-  process.exit(0);
+/** Reads and trims the analytics log file, exiting when missing or empty. */
+async function readAnalyticsLog(logFile) {
+  let fileContents = '';
+  try {
+    fileContents = (await fs.promises.readFile(logFile, 'utf8')).trim();
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.error(`No log file found at: ${logFile}`);
+      console.error('Pass the path as an argument: node scripts/view-analytics.js /path/to/analytics.log');
+      process.exit(1);
+    }
+    throw err;
+  }
+
+  if (!fileContents) {
+    console.log('Log file is empty — no views recorded yet.');
+    process.exit(0);
+  }
+  return fileContents;
 }
 
-const entries = raw
-  .split('\n')
-  .filter(Boolean)
-  .map(l => { try { return JSON.parse(l); } catch { return null; } })
-  .filter(Boolean);
+/** Parses newline-delimited JSON log lines into valid entry objects. */
+function parseLogEntries(fileContents) {
+  const entries = fileContents
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 
-if (entries.length === 0) {
-  console.log('No valid entries found.');
-  process.exit(0);
+  if (entries.length === 0) {
+    console.log('No valid entries found.');
+    process.exit(0);
+  }
+  return entries;
 }
 
-const today = new Date().toISOString().slice(0, 10);
-const todayEntries = entries.filter(e => e.ts && e.ts.startsWith(today));
-const uniqueIps = new Set(entries.map(e => e.ip)).size;
-
+/** Groups array items by key and returns sorted [value, count] pairs descending. */
 const countBy = (arr, key) => {
   const map = {};
-  arr.forEach(e => {
-    const v = (e[key] || '(none)').toString().trim() || '(none)';
-    map[v] = (map[v] || 0) + 1;
+  arr.forEach((entry) => {
+    const value = (entry[key] || '(none)').toString().trim() || '(none)';
+    map[value] = (map[value] || 0) + 1;
   });
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 };
 
-const hr = '─'.repeat(50);
+/** Prints totals, top pages/referrers, and the latest views to stdout. */
+function printAnalyticsSummary(entries) {
+  const today = new Date().toISOString().slice(0, 10);
+  const todayEntries = entries.filter((entry) => entry.ts?.startsWith(today));
+  const uniqueIps = new Set(entries.map((entry) => entry.ip)).size;
 
-console.log('═'.repeat(50));
-console.log('  GFC Analytics Summary');
-console.log('═'.repeat(50));
-console.log(`  Total page views (all time) : ${entries.length}`);
-console.log(`  Unique IPs (approx.)        : ${uniqueIps}`);
-console.log(`  Views today (${today})  : ${todayEntries.length}`);
+  const hr = '─'.repeat(50);
 
-console.log(`\n── Top Pages ${hr.slice(12)}`);
-countBy(entries, 'page').slice(0, 10).forEach(([page, count]) => {
-  console.log(`  ${String(count).padStart(5)}  ${page}`);
-});
+  console.log('═'.repeat(50));
+  console.log('  GFC Analytics Summary');
+  console.log('═'.repeat(50));
+  console.log(`  Total page views (all time) : ${entries.length}`);
+  console.log(`  Unique IPs (approx.)        : ${uniqueIps}`);
+  console.log(`  Views today (${today})  : ${todayEntries.length}`);
 
-console.log(`\n── Top Referrers ${hr.slice(16)}`);
-countBy(entries, 'ref').slice(0, 10).forEach(([ref, count]) => {
-  console.log(`  ${String(count).padStart(5)}  ${ref}`);
-});
+  console.log(`\n── Top Pages ${hr.slice(12)}`);
+  countBy(entries, 'page').slice(0, 10).forEach(([page, count]) => {
+    console.log(`  ${String(count).padStart(5)}  ${page}`);
+  });
 
-console.log(`\n── Last 20 Views ${hr.slice(16)}`);
-[...entries].slice(-20).reverse().forEach(e => {
-  const ts = (e.ts || '').slice(0, 19);
-  const page = (e.page || '/').padEnd(35);
-  console.log(`  ${ts}  ${page}  ${e.ip || ''}`);
-});
+  console.log(`\n── Top Referrers ${hr.slice(16)}`);
+  countBy(entries, 'ref').slice(0, 10).forEach(([ref, count]) => {
+    console.log(`  ${String(count).padStart(5)}  ${ref}`);
+  });
 
-console.log('═'.repeat(50));
+  console.log(`\n── Last 20 Views ${hr.slice(16)}`);
+  [...entries].slice(-20).reverse().forEach((entry) => {
+    const ts = (entry.ts || '').slice(0, 19);
+    const page = (entry.page || '/').padEnd(35);
+    console.log(`  ${ts}  ${page}  ${entry.ip || ''}`);
+  });
+
+  console.log('═'.repeat(50));
+}
+
+/** Loads the log file and prints the analytics summary. */
+async function main() {
+  const logFile = resolveLogPath(process.argv);
+  const fileContents = await readAnalyticsLog(logFile);
+  const entries = parseLogEntries(fileContents);
+  printAnalyticsSummary(entries);
+}
+
+main().catch(console.error);
