@@ -11,6 +11,7 @@ declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
 declare const __GFC_APP_VERSION__: string;
 
+/** Build-time Sentry DSN injected by Vite (`VITE_SENTRY_DSN`). */
 function getSentryDsn(): string {
   return typeof __GFC_SENTRY_DSN__ !== 'undefined' ? __GFC_SENTRY_DSN__ : '';
 }
@@ -20,11 +21,13 @@ export function isSentryEnabled(): boolean {
   return Boolean(getSentryDsn().trim());
 }
 
+/** Sentry release name tied to the app package version. */
 function getRelease(): string | undefined {
   const version = typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : '';
   return version ? `graphical-forecast-creator@${version}` : undefined;
 }
 
+/** Sentry environment label (e.g. production on main deploy). */
 function getEnvironment(): string {
   const configured =
     typeof __GFC_SENTRY_ENVIRONMENT__ !== 'undefined' ? __GFC_SENTRY_ENVIRONMENT__ : '';
