@@ -40,6 +40,7 @@ describe('instrument', () => {
       expect(Sentry.init).toHaveBeenCalledWith(
         expect.objectContaining({
           dsn: 'https://example@o0.ingest.sentry.io/0',
+          tunnel: '/api/sentry-tunnel',
           environment: 'production',
           release: 'graphical-forecast-creator@1.0.0',
           sendDefaultPii: true,

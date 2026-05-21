@@ -12,6 +12,7 @@ const path = require('path');
 const { registerBetaRoutes } = require('./beta');
 const { registerBillingRoutes } = require('./billing');
 const { registerMetricsRoutes } = require('./metrics');
+const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
 
 const PORT = parseInt(process.env.PORT || '3006', 10);
 const LOG_DIR = process.env.LOG_DIR || path.join(__dirname, 'logs');
@@ -30,6 +31,8 @@ const collectRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+registerSentryTunnelRoutes(app, express, rateLimit);
 
 registerBillingRoutes(app, express);
 registerMetricsRoutes(app, express);

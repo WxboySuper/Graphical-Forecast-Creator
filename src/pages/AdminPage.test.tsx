@@ -7,7 +7,12 @@ jest.mock('../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../instrument', () => ({
+  isSentryEnabled: jest.fn(() => false),
+}));
+
 const mockUseAuth = jest.requireMock('../auth/AuthProvider').useAuth as jest.Mock;
+const mockIsSentryEnabled = jest.requireMock('../instrument').isSentryEnabled as jest.Mock;
 const mockFetch = jest.fn();
 
 const renderAdminPage = () =>
@@ -24,6 +29,7 @@ const renderAdminPage = () =>
 describe('AdminPage', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    mockIsSentryEnabled.mockReturnValue(false);
     global.fetch = mockFetch as unknown as typeof fetch;
   });
 
@@ -109,4 +115,43 @@ describe('AdminPage', () => {
     expect(screen.getByText('Premium subscriptions')).toBeInTheDocument();
     expect(screen.getByText('Hosted data footprint')).toBeInTheDocument();
   });
+
+  test('shows Sentry test control when monitoring is enabled in the build', async () => {
+    mockIsSentryEnabled.mockReturnValue(true);
+    mockUseAuth.mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: {
+        getIdToken: jest.fn().mockResolvedValue('token-123'),
+      },
+    });
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        metricsEnabled: true,
+        window: 7,
+        summary: DEFAULT_ADMIN_SUMMARY,
+        dailyMetrics: [],
+      }),
+    });
+
+    renderAdminPage();
+
+    expect(await screen.findByRole('button', { name: 'Send Sentry test error' })).toBeInTheDocument();
+  });
 });
+
+const DEFAULT_ADMIN_SUMMARY = {
+  totalAccounts: 0,
+  activeDevices: 0,
+  activeSignedInAccounts: 0,
+  premiumSubscriptions: 0,
+  storageBytes: 0,
+  signups: 0,
+  signIns: 0,
+  upgrades: 0,
+  cancellations: 0,
+  cloudSaves: 0,
+  cloudLoads: 0,
+};
