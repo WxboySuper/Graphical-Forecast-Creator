@@ -118,6 +118,34 @@ Run the app with beta-only features locally (useful for testing forecast redesig
 
 - To enable hosted auth locally, provide Firebase web config via env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID and restart the dev server.
 
+### Production monitoring (Sentry, main only)
+
+Sentry is wired for **production** (`main` branch deploys to gfc.weatherboysuper.com). Beta and local dev builds omit the DSN and stay inert.
+
+Production web monitoring includes:
+
+- Error monitoring (React 19 `reactErrorHandler` + unhandled errors)
+- Performance tracing (React Router v7 navigation)
+- Session Replay (10% of sessions; 100% when an error occurs; text masked, media blocked)
+- Redux action breadcrumbs (forecast map payloads stripped from breadcrumbs)
+- Structured logs (`Sentry.logger.*`)
+
+Create two Sentry projects (recommended):
+
+- **Web** — React client (`@sentry/react`)
+- **Analytics API** — Express server on the VPS (`@sentry/node`)
+
+Add these GitHub Actions secrets (repo → Settings → Secrets and variables → Actions):
+
+| Secret | Used for |
+|--------|----------|
+| `VITE_SENTRY_DSN` | Browser error + performance monitoring |
+| `SENTRY_DSN` | Analytics/billing API server |
+| `SENTRY_AUTH_TOKEN` | Upload source maps during the main deploy build (use a Sentry **Organization Auth Token**; `org:ci` scope is correct and fixed) |
+| `SENTRY_ORG` | Your Sentry organization slug |
+| `SENTRY_PROJECT` | Web project slug (source maps) — not the API project |
+
+After the next `main` deploy, verify in Sentry with a test error from the browser console on production (not from DevTools while paused — use a one-off button or `throw new Error('Sentry test')` in the console on the live site).
 
 ---
 

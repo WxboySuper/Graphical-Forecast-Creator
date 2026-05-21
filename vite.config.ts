@@ -2,12 +2,31 @@ import path from 'path';
 import fs from 'fs';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const base = env.PUBLIC_URL || '/';
   const pkgPath = path.resolve(__dirname, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+  const releaseName = `graphical-forecast-creator@${pkg.version}`;
+  const uploadSourceMaps = Boolean(
+    env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT
+  );
+  const sentryPlugins =
+    uploadSourceMaps
+      ? [
+          sentryVitePlugin({
+            org: env.SENTRY_ORG,
+            project: env.SENTRY_PROJECT,
+            authToken: env.SENTRY_AUTH_TOKEN,
+            release: { name: releaseName },
+            sourcemaps: {
+              filesToDeleteAfterUpload: ['**/*.map'],
+            },
+          }),
+        ]
+      : [];
 
   return {
     base,
@@ -20,8 +39,10 @@ export default defineConfig(({ mode }) => {
       __GFC_FIREBASE_AUTH_DOMAIN__: JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN ?? ''),
       __GFC_FIREBASE_PROJECT_ID__: JSON.stringify(env.VITE_FIREBASE_PROJECT_ID ?? ''),
       __GFC_FIREBASE_APP_ID__: JSON.stringify(env.VITE_FIREBASE_APP_ID ?? ''),
+      __GFC_SENTRY_DSN__: JSON.stringify(env.VITE_SENTRY_DSN ?? ''),
+      __GFC_SENTRY_ENVIRONMENT__: JSON.stringify(env.VITE_SENTRY_ENVIRONMENT ?? ''),
     },
-    plugins: [react()],
+    plugins: [react(), ...sentryPlugins],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
@@ -30,6 +51,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'build',
       emptyOutDir: true,
+      sourcemap: uploadSourceMaps ? 'hidden' : false,
     },
     server: {
       host: '0.0.0.0',

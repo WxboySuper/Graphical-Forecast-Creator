@@ -1,3 +1,6 @@
+import './instrument';
+import { isSentryEnabled } from './instrument';
+import { reactErrorHandler } from '@sentry/react';
 import './immerSetup';
 // skipcq: JS-W1028
 import React from 'react';
@@ -14,8 +17,18 @@ import { trackPageView } from './utils/analyticsUtils';
 // Setup cycle history persistence
 setupCycleHistoryListener(store);
 
+const rootElement = document.getElementById('root') as HTMLElement;
 const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
+  rootElement,
+  isSentryEnabled()
+    ? {
+        onUncaughtError: reactErrorHandler((error, errorInfo) => {
+          console.warn('Uncaught error', error, errorInfo.componentStack);
+        }),
+        onCaughtError: reactErrorHandler(),
+        onRecoverableError: reactErrorHandler(),
+      }
+    : undefined
 );
 root.render(
   <React.StrictMode>

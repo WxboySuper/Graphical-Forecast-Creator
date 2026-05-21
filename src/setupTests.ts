@@ -13,6 +13,9 @@ const globalScope = globalThis as typeof globalThis & {
   __GFC_FIREBASE_AUTH_DOMAIN__?: string;
   __GFC_FIREBASE_PROJECT_ID__?: string;
   __GFC_FIREBASE_APP_ID__?: string;
+  __GFC_SENTRY_DSN__?: string;
+  __GFC_SENTRY_ENVIRONMENT__?: string;
+  __GFC_APP_VERSION__?: string;
   Headers?: typeof Headers;
   Request?: typeof Request;
   Response?: typeof Response;
@@ -42,6 +45,9 @@ if (typeof globalScope.__GFC_FIREBASE_API_KEY__ === 'undefined') globalScope.__G
 if (typeof globalScope.__GFC_FIREBASE_AUTH_DOMAIN__ === 'undefined') globalScope.__GFC_FIREBASE_AUTH_DOMAIN__ = '';
 if (typeof globalScope.__GFC_FIREBASE_PROJECT_ID__ === 'undefined') globalScope.__GFC_FIREBASE_PROJECT_ID__ = '';
 if (typeof globalScope.__GFC_FIREBASE_APP_ID__ === 'undefined') globalScope.__GFC_FIREBASE_APP_ID__ = '';
+if (typeof globalScope.__GFC_SENTRY_DSN__ === 'undefined') globalScope.__GFC_SENTRY_DSN__ = '';
+if (typeof globalScope.__GFC_SENTRY_ENVIRONMENT__ === 'undefined') globalScope.__GFC_SENTRY_ENVIRONMENT__ = '';
+if (typeof globalScope.__GFC_APP_VERSION__ === 'undefined') globalScope.__GFC_APP_VERSION__ = 'test';
 
 if (typeof globalScope.Headers === 'undefined') {
   globalScope.Headers =
