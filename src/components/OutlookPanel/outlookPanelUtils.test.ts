@@ -15,6 +15,7 @@ describe('outlookPanelUtils', () => {
     expect(getAvailableProbabilities('totalSevere', 3)).toContain('5%');
     expect(getAvailableProbabilities('day4-8', 4)).toContain('15%');
     expect(getAvailableProbabilities('day4-8', 1)).toEqual([]);
+    expect(getAvailableProbabilities('excessiveRainfall', 1)).toEqual(['MRGL', 'SLGT']);
   });
 
   it('keeps legacy significance disabled', () => {
@@ -47,6 +48,7 @@ describe('outlookPanelUtils', () => {
     expect(getCurrentColor('categorical', 'TSTM')).not.toBe('#FFFFFF');
     expect(getCurrentColor('hail', 'CIG2')).toBe('#e0e0e0');
     expect(getCurrentColor('wind', '45%')).not.toBe('#FFFFFF');
+    expect(getCurrentColor('excessiveRainfall', 'MRGL')).not.toBe('#FFFFFF');
     expect(getCurrentColor('unknown' as never, '??')).toBe('#FFFFFF');
   });
 });

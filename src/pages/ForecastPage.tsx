@@ -80,6 +80,8 @@ export const getProbabilityList = (activeOutlookType: string) => {
     case 'wind':
     case 'hail':
       return ['5%', '15%', '30%', '45%', '60%'] as readonly string[];
+    case 'excessiveRainfall':
+      return ['MRGL', 'SLGT'] as readonly string[];
     default:
       return [] as readonly string[];
   }
@@ -369,6 +371,7 @@ const OUTLOOK_SHORTCUTS: Record<string, { type: OutlookType; label: string }> = 
   t: { type: 'tornado', label: 'Tornado' },
   w: { type: 'wind', label: 'Wind' },
   h: { type: 'hail', label: 'Hail' },
+  r: { type: 'excessiveRainfall', label: 'Excessive Rainfall' },
   c: { type: 'categorical', label: 'Categorical' },
 };
 

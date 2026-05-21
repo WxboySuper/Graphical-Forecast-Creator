@@ -59,6 +59,7 @@ type EditableOutlookType =
   | "tornado"
   | "wind"
   | "hail"
+  | "excessiveRainfall"
   | "totalSevere"
   | "day4-8";
 
@@ -124,6 +125,7 @@ const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
   "tornado",
   "wind",
   "hail",
+  "excessiveRainfall",
   "totalSevere",
   "day4-8",
 ]);
@@ -522,6 +524,15 @@ export const createTileSource = (
   }
 };
 
+export const createRadarTileSource = (): XYZ => {
+  return new XYZ({
+    url: "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r/{z}/{x}/{y}.png",
+    attributions: "Radar data &copy; Iowa State University",
+    crossOrigin: "anonymous",
+    maxZoom: 12,
+  });
+};
+
 /** Sentinel value used to clear an Overlay's position, causing it to be hidden from the map. */
 const OVERLAY_HIDDEN_POSITION: Parameters<Overlay["setPosition"]>[0] =
   undefined;
@@ -559,6 +570,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
     const ghostOutlooks = useSelector(
       (state: RootState) => state.overlays.ghostOutlooks,
     );
+    const radarOverlayVisible = useSelector(
+      (state: RootState) => state.overlays.radarOverlay,
+    );
     const initialMapViewRef = useRef(currentMapView);
     const currentMapViewRef = useRef(currentMapView);
     const popupRef = useRef<HTMLDivElement>(null);
@@ -587,6 +601,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
     const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
+    const radarLayerRef = useRef<TileLayer<XYZ> | null>(null);
     const vectorSourceRef = useRef<VectorSource>(new VectorSource());
     const catSourceRef = useRef<VectorSource>(new VectorSource());
     const ghostSourceRef = useRef<VectorSource>(new VectorSource());
@@ -713,6 +728,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
       });
       vectorLayerRef.current = vectorLayer;
       // Place labels/cities above outlook polygons.
+      const radarLayer = new TileLayer({
+        source: createRadarTileSource(),
+        visible: radarOverlayVisible,
+        zIndex: 2.5,
+        opacity: 0.55,
+      });
+      radarLayerRef.current = radarLayer;
       const labelLayer = new TileLayer({
         source: createLabelOverlaySource("osm") ?? undefined,
         visible: true,
@@ -728,6 +750,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         target: mapElementRef.current,
         layers: [
           tileLayer,
+          radarLayer,
           vectorBaseGroup,
           worldLayer,
           lakesLayer,
@@ -965,8 +988,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         vectorBaseGroupRef.current = null;
         vectorReferenceGroupRef.current = null;
         vectorLayerRef.current = null;
+        radarLayerRef.current = null;
       };
-    }, [dispatch]);
+    }, [dispatch, radarOverlayVisible]);
 
     useEffect(() => {
       if (!selectRef.current) {
@@ -1031,6 +1055,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         isApplyingExternalViewRef.current = false;
       }, 0);
     }, [currentMapView.center, currentMapView.zoom]);
+
+    useEffect(() => {
+      if (!radarLayerRef.current) {
+        return;
+      }
+      radarLayerRef.current.setVisible(radarOverlayVisible);
+    }, [radarOverlayVisible]);
 
     // Swap base tile source / blank land layer when style changes
     useEffect(() => {

@@ -6,7 +6,7 @@ import { colorMappings, getCategoricalRiskDisplayName } from '../../utils/outloo
 import { CategoricalRiskLevel } from '../../types/outlooks';
 import './Legend.css';
 
-type LegendOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail' | 'totalSevere' | 'day4-8';
+type LegendOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail' | 'excessiveRainfall' | 'totalSevere' | 'day4-8';
 
 interface LegendProps {
   activeOutlookType?: LegendOutlookType;
@@ -59,6 +59,9 @@ const Legend: React.FC<LegendProps> = React.memo(({
     } else if (activeOutlookType === 'hail') {
       probabilities = ['5%', '15%', '30%', '45%', '60%', 'CIG1', 'CIG2'];
       colorMap = colorMappings.hail;
+    } else if (activeOutlookType === 'excessiveRainfall') {
+      probabilities = ['MRGL', 'SLGT'];
+      colorMap = colorMappings.excessiveRainfall;
     } else if (activeOutlookType === 'totalSevere') {
       probabilities = ['5%', '15%', '30%', '45%', '60%', 'CIG1', 'CIG2'];
       colorMap = colorMappings.totalSevere;
@@ -72,6 +75,7 @@ const Legend: React.FC<LegendProps> = React.memo(({
         <h4 id="legend-title">
           {activeOutlookType === 'totalSevere' ? 'TotalSevere' : 
            activeOutlookType === 'day4-8' ? 'Day4-8' :
+           activeOutlookType === 'excessiveRainfall' ? 'Excessive Rainfall' :
            activeOutlookType.charAt(0).toUpperCase() + activeOutlookType.slice(1)} Probabilities
         </h4>
         <div className="legend-items" role="list" aria-labelledby="legend-title">

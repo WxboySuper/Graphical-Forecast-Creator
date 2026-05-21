@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Calendar,
   CloudHail,
+  CloudRain,
   LayoutGrid,
   Tornado,
   Wind,
@@ -14,6 +15,7 @@ export const outlookIcons: Record<OutlookType, React.ReactNode> = {
   tornado: <Tornado className="h-4 w-4" />,
   wind: <Wind className="h-4 w-4" />,
   hail: <CloudHail className="h-4 w-4" />,
+  excessiveRainfall: <CloudRain className="h-4 w-4" />,
   categorical: <LayoutGrid className="h-4 w-4" />,
   totalSevere: <CloudHail className="h-4 w-4" />,
   'day4-8': <Calendar className="h-4 w-4" />,
@@ -23,6 +25,7 @@ export const outlookLabels: Record<OutlookType, string> = {
   tornado: 'Tornado',
   wind: 'Wind',
   hail: 'Hail',
+  excessiveRainfall: 'Excessive Rainfall',
   categorical: 'Categorical',
   totalSevere: 'Total Severe',
   'day4-8': 'Day 4-8',
@@ -32,6 +35,7 @@ export const outlookShortcuts: Record<OutlookType, string> = {
   tornado: 'T',
   wind: 'W',
   hail: 'H',
+  excessiveRainfall: 'R',
   categorical: 'C',
   totalSevere: 'S',
   'day4-8': 'D',
@@ -64,6 +68,7 @@ export const hasDayOutlookData = (
     (data.tornado && data.tornado.size > 0) ||
     (data.wind && data.wind.size > 0) ||
     (data.hail && data.hail.size > 0) ||
+    (data.excessiveRainfall && data.excessiveRainfall.size > 0) ||
     (data.totalSevere && data.totalSevere.size > 0) ||
     (data['day4-8'] && data['day4-8'].size > 0) ||
     (data.categorical && data.categorical.size > 0)

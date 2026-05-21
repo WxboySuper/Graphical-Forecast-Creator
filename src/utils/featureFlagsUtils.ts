@@ -9,6 +9,7 @@ export const getFirstEnabledOutlookType = (featureFlags: FeatureFlags): OutlookT
   if (featureFlags.tornadoOutlookEnabled) return 'tornado';
   if (featureFlags.windOutlookEnabled) return 'wind';
   if (featureFlags.hailOutlookEnabled) return 'hail';
+  if (featureFlags.excessiveRainfallOutlookEnabled) return 'excessiveRainfall';
   if (featureFlags.categoricalOutlookEnabled) return 'categorical';
   
   // If somehow all outlooks are disabled, return categorical as a fallback
@@ -24,6 +25,7 @@ export const isAnyOutlookEnabled = (featureFlags: FeatureFlags): boolean => {
     featureFlags.tornadoOutlookEnabled ||
     featureFlags.windOutlookEnabled ||
     featureFlags.hailOutlookEnabled ||
+    featureFlags.excessiveRainfallOutlookEnabled ||
     featureFlags.categoricalOutlookEnabled
   );
 };
@@ -41,6 +43,8 @@ export const isOutlookTypeEnabled = (featureFlags: FeatureFlags, type: OutlookTy
       return featureFlags.hailOutlookEnabled;
     case 'categorical':
       return featureFlags.categoricalOutlookEnabled;
+    case 'excessiveRainfall':
+      return featureFlags.excessiveRainfallOutlookEnabled;
     default:
       return false;
   }

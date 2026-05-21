@@ -129,7 +129,7 @@ export const UsageSection: React.FC = () => (
         <span className="item-title">Select a day:</span> Use the day buttons (1–8) in the toolbar or press the corresponding number key.
       </li>
       <li>
-        <span className="item-title">Select an outlook type:</span> Choose Tornado, Wind, Hail, or Categorical (Days 1–2), Total Severe (Day 3), or Day 4–8.
+        <span className="item-title">Select an outlook type:</span> Choose Tornado, Wind, Hail, Excessive Rainfall, or Categorical (Days 1–2), Total Severe (Day 3), or Day 4–8.
       </li>
       <li>
         <span className="item-title">Select a probability:</span> Click the desired probability level in the panel.

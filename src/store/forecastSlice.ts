@@ -63,11 +63,12 @@ const ALL_OUTLOOK_TYPES: OutlookType[] = [
   'tornado',
   'wind',
   'hail',
+  'excessiveRainfall',
   'categorical',
   'totalSevere',
   'day4-8',
 ];
-const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical'];
+const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'excessiveRainfall', 'categorical'];
 const COPY_FEATURE_RULES: Record<DayBucket, Record<DayBucket, CopyFeatureRule[]>> = {
   day12: {
     day12: DIRECT_DAY12_COPY_TYPES.map((type) => ({ sourceType: type, targetType: type })),
@@ -112,10 +113,11 @@ const createEmptyOutlook = (day: DayType): OutlookDay => {
   const baseData: OutlookData = {};
 
   if (day === 1 || day === 2) {
-    // Day 1/2: tornado, wind, hail, categorical
+    // Day 1/2: tornado, wind, hail, excessiveRainfall, categorical
     baseData.tornado = new Map();
     baseData.wind = new Map();
     baseData.hail = new Map();
+    baseData.excessiveRainfall = new Map();
     baseData.categorical = new Map();
   } else if (day === 3) {
     // Day 3: totalSevere, categorical

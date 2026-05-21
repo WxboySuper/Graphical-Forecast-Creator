@@ -4,6 +4,7 @@ import { RootState } from '../../store';
 import {
   toggleStateBorders,
   toggleCounties,
+  toggleRadarOverlay,
 } from '../../store/overlaysSlice';
 import './OverlayControls.css';
 
@@ -21,10 +22,14 @@ const OverlayControls: React.FC = () => {
   const handleToggleCounties = () => {
     dispatch(toggleCounties());
   };
+
+  const handleToggleRadarOverlay = () => {
+    dispatch(toggleRadarOverlay());
+  };
   
   return (
     <div className="overlay-controls">
-      <div className="overlay-controls-header">Boundaries</div>
+      <div className="overlay-controls-header">Overlays</div>
       
       <label className="overlay-control-item">
         <input
@@ -42,6 +47,14 @@ const OverlayControls: React.FC = () => {
           onChange={handleToggleCounties}
         />
         <span className="overlay-control-label">Counties</span>
+      </label>
+      <label className="overlay-control-item">
+        <input
+          type="checkbox"
+          checked={overlays.radarOverlay}
+          onChange={handleToggleRadarOverlay}
+        />
+        <span className="overlay-control-label">Live Radar</span>
       </label>
     </div>
   );

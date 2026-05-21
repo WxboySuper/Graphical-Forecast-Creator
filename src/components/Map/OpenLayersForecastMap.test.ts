@@ -34,6 +34,7 @@ import {
   isDrawableOutlookType,
   toOlStyle,
   toGhostOlStyle,
+  createRadarTileSource,
 } from './OpenLayersForecastMap';
 
 type FeatureStub = {
@@ -100,6 +101,12 @@ describe('OpenLayersForecastMap helpers', () => {
 
     const f2 = createOutlookFill({ probability: 'CIG1', fillColor: '#000000', fillOpacity: 0.5 });
     expect(f2).toBeTruthy();
+  });
+
+  test('createRadarTileSource returns a radar XYZ tile source', () => {
+    const source = createRadarTileSource();
+    expect(source).toBeTruthy();
+    expect(source.getUrls?.()[0]).toContain('nexrad-n0r');
   });
 
   test('resolveStrokeWidth returns 3 for top layer, numeric weight otherwise, and default 2', () => {

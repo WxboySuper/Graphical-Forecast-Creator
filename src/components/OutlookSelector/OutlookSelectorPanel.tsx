@@ -3,6 +3,7 @@ import {
   Tornado, 
   Wind, 
   CloudHail, 
+  CloudRain,
   LayoutGrid, 
   CloudSun,
   Calendar
@@ -23,6 +24,7 @@ const outlookIcons: Record<OutlookType, React.ReactNode> = {
   tornado: <Tornado className="h-4 w-4" />,
   wind: <Wind className="h-4 w-4" />,
   hail: <CloudHail className="h-4 w-4" />,
+  excessiveRainfall: <CloudRain className="h-4 w-4" />,
   categorical: <LayoutGrid className="h-4 w-4" />,
   totalSevere: <CloudSun className="h-4 w-4" />,
   'day4-8': <Calendar className="h-4 w-4" />,
@@ -32,6 +34,7 @@ const outlookLabels: Record<OutlookType, string> = {
   tornado: 'Tornado',
   wind: 'Wind',
   hail: 'Hail',
+  excessiveRainfall: 'Excessive Rainfall',
   categorical: 'Categorical',
   totalSevere: 'Total Severe',
   'day4-8': 'Day 4-8',
@@ -41,6 +44,7 @@ const outlookShortcuts: Record<OutlookType, string> = {
   tornado: 'T',
   wind: 'W',
   hail: 'L',
+  excessiveRainfall: 'R',
   categorical: 'C',
   totalSevere: 'S',
   'day4-8': 'D',
@@ -59,7 +63,7 @@ export const OutlookSelectorPanel: React.FC = memo(() => {
   } = useOutlookPanelLogic();
 
   // Get available outlook types
-  const availableTypes = (['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'] as OutlookType[])
+  const availableTypes = (['tornado', 'wind', 'hail', 'excessiveRainfall', 'categorical', 'totalSevere', 'day4-8'] as OutlookType[])
     .filter(type => getOutlookTypeEnabled(type));
 
   // Get current color for preview
@@ -74,8 +78,8 @@ export const OutlookSelectorPanel: React.FC = memo(() => {
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Type
             </label>
-            <div className="grid grid-cols-2 grid-rows-2 gap-1">
-              {availableTypes.slice(0, 4).map((type) => (
+            <div className="grid grid-cols-2 grid-rows-3 gap-1">
+              {availableTypes.map((type) => (
                 <Tooltip key={type}>
                   <TooltipTrigger asChild>
                     <Button

@@ -6,12 +6,13 @@ const mockDispatch = jest.fn();
 jest.mock('react-redux', () => ({
   useDispatch: () => mockDispatch,
   useSelector: (selector: (state: unknown) => unknown) => selector({
-    overlays: { showStateBorders: false, showCounties: false },
+    overlays: { stateBorders: false, counties: false, radarOverlay: false },
   }),
 }));
 jest.mock('../../store/overlaysSlice', () => ({
   toggleStateBorders: () => ({ type: 'overlays/toggleStateBorders' }),
   toggleCounties: () => ({ type: 'overlays/toggleCounties' }),
+  toggleRadarOverlay: () => ({ type: 'overlays/toggleRadarOverlay' }),
 }));
 
 beforeEach(() => mockDispatch.mockClear());

@@ -10,6 +10,7 @@ export interface FeatureFlags {
   windOutlookEnabled: boolean;
   hailOutlookEnabled: boolean;
   categoricalOutlookEnabled: boolean;
+  excessiveRainfallOutlookEnabled: boolean;
   
   // Other features
   saveLoadEnabled: boolean;
@@ -22,6 +23,7 @@ const initialState: FeatureFlags = {
   windOutlookEnabled: true,
   hailOutlookEnabled: true,
   categoricalOutlookEnabled: true,
+  excessiveRainfallOutlookEnabled: true,
   saveLoadEnabled: true,
   significantThreatsEnabled: true,
 };

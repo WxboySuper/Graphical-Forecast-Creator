@@ -55,6 +55,11 @@ export type Day48Probability =
   | '15%' // Yellow
   | '30%'; // Orange
 
+// Excessive rainfall outlook levels
+export type ExcessiveRainfallProbability =
+  | 'MRGL'
+  | 'SLGT';
+
 // CIG (Hatching) Levels
 export type CIGLevel = 
   | 'CIG0' // No hatching
@@ -63,13 +68,13 @@ export type CIGLevel =
   | 'CIG3'; // Crosshatch
 
 // Outlook types - varies by day
-// Day 1/2: tornado, wind, hail, categorical
-// Day 3: totalSevere, categorical  
+// Day 1/2: tornado, wind, hail, categorical, excessiveRainfall
+// Day 3: totalSevere, categorical
 // Day 4-8: day4-8
-export type OutlookType = 'tornado' | 'wind' | 'hail' | 'categorical' | 'totalSevere' | 'day4-8';
+export type OutlookType = 'tornado' | 'wind' | 'hail' | 'categorical' | 'totalSevere' | 'day4-8' | 'excessiveRainfall';
 
 // Combined probability type for use across the app
-export type Probability = TornadoProbability | WindProbability | HailProbability | TotalSevereProbability | Day48Probability | CategoricalRiskLevel | CIGLevel;
+export type Probability = TornadoProbability | WindProbability | HailProbability | TotalSevereProbability | Day48Probability | ExcessiveRainfallProbability | CategoricalRiskLevel | CIGLevel;
 
 export type Hazard = OutlookType;
 
@@ -99,6 +104,7 @@ export interface OutlookData {
   tornado?: Map<string, Feature[]>;
   wind?: Map<string, Feature[]>;
   hail?: Map<string, Feature[]>;
+  excessiveRainfall?: Map<string, Feature[]>;
   
   // Day 3 field
   totalSevere?: Map<string, Feature[]>;
@@ -115,6 +121,7 @@ export interface ColorMappings {
   tornado: Record<TornadoProbability, string>;
   wind: Record<WindProbability, string>;
   hail: Record<HailProbability, string>;
+  excessiveRainfall: Record<ExcessiveRainfallProbability, string>;
   totalSevere: Record<TotalSevereProbability, string>;
   'day4-8': Record<Day48Probability, string>;
   categorical: Record<CategoricalRiskLevel, string>;
@@ -134,6 +141,7 @@ export interface SerializedOutlookData {
   tornado?: [string, Feature[]][];
   wind?: [string, Feature[]][];
   hail?: [string, Feature[]][];
+  excessiveRainfall?: [string, Feature[]][];
   totalSevere?: [string, Feature[]][];
   'day4-8'?: [string, Feature[]][];
   categorical?: [string, Feature[]][];

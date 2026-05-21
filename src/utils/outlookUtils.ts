@@ -46,6 +46,10 @@ export const colorMappings: ColorMappings = {
     '45%': '#FF7FFF',
     '60%': '#C895F6',
   },
+  excessiveRainfall: {
+    'MRGL': '#7CC1FF',
+    'SLGT': '#3B7EFF',
+  },
   totalSevere: {
     '5%': '#C5A392',
     '15%': '#FFEB7F',
@@ -74,7 +78,7 @@ export function getOutlookConstraints(day: DayType) {
     case 1:
     case 2:
       return {
-        outlookTypes: ['tornado', 'wind', 'hail', 'categorical'] as const,
+        outlookTypes: ['tornado', 'wind', 'hail', 'categorical', 'excessiveRainfall'] as const,
         allowsProbabilities: true,
         allowedCIG: ['CIG1', 'CIG2', 'CIG3'],
         allowedCategorical: ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'],
@@ -82,7 +86,8 @@ export function getOutlookConstraints(day: DayType) {
         probabilities: {
           tornado: ['2%', '5%', '10%', '15%', '30%', '45%', '60%'],
           wind: ['5%', '15%', '30%', '45%', '60%', '75%', '90%'],
-          hail: ['5%', '15%', '30%', '45%', '60%']
+          hail: ['5%', '15%', '30%', '45%', '60%'],
+          excessiveRainfall: ['MRGL', 'SLGT']
         }
       };
     case 3:

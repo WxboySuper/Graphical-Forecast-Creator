@@ -13,7 +13,7 @@ import {
 describe('outlookUtils extra', () => {
   test('getOutlookConstraints returns correct sets for days', () => {
     const d1 = getOutlookConstraints(1);
-    expect(d1.outlookTypes).toEqual(expect.arrayContaining(['tornado', 'wind', 'hail', 'categorical']));
+    expect(d1.outlookTypes).toEqual(expect.arrayContaining(['tornado', 'wind', 'hail', 'categorical', 'excessiveRainfall']));
     const d3 = getOutlookConstraints(3);
     expect(d3.allowedCategorical).not.toContain('HIGH');
     const d8 = getOutlookConstraints(8);
@@ -76,6 +76,9 @@ describe('outlookUtils extra', () => {
     expect(getOutlookColor('categorical', 'TSTM')).toBe('#C1E9C1');
     // tornado 15% mapping exists
     expect(getOutlookColor('tornado', '15%')).toBe('#FF8080');
+    // excessive rainfall mappings exist
+    expect(getOutlookColor('excessiveRainfall', 'MRGL')).toBe('#7CC1FF');
+    expect(getOutlookColor('excessiveRainfall', 'SLGT')).toBe('#3B7EFF');
     // unknown type returns default gray
     expect(getOutlookColor('unknown-type', '5%')).toBe('#808080');
   });

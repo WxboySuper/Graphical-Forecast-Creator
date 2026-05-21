@@ -1,4 +1,4 @@
-import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindProbability, HailProbability, TotalSevereProbability,Day48Probability, CIGLevel, DayType } from '../../types/outlooks';
+import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindProbability, HailProbability, TotalSevereProbability, Day48Probability, ExcessiveRainfallProbability, CIGLevel, DayType } from '../../types/outlooks';
 import { colorMappings, getOutlookConstraints } from '../../utils/outlookUtils';
 
 /**
@@ -36,6 +36,11 @@ export const getAvailableProbabilities = (activeOutlookType: OutlookType, curren
       if (constraints.probabilities.hail) {
         const hailCigs = cigs.filter(c => c !== 'CIG3');
         return [...constraints.probabilities.hail, ...hailCigs] as (HailProbability | CIGLevel)[];
+      }
+      return [];
+    case 'excessiveRainfall':
+      if (constraints.probabilities.excessiveRainfall) {
+        return constraints.probabilities.excessiveRainfall as ExcessiveRainfallProbability[];
       }
       return [];
     case 'totalSevere':
@@ -90,8 +95,7 @@ export const getProbabilityButtonStyle = (activeOutlookType: OutlookType, active
     let colorMap: Record<string, string>;
     if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
     else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
-    else if (activeOutlookType === 'hail') colorMap = colorMappings.hail;
-    else if (activeOutlookType === 'totalSevere') colorMap = colorMappings.totalSevere;
+    else if (activeOutlookType === 'hail') colorMap = colorMappings.hail;    else if (activeOutlookType === 'excessiveRainfall') colorMap = colorMappings.excessiveRainfall;    else if (activeOutlookType === 'totalSevere') colorMap = colorMappings.totalSevere;
     else if (activeOutlookType === 'day4-8') colorMap = colorMappings['day4-8'];
     else colorMap = {};
 
@@ -127,6 +131,7 @@ export const getCurrentColor = (activeOutlookType: OutlookType, activeProbabilit
   if (activeOutlookType === 'tornado') colorMap = colorMappings.tornado;
   else if (activeOutlookType === 'wind') colorMap = colorMappings.wind;
   else if (activeOutlookType === 'hail') colorMap = colorMappings.hail;
+  else if (activeOutlookType === 'excessiveRainfall') colorMap = colorMappings.excessiveRainfall;
   else if (activeOutlookType === 'totalSevere') colorMap = colorMappings.totalSevere;
   else if (activeOutlookType === 'day4-8') colorMap = colorMappings['day4-8'];
   else colorMap = {};

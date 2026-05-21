@@ -74,7 +74,7 @@ describe('DaySelectorPanel', () => {
 
     expect(screen.getByText(new Date('2026-03-27').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '2' })).toHaveClass('bg-primary');
-    expect(container.querySelector('.text-center')).toHaveTextContent('Tornado, Wind, Hail, Categorical');
+    expect(container.querySelector('.text-center')).toHaveTextContent('Tornado, Wind, Hail, Excessive Rainfall, Categorical');
     expect(container.querySelectorAll('.bg-success')).toHaveLength(3);
   });
 

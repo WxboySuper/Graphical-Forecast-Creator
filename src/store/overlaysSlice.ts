@@ -6,6 +6,7 @@ export type BaseMapStyle = 'osm' | 'carto-light' | 'carto-dark' | 'esri-satellit
 export interface OverlaysState {
   stateBorders: boolean;
   counties: boolean;
+  radarOverlay: boolean;
   baseMapStyle: BaseMapStyle;
   ghostOutlooks: Record<OutlookType, boolean>;
 }
@@ -13,6 +14,7 @@ export interface OverlaysState {
 const initialState: OverlaysState = {
   stateBorders: true, // Default to showing state borders
   counties: false,
+  radarOverlay: false,
   baseMapStyle: 'osm',
   ghostOutlooks: {
     tornado: false,
@@ -41,8 +43,14 @@ const overlaysSlice = createSlice({
     toggleCounties: (state) => {
       state.counties = !state.counties;
     },
-    setOverlay: (state, action: PayloadAction<{ layer: 'stateBorders' | 'counties'; visible: boolean }>) => {
+    setOverlay: (state, action: PayloadAction<{ layer: 'stateBorders' | 'counties' | 'radarOverlay'; visible: boolean }>) => {
       state[action.payload.layer] = action.payload.visible;
+    },
+    toggleRadarOverlay: (state) => {
+      state.radarOverlay = !state.radarOverlay;
+    },
+    setRadarOverlay: (state, action: PayloadAction<boolean>) => {
+      state.radarOverlay = action.payload;
     },
     setBaseMapStyle: (state, action: PayloadAction<BaseMapStyle>) => {
       state.baseMapStyle = action.payload;
@@ -56,7 +64,7 @@ const overlaysSlice = createSlice({
       state.ghostOutlooks[outlookType] = visible;
     },
     applyOverlaySettings: (state, action: PayloadAction<Partial<OverlaysState>>) => {
-      const { stateBorders, counties, baseMapStyle, ghostOutlooks } = action.payload;
+      const { stateBorders, counties, radarOverlay, baseMapStyle, ghostOutlooks } = action.payload;
 
       if (typeof stateBorders === 'boolean') {
         state.stateBorders = stateBorders;
@@ -64,6 +72,10 @@ const overlaysSlice = createSlice({
 
       if (typeof counties === 'boolean') {
         state.counties = counties;
+      }
+
+      if (typeof radarOverlay === 'boolean') {
+        state.radarOverlay = radarOverlay;
       }
 
       if (baseMapStyle) {
@@ -88,6 +100,8 @@ export const {
   toggleStateBorders,
   toggleCounties,
   setOverlay,
+  toggleRadarOverlay,
+  setRadarOverlay,
   setBaseMapStyle,
   toggleGhostOutlook,
   setGhostOutlookVisibility,

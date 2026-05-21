@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 
 ## v1.5.2
 
-## Fixed
+### Added
+- Added a live radar overlay to the forecast map, enabling users to compare real-time radar with their outlooks.
+- Added Storm Prediction Center-style Excessive Rainfall outlook support for Day 1/2 with MRGL and SLGT probabilities.
+
+### Fixed
 - Fixed the primary button on the signed-out Home Page being incorrectly white/blank
 - Fixed an issue where you couldn't export an outlook as an image
 

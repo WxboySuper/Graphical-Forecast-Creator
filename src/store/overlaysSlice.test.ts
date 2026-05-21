@@ -6,4 +6,10 @@ describe('overlaysSlice', () => {
 
     expect(Object.values(state.ghostOutlooks)).toEqual([false, false, false, false, false, false]);
   });
+
+  test('defaults radar overlay to off', () => {
+    const state = reducer(undefined, { type: '@@INIT' });
+
+    expect(state.radarOverlay).toBe(false);
+  });
 });

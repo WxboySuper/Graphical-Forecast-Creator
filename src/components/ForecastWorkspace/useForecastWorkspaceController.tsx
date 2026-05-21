@@ -12,7 +12,7 @@ import { useExportMap } from '../DrawingTools/useExportMap';
 import { DayType, OutlookType } from '../../types/outlooks';
 import { getOutlookColor } from '../../utils/outlookUtils';
 
-const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
+const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'excessiveRainfall', 'categorical', 'totalSevere', 'day4-8'];
 
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 

@@ -20,7 +20,7 @@ const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 // Get description for each day type
 const getDayDescription = (day: DayType): string => {
   if (day === 1 || day === 2) {
-    return 'Tornado, Wind, Hail, Categorical';
+    return 'Tornado, Wind, Hail, Excessive Rainfall, Categorical';
   } else if (day === 3) {
     return 'Total Severe, Categorical';
   } else {
@@ -35,7 +35,7 @@ const hasDataForDay = (days: ForecastDays, day: DayType): boolean => {
   const outlookDay = days[day];
   if (!outlookDay) return false;
   const { data } = outlookDay;
-  const keys = ['tornado', 'wind', 'hail', 'totalSevere', 'day4-8', 'categorical'];
+  const keys = ['tornado', 'wind', 'hail', 'excessiveRainfall', 'totalSevere', 'day4-8', 'categorical'];
   return keys.some((k) => (data?.[k as keyof typeof data]?.size ?? 0) > 0);
 };
 

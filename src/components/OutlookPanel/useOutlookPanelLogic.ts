@@ -42,6 +42,7 @@ export function useOutlookPanelLogic() {
       wind: featureFlags.windOutlookEnabled,
       hail: featureFlags.hailOutlookEnabled,
       categorical: featureFlags.categoricalOutlookEnabled,
+      excessiveRainfall: featureFlags.excessiveRainfallOutlookEnabled,
       totalSevere: true, // Day 3 - always enabled
       'day4-8': true, // Day 4-8 - always enabled
     };
@@ -85,6 +86,7 @@ export function useOutlookPanelLogic() {
       wind: () => handleOutlookTypeChange('wind'),
       hail: () => handleOutlookTypeChange('hail'),
       categorical: () => handleOutlookTypeChange('categorical'),
+      excessiveRainfall: () => handleOutlookTypeChange('excessiveRainfall'),
       totalSevere: () => handleOutlookTypeChange('totalSevere'),
       'day4-8': () => handleOutlookTypeChange('day4-8'),
     }),
