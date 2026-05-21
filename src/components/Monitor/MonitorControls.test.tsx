@@ -4,6 +4,10 @@ import { DEFAULT_MONITOR_SETTINGS } from '../../monitor/types';
 
 const baseProps = {
   settings: DEFAULT_MONITOR_SETTINGS,
+  radarSiteOptions: [
+    { id: 'KTLX', name: 'Oklahoma City', label: 'KTLX — Oklahoma City' },
+    { id: 'KAMA', name: 'Amarillo', label: 'KAMA — Amarillo' },
+  ],
   outlookOptions: [{
     id: 'current',
     kind: 'current' as const,
@@ -36,14 +40,24 @@ describe('MonitorControls', () => {
   });
 
   test('renders controls and dispatches user changes', () => {
-    render(<MonitorControls {...baseProps} />);
+    const { rerender } = render(<MonitorControls {...baseProps} />);
 
     expect(screen.getByRole('heading', { name: 'Monitor' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Radar source'), { target: { value: 'mrms-conus' } });
+    expect(baseProps.onRadarModeChange).toHaveBeenCalledWith('mrms-conus');
+
+    rerender(
+      <MonitorControls
+        {...baseProps}
+        settings={{ ...DEFAULT_MONITOR_SETTINGS, radarMode: 'site' }}
+      />
+    );
+    expect(screen.getByPlaceholderText(/Search KTLX/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Base Reflectivity')).toBeInTheDocument();
+
     fireEvent.change(screen.getByLabelText('Radar site'), { target: { value: 'KDVN' } });
     expect(baseProps.onRadarSiteChange).toHaveBeenCalledWith('KDVN');
-
-    fireEvent.change(screen.getAllByDisplayValue('Off')[0], { target: { value: 'mrms-conus' } });
-    expect(baseProps.onRadarModeChange).toHaveBeenCalledWith('mrms-conus');
 
     fireEvent.click(screen.getByLabelText('Refresh live layers'));
     expect(baseProps.onRefresh).toHaveBeenCalledTimes(1);

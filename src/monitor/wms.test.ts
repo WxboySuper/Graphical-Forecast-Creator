@@ -3,7 +3,9 @@ import {
   buildSatelliteLayerConfig,
   findLatestLayerTime,
   findLayerTimeValues,
+  getRadarProductsForMode,
   parseWmsLayerTimes,
+  resolveRadarProductForMode,
   selectAnimationFrameTimes,
 } from './wms';
 
@@ -50,6 +52,13 @@ describe('WMS helpers', () => {
       '2026-04-28T17:46:20Z',
     ]);
     expect(findLatestLayerTime(sampleCapabilities, 'missing')).toBeUndefined();
+  });
+
+  test('filters radar products by source mode', () => {
+    expect(getRadarProductsForMode('mrms-conus').map((product) => product.value)).toEqual(['bref-qcd', 'cref-qcd']);
+    expect(getRadarProductsForMode('site').map((product) => product.value)).toEqual(['sr-bref', 'sr-bvel']);
+    expect(resolveRadarProductForMode('site', 'cref-qcd')).toBe('sr-bref');
+    expect(resolveRadarProductForMode('mrms-conus', 'sr-bvel')).toBe('bref-qcd');
   });
 
   test('selects trailing frames for playback', () => {

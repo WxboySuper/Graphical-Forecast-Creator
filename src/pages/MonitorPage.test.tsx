@@ -34,6 +34,14 @@ jest.mock('../monitor/useLiveWmsLayers', () => ({
   }),
 }));
 
+jest.mock('../monitor/useRadarSiteOptions', () => ({
+  useRadarSiteOptions: () => ({
+    sites: [{ id: 'KTLX', name: 'Oklahoma City', label: 'KTLX — Oklahoma City' }],
+    loading: false,
+    error: undefined,
+  }),
+}));
+
 jest.mock('../components/Monitor/MonitorMap', () => () => <div data-testid="monitor-map-stub" />);
 
 const renderMonitorPage = () => {

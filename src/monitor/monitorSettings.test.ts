@@ -1,4 +1,5 @@
 import { DEFAULT_MONITOR_SETTINGS, normalizeMonitorSettings } from './types';
+import monitorReducer, { setRadarMode } from '../store/monitorSlice';
 import { readStoredMonitorSettings, writeStoredMonitorSettings, MONITOR_SETTINGS_STORAGE_KEY } from './storage';
 
 describe('monitor settings', () => {
@@ -33,6 +34,18 @@ describe('monitor settings', () => {
       animationEnabled: true,
       animationSpeedMs: 250,
     });
+  });
+
+  test('coerces radar product when switching source mode', () => {
+    const state = monitorReducer(undefined, { type: 'init' });
+    const siteState = monitorReducer(state, setRadarMode('site'));
+    expect(siteState.radarProduct).toBe('sr-bref');
+
+    const mrmsState = monitorReducer(
+      { ...siteState, radarProduct: 'sr-bvel' },
+      setRadarMode('mrms-conus')
+    );
+    expect(mrmsState.radarProduct).toBe('bref-qcd');
   });
 
   test('persists settings to localStorage with fallback on invalid content', () => {

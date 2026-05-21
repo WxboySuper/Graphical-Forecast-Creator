@@ -15,12 +15,48 @@ export interface WmsLayerTime {
 /** Maximum WMS frames to loop during playback (keeps animation responsive). */
 export const MAX_ANIMATION_FRAMES = 12;
 
-export const MRMS_PRODUCTS: Array<{ value: MonitorRadarProduct; label: string; mode: MonitorRadarMode }> = [
-  { value: 'bref-qcd', label: 'MRMS Base Reflectivity', mode: 'mrms-conus' },
-  { value: 'cref-qcd', label: 'MRMS Composite Reflectivity', mode: 'mrms-conus' },
-  { value: 'sr-bref', label: 'Site Base Reflectivity', mode: 'site' },
-  { value: 'sr-bvel', label: 'Site Base Velocity', mode: 'site' },
+export const MRMS_RADAR_PRODUCTS: Array<{ value: MonitorRadarProduct; label: string }> = [
+  { value: 'bref-qcd', label: 'Base Reflectivity (MRMS)' },
+  { value: 'cref-qcd', label: 'Composite Reflectivity (MRMS)' },
 ];
+
+export const SITE_RADAR_PRODUCTS: Array<{ value: MonitorRadarProduct; label: string }> = [
+  { value: 'sr-bref', label: 'Base Reflectivity' },
+  { value: 'sr-bvel', label: 'Base Velocity' },
+];
+
+/** @deprecated Use {@link getRadarProductsForMode} instead. */
+export const MRMS_PRODUCTS = [
+  ...MRMS_RADAR_PRODUCTS.map((product) => ({ ...product, mode: 'mrms-conus' as const })),
+  ...SITE_RADAR_PRODUCTS.map((product) => ({ ...product, mode: 'site' as const })),
+];
+
+export const getRadarProductsForMode = (mode: MonitorRadarMode) => {
+  if (mode === 'site') {
+    return SITE_RADAR_PRODUCTS;
+  }
+
+  if (mode === 'mrms-conus') {
+    return MRMS_RADAR_PRODUCTS;
+  }
+
+  return [];
+};
+
+export const resolveRadarProductForMode = (
+  mode: MonitorRadarMode,
+  product: MonitorRadarProduct
+): MonitorRadarProduct => {
+  if (mode === 'site') {
+    return product === 'sr-bvel' ? 'sr-bvel' : 'sr-bref';
+  }
+
+  if (mode === 'mrms-conus') {
+    return product === 'cref-qcd' ? 'cref-qcd' : 'bref-qcd';
+  }
+
+  return product;
+};
 
 export const SATELLITE_PRODUCTS: Array<{ value: MonitorSatelliteProduct; label: string }> = [
   { value: 'none', label: 'Off' },
@@ -79,11 +115,15 @@ export const buildRadarLayerConfig = ({
   }
 
   if (radarMode === 'mrms-conus') {
-    return radarProduct === 'cref-qcd' ? MRMS_LAYER_BY_PRODUCT['cref-qcd'] : MRMS_LAYER_BY_PRODUCT['bref-qcd'];
+    const mrmsProduct = resolveRadarProductForMode('mrms-conus', radarProduct);
+    return mrmsProduct === 'cref-qcd' ? MRMS_LAYER_BY_PRODUCT['cref-qcd'] : MRMS_LAYER_BY_PRODUCT['bref-qcd'];
   }
 
+  const siteProduct = resolveRadarProductForMode('site', radarProduct);
   const site = radarSite.trim().toLowerCase();
-  const suffix = radarProduct === 'sr-bvel' ? SITE_LAYER_SUFFIX_BY_PRODUCT['sr-bvel'] : SITE_LAYER_SUFFIX_BY_PRODUCT['sr-bref'];
+  const suffix = siteProduct === 'sr-bvel'
+    ? SITE_LAYER_SUFFIX_BY_PRODUCT['sr-bvel']
+    : SITE_LAYER_SUFFIX_BY_PRODUCT['sr-bref'];
   return {
     url: `https://opengeo.ncep.noaa.gov/geoserver/${site}/ows`,
     layer: `${site}_${suffix}`,

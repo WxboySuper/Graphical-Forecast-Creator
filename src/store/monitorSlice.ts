@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { MonitorMapView, MonitorOutlookSourceSelection, MonitorSettings } from '../monitor/types';
 import { DEFAULT_MONITOR_SETTINGS, normalizeMonitorSettings } from '../monitor/types';
+import { resolveRadarProductForMode } from '../monitor/wms';
 
 export type MonitorState = MonitorSettings;
 
@@ -17,12 +18,10 @@ const monitorSlice = createSlice({
       }),
     setRadarMode: (state, action: PayloadAction<MonitorSettings['radarMode']>) => {
       state.radarMode = action.payload;
+      state.radarProduct = resolveRadarProductForMode(action.payload, state.radarProduct);
     },
     setRadarProduct: (state, action: PayloadAction<MonitorSettings['radarProduct']>) => {
-      state.radarProduct = action.payload;
-      if ((action.payload === 'sr-bref' || action.payload === 'sr-bvel') && state.radarMode === 'mrms-conus') {
-        state.radarMode = 'site';
-      }
+      state.radarProduct = resolveRadarProductForMode(state.radarMode, action.payload);
     },
     setRadarSite: (state, action: PayloadAction<string>) => {
       const nextSite = action.payload.trim().toUpperCase();

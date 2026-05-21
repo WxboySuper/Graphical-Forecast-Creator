@@ -27,6 +27,7 @@ import { areMonitorSettingsEqual } from '../monitor/types';
 import type { MonitorSettings } from '../monitor/types';
 import { buildRadarLayerConfig, buildSatelliteLayerConfig } from '../monitor/wms';
 import { useLiveWmsLayers } from '../monitor/useLiveWmsLayers';
+import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
 import { deserializeForecast } from '../utils/fileUtils';
 import { getLocalCalendarDate } from '../utils/localDate';
 import './MonitorPage.css';
@@ -150,6 +151,7 @@ export const MonitorPage: React.FC = () => {
   const savedCycles = useSelector(selectSavedCycles);
   const { cycles: cloudCycles, loading: cloudCyclesLoading } = useCloudCycles();
   const { premiumActive } = useEntitlement();
+  const { sites: radarSiteOptions, loading: radarSitesLoading, error: radarSitesError } = useRadarSiteOptions();
   const today = useMemo(() => getLocalCalendarDate(), []);
 
   useLocalMonitorSettings(settings);
@@ -208,6 +210,9 @@ export const MonitorPage: React.FC = () => {
         settings={settings}
         outlookOptions={outlookOptions}
         selectedOutlook={selectedOutlook}
+        radarSiteOptions={radarSiteOptions}
+        radarSitesLoading={radarSitesLoading}
+        radarSitesError={radarSitesError}
         radarLatestTime={radarDisplayTime}
         satelliteLatestTime={satelliteDisplayTime}
         statusMessage={statusMessage}
