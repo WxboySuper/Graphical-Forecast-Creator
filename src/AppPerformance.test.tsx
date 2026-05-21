@@ -10,6 +10,7 @@ import appModeReducer from './store/appModeSlice';
 import overlaysReducer from './store/overlaysSlice';
 import stormReportsReducer from './store/stormReportsSlice';
 import verificationReducer from './store/verificationSlice';
+import monitorReducer from './store/monitorSlice';
 import { ForecastPage } from './pages/ForecastPage';
 
 // Mock child components
@@ -84,6 +85,7 @@ describe('ForecastPage Performance', () => {
         overlays: overlaysReducer,
         stormReports: stormReportsReducer,
         verification: verificationReducer,
+        monitor: monitorReducer,
       },
       middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({

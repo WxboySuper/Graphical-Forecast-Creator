@@ -21,8 +21,11 @@ import type { RootState } from '../store';
 import { setDarkMode } from '../store/themeSlice';
 import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
+import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { queueProductMetric } from '../utils/productMetrics';
+import type { MonitorSettings } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, normalizeMonitorSettings } from '../monitor/types';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
   normalizeForecastUiVariant,
@@ -72,6 +75,7 @@ interface UserSettingsDocument {
   ghostOutlooks: OverlaysState['ghostOutlooks'];
   defaultForecasterName: string;
   forecastUiVariant: ForecastUiVariant;
+  monitorSettings: MonitorSettings;
 }
 
 interface UserProfileDocument {
@@ -116,10 +120,11 @@ interface BuildSettingsArgs {
   overlays: OverlaysState;
   defaultForecasterName: string;
   forecastUiVariant: ForecastUiVariant;
+  monitorSettings?: MonitorSettings;
 }
 /** Builds the normalized settings document shape from current local state. */
 export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
-  const { darkMode, overlays, defaultForecasterName, forecastUiVariant } = args;
+  const { darkMode, overlays, defaultForecasterName, forecastUiVariant, monitorSettings } = args;
   return {
     darkMode,
     baseMapStyle: overlays.baseMapStyle,
@@ -128,6 +133,7 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
     ghostOutlooks: overlays.ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant,
+    monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
   };
 };
 
@@ -145,6 +151,7 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
     ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant,
+    monitorSettings,
   } = value;
 
   if (typeof darkMode !== 'boolean') {
@@ -171,6 +178,7 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
     ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
+    monitorSettings: normalizeMonitorSettings(monitorSettings),
   };
 };
 
@@ -244,7 +252,8 @@ export const areUserSettingsEqual = (
     left.counties === right.counties &&
     left.defaultForecasterName === right.defaultForecasterName &&
     left.forecastUiVariant === right.forecastUiVariant &&
-    JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks)
+    JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
+    areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings)
   );
 };
 
@@ -298,6 +307,7 @@ export const applySettingsToState = (
   }
 
   writeStoredForecastUiVariant(settings.forecastUiVariant);
+  dispatch(applyMonitorSettings(settings.monitorSettings));
   lastSyncedSettingsRef.current = settings;
   setSyncedSettings(settings);
 };
@@ -989,8 +999,10 @@ const useHostedAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const overlays = useSelector((state: RootState) => state.overlays);
+  const monitorSettings = useSelector((state: RootState) => state.monitor);
   const currentDarkModeRef = useRef(darkMode);
   const currentOverlaysRef = useRef(overlays);
+  const currentMonitorSettingsRef = useRef(monitorSettings);
   const hasInitializedSettingsRef = useRef(false);
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const pendingSettingsWriteRef = useRef<number | null>(null);
@@ -1010,6 +1022,10 @@ const useHostedAuthState = (): AuthContextValue => {
   useEffect(() => {
     currentOverlaysRef.current = overlays;
   }, [overlays]);
+
+  useEffect(() => {
+    currentMonitorSettingsRef.current = monitorSettings;
+  }, [monitorSettings]);
 
   useEffect(function subscribeToHostedAuthState() {
     if (!isHostedAuthEnabled || !auth) {
@@ -1091,6 +1107,7 @@ const useHostedAuthState = (): AuthContextValue => {
         overlays: currentOverlaysRef.current,
         defaultForecasterName: user.displayName ?? '',
         forecastUiVariant: readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
+        monitorSettings: currentMonitorSettingsRef.current,
       });
 
     /** Applies validated remote settings into Redux and local auth state. */
@@ -1201,6 +1218,7 @@ const useHostedAuthState = (): AuthContextValue => {
       overlays,
       defaultForecasterName: syncedSettings?.defaultForecasterName ?? user.displayName ?? '',
       forecastUiVariant: syncedSettings?.forecastUiVariant ?? DEFAULT_FORECAST_UI_VARIANT,
+      monitorSettings: syncedSettings?.monitorSettings ?? monitorSettings,
     });
 
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, nextSettings)) {
@@ -1253,6 +1271,7 @@ const useHostedAuthState = (): AuthContextValue => {
       overlays,
       defaultForecasterName: user.displayName ?? '',
       forecastUiVariant: syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
+      monitorSettings: syncedSettings?.monitorSettings ?? monitorSettings,
     });
     const nextSettings: UserSettingsDocument = {
       ...(lastSyncedSettingsRef.current ?? fallbackSettings),

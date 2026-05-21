@@ -32,6 +32,7 @@ import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
 import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
+import monitorReducer from '../store/monitorSlice';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -93,6 +94,7 @@ const createStore = () => configureStore({
     appMode: appModeReducer,
     theme: themeReducer,
     verification: verificationReducer,
+    monitor: monitorReducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware({
     serializableCheck: false,

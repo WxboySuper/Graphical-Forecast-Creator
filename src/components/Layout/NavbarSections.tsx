@@ -4,6 +4,7 @@ import {
   Map,
   MessageSquare,
   CheckCircle,
+  RadioTower,
   Moon,
   Sun,
   HelpCircle,
@@ -57,6 +58,7 @@ const navItems = [
   { to: '/forecast', label: 'Forecast', icon: Map, shortcut: '⌃1' },
   { to: '/discussion', label: 'Discussion', icon: MessageSquare, shortcut: '⌃2' },
   { to: '/verification', label: 'Verification', icon: CheckCircle, shortcut: '⌃3' },
+  { to: '/monitor', label: 'Monitor', icon: RadioTower, shortcut: '⌃4' },
 ];
 
 // Define external links for the right action buttons
