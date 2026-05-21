@@ -12,14 +12,18 @@ append_summary ""
 append_summary "Source: \`${SOURCE_BRANCH}\` → \`${BASE_BRANCH}\`"
 append_summary ""
 
+REPO_OWNER="${REPO%%/*}"
+WORK_DIR="${RUNNER_TEMP:-/tmp}/gfc-port-${GITHUB_RUN_ID:-$$}"
+mkdir -p "${WORK_DIR}"
+
 # Fetch all active branches
-gh api repos/"${REPO}"/branches --paginate > branches.json
+gh api repos/"${REPO}"/branches --paginate > "${WORK_DIR}/branches.json"
 
 # Resolve the original PR commits so port branches only carry the
 # intended change set instead of every commit missing from target.
 git fetch origin pull/"${PR_NUMBER}"/head:refs/remotes/origin/pr/"${PR_NUMBER}"
-gh api repos/"${REPO}"/pulls/"${PR_NUMBER}"/commits --paginate > pr-commits.json
-mapfile -t PR_COMMIT_SHAS < <(jq -r '.[].sha' pr-commits.json)
+gh api repos/"${REPO}"/pulls/"${PR_NUMBER}"/commits --paginate > "${WORK_DIR}/pr-commits.json"
+mapfile -t PR_COMMIT_SHAS < <(jq -r '.[].sha' "${WORK_DIR}/pr-commits.json")
 
 if [[ ${#PR_COMMIT_SHAS[@]} -eq 0 ]]; then
   echo "::error title=Porting aborted::No source PR commits found for #${PR_NUMBER}."
@@ -33,20 +37,20 @@ TARGETS=()
 if [[ "${BASE_BRANCH}" == "main" ]]; then
   TARGETS+=("beta")
 
-  HOTFIX_BRANCHES=$(jq -r '.[].name | select(startswith("hotfix/"))' branches.json)
+  HOTFIX_BRANCHES=$(jq -r '.[].name | select(startswith("hotfix/"))' "${WORK_DIR}/branches.json")
   for b in $HOTFIX_BRANCHES; do
     if [[ "${b}" != "${SOURCE_BRANCH}" ]]; then
       TARGETS+=("${b}")
     fi
   done
 
-  FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
+  FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' "${WORK_DIR}/branches.json")
   for b in $FEATURE_BRANCHES; do
     TARGETS+=("${b}")
   done
 
 elif [[ "${BASE_BRANCH}" == "beta" ]]; then
-  FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
+  FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' "${WORK_DIR}/branches.json")
   for b in $FEATURE_BRANCHES; do
     if [[ "${b}" != "${SOURCE_BRANCH}" ]]; then
       TARGETS+=("${b}")
@@ -58,6 +62,25 @@ FAILURES=()
 CONFLICT_PR_URLS=()
 SUCCESS_COUNT=0
 SKIPPED_COUNT=0
+
+compare_url_for_port_branch() {
+  local target="$1"
+  local port_branch="$2"
+  echo "https://github.com/${REPO}/compare/${target}...${port_branch}?expand=1"
+}
+
+mark_port_pr_draft() {
+  local pr_num="$1"
+  gh pr ready "${pr_num}" --repo "${REPO}" --undo 2>/dev/null || \
+    gh api repos/"${REPO}"/pulls/"${pr_num}" -X PATCH -f draft=true >/dev/null 2>&1 || true
+}
+
+find_open_port_pr() {
+  local port_branch="$1"
+  local target="$2"
+  gh pr list --repo "${REPO}" --head "${REPO_OWNER}:${port_branch}" --base "${target}" --state open \
+    --json number,url --jq '.[0] // empty | [.number, .url] | @tsv' 2>/dev/null || true
+}
 
 create_or_update_conflict_pr() {
   local target="$1"
@@ -95,26 +118,58 @@ Keeping this branch current avoids \`${target}\` drifting behind \`${BASE_BRANCH
 EOF
 )"
 
+  local pr_url=""
   local existing_pr
-  existing_pr="$(gh pr list --repo "${REPO}" --head "${port_branch}" --base "${target}" --state open --json number,url -q '.[0] | "\(.number)\t\(.url)"' 2>/dev/null || true)"
+  existing_pr="$(find_open_port_pr "${port_branch}" "${target}")"
 
-  local pr_url
-  if [[ -n "${existing_pr}" && "${existing_pr}" != "null" ]]; then
+  if [[ -n "${existing_pr}" ]]; then
     local pr_num="${existing_pr%%$'\t'*}"
     pr_url="${existing_pr#*$'\t'}"
-    gh pr edit "${pr_num}" --repo "${REPO}" --draft --body "${body}" || true
-    gh pr comment "${pr_num}" --repo "${REPO}" --body "Port branch updated after a new merge into \`${BASE_BRANCH}\`. Please re-check conflict resolution." || true
-    echo "Updated existing draft port PR #${pr_num} for ${target}"
-  else
+    if [[ -n "${pr_num}" && "${pr_num}" =~ ^[0-9]+$ ]]; then
+      gh pr edit "${pr_num}" --repo "${REPO}" --body "${body}" || true
+      mark_port_pr_draft "${pr_num}"
+      gh pr comment "${pr_num}" --repo "${REPO}" --body "Port branch updated after a new merge into \`${BASE_BRANCH}\`. Please re-check conflict resolution." || true
+      echo "Updated existing draft port PR #${pr_num} for ${target}"
+    else
+      existing_pr=""
+    fi
+  fi
+
+  if [[ -z "${pr_url}" ]]; then
     gh label create "porting/conflicts" --repo "${REPO}" --color "B60205" --description "Automated port PR that needs manual conflict resolution" 2>/dev/null || true
-    pr_url="$(gh pr create --repo "${REPO}" \
+    local create_output=""
+    if create_output="$(gh pr create --repo "${REPO}" \
       --head "${port_branch}" \
       --base "${target}" \
       --draft \
       --title "[Port][Conflicts] ${PR_TITLE} → ${target}" \
       --body "${body}" \
-      --label "porting/conflicts")"
+      --label "porting/conflicts" 2>&1)"; then
+      pr_url="${create_output}"
+    else
+      echo "::warning title=Draft port PR create failed::${create_output}"
+      if create_output="$(gh pr create --repo "${REPO}" \
+        --head "${port_branch}" \
+        --base "${target}" \
+        --title "[Port][Conflicts] ${PR_TITLE} → ${target}" \
+        --body "${body}" \
+        --label "porting/conflicts" 2>&1)"; then
+        pr_url="${create_output}"
+        local created_num
+        created_num="$(gh pr list --repo "${REPO}" --head "${REPO_OWNER}:${port_branch}" --base "${target}" --state open --json number -q '.[0].number' 2>/dev/null || true)"
+        if [[ -n "${created_num}" && "${created_num}" =~ ^[0-9]+$ ]]; then
+          mark_port_pr_draft "${created_num}"
+        fi
+      else
+        pr_url="$(compare_url_for_port_branch "${target}" "${port_branch}")"
+        echo "::warning title=Port PR not created::${create_output} — open manually: ${pr_url}"
+      fi
+    fi
     echo "Opened draft conflict port PR for ${target}: ${pr_url}"
+  fi
+
+  if [[ -z "${pr_url}" ]]; then
+    pr_url="$(compare_url_for_port_branch "${target}" "${port_branch}")"
   fi
 
   CONFLICT_PR_URLS+=("${target}|${pr_url}|${conflict_files}")
@@ -139,7 +194,11 @@ commit_conflict_wip() {
     done
   fi
 
-  git add -A
+  if [[ ${#conflict_paths[@]} -gt 0 ]]; then
+    git add "${conflict_paths[@]}"
+  fi
+  git add -u
+
   if ! git -c core.hooksPath=/dev/null commit --no-verify -m "chore(port): WIP — resolve conflicts porting #${PR_NUMBER} to ${target}
 
 Automated port from ${SOURCE_BRANCH} (merged to ${BASE_BRANCH}).
