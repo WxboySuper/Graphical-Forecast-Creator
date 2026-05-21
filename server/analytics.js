@@ -7,12 +7,25 @@ function createCollectHandler(fs, LOG_FILE) {
     const page = (typeof req.body?.page === 'string' ? req.body.page : '/').slice(0, 200);
     const referrer = (typeof req.body?.referrer === 'string' ? req.body.referrer : '').slice(0, 500);
 
+<<<<<<< HEAD
     const entry = {
       ts: new Date().toISOString(),
       ua: (req.headers['user-agent'] || '').slice(0, 300),
       page,
       ref: referrer,
     };
+=======
+const { initSentry, setupExpressErrorHandler } = require('./sentry');
+initSentry();
+
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const fs = require('fs');
+const path = require('path');
+const { registerBetaRoutes } = require('./beta');
+const { registerBillingRoutes } = require('./billing');
+const { registerMetricsRoutes } = require('./metrics');
+>>>>>>> 89d794e (feat: add Sentry monitoring for production main deploys)
 
     try {
       fs.appendFileSync(LOG_FILE, `${JSON.stringify(entry)}\n`);
@@ -68,8 +81,15 @@ async function start() {
     fs.mkdirSync(LOG_DIR, { recursive: true });
   }
 
+<<<<<<< HEAD
   const app = express();
   configureApp(app, express, fs, LOG_FILE);
+=======
+setupExpressErrorHandler(app);
+
+// Reject everything else quietly
+app.use((_req, res) => res.status(404).end());
+>>>>>>> 89d794e (feat: add Sentry monitoring for production main deploys)
 
   // Bind to loopback only — never exposed to the internet directly (nginx proxies in)
   app.listen(PORT, '127.0.0.1', () => {
