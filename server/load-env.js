@@ -46,20 +46,22 @@ const assignMissingEnvValues = (lines) => {
 };
 
 /** Loads one .env file into process.env when the file exists. */
-const loadEnvFile = (envPath) => {
-  if (!fs.existsSync(envPath)) {
-    return;
+const loadEnvFile = async (envPath) => {
+  try {
+    const raw = await fs.promises.readFile(envPath, 'utf8');
+    const lines = raw.split(/\r?\n/);
+    assignMissingEnvValues(lines);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      throw err;
+    }
   }
-
-  const raw = fs.readFileSync(envPath, 'utf8');
-  const lines = raw.split(/\r?\n/);
-  assignMissingEnvValues(lines);
 };
 
 /** Loads the colocated server .env first, then falls back to the repo-root .env for local runs. */
-const loadEnv = () => {
-  loadEnvFile(path.resolve(__dirname, '.env'));
-  loadEnvFile(path.resolve(__dirname, '..', '.env'));
+const loadEnv = async () => {
+  await loadEnvFile(path.resolve(__dirname, '.env'));
+  await loadEnvFile(path.resolve(__dirname, '..', '.env'));
 };
 
-loadEnv();
+module.exports = loadEnv;
