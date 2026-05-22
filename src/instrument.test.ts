@@ -46,8 +46,6 @@ describe('instrument', () => {
           enableLogs: true,
           normalizeDepth: 10,
           tracesSampleRate: 0.1,
-          replaysSessionSampleRate: 0,
-          replaysOnErrorSampleRate: 0,
           tracePropagationTargets: expect.arrayContaining([
             'localhost',
             expect.any(RegExp),

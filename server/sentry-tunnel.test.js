@@ -43,8 +43,16 @@ describe('sentry-tunnel helpers', () => {
       projectId: '111',
     });
 
-    process.env.SENTRY_BROWSER_DSN = previousBrowser;
-    process.env.SENTRY_DSN = previousServer;
+    if (previousBrowser === undefined) {
+      delete process.env.SENTRY_BROWSER_DSN;
+    } else {
+      process.env.SENTRY_BROWSER_DSN = previousBrowser;
+    }
+    if (previousServer === undefined) {
+      delete process.env.SENTRY_DSN;
+    } else {
+      process.env.SENTRY_DSN = previousServer;
+    }
   });
 
   it('rejects malformed DSN values', () => {
