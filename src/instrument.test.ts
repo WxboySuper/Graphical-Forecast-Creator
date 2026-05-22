@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/react';
-import { isSentryEnabled } from './instrument';
 
 jest.mock('@sentry/react', () => ({
   init: jest.fn(),
@@ -23,10 +22,7 @@ describe('instrument', () => {
   it('is disabled without a DSN', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = '';
-<<<<<<< HEAD
-=======
       // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
->>>>>>> origin/pr/316
       const { isSentryEnabled: enabled } = require('./instrument');
       expect(enabled()).toBe(false);
       expect(Sentry.init).not.toHaveBeenCalled();
@@ -37,26 +33,19 @@ describe('instrument', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
       globalScope.__GFC_SENTRY_ENVIRONMENT__ = 'production';
-<<<<<<< HEAD
-=======
       // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
->>>>>>> origin/pr/316
       const { isSentryEnabled: enabled } = require('./instrument');
       expect(enabled()).toBe(true);
       expect(Sentry.init).toHaveBeenCalledWith(
         expect.objectContaining({
           dsn: 'https://example@o0.ingest.sentry.io/0',
+          tunnel: '/api/sentry-tunnel',
           environment: 'production',
           release: 'graphical-forecast-creator@1.0.0',
           sendDefaultPii: false,
           enableLogs: true,
           normalizeDepth: 10,
           tracesSampleRate: 0.1,
-<<<<<<< HEAD
-          replaysSessionSampleRate: 0,
-          replaysOnErrorSampleRate: 0,
-=======
->>>>>>> origin/pr/316
           tracePropagationTargets: expect.arrayContaining([
             'localhost',
             expect.any(RegExp),
