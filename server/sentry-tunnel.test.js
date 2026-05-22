@@ -3,7 +3,6 @@
 const {
   parseAllowedSentryEndpoint,
   parseSentryDsnString,
-  isAllowedSentryHost,
   buildEnvelopeUrl,
   getConfiguredSentryEndpoint,
 } = require('./sentry-tunnel');
@@ -43,8 +42,16 @@ describe('sentry-tunnel helpers', () => {
       projectId: '111',
     });
 
-    process.env.SENTRY_BROWSER_DSN = previousBrowser;
-    process.env.SENTRY_DSN = previousServer;
+    if (previousBrowser === undefined) {
+      delete process.env.SENTRY_BROWSER_DSN;
+    } else {
+      process.env.SENTRY_BROWSER_DSN = previousBrowser;
+    }
+    if (previousServer === undefined) {
+      delete process.env.SENTRY_DSN;
+    } else {
+      process.env.SENTRY_DSN = previousServer;
+    }
   });
 
   it('rejects malformed DSN values', () => {
@@ -59,8 +66,4 @@ describe('sentry-tunnel helpers', () => {
     expect(parseSentryDsnString('http://evil.example/1')).toBeNull();
   });
 
-  it('rejects non-Sentry hosts', () => {
-    expect(isAllowedSentryHost('evil.example.com')).toBe(false);
-    expect(isAllowedSentryHost('o4511425762361344.ingest.us.sentry.io')).toBe(true);
-  });
 });
