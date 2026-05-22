@@ -46,11 +46,6 @@ function buildEnvelopeUrl(host, projectId) {
   return `https://${host}/api/${projectId}/envelope/`;
 }
 
-/** @returns {boolean} Whether the DSN host is a known Sentry ingest endpoint. */
-function isAllowedSentryHost(hostname) {
-  return SENTRY_DSN_PATTERN.test(`https://${hostname}/0`);
-}
-
 /** @returns {{ host: string, projectId: string } | null} Browser-facing Sentry ingest target for the tunnel. */
 function getConfiguredSentryEndpoint() {
   const browserDsn = process.env.SENTRY_BROWSER_DSN || process.env.SENTRY_DSN || '';
@@ -127,7 +122,6 @@ module.exports = {
   registerSentryTunnelRoutes,
   parseAllowedSentryEndpoint,
   parseSentryDsnString,
-  isAllowedSentryHost,
   buildEnvelopeUrl,
   getConfiguredSentryEndpoint,
 };

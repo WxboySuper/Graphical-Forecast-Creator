@@ -9,7 +9,7 @@ function initSentry() {
 
   const Sentry = require('@sentry/node');
   const release = (process.env.SENTRY_RELEASE || '').trim() || undefined;
-  const environment = (process.env.SENTRY_ENVIRONMENT || 'production').trim();
+  const environment = (process.env.SENTRY_ENVIRONMENT || 'production').trim() || 'production';
   const tracesSampleRate = Number.parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1');
 
   Sentry.init({
