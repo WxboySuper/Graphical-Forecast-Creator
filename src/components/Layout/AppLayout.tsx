@@ -117,6 +117,8 @@ export const AppLayout: React.FC = () => {
       }
 
       if (e.ctrlKey || e.metaKey) {
+        if (!e.key) return;
+
         // Define Ctrl/Cmd+key shortcuts for navigation and actions
         const key = e.key.toLowerCase();
         // Define shortcuts for navigation and actions
