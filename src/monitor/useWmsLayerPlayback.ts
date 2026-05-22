@@ -41,13 +41,21 @@ export const advancePlaybackFrame = (current: LayerPlaybackState): LayerPlayback
   };
 };
 
-export const useLoadWmsLayerFrames = (
-  config: WmsLayerConfig | null,
-  setPlayback: Dispatch<SetStateAction<LayerPlaybackState>>,
-  refreshToken: number,
-  addToast: AddToastFn,
-  unavailableMessage: string,
-): void => {
+interface LoadWmsLayerFramesOptions {
+  config: WmsLayerConfig | null;
+  setPlayback: Dispatch<SetStateAction<LayerPlaybackState>>;
+  refreshToken: number;
+  addToast: AddToastFn;
+  unavailableMessage: string;
+}
+
+export const useLoadWmsLayerFrames = ({
+  config,
+  setPlayback,
+  refreshToken,
+  addToast,
+  unavailableMessage,
+}: LoadWmsLayerFramesOptions): void => {
   const configKey = config ? `${config.url}::${config.layer}` : 'off';
 
   useEffect(() => {

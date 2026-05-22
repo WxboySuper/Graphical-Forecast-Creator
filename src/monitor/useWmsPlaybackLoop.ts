@@ -6,13 +6,21 @@ import {
   type LayerPlaybackState,
 } from './useWmsLayerPlayback';
 
-export const useWmsPlaybackLoop = (
-  shouldAnimate: boolean,
-  frameSignature: string,
-  animationSpeedMs: number,
-  setRadarPlayback: Dispatch<SetStateAction<LayerPlaybackState>>,
-  setSatellitePlayback: Dispatch<SetStateAction<LayerPlaybackState>>,
-) => {
+interface WmsPlaybackLoopOptions {
+  shouldAnimate: boolean;
+  frameSignature: string;
+  animationSpeedMs: number;
+  setRadarPlayback: Dispatch<SetStateAction<LayerPlaybackState>>;
+  setSatellitePlayback: Dispatch<SetStateAction<LayerPlaybackState>>;
+}
+
+export const useWmsPlaybackLoop = ({
+  shouldAnimate,
+  frameSignature,
+  animationSpeedMs,
+  setRadarPlayback,
+  setSatellitePlayback,
+}: WmsPlaybackLoopOptions) => {
   useEffect(() => {
     if (!shouldAnimate) {
       setRadarPlayback(snapToLatestFrame);

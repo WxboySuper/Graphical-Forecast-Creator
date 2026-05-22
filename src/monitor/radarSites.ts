@@ -15,25 +15,35 @@ export const resetRadarSiteCacheForTests = (): void => {
   cachedRadarSites = null;
 };
 
-const parseRadarSiteFeature = (feature: unknown): RadarSiteOption | null => {
+const readRadarSiteProperties = (
+  feature: unknown,
+): { id: string; name: string; wfoId?: string } | null => {
   if (!feature || typeof feature !== 'object' || !('properties' in feature)) {
     return null;
   }
 
   const properties = (feature as { properties?: Record<string, unknown> }).properties ?? {};
   const id = typeof properties.rda_id === 'string' ? properties.rda_id.trim().toUpperCase() : '';
-  const name = typeof properties.name === 'string' ? properties.name.trim() : '';
-  const wfoId = typeof properties.wfo_id === 'string' ? properties.wfo_id.trim() : undefined;
-
   if (!/^K[A-Z0-9]{3}$/.test(id)) {
     return null;
   }
 
+  const name = typeof properties.name === 'string' ? properties.name.trim() : '';
+  const wfoId = typeof properties.wfo_id === 'string' ? properties.wfo_id.trim() : undefined;
+  return { id, name, wfoId };
+};
+
+const parseRadarSiteFeature = (feature: unknown): RadarSiteOption | null => {
+  const site = readRadarSiteProperties(feature);
+  if (!site) {
+    return null;
+  }
+
   return {
-    id,
-    name: name || id,
-    label: name ? `${id} — ${name}` : id,
-    wfoId,
+    id: site.id,
+    name: site.name || site.id,
+    label: site.name ? `${site.id} — ${site.name}` : site.id,
+    wfoId: site.wfoId,
   };
 };
 

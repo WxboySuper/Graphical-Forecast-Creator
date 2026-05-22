@@ -4,6 +4,25 @@ import type { AddToastFn } from '../components/Layout';
 import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
 import { deserializeForecast } from '../utils/fileUtils';
 
+const loadCloudOutlookOption = async (
+  loadCycle: ReturnType<typeof useCloudCycles>['loadCycle'],
+  selectedOption: MonitorOutlookSourceOption,
+  today: string,
+): Promise<MonitorOutlookSourceOption> => {
+  const payload = await loadCycle(selectedOption.id);
+  if (!payload) {
+    return selectedOption;
+  }
+
+  const cycle = deserializeForecast(payload);
+  const dayOne = cycle.cycleDate === today ? cycle.days[1]?.data : undefined;
+  return {
+    ...selectedOption,
+    data: dayOne,
+    status: dayOne ? undefined : 'Cloud cycle does not contain a Day 1 outlook for today.',
+  };
+};
+
 export const useMonitorCloudOutlook = ({
   selectedOption,
   today,
@@ -24,19 +43,11 @@ export const useMonitorCloudOutlook = ({
 
     let active = true;
 
-    loadCycle(selectedOption.id)
-      .then((payload) => {
-        if (!active || !payload) {
-          return;
+    loadCloudOutlookOption(loadCycle, selectedOption, today)
+      .then((option) => {
+        if (active) {
+          setCloudOption(option);
         }
-
-        const cycle = deserializeForecast(payload);
-        const dayOne = cycle.cycleDate === today ? cycle.days[1]?.data : undefined;
-        setCloudOption({
-          ...selectedOption,
-          data: dayOne,
-          status: dayOne ? undefined : 'Cloud cycle does not contain a Day 1 outlook for today.',
-        });
       })
       .catch(() => {
         if (!active) {

@@ -30,33 +30,33 @@ export const useLiveWmsLayers = ({
   const [radarPlayback, setRadarPlayback] = useState<LayerPlaybackState>(emptyPlayback);
   const [satellitePlayback, setSatellitePlayback] = useState<LayerPlaybackState>(emptyPlayback);
 
-  useLoadWmsLayerFrames(
-    radarConfig,
-    setRadarPlayback,
+  useLoadWmsLayerFrames({
+    config: radarConfig,
+    setPlayback: setRadarPlayback,
     refreshToken,
     addToast,
-    'Radar capabilities are unavailable right now.',
-  );
-  useLoadWmsLayerFrames(
-    satelliteConfig,
-    setSatellitePlayback,
+    unavailableMessage: 'Radar capabilities are unavailable right now.',
+  });
+  useLoadWmsLayerFrames({
+    config: satelliteConfig,
+    setPlayback: setSatellitePlayback,
     refreshToken,
     addToast,
-    'Satellite capabilities are unavailable right now.',
-  );
+    unavailableMessage: 'Satellite capabilities are unavailable right now.',
+  });
 
   const radarHasFrames = radarPlayback.frameTimes.length > 1;
   const satelliteHasFrames = satellitePlayback.frameTimes.length > 1;
   const shouldAnimate = animationEnabled && (radarHasFrames || satelliteHasFrames);
   const frameSignature = `${radarPlayback.frameTimes.join('|')}::${satellitePlayback.frameTimes.join('|')}`;
 
-  useWmsPlaybackLoop(
+  useWmsPlaybackLoop({
     shouldAnimate,
     frameSignature,
     animationSpeedMs,
     setRadarPlayback,
     setSatellitePlayback,
-  );
+  });
 
   return {
     radarDisplayTime: resolveDisplayTime(radarPlayback),

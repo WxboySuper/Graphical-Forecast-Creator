@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import type { WmsLayerConfig } from '../../monitor/wms';
-import { applyWmsLayer, buildWmsParams } from './monitorMapLayerUtils';
 import type { useMonitorMapRefs } from './monitorMapRefs';
+import { useMonitorRadarWmsSync } from './useMonitorRadarWmsSync';
+import { useMonitorSatelliteWmsSync } from './useMonitorSatelliteWmsSync';
 
 type MonitorMapRefs = ReturnType<typeof useMonitorMapRefs>;
 
@@ -20,29 +20,6 @@ export const useMonitorMapWmsSync = ({
   satelliteOpacity,
   refs,
 }: UseMonitorMapWmsSyncArgs) => {
-  useEffect(() => {
-    if (refs.radarLayerRef.current) {
-      applyWmsLayer(refs.radarLayerRef.current, radarLayer, radarOpacity, refs.radarLayerKeyRef);
-    }
-  }, [radarLayer, radarOpacity]);
-
-  useEffect(() => {
-    const source = refs.radarLayerRef.current?.getSource();
-    if (source && radarLayer) {
-      source.updateParams(buildWmsParams(radarLayer));
-    }
-  }, [radarLayer?.latestTime]);
-
-  useEffect(() => {
-    if (refs.satelliteLayerRef.current) {
-      applyWmsLayer(refs.satelliteLayerRef.current, satelliteLayer, satelliteOpacity, refs.satelliteLayerKeyRef);
-    }
-  }, [satelliteLayer, satelliteOpacity]);
-
-  useEffect(() => {
-    const source = refs.satelliteLayerRef.current?.getSource();
-    if (source && satelliteLayer) {
-      source.updateParams(buildWmsParams(satelliteLayer));
-    }
-  }, [satelliteLayer?.latestTime]);
+  useMonitorRadarWmsSync(radarLayer, radarOpacity, refs);
+  useMonitorSatelliteWmsSync(satelliteLayer, satelliteOpacity, refs);
 };

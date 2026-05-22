@@ -8,23 +8,25 @@ const TODAY_SECTION_HEADERS: ReadonlyArray<{ header: string; type: ReportType }>
   { header: 'Time,Size', type: 'hail' },
 ];
 
-const parseTodaySection = (
+const parseTodaySectionRows = (
   lines: string[],
   startIndex: number,
   type: ReportType,
-): { reports: StormReport[]; nextIndex: number } => {
+): StormReport[] => {
   const reports: StormReport[] = [];
-  let index = startIndex;
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line || line.startsWith('Time,')) {
+      break;
+    }
 
-  while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
-    const report = parseTodayCsvRow(lines[index], type);
+    const report = parseTodayCsvRow(line, type);
     if (report) {
       reports.push(report);
     }
-    index += 1;
   }
 
-  return { reports, nextIndex: index };
+  return reports;
 };
 
 /** Parses SPC today.csv (Time,F_Scale / Time,Speed / Time,Size sections). */
@@ -46,9 +48,12 @@ export const parseTodayStormReportCsv = (csvText: string): StormReport[] => {
       continue;
     }
 
-    const parsed = parseTodaySection(lines, index + 1, section.type);
-    reports.push(...parsed.reports);
-    index = parsed.nextIndex;
+    const sectionStart = index + 1;
+    reports.push(...parseTodaySectionRows(lines, sectionStart, section.type));
+    index = sectionStart;
+    while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
+      index += 1;
+    }
   }
 
   return reports;
