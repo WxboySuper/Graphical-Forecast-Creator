@@ -106,24 +106,33 @@ const DayTabs: React.FC<{ currentDay: DayType; days: ForecastDays; onDayButtonCl
   </div>
 );
 
+/** Returns true when the event target is a text field that should consume keystrokes. */
+export const isEditableTypingTarget = (target: EventTarget | null): boolean =>
+  target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+/** Returns true when any modifier would make a digit key a combo shortcut instead of day select. */
+export const keyboardEventHasModifier = (event: KeyboardEvent): boolean =>
+  event.ctrlKey || event.metaKey || event.altKey || event.shiftKey;
+
+/** Maps a digit keydown to a forecast day (1-8), or null when the event should be ignored. */
+export const getForecastDayFromDigitKeyDown = (event: KeyboardEvent): DayType | null => {
+  if (isEditableTypingTarget(event.target)) return null;
+  if (keyboardEventHasModifier(event)) return null;
+
+  const key = keyboardShortcutKey(event);
+  if (!key) return null;
+
+  const num = parseInt(key, 10);
+  if (num >= 1 && num <= 8) return num as DayType;
+  return null;
+};
+
 // Custom hook: listen for number keys 1-8 to select forecast days
 const useDayNumberShortcuts = (dispatch: ReturnType<typeof useDispatch>) => {
-  /** Returns true if the given event target is a text-entry element that should absorb keystrokes. */
-  const isEditable = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
-  /** Returns true if any modifier key (Ctrl, Meta, Alt, Shift) is held, so shortcuts don't clash with combos. */
-  const hasModifier = (e: KeyboardEvent) => e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
-
   useEffect(() => {
-    /** Selects the forecast day matching the pressed digit key (1-8) unless focus is inside a text field. */
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isEditable(e.target as EventTarget | null)) return;
-      if (hasModifier(e)) return;
-
-      const key = keyboardShortcutKey(e);
-      if (!key) return;
-
-      const num = parseInt(key, 10);
-      if (num >= 1 && num <= 8) dispatch(setForecastDay(num as DayType));
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const day = getForecastDayFromDigitKeyDown(event);
+      if (day) dispatch(setForecastDay(day));
     };
 
     window.addEventListener('keydown', handleKeyDown);
