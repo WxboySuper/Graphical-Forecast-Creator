@@ -1,35 +1,81 @@
 'use strict';
 
-const SENTRY_INGEST_HOST_PATTERN = /^o\d+\.ingest(\.[a-z]{2})?\.sentry\.io$/i;
+const SENTRY_DSN_PATTERN =
+  /^https:\/\/(?:[^@/]+@)?(o\d+\.ingest(?:\.[a-z]{2})?\.sentry\.io)\/(\d+)\/?$/iu;
 
-/** @returns {URL | null} DSN parsed from the first envelope header line. */
-function parseEnvelopeDsn(envelopeBody) {
+/** @returns {{ host: string, projectId: string } | null} Parsed ingest target from a Sentry DSN string. */
+function parseSentryDsnString(dsnString) {
+  if (!dsnString || typeof dsnString !== 'string') {
+    return null;
+  }
+
+  const match = dsnString.trim().match(SENTRY_DSN_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    host: match[1],
+    projectId: match[2],
+  };
+}
+
+/** @returns {{ host: string, projectId: string } | null} Parsed Sentry ingest target from an envelope header DSN. */
+function parseAllowedSentryEndpoint(envelopeBody) {
   const firstLine = envelopeBody.toString('utf8').split('\n').find((line) => line.trim());
   if (!firstLine) {
     return null;
   }
 
-  const header = JSON.parse(firstLine);
+  let header;
+  try {
+    header = JSON.parse(firstLine);
+  } catch {
+    return null;
+  }
+
   if (!header?.dsn || typeof header.dsn !== 'string') {
     return null;
   }
 
-  return new URL(header.dsn);
+  return parseSentryDsnString(header.dsn);
 }
 
-/** @returns {boolean} Whether the DSN host is a known Sentry ingest endpoint. */
-function isAllowedSentryHost(hostname) {
-  return SENTRY_INGEST_HOST_PATTERN.test(hostname);
+/** @returns {string} Upstream envelope URL for a validated Sentry host and project id. */
+function buildEnvelopeUrl(host, projectId) {
+  return `https://${host}/api/${projectId}/envelope/`;
 }
 
-/** @returns {string} Upstream envelope URL for a validated Sentry DSN. */
-function buildEnvelopeUrl(dsn) {
-  const projectId = dsn.pathname.replace(/^\//, '');
-  return `https://${dsn.host}/api/${projectId}/envelope/`;
+/** @returns {{ host: string, projectId: string } | null} Browser-facing Sentry ingest target for the tunnel. */
+function getConfiguredSentryEndpoint() {
+  const browserDsn = process.env.SENTRY_BROWSER_DSN || process.env.SENTRY_DSN || '';
+  return parseSentryDsnString(browserDsn);
+}
+
+/** @returns {boolean} Whether the client envelope targets the same Sentry project as the server. */
+function clientEndpointMatchesConfigured(clientEndpoint, configuredEndpoint) {
+  if (!clientEndpoint) {
+    return false;
+  }
+
+  return (
+    clientEndpoint.host === configuredEndpoint.host &&
+    clientEndpoint.projectId === configuredEndpoint.projectId
+  );
 }
 
 /** Registers POST /api/sentry-tunnel to proxy browser envelopes past ad blockers. */
 function registerSentryTunnelRoutes(app, express, rateLimit) {
+  const configuredEndpoint = getConfiguredSentryEndpoint();
+  if (!configuredEndpoint) {
+    console.warn(
+      '[analytics] sentry tunnel disabled: SENTRY_BROWSER_DSN (or SENTRY_DSN) is missing or invalid'
+    );
+    return;
+  }
+
+  const targetUrl = buildEnvelopeUrl(configuredEndpoint.host, configuredEndpoint.projectId);
+
   const tunnelRateLimit = rateLimit({
     windowMs: 60 * 1000,
     max: 120,
@@ -49,14 +95,11 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
           return;
         }
 
-        const dsn = parseEnvelopeDsn(envelopeBody);
-        if (!dsn || !isAllowedSentryHost(dsn.hostname)) {
+        const clientEndpoint = parseAllowedSentryEndpoint(envelopeBody);
+        if (!clientEndpointMatchesConfigured(clientEndpoint, configuredEndpoint)) {
           res.status(400).end();
           return;
         }
-
-        const query = new URLSearchParams(req.query).toString();
-        const targetUrl = query ? `${buildEnvelopeUrl(dsn)}?${query}` : buildEnvelopeUrl(dsn);
 
         const upstream = await fetch(targetUrl, {
           method: 'POST',
@@ -77,7 +120,8 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
 
 module.exports = {
   registerSentryTunnelRoutes,
-  parseEnvelopeDsn,
-  isAllowedSentryHost,
+  parseAllowedSentryEndpoint,
+  parseSentryDsnString,
   buildEnvelopeUrl,
+  getConfiguredSentryEndpoint,
 };

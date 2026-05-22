@@ -36,6 +36,7 @@ function buildSentryInitOptions() {
     dsn,
     environment: getSentryEnvironment(),
     release: getSentryRelease(),
+    sendDefaultPii: false,
     tracesSampleRate: getTracesSampleRate(),
   };
 }

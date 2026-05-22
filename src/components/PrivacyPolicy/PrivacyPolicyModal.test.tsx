@@ -16,7 +16,7 @@ describe('PrivacyPolicyModal Utils', () => {
   });
 
   test('hasAcceptedPrivacyPolicy returns true when accepted current version', () => {
-    localStorage.setItem('gfc-privacy-policy-accepted', '1.1.0');
+    localStorage.setItem('gfc-privacy-policy-accepted', '1.2.0');
     expect(hasAcceptedPrivacyPolicy()).toBe(true);
   });
 
@@ -67,7 +67,7 @@ describe('PrivacyPolicyModal component', () => {
     fireEvent.click(acceptButton);
 
     expect(onAcceptMock).toHaveBeenCalled();
-    expect(localStorage.getItem('gfc-privacy-policy-accepted')).toBe('1.1.0');
+    expect(localStorage.getItem('gfc-privacy-policy-accepted')).toBe('1.2.0');
   });
 
   test('renders view-only mode when specified', () => {
