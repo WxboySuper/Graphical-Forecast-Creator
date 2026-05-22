@@ -122,7 +122,6 @@ export const AppLayout: React.FC = () => {
         if (!key) return;
 
         // Define Ctrl/Cmd+key shortcuts for navigation and actions
-        // Define shortcuts for navigation and actions
         const shortcuts: Record<string, () => void> = {
           h: () => navigate('/'),
           '1': () => navigate('/forecast'),
@@ -132,7 +131,7 @@ export const AppLayout: React.FC = () => {
           d: () => document.documentElement.classList.toggle('dark-mode'),
         };
 
-        // Example: Ctrl+H for home, Ctrl+1 for forecast, Ctrl+2 for discussion, Ctrl+3 for verification, Ctrl+D to toggle dark mode
+        // Ctrl+H home, Ctrl+1 forecast, Ctrl+2 discussion, Ctrl+3 verification, Ctrl+4 monitor, Ctrl+D dark mode
         const action = shortcuts[key];
         if (action) {
           e.preventDefault();
