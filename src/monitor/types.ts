@@ -74,7 +74,5 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
   alertsShowAdvisories: false,
 };
 
-export { normalizeMonitorSettings } from './monitorSettingsNormalize';
-
 export const areMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean =>
   JSON.stringify(left) === JSON.stringify(right);

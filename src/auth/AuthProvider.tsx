@@ -25,7 +25,8 @@ import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { queueProductMetric } from '../utils/productMetrics';
 import type { MonitorSettings } from '../monitor/types';
-import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, normalizeMonitorSettings } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual } from '../monitor/types';
+import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
   normalizeForecastUiVariant,
