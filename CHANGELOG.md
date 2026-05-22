@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ## v1.5.2
 
-## Fixed
+### Fixed
 - Fixed the primary button on the signed-out Home Page being incorrectly white/blank
 - Fixed an issue where you couldn't export an outlook as an image
 
