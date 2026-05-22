@@ -126,6 +126,7 @@ export const getForecastDayFromDigitKeyDown = (event: KeyboardEvent): DayType | 
 // Custom hook: listen for number keys 1-8 to select forecast days
 const useDayNumberShortcuts = (dispatch: ReturnType<typeof useDispatch>) => {
   useEffect(() => {
+    /** Dispatches day selection when the user presses digit keys 1–8. */
     const handleKeyDown = (event: KeyboardEvent) => {
       const day = getForecastDayFromDigitKeyDown(event);
       if (day) dispatch(setForecastDay(day));
