@@ -86,6 +86,35 @@
   margin-top: 0;
 }
 
+.privacy-whats-new {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.privacy-whats-new h3 {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.privacy-whats-new ul {
+  margin: 0 0 0 18px;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+.privacy-whats-new ul li {
+  margin-bottom: 4px;
+}
+
+.privacy-whats-new ul li:last-child {
+  margin-bottom: 0;
+}
+
 .privacy-modal-body p {
   margin: 0 0 10px;
   color: var(--text-secondary);
