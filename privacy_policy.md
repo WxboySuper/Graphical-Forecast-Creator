@@ -28,6 +28,8 @@ We also generate a browser-scoped anonymous installation identifier to help esti
 
 Separately from product metrics, the hosted service may keep short operational request logs such as page path, referrer, timestamp, and user-agent for maintenance and debugging. These logs are not used to inspect forecast contents and are kept separate from the product metrics dashboard.
 
+On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics above. We do not use Sentry for advertising or the sale of personal data. Error reports are designed to exclude forecast map payloads, do not use session replay, and are configured without sending IP addresses or cookies by default. Events are tagged by environment (production or beta) so staging issues stay separate from production.
+
 **6. Data Retention & Deletion**
 You own your data. You have the right to delete your account and associated cloud data at any time. Upon account deletion, your cloud-hosted cycles, profile data, synced settings, and user-linked progress metrics will be permanently removed from our Firebase servers. Your local, offline saves will remain completely untouched on your device.
 
