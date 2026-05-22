@@ -11,6 +11,7 @@ declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
 declare const __GFC_APP_VERSION__: string;
 
+/** Returns the Sentry DSN baked in at build time, or an empty string when monitoring is off. */
 function getSentryDsn(): string {
   return typeof __GFC_SENTRY_DSN__ !== 'undefined' ? __GFC_SENTRY_DSN__ : '';
 }
@@ -20,11 +21,13 @@ export function isSentryEnabled(): boolean {
   return Boolean(getSentryDsn().trim());
 }
 
+/** Returns the Sentry release string derived from the app version, when available. */
 function getRelease(): string | undefined {
   const version = typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : '';
   return version ? `graphical-forecast-creator@${version}` : undefined;
 }
 
+/** Returns the configured Sentry environment label (production, beta, etc.). */
 function getEnvironment(): string {
   const configured =
     typeof __GFC_SENTRY_ENVIRONMENT__ !== 'undefined' ? __GFC_SENTRY_ENVIRONMENT__ : '';

@@ -22,10 +22,18 @@ function isAllowedSentryHost(hostname) {
   return SENTRY_INGEST_HOST_PATTERN.test(hostname);
 }
 
-/** @returns {string} Upstream envelope URL for a validated Sentry DSN. */
+/** @returns {string | null} Upstream envelope URL for a validated Sentry DSN. */
 function buildEnvelopeUrl(dsn) {
+  if (dsn.protocol !== 'https:') {
+    return null;
+  }
+
   const projectId = dsn.pathname.replace(/^\//, '');
-  return `https://${dsn.host}/api/${projectId}/envelope/`;
+  if (!/^\d+$/.test(projectId)) {
+    return null;
+  }
+
+  return `https://${dsn.hostname}/api/${projectId}/envelope/`;
 }
 
 /** Registers POST /api/sentry-tunnel to proxy browser envelopes past ad blockers. */
@@ -55,8 +63,11 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
           return;
         }
 
-        const query = new URLSearchParams(req.query).toString();
-        const targetUrl = query ? `${buildEnvelopeUrl(dsn)}?${query}` : buildEnvelopeUrl(dsn);
+        const targetUrl = buildEnvelopeUrl(dsn);
+        if (!targetUrl) {
+          res.status(400).end();
+          return;
+        }
 
         const upstream = await fetch(targetUrl, {
           method: 'POST',

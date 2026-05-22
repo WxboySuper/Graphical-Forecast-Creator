@@ -12,6 +12,11 @@ describe('sentry-tunnel helpers', () => {
     expect(buildEnvelopeUrl(dsn)).toBe('https://o123.ingest.us.sentry.io/api/456/envelope/');
   });
 
+  it('rejects non-https DSNs and non-numeric project ids', () => {
+    expect(buildEnvelopeUrl(new URL('http://o123.ingest.us.sentry.io/456'))).toBeNull();
+    expect(buildEnvelopeUrl(new URL('https://o123.ingest.us.sentry.io/not-a-project'))).toBeNull();
+  });
+
   it('rejects non-Sentry hosts', () => {
     expect(isAllowedSentryHost('evil.example.com')).toBe(false);
     expect(isAllowedSentryHost('o4511425762361344.ingest.us.sentry.io')).toBe(true);

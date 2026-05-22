@@ -1,4 +1,3 @@
-import './instrument';
 import { isSentryEnabled } from './instrument';
 import { reactErrorHandler } from '@sentry/react';
 import './immerSetup';

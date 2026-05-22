@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/react';
-import { isSentryEnabled } from './instrument';
 
 jest.mock('@sentry/react', () => ({
   init: jest.fn(),
@@ -23,6 +22,7 @@ describe('instrument', () => {
   it('is disabled without a DSN', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = '';
+      // skipcq: JS-C1003
       const { isSentryEnabled: enabled } = require('./instrument');
       expect(enabled()).toBe(false);
       expect(Sentry.init).not.toHaveBeenCalled();
@@ -33,6 +33,7 @@ describe('instrument', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
       globalScope.__GFC_SENTRY_ENVIRONMENT__ = 'production';
+      // skipcq: JS-C1003
       const { isSentryEnabled: enabled } = require('./instrument');
       expect(enabled()).toBe(true);
       expect(Sentry.init).toHaveBeenCalledWith(
