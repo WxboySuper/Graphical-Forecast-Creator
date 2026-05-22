@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { MonitorMapView, MonitorOutlookLayerType, MonitorOutlookSourceSelection, MonitorSettings } from '../monitor/types';
-import { DEFAULT_MONITOR_SETTINGS, normalizeMonitorSettings } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
+import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import { resolveRadarProductForMode } from '../monitor/wms';
 
 export type MonitorState = MonitorSettings;

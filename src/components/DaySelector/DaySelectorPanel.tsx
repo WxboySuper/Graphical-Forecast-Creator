@@ -14,6 +14,11 @@ import {
 import { selectForecastCycle, setForecastDay, setCycleDate } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 import { cn } from '../../lib/utils';
+import {
+  hasAnyModifierKey,
+  isTypingTarget,
+  keyboardShortcutKey,
+} from '../../utils/keyboardShortcutKey';
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -105,21 +110,26 @@ const DayTabs: React.FC<{ currentDay: DayType; days: ForecastDays; onDayButtonCl
   </div>
 );
 
+/** Maps a digit keydown to a forecast day (1-8), or null when the event should be ignored. */
+export const getForecastDayFromDigitKeyDown = (event: KeyboardEvent): DayType | null => {
+  if (isTypingTarget(event.target)) return null;
+  if (hasAnyModifierKey(event)) return null;
+
+  const key = keyboardShortcutKey(event);
+  if (!key) return null;
+
+  const num = parseInt(key, 10);
+  if (num >= 1 && num <= 8) return num as DayType;
+  return null;
+};
+
 // Custom hook: listen for number keys 1-8 to select forecast days
 const useDayNumberShortcuts = (dispatch: ReturnType<typeof useDispatch>) => {
-  /** Returns true if the given event target is a text-entry element that should absorb keystrokes. */
-  const isEditable = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
-  /** Returns true if any modifier key (Ctrl, Meta, Alt, Shift) is held, so shortcuts don't clash with combos. */
-  const hasModifier = (e: KeyboardEvent) => e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
-
   useEffect(() => {
-    /** Selects the forecast day matching the pressed digit key (1-8) unless focus is inside a text field. */
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isEditable(e.target as EventTarget | null)) return;
-      if (hasModifier(e)) return;
-
-      const num = parseInt(e.key);
-      if (num >= 1 && num <= 8) dispatch(setForecastDay(num as DayType));
+    /** Dispatches day selection when the user presses digit keys 1–8. */
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const day = getForecastDayFromDigitKeyDown(event);
+      if (day) dispatch(setForecastDay(day));
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -167,12 +177,10 @@ export const DaySelectorPanel: React.FC = () => {
     setTempDate(e.target.value);
   }, []);
 
-  // Keyboard shortcuts for day navigation (1-8)
   const handleCancelDateEdit = useCallback(() => {
     setIsEditingDate(false);
   }, []);
 
-  // Keyboard shortcuts for day navigation (1-8)
   const handleStartDateEdit = useCallback(() => {
     setTempDate(forecastCycle.cycleDate);
     setIsEditingDate(true);
@@ -188,7 +196,6 @@ export const DaySelectorPanel: React.FC = () => {
     handleDayChange(day);
   }, [handleDayChange]);
 
-  // Keyboard shortcuts for day navigation (1-8)
   // Keyboard shortcuts for day navigation (1-8)
   useDayNumberShortcuts(dispatch);
 

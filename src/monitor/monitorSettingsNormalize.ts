@@ -15,7 +15,7 @@ const RADAR_MODES: MonitorRadarMode[] = ['none', 'mrms-conus', 'site'];
 const RADAR_PRODUCTS: MonitorRadarProduct[] = ['bref-qcd', 'cref-qcd', 'sr-bref', 'sr-bvel'];
 const SATELLITE_PRODUCTS: MonitorSatelliteProduct[] = ['none', 'goes-visible', 'goes-longwave', 'goes-water-vapor', 'goes-shortwave'];
 const OUTLOOK_KINDS: MonitorOutlookSourceKind[] = ['current', 'local-cycle', 'cloud-cycle'];
-const OUTLOOK_LAYER_TYPES: MonitorOutlookLayerType[] = [...MONITOR_OUTLOOK_LAYER_TYPES];
+const OUTLOOK_LAYER_TYPES: readonly MonitorOutlookLayerType[] = MONITOR_OUTLOOK_LAYER_TYPES;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
