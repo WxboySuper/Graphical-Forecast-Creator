@@ -593,6 +593,8 @@ export const processShortcutKeyDown = (
   e: KeyboardEvent,
   context: KeyboardShortcutContext
 ) => {
+  if (!e.key) return;
+
   const key = e.key.toLowerCase();
   if (isTypingTarget(e.target)) return;
 
