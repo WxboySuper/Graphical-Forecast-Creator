@@ -14,8 +14,8 @@ export function useFirestoreSleepRecovery(): void {
 
     const firestore = db;
 
-    /** Pauses or resumes Firestore sync when the document visibility changes. */
-    const handleVisibilityChange = (): void => {
+    /** Pauses or resumes Firestore sync to match current tab visibility. */
+    const syncFirestoreNetworkToVisibility = (): void => {
       if (document.hidden) {
         disableNetwork(firestore).catch(() => undefined);
         return;
@@ -24,9 +24,10 @@ export function useFirestoreSleepRecovery(): void {
       enableNetwork(firestore).catch(() => undefined);
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    syncFirestoreNetworkToVisibility();
+    document.addEventListener('visibilitychange', syncFirestoreNetworkToVisibility);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', syncFirestoreNetworkToVisibility);
     };
   }, []);
 }

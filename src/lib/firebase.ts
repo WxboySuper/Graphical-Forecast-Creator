@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache, type Firestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  memoryLocalCache,
+  type Firestore,
+} from 'firebase/firestore';
 
 interface FirebaseClientConfig {
   apiKey: string;
@@ -23,12 +28,19 @@ let firebaseApp: FirebaseApp | null = null;
 let firebaseAuth: Auth | null = null;
 let firestoreDb: Firestore | null = null;
 
+/** Memory cache avoids IndexedDB persistence that Safari can invalidate after sleep. */
+function getOrInitFirestore(app: FirebaseApp): Firestore {
+  try {
+    return initializeFirestore(app, { localCache: memoryLocalCache() });
+  } catch {
+    return getFirestore(app);
+  }
+}
+
 if (isHostedAuthEnabled) {
   firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseClientConfig);
   firebaseAuth = getAuth(firebaseApp);
-  // Memory cache avoids Firestore's default IndexedDB persistence, which Safari can
-  // invalidate after sleep ("Connection to Indexed Database server lost").
-  firestoreDb = initializeFirestore(firebaseApp, { localCache: memoryLocalCache() });
+  firestoreDb = getOrInitFirestore(firebaseApp);
 }
 
 export const app = firebaseApp;
