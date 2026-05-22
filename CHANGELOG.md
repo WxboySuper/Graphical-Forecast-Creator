@@ -5,35 +5,6 @@ All notable changes to this project will be documented in this file.
 
 ## v1.5.3
 
-### Discord announcement (draft)
-
-Copy/paste starting point — edit tone and channels as you like.
-
----
-
-**GFC v1.5.3 is live** (production + beta)
-
-We shipped a **privacy-focused update** to how the hosted app handles error monitoring, plus an updated Privacy Policy.
-
-**What you will notice**
-- You may be asked to **accept the updated Privacy Policy (v1.2.0)** the next time you open GFC on gfc.weatherboysuper.com or beta-gfc.weatherboysuper.com.
-- No change to how you draw outlooks, save cycles, or use cloud features — this is infrastructure and disclosure, not a forecast-editor feature release.
-
-**What changed behind the scenes**
-- **Error monitoring (Sentry)** is enabled on hosted production and beta so we can fix crashes faster.
-- **Session replay is off** — we are not recording screen replays of your session.
-- **No IP/cookies in error reports by default** — monitoring is tuned for bug diagnosis, not ad-style tracking.
-- **Forecast map data is not attached** to error breadcrumbs (action names only for forecast edits).
-- Browser errors go through our **server tunnel** so ad blockers are less likely to block crash reports (helps us fix issues you hit).
-
-**Why we did this**
-- Catch production bugs we cannot reproduce locally.
-- Stay aligned with what the Privacy Policy says we collect.
-
-Questions → alex@weatherboysuper.com
-
----
-
 ### Changed
 - **Privacy policy v1.2.0:** Added a clear disclosure for hosted error monitoring (Sentry): what is collected, what is not (no session replay, no default IP/cookie payloads, forecast contents not sent in breadcrumbs), and separate production vs beta environments.
 - **In-app privacy modal:** Bumped to v1.2.0 with the same Sentry disclosure; users who accepted an older policy version will be prompted to accept again on next visit.
