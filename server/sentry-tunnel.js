@@ -27,7 +27,13 @@ function parseAllowedSentryEndpoint(envelopeBody) {
     return null;
   }
 
-  const header = JSON.parse(firstLine);
+  let header;
+  try {
+    header = JSON.parse(firstLine);
+  } catch {
+    return null;
+  }
+
   if (!header?.dsn || typeof header.dsn !== 'string') {
     return null;
   }
@@ -45,9 +51,10 @@ function isAllowedSentryHost(hostname) {
   return SENTRY_DSN_PATTERN.test(`https://${hostname}/0`);
 }
 
-/** @returns {{ host: string, projectId: string } | null} Server-configured Sentry ingest target. */
+/** @returns {{ host: string, projectId: string } | null} Browser-facing Sentry ingest target for the tunnel. */
 function getConfiguredSentryEndpoint() {
-  return parseSentryDsnString(process.env.SENTRY_DSN || '');
+  const browserDsn = process.env.SENTRY_BROWSER_DSN || process.env.SENTRY_DSN || '';
+  return parseSentryDsnString(browserDsn);
 }
 
 /** @returns {boolean} Whether the client envelope targets the same Sentry project as the server. */
@@ -66,7 +73,9 @@ function clientEndpointMatchesConfigured(clientEndpoint, configuredEndpoint) {
 function registerSentryTunnelRoutes(app, express, rateLimit) {
   const configuredEndpoint = getConfiguredSentryEndpoint();
   if (!configuredEndpoint) {
-    console.warn('[analytics] sentry tunnel disabled: SENTRY_DSN is missing or invalid');
+    console.warn(
+      '[analytics] sentry tunnel disabled: SENTRY_BROWSER_DSN (or SENTRY_DSN) is missing or invalid'
+    );
     return;
   }
 

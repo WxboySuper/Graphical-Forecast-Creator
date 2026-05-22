@@ -42,6 +42,7 @@ export function initSentry(): void {
 
   Sentry.init({
     dsn: getSentryDsn(),
+    tunnel: '/api/sentry-tunnel',
     environment: getEnvironment(),
     release: getRelease(),
     sendDefaultPii: false,
