@@ -44,6 +44,7 @@ import { useCloudSync } from '../hooks/useCloudSync';
 import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbarButton';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
+import { keyboardShortcutKey } from '../utils/keyboardShortcutKey';
 import { queueProductMetric } from '../utils/productMetrics';
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
 import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
@@ -593,9 +594,8 @@ export const processShortcutKeyDown = (
   e: KeyboardEvent,
   context: KeyboardShortcutContext
 ) => {
-  if (!e.key) return;
-
-  const key = e.key.toLowerCase();
+  const key = keyboardShortcutKey(e);
+  if (!key) return;
   if (isTypingTarget(e.target)) return;
 
   if (handleUndoRedoShortcuts(e, key, context)) return;

@@ -14,6 +14,7 @@ import {
 import { selectForecastCycle, setForecastDay, setCycleDate } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 import { cn } from '../../lib/utils';
+import { keyboardShortcutKey } from '../../utils/keyboardShortcutKey';
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -118,7 +119,10 @@ const useDayNumberShortcuts = (dispatch: ReturnType<typeof useDispatch>) => {
       if (isEditable(e.target as EventTarget | null)) return;
       if (hasModifier(e)) return;
 
-      const num = parseInt(e.key);
+      const key = keyboardShortcutKey(e);
+      if (!key) return;
+
+      const num = parseInt(key, 10);
       if (num >= 1 && num <= 8) dispatch(setForecastDay(num as DayType));
     };
 
