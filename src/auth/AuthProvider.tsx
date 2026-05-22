@@ -21,8 +21,11 @@ import type { RootState } from '../store';
 import { setDarkMode } from '../store/themeSlice';
 import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
+import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { queueProductMetric } from '../utils/productMetrics';
+import type { MonitorSettings } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, normalizeMonitorSettings } from '../monitor/types';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
   normalizeForecastUiVariant,
@@ -72,6 +75,7 @@ interface UserSettingsDocument {
   ghostOutlooks: OverlaysState['ghostOutlooks'];
   defaultForecasterName: string;
   forecastUiVariant: ForecastUiVariant;
+  monitorSettings: MonitorSettings;
 }
 
 interface UserProfileDocument {
@@ -116,10 +120,11 @@ interface BuildSettingsArgs {
   overlays: OverlaysState;
   defaultForecasterName: string;
   forecastUiVariant: ForecastUiVariant;
+  monitorSettings?: MonitorSettings;
 }
 /** Builds the normalized settings document shape from current local state. */
 export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
-  const { darkMode, overlays, defaultForecasterName, forecastUiVariant } = args;
+  const { darkMode, overlays, defaultForecasterName, forecastUiVariant, monitorSettings } = args;
   return {
     darkMode,
     baseMapStyle: overlays.baseMapStyle,
@@ -128,6 +133,7 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
     ghostOutlooks: overlays.ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant,
+    monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
   };
 };
 
@@ -145,6 +151,7 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
     ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant,
+    monitorSettings,
   } = value;
 
   if (typeof darkMode !== 'boolean') {
@@ -171,6 +178,7 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
     ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
+    monitorSettings: normalizeMonitorSettings(monitorSettings),
   };
 };
 
@@ -228,6 +236,20 @@ export const postLocalJson = async <TResponse = Record<string, unknown>>(
   return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
 };
 
+/** Compares hosted settings fields excluding updatedAt metadata. */
+const compareUserSettingsFields = (
+  left: UserSettingsDocument,
+  right: UserSettingsDocument,
+): boolean =>
+  left.darkMode === right.darkMode &&
+  left.baseMapStyle === right.baseMapStyle &&
+  left.stateBorders === right.stateBorders &&
+  left.counties === right.counties &&
+  left.defaultForecasterName === right.defaultForecasterName &&
+  left.forecastUiVariant === right.forecastUiVariant &&
+  JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
+  areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
+
 /** True when two normalized settings payloads contain the same user-visible values. */
 export const areUserSettingsEqual = (
   left: UserSettingsDocument | null,
@@ -237,15 +259,109 @@ export const areUserSettingsEqual = (
     return left === right;
   }
 
-  return (
-    left.darkMode === right.darkMode &&
-    left.baseMapStyle === right.baseMapStyle &&
-    left.stateBorders === right.stateBorders &&
-    left.counties === right.counties &&
-    left.defaultForecasterName === right.defaultForecasterName &&
-    left.forecastUiVariant === right.forecastUiVariant &&
-    JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks)
+  return compareUserSettingsFields(left, right);
+};
+
+/** Applies a partial settings patch onto a normalized baseline document. */
+export const mergeUserSettingsDocument = (
+  base: UserSettingsDocument,
+  patch: Partial<UserSettingsDocument>,
+): UserSettingsDocument => ({
+  ...base,
+  ...patch,
+});
+
+const writeHostedSettingsDocument = async (
+  settingsRef: ReturnType<typeof doc>,
+  nextSettings: UserSettingsDocument,
+): Promise<void> => {
+  await setDoc(
+    settingsRef,
+    {
+      ...nextSettings,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
   );
+};
+
+const buildHostedAccountFallbackSettings = (
+  darkMode: boolean,
+  overlays: OverlaysState,
+  displayName: string,
+  forecastUiVariant: ForecastUiVariant,
+  monitorSettings: MonitorSettings,
+): UserSettingsDocument =>
+  createSettingsSnapshot({
+    darkMode,
+    overlays,
+    defaultForecasterName: displayName,
+    forecastUiVariant,
+    monitorSettings,
+  });
+
+interface PersistHostedSettingsContext {
+  user: User;
+  darkMode: boolean;
+  overlays: OverlaysState;
+  syncedSettings: UserSettingsDocument | null;
+  monitorSettings: MonitorSettings;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<'synced' | 'syncing' | 'error'>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+const persistHostedSettingsUpdate = async (
+  context: PersistHostedSettingsContext,
+  patch: Partial<UserSettingsDocument>,
+): Promise<void> => {
+  const {
+    user,
+    darkMode,
+    overlays,
+    syncedSettings,
+    monitorSettings,
+    lastSyncedSettingsRef,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    setError,
+  } = context;
+
+  const forecastUiVariant =
+    syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT;
+  const fallbackSettings = buildHostedAccountFallbackSettings(
+    darkMode,
+    overlays,
+    user.displayName ?? '',
+    forecastUiVariant,
+    syncedSettings?.monitorSettings ?? monitorSettings,
+  );
+  const baselineSettings = lastSyncedSettingsRef.current ?? fallbackSettings;
+  const nextSettings = mergeUserSettingsDocument(baselineSettings, patch);
+  if (areUserSettingsEqual(baselineSettings, nextSettings)) {
+    setSettingsSyncStatus('synced');
+    return;
+  }
+
+  const previousSettings = lastSyncedSettingsRef.current;
+  const previousSyncedSettings = syncedSettings;
+  lastSyncedSettingsRef.current = nextSettings;
+  setSyncedSettings(nextSettings);
+  setSettingsSyncStatus('syncing');
+  setError(null);
+
+  try {
+    await writeHostedSettingsDocument(doc(requireDb(), 'userSettings', user.uid), nextSettings);
+    setSettingsSyncStatus('synced');
+    writeStoredForecastUiVariant(nextSettings.forecastUiVariant);
+  } catch (updateError) {
+    lastSyncedSettingsRef.current = previousSettings;
+    setSyncedSettings(previousSyncedSettings);
+    setSettingsSyncStatus('error');
+    setError(getSettingsUpdateError(updateError));
+    throw updateError;
+  }
 };
 
 /** True when the current overlay state already matches the incoming synced overlay values. */
@@ -298,6 +414,7 @@ export const applySettingsToState = (
   }
 
   writeStoredForecastUiVariant(settings.forecastUiVariant);
+  dispatch(applyMonitorSettings(settings.monitorSettings));
   lastSyncedSettingsRef.current = settings;
   setSyncedSettings(settings);
 };
@@ -989,8 +1106,10 @@ const useHostedAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const overlays = useSelector((state: RootState) => state.overlays);
+  const monitorSettings = useSelector((state: RootState) => state.monitor);
   const currentDarkModeRef = useRef(darkMode);
   const currentOverlaysRef = useRef(overlays);
+  const currentMonitorSettingsRef = useRef(monitorSettings);
   const hasInitializedSettingsRef = useRef(false);
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const pendingSettingsWriteRef = useRef<number | null>(null);
@@ -1010,6 +1129,10 @@ const useHostedAuthState = (): AuthContextValue => {
   useEffect(() => {
     currentOverlaysRef.current = overlays;
   }, [overlays]);
+
+  useEffect(() => {
+    currentMonitorSettingsRef.current = monitorSettings;
+  }, [monitorSettings]);
 
   useEffect(function subscribeToHostedAuthState() {
     if (!isHostedAuthEnabled || !auth) {
@@ -1091,6 +1214,7 @@ const useHostedAuthState = (): AuthContextValue => {
         overlays: currentOverlaysRef.current,
         defaultForecasterName: user.displayName ?? '',
         forecastUiVariant: readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
+        monitorSettings: currentMonitorSettingsRef.current,
       });
 
     /** Applies validated remote settings into Redux and local auth state. */
@@ -1201,6 +1325,7 @@ const useHostedAuthState = (): AuthContextValue => {
       overlays,
       defaultForecasterName: syncedSettings?.defaultForecasterName ?? user.displayName ?? '',
       forecastUiVariant: syncedSettings?.forecastUiVariant ?? DEFAULT_FORECAST_UI_VARIANT,
+      monitorSettings: syncedSettings?.monitorSettings ?? monitorSettings,
     });
 
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, nextSettings)) {
@@ -1241,55 +1366,21 @@ const useHostedAuthState = (): AuthContextValue => {
   }, [darkMode, overlays, settingsSyncStatus, status, syncedSettings?.defaultForecasterName, user]);
 
   /** Persists explicit account settings changes made from the account page. */
-  const updateSyncedSettings = async (settings: Partial<UserSettingsDocument>): Promise<void> => {
-    const hostedSyncUnavailable = !isHostedAuthEnabled || !db || !user;
-    if (hostedSyncUnavailable) {
-      throw new Error('Hosted accounts are not enabled for this deployment.');
-    }
-
-    const settingsRef = doc(requireDb(), 'userSettings', user.uid);
-    const fallbackSettings = createSettingsSnapshot({
-      darkMode,
-      overlays,
-      defaultForecasterName: user.displayName ?? '',
-      forecastUiVariant: syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
-    });
-    const nextSettings: UserSettingsDocument = {
-      ...(lastSyncedSettingsRef.current ?? fallbackSettings),
-      ...settings,
-    };
-    if (areUserSettingsEqual(lastSyncedSettingsRef.current ?? fallbackSettings, nextSettings)) {
-      setSettingsSyncStatus('synced');
-      return;
-    }
-    const previousSettings = lastSyncedSettingsRef.current;
-    const previousSyncedSettings = syncedSettings;
-
-    lastSyncedSettingsRef.current = nextSettings;
-    setSyncedSettings(nextSettings);
-    setSettingsSyncStatus('syncing');
-    setError(null);
-
-    try {
-      await setDoc(
-        settingsRef,
-        {
-          ...nextSettings,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      setSettingsSyncStatus('synced');
-      writeStoredForecastUiVariant(nextSettings.forecastUiVariant);
-    } catch (updateError) {
-      lastSyncedSettingsRef.current = previousSettings;
-      setSyncedSettings(previousSyncedSettings);
-      setSettingsSyncStatus('error');
-      setError(getSettingsUpdateError(updateError));
-      throw updateError;
-    }
-  };
+  const updateSyncedSettings = (settings: Partial<UserSettingsDocument>): Promise<void> =>
+    persistHostedSettingsUpdate(
+      {
+        user: user as User,
+        darkMode,
+        overlays,
+        syncedSettings,
+        monitorSettings,
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+        setSettingsSyncStatus,
+        setError,
+      },
+      settings,
+    );
 
   const value = useMemo<AuthContextValue>(() => {
     if (!isHostedAuthEnabled || !auth) {

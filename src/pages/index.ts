@@ -2,6 +2,7 @@ export { HomePage } from './HomePage';
 export { ForecastPage } from './ForecastPage';
 export { DiscussionPage } from './DiscussionPage';
 export { VerificationPage } from './VerificationPage';
+export { MonitorPage } from './MonitorPage';
 export { ComingSoonPage } from './ComingSoonPage';
 export { AccountPage } from './AccountPage';
 export { PricingPage } from './PricingPage';

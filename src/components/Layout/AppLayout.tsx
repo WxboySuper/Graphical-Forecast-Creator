@@ -127,6 +127,7 @@ export const AppLayout: React.FC = () => {
           '1': () => navigate('/forecast'),
           '2': () => navigate('/discussion'),
           '3': () => navigate('/verification'),
+          '4': () => navigate('/monitor'),
           d: () => document.documentElement.classList.toggle('dark-mode'),
         };
 

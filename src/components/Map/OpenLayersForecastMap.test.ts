@@ -159,4 +159,17 @@ describe('OpenLayersForecastMap helpers', () => {
     expect(s1).toBeTruthy();
     expect(s2).toBeTruthy();
   });
+
+  test('toOlStyle transparencyScale reduces fill and stroke alpha', () => {
+    const base = toOlStyle({ outlookType: 'categorical', probability: 'P10' });
+    const scaled = toOlStyle(
+      { outlookType: 'categorical', probability: 'P10' },
+      { transparencyScale: 0.4 },
+    );
+
+    expect(base.getFill()?.getColor()).toBe('rgba(17, 34, 51, 0.5)');
+    expect(scaled.getFill()?.getColor()).toBe('rgba(17, 34, 51, 0.2)');
+    expect(base.getStroke()?.getColor()).toBe('rgba(68, 85, 102, 0.9)');
+    expect(scaled.getStroke()?.getColor()).toMatch(/^rgba\(68, 85, 102, 0\.36/);
+  });
 });
