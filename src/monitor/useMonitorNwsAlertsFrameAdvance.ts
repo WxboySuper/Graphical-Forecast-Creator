@@ -1,15 +1,24 @@
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
-export const useMonitorNwsAlertsFrameAdvance = (
-  enabled: boolean,
-  animationEnabled: boolean,
-  filteredFrameCount: number,
-  animationSpeedMs: number,
-  setFrameIndex: Dispatch<SetStateAction<number>>,
-) => {
+interface MonitorNwsAlertsFrameAdvanceOptions {
+  enabled: boolean;
+  animationEnabled: boolean;
+  filteredFrameCount: number;
+  animationSpeedMs: number;
+  setFrameIndex: Dispatch<SetStateAction<number>>;
+}
+
+export const useMonitorNwsAlertsFrameAdvance = ({
+  enabled,
+  animationEnabled,
+  filteredFrameCount,
+  animationSpeedMs,
+  setFrameIndex,
+}: MonitorNwsAlertsFrameAdvanceOptions) => {
   useEffect(() => {
-    if (!enabled || !animationEnabled || filteredFrameCount < 2) {
+    const shouldAdvance = enabled && animationEnabled && filteredFrameCount >= 2;
+    if (!shouldAdvance) {
       return;
     }
 

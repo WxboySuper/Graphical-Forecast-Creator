@@ -15,13 +15,21 @@ const appendSnapshotFrame = (
   return [...current, collection].slice(-MAX_ANIMATION_FRAMES);
 };
 
-export const useMonitorNwsAlertsRefresh = (
-  enabled: boolean,
-  animationEnabled: boolean,
-  animationSpeedMs: number,
-  setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>,
-  setFetchedAt: Dispatch<SetStateAction<string | null>>,
-) => {
+interface MonitorNwsAlertsRefreshOptions {
+  enabled: boolean;
+  animationEnabled: boolean;
+  animationSpeedMs: number;
+  setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
+  setFetchedAt: Dispatch<SetStateAction<string | null>>;
+}
+
+export const useMonitorNwsAlertsRefresh = ({
+  enabled,
+  animationEnabled,
+  animationSpeedMs,
+  setRawFrames,
+  setFetchedAt,
+}: MonitorNwsAlertsRefreshOptions) => {
   useEffect(() => {
     if (!enabled || !animationEnabled) {
       return;

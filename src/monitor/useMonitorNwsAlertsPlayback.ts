@@ -25,13 +25,19 @@ export const useMonitorNwsAlertsPlayback = ({
   setFrameIndex,
   setFetchedAt,
 }: UseMonitorNwsAlertsPlaybackArgs) => {
-  useMonitorNwsAlertsFrameAdvance(
+  useMonitorNwsAlertsFrameAdvance({
     enabled,
     animationEnabled,
     filteredFrameCount,
     animationSpeedMs,
     setFrameIndex,
-  );
-  useMonitorNwsAlertsRefresh(enabled, animationEnabled, animationSpeedMs, setRawFrames, setFetchedAt);
+  });
+  useMonitorNwsAlertsRefresh({
+    enabled,
+    animationEnabled,
+    animationSpeedMs,
+    setRawFrames,
+    setFetchedAt,
+  });
   useMonitorNwsAlertsFrameSync(enabled, animationEnabled, rawFrameCount, setFrameIndex);
 };
