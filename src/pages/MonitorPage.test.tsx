@@ -34,6 +34,28 @@ jest.mock('../monitor/useLiveWmsLayers', () => ({
   }),
 }));
 
+jest.mock('../monitor/useMonitorStormReports', () => ({
+  useMonitorStormReports: () => ({
+    reports: [],
+    loading: false,
+    error: null,
+    fetchedAt: null,
+    totalCount: 0,
+  }),
+}));
+
+jest.mock('../monitor/useMonitorNwsAlerts', () => ({
+  useMonitorNwsAlerts: () => ({
+    alertCollection: { type: 'FeatureCollection', features: [] },
+    frameCount: 0,
+    frameIndex: 0,
+    loading: false,
+    error: null,
+    fetchedAt: null,
+    polygonCount: 0,
+  }),
+}));
+
 jest.mock('../monitor/useRadarSiteOptions', () => ({
   useRadarSiteOptions: () => ({
     sites: [{ id: 'KTLX', name: 'Oklahoma City', label: 'KTLX — Oklahoma City' }],
@@ -87,6 +109,6 @@ describe('MonitorPage', () => {
     expect(screen.getByRole('heading', { name: 'Monitor' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: /Monitor controls/i })).toBeInTheDocument();
     expect(screen.getByTestId('monitor-map-stub')).toBeInTheDocument();
-    expect(screen.getByText(/Live layers are opt-in/i)).toBeInTheDocument();
+    expect(screen.getByText(/SPC reports, and NWS alerts/i)).toBeInTheDocument();
   });
 });

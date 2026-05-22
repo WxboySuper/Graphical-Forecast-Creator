@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
+import Overlay from 'ol/Overlay';
 import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
@@ -9,12 +10,24 @@ import VectorSource from 'ol/source/Vector';
 import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
 import GeoJSON from 'ol/format/GeoJSON';
+import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
 import { Fill, Stroke, Style } from 'ol/style';
 import type { FeatureLike } from 'ol/Feature';
 import type { Feature as GeoJsonFeature } from 'geojson';
 import { fromLonLat, toLonLat } from 'ol/proj';
+import type { StormReport } from '../../types/stormReports';
+import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
+import { buildNwsAlertStyle } from '../../monitor/nwsAlerts';
+import type { NwsAlertDetails } from '../../monitor/nwsAlertDetails';
+import { parseNwsAlertFromOlProperties } from '../../monitor/nwsAlertDetails';
+import { buildStormReportStyle } from '../../monitor/stormReportMapStyle';
+import MonitorAlertPopup from './MonitorAlertPopup';
+import { hideOverlay } from '../Map/OpenLayersForecastMap';
 import { useDispatch, useSelector } from 'react-redux';
-import type { OutlookData, OutlookType } from '../../types/outlooks';
+import type { OutlookData } from '../../types/outlooks';
+import type { MonitorOutlookLayerType } from '../../monitor/types';
+import { flattenMonitorOutlookFeatures } from '../../monitor/outlookLayers';
 import type { AppDispatch, RootState } from '../../store';
 import { setMonitorMapView } from '../../store/monitorSlice';
 import type { MonitorMapView } from '../../monitor/types';
@@ -30,14 +43,24 @@ interface MonitorMapProps {
   satelliteLayer: WmsLayerConfig | null;
   satelliteOpacity: number;
   outlookData?: OutlookData;
+  outlookType: MonitorOutlookLayerType;
+  stormReports: StormReport[];
+  alertsCollection: NwsAlertFeatureCollection;
+  alertsOpacity: number;
 }
 
 const BASE_LAYER_Z_INDEX = 0;
-const REFERENCE_LAYER_Z_INDEX = 12;
 const SATELLITE_LAYER_Z_INDEX = 15;
 const RADAR_LAYER_Z_INDEX = 20;
-const OUTLOOK_LAYER_Z_INDEX = 100;
-const STATE_OUTLINE_LAYER_Z_INDEX = 110;
+const ALERTS_LAYER_Z_INDEX = 1030;
+/** Outlook polygons must stay see-through so live radar/satellite imagery remains readable. */
+const MONITOR_OUTLOOK_TRANSPARENCY_SCALE = 0.38;
+const STATE_OUTLINE_LAYER_Z_INDEX = 1045;
+/** Above live WMS layers but below road/label vectors (OpenFreeMap overlay sits at 1050). */
+const OUTLOOK_LAYER_Z_INDEX = 1040;
+const STORM_REPORTS_LAYER_Z_INDEX = 1048;
+/** Roads and place labels sit above live imagery and outlook polygons (matches forecast map). */
+const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 
 const US_STATES_GEOJSON_URL =
   'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json';
@@ -85,26 +108,6 @@ const buildWmsParams = (config: WmsLayerConfig) => ({
 });
 
 const buildWmsLayerKey = (config: WmsLayerConfig): string => `${config.url}::${config.layer}`;
-
-const flattenOutlookFeatures = (data?: OutlookData): Array<{ outlookType: OutlookType; probability: string; feature: GeoJsonFeature }> => {
-  if (!data) {
-    return [];
-  }
-
-  const items: Array<{ outlookType: OutlookType; probability: string; feature: GeoJsonFeature }> = [];
-  (Object.entries(data) as Array<[OutlookType, Map<string, GeoJsonFeature[]> | undefined]>).forEach(([outlookType, map]) => {
-    if (!(map instanceof Map)) {
-      return;
-    }
-
-    map.forEach((features, probability) => {
-      features.forEach((feature) => {
-        items.push({ outlookType, probability, feature });
-      });
-    });
-  });
-  return items;
-};
 
 const applyWmsLayer = (
   layer: TileLayer<TileWMS>,
@@ -165,21 +168,34 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   satelliteLayer,
   satelliteOpacity,
   outlookData,
+  outlookType,
+  stormReports,
+  alertsCollection,
+  alertsOpacity,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
+  const [selectedAlert, setSelectedAlert] = useState<NwsAlertDetails | null>(null);
   const mapElementRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<Overlay | null>(null);
   const mapRef = useRef<OLMap | null>(null);
   const radarLayerRef = useRef<TileLayer<TileWMS> | null>(null);
   const satelliteLayerRef = useRef<TileLayer<TileWMS> | null>(null);
+  const alertsLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
   const vectorStyleRequestRef = useRef(0);
   const radarLayerKeyRef = useRef<string | null>(null);
   const satelliteLayerKeyRef = useRef<string | null>(null);
   const outlookSourceRef = useRef(new VectorSource());
+  const alertsSourceRef = useRef(new VectorSource());
+  const stormReportsSourceRef = useRef(new VectorSource());
   const stateOutlineSourceRef = useRef(new VectorSource());
   const applyingExternalViewRef = useRef(false);
-  const serializedFeatures = useMemo(() => flattenOutlookFeatures(outlookData), [outlookData]);
+  const serializedFeatures = useMemo(
+    () => flattenMonitorOutlookFeatures(outlookData, outlookType),
+    [outlookData, outlookType],
+  );
 
   useEffect(() => {
     if (!mapElementRef.current) {
@@ -192,7 +208,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     });
     const vectorReferenceGroup = new LayerGroup({
       visible: false,
-      zIndex: REFERENCE_LAYER_Z_INDEX,
+      zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
     });
     const satelliteLayerInstance = new TileLayer<TileWMS>({
       visible: false,
@@ -204,10 +220,22 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
       opacity: radarOpacity,
       zIndex: RADAR_LAYER_Z_INDEX,
     });
+    const alertsLayer = new VectorLayer({
+      source: alertsSourceRef.current,
+      opacity: alertsOpacity,
+      zIndex: ALERTS_LAYER_Z_INDEX,
+      style: (feature) => {
+        const event = String(feature.get('event') ?? '');
+        return buildNwsAlertStyle(event);
+      },
+    });
     const outlookLayer = new VectorLayer({
       source: outlookSourceRef.current,
-      opacity: 0.9,
       zIndex: OUTLOOK_LAYER_Z_INDEX,
+    });
+    const stormReportsLayer = new VectorLayer({
+      source: stormReportsSourceRef.current,
+      zIndex: STORM_REPORTS_LAYER_Z_INDEX,
     });
     const stateOutlineLayer = new VectorLayer({
       source: stateOutlineSourceRef.current,
@@ -218,11 +246,13 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
       target: mapElementRef.current,
       layers: [
         baseLayer,
-        vectorReferenceGroup,
         satelliteLayerInstance,
         radarLayerInstance,
+        alertsLayer,
         outlookLayer,
+        stormReportsLayer,
         stateOutlineLayer,
+        vectorReferenceGroup,
       ],
       view: new View({
         center: fromLonLat([mapView.center[1], mapView.center[0]]),
@@ -252,9 +282,61 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     };
 
     map.on('moveend', handleMoveEnd);
+
+    if (popupRef.current) {
+      const overlay = new Overlay({
+        element: popupRef.current,
+        autoPan: false,
+      });
+      map.addOverlay(overlay);
+      overlayRef.current = overlay;
+    }
+
+    const handleMapClick = (evt: { pixel: number[]; coordinate: number[] }) => {
+      const feature = map.forEachFeatureAtPixel(
+        evt.pixel,
+        (candidate) => (candidate.get('nwsAlert') ? candidate : undefined),
+        {
+          layerFilter: (layer) => layer === alertsLayer,
+          hitTolerance: 6,
+        },
+      );
+
+      if (feature && overlayRef.current) {
+        const details = parseNwsAlertFromOlProperties(feature.getProperties() as Record<string, unknown>);
+        if (details) {
+          setSelectedAlert(details);
+          overlayRef.current.setPosition(evt.coordinate);
+          return;
+        }
+      }
+
+      if (overlayRef.current) {
+        hideOverlay(overlayRef.current);
+      }
+      setSelectedAlert(null);
+    };
+
+    const handlePointerMove = (evt: { pixel: number[] }) => {
+      const target = map.getTargetElement();
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const hitAlert = map.hasFeatureAtPixel(evt.pixel, {
+        layerFilter: (layer) => layer === alertsLayer,
+        hitTolerance: 6,
+      });
+      target.style.cursor = hitAlert ? 'pointer' : '';
+    };
+
+    map.on('click', handleMapClick);
+    map.on('pointermove', handlePointerMove);
+
     mapRef.current = map;
     radarLayerRef.current = radarLayerInstance;
     satelliteLayerRef.current = satelliteLayerInstance;
+    alertsLayerRef.current = alertsLayer;
     vectorReferenceGroupRef.current = vectorReferenceGroup;
 
     loadUsStateOutlines(stateOutlineSourceRef.current, darkMode).catch(() => {
@@ -275,6 +357,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
         }
 
         replaceLayerGroupLayers(vectorReferenceGroupRef.current, nextReferenceGroup);
+        vectorReferenceGroupRef.current.setZIndex(TOP_VECTOR_REFERENCE_LAYER_Z_INDEX);
         vectorReferenceGroupRef.current.setVisible(true);
       })
       .catch(() => {
@@ -283,10 +366,18 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
 
     return () => {
       map.un('moveend', handleMoveEnd);
+      map.un('click', handleMapClick);
+      map.un('pointermove', handlePointerMove);
+      const target = map.getTargetElement();
+      if (target instanceof HTMLElement) {
+        target.style.cursor = '';
+      }
       map.setTarget(undefined);
+      overlayRef.current = null;
       mapRef.current = null;
       radarLayerRef.current = null;
       satelliteLayerRef.current = null;
+      alertsLayerRef.current = null;
       vectorReferenceGroupRef.current = null;
       radarLayerKeyRef.current = null;
       satelliteLayerKeyRef.current = null;
@@ -360,7 +451,10 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
 
       const applyStyle = (item: FeatureLike) => {
         if ('setStyle' in item && typeof item.setStyle === 'function') {
-          item.setStyle(toOlStyle({ outlookType, probability }, { isTopLayer: true }));
+          item.setStyle(toOlStyle(
+            { outlookType, probability },
+            { transparencyScale: MONITOR_OUTLOOK_TRANSPARENCY_SCALE },
+          ));
         }
         source.addFeature(item as never);
       };
@@ -373,9 +467,75 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     });
   }, [serializedFeatures]);
 
+  useEffect(() => {
+    alertsLayerRef.current?.setOpacity(alertsOpacity);
+  }, [alertsOpacity]);
+
+  useEffect(() => {
+    const source = alertsSourceRef.current;
+    source.clear();
+    const format = new GeoJSON();
+
+    alertsCollection.features.forEach((feature) => {
+      if (!feature.geometry) {
+        return;
+      }
+
+      const olFeatures = format.readFeatures(feature, {
+        dataProjection: 'EPSG:4326',
+        featureProjection: 'EPSG:3857',
+      });
+
+      olFeatures.forEach((olFeature) => {
+        if ('setProperties' in olFeature && typeof olFeature.setProperties === 'function') {
+          olFeature.setProperties({
+            ...(feature.properties ?? {}),
+            event: feature.properties?.event ?? 'Alert',
+            nwsAlert: true,
+          });
+        }
+        source.addFeature(olFeature as never);
+      });
+    });
+  }, [alertsCollection]);
+
+  useEffect(() => {
+    if (overlayRef.current) {
+      hideOverlay(overlayRef.current);
+    }
+    setSelectedAlert(null);
+  }, [alertsCollection]);
+
+  useEffect(() => {
+    const source = stormReportsSourceRef.current;
+    source.clear();
+
+    stormReports.forEach((report) => {
+      const feature = new Feature({
+        geometry: new Point(fromLonLat([report.longitude, report.latitude])),
+        reportId: report.id,
+        type: report.type,
+      });
+      feature.setStyle(buildStormReportStyle(report.type));
+      source.addFeature(feature);
+    });
+  }, [stormReports]);
+
+  const handleCloseAlertPopup = () => {
+    if (overlayRef.current) {
+      hideOverlay(overlayRef.current);
+    }
+    setSelectedAlert(null);
+  };
+
   return (
     <div className="monitor-map" aria-label="Monitor map">
       <div ref={mapElementRef} className="monitor-map__viewport" />
+      <div ref={popupRef} className="monitor-map__alertOverlay">
+        {selectedAlert && (
+          <MonitorAlertPopup details={selectedAlert} onClose={handleCloseAlertPopup} />
+        )}
+      </div>
       <div className="monitor-map__badge">Read-only monitor</div>
     </div>
   );

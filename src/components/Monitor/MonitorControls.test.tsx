@@ -29,6 +29,33 @@ const baseProps = {
   onSatelliteProductChange: jest.fn(),
   onSatelliteOpacityChange: jest.fn(),
   onOutlookSourceChange: jest.fn(),
+  onOutlookTypeChange: jest.fn(),
+  stormReportsMeta: {
+    reports: [],
+    loading: false,
+    error: null,
+    fetchedAt: null,
+    totalCount: 0,
+  },
+  onStormReportsEnabledChange: jest.fn(),
+  onStormReportsFilterTornadoChange: jest.fn(),
+  onStormReportsFilterWindChange: jest.fn(),
+  onStormReportsFilterHailChange: jest.fn(),
+  onStormReportsMatchOutlookTypeChange: jest.fn(),
+  alertsMeta: {
+    alertCollection: { type: 'FeatureCollection', features: [] },
+    frameCount: 0,
+    frameIndex: 0,
+    loading: false,
+    error: null,
+    fetchedAt: null,
+    polygonCount: 0,
+  },
+  onAlertsEnabledChange: jest.fn(),
+  onAlertsOpacityChange: jest.fn(),
+  onAlertsShowWatchesChange: jest.fn(),
+  onAlertsShowWarningsChange: jest.fn(),
+  onAlertsShowAdvisoriesChange: jest.fn(),
   onAnimationEnabledChange: jest.fn(),
   onAnimationSpeedChange: jest.fn(),
   onRefresh: jest.fn(),
@@ -62,7 +89,16 @@ describe('MonitorControls', () => {
     fireEvent.click(screen.getByLabelText('Refresh live layers'));
     expect(baseProps.onRefresh).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    fireEvent.change(screen.getByLabelText('Outlook type'), { target: { value: 'wind' } });
+    expect(baseProps.onOutlookTypeChange).toHaveBeenCalledWith('wind');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle playback controls' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
     expect(baseProps.onAnimationEnabledChange).toHaveBeenCalledWith(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle radar controls' }));
+    expect(screen.queryByLabelText('Radar source')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle radar controls' }));
+    expect(screen.getByLabelText('Radar source')).toBeInTheDocument();
   });
 });

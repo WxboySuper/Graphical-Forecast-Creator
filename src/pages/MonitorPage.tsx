@@ -7,6 +7,17 @@ import {
   setAnimationEnabled,
   setAnimationSpeedMs,
   setMonitorOutlookSource,
+  setMonitorOutlookType,
+  setAlertsEnabled,
+  setAlertsOpacity,
+  setAlertsShowAdvisories,
+  setAlertsShowWarnings,
+  setAlertsShowWatches,
+  setStormReportsEnabled,
+  setStormReportsFilterHail,
+  setStormReportsFilterTornado,
+  setStormReportsFilterWind,
+  setStormReportsMatchOutlookType,
   setRadarMode,
   setRadarOpacity,
   setRadarProduct,
@@ -27,6 +38,8 @@ import { areMonitorSettingsEqual } from '../monitor/types';
 import type { MonitorSettings } from '../monitor/types';
 import { buildRadarLayerConfig, buildSatelliteLayerConfig } from '../monitor/wms';
 import { useLiveWmsLayers } from '../monitor/useLiveWmsLayers';
+import { useMonitorNwsAlerts } from '../monitor/useMonitorNwsAlerts';
+import { useMonitorStormReports } from '../monitor/useMonitorStormReports';
 import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
 import { deserializeForecast } from '../utils/fileUtils';
 import { getLocalCalendarDate } from '../utils/localDate';
@@ -182,6 +195,28 @@ export const MonitorPage: React.FC = () => {
     addToast,
   });
 
+  const stormReportState = useMonitorStormReports({
+    enabled: settings.stormReportsEnabled,
+    filterTornado: settings.stormReportsFilterTornado,
+    filterWind: settings.stormReportsFilterWind,
+    filterHail: settings.stormReportsFilterHail,
+    matchOutlookType: settings.stormReportsMatchOutlookType,
+    outlookType: settings.outlookType,
+    refreshToken,
+    addToast,
+  });
+
+  const alertState = useMonitorNwsAlerts({
+    enabled: settings.alertsEnabled,
+    showWatches: settings.alertsShowWatches,
+    showWarnings: settings.alertsShowWarnings,
+    showAdvisories: settings.alertsShowAdvisories,
+    animationEnabled: settings.animationEnabled,
+    animationSpeedMs: settings.animationSpeedMs,
+    refreshToken,
+    addToast,
+  });
+
   const handleRefreshLiveLayers = useCallback(() => {
     setRefreshToken((value) => value + 1);
   }, []);
@@ -199,10 +234,14 @@ export const MonitorPage: React.FC = () => {
     dispatch(setMonitorOutlookSource(source));
   }, [dispatch]);
 
+  const handleOutlookTypeChange = useCallback((type: MonitorSettings['outlookType']) => {
+    dispatch(setMonitorOutlookType(type));
+  }, [dispatch]);
+
   const syncLabel = premiumActive ? 'Cloud sync eligible' : 'Local settings';
   const statusMessage = cloudCyclesLoading
     ? 'Loading saved outlook sources.'
-    : 'Live layers are opt-in; outlooks stay read-only.';
+    : 'Live radar, satellite, SPC reports, and NWS alerts refresh with Playback or Refresh.';
 
   return (
     <div className="monitor-page">
@@ -224,6 +263,19 @@ export const MonitorPage: React.FC = () => {
         onSatelliteProductChange={(product) => dispatch(setSatelliteProduct(product))}
         onSatelliteOpacityChange={(opacity) => dispatch(setSatelliteOpacity(opacity))}
         onOutlookSourceChange={handleOutlookSourceChange}
+        onOutlookTypeChange={handleOutlookTypeChange}
+        stormReportsMeta={stormReportState}
+        onStormReportsEnabledChange={(enabled) => dispatch(setStormReportsEnabled(enabled))}
+        onStormReportsFilterTornadoChange={(enabled) => dispatch(setStormReportsFilterTornado(enabled))}
+        onStormReportsFilterWindChange={(enabled) => dispatch(setStormReportsFilterWind(enabled))}
+        onStormReportsFilterHailChange={(enabled) => dispatch(setStormReportsFilterHail(enabled))}
+        onStormReportsMatchOutlookTypeChange={(enabled) => dispatch(setStormReportsMatchOutlookType(enabled))}
+        alertsMeta={alertState}
+        onAlertsEnabledChange={(enabled) => dispatch(setAlertsEnabled(enabled))}
+        onAlertsOpacityChange={(opacity) => dispatch(setAlertsOpacity(opacity))}
+        onAlertsShowWatchesChange={(enabled) => dispatch(setAlertsShowWatches(enabled))}
+        onAlertsShowWarningsChange={(enabled) => dispatch(setAlertsShowWarnings(enabled))}
+        onAlertsShowAdvisoriesChange={(enabled) => dispatch(setAlertsShowAdvisories(enabled))}
         onAnimationEnabledChange={(enabled) => dispatch(setAnimationEnabled(enabled))}
         onAnimationSpeedChange={(speed) => dispatch(setAnimationSpeedMs(speed))}
         onRefresh={handleRefreshLiveLayers}
@@ -236,6 +288,10 @@ export const MonitorPage: React.FC = () => {
         satelliteLayer={satelliteLayer}
         satelliteOpacity={settings.satelliteOpacity}
         outlookData={selectedOutlook.data}
+        outlookType={settings.outlookType}
+        stormReports={stormReportState.reports}
+        alertsCollection={alertState.alertCollection}
+        alertsOpacity={settings.alertsOpacity}
       />
     </div>
   );

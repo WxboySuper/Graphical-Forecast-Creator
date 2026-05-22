@@ -6,6 +6,10 @@ export type MonitorSatelliteProduct = 'none' | 'goes-visible' | 'goes-longwave' 
 
 export type MonitorOutlookSourceKind = 'current' | 'local-cycle' | 'cloud-cycle';
 
+export const MONITOR_OUTLOOK_LAYER_TYPES = ['tornado', 'wind', 'hail', 'categorical'] as const;
+
+export type MonitorOutlookLayerType = (typeof MONITOR_OUTLOOK_LAYER_TYPES)[number];
+
 export interface MonitorOutlookSourceSelection {
   kind: MonitorOutlookSourceKind;
   id: string;
@@ -24,9 +28,20 @@ export interface MonitorSettings {
   satelliteProduct: MonitorSatelliteProduct;
   satelliteOpacity: number;
   outlookSource: MonitorOutlookSourceSelection;
+  outlookType: MonitorOutlookLayerType;
   mapView: MonitorMapView;
   animationEnabled: boolean;
   animationSpeedMs: number;
+  stormReportsEnabled: boolean;
+  stormReportsFilterTornado: boolean;
+  stormReportsFilterWind: boolean;
+  stormReportsFilterHail: boolean;
+  stormReportsMatchOutlookType: boolean;
+  alertsEnabled: boolean;
+  alertsOpacity: number;
+  alertsShowWatches: boolean;
+  alertsShowWarnings: boolean;
+  alertsShowAdvisories: boolean;
 }
 
 export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
@@ -40,18 +55,30 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
     kind: 'current',
     id: 'current',
   },
+  outlookType: 'categorical',
   mapView: {
     center: [39.8283, -98.5795],
     zoom: 4,
   },
   animationEnabled: false,
   animationSpeedMs: 400,
+  stormReportsEnabled: true,
+  stormReportsFilterTornado: true,
+  stormReportsFilterWind: true,
+  stormReportsFilterHail: true,
+  stormReportsMatchOutlookType: false,
+  alertsEnabled: true,
+  alertsOpacity: 0.55,
+  alertsShowWatches: true,
+  alertsShowWarnings: true,
+  alertsShowAdvisories: false,
 };
 
 const RADAR_MODES: MonitorRadarMode[] = ['none', 'mrms-conus', 'site'];
 const RADAR_PRODUCTS: MonitorRadarProduct[] = ['bref-qcd', 'cref-qcd', 'sr-bref', 'sr-bvel'];
 const SATELLITE_PRODUCTS: MonitorSatelliteProduct[] = ['none', 'goes-visible', 'goes-longwave', 'goes-water-vapor', 'goes-shortwave'];
 const OUTLOOK_KINDS: MonitorOutlookSourceKind[] = ['current', 'local-cycle', 'cloud-cycle'];
+const OUTLOOK_LAYER_TYPES: MonitorOutlookLayerType[] = [...MONITOR_OUTLOOK_LAYER_TYPES];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -125,11 +152,40 @@ export const normalizeMonitorSettings = (value: unknown): MonitorSettings => {
     satelliteProduct: readEnum(value.satelliteProduct, SATELLITE_PRODUCTS, DEFAULT_MONITOR_SETTINGS.satelliteProduct),
     satelliteOpacity: readNumber(value.satelliteOpacity, DEFAULT_MONITOR_SETTINGS.satelliteOpacity, 0, 1),
     outlookSource: readOutlookSource(value.outlookSource),
+    outlookType: readEnum(value.outlookType, OUTLOOK_LAYER_TYPES, DEFAULT_MONITOR_SETTINGS.outlookType),
     mapView: readMapView(value.mapView),
     animationEnabled: typeof value.animationEnabled === 'boolean'
       ? value.animationEnabled
       : DEFAULT_MONITOR_SETTINGS.animationEnabled,
     animationSpeedMs: readNumber(value.animationSpeedMs, DEFAULT_MONITOR_SETTINGS.animationSpeedMs, 150, 2000),
+    stormReportsEnabled: typeof value.stormReportsEnabled === 'boolean'
+      ? value.stormReportsEnabled
+      : DEFAULT_MONITOR_SETTINGS.stormReportsEnabled,
+    stormReportsFilterTornado: typeof value.stormReportsFilterTornado === 'boolean'
+      ? value.stormReportsFilterTornado
+      : DEFAULT_MONITOR_SETTINGS.stormReportsFilterTornado,
+    stormReportsFilterWind: typeof value.stormReportsFilterWind === 'boolean'
+      ? value.stormReportsFilterWind
+      : DEFAULT_MONITOR_SETTINGS.stormReportsFilterWind,
+    stormReportsFilterHail: typeof value.stormReportsFilterHail === 'boolean'
+      ? value.stormReportsFilterHail
+      : DEFAULT_MONITOR_SETTINGS.stormReportsFilterHail,
+    stormReportsMatchOutlookType: typeof value.stormReportsMatchOutlookType === 'boolean'
+      ? value.stormReportsMatchOutlookType
+      : DEFAULT_MONITOR_SETTINGS.stormReportsMatchOutlookType,
+    alertsEnabled: typeof value.alertsEnabled === 'boolean'
+      ? value.alertsEnabled
+      : DEFAULT_MONITOR_SETTINGS.alertsEnabled,
+    alertsOpacity: readNumber(value.alertsOpacity, DEFAULT_MONITOR_SETTINGS.alertsOpacity, 0, 1),
+    alertsShowWatches: typeof value.alertsShowWatches === 'boolean'
+      ? value.alertsShowWatches
+      : DEFAULT_MONITOR_SETTINGS.alertsShowWatches,
+    alertsShowWarnings: typeof value.alertsShowWarnings === 'boolean'
+      ? value.alertsShowWarnings
+      : DEFAULT_MONITOR_SETTINGS.alertsShowWarnings,
+    alertsShowAdvisories: typeof value.alertsShowAdvisories === 'boolean'
+      ? value.alertsShowAdvisories
+      : DEFAULT_MONITOR_SETTINGS.alertsShowAdvisories,
   };
 };
 

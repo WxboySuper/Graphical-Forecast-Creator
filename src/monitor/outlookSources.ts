@@ -3,6 +3,7 @@ import type { CloudCycleMetadata } from '../types/cloudCycles';
 import type { DayType, ForecastCycle, OutlookData } from '../types/outlooks';
 import type { SavedCycle } from '../store/forecastSlice';
 import type { MonitorOutlookSourceSelection } from './types';
+import { coerceOutlookProbabilityMap } from './outlookLayers';
 
 export interface MonitorOutlookSourceOption {
   id: string;
@@ -31,11 +32,17 @@ export const cloneOutlookDataForReadOnly = (data: OutlookData | undefined): Outl
     return undefined;
   }
 
-  const cloneMap = (map?: Map<string, Feature[]>): Map<string, Feature[]> | undefined =>
-    map ? new Map(Array.from(map.entries(), ([probability, features]) => [
+  const cloneMap = (map?: Map<string, Feature[]> | Record<string, Feature[]>): Map<string, Feature[]> | undefined => {
+    const normalized = coerceOutlookProbabilityMap(map);
+    if (!normalized) {
+      return undefined;
+    }
+
+    return new Map(Array.from(normalized.entries(), ([probability, features]) => [
       probability,
       features.map(cloneFeature),
-    ])) : undefined;
+    ]));
+  };
 
   return {
     tornado: cloneMap(data.tornado),

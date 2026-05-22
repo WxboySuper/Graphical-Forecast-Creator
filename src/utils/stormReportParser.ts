@@ -1,34 +1,96 @@
 import { StormReport, ReportType } from '../types/stormReports';
 import { v4 as uuidv4 } from 'uuid';
 
+export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today.csv';
+
+const archiveUrlForDate = (date: string): string =>
+  `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
+
 /**
  * Fetches storm reports from NOAA archives for a given date
  * @param date Date in YYMMDD format (e.g., "260130" for January 30, 2026)
  * @returns Promise with array of storm reports
  */
 export async function fetchStormReports(date: string): Promise<StormReport[]> {
-  const url = `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
-  
-  try {
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch storm reports: ${response.statusText}`);
-    }
-    
-    const text = await response.text();
-    const reports = parseCSV(text);
-    
-    return reports;
-  } catch (error) {
-    throw error;
+  const response = await fetch(archiveUrlForDate(date));
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch storm reports: ${response.statusText}`);
   }
+
+  return parseArchiveStormReportCsv(await response.text());
 }
 
+/** Fetches same-day SPC storm reports (today.csv). */
+export async function fetchTodayStormReports(): Promise<StormReport[]> {
+  const response = await fetch(SPC_TODAY_STORM_REPORTS_URL);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch today's storm reports: ${response.statusText}`);
+  }
+
+  return parseTodayStormReportCsv(await response.text());
+}
+
+/** Parses SPC today.csv (Time,F_Scale / Time,Speed / Time,Size sections). */
+export const parseTodayStormReportCsv = (csvText: string): StormReport[] => {
+  const lines = csvText.split('\n').map((line) => line.trim());
+  const reports: StormReport[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line) {
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith('Time,F_Scale')) {
+      index += 1;
+      while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
+        const report = parseTodayCsvRow(lines[index], 'tornado');
+        if (report) {
+          reports.push(report);
+        }
+        index += 1;
+      }
+      continue;
+    }
+
+    if (line.startsWith('Time,Speed')) {
+      index += 1;
+      while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
+        const report = parseTodayCsvRow(lines[index], 'wind');
+        if (report) {
+          reports.push(report);
+        }
+        index += 1;
+      }
+      continue;
+    }
+
+    if (line.startsWith('Time,Size')) {
+      index += 1;
+      while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
+        const report = parseTodayCsvRow(lines[index], 'hail');
+        if (report) {
+          reports.push(report);
+        }
+        index += 1;
+      }
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return reports;
+};
+
 /**
- * Parses CSV text into storm reports
+ * Parses archived *_rpts_raw.csv storm report text.
  */
-function parseCSV(csvText: string): StormReport[] {
+export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
   const reports: StormReport[] = [];
   const lines = csvText.split('\n');
   
@@ -72,7 +134,7 @@ function parseCSV(csvText: string): StormReport[] {
     
     // Parse data row
     try {
-      const report = parseCSVRow(line, currentSection, headers);
+      const report = parseArchiveCsvRow(line, currentSection, headers);
       if (report) {
         reports.push(report);
       }
@@ -87,7 +149,48 @@ function parseCSV(csvText: string): StormReport[] {
 /**
  * Parses a single CSV row into a storm report
  */
-function parseCSVRow(line: string, type: ReportType, headers: string[]): StormReport | null {
+const parseTodayCsvRow = (line: string, type: ReportType): StormReport | null => {
+  const headers = type === 'tornado'
+    ? ['Time', 'F_Scale', 'Location', 'County', 'State', 'Lat', 'Lon', 'Comments']
+    : type === 'wind'
+      ? ['Time', 'Speed', 'Location', 'County', 'State', 'Lat', 'Lon', 'Comments']
+      : ['Time', 'Size', 'Location', 'County', 'State', 'Lat', 'Lon', 'Comments'];
+
+  return parseStormReportRow(line, type, headers, {
+    scaleField: type === 'tornado' ? 'F_Scale' : undefined,
+    speedField: type === 'wind' ? 'Speed' : undefined,
+    sizeField: type === 'hail' ? 'Size' : undefined,
+    latField: 'Lat',
+    lonField: 'Lon',
+    remarksField: 'Comments',
+  });
+};
+
+const parseArchiveCsvRow = (line: string, type: ReportType, headers: string[]): StormReport | null =>
+  parseStormReportRow(line, type, headers, {
+    scaleField: 'EF_Scale',
+    speedField: 'Speed(MPH)',
+    sizeField: 'Size(1/100in.)',
+    latField: 'LAT',
+    lonField: 'LON',
+    remarksField: 'Remarks',
+  });
+
+interface StormReportRowFieldMap {
+  scaleField?: string;
+  speedField?: string;
+  sizeField?: string;
+  latField: string;
+  lonField: string;
+  remarksField: string;
+}
+
+const parseStormReportRow = (
+  line: string,
+  type: ReportType,
+  headers: string[],
+  fields: StormReportRowFieldMap,
+): StormReport | null => {
   // Split by comma, but handle quoted fields
   const values: string[] = [];
   let currentValue = '';
@@ -114,8 +217,8 @@ function parseCSVRow(line: string, type: ReportType, headers: string[]): StormRe
   });
   
   // Extract coordinates
-  const lat = parseFloat(row['LAT']);
-  const lon = parseFloat(row['LON']);
+  const lat = parseFloat(row[fields.latField]);
+  const lon = parseFloat(row[fields.lonField]);
   
   if (isNaN(lat) || isNaN(lon)) {
     return null;
@@ -126,29 +229,32 @@ function parseCSVRow(line: string, type: ReportType, headers: string[]): StormRe
   
   // Extract magnitude based on type
   let magnitude = '';
+  const remarks = row[fields.remarksField] || '';
+
   if (type === 'tornado') {
-    const efScale = row['EF_Scale'];
-    if (efScale && efScale !== 'UNK') {
-      magnitude = efScale;
+    const scaleField = fields.scaleField ? row[fields.scaleField] : '';
+    if (scaleField && scaleField !== 'UNK') {
+      magnitude = scaleField.startsWith('EF') ? scaleField : `EF${scaleField}`;
     } else {
-      // Try to extract from remarks
-      const remarks = row['Remarks'] || '';
       const efMatch = remarks.match(/EF-?(\d+)/i);
       if (efMatch) {
         magnitude = `EF${efMatch[1]}`;
       }
     }
   } else if (type === 'wind') {
-    const speed = row['Speed(MPH)'];
+    const speed = fields.speedField ? row[fields.speedField] : '';
     if (speed && speed !== 'UNK') {
-      magnitude = `${speed} mph`;
+      magnitude = speed.toLowerCase().includes('mph') ? speed : `${speed} mph`;
     }
   } else if (type === 'hail') {
-    const size = row['Size(1/100in.)'];
+    const size = fields.sizeField ? row[fields.sizeField] : '';
     if (size && size !== 'UNK') {
-      // Convert from 1/100 inches to inches
-      const inches = parseInt(size) / 100;
-      magnitude = `${inches.toFixed(2)}"`;
+      if (size.includes('.')) {
+        magnitude = `${size}"`;
+      } else {
+        const inches = parseInt(size, 10) / 100;
+        magnitude = Number.isNaN(inches) ? '' : `${inches.toFixed(2)}"`;
+      }
     }
   }
 
@@ -159,12 +265,12 @@ function parseCSVRow(line: string, type: ReportType, headers: string[]): StormRe
     longitude: lon,
     time,
     magnitude,
-    location: row['Location'] || '',
-    county: row['County'] || '',
-    state: row['State'] || '',
-    comments: row['Remarks'] || ''
+    location: row.Location || '',
+    county: row.County || '',
+    state: row.State || '',
+    comments: remarks,
   };
-}
+};
 
 /**
  * Formats a date object to YYMMDD format for NOAA storm report archives

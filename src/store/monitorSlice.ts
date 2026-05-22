@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { MonitorMapView, MonitorOutlookSourceSelection, MonitorSettings } from '../monitor/types';
+import type { MonitorMapView, MonitorOutlookLayerType, MonitorOutlookSourceSelection, MonitorSettings } from '../monitor/types';
 import { DEFAULT_MONITOR_SETTINGS, normalizeMonitorSettings } from '../monitor/types';
 import { resolveRadarProductForMode } from '../monitor/wms';
 
@@ -44,6 +44,9 @@ const monitorSlice = createSlice({
     setMonitorOutlookSource: (state, action: PayloadAction<MonitorOutlookSourceSelection>) => {
       state.outlookSource = action.payload;
     },
+    setMonitorOutlookType: (state, action: PayloadAction<MonitorOutlookLayerType>) => {
+      state.outlookType = action.payload;
+    },
     setMonitorMapView: (state, action: PayloadAction<MonitorMapView>) => {
       state.mapView = action.payload;
     },
@@ -52,6 +55,36 @@ const monitorSlice = createSlice({
     },
     setAnimationSpeedMs: (state, action: PayloadAction<number>) => {
       state.animationSpeedMs = Math.min(2000, Math.max(150, action.payload));
+    },
+    setStormReportsEnabled: (state, action: PayloadAction<boolean>) => {
+      state.stormReportsEnabled = action.payload;
+    },
+    setStormReportsFilterTornado: (state, action: PayloadAction<boolean>) => {
+      state.stormReportsFilterTornado = action.payload;
+    },
+    setStormReportsFilterWind: (state, action: PayloadAction<boolean>) => {
+      state.stormReportsFilterWind = action.payload;
+    },
+    setStormReportsFilterHail: (state, action: PayloadAction<boolean>) => {
+      state.stormReportsFilterHail = action.payload;
+    },
+    setStormReportsMatchOutlookType: (state, action: PayloadAction<boolean>) => {
+      state.stormReportsMatchOutlookType = action.payload;
+    },
+    setAlertsEnabled: (state, action: PayloadAction<boolean>) => {
+      state.alertsEnabled = action.payload;
+    },
+    setAlertsOpacity: (state, action: PayloadAction<number>) => {
+      state.alertsOpacity = Math.min(1, Math.max(0, action.payload));
+    },
+    setAlertsShowWatches: (state, action: PayloadAction<boolean>) => {
+      state.alertsShowWatches = action.payload;
+    },
+    setAlertsShowWarnings: (state, action: PayloadAction<boolean>) => {
+      state.alertsShowWarnings = action.payload;
+    },
+    setAlertsShowAdvisories: (state, action: PayloadAction<boolean>) => {
+      state.alertsShowAdvisories = action.payload;
     },
   },
 });
@@ -65,9 +98,20 @@ export const {
   setSatelliteProduct,
   setSatelliteOpacity,
   setMonitorOutlookSource,
+  setMonitorOutlookType,
   setMonitorMapView,
   setAnimationEnabled,
   setAnimationSpeedMs,
+  setStormReportsEnabled,
+  setStormReportsFilterTornado,
+  setStormReportsFilterWind,
+  setStormReportsFilterHail,
+  setStormReportsMatchOutlookType,
+  setAlertsEnabled,
+  setAlertsOpacity,
+  setAlertsShowWatches,
+  setAlertsShowWarnings,
+  setAlertsShowAdvisories,
 } = monitorSlice.actions;
 
 export default monitorSlice.reducer;
