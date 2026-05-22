@@ -3,13 +3,30 @@ import './PrivacyPolicyModal.css';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.1.0';
+const PRIVACY_POLICY_VERSION = '1.2.0';
+const PRIVACY_POLICY_LAST_UPDATED = 'May 22, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
+
+const PRIVACY_POLICY_WHATS_NEW: string[] = [
+  'We added a disclosure for hosted error monitoring (Sentry) on production and beta deployments.',
+  'Error monitoring does not use session replay and does not send IP addresses or cookies by default.',
+  'Forecast map data is not attached to error reports; only limited diagnostic data is collected to fix bugs.',
+];
 
 /** Returns true if the user has accepted the current version of the Privacy Policy. */
 export function hasAcceptedPrivacyPolicy(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY) === PRIVACY_POLICY_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+/** Returns true when the user previously accepted an older policy and must re-accept. */
+export function isPrivacyPolicyUpgrade(): boolean {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored != null && stored !== PRIVACY_POLICY_VERSION;
   } catch {
     return false;
   }
@@ -30,9 +47,22 @@ interface PrivacyPolicyModalProps {
   onClose?: () => void;
 }
 
+/** Highlights material changes in the current policy version for users who must re-accept. */
+const PrivacyPolicyWhatsNew: React.FC = () => (
+  <aside className="privacy-whats-new" aria-labelledby="privacy-whats-new-title" role="note">
+    <h3 id="privacy-whats-new-title">What&apos;s new in version {PRIVACY_POLICY_VERSION}</h3>
+    <ul>
+      {PRIVACY_POLICY_WHATS_NEW.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  </aside>
+);
+
 /** Renders the current in-app Privacy Policy content for both acceptance and view-only modes. */
-const PrivacyPolicyContent: React.FC = () => (
+const PrivacyPolicyContent: React.FC<{ showWhatsNew?: boolean }> = ({ showWhatsNew = false }) => (
   <>
+    {showWhatsNew && <PrivacyPolicyWhatsNew />}
     <p>
       <strong>TL;DR:</strong> Your local forecasts stay on your device. If you choose to make an account, we only
       collect what is strictly necessary to sync your work and securely manage your subscription.
@@ -93,6 +123,13 @@ const PrivacyPolicyContent: React.FC = () => (
       Separately from product metrics, the hosted service may keep short operational request logs such as page path,
       referrer, timestamp, and user-agent for maintenance and debugging. These logs are not used to inspect forecast
       contents and are kept separate from the product metrics dashboard.
+    </p>
+    <p>
+      On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
+      application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics
+      above. We do not use Sentry for advertising or the sale of personal data. Error reports are designed to exclude
+      forecast map payloads, do not use session replay, and are configured without sending IP addresses or cookies by
+      default. Events are tagged by environment (production or beta) so staging issues stay separate from production.
     </p>
 
     <h3>6. Data Retention &amp; Deletion</h3>
@@ -155,7 +192,7 @@ const PrivacyPolicyAcceptanceFooter: React.FC<{
         onChange={onCheckedChange}
       />
       I have read and agree to the Privacy Policy. I understand what data stays local, what data may be stored for
-      hosted features, and how GFC handles anonymous product analytics.
+      hosted features, product analytics, and error monitoring as described in this policy.
     </label>
     <div className="privacy-button-row">
       <button className="privacy-btn-decline" onClick={onDecline}>
@@ -174,7 +211,11 @@ const PrivacyPolicyHeader: React.FC<{ viewOnly: boolean; onClose?: () => void }>
     <div className="privacy-modal-header-row">
       <div>
         <h2 id="privacy-title">Privacy Policy</h2>
-        <p>Please read and accept before using Graphical Forecast Creator &mdash; Last Updated March 30, 2026</p>
+        <p>
+          {viewOnly
+            ? `Version ${PRIVACY_POLICY_VERSION} — Last updated ${PRIVACY_POLICY_LAST_UPDATED}`
+            : `Please read and accept before using Graphical Forecast Creator — Last updated ${PRIVACY_POLICY_LAST_UPDATED}`}
+        </p>
       </div>
       {viewOnly && (
         <button className="privacy-close-view-btn" onClick={onClose} aria-label="Close">
@@ -211,7 +252,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept, viewO
       <div className="privacy-modal">
         <PrivacyPolicyHeader viewOnly={viewOnly} onClose={onClose} />
         <div className="privacy-modal-body">
-          <PrivacyPolicyContent />
+          <PrivacyPolicyContent showWhatsNew={!viewOnly && isPrivacyPolicyUpgrade()} />
         </div>
 
         {viewOnly ? (

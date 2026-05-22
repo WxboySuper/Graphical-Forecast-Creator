@@ -2,6 +2,9 @@
 
 require('./load-env');
 
+const { initSentry, setupExpressErrorHandler } = require('./sentry');
+initSentry();
+
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
@@ -9,6 +12,7 @@ const path = require('path');
 const { registerBetaRoutes } = require('./beta');
 const { registerBillingRoutes } = require('./billing');
 const { registerMetricsRoutes } = require('./metrics');
+const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
 
 const PORT = parseInt(process.env.PORT || '3006', 10);
 const LOG_DIR = process.env.LOG_DIR || path.join(__dirname, 'logs');
@@ -27,6 +31,8 @@ const collectRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+registerSentryTunnelRoutes(app, express, rateLimit);
 
 registerBillingRoutes(app, express);
 registerMetricsRoutes(app, express);
@@ -52,6 +58,8 @@ app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, (req, res
     res.status(500).end();
   }
 });
+
+setupExpressErrorHandler(app);
 
 // Reject everything else quietly
 app.use((_req, res) => res.status(404).end());
