@@ -147,6 +147,8 @@ Add these GitHub Actions secrets (repo → Settings → Secrets and variables �
 | `SENTRY_ORG` | Your Sentry organization slug |
 | `SENTRY_PROJECT` | Web project slug (source maps) — not the API project |
 
+Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the analytics VPS so `/api/sentry-tunnel` validates browser envelopes against the web project.
+
 After the next `main` deploy, verify in Sentry with a test error from the browser console on production (not from DevTools while paused — use a one-off button or `throw new Error('Sentry test')` in the console on the live site).
 
 ---
