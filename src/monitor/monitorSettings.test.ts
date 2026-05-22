@@ -1,4 +1,5 @@
-import { DEFAULT_MONITOR_SETTINGS, normalizeMonitorSettings } from './types';
+import { DEFAULT_MONITOR_SETTINGS } from './types';
+import { normalizeMonitorSettings } from './monitorSettingsNormalize';
 import monitorReducer, { setRadarMode, setRadarSite } from '../store/monitorSlice';
 import { readStoredMonitorSettings, writeStoredMonitorSettings, MONITOR_SETTINGS_STORAGE_KEY } from './storage';
 

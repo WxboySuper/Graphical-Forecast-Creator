@@ -1,4 +1,5 @@
-import { DEFAULT_MONITOR_SETTINGS, MonitorSettings, normalizeMonitorSettings } from './types';
+import { DEFAULT_MONITOR_SETTINGS, MonitorSettings } from './types';
+import { normalizeMonitorSettings } from './monitorSettingsNormalize';
 
 export const MONITOR_SETTINGS_STORAGE_KEY = 'gfc-monitor-settings';
 
