@@ -3,7 +3,7 @@ import './PrivacyPolicyModal.css';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.1.0';
+const PRIVACY_POLICY_VERSION = '1.2.0';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 /** Returns true if the user has accepted the current version of the Privacy Policy. */
@@ -94,6 +94,13 @@ const PrivacyPolicyContent: React.FC = () => (
       referrer, timestamp, and user-agent for maintenance and debugging. These logs are not used to inspect forecast
       contents and are kept separate from the product metrics dashboard.
     </p>
+    <p>
+      On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
+      application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics
+      above. We do not use Sentry for advertising or the sale of personal data. Error reports are designed to exclude
+      forecast map payloads, do not use session replay, and are configured without sending IP addresses or cookies by
+      default. Events are tagged by environment (production or beta) so staging issues stay separate from production.
+    </p>
 
     <h3>6. Data Retention &amp; Deletion</h3>
     <p>
@@ -155,7 +162,7 @@ const PrivacyPolicyAcceptanceFooter: React.FC<{
         onChange={onCheckedChange}
       />
       I have read and agree to the Privacy Policy. I understand what data stays local, what data may be stored for
-      hosted features, and how GFC handles anonymous product analytics.
+      hosted features, product analytics, and error monitoring as described in this policy.
     </label>
     <div className="privacy-button-row">
       <button className="privacy-btn-decline" onClick={onDecline}>
