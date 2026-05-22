@@ -60,6 +60,7 @@ export const useMonitorMapBootstrap = ({
   const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => {
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     if (!mapElementRef.current) {
       return;
     }
@@ -127,6 +128,7 @@ export const useMonitorMapBootstrap = ({
           if (candidate.get('nwsAlert')) {
             return candidate;
           }
+          return undefined;
         },
         { layerFilter: (layer) => layer === alertsLayer, hitTolerance: 6 },
       );

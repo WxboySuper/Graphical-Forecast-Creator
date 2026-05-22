@@ -130,6 +130,99 @@ const useCloudOutlookData = ({
   return selectedOption.kind === 'cloud-cycle' ? cloudOption ?? selectedOption : selectedOption;
 };
 
+interface MonitorPageWorkspaceProps {
+  settings: MonitorSettings;
+  outlookOptions: MonitorOutlookSourceOption[];
+  selectedOutlook: MonitorOutlookSourceOption;
+  radarSiteOptions: ReturnType<typeof useRadarSiteOptions>['sites'];
+  radarSitesLoading?: boolean;
+  radarSitesError?: string;
+  radarDisplayTime?: string;
+  satelliteDisplayTime?: string;
+  radarLayer: ReturnType<typeof buildRadarLayerConfig> | null;
+  satelliteLayer: ReturnType<typeof buildSatelliteLayerConfig> | null;
+  statusMessage: string;
+  syncLabel: string;
+  stormReportState: ReturnType<typeof useMonitorStormReports>;
+  alertState: ReturnType<typeof useMonitorNwsAlerts>;
+  onRefresh: () => void;
+  onOutlookSourceChange: (source: MonitorSettings['outlookSource']) => void;
+  onOutlookTypeChange: (type: MonitorSettings['outlookType']) => void;
+  dispatch: AppDispatch;
+}
+
+const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
+  settings,
+  outlookOptions,
+  selectedOutlook,
+  radarSiteOptions,
+  radarSitesLoading,
+  radarSitesError,
+  radarDisplayTime,
+  satelliteDisplayTime,
+  radarLayer,
+  satelliteLayer,
+  statusMessage,
+  syncLabel,
+  stormReportState,
+  alertState,
+  onRefresh,
+  onOutlookSourceChange,
+  onOutlookTypeChange,
+  dispatch,
+}) => (
+    <div className="monitor-page">
+      <MonitorControls
+        settings={settings}
+        outlookOptions={outlookOptions}
+        selectedOutlook={selectedOutlook}
+        radarSiteOptions={radarSiteOptions}
+        radarSitesLoading={radarSitesLoading}
+        radarSitesError={radarSitesError}
+        radarLatestTime={radarDisplayTime}
+        satelliteLatestTime={satelliteDisplayTime}
+        statusMessage={statusMessage}
+        syncLabel={syncLabel}
+        onRadarModeChange={(mode) => dispatch(setRadarMode(mode))}
+        onRadarProductChange={(product) => dispatch(setRadarProduct(product))}
+        onRadarSiteChange={(site) => dispatch(setRadarSite(site))}
+        onRadarOpacityChange={(opacity) => dispatch(setRadarOpacity(opacity))}
+        onSatelliteProductChange={(product) => dispatch(setSatelliteProduct(product))}
+        onSatelliteOpacityChange={(opacity) => dispatch(setSatelliteOpacity(opacity))}
+        onOutlookSourceChange={onOutlookSourceChange}
+        onOutlookTypeChange={onOutlookTypeChange}
+        stormReportsMeta={stormReportState}
+        onStormReportsEnabledChange={(enabled) => dispatch(setStormReportsEnabled(enabled))}
+        onStormReportsFilterTornadoChange={(enabled) => dispatch(setStormReportsFilterTornado(enabled))}
+        onStormReportsFilterWindChange={(enabled) => dispatch(setStormReportsFilterWind(enabled))}
+        onStormReportsFilterHailChange={(enabled) => dispatch(setStormReportsFilterHail(enabled))}
+        onStormReportsMatchOutlookTypeChange={(enabled) => dispatch(setStormReportsMatchOutlookType(enabled))}
+        alertsMeta={alertState}
+        onAlertsEnabledChange={(enabled) => dispatch(setAlertsEnabled(enabled))}
+        onAlertsOpacityChange={(opacity) => dispatch(setAlertsOpacity(opacity))}
+        onAlertsShowWatchesChange={(enabled) => dispatch(setAlertsShowWatches(enabled))}
+        onAlertsShowWarningsChange={(enabled) => dispatch(setAlertsShowWarnings(enabled))}
+        onAlertsShowAdvisoriesChange={(enabled) => dispatch(setAlertsShowAdvisories(enabled))}
+        onAnimationEnabledChange={(enabled) => dispatch(setAnimationEnabled(enabled))}
+        onAnimationSpeedChange={(speed) => dispatch(setAnimationSpeedMs(speed))}
+        onRefresh={onRefresh}
+      />
+
+      <MonitorMap
+        mapView={settings.mapView}
+        radarLayer={radarLayer}
+        radarOpacity={settings.radarOpacity}
+        satelliteLayer={satelliteLayer}
+        satelliteOpacity={settings.satelliteOpacity}
+        outlookData={selectedOutlook.data}
+        outlookType={settings.outlookType}
+        stormReports={stormReportState.reports}
+        alertsCollection={alertState.alertCollection}
+        alertsOpacity={settings.alertsOpacity}
+      />
+    </div>
+);
+
 /** Real-time monitor page for radar, satellite, and read-only personal outlook overlays. */
 export const MonitorPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -219,56 +312,26 @@ export const MonitorPage: React.FC = () => {
     : 'Live radar, satellite, SPC reports, and NWS alerts refresh with Playback or Refresh.';
 
   return (
-    <div className="monitor-page">
-      <MonitorControls
-        settings={settings}
-        outlookOptions={outlookOptions}
-        selectedOutlook={selectedOutlook}
-        radarSiteOptions={radarSiteOptions}
-        radarSitesLoading={radarSitesLoading}
-        radarSitesError={radarSitesError}
-        radarLatestTime={radarDisplayTime}
-        satelliteLatestTime={satelliteDisplayTime}
-        statusMessage={statusMessage}
-        syncLabel={syncLabel}
-        onRadarModeChange={(mode) => dispatch(setRadarMode(mode))}
-        onRadarProductChange={(product) => dispatch(setRadarProduct(product))}
-        onRadarSiteChange={(site) => dispatch(setRadarSite(site))}
-        onRadarOpacityChange={(opacity) => dispatch(setRadarOpacity(opacity))}
-        onSatelliteProductChange={(product) => dispatch(setSatelliteProduct(product))}
-        onSatelliteOpacityChange={(opacity) => dispatch(setSatelliteOpacity(opacity))}
-        onOutlookSourceChange={handleOutlookSourceChange}
-        onOutlookTypeChange={handleOutlookTypeChange}
-        stormReportsMeta={stormReportState}
-        onStormReportsEnabledChange={(enabled) => dispatch(setStormReportsEnabled(enabled))}
-        onStormReportsFilterTornadoChange={(enabled) => dispatch(setStormReportsFilterTornado(enabled))}
-        onStormReportsFilterWindChange={(enabled) => dispatch(setStormReportsFilterWind(enabled))}
-        onStormReportsFilterHailChange={(enabled) => dispatch(setStormReportsFilterHail(enabled))}
-        onStormReportsMatchOutlookTypeChange={(enabled) => dispatch(setStormReportsMatchOutlookType(enabled))}
-        alertsMeta={alertState}
-        onAlertsEnabledChange={(enabled) => dispatch(setAlertsEnabled(enabled))}
-        onAlertsOpacityChange={(opacity) => dispatch(setAlertsOpacity(opacity))}
-        onAlertsShowWatchesChange={(enabled) => dispatch(setAlertsShowWatches(enabled))}
-        onAlertsShowWarningsChange={(enabled) => dispatch(setAlertsShowWarnings(enabled))}
-        onAlertsShowAdvisoriesChange={(enabled) => dispatch(setAlertsShowAdvisories(enabled))}
-        onAnimationEnabledChange={(enabled) => dispatch(setAnimationEnabled(enabled))}
-        onAnimationSpeedChange={(speed) => dispatch(setAnimationSpeedMs(speed))}
-        onRefresh={handleRefreshLiveLayers}
-      />
-
-      <MonitorMap
-        mapView={settings.mapView}
-        radarLayer={radarLayer}
-        radarOpacity={settings.radarOpacity}
-        satelliteLayer={satelliteLayer}
-        satelliteOpacity={settings.satelliteOpacity}
-        outlookData={selectedOutlook.data}
-        outlookType={settings.outlookType}
-        stormReports={stormReportState.reports}
-        alertsCollection={alertState.alertCollection}
-        alertsOpacity={settings.alertsOpacity}
-      />
-    </div>
+    <MonitorPageWorkspace
+      settings={settings}
+      outlookOptions={outlookOptions}
+      selectedOutlook={selectedOutlook}
+      radarSiteOptions={radarSiteOptions}
+      radarSitesLoading={radarSitesLoading}
+      radarSitesError={radarSitesError}
+      radarDisplayTime={radarDisplayTime}
+      satelliteDisplayTime={satelliteDisplayTime}
+      radarLayer={radarLayer}
+      satelliteLayer={satelliteLayer}
+      statusMessage={statusMessage}
+      syncLabel={syncLabel}
+      stormReportState={stormReportState}
+      alertState={alertState}
+      onRefresh={handleRefreshLiveLayers}
+      onOutlookSourceChange={handleOutlookSourceChange}
+      onOutlookTypeChange={handleOutlookTypeChange}
+      dispatch={dispatch}
+    />
   );
 };
 

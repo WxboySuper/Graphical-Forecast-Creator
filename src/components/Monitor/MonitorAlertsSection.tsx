@@ -14,6 +14,30 @@ interface MonitorAlertsMeta {
   polygonCount: number;
 }
 
+interface MonitorAlertCategoryCheckboxProps {
+  label: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
+const MonitorAlertCategoryCheckbox: React.FC<MonitorAlertCategoryCheckboxProps> = ({
+  label,
+  checked,
+  disabled,
+  onChange,
+}) => (
+  <label className="monitor-controls__checkbox">
+    <input
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.checked)}
+    />
+    {label}
+  </label>
+);
+
 interface MonitorAlertsSectionProps {
   settings: MonitorSettings;
   alertsMeta: MonitorAlertsMeta;
@@ -85,29 +109,5 @@ const MonitorAlertsSection: React.FC<MonitorAlertsSectionProps> = ({
     </MonitorControlsSection>
   );
 };
-
-interface MonitorAlertCategoryCheckboxProps {
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  onChange: (enabled: boolean) => void;
-}
-
-const MonitorAlertCategoryCheckbox: React.FC<MonitorAlertCategoryCheckboxProps> = ({
-  label,
-  checked,
-  disabled,
-  onChange,
-}) => (
-  <label className="monitor-controls__checkbox">
-    <input
-      type="checkbox"
-      checked={checked}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.checked)}
-    />
-    {label}
-  </label>
-);
 
 export default MonitorAlertsSection;

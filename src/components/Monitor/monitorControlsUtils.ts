@@ -15,11 +15,17 @@ export const formatLayerTime = (time?: string): string => {
 
 export const sourceValue = (source: MonitorOutlookSourceSelection): string => `${source.kind}:${source.id}`;
 
+const OUTLOOK_SOURCE_KINDS = new Set<MonitorOutlookSourceSelection['kind']>([
+  'current',
+  'local-cycle',
+  'cloud-cycle',
+]);
+
 export const parseSourceValue = (value: string): MonitorOutlookSourceSelection => {
   const [kind, ...idParts] = value.split(':');
   const id = idParts.join(':') || 'current';
-  if (kind === 'local-cycle' || kind === 'cloud-cycle' || kind === 'current') {
-    return { kind, id };
+  if (OUTLOOK_SOURCE_KINDS.has(kind as MonitorOutlookSourceSelection['kind'])) {
+    return { kind: kind as MonitorOutlookSourceSelection['kind'], id };
   }
 
   return { kind: 'current', id: 'current' };

@@ -6,6 +6,49 @@ import type { MonitorSettings } from '../../monitor/types';
 import MonitorControlsSection from './MonitorControlsSection';
 import { formatLayerTime } from './monitorControlsUtils';
 
+interface MonitorRadarSiteFieldProps {
+  radarSite: string;
+  radarSiteOptions: RadarSiteOption[];
+  radarSitesLoading?: boolean;
+  radarSitesError?: string;
+  selectedSiteLabel?: string;
+  onRadarSiteChange: (site: string) => void;
+}
+
+const MonitorRadarSiteField: React.FC<MonitorRadarSiteFieldProps> = ({
+  radarSite,
+  radarSiteOptions,
+  radarSitesLoading,
+  radarSitesError,
+  selectedSiteLabel,
+  onRadarSiteChange,
+}) => (
+  <label>
+    Radar site
+    <input
+      value={radarSite}
+      list="monitor-radar-site-list"
+      maxLength={4}
+      placeholder="Search KTLX, KOUN…"
+      onInput={(event) => onRadarSiteChange(event.currentTarget.value)}
+      aria-label="Radar site"
+      autoComplete="off"
+    />
+    <datalist id="monitor-radar-site-list">
+      {radarSiteOptions.map((site) => (
+        <option key={site.id} value={site.id}>
+          {site.name}
+        </option>
+      ))}
+    </datalist>
+    <div className="monitor-controls__meta">
+      {radarSitesLoading && 'Loading radar sites…'}
+      {!radarSitesLoading && radarSitesError}
+      {!radarSitesLoading && !radarSitesError && (selectedSiteLabel ?? 'Enter a four-character site ID (e.g. KTLX).')}
+    </div>
+  </label>
+);
+
 interface MonitorRadarSectionProps {
   settings: MonitorSettings;
   radarSiteOptions: RadarSiteOption[];
@@ -95,48 +138,5 @@ const MonitorRadarSection: React.FC<MonitorRadarSectionProps> = ({
     </MonitorControlsSection>
   );
 };
-
-interface MonitorRadarSiteFieldProps {
-  radarSite: string;
-  radarSiteOptions: RadarSiteOption[];
-  radarSitesLoading?: boolean;
-  radarSitesError?: string;
-  selectedSiteLabel?: string;
-  onRadarSiteChange: (site: string) => void;
-}
-
-const MonitorRadarSiteField: React.FC<MonitorRadarSiteFieldProps> = ({
-  radarSite,
-  radarSiteOptions,
-  radarSitesLoading,
-  radarSitesError,
-  selectedSiteLabel,
-  onRadarSiteChange,
-}) => (
-  <label>
-    Radar site
-    <input
-      value={radarSite}
-      list="monitor-radar-site-list"
-      maxLength={4}
-      placeholder="Search KTLX, KOUN…"
-      onInput={(event) => onRadarSiteChange(event.currentTarget.value)}
-      aria-label="Radar site"
-      autoComplete="off"
-    />
-    <datalist id="monitor-radar-site-list">
-      {radarSiteOptions.map((site) => (
-        <option key={site.id} value={site.id}>
-          {site.name}
-        </option>
-      ))}
-    </datalist>
-    <div className="monitor-controls__meta">
-      {radarSitesLoading && 'Loading radar sites…'}
-      {!radarSitesLoading && radarSitesError}
-      {!radarSitesLoading && !radarSitesError && (selectedSiteLabel ?? 'Enter a four-character site ID (e.g. KTLX).')}
-    </div>
-  </label>
-);
 
 export default MonitorRadarSection;

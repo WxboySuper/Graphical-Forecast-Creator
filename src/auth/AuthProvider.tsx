@@ -236,6 +236,19 @@ export const postLocalJson = async <TResponse = Record<string, unknown>>(
   return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
 };
 
+const compareUserSettingsFields = (
+  left: UserSettingsDocument,
+  right: UserSettingsDocument,
+): boolean =>
+  left.darkMode === right.darkMode &&
+  left.baseMapStyle === right.baseMapStyle &&
+  left.stateBorders === right.stateBorders &&
+  left.counties === right.counties &&
+  left.defaultForecasterName === right.defaultForecasterName &&
+  left.forecastUiVariant === right.forecastUiVariant &&
+  JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
+  areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
+
 /** True when two normalized settings payloads contain the same user-visible values. */
 export const areUserSettingsEqual = (
   left: UserSettingsDocument | null,
@@ -245,17 +258,16 @@ export const areUserSettingsEqual = (
     return left === right;
   }
 
-  return (
-    left.darkMode === right.darkMode &&
-    left.baseMapStyle === right.baseMapStyle &&
-    left.stateBorders === right.stateBorders &&
-    left.counties === right.counties &&
-    left.defaultForecasterName === right.defaultForecasterName &&
-    left.forecastUiVariant === right.forecastUiVariant &&
-    JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
-    areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings)
-  );
+  return compareUserSettingsFields(left, right);
 };
+
+export const mergeUserSettingsDocument = (
+  base: UserSettingsDocument,
+  patch: Partial<UserSettingsDocument>,
+): UserSettingsDocument => ({
+  ...base,
+  ...patch,
+});
 
 /** True when the current overlay state already matches the incoming synced overlay values. */
 export const areOverlaySettingsEqual = (
@@ -1273,11 +1285,9 @@ const useHostedAuthState = (): AuthContextValue => {
       forecastUiVariant: syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
       monitorSettings: syncedSettings?.monitorSettings ?? monitorSettings,
     });
-    const nextSettings: UserSettingsDocument = {
-      ...(lastSyncedSettingsRef.current ?? fallbackSettings),
-      ...settings,
-    };
-    if (areUserSettingsEqual(lastSyncedSettingsRef.current ?? fallbackSettings, nextSettings)) {
+    const baselineSettings = lastSyncedSettingsRef.current ?? fallbackSettings;
+    const nextSettings = mergeUserSettingsDocument(baselineSettings, settings);
+    if (areUserSettingsEqual(baselineSettings, nextSettings)) {
       setSettingsSyncStatus('synced');
       return;
     }

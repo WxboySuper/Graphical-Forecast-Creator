@@ -39,31 +39,26 @@ export const buildCsvRow = (headers: string[], values: string[]): Record<string,
   return row;
 };
 
-export const extractStormReportMagnitude = (
-  type: ReportType,
-  row: Record<string, string>,
-  fields: StormReportRowFieldMap,
-): string => {
+const extractTornadoMagnitude = (row: Record<string, string>, fields: StormReportRowFieldMap): string => {
   const remarks = row[fields.remarksField] || '';
-
-  if (type === 'tornado') {
-    const scaleField = fields.scaleField ? row[fields.scaleField] : '';
-    if (scaleField && scaleField !== 'UNK') {
-      return scaleField.startsWith('EF') ? scaleField : `EF${scaleField}`;
-    }
-
-    const efMatch = remarks.match(/EF-?(\d+)/i);
-    return efMatch ? `EF${efMatch[1]}` : '';
+  const scaleField = fields.scaleField ? row[fields.scaleField] : '';
+  if (scaleField && scaleField !== 'UNK') {
+    return scaleField.startsWith('EF') ? scaleField : `EF${scaleField}`;
   }
 
-  if (type === 'wind') {
-    const speed = fields.speedField ? row[fields.speedField] : '';
-    if (speed && speed !== 'UNK') {
-      return speed.toLowerCase().includes('mph') ? speed : `${speed} mph`;
-    }
-    return '';
-  }
+  const efMatch = remarks.match(/EF-?(\d+)/i);
+  return efMatch ? `EF${efMatch[1]}` : '';
+};
 
+const extractWindMagnitude = (row: Record<string, string>, fields: StormReportRowFieldMap): string => {
+  const speed = fields.speedField ? row[fields.speedField] : '';
+  if (speed && speed !== 'UNK') {
+    return speed.toLowerCase().includes('mph') ? speed : `${speed} mph`;
+  }
+  return '';
+};
+
+const extractHailMagnitude = (row: Record<string, string>, fields: StormReportRowFieldMap): string => {
   const size = fields.sizeField ? row[fields.sizeField] : '';
   if (!size || size === 'UNK') {
     return '';
@@ -75,4 +70,20 @@ export const extractStormReportMagnitude = (
 
   const inches = parseInt(size, 10) / 100;
   return Number.isNaN(inches) ? '' : `${inches.toFixed(2)}"`;
+};
+
+export const extractStormReportMagnitude = (
+  type: ReportType,
+  row: Record<string, string>,
+  fields: StormReportRowFieldMap,
+): string => {
+  if (type === 'tornado') {
+    return extractTornadoMagnitude(row, fields);
+  }
+
+  if (type === 'wind') {
+    return extractWindMagnitude(row, fields);
+  }
+
+  return extractHailMagnitude(row, fields);
 };

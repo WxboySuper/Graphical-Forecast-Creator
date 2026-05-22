@@ -15,6 +15,28 @@ export const resetRadarSiteCacheForTests = (): void => {
   cachedRadarSites = null;
 };
 
+const parseRadarSiteFeature = (feature: unknown): RadarSiteOption | null => {
+  if (!feature || typeof feature !== 'object' || !('properties' in feature)) {
+    return null;
+  }
+
+  const properties = (feature as { properties?: Record<string, unknown> }).properties ?? {};
+  const id = typeof properties.rda_id === 'string' ? properties.rda_id.trim().toUpperCase() : '';
+  const name = typeof properties.name === 'string' ? properties.name.trim() : '';
+  const wfoId = typeof properties.wfo_id === 'string' ? properties.wfo_id.trim() : undefined;
+
+  if (!/^K[A-Z0-9]{3}$/.test(id)) {
+    return null;
+  }
+
+  return {
+    id,
+    name: name || id,
+    label: name ? `${id} — ${name}` : id,
+    wfoId,
+  };
+};
+
 const parseRadarSites = (payload: unknown): RadarSiteOption[] => {
   if (!payload || typeof payload !== 'object' || !('features' in payload)) {
     return [];
@@ -23,27 +45,7 @@ const parseRadarSites = (payload: unknown): RadarSiteOption[] => {
   const features = (payload as { features?: unknown[] }).features ?? [];
 
   return features
-    .map((feature): RadarSiteOption | null => {
-      if (!feature || typeof feature !== 'object' || !('properties' in feature)) {
-        return null;
-      }
-
-      const properties = (feature as { properties?: Record<string, unknown> }).properties ?? {};
-      const id = typeof properties.rda_id === 'string' ? properties.rda_id.trim().toUpperCase() : '';
-      const name = typeof properties.name === 'string' ? properties.name.trim() : '';
-      const wfoId = typeof properties.wfo_id === 'string' ? properties.wfo_id.trim() : undefined;
-
-      if (!/^K[A-Z0-9]{3}$/.test(id)) {
-        return null;
-      }
-
-      return {
-        id,
-        name: name || id,
-        label: name ? `${id} — ${name}` : id,
-        wfoId,
-      };
-    })
+    .map(parseRadarSiteFeature)
     .filter((site): site is RadarSiteOption => Boolean(site))
     .sort((left, right) => left.id.localeCompare(right.id));
 };

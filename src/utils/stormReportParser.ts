@@ -1,5 +1,8 @@
 import { StormReport, ReportType } from '../types/stormReports';
-import { parseArchiveCsvRow, parseTodayCsvRow } from './stormReportRows';
+import { parseArchiveCsvRow } from './stormReportRows';
+import { parseTodayStormReportCsv } from './stormReportTodayCsv';
+
+export { parseTodayStormReportCsv } from './stormReportTodayCsv';
 
 export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today.csv';
 
@@ -31,61 +34,6 @@ export async function fetchTodayStormReports(): Promise<StormReport[]> {
 
   return parseTodayStormReportCsv(await response.text());
 }
-
-/** Parses SPC today.csv (Time,F_Scale / Time,Speed / Time,Size sections). */
-export const parseTodayStormReportCsv = (csvText: string): StormReport[] => {
-  const lines = csvText.split('\n').map((line) => line.trim());
-  const reports: StormReport[] = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-    if (!line) {
-      index += 1;
-      continue;
-    }
-
-    if (line.startsWith('Time,F_Scale')) {
-      index += 1;
-      while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
-        const report = parseTodayCsvRow(lines[index], 'tornado');
-        if (report) {
-          reports.push(report);
-        }
-        index += 1;
-      }
-      continue;
-    }
-
-    if (line.startsWith('Time,Speed')) {
-      index += 1;
-      while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
-        const report = parseTodayCsvRow(lines[index], 'wind');
-        if (report) {
-          reports.push(report);
-        }
-        index += 1;
-      }
-      continue;
-    }
-
-    if (line.startsWith('Time,Size')) {
-      index += 1;
-      while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
-        const report = parseTodayCsvRow(lines[index], 'hail');
-        if (report) {
-          reports.push(report);
-        }
-        index += 1;
-      }
-      continue;
-    }
-
-    index += 1;
-  }
-
-  return reports;
-};
 
 /**
  * Parses archived *_rpts_raw.csv storm report text.

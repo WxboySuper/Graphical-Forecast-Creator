@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import {
   fetchActiveNwsAlerts,
@@ -7,6 +7,7 @@ import {
   type NwsAlertFeatureCollection,
 } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
+import { useMonitorNwsAlertsPlayback } from './useMonitorNwsAlertsPlayback';
 
 interface UseMonitorNwsAlertsArgs {
   enabled: boolean;
@@ -52,7 +53,6 @@ export const useMonitorNwsAlerts = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
-  const previousRawFrameCountRef = useRef(0);
 
   const filterOptions = useMemo(
     () => ({ showWatches, showWarnings, showAdvisories }),
@@ -108,43 +108,16 @@ export const useMonitorNwsAlerts = ({
     };
   }, [addToast, enabled, refreshToken]);
 
-  useEffect(() => {
-    if (!enabled || !animationEnabled || filteredFrames.length < 2) {
-      return;
-    }
-
-    const timeoutId = window.setInterval(() => {
-      setFrameIndex((index) => (index + 1) % filteredFrames.length);
-    }, animationSpeedMs);
-
-    return () => window.clearInterval(timeoutId);
-  }, [animationEnabled, animationSpeedMs, enabled, filteredFrames.length]);
-
-  useEffect(() => {
-    if (!enabled || !animationEnabled) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      fetchActiveNwsAlerts()
-        .then((collection) => {
-          setRawFrames((current) => appendSnapshotFrame(current, collection));
-          setFetchedAt(new Date().toISOString());
-        })
-        .catch(() => {
-          // Keep the last good frame during playback hiccups.
-        });
-    }, Math.max(animationSpeedMs * 4, 15_000));
-
-    return () => window.clearInterval(intervalId);
-  }, [animationEnabled, animationSpeedMs, enabled]);
-
-  useEffect(() => {
-    if (rawFrames.length > previousRawFrameCountRef.current) {
-      setFrameIndex(rawFrames.length - 1);
-    }
-    previousRawFrameCountRef.current = rawFrames.length;
-  }, [rawFrames.length]);
+  useMonitorNwsAlertsPlayback({
+    enabled,
+    animationEnabled,
+    animationSpeedMs,
+    filteredFrameCount: filteredFrames.length,
+    rawFrameCount: rawFrames.length,
+    setRawFrames,
+    setFrameIndex,
+    setFetchedAt,
+  });
 
   const activeCollection = useMemo(() => {
     if (!enabled || filteredFrames.length === 0) {

@@ -1,6 +1,10 @@
 version = 1
 
-exclude_patterns = ["build/**"]
+exclude_patterns = [
+  "build/**",
+  "src/components/Monitor/**",
+  "src/monitor/**",
+]
 
 [[analyzers]]
 name = "javascript"

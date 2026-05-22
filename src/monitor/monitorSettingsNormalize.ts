@@ -40,30 +40,32 @@ const readSite = (value: unknown, fallback: string): string => {
   return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
 };
 
+const readMapViewCenter = (center: unknown, zoom: unknown): MonitorMapView | null => {
+  if (
+    !Array.isArray(center) ||
+    center.length !== 2 ||
+    typeof center[0] !== 'number' ||
+    typeof center[1] !== 'number' ||
+    typeof zoom !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    center: [
+      readNumber(center[0], DEFAULT_MONITOR_SETTINGS.mapView.center[0], -90, 90),
+      readNumber(center[1], DEFAULT_MONITOR_SETTINGS.mapView.center[1], -180, 180),
+    ],
+    zoom: readNumber(zoom, DEFAULT_MONITOR_SETTINGS.mapView.zoom, 2, 14),
+  };
+};
+
 const readMapView = (value: unknown): MonitorMapView => {
   if (!isRecord(value)) {
     return DEFAULT_MONITOR_SETTINGS.mapView;
   }
 
-  const center = value.center;
-  const zoom = value.zoom;
-  if (
-    Array.isArray(center) &&
-    center.length === 2 &&
-    typeof center[0] === 'number' &&
-    typeof center[1] === 'number' &&
-    typeof zoom === 'number'
-  ) {
-    return {
-      center: [
-        readNumber(center[0], DEFAULT_MONITOR_SETTINGS.mapView.center[0], -90, 90),
-        readNumber(center[1], DEFAULT_MONITOR_SETTINGS.mapView.center[1], -180, 180),
-      ],
-      zoom: readNumber(zoom, DEFAULT_MONITOR_SETTINGS.mapView.zoom, 2, 14),
-    };
-  }
-
-  return DEFAULT_MONITOR_SETTINGS.mapView;
+  return readMapViewCenter(value.center, value.zoom) ?? DEFAULT_MONITOR_SETTINGS.mapView;
 };
 
 const readOutlookSource = (value: unknown): MonitorOutlookSourceSelection => {
