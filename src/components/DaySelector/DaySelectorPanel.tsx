@@ -14,7 +14,11 @@ import {
 import { selectForecastCycle, setForecastDay, setCycleDate } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 import { cn } from '../../lib/utils';
-import { keyboardShortcutKey } from '../../utils/keyboardShortcutKey';
+import {
+  hasAnyModifierKey,
+  isTypingTarget,
+  keyboardShortcutKey,
+} from '../../utils/keyboardShortcutKey';
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -106,18 +110,10 @@ const DayTabs: React.FC<{ currentDay: DayType; days: ForecastDays; onDayButtonCl
   </div>
 );
 
-/** Returns true when the event target is a text field that should consume keystrokes. */
-export const isEditableTypingTarget = (target: EventTarget | null): boolean =>
-  target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-
-/** Returns true when any modifier would make a digit key a combo shortcut instead of day select. */
-export const keyboardEventHasModifier = (event: KeyboardEvent): boolean =>
-  event.ctrlKey || event.metaKey || event.altKey || event.shiftKey;
-
 /** Maps a digit keydown to a forecast day (1-8), or null when the event should be ignored. */
 export const getForecastDayFromDigitKeyDown = (event: KeyboardEvent): DayType | null => {
-  if (isEditableTypingTarget(event.target)) return null;
-  if (keyboardEventHasModifier(event)) return null;
+  if (isTypingTarget(event.target)) return null;
+  if (hasAnyModifierKey(event)) return null;
 
   const key = keyboardShortcutKey(event);
   if (!key) return null;
@@ -180,12 +176,10 @@ export const DaySelectorPanel: React.FC = () => {
     setTempDate(e.target.value);
   }, []);
 
-  // Keyboard shortcuts for day navigation (1-8)
   const handleCancelDateEdit = useCallback(() => {
     setIsEditingDate(false);
   }, []);
 
-  // Keyboard shortcuts for day navigation (1-8)
   const handleStartDateEdit = useCallback(() => {
     setTempDate(forecastCycle.cycleDate);
     setIsEditingDate(true);
@@ -201,7 +195,6 @@ export const DaySelectorPanel: React.FC = () => {
     handleDayChange(day);
   }, [handleDayChange]);
 
-  // Keyboard shortcuts for day navigation (1-8)
   // Keyboard shortcuts for day navigation (1-8)
   useDayNumberShortcuts(dispatch);
 
