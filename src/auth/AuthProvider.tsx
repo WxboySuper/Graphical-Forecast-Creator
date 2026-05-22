@@ -272,6 +272,7 @@ export const mergeUserSettingsDocument = (
   ...patch,
 });
 
+/** Writes a merged settings document to Firestore with an updated server timestamp. */
 const writeHostedSettingsDocument = async (
   settingsRef: ReturnType<typeof doc>,
   nextSettings: UserSettingsDocument,
@@ -286,6 +287,7 @@ const writeHostedSettingsDocument = async (
   );
 };
 
+/** Builds a full settings snapshot from local UI state when hosted sync has no baseline yet. */
 const buildHostedAccountFallbackSettings = (
   darkMode: boolean,
   overlays: OverlaysState,
@@ -313,6 +315,7 @@ interface PersistHostedSettingsContext {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
+/** Merges a settings patch into the hosted document and updates local sync state. */
 const persistHostedSettingsUpdate = async (
   context: PersistHostedSettingsContext,
   patch: Partial<UserSettingsDocument>,
