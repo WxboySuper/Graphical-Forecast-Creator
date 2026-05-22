@@ -1,20 +1,41 @@
 'use strict';
 
-const { parseEnvelopeDsn, isAllowedSentryHost, buildEnvelopeUrl } = require('./sentry-tunnel');
+const {
+  parseAllowedSentryEndpoint,
+  parseSentryDsnString,
+  isAllowedSentryHost,
+  buildEnvelopeUrl,
+} = require('./sentry-tunnel');
 
 describe('sentry-tunnel helpers', () => {
   it('parses DSN from an envelope header', () => {
     const body = Buffer.from(
       `${JSON.stringify({ dsn: 'https://key@o123.ingest.us.sentry.io/456' })}\n{"type":"session"}`
     );
-    const dsn = parseEnvelopeDsn(body);
-    expect(dsn?.hostname).toBe('o123.ingest.us.sentry.io');
-    expect(buildEnvelopeUrl(dsn)).toBe('https://o123.ingest.us.sentry.io/api/456/envelope/');
+    const endpoint = parseAllowedSentryEndpoint(body);
+    expect(endpoint).toEqual({ host: 'o123.ingest.us.sentry.io', projectId: '456' });
+    expect(buildEnvelopeUrl(endpoint.host, endpoint.projectId)).toBe(
+      'https://o123.ingest.us.sentry.io/api/456/envelope/'
+    );
   });
 
-  it('rejects non-https DSNs and non-numeric project ids', () => {
-    expect(buildEnvelopeUrl(new URL('http://o123.ingest.us.sentry.io/456'))).toBeNull();
-    expect(buildEnvelopeUrl(new URL('https://o123.ingest.us.sentry.io/not-a-project'))).toBeNull();
+  it('parses configured DSN strings', () => {
+    expect(parseSentryDsnString('https://key@o123.ingest.us.sentry.io/456')).toEqual({
+      host: 'o123.ingest.us.sentry.io',
+      projectId: '456',
+    });
+  });
+
+  it('rejects malformed DSN values', () => {
+    const httpBody = Buffer.from(
+      `${JSON.stringify({ dsn: 'http://o123.ingest.us.sentry.io/456' })}\n{}`
+    );
+    const invalidProjectBody = Buffer.from(
+      `${JSON.stringify({ dsn: 'https://o123.ingest.us.sentry.io/not-a-project' })}\n{}`
+    );
+    expect(parseAllowedSentryEndpoint(httpBody)).toBeNull();
+    expect(parseAllowedSentryEndpoint(invalidProjectBody)).toBeNull();
+    expect(parseSentryDsnString('http://evil.example/1')).toBeNull();
   });
 
   it('rejects non-Sentry hosts', () => {

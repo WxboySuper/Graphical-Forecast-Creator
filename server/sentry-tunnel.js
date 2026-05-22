@@ -1,9 +1,27 @@
 'use strict';
 
-const SENTRY_INGEST_HOST_PATTERN = /^o\d+\.ingest(\.[a-z]{2})?\.sentry\.io$/i;
+const SENTRY_DSN_PATTERN =
+  /^https:\/\/(?:[^@/]+@)?(o\d+\.ingest(?:\.[a-z]{2})?\.sentry\.io)\/(\d+)\/?$/iu;
 
-/** @returns {URL | null} DSN parsed from the first envelope header line. */
-function parseEnvelopeDsn(envelopeBody) {
+/** @returns {{ host: string, projectId: string } | null} Parsed ingest target from a Sentry DSN string. */
+function parseSentryDsnString(dsnString) {
+  if (!dsnString || typeof dsnString !== 'string') {
+    return null;
+  }
+
+  const match = dsnString.trim().match(SENTRY_DSN_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    host: match[1],
+    projectId: match[2],
+  };
+}
+
+/** @returns {{ host: string, projectId: string } | null} Parsed Sentry ingest target from an envelope header DSN. */
+function parseAllowedSentryEndpoint(envelopeBody) {
   const firstLine = envelopeBody.toString('utf8').split('\n').find((line) => line.trim());
   if (!firstLine) {
     return null;
@@ -14,30 +32,34 @@ function parseEnvelopeDsn(envelopeBody) {
     return null;
   }
 
-  return new URL(header.dsn);
+  return parseSentryDsnString(header.dsn);
+}
+
+/** @returns {string} Upstream envelope URL for a validated Sentry host and project id. */
+function buildEnvelopeUrl(host, projectId) {
+  return `https://${host}/api/${projectId}/envelope/`;
 }
 
 /** @returns {boolean} Whether the DSN host is a known Sentry ingest endpoint. */
 function isAllowedSentryHost(hostname) {
-  return SENTRY_INGEST_HOST_PATTERN.test(hostname);
+  return SENTRY_DSN_PATTERN.test(`https://${hostname}/0`);
 }
 
-/** @returns {string | null} Upstream envelope URL for a validated Sentry DSN. */
-function buildEnvelopeUrl(dsn) {
-  if (dsn.protocol !== 'https:') {
-    return null;
-  }
-
-  const projectId = dsn.pathname.replace(/^\//, '');
-  if (!/^\d+$/.test(projectId)) {
-    return null;
-  }
-
-  return `https://${dsn.hostname}/api/${projectId}/envelope/`;
+/** @returns {{ host: string, projectId: string } | null} Server-configured Sentry ingest target. */
+function getConfiguredSentryEndpoint() {
+  return parseSentryDsnString(process.env.SENTRY_DSN || '');
 }
 
 /** Registers POST /api/sentry-tunnel to proxy browser envelopes past ad blockers. */
 function registerSentryTunnelRoutes(app, express, rateLimit) {
+  const configuredEndpoint = getConfiguredSentryEndpoint();
+  if (!configuredEndpoint) {
+    console.warn('[analytics] sentry tunnel disabled: SENTRY_DSN is missing or invalid');
+    return;
+  }
+
+  const targetUrl = buildEnvelopeUrl(configuredEndpoint.host, configuredEndpoint.projectId);
+
   const tunnelRateLimit = rateLimit({
     windowMs: 60 * 1000,
     max: 120,
@@ -57,14 +79,12 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
           return;
         }
 
-        const dsn = parseEnvelopeDsn(envelopeBody);
-        if (!dsn || !isAllowedSentryHost(dsn.hostname)) {
-          res.status(400).end();
-          return;
-        }
-
-        const targetUrl = buildEnvelopeUrl(dsn);
-        if (!targetUrl) {
+        const clientEndpoint = parseAllowedSentryEndpoint(envelopeBody);
+        if (
+          !clientEndpoint ||
+          clientEndpoint.host !== configuredEndpoint.host ||
+          clientEndpoint.projectId !== configuredEndpoint.projectId
+        ) {
           res.status(400).end();
           return;
         }
@@ -88,7 +108,9 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
 
 module.exports = {
   registerSentryTunnelRoutes,
-  parseEnvelopeDsn,
+  parseAllowedSentryEndpoint,
+  parseSentryDsnString,
   isAllowedSentryHost,
   buildEnvelopeUrl,
+  getConfiguredSentryEndpoint,
 };
