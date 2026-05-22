@@ -3,23 +3,29 @@ import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { areMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
 
+const shouldSyncPremiumMonitorSettings = (
+  premiumActive: boolean,
+  status: string,
+  lastSynced: MonitorSettings | null,
+  settings: MonitorSettings,
+): boolean =>
+  premiumActive &&
+  status === 'signed_in' &&
+  (!lastSynced || !areMonitorSettingsEqual(lastSynced, settings));
+
 export const usePremiumMonitorSettingsSync = (settings: MonitorSettings) => {
   const { status, syncedSettings, updateSyncedSettings } = useAuth();
   const { premiumActive } = useEntitlement();
   const lastSyncedRef = useRef<MonitorSettings | null>(syncedSettings?.monitorSettings ?? null);
 
   useEffect(() => {
-    if (syncedSettings?.monitorSettings && !areMonitorSettingsEqual(syncedSettings.monitorSettings, settings)) {
+    if (syncedSettings?.monitorSettings) {
       lastSyncedRef.current = syncedSettings.monitorSettings;
     }
-  }, [settings, syncedSettings?.monitorSettings]);
+  }, [syncedSettings?.monitorSettings]);
 
   useEffect(() => {
-    if (!premiumActive || status !== 'signed_in') {
-      return;
-    }
-
-    if (lastSyncedRef.current && areMonitorSettingsEqual(lastSyncedRef.current, settings)) {
+    if (!shouldSyncPremiumMonitorSettings(premiumActive, status, lastSyncedRef.current, settings)) {
       return;
     }
 

@@ -285,6 +285,21 @@ const writeHostedSettingsDocument = async (
   );
 };
 
+const buildHostedAccountFallbackSettings = (
+  darkMode: boolean,
+  overlays: OverlaysState,
+  displayName: string,
+  forecastUiVariant: ForecastUiVariant,
+  monitorSettings: MonitorSettings,
+): UserSettingsDocument =>
+  createSettingsSnapshot({
+    darkMode,
+    overlays,
+    defaultForecasterName: displayName,
+    forecastUiVariant,
+    monitorSettings,
+  });
+
 /** True when the current overlay state already matches the incoming synced overlay values. */
 export const areOverlaySettingsEqual = (
   current: OverlaysState,
@@ -1288,35 +1303,35 @@ const useHostedAuthState = (): AuthContextValue => {
 
   /** Persists explicit account settings changes made from the account page. */
   const updateSyncedSettings = async (settings: Partial<UserSettingsDocument>): Promise<void> => {
-    const hostedSyncUnavailable = !isHostedAuthEnabled || !db || !user;
-    if (hostedSyncUnavailable) {
+    if (!isHostedAuthEnabled || !db || !user) {
       throw new Error('Hosted accounts are not enabled for this deployment.');
     }
 
-    const settingsRef = doc(requireDb(), 'userSettings', user.uid);
-    const fallbackSettings = createSettingsSnapshot({
+    const forecastUiVariant =
+      syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT;
+    const fallbackSettings = buildHostedAccountFallbackSettings(
       darkMode,
       overlays,
-      defaultForecasterName: user.displayName ?? '',
-      forecastUiVariant: syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
-      monitorSettings: syncedSettings?.monitorSettings ?? monitorSettings,
-    });
+      user.displayName ?? '',
+      forecastUiVariant,
+      syncedSettings?.monitorSettings ?? monitorSettings,
+    );
     const baselineSettings = lastSyncedSettingsRef.current ?? fallbackSettings;
     const nextSettings = mergeUserSettingsDocument(baselineSettings, settings);
     if (areUserSettingsEqual(baselineSettings, nextSettings)) {
       setSettingsSyncStatus('synced');
       return;
     }
+
     const previousSettings = lastSyncedSettingsRef.current;
     const previousSyncedSettings = syncedSettings;
-
     lastSyncedSettingsRef.current = nextSettings;
     setSyncedSettings(nextSettings);
     setSettingsSyncStatus('syncing');
     setError(null);
 
     try {
-      await writeHostedSettingsDocument(settingsRef, nextSettings);
+      await writeHostedSettingsDocument(doc(requireDb(), 'userSettings', user.uid), nextSettings);
       setSettingsSyncStatus('synced');
       writeStoredForecastUiVariant(nextSettings.forecastUiVariant);
     } catch (updateError) {
