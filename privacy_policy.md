@@ -1,5 +1,5 @@
 # Privacy Policy
-**Last Updated: March 30, 2026**
+**Last Updated: May 22, 2026**
 
 **TL;DR:** Your local forecasts stay on your device. If you choose to make an account, we only collect what is strictly necessary to sync your work and securely manage your subscription. 
 
