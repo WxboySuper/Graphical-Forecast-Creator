@@ -10,7 +10,7 @@ import { buildStormReportStyle } from '../../monitor/stormReportMapStyle';
 import { toOlStyle } from '../Map/OpenLayersForecastMap';
 import { MONITOR_OUTLOOK_TRANSPARENCY_SCALE } from './monitorMapLayerUtils';
 
-interface SerializedOutlookFeature {
+export interface SerializedMonitorOutlookFeature {
   outlookType: string;
   probability: string;
   feature: object;
@@ -18,7 +18,7 @@ interface SerializedOutlookFeature {
 
 export const syncOutlookFeatures = (
   source: VectorSource,
-  serializedFeatures: SerializedOutlookFeature[],
+  serializedFeatures: SerializedMonitorOutlookFeature[],
 ) => {
   source.clear();
   const format = new GeoJSON();

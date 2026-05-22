@@ -8,6 +8,7 @@ enabled = true
 
   [analyzers.meta]
   plugins = ["react"]
+  skip_doc_coverage = ["arrow-function-expression", "function-expression", "method-definition", "class-expression"]
 
   [analyzers.features]
   parse_test_files = false

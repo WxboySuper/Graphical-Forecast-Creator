@@ -1,7 +1,5 @@
 import { StormReport, ReportType } from '../types/stormReports';
-import { v4 as uuidv4 } from 'uuid';
-import { buildCsvRow, extractStormReportMagnitude, splitCsvLine } from './stormReportCsv';
-import type { StormReportRowFieldMap } from './stormReportCsv';
+import { parseArchiveCsvRow, parseTodayCsvRow } from './stormReportRows';
 
 export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today.csv';
 
@@ -147,67 +145,6 @@ export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
   
   return reports;
 }
-
-/**
- * Parses a single CSV row into a storm report
- */
-const parseTodayCsvRow = (line: string, type: ReportType): StormReport | null => {
-  const headers = type === 'tornado'
-    ? ['Time', 'F_Scale', 'Location', 'County', 'State', 'Lat', 'Lon', 'Comments']
-    : type === 'wind'
-      ? ['Time', 'Speed', 'Location', 'County', 'State', 'Lat', 'Lon', 'Comments']
-      : ['Time', 'Size', 'Location', 'County', 'State', 'Lat', 'Lon', 'Comments'];
-
-  return parseStormReportRow(line, type, headers, {
-    scaleField: type === 'tornado' ? 'F_Scale' : undefined,
-    speedField: type === 'wind' ? 'Speed' : undefined,
-    sizeField: type === 'hail' ? 'Size' : undefined,
-    latField: 'Lat',
-    lonField: 'Lon',
-    remarksField: 'Comments',
-  });
-};
-
-const parseArchiveCsvRow = (line: string, type: ReportType, headers: string[]): StormReport | null =>
-  parseStormReportRow(line, type, headers, {
-    scaleField: 'EF_Scale',
-    speedField: 'Speed(MPH)',
-    sizeField: 'Size(1/100in.)',
-    latField: 'LAT',
-    lonField: 'LON',
-    remarksField: 'Remarks',
-  });
-
-const parseStormReportRow = (
-  line: string,
-  type: ReportType,
-  headers: string[],
-  fields: StormReportRowFieldMap,
-): StormReport | null => {
-  const row = buildCsvRow(headers, splitCsvLine(line));
-  const lat = parseFloat(row[fields.latField]);
-  const lon = parseFloat(row[fields.lonField]);
-
-  if (Number.isNaN(lat) || Number.isNaN(lon)) {
-    return null;
-  }
-
-  const time = row.Time ? `${row.Time}Z` : '';
-  const magnitude = extractStormReportMagnitude(type, row, fields);
-
-  return {
-    id: uuidv4(),
-    type,
-    latitude: lat,
-    longitude: lon,
-    time,
-    magnitude,
-    location: row.Location || '',
-    county: row.County || '',
-    state: row.State || '',
-    comments: row[fields.remarksField] || '',
-  };
-};
 
 /**
  * Formats a date object to YYMMDD format for NOAA storm report archives
