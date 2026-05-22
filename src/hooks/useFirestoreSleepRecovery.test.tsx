@@ -1,5 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { disableNetwork, enableNetwork } from 'firebase/firestore';
+import { useFirestoreSleepRecovery } from './useFirestoreSleepRecovery';
 
 jest.mock('firebase/firestore', () => ({
   disableNetwork: jest.fn(() => Promise.resolve()),
@@ -17,7 +18,6 @@ describe('useFirestoreSleepRecovery', () => {
   });
 
   it('disables Firestore network when the tab is hidden', () => {
-    const { useFirestoreSleepRecovery } = require('./useFirestoreSleepRecovery');
     renderHook(() => useFirestoreSleepRecovery());
 
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
@@ -28,7 +28,6 @@ describe('useFirestoreSleepRecovery', () => {
   });
 
   it('re-enables Firestore network when the tab becomes visible', () => {
-    const { useFirestoreSleepRecovery } = require('./useFirestoreSleepRecovery');
     renderHook(() => useFirestoreSleepRecovery());
 
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });

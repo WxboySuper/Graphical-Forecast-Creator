@@ -14,20 +14,19 @@ export function useFirestoreSleepRecovery(): void {
 
     const firestore = db;
 
-    const handleVisibilityChange = () => {
+    /** Pauses or resumes Firestore sync when the document visibility changes. */
+    const handleVisibilityChange = (): void => {
       if (document.hidden) {
-        void disableNetwork(firestore).catch(() => {
-          // Best-effort: tab may already be tearing down storage.
-        });
+        disableNetwork(firestore).catch(() => undefined);
         return;
       }
 
-      void enableNetwork(firestore).catch(() => {
-        // Best-effort: network may recover on the next user action.
-      });
+      enableNetwork(firestore).catch(() => undefined);
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 }
