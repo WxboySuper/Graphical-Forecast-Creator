@@ -1,5 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './PrivacyPolicyModal';
+import PrivacyPolicyModal, {
+  hasAcceptedPrivacyPolicy,
+  isPrivacyPolicyUpgrade,
+} from './PrivacyPolicyModal';
 
 describe('PrivacyPolicyModal Utils', () => {
   beforeEach(() => {
@@ -31,6 +34,20 @@ describe('PrivacyPolicyModal Utils', () => {
     });
     expect(hasAcceptedPrivacyPolicy()).toBe(false);
   });
+
+  test('isPrivacyPolicyUpgrade returns false when not previously accepted', () => {
+    expect(isPrivacyPolicyUpgrade()).toBe(false);
+  });
+
+  test('isPrivacyPolicyUpgrade returns true when an older version was accepted', () => {
+    localStorage.setItem('gfc-privacy-policy-accepted', '1.0.0');
+    expect(isPrivacyPolicyUpgrade()).toBe(true);
+  });
+
+  test('isPrivacyPolicyUpgrade returns false when current version was accepted', () => {
+    localStorage.setItem('gfc-privacy-policy-accepted', '1.2.0');
+    expect(isPrivacyPolicyUpgrade()).toBe(false);
+  });
 });
 
 describe('PrivacyPolicyModal component', () => {
@@ -50,6 +67,29 @@ describe('PrivacyPolicyModal component', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
     expect(screen.getByText('Accept & Continue')).toBeInTheDocument();
     expect(screen.getByText('Accept & Continue')).toBeDisabled();
+  });
+
+  test('shows last updated date and whats new when upgrading from an older policy', () => {
+    localStorage.setItem('gfc-privacy-policy-accepted', '1.0.0');
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
+    expect(screen.getByText(/Last updated May 22, 2026/u)).toBeInTheDocument();
+    expect(screen.getByRole('note')).toBeInTheDocument();
+    expect(screen.getByText(/What's new in version 1\.2\.0/u)).toBeInTheDocument();
+    expect(screen.getByText(/hosted error monitoring \(Sentry\)/u)).toBeInTheDocument();
+  });
+
+  test('hides whats new for first-time users in acceptance mode', () => {
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
+    expect(screen.getByText(/Last updated May 22, 2026/u)).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.queryByText(/What's new in version/u)).not.toBeInTheDocument();
+  });
+
+  test('hides whats new in view-only mode but shows version date', () => {
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
+    expect(screen.getByText(/Version 1\.2\.0 — Last updated May 22, 2026/u)).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.queryByText(/What's new in version/i)).not.toBeInTheDocument();
   });
 
   test('enables accept button when checkbox is checked', () => {
