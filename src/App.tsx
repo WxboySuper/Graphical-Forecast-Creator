@@ -13,6 +13,7 @@ import 'leaflet/dist/leaflet.css';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
 
 import { useAutoSave } from './hooks/useAutoSave';
+import { useFirestoreSleepRecovery } from './hooks/useFirestoreSleepRecovery';
 import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 import { AuthProvider } from './auth/AuthProvider';
 import { EntitlementProvider } from './billing/EntitlementProvider';
@@ -61,7 +62,10 @@ const AppHooks = () => {
   
   // Enable Auto-Save
   useAutoSave();
-  
+
+  // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
+  useFirestoreSleepRecovery();
+
   // Load cycle history from localStorage
   useCycleHistoryPersistence();
 

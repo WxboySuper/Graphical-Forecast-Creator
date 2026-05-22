@@ -3,6 +3,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6
+
+### Fixed
+- **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
+
 ## v1.5.1
 
 ### Fixed
