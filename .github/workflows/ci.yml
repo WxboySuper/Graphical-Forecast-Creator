@@ -15,6 +15,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
       - name: Validate package version for target branch
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -23,6 +28,7 @@ jobs:
         run: node scripts/validate-package-version.mjs
 
   build-and-test:
+    needs: [package-version-policy]
     runs-on: ubuntu-latest
     strategy:
       matrix:
