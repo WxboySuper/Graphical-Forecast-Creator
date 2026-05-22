@@ -1366,14 +1366,10 @@ const useHostedAuthState = (): AuthContextValue => {
   }, [darkMode, overlays, settingsSyncStatus, status, syncedSettings?.defaultForecasterName, user]);
 
   /** Persists explicit account settings changes made from the account page. */
-  const updateSyncedSettings = async (settings: Partial<UserSettingsDocument>): Promise<void> => {
-    if (!isHostedAuthEnabled || !db || !user) {
-      throw new Error('Hosted accounts are not enabled for this deployment.');
-    }
-
-    await persistHostedSettingsUpdate(
+  const updateSyncedSettings = (settings: Partial<UserSettingsDocument>): Promise<void> =>
+    persistHostedSettingsUpdate(
       {
-        user,
+        user: user as User,
         darkMode,
         overlays,
         syncedSettings,
@@ -1385,7 +1381,6 @@ const useHostedAuthState = (): AuthContextValue => {
       },
       settings,
     );
-  };
 
   const value = useMemo<AuthContextValue>(() => {
     if (!isHostedAuthEnabled || !auth) {
