@@ -25,12 +25,13 @@ describe('firebase configuration', () => {
     const getApp = jest.fn(() => ({ name: 'existing' }));
     const getApps = jest.fn(() => []);
     const getAuth = jest.fn(() => ({ name: 'auth' }));
-    const getFirestore = jest.fn(() => ({ name: 'db' }));
+    const initializeFirestore = jest.fn(() => ({ name: 'db' }));
+    const memoryLocalCache = jest.fn(() => ({ kind: 'memory' }));
     const GoogleAuthProvider = jest.fn();
 
     jest.doMock('firebase/app', () => ({ initializeApp, getApp, getApps }));
     jest.doMock('firebase/auth', () => ({ getAuth, GoogleAuthProvider }));
-    jest.doMock('firebase/firestore', () => ({ getFirestore }));
+    jest.doMock('firebase/firestore', () => ({ initializeFirestore, memoryLocalCache }));
 
     globalThis.__GFC_FIREBASE_API_KEY__ = 'api';
     globalThis.__GFC_FIREBASE_AUTH_DOMAIN__ = 'auth';
@@ -48,7 +49,11 @@ describe('firebase configuration', () => {
         appId: 'app-id',
       });
       expect(getAuth).toHaveBeenCalledWith({ name: 'app' });
-      expect(getFirestore).toHaveBeenCalledWith({ name: 'app' });
+      expect(memoryLocalCache).toHaveBeenCalledTimes(1);
+      expect(initializeFirestore).toHaveBeenCalledWith(
+        { name: 'app' },
+        { localCache: { kind: 'memory' } }
+      );
       expect(firebase.requireAuth()).toEqual({ name: 'auth' });
       expect(firebase.requireDb()).toEqual({ name: 'db' });
       expect(GoogleAuthProvider).toHaveBeenCalledTimes(1);
