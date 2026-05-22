@@ -15,7 +15,7 @@ function getSentryDsn(): string {
   return typeof __GFC_SENTRY_DSN__ !== 'undefined' ? __GFC_SENTRY_DSN__ : '';
 }
 
-/** True when a production DSN was baked into the build (main deploy only). */
+/** True when a DSN was baked into the build (hosted production or beta deploys). */
 export function isSentryEnabled(): boolean {
   return Boolean(getSentryDsn().trim());
 }
@@ -31,7 +31,7 @@ function getEnvironment(): string {
   return configured.trim() || 'production';
 }
 
-/** Initializes Sentry when a DSN is present. No-op in local dev and beta builds. */
+/** Initializes Sentry when a DSN is present. No-op in local dev without a DSN. */
 export function initSentry(): void {
   if (!isSentryEnabled()) {
     return;
@@ -41,7 +41,6 @@ export function initSentry(): void {
     dsn: getSentryDsn(),
     environment: getEnvironment(),
     release: getRelease(),
-    // Privacy policy: no raw IP in product analytics; keep false until policy covers Sentry PII.
     sendDefaultPii: false,
     enableLogs: true,
     normalizeDepth: 10,
@@ -53,19 +52,16 @@ export function initSentry(): void {
         createRoutesFromChildren,
         matchRoutes,
       }),
-      Sentry.replayIntegration({
-        maskAllText: true,
-        blockAllMedia: true,
-      }),
     ],
     tracesSampleRate: 0.1,
     tracePropagationTargets: [
       'localhost',
       /^https:\/\/gfc\.weatherboysuper\.com/,
+      /^https:\/\/beta-gfc\.weatherboysuper\.com/,
       /^\/api/,
     ],
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0,
   });
 }
 

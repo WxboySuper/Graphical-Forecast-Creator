@@ -4,7 +4,6 @@ import { isSentryEnabled } from './instrument';
 jest.mock('@sentry/react', () => ({
   init: jest.fn(),
   reactRouterV7BrowserTracingIntegration: jest.fn(() => ({})),
-  replayIntegration: jest.fn(() => ({})),
 }));
 
 describe('instrument', () => {
@@ -30,7 +29,7 @@ describe('instrument', () => {
     });
   });
 
-  it('initializes Sentry with replay, tracing, and logging when a DSN is configured', () => {
+  it('initializes Sentry with tracing and logging when a DSN is configured', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
       globalScope.__GFC_SENTRY_ENVIRONMENT__ = 'production';
@@ -45,19 +44,18 @@ describe('instrument', () => {
           enableLogs: true,
           normalizeDepth: 10,
           tracesSampleRate: 0.1,
-          replaysSessionSampleRate: 0.1,
-          replaysOnErrorSampleRate: 1.0,
+          replaysSessionSampleRate: 0,
+          replaysOnErrorSampleRate: 0,
           tracePropagationTargets: expect.arrayContaining([
             'localhost',
+            expect.any(RegExp),
             expect.any(RegExp),
             expect.any(RegExp),
           ]),
         })
       );
-      expect(Sentry.replayIntegration).toHaveBeenCalledWith({
-        maskAllText: true,
-        blockAllMedia: true,
-      });
+      const initCall = (Sentry.init as jest.Mock).mock.calls[0][0];
+      expect(initCall.integrations).toHaveLength(1);
     });
   });
 });

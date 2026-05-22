@@ -16,6 +16,7 @@ function initSentry() {
     dsn,
     environment,
     release,
+    sendDefaultPii: false,
     tracesSampleRate: Number.isFinite(tracesSampleRate) ? tracesSampleRate : 0.1,
   });
 
