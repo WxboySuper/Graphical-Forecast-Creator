@@ -52,6 +52,21 @@ describe('PrivacyPolicyModal component', () => {
     expect(screen.getByText('Accept & Continue')).toBeDisabled();
   });
 
+  test('shows last updated date and whats new in acceptance mode', () => {
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
+    expect(screen.getByText(/Last updated May 22, 2026/i)).toBeInTheDocument();
+    expect(screen.getByRole('note')).toBeInTheDocument();
+    expect(screen.getByText(/What's new in version 1\.2\.0/i)).toBeInTheDocument();
+    expect(screen.getByText(/hosted error monitoring \(Sentry\)/i)).toBeInTheDocument();
+  });
+
+  test('hides whats new in view-only mode but shows version date', () => {
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
+    expect(screen.getByText(/Version 1\.2\.0 — Last updated May 22, 2026/i)).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.queryByText(/What's new in version/i)).not.toBeInTheDocument();
+  });
+
   test('enables accept button when checkbox is checked', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
     const checkbox = screen.getByRole('checkbox');
