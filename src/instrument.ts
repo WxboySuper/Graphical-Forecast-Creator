@@ -11,6 +11,10 @@ declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
 declare const __GFC_APP_VERSION__: string;
 
+<<<<<<< HEAD
+=======
+/** Returns the Sentry DSN baked in at build time, or an empty string when monitoring is off. */
+>>>>>>> origin/pr/316
 function getSentryDsn(): string {
   return typeof __GFC_SENTRY_DSN__ !== 'undefined' ? __GFC_SENTRY_DSN__ : '';
 }
@@ -20,11 +24,19 @@ export function isSentryEnabled(): boolean {
   return Boolean(getSentryDsn().trim());
 }
 
+<<<<<<< HEAD
+=======
+/** Returns the Sentry release string derived from the app version, when available. */
+>>>>>>> origin/pr/316
 function getRelease(): string | undefined {
   const version = typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : '';
   return version ? `graphical-forecast-creator@${version}` : undefined;
 }
 
+<<<<<<< HEAD
+=======
+/** Returns the configured Sentry environment label (production, beta, etc.). */
+>>>>>>> origin/pr/316
 function getEnvironment(): string {
   const configured =
     typeof __GFC_SENTRY_ENVIRONMENT__ !== 'undefined' ? __GFC_SENTRY_ENVIRONMENT__ : '';
@@ -60,8 +72,11 @@ export function initSentry(): void {
       /^https:\/\/beta-gfc\.weatherboysuper\.com/,
       /^\/api/,
     ],
+<<<<<<< HEAD
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
+=======
+>>>>>>> origin/pr/316
   });
 }
 
