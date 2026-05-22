@@ -64,8 +64,6 @@ export function initSentry(): void {
       /^https:\/\/beta-gfc\.weatherboysuper\.com/,
       /^\/api/,
     ],
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
   });
 }
 
