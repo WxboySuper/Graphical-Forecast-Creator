@@ -1,0 +1,59 @@
+import { useEffect, useState } from 'react';
+import { useCloudCycles } from '../hooks/useCloudCycles';
+import type { AddToastFn } from '../components/Layout';
+import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
+import { deserializeForecast } from '../utils/fileUtils';
+
+export const useMonitorCloudOutlook = ({
+  selectedOption,
+  today,
+  addToast,
+}: {
+  selectedOption: MonitorOutlookSourceOption;
+  today: string;
+  addToast: AddToastFn;
+}) => {
+  const { loadCycle } = useCloudCycles();
+  const [cloudOption, setCloudOption] = useState<MonitorOutlookSourceOption | null>(null);
+
+  useEffect(() => {
+    if (selectedOption.kind !== 'cloud-cycle') {
+      setCloudOption(null);
+      return;
+    }
+
+    let active = true;
+
+    loadCycle(selectedOption.id)
+      .then((payload) => {
+        if (!active || !payload) {
+          return;
+        }
+
+        const cycle = deserializeForecast(payload);
+        const dayOne = cycle.cycleDate === today ? cycle.days[1]?.data : undefined;
+        setCloudOption({
+          ...selectedOption,
+          data: dayOne,
+          status: dayOne ? undefined : 'Cloud cycle does not contain a Day 1 outlook for today.',
+        });
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        addToast('Cloud outlook could not be loaded.', 'error');
+        setCloudOption({
+          ...selectedOption,
+          status: 'Cloud outlook could not be loaded.',
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [addToast, loadCycle, selectedOption, today]);
+
+  return selectedOption.kind === 'cloud-cycle' ? cloudOption ?? selectedOption : selectedOption;
+};

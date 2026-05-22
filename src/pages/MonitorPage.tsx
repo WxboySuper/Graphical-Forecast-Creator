@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
 import type { RootState, AppDispatch } from '../store';
@@ -26,109 +26,27 @@ import {
   setSatelliteProduct,
 } from '../store/monitorSlice';
 import { selectForecastCycle, selectSavedCycles } from '../store/forecastSlice';
-import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import type { AddToastFn } from '../components/Layout';
 import { MonitorControls, MonitorMap } from '../components/Monitor';
 import { buildMonitorOutlookOptions, resolveSelectedOutlookOption } from '../monitor/outlookSources';
 import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
-import { readStoredMonitorSettings, writeStoredMonitorSettings } from '../monitor/storage';
 import type { MonitorSettings } from '../monitor/types';
+import { useLocalMonitorSettings } from './useLocalMonitorSettings';
+import { useMonitorCloudOutlook } from './useMonitorCloudOutlook';
 import { usePremiumMonitorSettingsSync } from './usePremiumMonitorSettingsSync';
 import { buildRadarLayerConfig, buildSatelliteLayerConfig } from '../monitor/wms';
 import { useLiveWmsLayers } from '../monitor/useLiveWmsLayers';
 import { useMonitorNwsAlerts } from '../monitor/useMonitorNwsAlerts';
 import { useMonitorStormReports } from '../monitor/useMonitorStormReports';
 import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
-import { deserializeForecast } from '../utils/fileUtils';
 import { getLocalCalendarDate } from '../utils/localDate';
 import './MonitorPage.css';
 
 interface PageContext {
   addToast: AddToastFn;
 }
-
-const useLocalMonitorSettings = (settings: MonitorSettings) => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { syncedSettings } = useAuth();
-  const hydratedRef = useRef(false);
-  const persistReadyRef = useRef(false);
-
-  useEffect(() => {
-    if (hydratedRef.current) {
-      return;
-    }
-
-    hydratedRef.current = true;
-    dispatch(applyMonitorSettings(syncedSettings?.monitorSettings ?? readStoredMonitorSettings()));
-  }, [dispatch, syncedSettings?.monitorSettings]);
-
-  useEffect(() => {
-    if (!hydratedRef.current) {
-      return;
-    }
-
-    if (!persistReadyRef.current) {
-      persistReadyRef.current = true;
-      return;
-    }
-
-    writeStoredMonitorSettings(settings);
-  }, [settings]);
-};
-
-const useCloudOutlookData = ({
-  selectedOption,
-  today,
-  addToast,
-}: {
-  selectedOption: MonitorOutlookSourceOption;
-  today: string;
-  addToast: AddToastFn;
-}) => {
-  const { loadCycle } = useCloudCycles();
-  const [cloudOption, setCloudOption] = useState<MonitorOutlookSourceOption | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    if (selectedOption.kind !== 'cloud-cycle') {
-      setCloudOption(null);
-      return;
-    }
-
-    loadCycle(selectedOption.id)
-      .then((payload) => {
-        if (!active || !payload) {
-          return;
-        }
-
-        const cycle = deserializeForecast(payload);
-        const dayOne = cycle.cycleDate === today ? cycle.days[1]?.data : undefined;
-        setCloudOption({
-          ...selectedOption,
-          data: dayOne,
-          status: dayOne ? undefined : 'Cloud cycle does not contain a Day 1 outlook for today.',
-        });
-      })
-      .catch(() => {
-        if (active) {
-          addToast('Cloud outlook could not be loaded.', 'error');
-          setCloudOption({
-            ...selectedOption,
-            status: 'Cloud outlook could not be loaded.',
-          });
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [addToast, loadCycle, selectedOption, today]);
-
-  return selectedOption.kind === 'cloud-cycle' ? cloudOption ?? selectedOption : selectedOption;
-};
 
 interface MonitorPageWorkspaceProps {
   settings: MonitorSettings;
@@ -249,7 +167,7 @@ export const MonitorPage: React.FC = () => {
     () => resolveSelectedOutlookOption(outlookOptions, settings.outlookSource),
     [outlookOptions, settings.outlookSource]
   );
-  const selectedOutlook = useCloudOutlookData({ selectedOption, today, addToast });
+  const selectedOutlook = useMonitorCloudOutlook({ selectedOption, today, addToast });
 
   const radarConfig = useMemo(() => buildRadarLayerConfig(settings), [settings]);
   const satelliteConfig = useMemo(() => buildSatelliteLayerConfig(settings.satelliteProduct), [settings.satelliteProduct]);

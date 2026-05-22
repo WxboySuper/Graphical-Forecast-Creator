@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import type { MonitorOutlookLayerType } from './types';
-import type { ReportType, StormReport } from '../types/stormReports';
+import type { StormReport } from '../types/stormReports';
 import { fetchTodayStormReports } from '../utils/stormReportParser';
+import { filterVisibleStormReports } from './filterVisibleStormReports';
 
 interface UseMonitorStormReportsArgs {
   enabled: boolean;
@@ -14,19 +15,6 @@ interface UseMonitorStormReportsArgs {
   refreshToken: number;
   addToast: AddToastFn;
 }
-
-const isTypeEnabled = (
-  type: ReportType,
-  filters: { filterTornado: boolean; filterWind: boolean; filterHail: boolean },
-): boolean => {
-  if (type === 'tornado') {
-    return filters.filterTornado;
-  }
-  if (type === 'wind') {
-    return filters.filterWind;
-  }
-  return filters.filterHail;
-};
 
 export const useMonitorStormReports = ({
   enabled,
@@ -84,21 +72,15 @@ export const useMonitorStormReports = ({
     };
   }, [addToast, enabled, refreshToken]);
 
-  const visibleReports = useMemo(() => {
-    const filters = { filterTornado, filterWind, filterHail };
-
-    return reports.filter((report) => {
-      if (!isTypeEnabled(report.type, filters)) {
-        return false;
-      }
-
-      if (matchOutlookType && outlookType !== 'categorical') {
-        return report.type === outlookType;
-      }
-
-      return true;
-    });
-  }, [filterHail, filterTornado, filterWind, matchOutlookType, outlookType, reports]);
+  const visibleReports = useMemo(
+    () => filterVisibleStormReports(
+      reports,
+      { filterTornado, filterWind, filterHail },
+      matchOutlookType,
+      outlookType,
+    ),
+    [filterHail, filterTornado, filterWind, matchOutlookType, outlookType, reports],
+  );
 
   return {
     reports: visibleReports,

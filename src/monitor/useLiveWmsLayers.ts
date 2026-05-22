@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import type { WmsLayerConfig } from './wms';
 import {
-  advancePlaybackFrame,
   emptyPlayback,
   resolveDisplayTime,
-  snapToLatestFrame,
   useLoadWmsLayerFrames,
   type LayerPlaybackState,
 } from './useWmsLayerPlayback';
+import { useWmsPlaybackLoop } from './useWmsPlaybackLoop';
 
 interface UseLiveWmsLayersArgs {
   radarConfig: WmsLayerConfig | null;
@@ -51,20 +50,13 @@ export const useLiveWmsLayers = ({
   const shouldAnimate = animationEnabled && (radarHasFrames || satelliteHasFrames);
   const frameSignature = `${radarPlayback.frameTimes.join('|')}::${satellitePlayback.frameTimes.join('|')}`;
 
-  useEffect(() => {
-    if (!shouldAnimate) {
-      setRadarPlayback(snapToLatestFrame);
-      setSatellitePlayback(snapToLatestFrame);
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setRadarPlayback(advancePlaybackFrame);
-      setSatellitePlayback(advancePlaybackFrame);
-    }, animationSpeedMs);
-
-    return () => window.clearInterval(intervalId);
-  }, [animationSpeedMs, frameSignature, shouldAnimate]);
+  useWmsPlaybackLoop(
+    shouldAnimate,
+    frameSignature,
+    animationSpeedMs,
+    setRadarPlayback,
+    setSatellitePlayback,
+  );
 
   return {
     radarDisplayTime: resolveDisplayTime(radarPlayback),

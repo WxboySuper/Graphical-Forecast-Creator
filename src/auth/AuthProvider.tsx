@@ -236,6 +236,7 @@ export const postLocalJson = async <TResponse = Record<string, unknown>>(
   return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
 };
 
+/** Compares hosted settings fields excluding updatedAt metadata. */
 const compareUserSettingsFields = (
   left: UserSettingsDocument,
   right: UserSettingsDocument,
@@ -261,6 +262,7 @@ export const areUserSettingsEqual = (
   return compareUserSettingsFields(left, right);
 };
 
+/** Applies a partial settings patch onto a normalized baseline document. */
 export const mergeUserSettingsDocument = (
   base: UserSettingsDocument,
   patch: Partial<UserSettingsDocument>,
@@ -268,6 +270,20 @@ export const mergeUserSettingsDocument = (
   ...base,
   ...patch,
 });
+
+const writeHostedSettingsDocument = async (
+  settingsRef: ReturnType<typeof doc>,
+  nextSettings: UserSettingsDocument,
+): Promise<void> => {
+  await setDoc(
+    settingsRef,
+    {
+      ...nextSettings,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+};
 
 /** True when the current overlay state already matches the incoming synced overlay values. */
 export const areOverlaySettingsEqual = (
@@ -1300,15 +1316,7 @@ const useHostedAuthState = (): AuthContextValue => {
     setError(null);
 
     try {
-      await setDoc(
-        settingsRef,
-        {
-          ...nextSettings,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
+      await writeHostedSettingsDocument(settingsRef, nextSettings);
       setSettingsSyncStatus('synced');
       writeStoredForecastUiVariant(nextSettings.forecastUiVariant);
     } catch (updateError) {
