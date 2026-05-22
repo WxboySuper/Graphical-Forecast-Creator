@@ -34,8 +34,8 @@ import { MonitorControls, MonitorMap } from '../components/Monitor';
 import { buildMonitorOutlookOptions, resolveSelectedOutlookOption } from '../monitor/outlookSources';
 import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
 import { readStoredMonitorSettings, writeStoredMonitorSettings } from '../monitor/storage';
-import { areMonitorSettingsEqual } from '../monitor/types';
 import type { MonitorSettings } from '../monitor/types';
+import { usePremiumMonitorSettingsSync } from './usePremiumMonitorSettingsSync';
 import { buildRadarLayerConfig, buildSatelliteLayerConfig } from '../monitor/wms';
 import { useLiveWmsLayers } from '../monitor/useLiveWmsLayers';
 import { useMonitorNwsAlerts } from '../monitor/useMonitorNwsAlerts';
@@ -53,6 +53,7 @@ const useLocalMonitorSettings = (settings: MonitorSettings) => {
   const dispatch = useDispatch<AppDispatch>();
   const { syncedSettings } = useAuth();
   const hydratedRef = useRef(false);
+  const persistReadyRef = useRef(false);
 
   useEffect(() => {
     if (hydratedRef.current) {
@@ -68,39 +69,13 @@ const useLocalMonitorSettings = (settings: MonitorSettings) => {
       return;
     }
 
+    if (!persistReadyRef.current) {
+      persistReadyRef.current = true;
+      return;
+    }
+
     writeStoredMonitorSettings(settings);
   }, [settings]);
-};
-
-const usePremiumMonitorSettingsSync = (settings: MonitorSettings) => {
-  const { status, syncedSettings, updateSyncedSettings } = useAuth();
-  const { premiumActive } = useEntitlement();
-  const lastSyncedRef = useRef<MonitorSettings | null>(syncedSettings?.monitorSettings ?? null);
-
-  useEffect(() => {
-    if (syncedSettings?.monitorSettings && !areMonitorSettingsEqual(syncedSettings.monitorSettings, settings)) {
-      lastSyncedRef.current = syncedSettings.monitorSettings;
-    }
-  }, [settings, syncedSettings?.monitorSettings]);
-
-  useEffect(() => {
-    if (!premiumActive || status !== 'signed_in') {
-      return;
-    }
-
-    if (lastSyncedRef.current && areMonitorSettingsEqual(lastSyncedRef.current, settings)) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      lastSyncedRef.current = settings;
-      updateSyncedSettings({ monitorSettings: settings }).catch(() => {
-        lastSyncedRef.current = null;
-      });
-    }, 900);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [premiumActive, settings, status, updateSyncedSettings]);
 };
 
 const useCloudOutlookData = ({

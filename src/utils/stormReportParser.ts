@@ -1,5 +1,7 @@
 import { StormReport, ReportType } from '../types/stormReports';
 import { v4 as uuidv4 } from 'uuid';
+import { buildCsvRow, extractStormReportMagnitude, splitCsvLine } from './stormReportCsv';
+import type { StormReportRowFieldMap } from './stormReportCsv';
 
 export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today.csv';
 
@@ -176,87 +178,22 @@ const parseArchiveCsvRow = (line: string, type: ReportType, headers: string[]): 
     remarksField: 'Remarks',
   });
 
-interface StormReportRowFieldMap {
-  scaleField?: string;
-  speedField?: string;
-  sizeField?: string;
-  latField: string;
-  lonField: string;
-  remarksField: string;
-}
-
 const parseStormReportRow = (
   line: string,
   type: ReportType,
   headers: string[],
   fields: StormReportRowFieldMap,
 ): StormReport | null => {
-  // Split by comma, but handle quoted fields
-  const values: string[] = [];
-  let currentValue = '';
-  let inQuotes = false;
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      values.push(currentValue);
-      currentValue = '';
-    } else {
-      currentValue += char;
-    }
-  }
-  values.push(currentValue); // Push the last value
-  
-  // Create object from headers and values
-  const row: Record<string, string> = {};
-  headers.forEach((header, index) => {
-    row[header] = values[index] || '';
-  });
-  
-  // Extract coordinates
+  const row = buildCsvRow(headers, splitCsvLine(line));
   const lat = parseFloat(row[fields.latField]);
   const lon = parseFloat(row[fields.lonField]);
-  
-  if (isNaN(lat) || isNaN(lon)) {
+
+  if (Number.isNaN(lat) || Number.isNaN(lon)) {
     return null;
   }
-  
-  // Extract time (HHMM format)
-  const time = row['Time'] ? `${row['Time']}Z` : '';
-  
-  // Extract magnitude based on type
-  let magnitude = '';
-  const remarks = row[fields.remarksField] || '';
 
-  if (type === 'tornado') {
-    const scaleField = fields.scaleField ? row[fields.scaleField] : '';
-    if (scaleField && scaleField !== 'UNK') {
-      magnitude = scaleField.startsWith('EF') ? scaleField : `EF${scaleField}`;
-    } else {
-      const efMatch = remarks.match(/EF-?(\d+)/i);
-      if (efMatch) {
-        magnitude = `EF${efMatch[1]}`;
-      }
-    }
-  } else if (type === 'wind') {
-    const speed = fields.speedField ? row[fields.speedField] : '';
-    if (speed && speed !== 'UNK') {
-      magnitude = speed.toLowerCase().includes('mph') ? speed : `${speed} mph`;
-    }
-  } else if (type === 'hail') {
-    const size = fields.sizeField ? row[fields.sizeField] : '';
-    if (size && size !== 'UNK') {
-      if (size.includes('.')) {
-        magnitude = `${size}"`;
-      } else {
-        const inches = parseInt(size, 10) / 100;
-        magnitude = Number.isNaN(inches) ? '' : `${inches.toFixed(2)}"`;
-      }
-    }
-  }
+  const time = row.Time ? `${row.Time}Z` : '';
+  const magnitude = extractStormReportMagnitude(type, row, fields);
 
   return {
     id: uuidv4(),
@@ -268,7 +205,7 @@ const parseStormReportRow = (
     location: row.Location || '',
     county: row.County || '',
     state: row.State || '',
-    comments: remarks,
+    comments: row[fields.remarksField] || '',
   };
 };
 

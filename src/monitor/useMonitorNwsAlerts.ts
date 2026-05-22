@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import {
   fetchActiveNwsAlerts,
@@ -24,6 +24,19 @@ const emptyCollection = (): NwsAlertFeatureCollection => ({
   features: [],
 });
 
+const appendSnapshotFrame = (
+  current: NwsAlertFeatureCollection[],
+  collection: NwsAlertFeatureCollection,
+): NwsAlertFeatureCollection[] => {
+  const snapshotKey = snapshotCollectionKey(collection);
+  const last = current[current.length - 1];
+  if (last && snapshotCollectionKey(last) === snapshotKey) {
+    return current;
+  }
+
+  return [...current, collection].slice(-MAX_ANIMATION_FRAMES);
+};
+
 export const useMonitorNwsAlerts = ({
   enabled,
   showWatches,
@@ -34,20 +47,26 @@ export const useMonitorNwsAlerts = ({
   refreshToken,
   addToast,
 }: UseMonitorNwsAlertsArgs) => {
-  const [frames, setFrames] = useState<NwsAlertFeatureCollection[]>([]);
+  const [rawFrames, setRawFrames] = useState<NwsAlertFeatureCollection[]>([]);
   const [frameIndex, setFrameIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const previousRawFrameCountRef = useRef(0);
 
   const filterOptions = useMemo(
     () => ({ showWatches, showWarnings, showAdvisories }),
     [showAdvisories, showWarnings, showWatches],
   );
 
+  const filteredFrames = useMemo(
+    () => rawFrames.map((frame) => filterNwsAlertCollection(frame, filterOptions)),
+    [filterOptions, rawFrames],
+  );
+
   useEffect(() => {
     if (!enabled) {
-      setFrames([]);
+      setRawFrames([]);
       setFrameIndex(0);
       setError(null);
       setLoading(false);
@@ -64,19 +83,9 @@ export const useMonitorNwsAlerts = ({
           return;
         }
 
-        const filtered = filterNwsAlertCollection(collection, filterOptions);
-        const snapshotKey = snapshotCollectionKey(filtered);
-
-        setFrames((current) => {
-          const last = current[current.length - 1];
-          if (last && snapshotCollectionKey(last) === snapshotKey) {
-            return current;
-          }
-
-          const nextFrames = [...current, filtered].slice(-MAX_ANIMATION_FRAMES);
-          setFrameIndex(nextFrames.length - 1);
-          return nextFrames;
-        });
+        const nextFrames = appendSnapshotFrame([], collection);
+        setRawFrames(nextFrames);
+        setFrameIndex(Math.max(0, nextFrames.length - 1));
         setFetchedAt(new Date().toISOString());
       })
       .catch(() => {
@@ -84,7 +93,7 @@ export const useMonitorNwsAlerts = ({
           return;
         }
 
-        setFrames([]);
+        setRawFrames([]);
         setError('Official alerts are unavailable right now.');
         addToast('NWS watch/warning polygons could not be loaded.', 'warning');
       })
@@ -97,19 +106,19 @@ export const useMonitorNwsAlerts = ({
     return () => {
       active = false;
     };
-  }, [addToast, enabled, filterOptions, refreshToken]);
+  }, [addToast, enabled, refreshToken]);
 
   useEffect(() => {
-    if (!enabled || !animationEnabled || frames.length < 2) {
+    if (!enabled || !animationEnabled || filteredFrames.length < 2) {
       return;
     }
 
     const timeoutId = window.setInterval(() => {
-      setFrameIndex((index) => (index + 1) % frames.length);
+      setFrameIndex((index) => (index + 1) % filteredFrames.length);
     }, animationSpeedMs);
 
     return () => window.clearInterval(timeoutId);
-  }, [animationEnabled, animationSpeedMs, enabled, frames.length]);
+  }, [animationEnabled, animationSpeedMs, enabled, filteredFrames.length]);
 
   useEffect(() => {
     if (!enabled || !animationEnabled) {
@@ -119,16 +128,7 @@ export const useMonitorNwsAlerts = ({
     const intervalId = window.setInterval(() => {
       fetchActiveNwsAlerts()
         .then((collection) => {
-          const filtered = filterNwsAlertCollection(collection, filterOptions);
-          const snapshotKey = snapshotCollectionKey(filtered);
-          setFrames((current) => {
-            const last = current[current.length - 1];
-            if (last && snapshotCollectionKey(last) === snapshotKey) {
-              return current;
-            }
-
-            return [...current, filtered].slice(-MAX_ANIMATION_FRAMES);
-          });
+          setRawFrames((current) => appendSnapshotFrame(current, collection));
           setFetchedAt(new Date().toISOString());
         })
         .catch(() => {
@@ -137,24 +137,31 @@ export const useMonitorNwsAlerts = ({
     }, Math.max(animationSpeedMs * 4, 15_000));
 
     return () => window.clearInterval(intervalId);
-  }, [animationEnabled, animationSpeedMs, enabled, filterOptions]);
+  }, [animationEnabled, animationSpeedMs, enabled]);
+
+  useEffect(() => {
+    if (rawFrames.length > previousRawFrameCountRef.current) {
+      setFrameIndex(rawFrames.length - 1);
+    }
+    previousRawFrameCountRef.current = rawFrames.length;
+  }, [rawFrames.length]);
 
   const activeCollection = useMemo(() => {
-    if (!enabled || frames.length === 0) {
+    if (!enabled || filteredFrames.length === 0) {
       return emptyCollection();
     }
 
-    if (animationEnabled && frames.length > 1) {
-      return frames[frameIndex] ?? frames[frames.length - 1] ?? emptyCollection();
+    if (animationEnabled && filteredFrames.length > 1) {
+      return filteredFrames[frameIndex] ?? filteredFrames[filteredFrames.length - 1] ?? emptyCollection();
     }
 
-    return frames[frames.length - 1] ?? emptyCollection();
-  }, [animationEnabled, enabled, frameIndex, frames]);
+    return filteredFrames[filteredFrames.length - 1] ?? emptyCollection();
+  }, [animationEnabled, enabled, filteredFrames, frameIndex]);
 
   return {
     alertCollection: activeCollection,
-    frameCount: frames.length,
-    frameIndex: animationEnabled ? frameIndex : Math.max(0, frames.length - 1),
+    frameCount: filteredFrames.length,
+    frameIndex: animationEnabled ? frameIndex : Math.max(0, filteredFrames.length - 1),
     loading,
     error,
     fetchedAt,

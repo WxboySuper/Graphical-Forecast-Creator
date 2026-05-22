@@ -36,4 +36,25 @@ describe('nwsAlerts', () => {
     expect(watchesOnly.features).toHaveLength(1);
     expect(watchesOnly.features[0]?.properties?.event).toBe('Tornado Watch');
   });
+
+  test('filterNwsAlertCollection always includes statements without advisories toggle', () => {
+    const collection = {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          properties: { event: 'Special Weather Statement' },
+          geometry: { type: 'Polygon' as const, coordinates: [] },
+        },
+      ],
+    };
+
+    const filtered = filterNwsAlertCollection(collection, {
+      showWatches: false,
+      showWarnings: false,
+      showAdvisories: false,
+    });
+
+    expect(filtered.features).toHaveLength(1);
+  });
 });

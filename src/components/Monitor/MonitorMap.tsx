@@ -7,34 +7,41 @@ import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
-import GeoJSON from 'ol/format/GeoJSON';
-import Feature from 'ol/Feature';
-import Point from 'ol/geom/Point';
-import { Fill, Stroke, Style } from 'ol/style';
-import type { FeatureLike } from 'ol/Feature';
-import type { Feature as GeoJsonFeature } from 'geojson';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
 import { buildNwsAlertStyle } from '../../monitor/nwsAlerts';
 import type { NwsAlertDetails } from '../../monitor/nwsAlertDetails';
 import { parseNwsAlertFromOlProperties } from '../../monitor/nwsAlertDetails';
-import { buildStormReportStyle } from '../../monitor/stormReportMapStyle';
 import MonitorAlertPopup from './MonitorAlertPopup';
 import { hideOverlay } from '../Map/OpenLayersForecastMap';
 import { useDispatch, useSelector } from 'react-redux';
 import type { OutlookData } from '../../types/outlooks';
-import type { MonitorOutlookLayerType } from '../../monitor/types';
+import type { MonitorMapView, MonitorOutlookLayerType } from '../../monitor/types';
 import { flattenMonitorOutlookFeatures } from '../../monitor/outlookLayers';
 import type { AppDispatch, RootState } from '../../store';
 import { setMonitorMapView } from '../../store/monitorSlice';
-import type { MonitorMapView } from '../../monitor/types';
 import type { WmsLayerConfig } from '../../monitor/wms';
 import { getOpenFreeMapStyleSet } from '../../lib/openFreeMap';
 import { apply } from 'ol-mapbox-style';
-import { toOlStyle } from '../Map/OpenLayersForecastMap';
+import {
+  ALERTS_LAYER_Z_INDEX,
+  applyWmsLayer,
+  BASE_LAYER_Z_INDEX,
+  buildWmsParams,
+  createBaseSource,
+  createStateOutlineStyle,
+  loadUsStateOutlines,
+  OUTLOOK_LAYER_Z_INDEX,
+  RADAR_LAYER_Z_INDEX,
+  replaceLayerGroupLayers,
+  SATELLITE_LAYER_Z_INDEX,
+  STATE_OUTLINE_LAYER_Z_INDEX,
+  STORM_REPORTS_LAYER_Z_INDEX,
+  TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+} from './monitorMapLayerUtils';
+import { syncAlertFeatures, syncOutlookFeatures, syncStormReportFeatures } from './monitorMapFeatureSync';
 
 interface MonitorMapProps {
   mapView: MonitorMapView;
@@ -48,118 +55,6 @@ interface MonitorMapProps {
   alertsCollection: NwsAlertFeatureCollection;
   alertsOpacity: number;
 }
-
-const BASE_LAYER_Z_INDEX = 0;
-const SATELLITE_LAYER_Z_INDEX = 15;
-const RADAR_LAYER_Z_INDEX = 20;
-const ALERTS_LAYER_Z_INDEX = 1030;
-/** Outlook polygons must stay see-through so live radar/satellite imagery remains readable. */
-const MONITOR_OUTLOOK_TRANSPARENCY_SCALE = 0.38;
-const STATE_OUTLINE_LAYER_Z_INDEX = 1045;
-/** Above live WMS layers but below road/label vectors (OpenFreeMap overlay sits at 1050). */
-const OUTLOOK_LAYER_Z_INDEX = 1040;
-const STORM_REPORTS_LAYER_Z_INDEX = 1048;
-/** Roads and place labels sit above live imagery and outlook polygons (matches forecast map). */
-const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
-
-const US_STATES_GEOJSON_URL =
-  'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json';
-
-const createBaseSource = (darkMode: boolean) => new XYZ({
-  url: darkMode
-    ? 'https://{a-d}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png'
-    : 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
-  attributions: '&copy; OpenStreetMap &copy; CARTO',
-  crossOrigin: 'anonymous',
-  maxZoom: 19,
-});
-
-const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
-  const targetLayers = target.getLayers();
-  targetLayers.clear();
-  source.getLayers().getArray().forEach((layer) => {
-    targetLayers.push(layer);
-  });
-};
-
-const createStateOutlineStyle = (darkMode: boolean) => new Style({
-  fill: new Fill({ color: 'rgba(0, 0, 0, 0)' }),
-  stroke: new Stroke({
-    color: darkMode ? 'rgba(226, 232, 240, 0.72)' : 'rgba(51, 65, 85, 0.88)',
-    width: 1.1,
-  }),
-});
-
-const createWmsSource = (config: WmsLayerConfig): TileWMS => new TileWMS({
-  url: config.url,
-  params: {
-    LAYERS: config.layer,
-    TILED: true,
-    ...(config.latestTime ? { TIME: config.latestTime } : {}),
-  },
-  serverType: 'geoserver',
-  crossOrigin: 'anonymous',
-});
-
-const buildWmsParams = (config: WmsLayerConfig) => ({
-  LAYERS: config.layer,
-  TILED: true,
-  ...(config.latestTime ? { TIME: config.latestTime } : {}),
-});
-
-const buildWmsLayerKey = (config: WmsLayerConfig): string => `${config.url}::${config.layer}`;
-
-const applyWmsLayer = (
-  layer: TileLayer<TileWMS>,
-  config: WmsLayerConfig | null,
-  opacity: number,
-  activeLayerKeyRef: React.MutableRefObject<string | null>
-) => {
-  if (!config) {
-    layer.setVisible(false);
-    activeLayerKeyRef.current = null;
-    return;
-  }
-
-  const nextLayerKey = buildWmsLayerKey(config);
-  const source = layer.getSource();
-
-  if (!source || activeLayerKeyRef.current !== nextLayerKey) {
-    layer.setSource(createWmsSource(config));
-    activeLayerKeyRef.current = nextLayerKey;
-  } else {
-    source.updateParams(buildWmsParams(config));
-  }
-
-  layer.setOpacity(opacity);
-  layer.setVisible(true);
-};
-
-let cachedUsStatesGeoJSON: object | null = null;
-
-const loadUsStateOutlines = async (source: VectorSource, darkMode: boolean) => {
-  if (source.getFeatures().length > 0) {
-    return;
-  }
-
-  if (!cachedUsStatesGeoJSON) {
-    const response = await fetch(US_STATES_GEOJSON_URL);
-    cachedUsStatesGeoJSON = await response.json() as object;
-  }
-
-  const format = new GeoJSON();
-  const features = format.readFeatures(cachedUsStatesGeoJSON, {
-    dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857',
-  });
-  const style = createStateOutlineStyle(darkMode);
-  features.forEach((feature) => {
-    if ('setStyle' in feature && typeof feature.setStyle === 'function') {
-      feature.setStyle(style);
-    }
-  });
-  source.addFeatures(features as never);
-};
 
 const MonitorMap: React.FC<MonitorMapProps> = ({
   mapView,
@@ -295,7 +190,11 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     const handleMapClick = (evt: { pixel: number[]; coordinate: number[] }) => {
       const feature = map.forEachFeatureAtPixel(
         evt.pixel,
-        (candidate) => (candidate.get('nwsAlert') ? candidate : undefined),
+        (candidate) => {
+          if (candidate.get('nwsAlert')) {
+            return candidate;
+          }
+        },
         {
           layerFilter: (layer) => layer === alertsLayer,
           hitTolerance: 6,
@@ -372,7 +271,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
       if (target instanceof HTMLElement) {
         target.style.cursor = '';
       }
-      map.setTarget(undefined);
+      map.setTarget();
       overlayRef.current = null;
       mapRef.current = null;
       radarLayerRef.current = null;
@@ -439,32 +338,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   }, [satelliteLayer?.latestTime]);
 
   useEffect(() => {
-    const source = outlookSourceRef.current;
-    source.clear();
-    const format = new GeoJSON();
-
-    serializedFeatures.forEach(({ outlookType, probability, feature }) => {
-      const olFeature = format.readFeature(feature, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857',
-      });
-
-      const applyStyle = (item: FeatureLike) => {
-        if ('setStyle' in item && typeof item.setStyle === 'function') {
-          item.setStyle(toOlStyle(
-            { outlookType, probability },
-            { transparencyScale: MONITOR_OUTLOOK_TRANSPARENCY_SCALE },
-          ));
-        }
-        source.addFeature(item as never);
-      };
-
-      if (Array.isArray(olFeature)) {
-        olFeature.forEach(applyStyle);
-      } else {
-        applyStyle(olFeature as FeatureLike);
-      }
-    });
+    syncOutlookFeatures(outlookSourceRef.current, serializedFeatures);
   }, [serializedFeatures]);
 
   useEffect(() => {
@@ -472,31 +346,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   }, [alertsOpacity]);
 
   useEffect(() => {
-    const source = alertsSourceRef.current;
-    source.clear();
-    const format = new GeoJSON();
-
-    alertsCollection.features.forEach((feature) => {
-      if (!feature.geometry) {
-        return;
-      }
-
-      const olFeatures = format.readFeatures(feature, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857',
-      });
-
-      olFeatures.forEach((olFeature) => {
-        if ('setProperties' in olFeature && typeof olFeature.setProperties === 'function') {
-          olFeature.setProperties({
-            ...(feature.properties ?? {}),
-            event: feature.properties?.event ?? 'Alert',
-            nwsAlert: true,
-          });
-        }
-        source.addFeature(olFeature as never);
-      });
-    });
+    syncAlertFeatures(alertsSourceRef.current, alertsCollection);
   }, [alertsCollection]);
 
   useEffect(() => {
@@ -507,18 +357,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   }, [alertsCollection]);
 
   useEffect(() => {
-    const source = stormReportsSourceRef.current;
-    source.clear();
-
-    stormReports.forEach((report) => {
-      const feature = new Feature({
-        geometry: new Point(fromLonLat([report.longitude, report.latitude])),
-        reportId: report.id,
-        type: report.type,
-      });
-      feature.setStyle(buildStormReportStyle(report.type));
-      source.addFeature(feature);
-    });
+    syncStormReportFeatures(stormReportsSourceRef.current, stormReports);
   }, [stormReports]);
 
   const handleCloseAlertPopup = () => {

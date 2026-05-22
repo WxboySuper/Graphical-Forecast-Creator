@@ -55,7 +55,8 @@ export const filterNwsAlertCollection = (
       return options.showAdvisories;
     }
 
-    return options.showAdvisories;
+    // Statements and uncategorized alerts have no dedicated toggle.
+    return true;
   });
 
   return {
