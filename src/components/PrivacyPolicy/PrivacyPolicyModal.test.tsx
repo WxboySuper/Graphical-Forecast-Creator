@@ -48,6 +48,13 @@ describe('PrivacyPolicyModal Utils', () => {
     localStorage.setItem('gfc-privacy-policy-accepted', '1.2.0');
     expect(isPrivacyPolicyUpgrade()).toBe(false);
   });
+
+  test('isPrivacyPolicyUpgrade returns false when localStorage throws', () => {
+    jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('Storage error');
+    });
+    expect(isPrivacyPolicyUpgrade()).toBe(false);
+  });
 });
 
 describe('PrivacyPolicyModal component', () => {
