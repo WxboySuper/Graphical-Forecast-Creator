@@ -22,6 +22,16 @@ export function hasAcceptedPrivacyPolicy(): boolean {
   }
 }
 
+/** Returns true when the user previously accepted an older policy and must re-accept. */
+export function isPrivacyPolicyUpgrade(): boolean {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored != null && stored !== PRIVACY_POLICY_VERSION;
+  } catch {
+    return false;
+  }
+}
+
 // Records acceptance of the current Privacy Policy version in localStorage.
 function acceptPrivacyPolicy(): void {
   try {
@@ -242,7 +252,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept, viewO
       <div className="privacy-modal">
         <PrivacyPolicyHeader viewOnly={viewOnly} onClose={onClose} />
         <div className="privacy-modal-body">
-          <PrivacyPolicyContent showWhatsNew={!viewOnly} />
+          <PrivacyPolicyContent showWhatsNew={!viewOnly && isPrivacyPolicyUpgrade()} />
         </div>
 
         {viewOnly ? (
