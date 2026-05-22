@@ -1,4 +1,4 @@
-import { DEFAULT_MONITOR_SETTINGS } from './types';
+import { DEFAULT_MONITOR_SETTINGS, MONITOR_OUTLOOK_LAYER_TYPES } from './types';
 import { normalizeMonitorSettings } from './monitorSettingsNormalize';
 import monitorReducer, { setRadarMode, setRadarSite } from '../store/monitorSlice';
 import { readStoredMonitorSettings, writeStoredMonitorSettings, MONITOR_SETTINGS_STORAGE_KEY } from './storage';
@@ -6,6 +6,11 @@ import { readStoredMonitorSettings, writeStoredMonitorSettings, MONITOR_SETTINGS
 describe('monitor settings', () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  test('loads outlook layer types without circular-import initialization errors', () => {
+    expect(MONITOR_OUTLOOK_LAYER_TYPES).toEqual(['tornado', 'wind', 'hail', 'categorical']);
+    expect(normalizeMonitorSettings({ outlookType: 'tornado' }).outlookType).toBe('tornado');
   });
 
   test('normalizes unknown settings with safe defaults and bounds', () => {
