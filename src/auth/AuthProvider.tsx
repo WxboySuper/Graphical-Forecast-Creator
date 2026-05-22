@@ -300,6 +300,70 @@ const buildHostedAccountFallbackSettings = (
     monitorSettings,
   });
 
+interface PersistHostedSettingsContext {
+  user: User;
+  darkMode: boolean;
+  overlays: OverlaysState;
+  syncedSettings: UserSettingsDocument | null;
+  monitorSettings: MonitorSettings;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<'synced' | 'syncing' | 'error'>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+const persistHostedSettingsUpdate = async (
+  context: PersistHostedSettingsContext,
+  patch: Partial<UserSettingsDocument>,
+): Promise<void> => {
+  const {
+    user,
+    darkMode,
+    overlays,
+    syncedSettings,
+    monitorSettings,
+    lastSyncedSettingsRef,
+    setSyncedSettings,
+    setSettingsSyncStatus,
+    setError,
+  } = context;
+
+  const forecastUiVariant =
+    syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT;
+  const fallbackSettings = buildHostedAccountFallbackSettings(
+    darkMode,
+    overlays,
+    user.displayName ?? '',
+    forecastUiVariant,
+    syncedSettings?.monitorSettings ?? monitorSettings,
+  );
+  const baselineSettings = lastSyncedSettingsRef.current ?? fallbackSettings;
+  const nextSettings = mergeUserSettingsDocument(baselineSettings, patch);
+  if (areUserSettingsEqual(baselineSettings, nextSettings)) {
+    setSettingsSyncStatus('synced');
+    return;
+  }
+
+  const previousSettings = lastSyncedSettingsRef.current;
+  const previousSyncedSettings = syncedSettings;
+  lastSyncedSettingsRef.current = nextSettings;
+  setSyncedSettings(nextSettings);
+  setSettingsSyncStatus('syncing');
+  setError(null);
+
+  try {
+    await writeHostedSettingsDocument(doc(requireDb(), 'userSettings', user.uid), nextSettings);
+    setSettingsSyncStatus('synced');
+    writeStoredForecastUiVariant(nextSettings.forecastUiVariant);
+  } catch (updateError) {
+    lastSyncedSettingsRef.current = previousSettings;
+    setSyncedSettings(previousSyncedSettings);
+    setSettingsSyncStatus('error');
+    setError(getSettingsUpdateError(updateError));
+    throw updateError;
+  }
+};
+
 /** True when the current overlay state already matches the incoming synced overlay values. */
 export const areOverlaySettingsEqual = (
   current: OverlaysState,
@@ -1307,40 +1371,20 @@ const useHostedAuthState = (): AuthContextValue => {
       throw new Error('Hosted accounts are not enabled for this deployment.');
     }
 
-    const forecastUiVariant =
-      syncedSettings?.forecastUiVariant ?? readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT;
-    const fallbackSettings = buildHostedAccountFallbackSettings(
-      darkMode,
-      overlays,
-      user.displayName ?? '',
-      forecastUiVariant,
-      syncedSettings?.monitorSettings ?? monitorSettings,
+    await persistHostedSettingsUpdate(
+      {
+        user,
+        darkMode,
+        overlays,
+        syncedSettings,
+        monitorSettings,
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+        setSettingsSyncStatus,
+        setError,
+      },
+      settings,
     );
-    const baselineSettings = lastSyncedSettingsRef.current ?? fallbackSettings;
-    const nextSettings = mergeUserSettingsDocument(baselineSettings, settings);
-    if (areUserSettingsEqual(baselineSettings, nextSettings)) {
-      setSettingsSyncStatus('synced');
-      return;
-    }
-
-    const previousSettings = lastSyncedSettingsRef.current;
-    const previousSyncedSettings = syncedSettings;
-    lastSyncedSettingsRef.current = nextSettings;
-    setSyncedSettings(nextSettings);
-    setSettingsSyncStatus('syncing');
-    setError(null);
-
-    try {
-      await writeHostedSettingsDocument(doc(requireDb(), 'userSettings', user.uid), nextSettings);
-      setSettingsSyncStatus('synced');
-      writeStoredForecastUiVariant(nextSettings.forecastUiVariant);
-    } catch (updateError) {
-      lastSyncedSettingsRef.current = previousSettings;
-      setSyncedSettings(previousSyncedSettings);
-      setSettingsSyncStatus('error');
-      setError(getSettingsUpdateError(updateError));
-      throw updateError;
-    }
   };
 
   const value = useMemo<AuthContextValue>(() => {

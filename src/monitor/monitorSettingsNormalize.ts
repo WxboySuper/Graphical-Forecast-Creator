@@ -40,14 +40,14 @@ const readSite = (value: unknown, fallback: string): string => {
   return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
 };
 
+const isLatLonPair = (center: unknown): center is [number, number] =>
+  Array.isArray(center) &&
+  center.length === 2 &&
+  typeof center[0] === 'number' &&
+  typeof center[1] === 'number';
+
 const readMapViewCenter = (center: unknown, zoom: unknown): MonitorMapView | null => {
-  if (
-    !Array.isArray(center) ||
-    center.length !== 2 ||
-    typeof center[0] !== 'number' ||
-    typeof center[1] !== 'number' ||
-    typeof zoom !== 'number'
-  ) {
+  if (!isLatLonPair(center) || typeof zoom !== 'number') {
     return null;
   }
 

@@ -31,30 +31,14 @@ const parseTodaySectionRows = (
 
 /** Parses SPC today.csv (Time,F_Scale / Time,Speed / Time,Size sections). */
 export const parseTodayStormReportCsv = (csvText: string): StormReport[] => {
-  const lines = csvText.split('\n').map((line) => line.trim());
-  const reports: StormReport[] = [];
-  let index = 0;
+  const lines = csvText.split('\n').map((line) => line.trim()).filter(Boolean);
 
-  while (index < lines.length) {
-    const line = lines[index];
-    if (!line) {
-      index += 1;
-      continue;
+  return TODAY_SECTION_HEADERS.flatMap(({ header, type }) => {
+    const headerIndex = lines.findIndex((line) => line.startsWith(header));
+    if (headerIndex < 0) {
+      return [];
     }
 
-    const section = TODAY_SECTION_HEADERS.find((entry) => line.startsWith(entry.header));
-    if (!section) {
-      index += 1;
-      continue;
-    }
-
-    const sectionStart = index + 1;
-    reports.push(...parseTodaySectionRows(lines, sectionStart, section.type));
-    index = sectionStart;
-    while (index < lines.length && lines[index] && !lines[index].startsWith('Time,')) {
-      index += 1;
-    }
-  }
-
-  return reports;
+    return parseTodaySectionRows(lines, headerIndex + 1, type);
+  });
 };
