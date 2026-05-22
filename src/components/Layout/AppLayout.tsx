@@ -11,6 +11,7 @@ import { RootState } from '../../store';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '../../lib/utils';
 import { NAVBAR_HEIGHT } from '../../lib/uiConstants';
+import { keyboardShortcutKey } from '../../utils/keyboardShortcutKey';
 
 export interface ToastItem {
   id: string;
@@ -117,10 +118,10 @@ export const AppLayout: React.FC = () => {
       }
 
       if (e.ctrlKey || e.metaKey) {
-        if (!e.key) return;
+        const key = keyboardShortcutKey(e);
+        if (!key) return;
 
         // Define Ctrl/Cmd+key shortcuts for navigation and actions
-        const key = e.key.toLowerCase();
         // Define shortcuts for navigation and actions
         const shortcuts: Record<string, () => void> = {
           h: () => navigate('/'),
