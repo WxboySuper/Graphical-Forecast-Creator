@@ -50,6 +50,18 @@ function getConfiguredSentryEndpoint() {
   return parseSentryDsnString(process.env.SENTRY_DSN || '');
 }
 
+/** @returns {boolean} Whether the client envelope targets the same Sentry project as the server. */
+function clientEndpointMatchesConfigured(clientEndpoint, configuredEndpoint) {
+  if (!clientEndpoint) {
+    return false;
+  }
+
+  return (
+    clientEndpoint.host === configuredEndpoint.host &&
+    clientEndpoint.projectId === configuredEndpoint.projectId
+  );
+}
+
 /** Registers POST /api/sentry-tunnel to proxy browser envelopes past ad blockers. */
 function registerSentryTunnelRoutes(app, express, rateLimit) {
   const configuredEndpoint = getConfiguredSentryEndpoint();
@@ -80,11 +92,7 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
         }
 
         const clientEndpoint = parseAllowedSentryEndpoint(envelopeBody);
-        if (
-          !clientEndpoint ||
-          clientEndpoint.host !== configuredEndpoint.host ||
-          clientEndpoint.projectId !== configuredEndpoint.projectId
-        ) {
+        if (!clientEndpointMatchesConfigured(clientEndpoint, configuredEndpoint)) {
           res.status(400).end();
           return;
         }
