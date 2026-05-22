@@ -31,16 +31,20 @@ const parseRadarSiteFeature = (feature: unknown): RadarSiteOption | null => {
   };
 };
 
+const isRadarFeatureCollection = (payload: unknown): payload is { features: unknown[] } =>
+  typeof payload === 'object' &&
+  payload !== null &&
+  'features' in payload &&
+  Array.isArray((payload as { features?: unknown[] }).features);
+
 const parseRadarSites = (payload: unknown): RadarSiteOption[] => {
-  if (!payload || typeof payload !== 'object' || !('features' in payload)) {
+  if (!isRadarFeatureCollection(payload)) {
     return [];
   }
 
-  const features = (payload as { features?: unknown[] }).features ?? [];
-
-  return features
+  return payload.features
     .map(parseRadarSiteFeature)
-    .filter((site): site is RadarSiteOption => Boolean(site))
+    .filter((site): site is RadarSiteOption => site !== null)
     .sort((left, right) => left.id.localeCompare(right.id));
 };
 
