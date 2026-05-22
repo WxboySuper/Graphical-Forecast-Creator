@@ -9,6 +9,19 @@ permissions:
   contents: read
 
 jobs:
+  package-version-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate package version for target branch
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: node scripts/validate-package-version.mjs
+
   build-and-test:
     runs-on: ubuntu-latest
     strategy:
