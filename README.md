@@ -118,6 +118,38 @@ Run the app with beta-only features locally (useful for testing forecast redesig
 
 - To enable hosted auth locally, provide Firebase web config via env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID and restart the dev server.
 
+### Hosted error monitoring (Sentry)
+
+Sentry is enabled on **production** (`main` → gfc.weatherboysuper.com) and **beta** (`beta` → beta-gfc.weatherboysuper.com) when deploy secrets provide a DSN. Local dev builds without `VITE_SENTRY_DSN` stay inert. Events are separated in Sentry by environment (`production` vs `beta`).
+
+Hosted monitoring includes:
+
+- Error monitoring (React 19 `reactErrorHandler` + unhandled errors)
+- Performance tracing (React Router v7 navigation, 10% sample)
+- Redux action breadcrumbs (forecast map payloads stripped from breadcrumbs)
+- Structured logs (`Sentry.logger.*`)
+- Server-side errors on the analytics API (`@sentry/node`)
+
+Session replay is **disabled**. `sendDefaultPii` is **false** (no IP/cookies in error payloads by default).
+
+Create two Sentry projects (recommended):
+
+- **Web** — React client (`@sentry/react`)
+- **Analytics API** — Express server on the VPS (`@sentry/node`)
+
+Add these GitHub Actions secrets (repo → Settings → Secrets and variables → Actions):
+
+| Secret | Used for |
+|--------|----------|
+| `VITE_SENTRY_DSN` | Browser error + performance monitoring |
+| `SENTRY_DSN` | Analytics/billing API server |
+| `SENTRY_AUTH_TOKEN` | Upload source maps during the main deploy build (use a Sentry **Organization Auth Token**; `org:ci` scope is correct and fixed) |
+| `SENTRY_ORG` | Your Sentry organization slug |
+| `SENTRY_PROJECT` | Web project slug (source maps) — not the API project |
+
+Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the analytics VPS so `/api/sentry-tunnel` validates browser envelopes against the web project.
+
+After the next `main` deploy, verify in Sentry with a test error from the browser console on production (not from DevTools while paused — use a one-off button or `throw new Error('Sentry test')` in the console on the live site).
 
 ---
 

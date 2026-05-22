@@ -1,5 +1,7 @@
 'use strict';
 
+const { initSentry, setupExpressErrorHandler } = require('./sentry');
+
 /** Returns the POST /collect handler that appends sanitized entries to the log file. */
 function createCollectHandler(fs, LOG_FILE) {
   return (req, res) => {
@@ -30,6 +32,7 @@ function configureApp(app, express, fs, LOG_FILE) {
   const { registerBetaRoutes } = require('./beta');
   const { registerBillingRoutes } = require('./billing');
   const { registerMetricsRoutes } = require('./metrics');
+  const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
 
   app.set('trust proxy', 'loopback');
 
@@ -40,11 +43,14 @@ function configureApp(app, express, fs, LOG_FILE) {
     legacyHeaders: false,
   });
 
+  registerSentryTunnelRoutes(app, express, rateLimit);
   registerBillingRoutes(app, express);
   registerMetricsRoutes(app, express);
   registerBetaRoutes(app, express);
 
   app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, createCollectHandler(fs, LOG_FILE));
+
+  setupExpressErrorHandler(app);
 
   // Reject everything else quietly
   app.use((_req, res) => res.status(404).end());
@@ -54,6 +60,7 @@ function configureApp(app, express, fs, LOG_FILE) {
 async function start() {
   const loadEnv = require('./load-env');
   await loadEnv();
+  initSentry();
 
   const express = require('express');
   const fs = require('fs');

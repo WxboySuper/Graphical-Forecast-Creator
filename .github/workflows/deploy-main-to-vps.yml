@@ -32,6 +32,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Read app version
+        id: app_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          VERSION=${VERSION//$'\n'/}
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "Invalid package version format: $VERSION" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build
         run: pnpm run build
         env:
@@ -43,6 +54,11 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_BETA_MODE: false
           VITE_BETA_INVITE_PATH: ''
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           CI: false  # Prevent ESLint warnings from failing the build
 
       - name: Setup SSH agent
@@ -86,6 +102,10 @@ jobs:
           FIREBASE_ADMIN_PROJECT_ID=${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
           FIREBASE_ADMIN_CLIENT_EMAIL=${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
           FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+          SENTRY_BROWSER_DSN=${{ secrets.VITE_SENTRY_DSN }}
+          SENTRY_ENVIRONMENT=production
+          SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.value }}
           EOF
           rsync -avz prod-server.env root@${{ secrets.PROD_SSH_HOST }}:/opt/gfc-analytics/.env
 
