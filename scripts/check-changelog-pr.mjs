@@ -36,6 +36,11 @@ if (headRef.startsWith('port/')) {
   process.exit(0);
 }
 
+if (headRef.startsWith('dependabot/')) {
+  console.log('Skipping changelog check for Dependabot version updates.');
+  process.exit(0);
+}
+
 const changedFiles = listChangedFilesBetweenRefs(baseRef, headRef);
 
 if (headRef.startsWith('dependabot/')) {

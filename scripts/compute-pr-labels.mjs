@@ -26,7 +26,8 @@ if (
   branchPolicy.ok &&
   branchPolicy.kind !== 'beta-promotion' &&
   branchPolicy.kind !== 'release-infrastructure' &&
-  !headRef.startsWith('port/')
+  !headRef.startsWith('port/') &&
+  !headRef.startsWith('dependabot/')
 ) {
   if (headRef.startsWith('dependabot/')) {
     const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
