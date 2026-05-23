@@ -70,8 +70,8 @@ export const extractDependenciesSubsection = (changelog, section) => {
  */
 export const formatDependencyChangelogBullet = ({ name, from, to, directory }) => {
   const label = packageDirectoryLabel(directory);
-  const scope = label === 'root' ? '' : ' (`' + label + '`)';
-  return '- **' + name + ':** ' + from + ' → ' + to + scope;
+  const scope = label === 'root' ? '' : ` (\`${label}\`)`;
+  return `- **${name}:** ${from} → ${to}${scope}`;
 };
 
 /**
@@ -99,14 +99,10 @@ const readPackageJsonPairAtRefs = (baseRef, headRef, packagePath) => {
   try {
     return {
       basePackage: JSON.parse(
-        execFileSync('git', ['show', 'origin/' + baseRef + ':' + packagePath], {
-          encoding: 'utf8',
-        }),
+        execFileSync('git', ['show', `origin/${baseRef}:${packagePath}`], { encoding: 'utf8' }),
       ),
       headPackage: JSON.parse(
-        execFileSync('git', ['show', 'origin/' + headRef + ':' + packagePath], {
-          encoding: 'utf8',
-        }),
+        execFileSync('git', ['show', `origin/${headRef}:${packagePath}`], { encoding: 'utf8' }),
       ),
       directory: packagePath === 'package.json' ? 'root' : 'server',
     };

@@ -1,13 +1,21 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { extractReleaseNotes } from './lib/changelog.mjs';
 import { hasBetaPrerelease } from './lib/package-version.mjs';
+
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-beta\.\d+)?$/;
+const BRANCH_PATTERN = /^[\w./-]+$/;
 
 const version = process.argv[2];
 const targetBranch = process.argv[3] ?? 'main';
 
-if (!version) {
-  console.error('Usage: node scripts/create-github-release.mjs <version> [target-branch]');
+if (!version || !VERSION_PATTERN.test(version)) {
+  console.error('Usage: node scripts/create-github-release.mjs <semver-version> [target-branch]');
+  process.exit(1);
+}
+
+if (!BRANCH_PATTERN.test(targetBranch)) {
+  console.error(`Invalid target branch: ${targetBranch}`);
   process.exit(1);
 }
 
@@ -21,16 +29,36 @@ const notesFile = process.env.NOTES_FILE ?? 'release-notes.md';
 writeFileSync(notesFile, `${section}\n`);
 
 const tag = `v${version}`;
-const prereleaseFlag = hasBetaPrerelease(version) ? '--prerelease' : '';
+const prerelease = hasBetaPrerelease(version);
 
-try {
-  execSync(`gh release view "${tag}"`, { stdio: 'ignore' });
+const ghReleaseExists = () => {
+  try {
+    execFileSync('gh', ['release', 'view', tag], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const createGhRelease = () => {
+  const args = [
+    'release',
+    'create',
+    tag,
+    '--title',
+    tag,
+    '--notes-file',
+    notesFile,
+    '--target',
+    targetBranch,
+  ];
+  if (prerelease) args.push('--prerelease');
+  execFileSync('gh', args, { stdio: 'inherit' });
+};
+
+if (ghReleaseExists()) {
   console.log(`GitHub release ${tag} already exists.`);
-} catch {
-  const prereleaseSuffix = prereleaseFlag ? ` ${prereleaseFlag}` : '';
-  execSync(
-    `gh release create "${tag}" --title "${tag}" --notes-file "${notesFile}" --target "${targetBranch}"${prereleaseSuffix}`,
-    { stdio: 'inherit' },
-  );
-  console.log(`Created GitHub release ${tag}${prereleaseFlag ? ' (prerelease)' : ''}.`);
+} else {
+  createGhRelease();
+  console.log(`Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`);
 }
