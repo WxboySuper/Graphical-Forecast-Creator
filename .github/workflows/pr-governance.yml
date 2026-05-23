@@ -1,0 +1,183 @@
+name: PR governance
+
+# Branch routing, changelog expectations, and PR labels on open/update and when CI finishes.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: read
+
+jobs:
+  policy:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch PR branches
+        run: |
+          git fetch origin "${{ github.base_ref }}" "${{ github.head_ref }}"
+
+      - name: Branch policy
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+        run: node scripts/validate-branch-policy.mjs
+
+      - name: Changelog policy
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/check-changelog-pr.mjs
+
+      - name: Apply routing labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const labelDefs = [
+              ['promotion', '1d76db'],
+              ['feature', '0e8a16'],
+              ['fix', 'd4c5f9'],
+              ['hotfix', 'b60205'],
+              ['release', '5319e7'],
+              ['port', 'c5def5'],
+              ['has conflicts', 'e11d21'],
+              ['draft', 'ededed'],
+              ['ci:pending', 'fbca04'],
+              ['ci:passing', '0e8a16'],
+              ['ci:failing', 'd73a4a'],
+              ['integration:primary', '1f6feb'],
+              ['integration:other', 'c2e0c6'],
+            ];
+            for (const [name, color] of labelDefs) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (error) {
+                if (error.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, name, color });
+                }
+              }
+            }
+
+            const pr = context.payload.pull_request;
+            const head = pr.head.ref;
+            const base = pr.base.ref;
+            const labels = new Set();
+
+            if (head === 'beta' && base === 'main') labels.add('promotion');
+            if (head.startsWith('feature/')) labels.add('feature');
+            if (head.startsWith('fix/')) labels.add('fix');
+            if (head.startsWith('hotfix/')) labels.add('hotfix');
+            if (head.startsWith('release/')) labels.add('release');
+            if (head.startsWith('port/')) labels.add('port');
+
+            if (base === 'beta' && !head.startsWith('hotfix/')) {
+              if (head.startsWith('feature/') || head.startsWith('fix/')) {
+                labels.add('integration:primary');
+              } else if (head !== 'beta' && !head.startsWith('port/')) {
+                labels.add('integration:other');
+              }
+            }
+
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+            });
+
+            if (pull.mergeable === false) labels.add('has conflicts');
+            if (pull.draft) labels.add('draft');
+
+            const existing = (await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+            })).data.map((label) => label.name);
+
+            const managed = [
+              'promotion', 'feature', 'fix', 'hotfix', 'release', 'port',
+              'integration:primary', 'integration:other',
+              'has conflicts', 'draft', 'ci:pending', 'ci:passing', 'ci:failing',
+              'changelog:ok', 'changelog:missing',
+            ];
+
+            for (const name of managed) {
+              if (existing.includes(name)) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  name,
+                });
+              }
+            }
+
+            for (const name of labels) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: [name],
+              });
+            }
+
+  refresh-labels:
+    if: >-
+      github.event_name == 'check_suite' &&
+      github.event.check_suite.pull_requests[0] != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update CI labels from check suite
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = github.event.check_suite.pull_requests[0];
+            if (!pr) return;
+
+            const conclusion = github.event.check_suite.conclusion;
+            const managed = ['ci:pending', 'ci:passing', 'ci:failing'];
+            const existing = (await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+            })).data.map((l) => l.name);
+
+            for (const name of managed) {
+              if (existing.includes(name)) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  name,
+                });
+              }
+            }
+
+            if (!conclusion) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['ci:pending'],
+              });
+              return;
+            }
+
+            const label = conclusion === 'success' ? 'ci:passing' : 'ci:failing';
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: [label],
+            });

@@ -3,11 +3,23 @@
 
 All notable changes to this project will be documented in this file.
 
+<<<<<<< HEAD
 ## v1.6
 
 ### Fixed
 - **GFC-WEB-4 (monitor startup):** Break circular import between `monitor/types` and `monitorSettingsNormalize` that crashed the hosted app at load (`Gv is not iterable` / `MONITOR_OUTLOOK_LAYER_TYPES` before initialization when spreading outlook layer types).
 - **Forecast keyboard shortcuts (GFC-WEB-3):** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts. Centralized the guard in `keyboardShortcutKey` and applied it to forecast, navbar, and day-selector shortcuts.
+=======
+## [Unreleased]
+
+### Changed
+- **Release automation:** Beta → main stays a normal PR; merge triggers stable versioning on `main`, GitHub Releases from CHANGELOG (including hotfixes), and beta prerelease bumps. CI enforces branch routing (preferred `feature/*`/`fix/*` → beta; only `hotfix/*` blocked on beta), changelog checks, and automated PR labels. Workflow definitions ship on `main` so GitHub can run them for repository pull requests.
+
+## v1.6
+
+### Fixed
+- **Forecast keyboard shortcuts:** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (reported in production via Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts.
+>>>>>>> 9570940 (ci: release automation and PR governance on main)
 - **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
 
 ## v1.5.3
