@@ -1,6 +1,6 @@
-import { execSync } from 'node:child_process';
 import { changelogTouchesPr } from './lib/changelog.mjs';
 import { evaluateBranchPolicy } from './lib/branch-policy.mjs';
+import { listChangedFilesBetweenRefs } from './lib/git-changed-files.mjs';
 
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const headRef = process.env.GITHUB_HEAD_REF ?? '';
@@ -26,12 +26,7 @@ if (headRef.startsWith('port/')) {
   process.exit(0);
 }
 
-const changedFiles = execSync(`git diff --name-only origin/${baseRef}...origin/${headRef}`, {
-  encoding: 'utf8',
-})
-  .split('\n')
-  .map((line) => line.trim())
-  .filter(Boolean);
+const changedFiles = listChangedFilesBetweenRefs(baseRef, headRef);
 
 const result = changelogTouchesPr(changedFiles, prBody);
 

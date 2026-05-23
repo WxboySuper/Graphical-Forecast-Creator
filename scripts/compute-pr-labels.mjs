@@ -1,6 +1,6 @@
-import { execSync } from 'node:child_process';
 import { evaluateBranchPolicy } from './lib/branch-policy.mjs';
 import { changelogTouchesPr } from './lib/changelog.mjs';
+import { listChangedFilesBetweenRefs } from './lib/git-changed-files.mjs';
 import { MANAGED_LABELS, computePrLabels } from './lib/pr-labels.mjs';
 
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
@@ -12,12 +12,7 @@ if (!baseRef || !headRef) {
   process.exit(0);
 }
 
-const changedFiles = execSync(`git diff --name-only origin/${baseRef}...origin/${headRef}`, {
-  encoding: 'utf8',
-})
-  .split('\n')
-  .map((line) => line.trim())
-  .filter(Boolean);
+const changedFiles = listChangedFilesBetweenRefs(baseRef, headRef);
 
 const branchPolicy = evaluateBranchPolicy({ baseRef, headRef });
 let changelogOk = true;
