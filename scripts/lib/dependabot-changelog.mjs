@@ -4,6 +4,7 @@ export const DEPENDENCIES_HEADING = '### Dependencies';
 export const DEPENDENCIES_MARKER = '<!-- dependabot-automation -->';
 
 const PACKAGE_JSON_PATHS = ['package.json', 'server/package.json'];
+const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies'];
 
 /**
  * @param {string} directory
@@ -20,21 +21,27 @@ export const packageDirectoryLabel = (directory) => {
 export const findDependabotChangelogSection = (changelog) => {
   const unreleased = changelog.indexOf('## [Unreleased]');
   if (unreleased !== -1) {
-    const afterStart = unreleased + '## [Unreleased]'.length;
-    const rest = changelog.slice(afterStart);
-    const next = rest.search(/\n## /);
-    const end = next === -1 ? changelog.length : afterStart + next;
-    return { heading: '## [Unreleased]', start: unreleased, end };
+    return sliceSectionBounds(changelog, unreleased, '## [Unreleased]'.length);
   }
 
   const match = changelog.match(/^## v[\d.]+/m);
   if (!match || match.index === undefined) return null;
 
-  const afterStart = match.index + match[0].length;
+  return sliceSectionBounds(changelog, match.index, match[0].length, match[0]);
+};
+
+/**
+ * @param {string} changelog
+ * @param {number} start
+ * @param {number} headingLength
+ * @param {string} [heading]
+ */
+const sliceSectionBounds = (changelog, start, headingLength, heading = '## [Unreleased]') => {
+  const afterStart = start + headingLength;
   const rest = changelog.slice(afterStart);
   const next = rest.search(/\n## /);
   const end = next === -1 ? changelog.length : afterStart + next;
-  return { heading: match[0], start: match.index, end };
+  return { heading, start, end };
 };
 
 /**
@@ -79,41 +86,102 @@ export const dependencyBumpDocumented = (bump, dependenciesBody) => {
 /**
  * @param {string} baseRef
  * @param {string} headRef
- * @returns {Array<{ name: string; from: string; to: string; directory: string; depType: string }>}
+ * @param {string} packagePath
  */
-export const listDependencyBumpsBetweenRefs = (baseRef, headRef) => {
-  /** @type {Array<{ name: string; from: string; to: string; directory: string; depType: string }>} */
-  const bumps = [];
-
-  for (const packagePath of PACKAGE_JSON_PATHS) {
-    let basePkg;
-    let headPkg;
-    try {
-      basePkg = JSON.parse(
+const readPackageJsonPairAtRefs = (baseRef, headRef, packagePath) => {
+  try {
+    return {
+      base: JSON.parse(
         execFileSync('git', ['show', `origin/${baseRef}:${packagePath}`], { encoding: 'utf8' }),
-      );
-      headPkg = JSON.parse(
+      ),
+      head: JSON.parse(
         execFileSync('git', ['show', `origin/${headRef}:${packagePath}`], { encoding: 'utf8' }),
-      );
-    } catch {
-      continue;
-    }
+      ),
+      directory: packagePath === 'package.json' ? 'root' : 'server',
+    };
+  } catch {
+    return null;
+  }
+};
 
-    const directory = packagePath === 'package.json' ? 'root' : 'server';
-
-    for (const depType of ['dependencies', 'devDependencies']) {
-      const baseDeps = basePkg[depType] ?? {};
-      const headDeps = headPkg[depType] ?? {};
-      for (const [name, to] of Object.entries(headDeps)) {
-        const from = baseDeps[name];
-        if (from !== undefined && from !== to) {
-          bumps.push({ name, from, to, directory, depType });
-        }
-      }
+/**
+ * @param {Record<string, string>} baseDeps
+ * @param {Record<string, string>} headDeps
+ * @param {string} directory
+ * @param {string} depType
+ */
+const bumpsForDependencyField = (baseDeps, headDeps, directory, depType) => {
+  const bumps = [];
+  for (const [name, to] of Object.entries(headDeps)) {
+    const from = baseDeps[name];
+    if (from !== undefined && from !== to) {
+      bumps.push({ name, from, to, directory, depType });
     }
   }
-
   return bumps;
+};
+
+/**
+ * @param {object} basePkg
+ * @param {object} headPkg
+ * @param {string} directory
+ */
+const collectBumpsFromPackagePair = (basePkg, headPkg, directory) =>
+  DEPENDENCY_FIELDS.flatMap((depType) =>
+    bumpsForDependencyField(basePkg[depType] ?? {}, headPkg[depType] ?? {}, directory, depType),
+  );
+
+/**
+ * @param {string} baseRef
+ * @param {string} headRef
+ */
+export const listDependencyBumpsBetweenRefs = (baseRef, headRef) =>
+  PACKAGE_JSON_PATHS.flatMap((packagePath) => {
+    const pair = readPackageJsonPairAtRefs(baseRef, headRef, packagePath);
+    return pair ? collectBumpsFromPackagePair(pair.base, pair.head, pair.directory) : [];
+  });
+
+/**
+ * @param {string} depsBody
+ */
+const parseDependencyLines = (depsBody) =>
+  depsBody
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.startsWith('- **') && line.includes(':**'));
+
+/**
+ * @param {string[]} lines
+ * @param {Array<{ name: string; from: string; to: string; directory: string }>} bumps
+ */
+const mergeDependencyLines = (lines, bumps) => {
+  const merged = [...lines];
+  for (const bump of bumps) {
+    const bullet = formatDependencyChangelogBullet(bump);
+    const existingIndex = merged.findIndex((line) => dependencyBulletCoversPackage(line, bump.name));
+    if (existingIndex === -1) merged.push(bullet);
+    else if (!merged[existingIndex].includes(bump.to)) merged[existingIndex] = bullet;
+  }
+  return merged;
+};
+
+/**
+ * @param {string[]} lines
+ */
+const formatDependenciesBlock = (lines) =>
+  [DEPENDENCIES_HEADING, DEPENDENCIES_MARKER, '', ...lines, ''].join('\n');
+
+/**
+ * @param {string} sectionBody
+ * @param {string} dependenciesBlock
+ */
+const replaceDependenciesBlock = (sectionBody, dependenciesBlock) => {
+  const escapedHeading = DEPENDENCIES_HEADING.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const depsPattern = new RegExp(`${escapedHeading}[\\s\\S]*?(?=\\n### |\\n## |$)`);
+  const stripped = sectionBody.replace(depsPattern, '').trimEnd();
+  const headingEnd = stripped.indexOf('\n');
+  const insertPos = headingEnd === -1 ? stripped.length : headingEnd + 1;
+  return `${stripped.slice(0, insertPos)}\n${dependenciesBlock}${stripped.slice(insertPos)}`;
 };
 
 /**
@@ -135,38 +203,11 @@ export const applyDependencyBumpsToChangelog = (changelog, bumps) => {
     return changelog;
   }
 
-  const depsBody = existingDepsBody ?? '';
-  const lines = depsBody
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line) => line.startsWith('- **') && line.includes(':**'));
-
-  for (const bump of bumps) {
-    const bullet = formatDependencyChangelogBullet(bump);
-    const existingIndex = lines.findIndex((line) => dependencyBulletCoversPackage(line, bump.name));
-    if (existingIndex === -1) {
-      lines.push(bullet);
-    } else if (!lines[existingIndex].includes(bump.to)) {
-      lines[existingIndex] = bullet;
-    }
-  }
-
-  const dependenciesBlock = [
-    DEPENDENCIES_HEADING,
-    DEPENDENCIES_MARKER,
-    '',
-    ...lines,
-    '',
-  ].join('\n');
-
-  let sectionBody = changelog.slice(section.start, section.end);
-  const escapedHeading = DEPENDENCIES_HEADING.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const depsPattern = new RegExp(`${escapedHeading}[\\s\\S]*?(?=\\n### |\\n## |$)`);
-  sectionBody = sectionBody.replace(depsPattern, '').trimEnd();
-
-  const headingEnd = sectionBody.indexOf('\n');
-  const insertPos = headingEnd === -1 ? sectionBody.length : headingEnd + 1;
-  sectionBody = `${sectionBody.slice(0, insertPos)}\n${dependenciesBlock}${sectionBody.slice(insertPos)}`;
+  const lines = mergeDependencyLines(parseDependencyLines(existingDepsBody ?? ''), bumps);
+  const sectionBody = replaceDependenciesBlock(
+    changelog.slice(section.start, section.end),
+    formatDependenciesBlock(lines),
+  );
 
   return changelog.slice(0, section.start) + sectionBody + changelog.slice(section.end);
 };

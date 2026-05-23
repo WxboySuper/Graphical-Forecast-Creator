@@ -81,7 +81,7 @@ Version update PRs from `.github/dependabot.yml` open against **beta** (root and
 
 ### Dependabot changelog automation
 
-- **Dependabot changelog** workflow (`dependabot-changelog.yml`) runs on each Dependabot PR and commits bullets under **`### Dependencies`** in the active changelog section (`## [Unreleased]` on `main`, or the top `## vX.Y` line on `beta`).
+- **Dependabot changelog** workflow (`dependabot-changelog.yml`) lives on **`main`** (required for GitHub Actions to run it). After it ships, it runs on each Dependabot PR targeting `beta` and commits bullets under **`### Dependencies`** in the active changelog section (`## [Unreleased]` on `main`, or the top `## vX.Y` line on `beta` once synced).
 - CI requires `CHANGELOG.md` to include those entries (not a generic changelog skip). Entries use the form `- **package:** old → new` with `(\`server\`)` when the bump is under `server/package.json`.
 - Dependency notes accumulate under **Dependencies** until the next **beta → main** promotion ships them in the stable GitHub Release for that line.
 
