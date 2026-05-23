@@ -12,6 +12,19 @@ Your normal flow stays simple: **open a PR, review it, click merge**. Automation
 
 After merge, **Post-merge automation** runs on its own (no Actions button).
 
+## Porting vs post-merge (do not double up)
+
+Two automations run on merged PRs; they are split on purpose:
+
+| Responsibility | Workflow | Mechanism |
+|----------------|----------|-----------|
+| **Versions and GitHub Releases** on `main` / `beta` | `post-merge-automation.yml` | Direct commits to `main` or `beta` |
+| **main → beta sync** after promotion, `release/*`, or `feature/release-*` | `post-merge-automation.yml` | Merge/bump on `beta` (no port PR) |
+| **hotfix → beta** (commits only) | `pr-porting.yml` | Port PR into `beta` |
+| **Fan-out to other `feature/*` / `hotfix/*`** | `pr-porting.yml` | Port PRs per target branch |
+
+If both tried to port the same merge into `beta`, you would get a port PR and a CI push fighting each other. **PR porting skips `beta`** when post-merge already owns that sync. CI **fails** new `port/* → beta` PRs that duplicate that path.
+
 ## What happens when you merge
 
 ### beta → main (promotion)
