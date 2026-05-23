@@ -9,6 +9,17 @@ All notable changes to this project will be documented in this file.
 <!-- dependabot-automation -->
 
 - **express-rate-limit:** ^8.5.1 → ^8.5.2 (`server`)
+- **@types/node:** ^25.5.0 → ^25.9.1
+- **@types/react-dom:** 18.2.18 → 19.2.3
+- **immer:** ^11.1.4 → ^11.1.8
+- **react-redux:** ^9.2.0 → ^9.3.0
+- **react-router-dom:** ^7.14.2 → ^7.15.1
+- **rollup:** >=4.60.2 → >=4.60.4
+- **ts-jest:** ^29.4.9 → ^29.4.11
+- **vite:** ^8.0.13 → ^8.0.14
+- **express:** ^4.21.2 → ^5.2.1 (`server`)
+- **stripe:** ^18.4.0 → ^22.1.1 (`server`)
+
 
 ### Fixed
 - **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
