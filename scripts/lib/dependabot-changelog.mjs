@@ -5,13 +5,25 @@ export const DEPENDENCIES_MARKER = '<!-- dependabot-automation -->';
 
 const PACKAGE_JSON_PATHS = ['package.json', 'server/package.json'];
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies'];
+const ROOT_DIRECTORY_LABELS = new Set(['root', '.', '']);
 
 /**
  * @param {string} directory
  */
 export const packageDirectoryLabel = (directory) => {
-  if (directory === 'root' || directory === '.' || directory === '') return 'root';
-  return directory.replace(/\/$/, '');
+  const normalized = String(directory ?? '').trim();
+  if (ROOT_DIRECTORY_LABELS.has(normalized)) return 'root';
+  return normalized.replace(/\/$/, '');
+};
+
+/**
+ * @param {string} changelog
+ * @param {number} afterStart
+ */
+const sectionEndIndex = (changelog, afterStart) => {
+  const rest = changelog.slice(afterStart);
+  const next = rest.search(/\n## /);
+  return next === -1 ? changelog.length : afterStart + next;
 };
 
 /**
@@ -21,27 +33,22 @@ export const packageDirectoryLabel = (directory) => {
 export const findDependabotChangelogSection = (changelog) => {
   const unreleased = changelog.indexOf('## [Unreleased]');
   if (unreleased !== -1) {
-    return sliceSectionBounds(changelog, unreleased, '## [Unreleased]'.length);
+    const heading = '## [Unreleased]';
+    return {
+      heading,
+      start: unreleased,
+      end: sectionEndIndex(changelog, unreleased + heading.length),
+    };
   }
 
   const match = changelog.match(/^## v[\d.]+/m);
   if (!match || match.index === undefined) return null;
 
-  return sliceSectionBounds(changelog, match.index, match[0].length, match[0]);
-};
-
-/**
- * @param {string} changelog
- * @param {number} start
- * @param {number} headingLength
- * @param {string} [heading]
- */
-const sliceSectionBounds = (changelog, start, headingLength, heading = '## [Unreleased]') => {
-  const afterStart = start + headingLength;
-  const rest = changelog.slice(afterStart);
-  const next = rest.search(/\n## /);
-  const end = next === -1 ? changelog.length : afterStart + next;
-  return { heading, start, end };
+  return {
+    heading: match[0],
+    start: match.index,
+    end: sectionEndIndex(changelog, match.index + match[0].length),
+  };
 };
 
 /**
@@ -62,9 +69,9 @@ export const extractDependenciesSubsection = (changelog, section) => {
  * @param {{ name: string; from: string; to: string; directory: string }} bump
  */
 export const formatDependencyChangelogBullet = ({ name, from, to, directory }) => {
-  const scope =
-    packageDirectoryLabel(directory) === 'root' ? '' : ` (\`${packageDirectoryLabel(directory)}\`)`;
-  return `- **${name}:** ${from} → ${to}${scope}`;
+  const label = packageDirectoryLabel(directory);
+  const scope = label === 'root' ? '' : ' (`' + label + '`)';
+  return '- **' + name + ':** ' + from + ' → ' + to + scope;
 };
 
 /**
@@ -91,11 +98,15 @@ export const dependencyBumpDocumented = (bump, dependenciesBody) => {
 const readPackageJsonPairAtRefs = (baseRef, headRef, packagePath) => {
   try {
     return {
-      base: JSON.parse(
-        execFileSync('git', ['show', `origin/${baseRef}:${packagePath}`], { encoding: 'utf8' }),
+      basePackage: JSON.parse(
+        execFileSync('git', ['show', 'origin/' + baseRef + ':' + packagePath], {
+          encoding: 'utf8',
+        }),
       ),
-      head: JSON.parse(
-        execFileSync('git', ['show', `origin/${headRef}:${packagePath}`], { encoding: 'utf8' }),
+      headPackage: JSON.parse(
+        execFileSync('git', ['show', 'origin/' + headRef + ':' + packagePath], {
+          encoding: 'utf8',
+        }),
       ),
       directory: packagePath === 'package.json' ? 'root' : 'server',
     };
@@ -138,7 +149,9 @@ const collectBumpsFromPackagePair = (basePkg, headPkg, directory) =>
 export const listDependencyBumpsBetweenRefs = (baseRef, headRef) =>
   PACKAGE_JSON_PATHS.flatMap((packagePath) => {
     const pair = readPackageJsonPairAtRefs(baseRef, headRef, packagePath);
-    return pair ? collectBumpsFromPackagePair(pair.base, pair.head, pair.directory) : [];
+    return pair
+      ? collectBumpsFromPackagePair(pair.basePackage, pair.headPackage, pair.directory)
+      : [];
   });
 
 /**
