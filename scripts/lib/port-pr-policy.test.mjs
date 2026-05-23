@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   evaluatePortPrPolicy,
+  isRedundantBetaPortPr,
   parsePortBranch,
   postMergeOwnsMainToBetaSync,
   targetBranchFromSlug,
@@ -31,6 +32,27 @@ describe('port PR policy', () => {
     assert.equal(postMergeOwnsMainToBetaSync('beta'), true);
     assert.equal(postMergeOwnsMainToBetaSync('feature/release-post-merge-github-release'), true);
     assert.equal(postMergeOwnsMainToBetaSync('hotfix/urgent'), false);
+  });
+
+  it('detects redundant beta port PRs', () => {
+    assert.equal(
+      isRedundantBetaPortPr({
+        targetBranch: 'beta',
+        baseRef: 'beta',
+        sourcePrBaseRef: 'main',
+        sourcePrHeadRef: 'feature/release-post-merge-github-release',
+      }),
+      true,
+    );
+    assert.equal(
+      isRedundantBetaPortPr({
+        targetBranch: 'beta',
+        baseRef: 'beta',
+        sourcePrBaseRef: 'main',
+        sourcePrHeadRef: 'hotfix/patch',
+      }),
+      false,
+    );
   });
 
   it('blocks redundant port PR into beta after release infrastructure merge', () => {

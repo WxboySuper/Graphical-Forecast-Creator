@@ -31,12 +31,29 @@ export const targetBranchFromSlug = (slug) => {
  *
  * @param {string} sourceHeadRef
  */
-export const postMergeOwnsMainToBetaSync = (sourceHeadRef) => {
-  if (sourceHeadRef === 'beta') return true;
-  if (sourceHeadRef.startsWith('release/')) return true;
-  if (sourceHeadRef.startsWith('feature/release-')) return true;
-  return false;
-};
+export const postMergeOwnsMainToBetaSync = (sourceHeadRef) =>
+  sourceHeadRef === 'beta' ||
+  sourceHeadRef.startsWith('release/') ||
+  sourceHeadRef.startsWith('feature/release-');
+
+/**
+ * @param {{
+ *   targetBranch: string;
+ *   baseRef: string;
+ *   sourcePrBaseRef: string;
+ *   sourcePrHeadRef: string;
+ * }} context
+ */
+export const isRedundantBetaPortPr = ({
+  targetBranch,
+  baseRef,
+  sourcePrBaseRef,
+  sourcePrHeadRef,
+}) =>
+  targetBranch === 'beta' &&
+  baseRef === 'beta' &&
+  sourcePrBaseRef === 'main' &&
+  postMergeOwnsMainToBetaSync(sourcePrHeadRef);
 
 /**
  * @param {{
@@ -61,10 +78,12 @@ export const evaluatePortPrPolicy = ({
   }
 
   if (
-    targetBranch === 'beta' &&
-    baseRef === 'beta' &&
-    sourcePrBaseRef === 'main' &&
-    postMergeOwnsMainToBetaSync(sourcePrHeadRef)
+    isRedundantBetaPortPr({
+      targetBranch,
+      baseRef,
+      sourcePrBaseRef,
+      sourcePrHeadRef,
+    })
   ) {
     return {
       ok: false,
