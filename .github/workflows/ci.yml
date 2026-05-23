@@ -103,3 +103,7 @@ jobs:
         run: pnpm test --silent
         env:
           CI: true
+
+      - name: Run analytics server tests
+        working-directory: server
+        run: npm ci && npm test

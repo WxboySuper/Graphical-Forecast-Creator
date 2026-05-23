@@ -5,14 +5,15 @@
   "description": "Lightweight page-view analytics collector for Graphical Forecast Creator",
   "main": "analytics.js",
   "scripts": {
-    "start": "node analytics.js"
+    "start": "node analytics.js",
+    "test": "node --test billing-stripe-period.test.js server-stack.test.js"
   },
   "dependencies": {
     "@sentry/node": "^10.53.1",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "firebase-admin": "^13.8.0",
-    "stripe": "^18.4.0"
+    "stripe": "^22.1.1"
   },
   "overrides": {
     "http-proxy-agent": "^7.0.2",
