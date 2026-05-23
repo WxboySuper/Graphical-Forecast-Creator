@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { changelogTouchesPr } from './lib/changelog.mjs';
 import { evaluateBranchPolicy } from './lib/branch-policy.mjs';
