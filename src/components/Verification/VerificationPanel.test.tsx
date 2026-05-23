@@ -10,6 +10,7 @@ import type { ForecastCycle } from '../../types/outlooks';
 
 jest.mock('../../utils/stormReportParser', () => ({
   fetchStormReports: jest.fn(),
+  fetchTodayStormReports: jest.fn(),
   formatReportDate: jest.fn(() => '2026-04-20'),
 }));
 
@@ -19,6 +20,7 @@ jest.mock('../../utils/verificationUtils', () => ({
 }));
 
 const mockFetchStormReports = jest.requireMock('../../utils/stormReportParser').fetchStormReports as jest.Mock;
+const mockFetchTodayStormReports = jest.requireMock('../../utils/stormReportParser').fetchTodayStormReports as jest.Mock;
 const mockFormatReportDate = jest.requireMock('../../utils/stormReportParser').formatReportDate as jest.Mock;
 const mockAnalyzeVerification = jest.requireMock('../../utils/verificationUtils').analyzeVerification as jest.Mock;
 const mockFormatVerificationSummary = jest.requireMock('../../utils/verificationUtils').formatVerificationSummary as jest.Mock;
@@ -111,6 +113,9 @@ describe('VerificationPanel', () => {
       { type: 'tornado' },
       { type: 'wind' },
     ]);
+    mockFetchTodayStormReports.mockResolvedValue([
+      { type: 'hail' },
+    ]);
     mockFormatReportDate.mockReturnValue('2026-04-20');
   });
 
@@ -160,12 +165,11 @@ describe('VerificationPanel', () => {
       const store = buildStore();
       renderPanel(store, { activePanel: 'setup' });
 
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: today } });
       fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
 
-      expect(screen.getByText(/Storm reports are not available for the current day until later/i)).toBeInTheDocument();
+      await waitFor(() => expect(mockFetchTodayStormReports).toHaveBeenCalled());
+      expect(mockFetchStormReports).not.toHaveBeenCalled();
+      await waitFor(() => expect(store.getState().stormReports.reports).toHaveLength(1));
 
       mockFetchStormReports.mockRejectedValueOnce(new Error('Service unavailable'));
       fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: '2026-04-19' } });

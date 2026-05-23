@@ -13,13 +13,14 @@ import 'leaflet/dist/leaflet.css';
 import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
 
 import { useAutoSave } from './hooks/useAutoSave';
+import { useFirestoreSleepRecovery } from './hooks/useFirestoreSleepRecovery';
 import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 import { AuthProvider } from './auth/AuthProvider';
 import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
 import { AppLayout } from './components/Layout';
-import { HomePage, ForecastPage, DiscussionPage, VerificationPage, ComingSoonPage, AccountPage, PricingPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
+import { HomePage, ForecastPage, DiscussionPage, VerificationPage, MonitorPage, ComingSoonPage, AccountPage, PricingPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
 import CloudLibraryPage from './pages/CloudLibraryPage';
 import BetaAccessGuard from './components/Beta/BetaAccessGuard';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
@@ -61,7 +62,10 @@ const AppHooks = () => {
   
   // Enable Auto-Save
   useAutoSave();
-  
+
+  // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
+  useFirestoreSleepRecovery();
+
   // Load cycle history from localStorage
   useCycleHistoryPersistence();
 
@@ -142,6 +146,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="forecast" element={<ForecastPage />} />
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
+        <Route path="monitor" element={<MonitorPage />} />
       </Route>
       </Route>
       <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />

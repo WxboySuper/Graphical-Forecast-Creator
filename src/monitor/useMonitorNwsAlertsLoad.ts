@@ -1,0 +1,84 @@
+import { useEffect } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import type { AddToastFn } from '../components/Layout';
+import { fetchActiveNwsAlerts, snapshotCollectionKey, type NwsAlertFeatureCollection } from './nwsAlerts';
+import { MAX_ANIMATION_FRAMES } from './wms';
+
+const appendSnapshotFrame = (
+  current: NwsAlertFeatureCollection[],
+  collection: NwsAlertFeatureCollection,
+): NwsAlertFeatureCollection[] => {
+  const snapshotKey = snapshotCollectionKey(collection);
+  const last = current[current.length - 1];
+  if (last && snapshotCollectionKey(last) === snapshotKey) {
+    return current;
+  }
+
+  return [...current, collection].slice(-MAX_ANIMATION_FRAMES);
+};
+
+interface UseMonitorNwsAlertsLoadOptions {
+  enabled: boolean;
+  refreshToken: number;
+  addToast: AddToastFn;
+  setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
+  setFrameIndex: Dispatch<SetStateAction<number>>;
+  setLoading: Dispatch<SetStateAction<boolean>>;
+  setError: Dispatch<SetStateAction<string | null>>;
+  setFetchedAt: Dispatch<SetStateAction<string | null>>;
+}
+
+export const useMonitorNwsAlertsLoad = ({
+  enabled,
+  refreshToken,
+  addToast,
+  setRawFrames,
+  setFrameIndex,
+  setLoading,
+  setError,
+  setFetchedAt,
+}: UseMonitorNwsAlertsLoadOptions) => {
+  useEffect(() => {
+    if (!enabled) {
+      setRawFrames([]);
+      setFrameIndex(0);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    fetchActiveNwsAlerts()
+      .then((collection) => {
+        if (!active) {
+          return;
+        }
+
+        const nextFrames = appendSnapshotFrame([], collection);
+        setRawFrames(nextFrames);
+        setFrameIndex(Math.max(0, nextFrames.length - 1));
+        setFetchedAt(new Date().toISOString());
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        setRawFrames([]);
+        setError('Official alerts are unavailable right now.');
+        addToast('NWS watch/warning polygons could not be loaded.', 'warning');
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [addToast, enabled, refreshToken, setError, setFetchedAt, setFrameIndex, setLoading, setRawFrames]);
+};

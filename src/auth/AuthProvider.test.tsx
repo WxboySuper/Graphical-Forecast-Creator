@@ -36,6 +36,8 @@ import {
 import themeReducer from '../store/themeSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import featureFlagsReducer from '../store/featureFlagsSlice';
+import monitorReducer from '../store/monitorSlice';
+import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 
 interface MockResponse {
   ok: boolean;
@@ -71,6 +73,7 @@ const createMockStore = () => configureStore({
     theme: themeReducer,
     overlays: overlaysReducer,
     featureFlags: featureFlagsReducer,
+    monitor: monitorReducer,
   },
 });
 
@@ -138,6 +141,7 @@ describe('AuthProvider Utils', () => {
       ghostOutlooks: {},
       defaultForecasterName: 'Forecaster',
       forecastUiVariant: 'workspace_dock',
+      monitorSettings: DEFAULT_MONITOR_SETTINGS,
     });
   });
 
@@ -150,6 +154,7 @@ describe('AuthProvider Utils', () => {
       ghostOutlooks: {},
       defaultForecasterName: 'Forecaster',
       forecastUiVariant: 'workspace_dock' as const,
+      monitorSettings: DEFAULT_MONITOR_SETTINGS,
     };
     expect(readRemoteSettings(validSettings)).toEqual(validSettings);
     expect(readRemoteSettings({ darkMode: 'not boolean' } as Record<string, unknown>)).toBeNull();
@@ -197,7 +202,7 @@ describe('AuthProvider Utils', () => {
       }
     );
 
-    expect(dispatch).toHaveBeenCalledTimes(2);
+    expect(dispatch).toHaveBeenCalledTimes(3);
     expect(setSyncedSettings).toHaveBeenCalledWith(expect.objectContaining({ darkMode: true, counties: true }));
 
     expect(lastSyncedSettingsRef.current).not.toBeNull();
@@ -243,6 +248,7 @@ describe('AuthProvider Utils', () => {
         ghostOutlooks: {},
         defaultForecasterName: '',
         forecastUiVariant: 'workspace_dock',
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
       },
       { includeCreatedAt: true }
     );
@@ -300,6 +306,7 @@ describe('AuthProvider Utils', () => {
         ghostOutlooks: {},
         defaultForecasterName: 'Local',
         forecastUiVariant: 'workspace_dock',
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
       },
     };
 
@@ -391,6 +398,7 @@ describe('AuthProvider Utils', () => {
         ghostOutlooks: {},
         defaultForecasterName: 'Local',
         forecastUiVariant: 'workspace_dock',
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
       },
     };
 
@@ -436,6 +444,7 @@ describe('AuthProvider Utils', () => {
       ghostOutlooks: {},
       defaultForecasterName: 'Remote',
       forecastUiVariant: 'workspace_dock' as const,
+      monitorSettings: DEFAULT_MONITOR_SETTINGS,
     };
     const getDocSpy = jest.mocked(getDoc);
     const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
@@ -580,6 +589,7 @@ describe('AuthProvider Local Auth', () => {
         ghostOutlooks: {},
         defaultForecasterName: 'Local Hero',
         forecastUiVariant: 'workspace_dock',
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
       },
       betaAccess: true,
     };

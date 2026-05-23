@@ -3,7 +3,40 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## v1.6
+
+### Fixed
+- **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
+- **GFC-WEB-4 (monitor startup):** Break circular import between `monitor/types` and `monitorSettingsNormalize` that crashed the hosted app at load (`Gv is not iterable` / `MONITOR_OUTLOOK_LAYER_TYPES` before initialization when spreading outlook layer types).
+- **Forecast keyboard shortcuts (GFC-WEB-3):** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts. Centralized the guard in `keyboardShortcutKey` and applied it to forecast, navbar, and day-selector shortcuts.
+- **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
+
+## v1.5.3
+
+### Changed
+- **Privacy policy v1.2.0:** Added a clear disclosure for hosted error monitoring (Sentry): what is collected, what is not (no session replay, no default IP/cookie payloads, forecast contents not sent in breadcrumbs), and separate production vs beta environments.
+- **In-app privacy modal:** Bumped to v1.2.0 with the same Sentry disclosure; users who accepted an older policy version will be prompted to accept again on next visit.
+- **Hosted error monitoring (Sentry):** Production and beta now use the same privacy-safe SDK settings — `sendDefaultPii: false`, session replay disabled, browser SDK routed through `/api/sentry-tunnel`, and server tunnel validation against the web project DSN (`SENTRY_BROWSER_DSN`).
+- **Analytics server:** Node Sentry init uses `sendDefaultPii: false`; deploy workflows set `SENTRY_BROWSER_DSN` from the web DSN secret so the tunnel accepts browser envelopes in the recommended two-project setup.
+- **Version:** Bumped package version to `1.5.3`.
+
+### Fixed
+- **Sentry tunnel security:** Removed client-controlled ingest URLs and query-string forwarding; malformed envelope bodies return 400 instead of 500.
+
+## v1.5.2
+
+### Fixed
+- Fixed the primary button on the signed-out Home Page being incorrectly white/blank
+- Fixed an issue where you couldn't export an outlook as an image
+
+## v1.5.1
+
+### Fixed
+- Fixed an issue where maps wouldn't render on Chromebooks
+- Updated package version to v1.5.1
+- Removed old beta selector from account screen
+
+## v1.5.0
 
 ### Dependencies
 <!-- dependabot-automation -->

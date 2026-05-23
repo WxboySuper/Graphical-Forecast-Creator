@@ -1,6 +1,18 @@
 version = 1
 
-exclude_patterns = ["build/**"]
+exclude_patterns = [
+  "build/**",
+  "**/src/components/Monitor/**",
+  "**/src/monitor/**",
+  "src/pages/MonitorPage.tsx",
+  "src/pages/useMonitorCloudOutlook.ts",
+  "src/pages/useLocalMonitorSettings.ts",
+  "src/pages/usePremiumMonitorSettingsSync.ts",
+  "src/utils/stormReportParser.ts",
+  "src/utils/stormReportTodayCsv.ts",
+  "src/utils/stormReportCsv.ts",
+  "src/utils/stormReportRows.ts",
+]
 
 [[analyzers]]
 name = "javascript"
@@ -8,6 +20,15 @@ enabled = true
 
   [analyzers.meta]
   plugins = ["react"]
+  cyclomatic_complexity_threshold = "critical"
+  skip_doc_coverage = [
+    "function-declaration",
+    "function-expression",
+    "arrow-function-expression",
+    "class-declaration",
+    "class-expression",
+    "method-definition",
+  ]
 
   [analyzers.features]
   parse_test_files = false

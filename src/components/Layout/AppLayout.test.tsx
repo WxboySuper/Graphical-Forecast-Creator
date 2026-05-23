@@ -119,4 +119,13 @@ describe('AppLayout', () => {
     fireEvent.click(screen.getByText('Close Privacy'));
     expect(screen.queryByTestId('privacy')).not.toBeInTheDocument();
   });
+
+  it('does not throw when Ctrl/Cmd keydown omits KeyboardEvent.key', () => {
+    renderWithRouter(<AppLayout />);
+
+    const event = new KeyboardEvent('keydown', { bubbles: true, ctrlKey: true });
+    Object.defineProperty(event, 'key', { value: undefined });
+
+    expect(() => window.dispatchEvent(event)).not.toThrow();
+  });
 });

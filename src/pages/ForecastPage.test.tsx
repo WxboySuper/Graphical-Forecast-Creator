@@ -32,6 +32,7 @@ import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
 import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
+import monitorReducer from '../store/monitorSlice';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -93,6 +94,7 @@ const createStore = () => configureStore({
     appMode: appModeReducer,
     theme: themeReducer,
     verification: verificationReducer,
+    monitor: monitorReducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware({
     serializableCheck: false,
@@ -299,5 +301,33 @@ describe('ForecastPage helpers', () => {
     Object.defineProperty(inputEvent, 'target', { value: document.createElement('input') });
     processShortcutKeyDown(inputEvent, context);
     expect(addToast).not.toHaveBeenCalledWith('Switched to Day 3', 'info');
+  });
+
+  it('ignores keydown events when the browser omits KeyboardEvent.key', () => {
+    const dispatch = jest.fn();
+    const addToast = jest.fn();
+    const handleSave = jest.fn();
+    const context = {
+      dispatch,
+      addToast,
+      isSaved: false,
+      canUndo: false,
+      canRedo: false,
+      handleSave,
+      fileInputRef: { current: null },
+      mapRef: { current: null },
+      currentDay: 1,
+      activeOutlookType: 'tornado' as const,
+      activeProbability: '10%',
+      isSignificant: false,
+    };
+
+    const event = new KeyboardEvent('keydown', { bubbles: true });
+    Object.defineProperty(event, 'key', { value: undefined });
+
+    expect(() => processShortcutKeyDown(event, context)).not.toThrow();
+    expect(handleSave).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(addToast).not.toHaveBeenCalled();
   });
 });

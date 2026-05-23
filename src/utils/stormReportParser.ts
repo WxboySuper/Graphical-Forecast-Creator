@@ -1,5 +1,13 @@
 import { StormReport, ReportType } from '../types/stormReports';
-import { v4 as uuidv4 } from 'uuid';
+import { parseArchiveCsvRow } from './stormReportRows';
+import { parseTodayStormReportCsv } from './stormReportTodayCsv';
+
+export { parseTodayStormReportCsv } from './stormReportTodayCsv';
+
+export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today.csv';
+
+const archiveUrlForDate = (date: string): string =>
+  `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
 
 /**
  * Fetches storm reports from NOAA archives for a given date
@@ -7,28 +15,30 @@ import { v4 as uuidv4 } from 'uuid';
  * @returns Promise with array of storm reports
  */
 export async function fetchStormReports(date: string): Promise<StormReport[]> {
-  const url = `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
-  
-  try {
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch storm reports: ${response.statusText}`);
-    }
-    
-    const text = await response.text();
-    const reports = parseCSV(text);
-    
-    return reports;
-  } catch (error) {
-    throw error;
+  const response = await fetch(archiveUrlForDate(date));
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch storm reports: ${response.statusText}`);
   }
+
+  return parseArchiveStormReportCsv(await response.text());
+}
+
+/** Fetches same-day SPC storm reports (today.csv). */
+export async function fetchTodayStormReports(): Promise<StormReport[]> {
+  const response = await fetch(SPC_TODAY_STORM_REPORTS_URL);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch today's storm reports: ${response.statusText}`);
+  }
+
+  return parseTodayStormReportCsv(await response.text());
 }
 
 /**
- * Parses CSV text into storm reports
+ * Parses archived *_rpts_raw.csv storm report text.
  */
-function parseCSV(csvText: string): StormReport[] {
+export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
   const reports: StormReport[] = [];
   const lines = csvText.split('\n');
   
@@ -72,7 +82,7 @@ function parseCSV(csvText: string): StormReport[] {
     
     // Parse data row
     try {
-      const report = parseCSVRow(line, currentSection, headers);
+      const report = parseArchiveCsvRow(line, currentSection, headers);
       if (report) {
         reports.push(report);
       }
@@ -82,88 +92,6 @@ function parseCSV(csvText: string): StormReport[] {
   }
   
   return reports;
-}
-
-/**
- * Parses a single CSV row into a storm report
- */
-function parseCSVRow(line: string, type: ReportType, headers: string[]): StormReport | null {
-  // Split by comma, but handle quoted fields
-  const values: string[] = [];
-  let currentValue = '';
-  let inQuotes = false;
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      values.push(currentValue);
-      currentValue = '';
-    } else {
-      currentValue += char;
-    }
-  }
-  values.push(currentValue); // Push the last value
-  
-  // Create object from headers and values
-  const row: Record<string, string> = {};
-  headers.forEach((header, index) => {
-    row[header] = values[index] || '';
-  });
-  
-  // Extract coordinates
-  const lat = parseFloat(row['LAT']);
-  const lon = parseFloat(row['LON']);
-  
-  if (isNaN(lat) || isNaN(lon)) {
-    return null;
-  }
-  
-  // Extract time (HHMM format)
-  const time = row['Time'] ? `${row['Time']}Z` : '';
-  
-  // Extract magnitude based on type
-  let magnitude = '';
-  if (type === 'tornado') {
-    const efScale = row['EF_Scale'];
-    if (efScale && efScale !== 'UNK') {
-      magnitude = efScale;
-    } else {
-      // Try to extract from remarks
-      const remarks = row['Remarks'] || '';
-      const efMatch = remarks.match(/EF-?(\d+)/i);
-      if (efMatch) {
-        magnitude = `EF${efMatch[1]}`;
-      }
-    }
-  } else if (type === 'wind') {
-    const speed = row['Speed(MPH)'];
-    if (speed && speed !== 'UNK') {
-      magnitude = `${speed} mph`;
-    }
-  } else if (type === 'hail') {
-    const size = row['Size(1/100in.)'];
-    if (size && size !== 'UNK') {
-      // Convert from 1/100 inches to inches
-      const inches = parseInt(size) / 100;
-      magnitude = `${inches.toFixed(2)}"`;
-    }
-  }
-
-  return {
-    id: uuidv4(),
-    type,
-    latitude: lat,
-    longitude: lon,
-    time,
-    magnitude,
-    location: row['Location'] || '',
-    county: row['County'] || '',
-    state: row['State'] || '',
-    comments: row['Remarks'] || ''
-  };
 }
 
 /**

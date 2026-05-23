@@ -126,6 +126,20 @@ test.describe('App smoke tests', () => {
     await expect(page.getByRole('heading', { name: /Verification/i })).toBeVisible({ timeout: 10000 });
   });
 
+  test('monitor page loads with live controls and no horizontal overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bypassLocalBeta(page);
+    await page.goto('/monitor?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+
+    await expect(page.getByRole('heading', { name: 'Monitor' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel('Monitor map')).toBeVisible();
+    await expect(page.getByRole('complementary', { name: /Monitor controls/i })).toBeVisible();
+
+    const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(documentOverflow).toBeLessThanOrEqual(1);
+  });
+
   test('404 / unknown routes do not white-screen', async ({ page }) => {
     await page.goto('/does-not-exist');
     // App shell (navbar) should still render — not a blank page

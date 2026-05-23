@@ -94,6 +94,8 @@ interface FillBuildInput {
 
 interface LayerStyleOptions {
   isTopLayer?: boolean;
+  /** Multiplier for fill/stroke alpha when imagery sits beneath outlooks (e.g. Monitor). */
+  transparencyScale?: number;
 }
 
 interface RgbaInput {
@@ -112,6 +114,7 @@ interface StrokeWidthInput {
 
 interface HatchPatternInput {
   cigLevel: string;
+  alpha?: number;
 }
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
@@ -222,7 +225,7 @@ export const createOutlookFill = ({
     });
   }
 
-  const pattern = createHatchPattern({ cigLevel: probability });
+  const pattern = createHatchPattern({ cigLevel: probability, alpha: fillOpacity });
   if (pattern) {
     return new Fill({ color: pattern as CanvasPattern });
   }
@@ -350,15 +353,18 @@ export const toOlStyle = (
   options: LayerStyleOptions = {},
 ) => {
   const { outlookType, probability } = selection;
-  const { isTopLayer = false } = options;
+  const { isTopLayer = false, transparencyScale = 1 } = options;
+  const alphaScale = Math.min(1, Math.max(0, transparencyScale));
 
   const style = getFeatureStyle(
     outlookType as EditableOutlookType,
     probability,
   );
   const fillColor = String(style.fillColor || "#ffffff");
-  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity });
-  const strokeOpacity = typeof style.opacity === "number" ? style.opacity : 1;
+  const fillOpacity =
+    resolveFillOpacity({ fillOpacity: style.fillOpacity }) * alphaScale;
+  const strokeOpacity =
+    (typeof style.opacity === "number" ? style.opacity : 1) * alphaScale;
   const strokeColor = String(style.color || "#000000");
   const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
   const fill = createOutlookFill({ probability, fillColor, fillOpacity });

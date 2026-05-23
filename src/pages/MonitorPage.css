@@ -1,0 +1,410 @@
+.monitor-page {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: calc(100dvh - var(--app-header-height, 64px));
+  max-height: calc(100dvh - var(--app-header-height, 64px));
+  overflow: hidden;
+  background: rgb(241, 245, 249);
+}
+
+.monitor-page > * {
+  min-height: 0;
+}
+
+.dark-mode .monitor-page {
+  background: rgb(2, 6, 23);
+}
+
+.monitor-controls {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-right: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.dark-mode .monitor-controls {
+  border-right-color: rgba(71, 85, 105, 0.8);
+  background: rgba(15, 23, 42, 0.96);
+}
+
+.monitor-controls__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.monitor-controls__header h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: rgb(15, 23, 42);
+}
+
+.dark-mode .monitor-controls__header h1 {
+  color: rgb(248, 250, 252);
+}
+
+.monitor-controls__header p,
+.monitor-controls__meta,
+.monitor-controls__buttonRow span {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgb(71, 85, 105);
+}
+
+.dark-mode .monitor-controls__header p,
+.dark-mode .monitor-controls__meta,
+.dark-mode .monitor-controls__buttonRow span {
+  color: rgb(203, 213, 225);
+}
+
+.monitor-controls__section {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 8px;
+  background: rgb(255, 255, 255);
+  overflow: visible;
+}
+
+.dark-mode .monitor-controls__section {
+  border-color: rgba(71, 85, 105, 0.9);
+  background: rgb(30, 41, 59);
+}
+
+.monitor-controls__sectionToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.monitor-controls__sectionToggle:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.dark-mode .monitor-controls__sectionToggle:hover {
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.monitor-controls__sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgb(30, 41, 59);
+}
+
+.dark-mode .monitor-controls__sectionTitle {
+  color: rgb(226, 232, 240);
+}
+
+.monitor-controls__sectionChevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: rgb(100, 116, 139);
+}
+
+.dark-mode .monitor-controls__sectionChevron {
+  color: rgb(148, 163, 184);
+}
+
+.monitor-controls__sectionBody {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 9px;
+  padding: 8px 12px 12px;
+  border-top: 1px solid rgba(203, 213, 225, 0.65);
+}
+
+.dark-mode .monitor-controls__sectionBody {
+  border-top-color: rgba(71, 85, 105, 0.65);
+}
+
+.monitor-controls__section--collapsed .monitor-controls__sectionToggle {
+  border-radius: 8px;
+}
+
+.monitor-controls label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(51, 65, 85);
+}
+
+.monitor-controls label.monitor-controls__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.monitor-controls label.monitor-controls__checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: rgb(37, 99, 235);
+}
+
+.dark-mode .monitor-controls label {
+  color: rgb(203, 213, 225);
+}
+
+.monitor-controls select,
+.monitor-controls input:not([type='range']):not([type='checkbox']) {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  border-radius: 6px;
+  background: rgb(255, 255, 255);
+  color: rgb(15, 23, 42);
+  font-size: 13px;
+}
+
+.dark-mode .monitor-controls select,
+.dark-mode .monitor-controls input:not([type='range']):not([type='checkbox']) {
+  border-color: rgba(100, 116, 139, 0.9);
+  background: rgb(15, 23, 42);
+  color: rgb(248, 250, 252);
+}
+
+.monitor-controls input[type='range'] {
+  width: 100%;
+  accent-color: rgb(37, 99, 235);
+}
+
+.monitor-controls__buttonRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.monitor-map {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.monitor-map__viewport {
+  width: 100%;
+  height: 100%;
+}
+
+.monitor-map__badge {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.82);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.monitor-map__alertOverlay {
+  display: none;
+}
+
+.monitor-map__alertOverlay:has(.monitor-alert-popup) {
+  display: block;
+}
+
+.monitor-alert-popup {
+  position: relative;
+  width: min(92vw, 340px);
+  max-height: min(60dvh, 420px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.85);
+  background: rgb(255, 255, 255);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.22);
+  pointer-events: auto;
+}
+
+.dark-mode .monitor-alert-popup {
+  border-color: rgba(71, 85, 105, 0.9);
+  background: rgb(30, 41, 59);
+  color: rgb(248, 250, 252);
+}
+
+.monitor-alert-popup__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monitor-alert-popup__title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: rgb(15, 23, 42);
+}
+
+.dark-mode .monitor-alert-popup__title {
+  color: rgb(248, 250, 252);
+}
+
+.monitor-alert-popup__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgb(100, 116, 139);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.monitor-alert-popup__close:hover {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.monitor-alert-popup__headline {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: rgb(51, 65, 85);
+}
+
+.dark-mode .monitor-alert-popup__headline {
+  color: rgb(203, 213, 225);
+}
+
+.monitor-alert-popup__meta {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.monitor-alert-popup__metaRow {
+  display: grid;
+  gap: 2px;
+}
+
+.monitor-alert-popup__metaLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(100, 116, 139);
+}
+
+.monitor-alert-popup__metaValue {
+  color: rgb(30, 41, 59);
+  line-height: 1.35;
+}
+
+.dark-mode .monitor-alert-popup__metaValue {
+  color: rgb(226, 232, 240);
+}
+
+.monitor-alert-popup__section {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.monitor-alert-popup__sectionTitle {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgb(100, 116, 139);
+}
+
+.monitor-alert-popup__body {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  color: rgb(51, 65, 85);
+}
+
+.dark-mode .monitor-alert-popup__body {
+  color: rgb(203, 213, 225);
+}
+
+.monitor-alert-popup__link {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(37, 99, 235);
+  text-decoration: none;
+}
+
+.monitor-alert-popup__link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 820px) {
+  .monitor-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .monitor-controls {
+    order: 2;
+    max-height: min(52dvh, 420px);
+    border-right: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.35);
+  }
+
+  .monitor-map {
+    order: 1;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .monitor-page {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    grid-template-rows: 1fr;
+  }
+
+  .monitor-controls {
+    order: 0;
+    max-height: none;
+    border-top: 0;
+    border-right: 1px solid rgba(148, 163, 184, 0.35);
+  }
+}

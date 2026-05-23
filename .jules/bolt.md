@@ -31,3 +31,6 @@
 ## 2024-05-23 - React Display Name
 **Learning:** Components defined via HOCs like `React.memo` or `forwardRef` lose their implicit name. Always manually set `Component.displayName = 'Component'` to ensure they are identifiable in DevTools and logs.
 **Action:** Add `displayName` immediately after component definition.
+## 2026-05-21 - Use asynchronous file I/O in CommonJS CLI scripts
+**Learning:** For single-purpose CommonJS CLI scripts handling I/O operations (like reading large log files), wrapping the logic in an `async function main() { ... }` block and utilizing `fs.promises` instead of synchronous `fs` methods improves event loop responsiveness and adheres to idiomatic Node.js practices, even if the raw execution time improvement is minimal.
+**Action:** When updating or writing CLI scripts that perform I/O operations, default to asynchronous implementations using top-level async wrappers rather than blocking synchronous methods.

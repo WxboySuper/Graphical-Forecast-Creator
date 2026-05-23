@@ -11,7 +11,7 @@ import {
   clearReports
 } from '../../store/stormReportsSlice';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
-import { fetchStormReports, formatReportDate } from '../../utils/stormReportParser';
+import { fetchStormReports, fetchTodayStormReports, formatReportDate } from '../../utils/stormReportParser';
 import { analyzeVerification, formatVerificationSummary } from '../../utils/verificationUtils';
 import type { OutlookTypeVerification, VerificationResult } from '../../utils/verificationUtils';
 import { DayType } from '../../types/outlooks';
@@ -319,14 +319,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         dateObj.getMonth() === today.getMonth() && 
         dateObj.getDate() === today.getDate();
 
-      if (isToday) {
-        dispatch(setError('info:Storm reports are not available for the current day until later.'));
-        dispatch(setLoading(false));
-        return;
-      }
-
       const reportDate = formatReportDate(dateObj);
-      const fetchedReports = await fetchStormReports(reportDate);
+      const fetchedReports = isToday
+        ? await fetchTodayStormReports()
+        : await fetchStormReports(reportDate);
 
       dispatch(setReports(fetchedReports));
       dispatch(setDate(reportDate));
