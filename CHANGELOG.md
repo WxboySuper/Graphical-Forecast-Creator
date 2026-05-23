@@ -9,8 +9,12 @@ All notable changes to this project will be documented in this file.
 <!-- dependabot-automation -->
 
 - **express-rate-limit:** ^8.5.1 → ^8.5.2 (`server`)
+- **express:** ^4.21.2 → ^5.2.1 (`server`)
+- **stripe:** ^18.4.0 → ^22.1.1 (`server`)
 
 ### Fixed
+- **Analytics server (beta):** Restored a broken partial merge in `server/analytics.js` so the hosted collector starts again before Express 5 / Stripe 22 land.
+- **Stripe subscription webhooks:** Read `current_period_end` from subscription items for Stripe API 2025-03-31+ (stripe-node v22) with fallback for older payloads.
 - **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
 - **GFC-WEB-4 (monitor startup):** Break circular import between `monitor/types` and `monitorSettingsNormalize` that crashed the hosted app at load (`Gv is not iterable` / `MONITOR_OUTLOOK_LAYER_TYPES` before initialization when spreading outlook layer types).
 - **Forecast keyboard shortcuts (GFC-WEB-3):** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts. Centralized the guard in `keyboardShortcutKey` and applied it to forecast, navbar, and day-selector shortcuts.

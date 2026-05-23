@@ -2,6 +2,7 @@
 
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
+const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
@@ -350,7 +351,7 @@ const createSubscriptionEntitlementPayload = (subscription, uid, stripeCustomerI
   stripeCustomerId,
   stripeSubscriptionId: subscription.id,
   cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-  currentPeriodEnd: getStripeDate(subscription.current_period_end),
+  currentPeriodEnd: getStripeDate(getSubscriptionPeriodEndUnix(subscription)),
 });
 
 /** Builds the entitlement payload for subscription lifecycle updates. */
