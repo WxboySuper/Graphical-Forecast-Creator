@@ -75,20 +75,45 @@ export const formatDependencyChangelogBullet = ({ name, from, to, directory }) =
 };
 
 /**
+ * @param {string} value
+ */
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
  * @param {string} line
  * @param {string} packageName
  */
 export const dependencyBulletCoversPackage = (line, packageName) =>
-  new RegExp(`\\*\\*${packageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\*\\*:`).test(line);
+  new RegExp(`\\*\\*${escapeRegExp(packageName)}:\\*\\*`).test(line);
+
+/**
+ * @param {string} line
+ * @param {{ name: string; directory: string }} bump
+ */
+export const dependencyBulletMatchesBump = (line, bump) => {
+  if (!dependencyBulletCoversPackage(line, bump.name)) return false;
+
+  const label = packageDirectoryLabel(bump.directory);
+  if (label === 'root') return !/\s\(`/.test(line);
+
+  return line.includes(`(\`${label}\`)`);
+};
 
 /**
  * @param {{ name: string; from: string; to: string; directory: string }} bump
  * @param {string} dependenciesBody
  */
-export const dependencyBumpDocumented = (bump, dependenciesBody) => {
-  if (!dependenciesBody.includes(`**${bump.name}:**`)) return false;
-  return dependenciesBody.includes(bump.from) && dependenciesBody.includes(bump.to);
-};
+export const dependencyBumpDocumented = (bump, dependenciesBody) =>
+  dependenciesBody
+    .split('\n')
+    .some((line) => {
+      const trimmed = line.trim();
+      return (
+        dependencyBulletMatchesBump(trimmed, bump) &&
+        trimmed.includes(bump.from) &&
+        trimmed.includes(bump.to)
+      );
+    });
 
 /**
  * @param {string} baseRef
@@ -167,7 +192,7 @@ const mergeDependencyLines = (lines, bumps) => {
   const merged = [...lines];
   for (const bump of bumps) {
     const bullet = formatDependencyChangelogBullet(bump);
-    const existingIndex = merged.findIndex((line) => dependencyBulletCoversPackage(line, bump.name));
+    const existingIndex = merged.findIndex((line) => dependencyBulletMatchesBump(line, bump));
     if (existingIndex === -1) merged.push(bullet);
     else if (!merged[existingIndex].includes(bump.to)) merged[existingIndex] = bullet;
   }
