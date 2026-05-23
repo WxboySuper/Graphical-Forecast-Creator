@@ -1,3 +1,23 @@
+import { deriveStableVersion, hasBetaPrerelease } from './package-version.mjs';
+
+/**
+ * @param {string} changelog
+ * @returns {string | null}
+ */
+export const extractUnreleasedSection = (changelog) => {
+  const heading = '## [Unreleased]';
+  const start = changelog.indexOf(heading);
+  if (start === -1) return null;
+
+  const afterHeading = start + heading.length;
+  const rest = changelog.slice(afterHeading);
+  const nextSection = rest.search(/\n## /);
+  const body = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
+  if (!body) return null;
+
+  return `${heading}\n\n${body}`.trim();
+};
+
 /**
  * @param {string} changelog
  * @param {string} stableVersion e.g. 1.6.0
@@ -21,6 +41,28 @@ export const extractChangelogSection = (changelog, stableVersion) => {
     const body = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
     if (body) {
       return `${heading}\n\n${body}`.trim();
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Notes body for a GitHub Release tag (stable or beta prerelease).
+ * @param {string} changelog
+ * @param {string} version e.g. 1.6.0 or 1.6.0-beta.2
+ * @returns {string | null}
+ */
+export const extractReleaseNotes = (changelog, version) => {
+  const stable = deriveStableVersion(version) ?? version;
+  const section = extractChangelogSection(changelog, stable);
+  if (section) return section;
+
+  if (hasBetaPrerelease(version)) {
+    const unreleased = extractUnreleasedSection(changelog);
+    if (unreleased) {
+      const body = unreleased.replace(/^## \[Unreleased\]\s*\n*/i, '').trim();
+      return `## v${version}\n\n${body}`.trim();
     }
   }
 
