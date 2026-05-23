@@ -167,7 +167,6 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
 // Create canvas pattern for CIG hatching
 export const createHatchPattern = ({
   cigLevel,
-  alpha = 1,
 }: HatchPatternInput): CanvasPattern | null => {
   const canvas = document.createElement("canvas");
   const size = 10;
@@ -177,7 +176,6 @@ export const createHatchPattern = ({
 
   if (!ctx) return null;
 
-  ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
   ctx.strokeStyle = "#000000";
   ctx.lineWidth = 1;
 
@@ -363,8 +361,8 @@ export const toOlStyle = (
     probability,
   );
   const fillColor = String(style.fillColor || "#ffffff");
-  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity }) * alphaScale;
-  const strokeOpacity = (typeof style.opacity === "number" ? style.opacity : 1) * alphaScale;
+  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity });
+  const strokeOpacity = typeof style.opacity === "number" ? style.opacity : 1;
   const strokeColor = String(style.color || "#000000");
   const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
   const fill = createOutlookFill({ probability, fillColor, fillOpacity });

@@ -2,12 +2,17 @@
 
 const { initSentry, setupExpressErrorHandler } = require('./sentry');
 
-/** Returns the POST /collect handler that appends sanitized entries to the log file. */
-function createCollectHandler(fs, LOG_FILE) {
-  return (req, res) => {
-    // Sanitise and cap all user-controlled fields
-    const page = (typeof req.body?.page === 'string' ? req.body.page : '/').slice(0, 200);
-    const referrer = (typeof req.body?.referrer === 'string' ? req.body.referrer : '').slice(0, 500);
+const { initSentry, setupExpressErrorHandler } = require('./sentry');
+initSentry();
+
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const fs = require('fs');
+const path = require('path');
+const { registerBetaRoutes } = require('./beta');
+const { registerBillingRoutes } = require('./billing');
+const { registerMetricsRoutes } = require('./metrics');
+const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
 
     const entry = {
       ts: new Date().toISOString(),
@@ -34,7 +39,11 @@ function configureApp(app, express, fs, LOG_FILE) {
   const { registerMetricsRoutes } = require('./metrics');
   const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
 
-  app.set('trust proxy', 'loopback');
+registerSentryTunnelRoutes(app, express, rateLimit);
+
+registerBillingRoutes(app, express);
+registerMetricsRoutes(app, express);
+registerBetaRoutes(app, express);
 
   const collectRateLimit = rateLimit({
     windowMs: 60 * 1000,
@@ -75,8 +84,10 @@ async function start() {
     fs.mkdirSync(LOG_DIR, { recursive: true });
   }
 
-  const app = express();
-  configureApp(app, express, fs, LOG_FILE);
+setupExpressErrorHandler(app);
+
+// Reject everything else quietly
+app.use((_req, res) => res.status(404).end());
 
   // Bind to loopback only — never exposed to the internet directly (nginx proxies in)
   app.listen(PORT, '127.0.0.1', () => {

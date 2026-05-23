@@ -1,11 +1,14 @@
 name: PR Porting System
 
 # Automates porting changes across the branch hierarchy via Pull Requests.
-# 
+#
 # Flows:
 # 1. hotfix/* → main (broadcasts to beta, other hotfix/*, and all feature/*)
 # 2. feature/* → beta (broadcasts to all other feature/*)
-# 
+#
+# On conflicts: opens draft port PRs with conflict markers, files a tracking issue,
+# and annotates the workflow run so ports are not silently dropped.
+#
 # Required secrets: GH_PAT (repo scope)
 
 on:
@@ -22,6 +25,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write
 
     steps:
       - name: Checkout Repository
@@ -42,133 +46,6 @@ jobs:
           BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          echo "Merging $SOURCE_BRANCH into $BASE_BRANCH. Porting to relevant branches..."
-          
-          # Fetch all active branches
-          gh api repos/${{ github.repository }}/branches --paginate > branches.json
-
-          # Resolve the original PR commits so port branches only carry the
-          # intended change set instead of every commit missing from target.
-          git fetch origin pull/"$PR_NUMBER"/head:refs/remotes/origin/pr/"$PR_NUMBER"
-          gh api repos/${{ github.repository }}/pulls/"$PR_NUMBER"/commits --paginate > pr-commits.json
-          mapfile -t PR_COMMIT_SHAS < <(jq -r '.[].sha' pr-commits.json)
-
-          if [[ ${#PR_COMMIT_SHAS[@]} -eq 0 ]]; then
-            echo "No source PR commits found for #$PR_NUMBER. Aborting."
-            exit 1
-          fi
-          
-          TARGETS=()
-          
-          if [[ "$BASE_BRANCH" == "main" ]]; then
-            # Flow 1: Broadcast to beta, other hotfix/*, and all feature/*
-            TARGETS+=("beta")
-            
-            HOTFIX_BRANCHES=$(jq -r '.[].name | select(startswith("hotfix/"))' branches.json)
-            for b in $HOTFIX_BRANCHES; do
-              if [[ "$b" != "$SOURCE_BRANCH" ]]; then
-                TARGETS+=("$b")
-              fi
-            done
-            
-            FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
-            for b in $FEATURE_BRANCHES; do
-              TARGETS+=("$b")
-            done
-            
-          elif [[ "$BASE_BRANCH" == "beta" ]]; then
-            # Flow 2: Broadcast to all feature/* branches
-            FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' branches.json)
-            for b in $FEATURE_BRANCHES; do
-              if [[ "$b" != "$SOURCE_BRANCH" ]]; then
-                TARGETS+=("$b")
-              fi
-            done
-          fi
-
-          FAILURES=()
-
-          # Port to each target
-          for TARGET in "${TARGETS[@]}"; do
-            echo "--- Attempting to port to $TARGET ---"
-            
-            # Use a temporary porting branch
-            PORT_BRANCH="port/${PR_NUMBER}-to-${TARGET//\//-}"
-            
-            # Check if target branch exists on origin
-            if ! git ls-remote --exit-code --heads origin "$TARGET" > /dev/null; then
-              echo "Branch $TARGET no longer exists. Skipping."
-              continue
-            fi
-
-            git fetch origin "$TARGET"
-            git checkout -B "$PORT_BRANCH" origin/"$TARGET"
-
-            COMMITS_TO_PICK=()
-            for SHA in "${PR_COMMIT_SHAS[@]}"; do
-              if git merge-base --is-ancestor "$SHA" origin/"$TARGET"; then
-                echo "Commit $SHA already exists on $TARGET. Skipping it."
-                continue
-              fi
-              COMMITS_TO_PICK+=("$SHA")
-            done
-
-            if [[ ${#COMMITS_TO_PICK[@]} -eq 0 ]]; then
-              echo "No source PR commits need porting to $TARGET. Skipping."
-              git checkout "$BASE_BRANCH"
-              git branch -D "$PORT_BRANCH" || true
-              continue
-            fi
-
-            if ! git cherry-pick "${COMMITS_TO_PICK[@]}"; then
-              echo "FAILED: Could not cherry-pick commits onto $TARGET"
-              git cherry-pick --abort || true
-              FAILURES+=("$TARGET")
-              git checkout "$BASE_BRANCH"
-              git branch -D "$PORT_BRANCH" || true
-              continue
-            fi
-
-            git push --force-with-lease origin "$PORT_BRANCH"
-
-            # Create the PR from the new temporary branch
-            if ! gh pr create \
-              --head "$PORT_BRANCH" \
-              --base "$TARGET" \
-              --title "[Port] $PR_TITLE to $TARGET" \
-              --body "Automated port of the original commits from PR #$PR_NUMBER into $TARGET after merge into $BASE_BRANCH."; then
-              echo "FAILED: Could not create PR for $TARGET"
-              FAILURES+=("$TARGET")
-              # Cleanup the failed branch
-              git push origin --delete "$PORT_BRANCH" || true
-            else
-              echo "Successfully created port PR for $TARGET using $PORT_BRANCH"
-            fi
-
-            # Always return to main context for next loop
-            git checkout "$BASE_BRANCH"
-            git branch -D "$PORT_BRANCH" || true
-          done
-
-          # --- Cleanup Original Branch ---
-          # If the source branch still exists on origin, delete it to keep repo clean
-          if [[ "$SOURCE_BRANCH" != "main" && "$SOURCE_BRANCH" != "beta" ]]; then
-            echo "--- Cleaning up original source branch $SOURCE_BRANCH ---"
-            if git ls-remote --exit-code --heads origin "$SOURCE_BRANCH" > /dev/null; then
-              gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/"$SOURCE_BRANCH" || echo "Note: Source branch $SOURCE_BRANCH was already deleted or is protected."
-            else
-              echo "Source branch $SOURCE_BRANCH already removed from origin."
-            fi
-          fi
-
-          if [[ ${#FAILURES[@]} -gt 0 ]]; then
-            FAILURE_MSG="### ⚠️ Automated Porting Failures\n\nSome branches could not be ported automatically from PR #$PR_NUMBER:\n"
-            for f in "${FAILURES[@]}"; do
-              FAILURE_MSG="$FAILURE_MSG- $f (likely merge conflicts or clean history missing)\n"
-            done
-            FAILURE_MSG="$FAILURE_MSG\nPlease handle these manual ports to keep branches in sync."
-            
-            gh pr comment "$PR_NUMBER" --body "$(echo -e "$FAILURE_MSG")"
-            exit 1
-          fi
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          REPO: ${{ github.repository }}
+        run: bash .github/scripts/port-changes.sh

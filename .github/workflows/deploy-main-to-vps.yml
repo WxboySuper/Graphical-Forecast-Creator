@@ -35,13 +35,14 @@ jobs:
       - name: Read app version
         id: app_version
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          VERSION=${VERSION//$'\n'/}
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
-            echo "Invalid package version format: $VERSION" >&2
+          RAW=$(node scripts/read-package-version.mjs)
+          STABLE=$(node scripts/derive-stable-version.mjs "$RAW")
+          if ! printf '%s' "$RAW" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "Invalid package version format: $RAW" >&2
             exit 1
           fi
-          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "value=$RAW" >> "$GITHUB_OUTPUT"
+          echo "sentry_release=$STABLE" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: pnpm run build
@@ -105,7 +106,7 @@ jobs:
           SENTRY_DSN=${{ secrets.SENTRY_DSN }}
           SENTRY_BROWSER_DSN=${{ secrets.VITE_SENTRY_DSN }}
           SENTRY_ENVIRONMENT=production
-          SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.value }}
+          SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.sentry_release }}
           EOF
           rsync -avz prod-server.env root@${{ secrets.PROD_SSH_HOST }}:/opt/gfc-analytics/.env
 

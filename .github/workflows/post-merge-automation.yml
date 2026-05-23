@@ -1,0 +1,193 @@
+name: Post-merge automation
+
+# Runs after a PR merges. No manual workflow dispatch needed for normal releases.
+#
+# beta → main: strip stable version on main, GitHub Release from CHANGELOG, start next beta line.
+# release/* → main: GitHub Release from CHANGELOG, start next beta line (optional prepare workflow).
+# feature/*|fix/*|other → beta: bump -beta.N on beta (hotfix/* is the only blocked target).
+# hotfix/* → main: bump patch on main and create GitHub Release.
+#
+# Required secret: GH_PAT (repo scope)
+on:
+  pull_request:
+    types: [closed]
+    branches: [main, beta]
+  workflow_dispatch:
+    inputs:
+      sync_beta_from_main:
+        description: Merge main into beta and set the next -beta.N version (recovery / bootstrap)
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  post-merge:
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Validate workflow dispatch inputs
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ inputs.sync_beta_from_main }}" != "true" ]; then
+            echo "Enable sync_beta_from_main or this workflow will not run any steps."
+            exit 1
+          fi
+
+      - name: Sync beta from main after release infrastructure merge
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.sync_beta_from_main) ||
+          (github.event_name == 'pull_request' &&
+            github.event.pull_request.base.ref == 'main' &&
+            startsWith(github.event.pull_request.head.ref, 'feature/release-'))
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          git fetch origin main beta
+          git show origin/main:package.json > /tmp/main-package.json
+          STABLE=$(node scripts/read-package-version.mjs /tmp/main-package.json)
+
+          git checkout beta
+          git pull origin beta
+          git merge origin/main -X theirs -m "chore: sync release automation from main"
+
+          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          NEXT=$(node scripts/read-package-version.mjs)
+
+          git add package.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: start beta cycle at $NEXT after main release v$STABLE"
+          fi
+          git push origin beta
+
+      - name: Beta promotion merged into main
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref == 'main' &&
+          github.event.pull_request.head.ref == 'beta'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git fetch origin main beta
+          git checkout main
+          git pull --ff-only origin main
+
+          BETA_VERSION=$(node scripts/read-package-version.mjs)
+          node scripts/strip-beta-prerelease-version.mjs
+          STABLE=$(node scripts/read-package-version.mjs)
+
+          if ! git diff --quiet package.json; then
+            git add package.json
+            git commit -m "chore: set stable v$STABLE on main after beta promotion"
+            git push origin main
+          fi
+
+          export NOTES_FILE=$(mktemp)
+          node scripts/create-github-release.mjs "$STABLE" main
+
+          git checkout beta
+          git pull --ff-only origin beta
+          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          if ! git diff --quiet package.json; then
+            git add package.json
+            git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"
+            git push origin beta
+          fi
+
+      - name: Release branch merged into main
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref == 'main' &&
+          startsWith(github.event.pull_request.head.ref, 'release/')
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git fetch origin main beta
+          git checkout main
+          git pull --ff-only origin main
+          STABLE=$(node scripts/read-package-version.mjs)
+
+          export NOTES_FILE=$(mktemp)
+          node scripts/create-github-release.mjs "$STABLE" main
+
+          git checkout beta
+          git pull --ff-only origin beta
+          BETA_VERSION=$(node scripts/read-package-version.mjs)
+          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          if ! git diff --quiet package.json; then
+            git add package.json
+            git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"
+            git push origin beta
+          fi
+
+      - name: Hotfix merged into main
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref == 'main' &&
+          startsWith(github.event.pull_request.head.ref, 'hotfix/')
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+          PREVIOUS=$(node scripts/read-package-version.mjs)
+          node scripts/apply-version-bump.mjs main
+          STABLE=$(node scripts/read-package-version.mjs)
+          git add package.json
+          git commit -m "chore: bump patch version after hotfix merge (was $PREVIOUS)"
+          git push origin main
+
+          export NOTES_FILE=$(mktemp)
+          node scripts/create-github-release.mjs "$STABLE" main
+
+      - name: Integration merge into beta
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref == 'beta' &&
+          github.event.pull_request.head.ref != 'beta' &&
+          !startsWith(github.event.pull_request.head.ref, 'port/') &&
+          !startsWith(github.event.pull_request.head.ref, 'hotfix/')
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            git fetch origin beta
+            git checkout beta
+            git pull --ff-only origin beta || git pull --rebase origin beta
+            PREVIOUS=$(node scripts/read-package-version.mjs)
+            node scripts/apply-version-bump.mjs beta
+            if git diff --quiet package.json; then
+              echo "No beta version change needed"
+              exit 0
+            fi
+            git add package.json
+            git commit -m "chore: bump beta prerelease after merge (was $PREVIOUS)"
+            if git push origin beta; then
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt), retrying..."
+            sleep 2
+          done
+          echo "Failed to push beta bump after 5 attempts"
+          exit 1

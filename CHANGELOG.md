@@ -38,6 +38,44 @@ All notable changes to this project will be documented in this file.
 ## v1.5.0
 
 ### Changed
+- **Release automation:** Beta → main stays a normal PR; merge triggers stable versioning on `main`, GitHub Releases from CHANGELOG (including hotfixes), and beta prerelease bumps. CI enforces branch routing (preferred `feature/*`/`fix/*` → beta; only `hotfix/*` blocked on beta), changelog checks, and automated PR labels. Workflow definitions ship on `main` so GitHub can run them for repository pull requests.
+- **Post-merge bootstrap:** `feature/release-*` → `main` syncs automation to `beta` and starts the next `-beta.N` line; manual `workflow_dispatch` recovery when bootstrap was missed.
+- **Dependabot:** Version update PRs for root and `server/` npm ecosystems target `beta` (not `main`). Urgent production dependency fixes use `hotfix/*` → `main` or a beta promotion.
+
+## v1.6
+
+### Fixed
+- **Forecast keyboard shortcuts:** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (reported in production via Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts.
+- **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
+
+## v1.5.3
+
+### Changed
+- **Privacy policy v1.2.0:** Added a clear disclosure for hosted error monitoring (Sentry): what is collected, what is not (no session replay, no default IP/cookie payloads, forecast contents not sent in breadcrumbs), and separate production vs beta environments.
+- **In-app privacy modal:** Bumped to v1.2.0 with the same Sentry disclosure; users who accepted an older policy version will be prompted to accept again on next visit.
+- **Hosted error monitoring (Sentry):** Production and beta now use the same privacy-safe SDK settings — `sendDefaultPii: false`, session replay disabled, browser SDK routed through `/api/sentry-tunnel`, and server tunnel validation against the web project DSN (`SENTRY_BROWSER_DSN`).
+- **Analytics server:** Node Sentry init uses `sendDefaultPii: false`; deploy workflows set `SENTRY_BROWSER_DSN` from the web DSN secret so the tunnel accepts browser envelopes in the recommended two-project setup.
+- **Version:** Bumped package version to `1.5.3`.
+
+### Fixed
+- **Sentry tunnel security:** Removed client-controlled ingest URLs and query-string forwarding; malformed envelope bodies return 400 instead of 500.
+
+## v1.5.2
+
+### Fixed
+- Fixed the primary button on the signed-out Home Page being incorrectly white/blank
+- Fixed an issue where you couldn't export an outlook as an image
+
+## v1.5.1
+
+### Fixed
+- Fixed an issue where maps wouldn't render on Chromebooks
+- Updated package version to v1.5.1
+- Removed old beta selector from account screen
+
+## v1.5.0
+
+### Changed
 - **Forecast Page nitpicks:** Fixed UI alignment on the forecast Draw tab (spacing for sections/menus and Current Selection breathing room), ensured the tab bar touches its bottom tray properly, expanded the Cycle Date fields horizontally on the Days tab, improved Ghost Layers labels placement, eliminated duplicated basemap dropdowns favoring the toolbar, standardized tools buttons on the right side to match the new Integrated Toolbar format, and gave map control buttons neutral hover colors.
 - **Home forecast workspace:** Refined the current cycle card with clearer header hierarchy, stronger status/date chips, and more balanced day and utility action tiles to reduce the cramped feel in the landing page layout.
 - **Discussion editor:** Neutralized colored toolbar button backgrounds in light mode for the DIY editor toolbar and leveled/centered the DIY/Guided tabs to fix alignment issues (files: src/pages/DiscussionPage.css, src/pages/DiscussionPage.tsx, src/components/DiscussionEditor/DIYDiscussionEditor.tsx).

@@ -5,6 +5,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { useAuth } from '../auth/AuthProvider';
+import { isSentryEnabled } from '../instrument';
 import './AdminPage.css';
 
 type AdminWindow = 7 | 30;
@@ -378,6 +379,36 @@ const AdminTrendRows: React.FC<{ dailyMetrics: AdminDailyMetric[] }> = ({ dailyM
   );
 };
 
+/** Sends a deliberate error to Sentry for production verification (admin-only surface). */
+const AdminSentryTestCard: React.FC = () => {
+  if (!isSentryEnabled()) {
+    return null;
+  }
+
+  return (
+    <Card className="admin-surface-card">
+      <CardHeader className="admin-card-header">
+        <CardTitle>Sentry monitoring</CardTitle>
+        <CardDescription>
+          Send a test error from this page to verify gfc-web error reporting. Check Issues in Sentry after
+          clicking.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="admin-card-content">
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => {
+            throw new Error('This is your first error!');
+          }}
+        >
+          Send Sentry test error
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
+
 /** Header section for the private admin dashboard. */
 const AdminHero: React.FC<{
   windowSize: AdminWindow;
@@ -488,6 +519,8 @@ const AdminDashboardContent: React.FC<{
       <AdminWindowTotalsCard summary={summary} windowSize={windowSize} />
       <AdminDailyTrendCard loading={loading} dailyMetrics={metricsResponse?.dailyMetrics ?? []} />
     </div>
+
+    <AdminSentryTestCard />
   </div>
 );
 

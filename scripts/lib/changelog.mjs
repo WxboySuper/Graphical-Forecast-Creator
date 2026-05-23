@@ -1,0 +1,49 @@
+/**
+ * @param {string} changelog
+ * @param {string} stableVersion e.g. 1.6.0
+ * @returns {string | null}
+ */
+export const extractChangelogSection = (changelog, stableVersion) => {
+  const [major, minor] = stableVersion.split('.');
+  const headings = [
+    `## v${stableVersion}`,
+    `## v${major}.${minor}`,
+    `## v${major}.${Number(minor)}`,
+  ];
+
+  for (const heading of headings) {
+    const start = changelog.indexOf(heading);
+    if (start === -1) continue;
+
+    const afterHeading = start + heading.length;
+    const rest = changelog.slice(afterHeading);
+    const nextSection = rest.search(/\n## v[0-9]/);
+    const body = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
+    if (body) {
+      return `${heading}\n\n${body}`.trim();
+    }
+  }
+
+  return null;
+};
+
+/**
+ * @param {string[]} changedFiles
+ * @param {string} prBody
+ */
+export const changelogTouchesPr = (changedFiles, prBody) => {
+  if (changedFiles.some((file) => file === 'CHANGELOG.md' || file.endsWith('/CHANGELOG.md'))) {
+    return { ok: true, reason: 'CHANGELOG.md modified in this PR.' };
+  }
+
+  const body = prBody ?? '';
+  if (/##\s*changelog/i.test(body) && /^\s*[-*]/m.test(body)) {
+    return { ok: true, reason: 'PR description includes a Changelog section with bullets.' };
+  }
+
+  return {
+    ok: false,
+    reason:
+      'Update CHANGELOG.md in this PR or add a "## Changelog" section with bullet points in the PR description.',
+  };
+};
