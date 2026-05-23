@@ -148,8 +148,8 @@ jobs:
 
           git checkout beta
           git pull --ff-only origin beta
-          git merge origin/main -X theirs -m "chore: sync main into beta after release branch merge"
           BETA_VERSION=$(node scripts/read-package-version.mjs)
+          git merge origin/main -X theirs -m "chore: sync main into beta after release branch merge"
           node scripts/bump-beta-after-main-release.mjs "$STABLE"
           git add package.json
           if ! git diff --cached --quiet; then
