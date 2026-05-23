@@ -1,4 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { changelogTouchesPr } from './lib/changelog.mjs';
+import {
+  dependabotChangelogTouchesPr,
+  listDependencyBumpsBetweenRefs,
+} from './lib/dependabot-changelog.mjs';
 import { evaluateBranchPolicy } from './lib/branch-policy.mjs';
 import { listChangedFilesBetweenRefs } from './lib/git-changed-files.mjs';
 
@@ -37,6 +42,20 @@ if (headRef.startsWith('dependabot/')) {
 }
 
 const changedFiles = listChangedFilesBetweenRefs(baseRef, headRef);
+
+if (headRef.startsWith('dependabot/')) {
+  const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
+  const changelogAtHead = execFileSync('git', ['show', `origin/${headRef}:CHANGELOG.md`], {
+    encoding: 'utf8',
+  });
+  const result = dependabotChangelogTouchesPr(changedFiles, changelogAtHead, bumps);
+  if (!result.ok) {
+    console.error(result.reason);
+    process.exit(1);
+  }
+  console.log(result.reason);
+  process.exit(0);
+}
 
 const result = changelogTouchesPr(changedFiles, prBody);
 
