@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   pr-governance:
@@ -27,6 +28,15 @@ jobs:
           GITHUB_HEAD_REF: ${{ github.head_ref }}
         run: node scripts/validate-branch-policy.mjs
 
+      - name: Port PR policy
+        if: startsWith(github.head_ref, 'port/')
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/validate-port-pr-policy.mjs
+
       - name: Changelog policy
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
@@ -46,7 +56,7 @@ jobs:
           node-version: '24.x'
 
       - name: Validate release automation unit tests
-        run: node --test scripts/lib/package-version.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/version-bump.test.mjs scripts/lib/glob-match.test.mjs scripts/lib/pr-labels.test.mjs scripts/lib/changelog.test.mjs scripts/lib/dependabot-changelog.test.mjs
+        run: node --test scripts/lib/package-version.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/port-pr-policy.test.mjs scripts/lib/version-bump.test.mjs scripts/lib/glob-match.test.mjs scripts/lib/pr-labels.test.mjs scripts/lib/changelog.test.mjs scripts/lib/dependabot-changelog.test.mjs
 
       - name: Validate package version for target branch
         env:
