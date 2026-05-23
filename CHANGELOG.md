@@ -3,6 +3,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **Release automation:** Beta → main stays a normal PR; merge triggers stable versioning on `main`, GitHub Releases from CHANGELOG (including hotfixes), and beta prerelease bumps. CI enforces branch routing (preferred `feature/*`/`fix/*` → beta; only `hotfix/*` blocked on beta), changelog checks, and automated PR labels. Workflow definitions ship on `main` so GitHub can run them for repository pull requests.
+
+## v1.6
+
+### Fixed
+- **Forecast keyboard shortcuts:** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (reported in production via Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts.
+- **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
+
 ## v1.5.3
 
 ### Changed
@@ -17,7 +28,7 @@ All notable changes to this project will be documented in this file.
 
 ## v1.5.2
 
-## Fixed
+### Fixed
 - Fixed the primary button on the signed-out Home Page being incorrectly white/blank
 - Fixed an issue where you couldn't export an outlook as an image
 

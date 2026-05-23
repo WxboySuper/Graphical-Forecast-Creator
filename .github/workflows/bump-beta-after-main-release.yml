@@ -1,0 +1,56 @@
+name: Bump beta for next development cycle
+
+# After a release PR merges to main, bump beta to the next minor beta prerelease (e.g. 1.6.0 → 1.7.0-beta.1).
+# Run manually when you are ready to start the next beta line — not automatic on every main merge.
+#
+# Required secret: GH_PAT (repo scope)
+on:
+  workflow_dispatch:
+    inputs:
+      stable_version:
+        description: 'Stable version just released on main (e.g. 1.6.0). Leave empty to read from origin/main.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  bump-beta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve stable version from main
+        id: stable
+        env:
+          INPUT_STABLE: ${{ inputs.stable_version }}
+        run: |
+          git fetch origin main beta
+          if [[ -n "$INPUT_STABLE" ]]; then
+            echo "value=$INPUT_STABLE" >> "$GITHUB_OUTPUT"
+          else
+            git show origin/main:package.json > /tmp/main-package.json
+            STABLE=$(node scripts/read-package-version.mjs /tmp/main-package.json)
+            echo "value=$STABLE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump beta package.json
+        env:
+          STABLE_VERSION: ${{ steps.stable.outputs.value }}
+        run: |
+          git checkout beta
+          git pull --ff-only origin beta
+          node scripts/bump-beta-after-main-release.mjs "$STABLE_VERSION"
+          git add package.json
+          git commit -m "chore: start next beta cycle after v$STABLE_VERSION main release"
+          git push origin beta
