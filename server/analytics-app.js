@@ -58,5 +58,4 @@ function configureApp(app, express, fs, LOG_FILE) {
 
 module.exports = {
   configureApp,
-  createCollectHandler,
 };
