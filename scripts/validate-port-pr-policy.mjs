@@ -14,19 +14,28 @@ if (!parsed) {
   process.exit(0);
 }
 
-const sourcePrJson = execFileSync(
-  'gh',
-  [
-    'pr',
-    'view',
-    String(parsed.sourcePrNumber),
-    '--repo',
-    process.env.GITHUB_REPOSITORY ?? '',
-    '--json',
-    'headRefName,baseRefName',
-  ],
-  { encoding: 'utf8' },
-);
+let sourcePrJson;
+try {
+  sourcePrJson = execFileSync(
+    'gh',
+    [
+      'pr',
+      'view',
+      String(parsed.sourcePrNumber),
+      '--repo',
+      process.env.GITHUB_REPOSITORY ?? '',
+      '--json',
+      'headRefName,baseRefName',
+    ],
+    { encoding: 'utf8' },
+  );
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(
+    `Port PR policy: could not fetch source PR #${parsed.sourcePrNumber} — ${message}`,
+  );
+  process.exit(1);
+}
 
 const sourcePr = JSON.parse(sourcePrJson);
 const result = evaluatePortPrPolicy({
