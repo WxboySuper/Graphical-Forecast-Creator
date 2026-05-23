@@ -21,7 +21,8 @@ if (
   branchPolicy.ok &&
   branchPolicy.kind !== 'beta-promotion' &&
   branchPolicy.kind !== 'release-infrastructure' &&
-  !headRef.startsWith('port/')
+  !headRef.startsWith('port/') &&
+  !headRef.startsWith('dependabot/')
 ) {
   const changelogResult = changelogTouchesPr(changedFiles, prBody);
   changelogOk = changelogResult.ok;
