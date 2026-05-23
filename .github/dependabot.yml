@@ -5,20 +5,19 @@ version: 2
 
 multi-ecosystem-groups:
   npm-beta:
+    target-branch: beta
     schedule:
       interval: weekly
 
 updates:
   - package-ecosystem: npm
     directory: /
-    target-branch: beta
     patterns:
       - "*"
     multi-ecosystem-group: npm-beta
 
   - package-ecosystem: npm
     directory: /server
-    target-branch: beta
     patterns:
       - "*"
     multi-ecosystem-group: npm-beta
