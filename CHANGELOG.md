@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 
 ## v1.6
 
+### Changed
+- **Post-merge releases:** `feature/release-*` → `main` and manual `workflow_dispatch` bootstrap now create the stable **GitHub Release** from `CHANGELOG.md` (e.g. backfill `v1.5.3` if missing).
+
 ### Fixed
 - **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
 - **GFC-WEB-4 (monitor startup):** Break circular import between `monitor/types` and `monitorSettingsNormalize` that crashed the hosted app at load (`Gv is not iterable` / `MONITOR_OUTLOOK_LAYER_TYPES` before initialization when spreading outlook layer types).

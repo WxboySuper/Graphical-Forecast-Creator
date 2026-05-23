@@ -5,6 +5,7 @@ name: Post-merge automation
 # beta → main: strip stable version on main, GitHub Release from CHANGELOG, start next beta line.
 # release/* → main: GitHub Release from CHANGELOG, start next beta line (optional prepare workflow).
 # feature/*|fix/*|other → beta: bump -beta.N on beta (hotfix/* is the only blocked target).
+# feature/release-* → main (and workflow_dispatch bootstrap): sync beta + GitHub Release for stable on main.
 # hotfix/* → main: bump patch on main and create GitHub Release.
 #
 # Required secret: GH_PAT (repo scope)
@@ -67,6 +68,10 @@ jobs:
           git fetch origin main beta
           git show origin/main:package.json > /tmp/main-package.json
           STABLE=$(node scripts/read-package-version.mjs /tmp/main-package.json)
+
+          export NOTES_FILE=$(mktemp)
+          git show origin/main:CHANGELOG.md > /tmp/main-changelog.md
+          CHANGELOG_FILE=/tmp/main-changelog.md node scripts/create-github-release.mjs "$STABLE" main
 
           git checkout beta
           git pull origin beta

@@ -44,11 +44,12 @@ Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from
 
 ### `feature/release-*` → main (release infrastructure)
 
+- Creates a **GitHub Release** for the stable version on `main` (from `CHANGELOG.md`) if it does not exist yet.
 - Merges **main** into **beta** so beta gets workflows/scripts.
 - Sets **beta** to the next development line (e.g. main `1.5.3` → beta `1.6.0-beta.1`).
 - Does **not** change `main` again (the PR already set the stable version).
 
-If you merged release automation before this step existed, run **Post-merge automation** manually (`workflow_dispatch`, enable **sync beta from main**).
+If you merged release automation before this step existed, run **Post-merge automation** manually (`workflow_dispatch`, enable **sync beta from main**) to backfill the GitHub Release and beta sync.
 
 ## Branch rules (enforced in CI)
 

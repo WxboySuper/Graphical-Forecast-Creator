@@ -10,7 +10,8 @@ if (!stableVersion) {
   process.exit(1);
 }
 
-const changelog = readFileSync('CHANGELOG.md', 'utf8');
+const changelogPath = process.env.CHANGELOG_FILE ?? 'CHANGELOG.md';
+const changelog = readFileSync(changelogPath, 'utf8');
 const section = extractChangelogSection(changelog, stableVersion);
 
 if (!section) {
