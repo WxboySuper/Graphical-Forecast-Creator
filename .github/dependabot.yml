@@ -1,18 +1,24 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+# Dependabot version updates target beta. Group root + server npm into one PR via multi-ecosystem-groups.
+# https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/configuring-multi-ecosystem-updates
 
 version: 2
+
+multi-ecosystem-groups:
+  npm-beta:
+    schedule:
+      interval: weekly
+
 updates:
   - package-ecosystem: npm
     directory: /
     target-branch: beta
-    schedule:
-      interval: weekly
+    patterns:
+      - "*"
+    multi-ecosystem-group: npm-beta
 
   - package-ecosystem: npm
     directory: /server
     target-branch: beta
-    schedule:
-      interval: weekly
+    patterns:
+      - "*"
+    multi-ecosystem-group: npm-beta
