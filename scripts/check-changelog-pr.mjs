@@ -21,6 +21,11 @@ if (branchPolicy.kind === 'beta-promotion') {
   process.exit(0);
 }
 
+if (branchPolicy.kind === 'release-infrastructure') {
+  console.log('Skipping changelog check for release infrastructure PR (workflow/CI only).');
+  process.exit(0);
+}
+
 if (headRef.startsWith('port/')) {
   console.log('Skipping changelog check for automated port PR.');
   process.exit(0);

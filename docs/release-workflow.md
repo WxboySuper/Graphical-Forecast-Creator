@@ -42,6 +42,14 @@ Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from
 - Automation bumps the **patch** on `main` after merge (e.g. `1.6.0` → `1.6.1`).
 - Creates a **GitHub Release** for the new patch version from `CHANGELOG.md`.
 
+### `feature/release-*` → main (release infrastructure)
+
+- Merges **main** into **beta** so beta gets workflows/scripts.
+- Sets **beta** to the next development line (e.g. main `1.5.3` → beta `1.6.0-beta.1`).
+- Does **not** change `main` again (the PR already set the stable version).
+
+If you merged release automation before this step existed, run **Post-merge automation** manually (`workflow_dispatch`, enable **sync beta from main**).
+
 ## Branch rules (enforced in CI)
 
 | Head branch | Base branch | Allowed |
@@ -51,6 +59,7 @@ Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from
 | Other names (not `hotfix/*`) | `beta` | Yes |
 | `hotfix/*` | `main` | Yes |
 | `beta` | `main` | Yes (promotion) |
+| `feature/release-*` | `main` | Yes (release infrastructure) |
 | `feature/*`, `fix/*`, other | `main` | **Blocked** |
 | `hotfix/*` | `beta` | **Blocked** |
 
@@ -63,6 +72,10 @@ Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from
 | `beta` | Must include `-beta.N` (e.g. `1.6.0-beta.2`) |
 | `main` | Stable semver only (e.g. `1.6.0`) |
 | PR **beta → main** | May show `-beta` on the PR; stripped automatically after merge |
+
+## Dependabot
+
+Version update PRs from `.github/dependabot.yml` open against **beta** (root and `server/`). They ride the normal integration and **beta → main** promotion path. For an urgent CVE on production before the next promotion, use **hotfix/* → main** (or merge the dependency fix to `main` manually) instead of waiting on Dependabot alone.
 
 ## Changelog
 

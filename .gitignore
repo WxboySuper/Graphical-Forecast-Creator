@@ -35,8 +35,13 @@ yarn-debug.log*
 yarn-error.log*
 
 # Personal Docs
+/personal-docs/
+/personal/
 */personal-docs/*
 */personal/*
+
+# Local review artifacts
+greptile-comment.txt
 
 /.idea
 

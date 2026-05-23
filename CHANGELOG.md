@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **Release automation:** Beta → main stays a normal PR; merge triggers stable versioning on `main`, GitHub Releases from CHANGELOG (including hotfixes), and beta prerelease bumps. CI enforces branch routing (preferred `feature/*`/`fix/*` → beta; only `hotfix/*` blocked on beta), changelog checks, and automated PR labels. Workflow definitions ship on `main` so GitHub can run them for repository pull requests.
+- **Post-merge bootstrap:** `feature/release-*` → `main` syncs automation to `beta` and starts the next `-beta.N` line; manual `workflow_dispatch` recovery when bootstrap was missed.
+- **Dependabot:** Version update PRs for root and `server/` npm ecosystems target `beta` (not `main`). Urgent production dependency fixes use `hotfix/*` → `main` or a beta promotion.
 
 ## v1.6
 
