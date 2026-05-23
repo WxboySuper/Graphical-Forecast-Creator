@@ -34,8 +34,24 @@ fi
 
 TARGETS=()
 
+# post-merge-automation.yml owns main→beta for promotion and release infrastructure
+# (version strip/bump, merge main into beta, GitHub releases). Porting the same merge
+# here would race or duplicate that work with a second port PR.
+post_merge_owns_beta_sync() {
+  [[ "${BASE_BRANCH}" == "main" ]] || return 1
+  [[ "${SOURCE_BRANCH}" == "beta" ]] && return 0
+  [[ "${SOURCE_BRANCH}" == release/* ]] && return 0
+  [[ "${SOURCE_BRANCH}" == feature/release-* ]] && return 0
+  return 1
+}
+
 if [[ "${BASE_BRANCH}" == "main" ]]; then
-  TARGETS+=("beta")
+  if post_merge_owns_beta_sync; then
+    echo "Skipping beta: post-merge-automation handles main→beta for ${SOURCE_BRANCH}."
+    append_summary "_Beta sync is handled by **Post-merge automation** (not a port PR)._"
+  else
+    TARGETS+=("beta")
+  fi
 
   HOTFIX_BRANCHES=$(jq -r '.[].name | select(startswith("hotfix/"))' "${WORK_DIR}/branches.json")
   for b in $HOTFIX_BRANCHES; do

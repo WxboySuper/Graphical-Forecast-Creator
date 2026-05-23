@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## v1.6
 
 ### Fixed
+- **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
 - **GFC-WEB-4 (monitor startup):** Break circular import between `monitor/types` and `monitorSettingsNormalize` that crashed the hosted app at load (`Gv is not iterable` / `MONITOR_OUTLOOK_LAYER_TYPES` before initialization when spreading outlook layer types).
 - **Forecast keyboard shortcuts (GFC-WEB-3):** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts. Centralized the guard in `keyboardShortcutKey` and applied it to forecast, navbar, and day-selector shortcuts.
 - **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
@@ -37,10 +38,16 @@ All notable changes to this project will be documented in this file.
 
 ## v1.5.0
 
+### Dependencies
+<!-- dependabot-automation -->
+
 ### Changed
+- **Post-merge `release/*` → main:** Automation now merges `main` into `beta` after every `release/*` merge (same as `feature/release-*`), not only when `package.json` changes — prevents beta from drifting behind main.
+- **Porting vs post-merge:** PR porting no longer opens `port/* → beta` when post-merge automation already syncs `main` into `beta` (beta promotion, `release/*`, and `feature/release-*` merges). CI fails redundant `port/* → beta` PRs so duplicate port work cannot merge.
+- **GitHub Releases on every version bump:** Post-merge automation now publishes a release whenever `package.json` changes — stable tags on `main` (promotion, hotfix, release branch, bootstrap backfill) and prerelease tags on `beta` after each `-beta.N` integration merge.
 - **Release automation:** Beta → main stays a normal PR; merge triggers stable versioning on `main`, GitHub Releases from CHANGELOG (including hotfixes), and beta prerelease bumps. CI enforces branch routing (preferred `feature/*`/`fix/*` → beta; only `hotfix/*` blocked on beta), changelog checks, and automated PR labels. Workflow definitions ship on `main` so GitHub can run them for repository pull requests.
-- **Post-merge bootstrap:** `feature/release-*` → `main` syncs automation to `beta` and starts the next `-beta.N` line; manual `workflow_dispatch` recovery when bootstrap was missed.
-- **Dependabot:** Version update PRs for root and `server/` npm ecosystems target `beta` (not `main`). Urgent production dependency fixes use `hotfix/*` → `main` or a beta promotion.
+- **Post-merge bootstrap:** `feature/release-*` → `main` syncs automation to `beta`, backfills the stable GitHub Release for `main`, starts the next `-beta.N` line, and publishes the first prerelease; manual `workflow_dispatch` recovery when bootstrap was missed.
+- **Dependabot:** Version update PRs for root and `server/` npm ecosystems target `beta` (not `main`). **Dependabot changelog** workflow maintains `### Dependencies` under `[Unreleased]`; CI validates those bullets instead of skipping changelog checks.
 
 ## v1.6
 
