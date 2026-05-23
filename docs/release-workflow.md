@@ -42,6 +42,14 @@ Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from
 - Automation bumps the **patch** on `main` after merge (e.g. `1.6.0` → `1.6.1`).
 - Creates a **GitHub Release** for the new patch version from `CHANGELOG.md`.
 
+### `feature/release-*` → main (release infrastructure)
+
+- Merges **main** into **beta** so beta gets workflows/scripts.
+- Sets **beta** to the next development line (e.g. main `1.5.3` → beta `1.6.0-beta.1`).
+- Does **not** change `main` again (the PR already set the stable version).
+
+If you merged release automation before this step existed, run **Post-merge automation** manually (`workflow_dispatch`, enable **sync beta from main**).
+
 ## Branch rules (enforced in CI)
 
 | Head branch | Base branch | Allowed |
