@@ -4,7 +4,7 @@ name: Post-merge automation
 #
 # Every package.json version bump creates a GitHub Release (stable or --prerelease for -beta.N).
 # beta → main: strip stable on main, release vX.Y.Z, start next beta line + prerelease for new beta.
-# release/* → main: stable release + next beta line + prerelease.
+# release/* → main: merge main into beta, stable release + next beta line + prerelease.
 # feature/*|fix/*|other → beta: bump -beta.N and prerelease vX.Y.Z-beta.N.
 # hotfix/* → main: patch bump on main + stable release.
 # feature/release-*|workflow_dispatch: sync main→beta, stable release for main, prerelease for new beta.
@@ -149,12 +149,13 @@ jobs:
           git checkout beta
           git pull --ff-only origin beta
           BETA_VERSION=$(node scripts/read-package-version.mjs)
+          git merge origin/main -X theirs -m "chore: sync main into beta after release branch merge"
           node scripts/bump-beta-after-main-release.mjs "$STABLE"
-          if ! git diff --quiet package.json; then
-            git add package.json
+          git add package.json
+          if ! git diff --cached --quiet; then
             git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"
-            git push origin beta
           fi
+          git push origin beta
 
           NEXT=$(node scripts/read-package-version.mjs)
           export NOTES_FILE=$(mktemp)
