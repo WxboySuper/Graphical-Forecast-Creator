@@ -54,6 +54,7 @@ jobs:
               ['hotfix', 'b60205'],
               ['release', '5319e7'],
               ['port', 'c5def5'],
+              ['refactor', 'bfdadc'],
               ['has conflicts', 'e11d21'],
               ['draft', 'ededed'],
               ['ci:pending', 'fbca04'],
@@ -89,17 +90,6 @@ jobs:
               }
             }
 
-            const managed = [
-              'promotion', 'feature', 'fix', 'hotfix', 'release', 'port',
-              'integration:primary', 'integration:other',
-              'has conflicts', 'draft', 'ci:pending', 'ci:passing', 'ci:failing',
-              'changelog:ok', 'changelog:missing',
-              'Documentation', 'Enhancement', 'Bug', 'Refactor',
-              'javascript', 'dependencies', 'quality', 'e2e-validated', 'porting',
-              'Component: Map', 'Component: Outlooks', 'Component: Drawing-Tools',
-              'Component: Export', 'Component: UI', 'Component: Storage',
-            ];
-
             const pr = context.payload.pull_request;
             const { data: pull } = await github.rest.pulls.get({
               owner,
@@ -110,6 +100,7 @@ jobs:
             const computed = JSON.parse(
               fs.readFileSync(process.env.COMPUTED_LABELS_PATH ?? 'pr-labels.json', 'utf8'),
             );
+            const managed = computed.managed ?? [];
             const labels = new Set(computed.labels ?? []);
 
             if (pull.mergeable === false) labels.add('has conflicts');
@@ -121,9 +112,17 @@ jobs:
               issue_number: pr.number,
             })).data.map((label) => label.name);
 
+            const safeRemoveLabel = async (name) => {
+              try {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            };
+
             for (const name of managed) {
               if (existing.includes(name)) {
-                await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name });
+                await safeRemoveLabel(name);
               }
             }
 
@@ -157,14 +156,22 @@ jobs:
               issue_number: pr.number,
             })).data.map((l) => l.name);
 
-            for (const name of managed) {
-              if (existing.includes(name)) {
+            const safeRemoveLabel = async (name) => {
+              try {
                 await github.rest.issues.removeLabel({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: pr.number,
                   name,
                 });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            };
+
+            for (const name of managed) {
+              if (existing.includes(name)) {
+                await safeRemoveLabel(name);
               }
             }
 

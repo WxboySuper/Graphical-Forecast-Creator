@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { evaluateBranchPolicy } from './lib/branch-policy.mjs';
 import { changelogTouchesPr } from './lib/changelog.mjs';
-import { computePrLabels } from './lib/pr-labels.mjs';
+import { MANAGED_LABELS, computePrLabels } from './lib/pr-labels.mjs';
 
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const headRef = process.env.GITHUB_HEAD_REF ?? '';
@@ -36,4 +36,4 @@ const labels = computePrLabels({
   changelogOk,
 });
 
-console.log(JSON.stringify({ labels }));
+console.log(JSON.stringify({ labels, managed: MANAGED_LABELS }));

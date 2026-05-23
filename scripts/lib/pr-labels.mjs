@@ -1,3 +1,5 @@
+import { anyFileMatches, pathMatches } from './glob-match.mjs';
+
 /**
  * @typedef {{ head: string; base: string }} RoutingContext
  * @typedef {{ changedFiles: string[]; head: string }} ContentContext
@@ -11,6 +13,7 @@ export const MANAGED_LABELS = [
   'hotfix',
   'release',
   'port',
+  'refactor',
   'integration:primary',
   'integration:other',
   'has conflicts',
@@ -37,42 +40,18 @@ export const MANAGED_LABELS = [
   'Component: Storage',
 ];
 
-/**
- * @param {string} file
- * @param {string} pattern
- */
-export const pathMatches = (file, pattern) => {
-  if (pattern.endsWith('/**')) {
-    const dir = pattern.slice(0, -3);
-    return file === dir || file.startsWith(`${dir}/`);
-  }
-  if (pattern.startsWith('**/')) {
-    const suffix = pattern.slice(3);
-    if (suffix.includes('*')) {
-      const re = new RegExp(`${suffix.replace(/\./g, '\\.').replace(/\*/g, '.*')}$`);
-      return re.test(file);
-    }
-    return file.endsWith(suffix);
-  }
-  if (pattern.includes('*')) {
-    const re = new RegExp(`^${pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*')}$`);
-    return re.test(file);
-  }
-  return file === pattern;
-};
-
-/**
- * @param {string[]} changedFiles
- * @param {string} pattern
- */
-const anyFileMatches = (changedFiles, pattern) => changedFiles.some((file) => pathMatches(file, pattern));
-
 /** @type {Array<{ label: string; patterns: string[] }>} */
 const CONTENT_LABEL_RULES = [
   { label: 'Component: Map', patterns: ['src/components/Map/**', 'src/maps/**', 'src/monitor/**', 'src/components/Monitor/**'] },
   {
     label: 'Component: Outlooks',
-    patterns: ['src/components/Outlook*/**', 'src/components/DaySelector/**', 'src/utils/outlookUtils.*'],
+    patterns: [
+      'src/components/OutlookPanel/**',
+      'src/components/OutlookSelector/**',
+      'src/components/OutlookDaySelector/**',
+      'src/components/DaySelector/**',
+      'src/utils/outlookUtils.*',
+    ],
   },
   { label: 'Component: Drawing-Tools', patterns: ['src/components/DrawingTools/**'] },
   { label: 'Component: Export', patterns: ['src/utils/exportUtils.*', 'src/components/DrawingTools/useExportMap.*'] },
@@ -116,11 +95,36 @@ const CONTENT_LABEL_RULES = [
 const DOC_ONLY_PATTERNS = ['docs/**', '**/*.md', '.github/**/*.md', 'CHANGELOG.md'];
 
 /**
+ * @param {string} head
+ * @returns {string | null}
+ */
+const branchTypeLabel = (head) => {
+  if (head.startsWith('hotfix/') || head.startsWith('fix/')) return 'Bug';
+  if (head.startsWith('feature/')) return 'Enhancement';
+  if (head.startsWith('refactor/')) return 'Refactor';
+  return null;
+};
+
+/**
  * @param {string[]} changedFiles
  */
 const isDocsOnlyChange = (changedFiles) =>
   changedFiles.length > 0 &&
   changedFiles.every((file) => DOC_ONLY_PATTERNS.some((pattern) => pathMatches(file, pattern)));
+
+/**
+ * @param {string[]} changedFiles
+ * @returns {Set<string>}
+ */
+const contentLabelsFromDiff = (changedFiles) => {
+  const labels = new Set();
+  for (const rule of CONTENT_LABEL_RULES) {
+    if (rule.patterns.some((pattern) => anyFileMatches(changedFiles, pattern))) {
+      labels.add(rule.label);
+    }
+  }
+  return labels;
+};
 
 /**
  * Branch routing and integration priority labels.
@@ -137,6 +141,7 @@ export const routingLabels = ({ head, base }) => {
   if (head.startsWith('hotfix/')) labels.add('hotfix');
   if (head.startsWith('release/')) labels.add('release');
   if (head.startsWith('port/')) labels.add('port');
+  if (head.startsWith('refactor/')) labels.add('refactor');
 
   if (base === 'beta' && !head.startsWith('hotfix/')) {
     if (head.startsWith('feature/') || head.startsWith('fix/')) {
@@ -158,11 +163,8 @@ export const routingLabels = ({ head, base }) => {
 export const descriptiveLabels = ({ changedFiles, head }) => {
   const labels = new Set();
 
-  if (head.startsWith('hotfix/') || head.startsWith('fix/')) {
-    labels.add('Bug');
-  } else if (head.startsWith('feature/')) {
-    labels.add('Enhancement');
-  }
+  const typeLabel = branchTypeLabel(head);
+  if (typeLabel) labels.add(typeLabel);
 
   if (head.startsWith('feature/release-') || head.startsWith('port/')) {
     labels.add('quality');
@@ -173,10 +175,8 @@ export const descriptiveLabels = ({ changedFiles, head }) => {
     return labels;
   }
 
-  for (const rule of CONTENT_LABEL_RULES) {
-    if (rule.patterns.some((pattern) => anyFileMatches(changedFiles, pattern))) {
-      labels.add(rule.label);
-    }
+  for (const label of contentLabelsFromDiff(changedFiles)) {
+    labels.add(label);
   }
 
   return labels;

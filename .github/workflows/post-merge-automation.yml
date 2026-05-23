@@ -123,11 +123,24 @@ jobs:
           !startsWith(github.event.pull_request.head.ref, 'port/') &&
           !startsWith(github.event.pull_request.head.ref, 'hotfix/')
         run: |
-          git fetch origin beta
-          git checkout beta
-          git pull --ff-only origin beta
-          PREVIOUS=$(node scripts/read-package-version.mjs)
-          node scripts/apply-version-bump.mjs beta
-          git add package.json
-          git commit -m "chore: bump beta prerelease after merge (was $PREVIOUS)"
-          git push origin beta
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            git fetch origin beta
+            git checkout beta
+            git pull --ff-only origin beta || git pull --rebase origin beta
+            PREVIOUS=$(node scripts/read-package-version.mjs)
+            node scripts/apply-version-bump.mjs beta
+            if git diff --quiet package.json; then
+              echo "No beta version change needed"
+              exit 0
+            fi
+            git add package.json
+            git commit -m "chore: bump beta prerelease after merge (was $PREVIOUS)"
+            if git push origin beta; then
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt), retrying..."
+            sleep 2
+          done
+          echo "Failed to push beta bump after 5 attempts"
+          exit 1

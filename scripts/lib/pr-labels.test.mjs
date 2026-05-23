@@ -32,6 +32,15 @@ describe('pr descriptive labels', () => {
     assert.ok(labels.has('Enhancement'));
   });
 
+  it('tags refactor branches with routing and Refactor', () => {
+    const routing = routingLabels({ head: 'refactor/labels', base: 'beta' });
+    assert.ok(routing.has('refactor'));
+    assert.ok(routing.has('integration:other'));
+
+    const labels = descriptiveLabels({ head: 'refactor/labels', changedFiles: ['src/App.tsx'] });
+    assert.ok(labels.has('Refactor'));
+  });
+
   it('tags map changes with Component: Map', () => {
     const labels = descriptiveLabels({
       head: 'feature/map',
