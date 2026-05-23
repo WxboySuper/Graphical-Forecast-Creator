@@ -33,18 +33,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
       - name: Read beta version and derive release branch
         id: meta
         run: |
           git fetch origin beta main
           git checkout origin/beta
           BETA_VERSION=$(node scripts/read-package-version.mjs)
-          STABLE_VERSION=$(node --input-type=module -e "
-            import { deriveStableVersion } from './scripts/lib/package-version.mjs';
-            const stable = deriveStableVersion(process.argv[1]);
-            if (!stable) process.exit(1);
-            console.log(stable);
-          " "$BETA_VERSION")
+          STABLE_VERSION=$(node scripts/derive-stable-version.mjs "$BETA_VERSION" --require-stable)
           RELEASE_BRANCH="release/v${STABLE_VERSION}"
           echo "beta_version=$BETA_VERSION" >> "$GITHUB_OUTPUT"
           echo "stable_version=$STABLE_VERSION" >> "$GITHUB_OUTPUT"

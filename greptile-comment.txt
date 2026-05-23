@@ -1,0 +1,99 @@
+<h3>Greptile Summary</h3>
+
+This PR overhauls the release workflow by introducing a PR-based promotion path (`release/vX.Y.Z ΓåÆ main` via `prepare-beta-main-release-pr.yml`), adding PR governance with routing labels and CI-status labels, and demoting the old direct-merge workflow to a legacy emergency path.
+
+- **New `prepare-beta-main-release-pr.yml`** creates a `release/vX.Y.Z` branch from `beta`, strips the `-beta` suffix on that branch only, and opens or refreshes a PR to `main` ΓÇö separating the version-stabilization commit from the merge itself.
+- **New `post-merge-automation.yml`** handles the three existing merge paths (`betaΓåÆmain`, `hotfixΓåÆmain`, feature/fixΓåÆ`beta`) automatically, but has no matching step for the new `release/*ΓåÆmain` path, meaning no GitHub Release is created after merging a release-branch PR.
+- **New `pr-governance.yml`** applies routing and CI-status labels on PR events and `check_suite` completion; the `refresh-labels` job references `github.event` inside `actions/github-script` (which should be `context.payload`) ΓÇö already noted in a prior review round.
+
+<h3>Confidence Score: 3/5</h3>
+
+The new recommended `release/vX.Y.Z ΓåÆ main` path leaves no GitHub Release behind on merge; production deploys work but the GitHub Release step is silently skipped every time this path is used.
+
+The post-merge automation was not extended to cover the new `release/* ΓåÆ main` merge event. All three conditional steps in `post-merge-automation.yml` evaluate to false for a release-branch merge, so the job exits cleanly having done nothing ΓÇö no GitHub Release, no automatic beta bump. Prior review rounds also identified unresolved bugs in `prepare-beta-main-release-pr.yml` and `pr-governance.yml` that remain in this version.
+
+`.github/workflows/post-merge-automation.yml` needs a new step guarded by `startsWith(head.ref, 'release/')` to create the GitHub Release. `.github/workflows/prepare-beta-main-release-pr.yml` and `.github/workflows/pr-governance.yml` have issues carried over from the previous review round.
+
+<details><summary><h3>Important Files Changed</h3></summary>
+
+
+
+
+| Filename | Overview |
+|----------|----------|
+| .github/workflows/post-merge-automation.yml | Handles betaΓåÆmain, hotfixΓåÆmain, and featureΓåÆbeta merges but has no handler for the new release/*ΓåÆmain path; no `actions/setup-node` means Node.js scripts run on the runner's ambient version. |
+| .github/workflows/prepare-beta-main-release-pr.yml | New workflow that creates a release/vX.Y.Z branch from beta, strips the beta suffix, and opens/updates a PR to main. The `process.argv[1]` argv-ordering bug in the `node -e` inline eval (already flagged in a prior review round) still exists in this version. |
+| .github/workflows/pr-governance.yml | New workflow combining routing labels and CI-status labels; the `refresh-labels` job references `github.event` inside `actions/github-script` (which should be `context.payload`), causing the check_suite path to always throw a TypeError ΓÇö already flagged in a prior review round. The `policy` job duplicates script calls already in `ci.yml`. |
+| .github/workflows/ci.yml | Adds `pr-governance` and `package-version-policy` jobs, properly gates `build-and-test` behind both. Branch/changelog policy checks are duplicated vs `pr-governance.yml`. |
+| .github/workflows/deploy-main-to-vps.yml | Previously-flagged `process.argv[1]` bug correctly fixed by passing the version via `RAW_VERSION` env var and reading `process.env.RAW_VERSION` in the inline eval. |
+| .github/workflows/bump-beta-after-main-release.yml | New manual workflow to bump beta to the next minor prerelease after a main release; correctly reads the stable version from origin/main or from user input and delegates to the script. |
+| .github/workflows/promote-beta-to-main.yml | Renamed to "(Legacy)" and gated behind `LEGACY-DIRECT-PROMOTE` confirmation input; the core merge-and-strip logic is unchanged and correct. |
+| scripts/lib/package-version.mjs | New module exporting version-policy helpers; logic is clean, `deriveStableVersion` correctly strips beta suffixes, and all edge cases are covered by the test suite. |
+| scripts/lib/branch-policy.mjs | New module encoding branch routing rules; correctly allows betaΓåÆmain, hotfixΓåÆmain, release/*ΓåÆmain, and feature/release-* infrastructure branches while blocking cross-branch violations. |
+| scripts/create-github-release.mjs | Reads stable version from `process.argv[2]` and CHANGELOG section extraction is correct; previously-flagged `process.argv` bug is fixed (uses direct script invocation, not inline eval). |
+| scripts/lib/changelog.mjs | New module for CHANGELOG section extraction and PR-body changelog detection; logic is straightforward and handles version headings at major.minor and major.minor.patch levels. |
+
+</details>
+
+
+</details>
+
+
+<details><summary><h3>Flowchart</h3></summary>
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+    A[beta branch] -->|prepare-beta-main-release-pr.yml| B[release/vX.Y.Z branch\nstable package.json]
+    B -->|Open PR to main| C{PR merged to main}
+    A -->|Direct PR to main| C
+
+    C -->|head == beta\npost-merge-automation.yml| D[Strip beta version\non main]
+    D --> E[Create GitHub Release]
+    E --> F[Bump beta to next cycle]
+
+    C -->|head == release/vX.Y.Z\npost-merge-automation.yml| G[All steps skipped\nNo GitHub Release created]
+    G --> H[Manual: run\nbump-beta-after-main-release.yml]
+
+    C -->|push to main| I[deploy-main-to-vps.yml\nProduction deploy]
+```
+</details>
+
+
+<!-- greptile_other_comments_section -->
+
+<a href="https://chatgpt.com/codex/deeplink?prompt=IMPORTANT%3A%20Work%20in%20the%20repository%20%22wxboysuper%2Fgraphical-forecast-creator%22%20on%20the%20existing%20branch%20%22feature%2Frelease-version-policy%22.%20Checkout%20that%20branch%20%E2%80%94%20do%20NOT%20create%20a%20new%20branch%20or%20open%20a%20new%20PR.%20Push%20your%20changes%20to%20%22feature%2Frelease-version-policy%22.%0A%0AFix%20the%20following%203%20code%20review%20issues.%20Work%20through%20them%20one%20at%20a%20time%2C%20proposing%20concise%20fixes.%0A%0A---%0A%0A%23%23%23%20Issue%201%20of%203%0A.github%2Fworkflows%2Fpost-merge-automation.yml%3A35-64%0A**GitHub%20Release%20never%20created%20on%20the%20new%20%60release%2F*%20%E2%86%92%20main%60%20path**%0A%0A%60post-merge-automation.yml%60%20has%20three%20guarded%20steps%3A%20%60head.ref%20%3D%3D%20'beta'%60%2C%20%60head.ref.startsWith%28'hotfix%2F'%29%60%2C%20and%20%60base.ref%20%3D%3D%20'beta'%60.%20None%20matches%20a%20%60release%2FvX.Y.Z%20%E2%86%92%20main%60%20merge%20%E2%80%94%20the%20job%20starts%2C%20passes%20all%20three%20%60if%3A%60%20evaluations%20as%20falsy%2C%20and%20exits%20cleanly%20having%20done%20nothing.%0A%0AConcretely%3A%20after%20merging%20a%20PR%20opened%20by%20%60prepare-beta-main-release-pr.yml%60%2C%20neither%20a%20GitHub%20Release%20nor%20an%20automatic%20beta%20bump%20is%20triggered.%20%60release_to_main.md%60%20notes%20the%20bump%20as%20%22optional%2Fmanual%22%2C%20but%20GitHub%20Release%20creation%20has%20no%20corresponding%20manual%20workflow%20and%20isn't%20mentioned%20in%20the%20template%20at%20all%2C%20leaving%20releases%20without%20a%20published%20GitHub%20Release%20whenever%20the%20release-branch%20path%20is%20used.%0A%0A%23%23%23%20Issue%202%20of%203%0A.github%2Fworkflows%2Fpost-merge-automation.yml%3A1-13%0A**No%20%60actions%2Fsetup-node%60%20%E2%80%94%20scripts%20run%20on%20the%20runner's%20ambient%20Node.js**%0A%0AAll%20three%20conditional%20steps%20call%20%60node%20scripts%2F%E2%80%A6%60%20but%20the%20job%20has%20no%20%60actions%2Fsetup-node%60%20step.%20The%20project's%20%60engines%60%20field%20requires%20%60%3E%3D22.12.0%60%3B%20if%20the%20%60ubuntu-latest%60%20runner%20ships%20with%20an%20older%20version%2C%20scripts%20that%20rely%20on%20newer%20APIs%20could%20fail%20silently%20or%20produce%20wrong%20output.%20Every%20other%20job%20in%20this%20repository%20that%20invokes%20Node.js%20pins%20a%20version%20via%20%60actions%2Fsetup-node%60.%0A%0A%23%23%23%20Issue%203%20of%203%0A.github%2Fworkflows%2Fci.yml%3A12-35%0A**Branch%20and%20changelog%20policy%20checks%20are%20duplicated%20between%20%60ci.yml%60%20and%20%60pr-governance.yml%60**%0A%0A%60ci.yml%60's%20%60pr-governance%60%20job%20and%20%60pr-governance.yml%60's%20%60policy%60%20job%20both%20invoke%20%60validate-branch-policy.mjs%60%20and%20%60check-changelog-pr.mjs%60%20with%20the%20same%20environment%20variables%20on%20every%20pull-request%20event.%20If%20either%20script%20is%20updated%20in%20the%20future%2C%20both%20call%20sites%20need%20to%20be%20kept%20in%20sync.%20Consider%20making%20%60ci.yml%60%20the%20single%20required-status-check%20entry%20point%20and%20removing%20the%20redundant%20script%20calls%20from%20%60pr-governance.yml%60's%20%60policy%60%20job%20%28keeping%20only%20label%20management%20there%29.%0A%0A"><picture><source media="(prefers-color-scheme: dark)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/FixAllInCodexDark.svg?v=3"><source media="(prefers-color-scheme: light)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/FixAllInCodex.svg?v=3"><img alt="Fix All in Codex" src="https://greptile-static-assets.s3.amazonaws.com/badges/FixAllInCodex.svg?v=3" height="20"></picture></a> <a href="https://app.greptile.com/api/ide/cursor?prompt=Fix%20the%20following%203%20code%20review%20issues.%20Work%20through%20them%20one%20at%20a%20time%2C%20proposing%20concise%20fixes.%0A%0A---%0A%0A%23%23%23%20Issue%201%20of%203%0A.github%2Fworkflows%2Fpost-merge-automation.yml%3A35-64%0A**GitHub%20Release%20never%20created%20on%20the%20new%20%60release%2F*%20%E2%86%92%20main%60%20path**%0A%0A%60post-merge-automation.yml%60%20has%20three%20guarded%20steps%3A%20%60head.ref%20%3D%3D%20'beta'%60%2C%20%60head.ref.startsWith%28'hotfix%2F'%29%60%2C%20and%20%60base.ref%20%3D%3D%20'beta'%60.%20None%20matches%20a%20%60release%2FvX.Y.Z%20%E2%86%92%20main%60%20merge%20%E2%80%94%20the%20job%20starts%2C%20passes%20all%20three%20%60if%3A%60%20evaluations%20as%20falsy%2C%20and%20exits%20cleanly%20having%20done%20nothing.%0A%0AConcretely%3A%20after%20merging%20a%20PR%20opened%20by%20%60prepare-beta-main-release-pr.yml%60%2C%20neither%20a%20GitHub%20Release%20nor%20an%20automatic%20beta%20bump%20is%20triggered.%20%60release_to_main.md%60%20notes%20the%20bump%20as%20%22optional%2Fmanual%22%2C%20but%20GitHub%20Release%20creation%20has%20no%20corresponding%20manual%20workflow%20and%20isn't%20mentioned%20in%20the%20template%20at%20all%2C%20leaving%20releases%20without%20a%20published%20GitHub%20Release%20whenever%20the%20release-branch%20path%20is%20used.%0A%0A%23%23%23%20Issue%202%20of%203%0A.github%2Fworkflows%2Fpost-merge-automation.yml%3A1-13%0A**No%20%60actions%2Fsetup-node%60%20%E2%80%94%20scripts%20run%20on%20the%20runner's%20ambient%20Node.js**%0A%0AAll%20three%20conditional%20steps%20call%20%60node%20scripts%2F%E2%80%A6%60%20but%20the%20job%20has%20no%20%60actions%2Fsetup-node%60%20step.%20The%20project's%20%60engines%60%20field%20requires%20%60%3E%3D22.12.0%60%3B%20if%20the%20%60ubuntu-latest%60%20runner%20ships%20with%20an%20older%20version%2C%20scripts%20that%20rely%20on%20newer%20APIs%20could%20fail%20silently%20or%20produce%20wrong%20output.%20Every%20other%20job%20in%20this%20repository%20that%20invokes%20Node.js%20pins%20a%20version%20via%20%60actions%2Fsetup-node%60.%0A%0A%23%23%23%20Issue%203%20of%203%0A.github%2Fworkflows%2Fci.yml%3A12-35%0A**Branch%20and%20changelog%20policy%20checks%20are%20duplicated%20between%20%60ci.yml%60%20and%20%60pr-governance.yml%60**%0A%0A%60ci.yml%60's%20%60pr-governance%60%20job%20and%20%60pr-governance.yml%60's%20%60policy%60%20job%20both%20invoke%20%60validate-branch-policy.mjs%60%20and%20%60check-changelog-pr.mjs%60%20with%20the%20same%20environment%20variables%20on%20every%20pull-request%20event.%20If%20either%20script%20is%20updated%20in%20the%20future%2C%20both%20call%20sites%20need%20to%20be%20kept%20in%20sync.%20Consider%20making%20%60ci.yml%60%20the%20single%20required-status-check%20entry%20point%20and%20removing%20the%20redundant%20script%20calls%20from%20%60pr-governance.yml%60's%20%60policy%60%20job%20%28keeping%20only%20label%20management%20there%29.%0A%0A&pr=329&platform=github"><picture><source media="(prefers-color-scheme: dark)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/FixAllInCursorDark.svg?v=3"><source media="(prefers-color-scheme: light)" srcset="https://greptile-static-assets.s3.amazonaws.com/badges/FixAllInCursor.svg?v=3"><img alt="Fix All in Cursor" src="https://greptile-static-assets.s3.amazonaws.com/badges/FixAllInCursor.svg?v=3" height="20"></picture></a>
+
+<details><summary>Prompt To Fix All With AI</summary>
+
+`````markdown
+Fix the following 3 code review issues. Work through them one at a time, proposing concise fixes.
+
+---
+
+### Issue 1 of 3
+.github/workflows/post-merge-automation.yml:35-64
+**GitHub Release never created on the new `release/* ΓåÆ main` path**
+
+`post-merge-automation.yml` has three guarded steps: `head.ref == 'beta'`, `head.ref.startsWith('hotfix/')`, and `base.ref == 'beta'`. None matches a `release/vX.Y.Z ΓåÆ main` merge ΓÇö the job starts, passes all three `if:` evaluations as falsy, and exits cleanly having done nothing.
+
+Concretely: after merging a PR opened by `prepare-beta-main-release-pr.yml`, neither a GitHub Release nor an automatic beta bump is triggered. `release_to_main.md` notes the bump as "optional/manual", but GitHub Release creation has no corresponding manual workflow and isn't mentioned in the template at all, leaving releases without a published GitHub Release whenever the release-branch path is used.
+
+### Issue 2 of 3
+.github/workflows/post-merge-automation.yml:1-13
+**No `actions/setup-node` ΓÇö scripts run on the runner's ambient Node.js**
+
+All three conditional steps call `node scripts/ΓÇª` but the job has no `actions/setup-node` step. The project's `engines` field requires `>=22.12.0`; if the `ubuntu-latest` runner ships with an older version, scripts that rely on newer APIs could fail silently or produce wrong output. Every other job in this repository that invokes Node.js pins a version via `actions/setup-node`.
+
+### Issue 3 of 3
+.github/workflows/ci.yml:12-35
+**Branch and changelog policy checks are duplicated between `ci.yml` and `pr-governance.yml`**
+
+`ci.yml`'s `pr-governance` job and `pr-governance.yml`'s `policy` job both invoke `validate-branch-policy.mjs` and `check-changelog-pr.mjs` with the same environment variables on every pull-request event. If either script is updated in the future, both call sites need to be kept in sync. Consider making `ci.yml` the single required-status-check entry point and removing the redundant script calls from `pr-governance.yml`'s `policy` job (keeping only label management there).
+
+
+`````
+
+</details>
+
+<sub>Reviews (6): Last reviewed commit: ["fix: derive stable Sentry release from e..."](https://github.com/wxboysuper/graphical-forecast-creator/commit/b72e893c95199cd03a3031f8d14c595704ab2429) | [Re-trigger Greptile](https://app.greptile.com/api/retrigger?id=33517050)</sub>

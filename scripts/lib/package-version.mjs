@@ -7,6 +7,12 @@ const STABLE_VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const RELEASE_BRANCH_PATTERN = /^release\/v[0-9]+\.[0-9]+\.[0-9]+$/;
 
 /**
+ * @param {string} message
+ * @returns {VersionPolicyFail}
+ */
+const policyFail = (message) => ({ ok: false, message });
+
+/**
  * @param {string} version
  */
 export const hasBetaPrerelease = (version) => BETA_PRERELEASE_PATTERN.test(version);
@@ -34,6 +40,50 @@ export const releaseBranchForStable = (stableVersion) => `release/v${stableVersi
 export const isReleasePromotionBranch = (headRef) => RELEASE_BRANCH_PATTERN.test(headRef);
 
 /**
+ * @param {string} version
+ * @param {string} targetBranch
+ * @returns {VersionPolicyResult}
+ */
+const validateBetaTargetVersion = (version, targetBranch) => {
+  if (targetBranch !== 'beta' || hasBetaPrerelease(version)) {
+    return { ok: true };
+  }
+  return policyFail(
+    `package.json version "${version}" must include a -beta prerelease on branch "${targetBranch}" ` +
+      '(for example 1.6.0-beta.1).',
+  );
+};
+
+/**
+ * @param {string} version
+ * @param {string} headRef
+ * @param {boolean} isPullRequest
+ * @returns {VersionPolicyResult}
+ */
+const validateMainTargetVersion = (version, headRef, isPullRequest) => {
+  const hasBeta = hasBetaPrerelease(version);
+  const isBetaPromotionPr = isPullRequest && headRef === 'beta';
+
+  if (hasBeta && !isBetaPromotionPr) {
+    const promotionHint = isPullRequest
+      ? 'Open a beta → main promotion PR (head branch beta) or hotfix/* with a stable version.'
+      : 'main must only receive stable semver versions.';
+    return policyFail(
+      `package.json version "${version}" must not include a -beta prerelease on "main". ${promotionHint}`,
+    );
+  }
+
+  if (isBetaPromotionPr && !hasBeta) {
+    return policyFail(
+      `Beta → main promotion PRs should carry a -beta prerelease on beta (got "${version}"). ` +
+        'CI will strip to stable on merge automatically.',
+    );
+  }
+
+  return { ok: true };
+};
+
+/**
  * @param {{
  *   version: string;
  *   targetBranch: string;
@@ -43,39 +93,13 @@ export const isReleasePromotionBranch = (headRef) => RELEASE_BRANCH_PATTERN.test
  * @returns {VersionPolicyResult}
  */
 export const evaluateVersionPolicy = ({ version, targetBranch, headRef = '', eventName = '' }) => {
-  const hasBeta = hasBetaPrerelease(version);
-  const isPullRequest = eventName === 'pull_request';
-
-  if (targetBranch === 'beta' && !hasBeta) {
-    return {
-      ok: false,
-      message:
-        `package.json version "${version}" must include a -beta prerelease on branch "${targetBranch}" ` +
-        '(for example 1.6.0-beta.1).',
-    };
+  const betaResult = validateBetaTargetVersion(version, targetBranch);
+  if (!betaResult.ok) {
+    return betaResult;
   }
 
   if (targetBranch === 'main') {
-    const isBetaPromotionPr = isPullRequest && headRef === 'beta';
-
-    if (hasBeta && !isBetaPromotionPr) {
-      const promotionHint = isPullRequest
-        ? 'Open a beta → main promotion PR (head branch beta) or hotfix/* with a stable version.'
-        : 'main must only receive stable semver versions.';
-      return {
-        ok: false,
-        message: `package.json version "${version}" must not include a -beta prerelease on "${targetBranch}". ${promotionHint}`,
-      };
-    }
-
-    if (isBetaPromotionPr && !hasBeta) {
-      return {
-        ok: false,
-        message:
-          `Beta → main promotion PRs should carry a -beta prerelease on beta (got "${version}"). ` +
-          'CI will strip to stable on merge automatically.',
-      };
-    }
+    return validateMainTargetVersion(version, headRef, eventName === 'pull_request');
   }
 
   return { ok: true };

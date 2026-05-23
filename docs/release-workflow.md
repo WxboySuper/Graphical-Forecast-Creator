@@ -23,6 +23,13 @@ After merge, **Post-merge automation** runs on its own (no Actions button).
    - Bumps **beta** to the next line (e.g. `1.7.0-beta.1`) for continued development.
 3. **Deploy Production to VPS** runs on the push to `main` (Sentry release uses the **stable** version even if the merge commit still had `-beta` briefly).
 
+### release/* → main (optional prepare workflow)
+
+Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from **Prepare Beta → Main Release PR**:
+
+1. Merge the release PR to `main`.
+2. **Post-merge automation** creates the **GitHub Release** and bumps **beta** to the next line.
+
 ### Integrations → beta
 
 - Preferred: `feature/*` and `fix/*` (labeled `integration:primary`).

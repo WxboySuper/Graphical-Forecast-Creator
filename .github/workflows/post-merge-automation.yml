@@ -3,6 +3,7 @@ name: Post-merge automation
 # Runs after a PR merges. No manual workflow dispatch needed for normal releases.
 #
 # beta → main: strip stable version on main, GitHub Release from CHANGELOG, start next beta line.
+# release/* → main: GitHub Release from CHANGELOG, start next beta line (optional prepare workflow).
 # feature/*|fix/*|other → beta: bump -beta.N on beta (hotfix/* is the only blocked target).
 # hotfix/* → main: bump patch on main and create GitHub Release.
 #
@@ -32,6 +33,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
       - name: Beta promotion merged into main
         if: >-
           github.event.pull_request.base.ref == 'main' &&
@@ -59,9 +65,36 @@ jobs:
           git checkout beta
           git pull --ff-only origin beta
           node scripts/bump-beta-after-main-release.mjs "$STABLE"
-          git add package.json
-          git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"
-          git push origin beta
+          if ! git diff --quiet package.json; then
+            git add package.json
+            git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"
+            git push origin beta
+          fi
+
+      - name: Release branch merged into main
+        if: >-
+          github.event.pull_request.base.ref == 'main' &&
+          startsWith(github.event.pull_request.head.ref, 'release/')
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git fetch origin main beta
+          git checkout main
+          git pull --ff-only origin main
+          STABLE=$(node scripts/read-package-version.mjs)
+
+          export NOTES_FILE=$(mktemp)
+          node scripts/create-github-release.mjs "$STABLE" main
+
+          git checkout beta
+          git pull --ff-only origin beta
+          BETA_VERSION=$(node scripts/read-package-version.mjs)
+          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          if ! git diff --quiet package.json; then
+            git add package.json
+            git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"
+            git push origin beta
+          fi
 
       - name: Hotfix merged into main
         if: >-
