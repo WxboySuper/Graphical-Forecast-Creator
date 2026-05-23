@@ -32,6 +32,7 @@ Every user-facing change must be recorded in [CHANGELOG.md](../CHANGELOG.md) und
 *   `Removed`: For now-removed features.
 *   `Fixed`: For any bug fixes.
 *   `Security`: In case of vulnerabilities.
+*   `Dependencies`: For dependency version bumps (Dependabot PRs auto-update this subsection).
 
 ### 2. Update Notes
 When structural changes (schema migrations, API changes, new store slices) occur:
