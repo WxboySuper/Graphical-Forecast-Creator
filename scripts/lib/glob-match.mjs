@@ -6,14 +6,14 @@
 export const escapeRegex = (segment) => segment.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 
 /**
- * Build a regex body where `*` matches one path segment (no slashes).
+ * Build a regex body where * matches one path segment (no slashes).
  *
  * @param {string} pattern
  */
 export const globToRegexBody = (pattern) => pattern.split('*').map(escapeRegex).join('[^/]*');
 
 /**
- * Match a repository path against a simple glob (`*`, `**/` prefix, `/**` suffix).
+ * Match a repository path against a simple glob (star, double-star-slash prefix, trailing-slash-star suffix).
  *
  * @param {string} file
  * @param {string} pattern

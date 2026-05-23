@@ -1,5 +1,4 @@
 import { descriptiveLabels } from './pr-label-content.mjs';
-import { MANAGED_LABELS } from './pr-label-managed.mjs';
 import { routingLabels } from './pr-label-routing.mjs';
 
 export { MANAGED_LABELS } from './pr-label-managed.mjs';
