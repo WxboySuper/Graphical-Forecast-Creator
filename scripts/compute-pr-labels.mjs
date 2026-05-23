@@ -1,0 +1,39 @@
+import { execSync } from 'node:child_process';
+import { evaluateBranchPolicy } from './lib/branch-policy.mjs';
+import { changelogTouchesPr } from './lib/changelog.mjs';
+import { computePrLabels } from './lib/pr-labels.mjs';
+
+const baseRef = process.env.GITHUB_BASE_REF ?? '';
+const headRef = process.env.GITHUB_HEAD_REF ?? '';
+const prBody = process.env.PR_BODY ?? '';
+
+if (!baseRef || !headRef) {
+  console.log('No PR base/head branch; skipping label computation.');
+  process.exit(0);
+}
+
+const changedFiles = execSync(`git diff --name-only origin/${baseRef}...origin/${headRef}`, {
+  encoding: 'utf8',
+})
+  .split('\n')
+  .map((line) => line.trim())
+  .filter(Boolean);
+
+const branchPolicy = evaluateBranchPolicy({ baseRef, headRef });
+let changelogOk = true;
+
+if (branchPolicy.ok && branchPolicy.kind !== 'beta-promotion' && !headRef.startsWith('port/')) {
+  const changelogResult = changelogTouchesPr(changedFiles, prBody);
+  changelogOk = changelogResult.ok;
+}
+
+const labels = computePrLabels({
+  head: headRef,
+  base: baseRef,
+  changedFiles,
+  mergeable: null,
+  draft: false,
+  changelogOk,
+});
+
+console.log(JSON.stringify({ labels }));

@@ -75,13 +75,15 @@ For PRs into **beta** (feature/fix) and **hotfix → main**:
 
 ## PR labels (automatic)
 
-`pr-governance.yml` manages labels such as:
+`pr-governance.yml` applies labels on every PR update:
 
-- `promotion`, `feature`, `fix`, `hotfix`
-- `has conflicts`, `draft`
-- `ci:pending`, `ci:passing`, `ci:failing`
+**Routing / integration:** `promotion`, `feature`, `fix`, `hotfix`, `release`, `port`, `integration:primary`, `integration:other`
 
-Create these labels in the repo once (any color); the workflow applies them on each PR.
+**What changed:** `Documentation`, `Enhancement`, `Bug`, `javascript`, `dependencies`, `quality`, `e2e-validated`, `porting`, and `Component: Map|Outlooks|Drawing-Tools|Export|UI|Storage` (from the file diff)
+
+**Status:** `has conflicts`, `draft`, `ci:pending`, `ci:passing`, `ci:failing`, `changelog:ok`, `changelog:missing`
+
+Labels are created in the repo if missing; only automation-managed labels are refreshed each run (manual labels you add are left alone).
 
 ## Optional / legacy workflows
 

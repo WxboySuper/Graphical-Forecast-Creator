@@ -46,7 +46,7 @@ jobs:
           node-version: '24.x'
 
       - name: Validate release automation unit tests
-        run: node --test scripts/lib/package-version.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/version-bump.test.mjs
+        run: node --test scripts/lib/package-version.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/version-bump.test.mjs scripts/lib/pr-labels.test.mjs
 
       - name: Validate package version for target branch
         env:

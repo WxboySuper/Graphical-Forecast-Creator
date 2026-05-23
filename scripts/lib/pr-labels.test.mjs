@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { computePrLabels, descriptiveLabels, routingLabels } from './pr-labels.mjs';
+
+describe('pr routing labels', () => {
+  it('tags beta promotion', () => {
+    const labels = routingLabels({ head: 'beta', base: 'main' });
+    assert.ok(labels.has('promotion'));
+  });
+
+  it('prioritizes feature integration to beta', () => {
+    const labels = routingLabels({ head: 'feature/foo', base: 'beta' });
+    assert.ok(labels.has('feature'));
+    assert.ok(labels.has('integration:primary'));
+  });
+
+  it('allows other branch names to beta', () => {
+    const labels = routingLabels({ head: 'chore/docs', base: 'beta' });
+    assert.ok(labels.has('integration:other'));
+  });
+});
+
+describe('pr descriptive labels', () => {
+  it('tags fix branches as Bug', () => {
+    const labels = descriptiveLabels({ head: 'fix/foo', changedFiles: ['src/App.tsx'] });
+    assert.ok(labels.has('Bug'));
+    assert.ok(labels.has('javascript'));
+  });
+
+  it('tags feature branches as Enhancement', () => {
+    const labels = descriptiveLabels({ head: 'feature/foo', changedFiles: ['src/App.tsx'] });
+    assert.ok(labels.has('Enhancement'));
+  });
+
+  it('tags map changes with Component: Map', () => {
+    const labels = descriptiveLabels({
+      head: 'feature/map',
+      changedFiles: ['src/components/Map/Foo.tsx'],
+    });
+    assert.ok(labels.has('Component: Map'));
+  });
+
+  it('tags workflow changes with quality', () => {
+    const labels = descriptiveLabels({
+      head: 'feature/release-version-policy',
+      changedFiles: ['.github/workflows/ci.yml', 'scripts/lib/pr-labels.mjs'],
+    });
+    assert.ok(labels.has('quality'));
+    assert.ok(labels.has('Enhancement'));
+  });
+
+  it('tags docs-only PRs as Documentation', () => {
+    const labels = descriptiveLabels({
+      head: 'chore/docs',
+      changedFiles: ['docs/release-workflow.md', 'CHANGELOG.md'],
+    });
+    assert.equal(labels.has('javascript'), false);
+    assert.ok(labels.has('Documentation'));
+  });
+});
+
+describe('computePrLabels', () => {
+  it('merges routing, descriptive, and changelog status', () => {
+    const labels = computePrLabels({
+      head: 'fix/keyboard',
+      base: 'beta',
+      changedFiles: ['src/components/Map/x.ts', 'CHANGELOG.md'],
+      mergeable: true,
+      draft: false,
+      changelogOk: true,
+    });
+    assert.ok(labels.includes('fix'));
+    assert.ok(labels.includes('Bug'));
+    assert.ok(labels.includes('Component: Map'));
+    assert.ok(labels.includes('changelog:ok'));
+  });
+});
