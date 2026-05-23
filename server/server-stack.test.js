@@ -2,9 +2,8 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
 
-/** @param {import('http').Server} server */
+/** @param {import('node:http').Server} server */
 const getServerPort = (server) => {
   const address = server.address();
   if (!address || typeof address === 'string') {
@@ -14,8 +13,8 @@ const getServerPort = (server) => {
 };
 
 describe('analytics server stack (express 5)', () => {
-  /** @type {import('http').Server | undefined} */
-  let server;
+  /** @type {import('node:http').Server | undefined} */
+  let server = undefined;
 
   before(async () => {
     const express = require('express');
