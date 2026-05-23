@@ -126,6 +126,45 @@ const contentLabelsFromDiff = (changedFiles) => {
   return labels;
 };
 
+/** @type {Array<[prefix: string, label: string]>} */
+const BRANCH_KIND_LABELS = [
+  ['feature/', 'feature'],
+  ['fix/', 'fix'],
+  ['hotfix/', 'hotfix'],
+  ['release/', 'release'],
+  ['port/', 'port'],
+  ['refactor/', 'refactor'],
+];
+
+/**
+ * @param {string} head
+ * @returns {Set<string>}
+ */
+const branchKindLabels = (head) => {
+  const labels = new Set();
+  for (const [prefix, label] of BRANCH_KIND_LABELS) {
+    if (head.startsWith(prefix)) labels.add(label);
+  }
+  return labels;
+};
+
+/**
+ * @param {string} head
+ * @returns {Set<string>}
+ */
+const betaIntegrationLabels = (head) => {
+  const labels = new Set();
+  if (head.startsWith('hotfix/')) return labels;
+  if (head.startsWith('feature/') || head.startsWith('fix/')) {
+    labels.add('integration:primary');
+    return labels;
+  }
+  if (head !== 'beta' && !head.startsWith('port/')) {
+    labels.add('integration:other');
+  }
+  return labels;
+};
+
 /**
  * Branch routing and integration priority labels.
  *
@@ -133,24 +172,11 @@ const contentLabelsFromDiff = (changedFiles) => {
  * @returns {Set<string>}
  */
 export const routingLabels = ({ head, base }) => {
-  const labels = new Set();
-
+  const labels = branchKindLabels(head);
   if (head === 'beta' && base === 'main') labels.add('promotion');
-  if (head.startsWith('feature/')) labels.add('feature');
-  if (head.startsWith('fix/')) labels.add('fix');
-  if (head.startsWith('hotfix/')) labels.add('hotfix');
-  if (head.startsWith('release/')) labels.add('release');
-  if (head.startsWith('port/')) labels.add('port');
-  if (head.startsWith('refactor/')) labels.add('refactor');
-
-  if (base === 'beta' && !head.startsWith('hotfix/')) {
-    if (head.startsWith('feature/') || head.startsWith('fix/')) {
-      labels.add('integration:primary');
-    } else if (head !== 'beta' && !head.startsWith('port/')) {
-      labels.add('integration:other');
-    }
+  if (base === 'beta') {
+    for (const label of betaIntegrationLabels(head)) labels.add(label);
   }
-
   return labels;
 };
 
