@@ -59,6 +59,7 @@ If you merged release automation before this step existed, run **Post-merge auto
 | Other names (not `hotfix/*`) | `beta` | Yes |
 | `hotfix/*` | `main` | Yes |
 | `beta` | `main` | Yes (promotion) |
+| `feature/release-*` | `main` | Yes (release infrastructure) |
 | `feature/*`, `fix/*`, other | `main` | **Blocked** |
 | `hotfix/*` | `beta` | **Blocked** |
 
@@ -71,6 +72,10 @@ If you merged release automation before this step existed, run **Post-merge auto
 | `beta` | Must include `-beta.N` (e.g. `1.6.0-beta.2`) |
 | `main` | Stable semver only (e.g. `1.6.0`) |
 | PR **beta → main** | May show `-beta` on the PR; stripped automatically after merge |
+
+## Dependabot
+
+Version update PRs from `.github/dependabot.yml` open against **beta** (root and `server/`). They ride the normal integration and **beta → main** promotion path. For an urgent CVE on production before the next promotion, use **hotfix/* → main** (or merge the dependency fix to `main` manually) instead of waiting on Dependabot alone.
 
 ## Changelog
 

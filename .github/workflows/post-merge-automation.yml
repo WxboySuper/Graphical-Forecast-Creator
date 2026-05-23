@@ -46,6 +46,14 @@ jobs:
         with:
           node-version: '24.x'
 
+      - name: Validate workflow dispatch inputs
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ inputs.sync_beta_from_main }}" != "true" ]; then
+            echo "Enable sync_beta_from_main or this workflow will not run any steps."
+            exit 1
+          fi
+
       - name: Sync beta from main after release infrastructure merge
         if: >-
           (github.event_name == 'workflow_dispatch' && inputs.sync_beta_from_main) ||
@@ -161,8 +169,6 @@ jobs:
           github.event.pull_request.head.ref != 'beta' &&
           !startsWith(github.event.pull_request.head.ref, 'port/') &&
           !startsWith(github.event.pull_request.head.ref, 'hotfix/')
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
           for attempt in 1 2 3 4 5; do

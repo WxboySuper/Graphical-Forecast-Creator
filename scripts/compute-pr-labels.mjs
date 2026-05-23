@@ -17,7 +17,12 @@ const changedFiles = listChangedFilesBetweenRefs(baseRef, headRef);
 const branchPolicy = evaluateBranchPolicy({ baseRef, headRef });
 let changelogOk = true;
 
-if (branchPolicy.ok && branchPolicy.kind !== 'beta-promotion' && !headRef.startsWith('port/')) {
+if (
+  branchPolicy.ok &&
+  branchPolicy.kind !== 'beta-promotion' &&
+  branchPolicy.kind !== 'release-infrastructure' &&
+  !headRef.startsWith('port/')
+) {
   const changelogResult = changelogTouchesPr(changedFiles, prBody);
   changelogOk = changelogResult.ok;
 }
