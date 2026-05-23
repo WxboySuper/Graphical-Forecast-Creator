@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - **stripe:** ^18.4.0 → ^22.1.1 (`server`)
 
 ### Fixed
+- **Analytics server tests:** Share `configureApp` with production so `/collect` stays rate-limited in server smoke tests (fixes CodeQL `js/missing-rate-limiting` on `beta`).
 - **Analytics server (beta):** Restored a broken partial merge in `server/analytics.js` so the hosted collector starts again before Express 5 / Stripe 22 land.
 - **Stripe subscription webhooks:** Read `current_period_end` from subscription items for Stripe API 2025-03-31+ (stripe-node v22) with fallback for older payloads.
 - **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
