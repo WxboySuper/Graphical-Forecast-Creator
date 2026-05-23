@@ -79,6 +79,12 @@ If you merged release automation before this step existed, run **Post-merge auto
 
 Version update PRs from `.github/dependabot.yml` open against **beta** (root and `server/`). They ride the normal integration and **beta → main** promotion path. For an urgent CVE on production before the next promotion, use **hotfix/* → main** (or merge the dependency fix to `main` manually) instead of waiting on Dependabot alone.
 
+### Dependabot changelog automation
+
+- **Dependabot changelog** workflow (`dependabot-changelog.yml`) runs on each Dependabot PR and commits bullets under **`### Dependencies`** in the active changelog section (`## [Unreleased]` on `main`, or the top `## vX.Y` line on `beta`).
+- CI requires `CHANGELOG.md` to include those entries (not a generic changelog skip). Entries use the form `- **package:** old → new` with `(\`server\`)` when the bump is under `server/package.json`.
+- Dependency notes accumulate under **Dependencies** until the next **beta → main** promotion ships them in the stable GitHub Release for that line.
+
 ## Changelog
 
 For PRs into **beta** (feature/fix) and **hotfix → main**:

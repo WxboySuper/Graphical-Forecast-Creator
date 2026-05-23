@@ -36,11 +36,6 @@ if (headRef.startsWith('port/')) {
   process.exit(0);
 }
 
-if (headRef.startsWith('dependabot/')) {
-  console.log('Skipping changelog check for Dependabot version updates.');
-  process.exit(0);
-}
-
 const changedFiles = listChangedFilesBetweenRefs(baseRef, headRef);
 
 if (headRef.startsWith('dependabot/')) {
@@ -57,6 +52,25 @@ if (headRef.startsWith('dependabot/')) {
   process.exit(0);
 }
 
+<<<<<<< HEAD
+const changedFiles = listChangedFilesBetweenRefs(baseRef, headRef);
+
+if (headRef.startsWith('dependabot/')) {
+  const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
+  const changelogAtHead = execFileSync('git', ['show', `origin/${headRef}:CHANGELOG.md`], {
+    encoding: 'utf8',
+  });
+  const result = dependabotChangelogTouchesPr(changedFiles, changelogAtHead, bumps);
+  if (!result.ok) {
+    console.error(result.reason);
+    process.exit(1);
+  }
+  console.log(result.reason);
+  process.exit(0);
+}
+
+=======
+>>>>>>> f4aafc8 (Add Dependabot changelog automation with a Dependencies section.)
 const result = changelogTouchesPr(changedFiles, prBody);
 
 if (!result.ok) {
