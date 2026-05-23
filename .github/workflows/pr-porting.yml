@@ -2,9 +2,13 @@ name: PR Porting System
 
 # Automates porting changes across the branch hierarchy via Pull Requests.
 #
+# main → beta is NOT ported here when post-merge-automation.yml already syncs beta
+# (beta promotion, release/*, feature/release-*). Those use direct CI pushes with version bumps.
+# hotfix/* → main still opens port PRs into beta (post-merge only bumps main).
+#
 # Flows:
-# 1. hotfix/* → main (broadcasts to beta, other hotfix/*, and all feature/*)
-# 2. feature/* → beta (broadcasts to all other feature/*)
+# 1. hotfix/* → main (port PRs to beta, other hotfix/*, and all feature/*)
+# 2. feature/* → beta (port PRs to all other feature/*)
 #
 # On conflicts: opens draft port PRs with conflict markers, files a tracking issue,
 # and annotates the workflow run so ports are not silently dropped.

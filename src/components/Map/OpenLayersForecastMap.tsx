@@ -361,8 +361,10 @@ export const toOlStyle = (
     probability,
   );
   const fillColor = String(style.fillColor || "#ffffff");
-  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity });
-  const strokeOpacity = typeof style.opacity === "number" ? style.opacity : 1;
+  const fillOpacity =
+    resolveFillOpacity({ fillOpacity: style.fillOpacity }) * alphaScale;
+  const strokeOpacity =
+    (typeof style.opacity === "number" ? style.opacity : 1) * alphaScale;
   const strokeColor = String(style.color || "#000000");
   const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
   const fill = createOutlookFill({ probability, fillColor, fillOpacity });
