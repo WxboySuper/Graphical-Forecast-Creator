@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 <!-- dependabot-automation -->
 
 ### Changed
+- **Dependabot grouping:** Root and `server/` npm version updates are combined into one multi-ecosystem Dependabot PR targeting `beta` instead of one PR per package.
 - **Post-merge `release/*` → main:** Automation now merges `main` into `beta` after every `release/*` merge (same as `feature/release-*`), not only when `package.json` changes — prevents beta from drifting behind main.
 - **Porting vs post-merge:** PR porting no longer opens `port/* → beta` when post-merge automation already syncs `main` into `beta` (beta promotion, `release/*`, and `feature/release-*` merges). CI fails redundant `port/* → beta` PRs so duplicate port work cannot merge.
 - **GitHub Releases on every version bump:** Post-merge automation now publishes a release whenever `package.json` changes — stable tags on `main` (promotion, hotfix, release branch, bootstrap backfill) and prerelease tags on `beta` after each `-beta.N` integration merge.
