@@ -36,11 +36,12 @@ jobs:
         id: app_version
         run: |
           RAW=$(node scripts/read-package-version.mjs)
-          STABLE=$(node --input-type=module -e "
+          STABLE=$(RAW_VERSION="$RAW" node --input-type=module -e "
             import { deriveStableVersion } from './scripts/lib/package-version.mjs';
-            const stable = deriveStableVersion(process.argv[1]);
-            console.log(stable ?? process.argv[1]);
-          " "$RAW")
+            const raw = process.env.RAW_VERSION ?? '';
+            const stable = deriveStableVersion(raw);
+            console.log(stable ?? raw);
+          ")
           if ! printf '%s' "$RAW" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
             echo "Invalid package version format: $RAW" >&2
             exit 1
