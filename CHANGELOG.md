@@ -5,8 +5,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Dependencies
+<!-- dependabot-automation -->
+
 ### Changed
+- **Post-merge `release/*` → main:** Automation now merges `main` into `beta` after every `release/*` merge (same as `feature/release-*`), not only when `package.json` changes — prevents beta from drifting behind main.
+- **Porting vs post-merge:** PR porting no longer opens `port/* → beta` when post-merge automation already syncs `main` into `beta` (beta promotion, `release/*`, and `feature/release-*` merges). CI fails redundant `port/* → beta` PRs so duplicate port work cannot merge.
+- **GitHub Releases on every version bump:** Post-merge automation now publishes a release whenever `package.json` changes — stable tags on `main` (promotion, hotfix, release branch, bootstrap backfill) and prerelease tags on `beta` after each `-beta.N` integration merge.
 - **Release automation:** Beta → main stays a normal PR; merge triggers stable versioning on `main`, GitHub Releases from CHANGELOG (including hotfixes), and beta prerelease bumps. CI enforces branch routing (preferred `feature/*`/`fix/*` → beta; only `hotfix/*` blocked on beta), changelog checks, and automated PR labels. Workflow definitions ship on `main` so GitHub can run them for repository pull requests.
+- **Post-merge bootstrap:** `feature/release-*` → `main` syncs automation to `beta`, backfills the stable GitHub Release for `main`, starts the next `-beta.N` line, and publishes the first prerelease; manual `workflow_dispatch` recovery when bootstrap was missed.
+- **Dependabot:** Version update PRs for root and `server/` npm ecosystems target `beta` (not `main`). **Dependabot changelog** workflow maintains `### Dependencies` under `[Unreleased]`; CI validates those bullets instead of skipping changelog checks.
 
 ## v1.6
 
