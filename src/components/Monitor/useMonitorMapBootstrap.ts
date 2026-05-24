@@ -41,9 +41,9 @@ interface UseMonitorMapBootstrapArgs {
   satelliteOpacity: number;
   alertsOpacity: number;
   mapElementRef: RefObject<HTMLDivElement | null>;
-  popupRef: RefObject<HTMLDivElement | null>;
   refs: MonitorMapRefs;
   onSelectAlert: (details: NwsAlertDetails | null) => void;
+  onCreatePopupElement: (el: HTMLDivElement | null) => void;
 }
 
 export const useMonitorMapBootstrap = ({
@@ -53,9 +53,9 @@ export const useMonitorMapBootstrap = ({
   satelliteOpacity,
   alertsOpacity,
   mapElementRef,
-  popupRef,
   refs,
   onSelectAlert,
+  onCreatePopupElement,
 }: UseMonitorMapBootstrapArgs) => {
   const dispatch = useDispatch<AppDispatch>();
 
@@ -164,11 +164,13 @@ export const useMonitorMapBootstrap = ({
     map.on('click', handleMapClick);
     map.on('pointermove', handlePointerMove);
 
-    if (popupRef.current) {
-      const overlay = new Overlay({ element: popupRef.current, autoPan: false });
-      map.addOverlay(overlay);
-      refs.overlayRef.current = overlay;
-    }
+    const popupEl = document.createElement("div");
+    popupEl.className = "monitor-map__alertOverlay";
+    refs.popupElRef.current = popupEl;
+    onCreatePopupElement(popupEl);
+    const overlay = new Overlay({ element: popupEl, autoPan: false });
+    map.addOverlay(overlay);
+    refs.overlayRef.current = overlay;
 
     refs.mapRef.current = map;
     refs.radarLayerRef.current = radarLayerInstance;
@@ -204,8 +206,16 @@ export const useMonitorMapBootstrap = ({
       if (target instanceof HTMLElement) {
         target.style.cursor = '';
       }
+      if (refs.overlayRef.current) {
+        map.removeOverlay(refs.overlayRef.current);
+        refs.overlayRef.current = null;
+      }
+      if (refs.popupElRef.current) {
+        refs.popupElRef.current.remove();
+        refs.popupElRef.current = null;
+      }
+      onCreatePopupElement(null);
       map.setTarget();
-      refs.overlayRef.current = null;
       refs.mapRef.current = null;
       refs.radarLayerRef.current = null;
       refs.satelliteLayerRef.current = null;

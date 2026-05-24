@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import 'ol/ol.css';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
@@ -35,13 +36,12 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   alertsOpacity,
 }) => {
   const mapElementRef = useRef<HTMLDivElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
   const serializedFeatures = useMemo(
     () => flattenMonitorOutlookFeatures(outlookData, outlookType),
     [outlookData, outlookType],
   );
 
-  const { selectedAlert, handleCloseAlertPopup } = useMonitorOlMap({
+  const { selectedAlert, handleCloseAlertPopup, popupElement } = useMonitorOlMap({
     mapView,
     radarLayer,
     radarOpacity,
@@ -52,17 +52,18 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     alertsCollection,
     alertsOpacity,
     mapElementRef,
-    popupRef,
   });
 
   return (
     <div className="monitor-map" aria-label="Monitor map">
       <div ref={mapElementRef} className="monitor-map__viewport" />
-      <div ref={popupRef} className="monitor-map__alertOverlay">
-        {selectedAlert && (
-          <MonitorAlertPopup details={selectedAlert} onClose={handleCloseAlertPopup} />
+      {popupElement &&
+        createPortal(
+          selectedAlert && (
+            <MonitorAlertPopup details={selectedAlert} onClose={handleCloseAlertPopup} />
+          ),
+          popupElement,
         )}
-      </div>
       <div className="monitor-map__badge">Read-only monitor</div>
     </div>
   );

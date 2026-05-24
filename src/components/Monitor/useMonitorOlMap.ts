@@ -23,12 +23,12 @@ interface UseMonitorOlMapArgs {
   alertsCollection: NwsAlertFeatureCollection;
   alertsOpacity: number;
   mapElementRef: RefObject<HTMLDivElement | null>;
-  popupRef: RefObject<HTMLDivElement | null>;
 }
 
 export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [selectedAlert, setSelectedAlert] = useState<NwsAlertDetails | null>(null);
+  const [popupElement, setPopupElement] = useState<HTMLDivElement | null>(null);
   const refs = useMonitorMapRefs();
 
   const clearSelectedAlert = useCallback(() => {
@@ -45,9 +45,9 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     satelliteOpacity: args.satelliteOpacity,
     alertsOpacity: args.alertsOpacity,
     mapElementRef: args.mapElementRef,
-    popupRef: args.popupRef,
     refs,
     onSelectAlert: setSelectedAlert,
+    onCreatePopupElement: setPopupElement,
   });
 
   useMonitorMapLayerSync({
@@ -68,5 +68,6 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   return {
     selectedAlert,
     handleCloseAlertPopup: clearSelectedAlert,
+    popupElement,
   };
 };
