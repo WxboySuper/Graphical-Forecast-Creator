@@ -1022,7 +1022,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
       if (!el) return;
       if (popupInfo) {
         el.style.display = "block";
-        el.textContent = "";
+        el.innerHTML = "";
         const content = document.createElement("div");
         content.className = "ol-popup-content";
         const name = document.createElement("div");
@@ -1038,7 +1038,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         el.appendChild(content);
       } else {
         el.style.display = "none";
-        el.textContent = "";
+        el.innerHTML = "";
       }
     }, [popupInfo]);
 

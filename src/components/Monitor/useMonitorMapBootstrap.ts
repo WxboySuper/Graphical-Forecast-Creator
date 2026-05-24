@@ -43,6 +43,7 @@ interface UseMonitorMapBootstrapArgs {
   mapElementRef: RefObject<HTMLDivElement | null>;
   refs: MonitorMapRefs;
   onSelectAlert: (details: NwsAlertDetails | null) => void;
+  onCreatePopupElement: (el: HTMLDivElement | null) => void;
 }
 
 export const useMonitorMapBootstrap = ({
@@ -54,6 +55,7 @@ export const useMonitorMapBootstrap = ({
   mapElementRef,
   refs,
   onSelectAlert,
+  onCreatePopupElement,
 }: UseMonitorMapBootstrapArgs) => {
   const dispatch = useDispatch<AppDispatch>();
 
@@ -165,6 +167,7 @@ export const useMonitorMapBootstrap = ({
     const popupEl = document.createElement("div");
     popupEl.className = "monitor-map__alertOverlay";
     refs.popupElRef.current = popupEl;
+    onCreatePopupElement(popupEl);
     const overlay = new Overlay({ element: popupEl, autoPan: false });
     map.addOverlay(overlay);
     refs.overlayRef.current = overlay;
@@ -211,6 +214,7 @@ export const useMonitorMapBootstrap = ({
         refs.popupElRef.current.remove();
         refs.popupElRef.current = null;
       }
+      onCreatePopupElement(null);
       map.setTarget();
       refs.mapRef.current = null;
       refs.radarLayerRef.current = null;

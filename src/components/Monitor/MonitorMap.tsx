@@ -41,7 +41,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     [outlookData, outlookType],
   );
 
-  const { selectedAlert, handleCloseAlertPopup, popupElRef } = useMonitorOlMap({
+  const { selectedAlert, handleCloseAlertPopup, popupElement } = useMonitorOlMap({
     mapView,
     radarLayer,
     radarOpacity,
@@ -57,12 +57,12 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   return (
     <div className="monitor-map" aria-label="Monitor map">
       <div ref={mapElementRef} className="monitor-map__viewport" />
-      {popupElRef.current &&
+      {popupElement &&
         createPortal(
           selectedAlert && (
             <MonitorAlertPopup details={selectedAlert} onClose={handleCloseAlertPopup} />
           ),
-          popupElRef.current,
+          popupElement,
         )}
       <div className="monitor-map__badge">Read-only monitor</div>
     </div>
