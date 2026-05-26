@@ -48,9 +48,9 @@ describe('fileUtils', () => {
       cycleDate: '2026-04-21'
     } as unknown as ForecastCycle;
 
-    expect(() => serializeForecast(corruptedCycle, { center: [0,0], zoom: 0 })).not.toThrow();
-    const ser = serializeForecast(corruptedCycle, { center: [0,0], zoom: 0 });
-    expect(ser.forecastCycle?.days?.[1]?.data?.categorical).toEqual([]);
+    let ser: ReturnType<typeof serializeForecast>;
+    expect(() => { ser = serializeForecast(corruptedCycle, { center: [0,0], zoom: 0 }); }).not.toThrow();
+    expect(ser!.forecastCycle?.days?.[1]?.data?.categorical).toEqual([]);
   });
 
   test('deserializeForecast handles non-Array data without throwing', () => {
@@ -73,5 +73,7 @@ describe('fileUtils', () => {
     };
 
     expect(() => deserializeForecast(corruptedData as never)).not.toThrow();
+    const result = deserializeForecast(corruptedData as never);
+    expect(result.days[1]?.data.tornado instanceof Map).toBe(true);
   });
 });
