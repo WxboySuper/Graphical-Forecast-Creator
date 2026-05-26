@@ -5,10 +5,12 @@ import { compileDiscussionToText } from './discussionUtils';
 const CURRENT_VERSION = '0.5.0';
 
 // Helper to convert Map to Array for JSON serialization
-const mapToArray = <K, V>(m: Map<K, V>): [K, V][] => Array.from(m.entries());
+const mapToArray = <K, V>(m: Map<K, V>): [K, V][] =>
+  m instanceof Map ? Array.from(m.entries()) : [];
 
 // Helper to convert serializable Array back to Map
-const arrayToMap = <K, V>(arr: [K, V][]): Map<K, V> => new Map(arr);
+const arrayToMap = <K, V>(arr: [K, V][]): Map<K, V> =>
+  Array.isArray(arr) ? new Map(arr) : new Map();
 
 // Types for serialization helper
 type SerializedDay = {
