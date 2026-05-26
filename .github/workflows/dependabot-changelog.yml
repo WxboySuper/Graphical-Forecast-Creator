@@ -24,7 +24,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_PAT || github.token }}
 
       - name: Fetch base branch
         run: git fetch origin "${{ github.base_ref }}"
