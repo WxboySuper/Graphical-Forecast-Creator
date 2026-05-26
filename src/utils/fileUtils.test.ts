@@ -50,7 +50,7 @@ describe('fileUtils', () => {
 
     let ser: ReturnType<typeof serializeForecast>;
     expect(() => { ser = serializeForecast(corruptedCycle, { center: [0,0], zoom: 0 }); }).not.toThrow();
-    expect(ser!.forecastCycle?.days?.[1]?.data?.categorical).toEqual([]);
+    expect(ser?.forecastCycle?.days?.[1]?.data?.categorical).toEqual([]);
   });
 
   test('deserializeForecast handles non-Array data without throwing', () => {
