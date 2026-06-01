@@ -1,31 +1,10 @@
 import type { Feature as GeoJsonFeature } from 'geojson';
 import type { MonitorOutlookLayerType } from './types';
 import type { OutlookData, OutlookType } from '../types/outlooks';
+import { coerceOutlookProbabilityMap } from '../utils/outlookMapCoercion';
 
 export { MONITOR_OUTLOOK_LAYER_TYPES } from './types';
-
-/** Accepts Map-backed outlook data and plain objects from legacy persisted cycles. */
-export const coerceOutlookProbabilityMap = (
-  map: Map<string, GeoJsonFeature[]> | Record<string, GeoJsonFeature[]> | undefined | unknown,
-): Map<string, GeoJsonFeature[]> | null => {
-  if (!map) {
-    return null;
-  }
-
-  if (map instanceof Map) {
-    return map;
-  }
-
-  if (typeof map === 'object' && !Array.isArray(map)) {
-    return new Map(
-      Object.entries(map as Record<string, GeoJsonFeature[]>).filter(
-        ([, features]) => Array.isArray(features),
-      ),
-    );
-  }
-
-  return null;
-};
+export { coerceOutlookProbabilityMap };
 
 export const MONITOR_OUTLOOK_LAYER_LABELS: Record<MonitorOutlookLayerType, string> = {
   tornado: 'Tornado',

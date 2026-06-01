@@ -1,6 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
+import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
 import { cloneForecastCycle } from '../utils/fileUtils';
@@ -729,7 +730,7 @@ export const forecastSlice = createSlice({
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
       if (savedCycle) {
-        state.forecastCycle = cloneForecastCycle(savedCycle.forecastCycle);
+        state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
         clearHistory(state);
         state.isSaved = true;
       }

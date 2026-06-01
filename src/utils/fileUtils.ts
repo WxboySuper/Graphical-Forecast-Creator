@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
+import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 
 const CURRENT_VERSION = '0.5.0';
 
@@ -9,8 +10,16 @@ const mapToArray = <K, V>(m: Map<K, V>): [K, V][] =>
   m instanceof Map ? Array.from(m.entries()) : [];
 
 // Helper to convert serializable Array back to Map
-const arrayToMap = <K, V>(arr: [K, V][]): Map<K, V> =>
-  Array.isArray(arr) ? new Map(arr) : new Map();
+const deserializeOutlookMap = <K extends string, V>(
+  value: [K, V][] | Record<string, V> | Map<K, V> | undefined,
+): Map<K, V> | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const coerced = coerceOutlookProbabilityMap(value);
+  return coerced ?? new Map<K, V>();
+};
 
 // Types for serialization helper
 type SerializedDay = {
@@ -123,12 +132,12 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
         const outlookData: OutlookData = {};
         
         // Only deserialize outlook maps that exist in the saved data
-        if (savedDay.data.tornado) outlookData.tornado = arrayToMap(savedDay.data.tornado);
-        if (savedDay.data.wind) outlookData.wind = arrayToMap(savedDay.data.wind);
-        if (savedDay.data.hail) outlookData.hail = arrayToMap(savedDay.data.hail);
-        if (savedDay.data.totalSevere) outlookData.totalSevere = arrayToMap(savedDay.data.totalSevere);
-        if (savedDay.data['day4-8']) outlookData['day4-8'] = arrayToMap(savedDay.data['day4-8']);
-        if (savedDay.data.categorical) outlookData.categorical = arrayToMap(savedDay.data.categorical);
+        if (savedDay.data.tornado) outlookData.tornado = deserializeOutlookMap(savedDay.data.tornado);
+        if (savedDay.data.wind) outlookData.wind = deserializeOutlookMap(savedDay.data.wind);
+        if (savedDay.data.hail) outlookData.hail = deserializeOutlookMap(savedDay.data.hail);
+        if (savedDay.data.totalSevere) outlookData.totalSevere = deserializeOutlookMap(savedDay.data.totalSevere);
+        if (savedDay.data['day4-8']) outlookData['day4-8'] = deserializeOutlookMap(savedDay.data['day4-8']);
+        if (savedDay.data.categorical) outlookData.categorical = deserializeOutlookMap(savedDay.data.categorical);
         
         days[day] = {
           day: savedDay.day,
@@ -168,10 +177,10 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
   const day1 = createEmptyOutlook(1);
   if (data.outlooks) { // Old format used 'outlooks'
     const outlookData: OutlookData = {};
-    if (data.outlooks.tornado) outlookData.tornado = arrayToMap(data.outlooks.tornado);
-    if (data.outlooks.wind) outlookData.wind = arrayToMap(data.outlooks.wind);
-    if (data.outlooks.hail) outlookData.hail = arrayToMap(data.outlooks.hail);
-    if (data.outlooks.categorical) outlookData.categorical = arrayToMap(data.outlooks.categorical);
+    if (data.outlooks.tornado) outlookData.tornado = deserializeOutlookMap(data.outlooks.tornado);
+    if (data.outlooks.wind) outlookData.wind = deserializeOutlookMap(data.outlooks.wind);
+    if (data.outlooks.hail) outlookData.hail = deserializeOutlookMap(data.outlooks.hail);
+    if (data.outlooks.categorical) outlookData.categorical = deserializeOutlookMap(data.outlooks.categorical);
     day1.data = outlookData;
   }
 
@@ -196,12 +205,10 @@ export const cloneForecastCycle = (forecastCycle: ForecastCycle): ForecastCycle 
  */
 export const validateForecastData = (data: unknown): data is GFCForecastSaveData => {
   if (typeof data !== 'object' || data === null) return false;
-  const d = data as Partial<GFCForecastSaveData>;
+  const candidate = data as Partial<GFCForecastSaveData>;
 
   // Check valid structure (either new or old)
-  if (!d.forecastCycle && !d.outlooks) return false;
-  
-  return true;
+  return Boolean(candidate.forecastCycle || candidate.outlooks);
 };
 
 /**

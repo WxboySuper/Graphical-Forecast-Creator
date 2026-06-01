@@ -34,6 +34,7 @@ All notable changes to this project will be documented in this file.
 - **Forecast keyboard shortcuts (GFC-WEB-3):** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts. Centralized the guard in `keyboardShortcutKey` and applied it to forecast, navbar, and day-selector shortcuts.
 - **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
 - **GFC-WEB-6 (auto-save/export crash):** Added runtime guards in `mapToArray` and `arrayToMap` so `serializeForecast`/`deserializeForecast` return fallback values instead of crashing when `OutlookData` Map fields are plain objects at runtime.
+- **GFC-WEB-7 (auto-categorical crash):** Coerce legacy plain-object probability maps to `Map` before auto-categorical iteration so `/forecast` no longer throws `forEach is not a function` when loading old saved cycles from localStorage.
 ## v1.5.3
 
 ### Changed
