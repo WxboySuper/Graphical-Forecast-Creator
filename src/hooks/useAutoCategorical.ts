@@ -297,79 +297,125 @@ const buildCumulativeCategoricalFeatures = (
   return generatedFeatures;
 };
 
-// Helper to convert Day 1/2 probability features to categorical pieces
-export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
-  const riskPolygons = new Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>();
+type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
 
-  // 2. Process each Probability Type
-  const types = ['tornado', 'wind', 'hail'] as const;
-  
-  types.forEach(type => {
-    const probMap = coerceOutlookProbabilityMap(outlooks[type]);
-    if (!probMap || probMap.size === 0) return;
-    
-    // Split into Probability Polygons and Hatching Polygons
-    const probabilityFeatures = new Map<string, Feature<Polygon | MultiPolygon>[]>();
-    const hatchingFeatures = new Map<CIGLevel, Feature<Polygon | MultiPolygon>[]>();
-    
-    probMap.forEach((features, key) => {
-      // Cast to Polygon/MultiPolygon
-      const validFeatures = features.filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') as Feature<Polygon | MultiPolygon>[];
-      if (validFeatures.length === 0) return;
+const isPolygonOutlookFeature = (feature: GeoJSON.Feature): feature is PolygonOutlookFeature =>
+  feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon';
 
-      if (key.startsWith('CIG')) {
-        hatchingFeatures.set(key as CIGLevel, validFeatures);
-      } else {
-        probabilityFeatures.set(key, validFeatures);
+const partitionProbabilityMap = (probMap: Map<string, GeoJSON.Feature[]>) => {
+  const probabilityFeatures = new Map<string, PolygonOutlookFeature[]>();
+  const hatchingFeatures = new Map<CIGLevel, PolygonOutlookFeature[]>();
+
+  probMap.forEach((features, key) => {
+    const validFeatures = features.filter(isPolygonOutlookFeature);
+    if (validFeatures.length === 0) {
+      return;
+    }
+
+    if (key.startsWith('CIG')) {
+      hatchingFeatures.set(key as CIGLevel, validFeatures);
+    } else {
+      probabilityFeatures.set(key, validFeatures);
+    }
+  });
+
+  return { probabilityFeatures, hatchingFeatures };
+};
+
+const buildHatchingRegions = (
+  hatchingFeatures: Map<CIGLevel, PolygonOutlookFeature[]>,
+  cigLevels: CIGLevel[],
+): Map<CIGLevel, PolygonOutlookFeature> => {
+  const hatchingRegions = new Map<CIGLevel, PolygonOutlookFeature>();
+
+  cigLevels.forEach((cig) => {
+    const features = hatchingFeatures.get(cig);
+    if (features) {
+      const unioned = safeUnion(features);
+      if (unioned) {
+        hatchingRegions.set(cig, unioned);
       }
-    });
+    }
+  });
 
-    // Create Unioned Hatching Regions for this type
-    const hatchingRegions = new Map<CIGLevel, Feature<Polygon | MultiPolygon>>();
-    const cigLevels: CIGLevel[] = ['CIG3', 'CIG2', 'CIG1'];
-    
-    cigLevels.forEach(cig => {
-      const features = hatchingFeatures.get(cig);
-      if (features) {
-        const unioned = safeUnion(features);
-        if (unioned) hatchingRegions.set(cig, unioned);
-      }
-    });
+  return hatchingRegions;
+};
 
-    // Process Probabilities against Hatching (of the same type)
-    probabilityFeatures.forEach((features, probStr) => {
-      features.forEach(poly => {
-        let remainingPoly: Feature<Polygon | MultiPolygon> | null = poly;
+const applyProbabilityFeaturesWithHatching = (
+  probabilityFeatures: Map<string, PolygonOutlookFeature[]>,
+  hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>,
+  cigLevels: CIGLevel[],
+  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature) => void,
+): void => {
+  probabilityFeatures.forEach((features, probStr) => {
+    features.forEach((poly) => {
+      let remainingPoly: PolygonOutlookFeature | null = poly;
 
-        // Intersect with Hatching Layers
-        cigLevels.forEach(cig => {
-          if (!remainingPoly) return;
-          const hatchRegion = hatchingRegions.get(cig);
-          
-          if (hatchRegion) {
-            try {
-              // Turf v7: intersect takes FeatureCollection
-              const intersection = turf.intersect(turf.featureCollection([remainingPoly, hatchRegion]));
-              if (intersection) {
-                // We found a piece with this CIG level
-                addPieceToRiskMap(type, probStr, cig, intersection as Feature<Polygon | MultiPolygon>, riskPolygons);
-                
-                // Subtract this piece from the remaining polygon
-                // Turf v7: difference takes FeatureCollection
-                remainingPoly = turf.difference(turf.featureCollection([remainingPoly, intersection as Feature<Polygon | MultiPolygon>])) as Feature<Polygon | MultiPolygon> | null;
-              }
-            } catch {
-              // Ignore topology errors
-            }
+      cigLevels.forEach((cig) => {
+        if (!remainingPoly) {
+          return;
+        }
+
+        const hatchRegion = hatchingRegions.get(cig);
+        if (!hatchRegion) {
+          return;
+        }
+
+        try {
+          const intersection = turf.intersect(turf.featureCollection([remainingPoly, hatchRegion]));
+          if (intersection) {
+            onPiece(probStr, cig, intersection as PolygonOutlookFeature);
+            remainingPoly = turf.difference(
+              turf.featureCollection([remainingPoly, intersection as PolygonOutlookFeature]),
+            ) as PolygonOutlookFeature | null;
           }
-        });
-
-        // Any remaining part is CIG0
-        if (remainingPoly) {
-          addPieceToRiskMap(type, probStr, 'CIG0', remainingPoly, riskPolygons);
+        } catch {
+          // Ignore topology errors
         }
       });
+
+      if (remainingPoly) {
+        onPiece(probStr, 'CIG0', remainingPoly);
+      }
     });
+  });
+};
+
+const appendRiskPolygon = (
+  riskMap: Map<CategoricalRiskLevel, PolygonOutlookFeature[]>,
+  risk: CategoricalRiskLevel,
+  poly: PolygonOutlookFeature,
+): void => {
+  if (risk === 'TSTM') {
+    return;
+  }
+
+  const current = riskMap.get(risk) || [];
+  current.push(poly);
+  riskMap.set(risk, current);
+};
+
+// Helper to convert Day 1/2 probability features to categorical pieces
+export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
+  const riskPolygons = new Map<CategoricalRiskLevel, PolygonOutlookFeature[]>();
+  const types = ['tornado', 'wind', 'hail'] as const;
+  const cigLevels: CIGLevel[] = ['CIG3', 'CIG2', 'CIG1'];
+
+  types.forEach((type) => {
+    const probMap = coerceOutlookProbabilityMap(outlooks[type]);
+    if (!probMap || probMap.size === 0) {
+      return;
+    }
+
+    const { probabilityFeatures, hatchingFeatures } = partitionProbabilityMap(probMap);
+    const hatchingRegions = buildHatchingRegions(hatchingFeatures, cigLevels);
+
+    applyProbabilityFeaturesWithHatching(
+      probabilityFeatures,
+      hatchingRegions,
+      cigLevels,
+      (probStr, cig, piece) => addPieceToRiskMap(type, probStr, cig, piece, riskPolygons),
+    );
   });
 
   return buildCumulativeCategoricalFeatures(riskPolygons);
@@ -380,101 +426,40 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
  * bucket and appends it unless it resolves to TSTM.
  */
 function addPieceToRiskMap(
-  type: 'tornado' | 'wind' | 'hail', 
-  prob: string, 
-  cig: CIGLevel, 
-  poly: Feature<Polygon | MultiPolygon>,
-  riskMap: Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>
+  type: 'tornado' | 'wind' | 'hail',
+  prob: string,
+  cig: CIGLevel,
+  poly: PolygonOutlookFeature,
+  riskMap: Map<CategoricalRiskLevel, PolygonOutlookFeature[]>,
 ) {
-    let risk: CategoricalRiskLevel = 'TSTM';
-    if (type === 'tornado') risk = tornadoToCategorical(prob, cig);
-    if (type === 'wind') risk = windToCategorical(prob, cig);
-    if (type === 'hail') risk = hailToCategorical(prob, cig);
+  let risk: CategoricalRiskLevel = 'TSTM';
+  if (type === 'tornado') risk = tornadoToCategorical(prob, cig);
+  if (type === 'wind') risk = windToCategorical(prob, cig);
+  if (type === 'hail') risk = hailToCategorical(prob, cig);
 
-    if (risk !== 'TSTM') {
-        const current = riskMap.get(risk) || [];
-        current.push(poly);
-        riskMap.set(risk, current);
-    }
+  appendRiskPolygon(riskMap, risk, poly);
 }
 
 // Helper to convert Day 3 Total Severe probability features to categorical pieces
 export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
-  const riskPolygons = new Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>();
-
-  // Day 3 only has totalSevere
+  const riskPolygons = new Map<CategoricalRiskLevel, PolygonOutlookFeature[]>();
   const probMap = coerceOutlookProbabilityMap(outlooks.totalSevere);
-  if (!probMap || probMap.size === 0) return [];
-  
-  // Split into Probability Polygons and Hatching Polygons
-  const probabilityFeatures = new Map<string, Feature<Polygon | MultiPolygon>[]>();
-  const hatchingFeatures = new Map<CIGLevel, Feature<Polygon | MultiPolygon>[]>();
-  
-  probMap.forEach((features, key) => {
-    const validFeatures = features.filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') as Feature<Polygon | MultiPolygon>[];
-    if (validFeatures.length === 0) return;
+  if (!probMap || probMap.size === 0) {
+    return [];
+  }
 
-    if (key.startsWith('CIG')) {
-      hatchingFeatures.set(key as CIGLevel, validFeatures);
-    } else {
-      probabilityFeatures.set(key, validFeatures);
-    }
-  });
+  const cigLevels: CIGLevel[] = ['CIG2', 'CIG1'];
+  const { probabilityFeatures, hatchingFeatures } = partitionProbabilityMap(probMap);
+  const hatchingRegions = buildHatchingRegions(hatchingFeatures, cigLevels);
 
-  // Create Unioned Hatching Regions
-  const hatchingRegions = new Map<CIGLevel, Feature<Polygon | MultiPolygon>>();
-  const cigLevels: CIGLevel[] = ['CIG2', 'CIG1']; // Day 3 only has CIG0, 1, 2 (no CIG3)
-  
-  cigLevels.forEach(cig => {
-    const features = hatchingFeatures.get(cig);
-    if (features) {
-      const unioned = safeUnion(features);
-      if (unioned) hatchingRegions.set(cig, unioned);
-    }
-  });
-
-  // Process Probabilities against Hatching
-  probabilityFeatures.forEach((features, probStr) => {
-    features.forEach(poly => {
-      let remainingPoly: Feature<Polygon | MultiPolygon> | null = poly;
-
-      // Intersect with Hatching Layers
-      cigLevels.forEach(cig => {
-        if (!remainingPoly) return;
-        const hatchRegion = hatchingRegions.get(cig);
-        
-        if (hatchRegion) {
-          try {
-            const intersection = turf.intersect(turf.featureCollection([remainingPoly, hatchRegion]));
-            if (intersection) {
-              // We found a piece with this CIG level
-              const risk = totalSevereToCategorical(probStr, cig);
-              if (risk !== 'TSTM') {
-                const current = riskPolygons.get(risk) || [];
-                current.push(intersection as Feature<Polygon | MultiPolygon>);
-                riskPolygons.set(risk, current);
-              }
-              
-              // Subtract this piece from the remaining polygon
-              remainingPoly = turf.difference(turf.featureCollection([remainingPoly, intersection as Feature<Polygon | MultiPolygon>])) as Feature<Polygon | MultiPolygon> | null;
-            }
-          } catch (e) {
-            // Ignore topology errors
-          }
-        }
-      });
-
-      // Any remaining part is CIG0
-      if (remainingPoly) {
-        const risk = totalSevereToCategorical(probStr, 'CIG0');
-        if (risk !== 'TSTM') {
-          const current = riskPolygons.get(risk) || [];
-          current.push(remainingPoly);
-          riskPolygons.set(risk, current);
-        }
-      }
-    });
-  });
+  applyProbabilityFeaturesWithHatching(
+    probabilityFeatures,
+    hatchingRegions,
+    cigLevels,
+    (probStr, cig, piece) => {
+      appendRiskPolygon(riskPolygons, totalSevereToCategorical(probStr, cig), piece);
+    },
+  );
 
   return buildCumulativeCategoricalFeatures(riskPolygons);
 }

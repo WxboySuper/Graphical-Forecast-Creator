@@ -205,12 +205,10 @@ export const cloneForecastCycle = (forecastCycle: ForecastCycle): ForecastCycle 
  */
 export const validateForecastData = (data: unknown): data is GFCForecastSaveData => {
   if (typeof data !== 'object' || data === null) return false;
-  const d = data as Partial<GFCForecastSaveData>;
+  const candidate = data as Partial<GFCForecastSaveData>;
 
   // Check valid structure (either new or old)
-  if (!d.forecastCycle && !d.outlooks) return false;
-  
-  return true;
+  return Boolean(candidate.forecastCycle || candidate.outlooks);
 };
 
 /**

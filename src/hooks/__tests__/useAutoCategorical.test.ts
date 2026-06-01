@@ -125,29 +125,30 @@ describe('processOutlooksToCategorical', () => {
     expect(result[0].properties?.outlookType).toBe('categorical');
   });
 
-  test('GFC-WEB-7: processDay12OutlooksToCategorical does not throw on empty legacy plain-object maps', () => {
-    const outlooks = {
-      tornado: {},
-      wind: {},
-      hail: {},
-      categorical: {},
-    } as unknown as OutlookData;
-
-    expect(() => processDay12OutlooksToCategorical(outlooks)).not.toThrow();
-    expect(processDay12OutlooksToCategorical(outlooks)).toEqual([]);
-  });
-
-  test('processDay12OutlooksToCategorical tolerates legacy plain-object probability maps', () => {
-    const outlooks = {
-      tornado: {},
-      wind: { '30%': [makeFeature('wind')] },
-      hail: new Map(),
-      categorical: {},
-    } as unknown as OutlookData;
-
-    expect(() => processDay12OutlooksToCategorical(outlooks)).not.toThrow();
-    expect(processDay12OutlooksToCategorical(outlooks).length).toBeGreaterThan(0);
-  });
+  test.each([
+    [
+      'empty legacy plain-object maps',
+      { tornado: {}, wind: {}, hail: {}, categorical: {} },
+      0,
+    ],
+    [
+      'legacy plain-object wind probabilities',
+      { tornado: {}, wind: { '30%': [makeFeature('wind')] }, hail: new Map(), categorical: {} },
+      1,
+    ],
+  ] as const)(
+    'GFC-WEB-7: processDay12OutlooksToCategorical tolerates %s',
+    (_label, outlooks, minFeatures) => {
+      const typedOutlooks = outlooks as unknown as OutlookData;
+      expect(() => processDay12OutlooksToCategorical(typedOutlooks)).not.toThrow();
+      const result = processDay12OutlooksToCategorical(typedOutlooks);
+      if (minFeatures === 0) {
+        expect(result).toEqual([]);
+      } else {
+        expect(result.length).toBeGreaterThanOrEqual(minFeatures);
+      }
+    },
+  );
 
   test('handles hatching intersections and union fallbacks for day 1 and day 2', () => {
     const outlooks: OutlookData = {
