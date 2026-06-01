@@ -6,6 +6,7 @@ export { MonitorPage } from './MonitorPage';
 export { ComingSoonPage } from './ComingSoonPage';
 export { AccountPage } from './AccountPage';
 export { PricingPage } from './PricingPage';
+export { UpdatesPage } from './UpdatesPage';
 export { AdminPage } from './AdminPage';
 export { default as BetaLandingPage } from './BetaLandingPage';
 export { default as BetaInvitePage } from './BetaInvitePage';

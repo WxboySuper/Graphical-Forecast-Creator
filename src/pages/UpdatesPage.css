@@ -1,0 +1,115 @@
+.updates-page {
+  min-height: 100%;
+  overflow: auto;
+  background: linear-gradient(180deg, var(--bg-primary) 0%, color-mix(in srgb, var(--muted) 35%, var(--bg-primary)) 100%);
+}
+
+.updates-page__inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 2rem) 4rem;
+}
+
+.updates-page__eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--button-bg);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.updates-page h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.updates-page__summary {
+  margin: 1rem 0 0;
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+.updates-page__section {
+  margin-top: 2.5rem;
+}
+
+.updates-page__section h2 {
+  margin: 0 0 0.75rem;
+  color: var(--text-primary);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.updates-page__section p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.updates-page__shots {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.updates-page__figure {
+  margin: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.updates-page__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.updates-page__figure figcaption {
+  padding: 0.65rem 0.9rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.updates-page__improvements {
+  margin: 2.5rem 0 0;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--bg-secondary);
+}
+
+.updates-page__improvements h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+}
+
+.updates-page__improvements ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.updates-page__improvements li + li {
+  margin-top: 0.45rem;
+}
+
+.updates-page__back {
+  display: inline-flex;
+  margin-top: 2.5rem;
+  color: var(--button-bg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.updates-page__back:hover {
+  text-decoration: underline;
+}

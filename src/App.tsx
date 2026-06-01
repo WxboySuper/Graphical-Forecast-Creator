@@ -20,7 +20,7 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
 import { AppLayout } from './components/Layout';
-import { HomePage, ForecastPage, DiscussionPage, VerificationPage, MonitorPage, ComingSoonPage, AccountPage, PricingPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
+import { HomePage, ForecastPage, DiscussionPage, VerificationPage, MonitorPage, ComingSoonPage, AccountPage, PricingPage, UpdatesPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
 import CloudLibraryPage from './pages/CloudLibraryPage';
 import BetaAccessGuard from './components/Beta/BetaAccessGuard';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
@@ -141,6 +141,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="pricing" element={<PricingPage />} />
+        <Route path="updates" element={<UpdatesPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route path="cloud" element={<CloudLibraryPage />} />
         <Route path="forecast" element={<ForecastPage />} />

@@ -24,6 +24,8 @@ All notable changes to this project will be documented in this file.
 - **ts-jest:** ^29.4.9 → ^29.4.11
 - **vite:** ^8.0.13 → ^8.0.14
 
+### Added
+- **What's New page:** Public `/updates` route with v1.6 copy in `src/content/updates/v1.6.ts` and screenshot directory `public/updates/v1.6/` (images optional until marketing adds them).
 
 ### Fixed
 - **Analytics server tests:** Share `configureApp` with production so `/collect` stays rate-limited in server smoke tests (fixes CodeQL `js/missing-rate-limiting` on `beta`).
