@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 
 ## v1.6
 
+### Added
+- **Monitor (`/monitor`):** Live weather workspace with radar and satellite WMS layers (site and composite modes, opacity, animation speed), read-only overlay of the active forecast cycle / saved local cycles / premium cloud library outlooks, NWS watches-warnings-advisories layer, and storm reports with hazard filters plus optional outlook-type matching. Redux `monitorSlice`, `MonitorControls` / `MonitorMap`, premium settings sync via `usePremiumMonitorSettingsSync`, and navbar route with shortcut.
+- **Monitor — NWS alerts & storm reports:** `useMonitorNwsAlerts` and `useMonitorStormReports` integrations, panel toggles, and map rendering for alert polygons and report markers.
+- **Monitor — outlook on map:** `buildMonitorOutlookOptions`, cloud outlook fetch hook, and OpenLayers outlook layer styling aligned with forecast outlook types.
+
+### Changed
+- **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`), subscription webhook `current_period_end` from subscription items (Stripe API 2025-03-31+) with legacy fallback, and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
+
 ### Dependencies
 <!-- dependabot-automation -->
 
@@ -30,7 +38,7 @@ All notable changes to this project will be documented in this file.
 - **Analytics server (beta):** Restored a broken partial merge in `server/analytics.js` so the hosted collector starts again before Express 5 / Stripe 22 land.
 - **Stripe subscription webhooks:** Read `current_period_end` from subscription items for Stripe API 2025-03-31+ (stripe-node v22) with fallback for older payloads.
 - **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
-- **GFC-WEB-4 (monitor startup):** Break circular import between `monitor/types` and `monitorSettingsNormalize` that crashed the hosted app at load (`Gv is not iterable` / `MONITOR_OUTLOOK_LAYER_TYPES` before initialization when spreading outlook layer types).
+- **OpenLayers popups:** Avoid `removeChild` NotFoundError when React popup nodes are moved during map teardown.
 - **Forecast keyboard shortcuts (GFC-WEB-3):** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts. Centralized the guard in `keyboardShortcutKey` and applied it to forecast, navbar, and day-selector shortcuts.
 - **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
 - **GFC-WEB-6 (auto-save/export crash):** Added runtime guards in `mapToArray` and `arrayToMap` so `serializeForecast`/`deserializeForecast` return fallback values instead of crashing when `OutlookData` Map fields are plain objects at runtime.
@@ -73,24 +81,6 @@ All notable changes to this project will be documented in this file.
 - **Release automation:** Beta → main stays a normal PR; merge triggers stable versioning on `main`, GitHub Releases from CHANGELOG (including hotfixes), and beta prerelease bumps. CI enforces branch routing (preferred `feature/*`/`fix/*` → beta; only `hotfix/*` blocked on beta), changelog checks, and automated PR labels. Workflow definitions ship on `main` so GitHub can run them for repository pull requests.
 - **Post-merge bootstrap:** `feature/release-*` → `main` syncs automation to `beta`, backfills the stable GitHub Release for `main`, starts the next `-beta.N` line, and publishes the first prerelease; manual `workflow_dispatch` recovery when bootstrap was missed.
 - **Dependabot:** Version update PRs for root and `server/` npm ecosystems target `beta` (not `main`). **Dependabot changelog** workflow maintains `### Dependencies` under `[Unreleased]`; CI validates those bullets instead of skipping changelog checks.
-
-## v1.6
-
-### Fixed
-- **Forecast keyboard shortcuts:** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (reported in production via Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts.
-- **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
-
-## v1.5.3
-
-### Changed
-- **Privacy policy v1.2.0:** Added a clear disclosure for hosted error monitoring (Sentry): what is collected, what is not (no session replay, no default IP/cookie payloads, forecast contents not sent in breadcrumbs), and separate production vs beta environments.
-- **In-app privacy modal:** Bumped to v1.2.0 with the same Sentry disclosure; users who accepted an older policy version will be prompted to accept again on next visit.
-- **Hosted error monitoring (Sentry):** Production and beta now use the same privacy-safe SDK settings — `sendDefaultPii: false`, session replay disabled, browser SDK routed through `/api/sentry-tunnel`, and server tunnel validation against the web project DSN (`SENTRY_BROWSER_DSN`).
-- **Analytics server:** Node Sentry init uses `sendDefaultPii: false`; deploy workflows set `SENTRY_BROWSER_DSN` from the web DSN secret so the tunnel accepts browser envelopes in the recommended two-project setup.
-- **Version:** Bumped package version to `1.5.3`.
-
-### Fixed
-- **Sentry tunnel security:** Removed client-controlled ingest URLs and query-string forwarding; malformed envelope bodies return 400 instead of 500.
 
 ## v1.5.2
 
