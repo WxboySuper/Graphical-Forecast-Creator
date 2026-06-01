@@ -46,7 +46,22 @@ export const normalizeOutlookData = (data: OutlookData): OutlookData => {
   const outlookKeys = ['tornado', 'wind', 'hail', 'totalSevere', 'categorical', 'day4-8'] as const;
 
   outlookKeys.forEach((key) => {
-    const coerced = coerceOutlookProbabilityMap(data[key]);
+    const raw = data[key];
+    if (raw === undefined || raw === null) {
+      return;
+    }
+
+    if (raw instanceof Map) {
+      normalized[key] = raw;
+      return;
+    }
+
+    if (Array.isArray(raw) && raw.length === 0) {
+      normalized[key] = new Map();
+      return;
+    }
+
+    const coerced = coerceOutlookProbabilityMap(raw);
     if (coerced && coerced.size > 0) {
       normalized[key] = coerced;
     }

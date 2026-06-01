@@ -299,9 +299,11 @@ const buildCumulativeCategoricalFeatures = (
 
 type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
 
+/** Narrows GeoJSON features to polygon geometries used in categorical generation. */
 const isPolygonOutlookFeature = (feature: GeoJSON.Feature): feature is PolygonOutlookFeature =>
   feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon';
 
+/** Separates probability keys from CIG hatching keys inside one outlook probability map. */
 const partitionProbabilityMap = (probMap: Map<string, GeoJSON.Feature[]>) => {
   const probabilityFeatures = new Map<string, PolygonOutlookFeature[]>();
   const hatchingFeatures = new Map<CIGLevel, PolygonOutlookFeature[]>();
@@ -322,6 +324,7 @@ const partitionProbabilityMap = (probMap: Map<string, GeoJSON.Feature[]>) => {
   return { probabilityFeatures, hatchingFeatures };
 };
 
+/** Unions hatching polygons per CIG level for intersection against probability areas. */
 const buildHatchingRegions = (
   hatchingFeatures: Map<CIGLevel, PolygonOutlookFeature[]>,
   cigLevels: CIGLevel[],
@@ -341,6 +344,7 @@ const buildHatchingRegions = (
   return hatchingRegions;
 };
 
+/** Splits each probability polygon by hatching layers and emits categorical pieces via callback. */
 const applyProbabilityFeaturesWithHatching = (
   probabilityFeatures: Map<string, PolygonOutlookFeature[]>,
   hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>,
@@ -381,6 +385,7 @@ const applyProbabilityFeaturesWithHatching = (
   });
 };
 
+/** Appends one categorical risk polygon unless the mapped risk is manual TSTM. */
 const appendRiskPolygon = (
   riskMap: Map<CategoricalRiskLevel, PolygonOutlookFeature[]>,
   risk: CategoricalRiskLevel,

@@ -3,6 +3,7 @@ import {
   normalizeForecastCycle,
   normalizeOutlookData,
 } from './outlookMapCoercion';
+import type { Feature as GeoJsonFeature } from 'geojson';
 import type { ForecastCycle, OutlookData } from '../types/outlooks';
 
 describe('outlookMapCoercion', () => {
@@ -41,7 +42,20 @@ describe('outlookMapCoercion', () => {
     const normalized = normalizeOutlookData(data);
     expect(normalized.tornado).toBeUndefined();
     expect(normalized.wind?.get('10%')).toHaveLength(1);
-    expect(normalized.hail).toBeUndefined();
+    expect(normalized.hail).toBeInstanceOf(Map);
+    expect(normalized.hail?.size).toBe(0);
+  });
+
+  test('normalizeOutlookData preserves empty Map instances', () => {
+    const emptyMap = new Map<string, GeoJsonFeature[]>();
+    const normalized = normalizeOutlookData({
+      tornado: emptyMap,
+      wind: [],
+    } as unknown as OutlookData);
+
+    expect(normalized.tornado).toBe(emptyMap);
+    expect(normalized.wind).toBeInstanceOf(Map);
+    expect(normalized.wind?.size).toBe(0);
   });
 
   test('normalizeForecastCycle normalizes every day', () => {

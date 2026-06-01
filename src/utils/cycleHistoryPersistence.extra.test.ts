@@ -71,7 +71,14 @@ describe('cycleHistoryPersistence', () => {
             },
             data: {
               tornado: {},
-              wind: {},
+              wind: {
+                '30%': [{
+                  type: 'Feature',
+                  id: 'legacy-wind',
+                  properties: {},
+                  geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+                }],
+              },
               hail: {},
               categorical: {},
             },
@@ -88,7 +95,8 @@ describe('cycleHistoryPersistence', () => {
 
     expect(loaded).toHaveLength(1);
     expect(loaded[0].forecastCycle.days[1]?.data.tornado).toBeUndefined();
-    expect(loaded[0].forecastCycle.days[1]?.data.wind).toBeUndefined();
+    expect(loaded[0].forecastCycle.days[1]?.data.wind).toBeInstanceOf(Map);
+    expect(loaded[0].forecastCycle.days[1]?.data.wind?.get('30%')).toHaveLength(1);
   });
 
   test('loadCycleHistoryFromStorage handles legacy format and computes stats when missing', async () => {
