@@ -10,6 +10,17 @@ describe('AlertBanner', () => {
     });
   };
 
+  const renderBanner = () =>
+    render(
+      <MemoryRouter>
+        <AlertBanner />
+      </MemoryRouter>,
+    );
+
+  const waitForBanner = async (message: string) => {
+    await waitFor(() => expect(screen.getByText(message)).toBeInTheDocument());
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn();
@@ -28,13 +39,9 @@ describe('AlertBanner', () => {
       dismissible: true,
     });
 
-    render(
-      <MemoryRouter>
-        <AlertBanner />
-      </MemoryRouter>,
-    );
+    renderBanner();
+    await waitForBanner('Test Alert');
 
-    await waitFor(() => expect(screen.getByText('Test Alert')).toBeInTheDocument());
     expect(screen.getByRole('status')).toHaveClass('alert-banner--warning');
   });
 
@@ -48,12 +55,7 @@ describe('AlertBanner', () => {
       linkLabel: "What's new",
     });
 
-    render(
-      <MemoryRouter>
-        <AlertBanner />
-      </MemoryRouter>,
-    );
-
+    renderBanner();
     await waitFor(() => expect(screen.getByRole('link', { name: "What's new" })).toHaveAttribute('href', '/updates'));
   });
 
@@ -66,11 +68,7 @@ describe('AlertBanner', () => {
       startsAt: '2099-01-01T00:00:00.000Z',
     });
 
-    render(
-      <MemoryRouter>
-        <AlertBanner />
-      </MemoryRouter>,
-    );
+    renderBanner();
 
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -90,11 +88,7 @@ describe('AlertBanner', () => {
       mockBannerFetch(config, ok ?? true);
     }
 
-    render(
-      <MemoryRouter>
-        <AlertBanner />
-      </MemoryRouter>,
-    );
+    renderBanner();
 
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -109,13 +103,8 @@ describe('AlertBanner', () => {
       dismissible: true,
     });
 
-    render(
-      <MemoryRouter>
-        <AlertBanner />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => expect(screen.getByText('Dismiss me')).toBeInTheDocument());
+    renderBanner();
+    await waitForBanner('Dismiss me');
 
     fireEvent.click(screen.getByLabelText('Dismiss alert'));
 
@@ -130,13 +119,8 @@ describe('AlertBanner', () => {
       dismissible: false,
     });
 
-    render(
-      <MemoryRouter>
-        <AlertBanner />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
+    renderBanner();
+    await waitForBanner('Permanent');
     expect(screen.queryByLabelText('Dismiss alert')).not.toBeInTheDocument();
   });
 });
