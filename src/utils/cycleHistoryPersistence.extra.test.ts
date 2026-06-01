@@ -51,6 +51,46 @@ describe('cycleHistoryPersistence', () => {
     expect(fileUtils.deserializeForecast).toHaveBeenCalled();
   });
 
+  test('GFC-WEB-7: legacy saved cycles with plain-object outlook maps normalize on load', async () => {
+    const legacy = [{
+      id: 'legacy-plain-maps',
+      timestamp: '2026-03-01T00:00:00.000Z',
+      cycleDate: '2026-03-01',
+      label: 'Legacy',
+      forecastCycle: {
+        currentDay: 1,
+        cycleDate: '2026-03-01',
+        days: {
+          1: {
+            day: 1,
+            metadata: {
+              issueDate: '2026-03-01',
+              validDate: '2026-03-01',
+              issuanceTime: '0600',
+              lowProbabilityOutlooks: [],
+            },
+            data: {
+              tornado: {},
+              wind: {},
+              hail: {},
+              categorical: {},
+            },
+          },
+        },
+      },
+      stats: {},
+    }];
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify(legacy));
+
+    const mod = await import('./cycleHistoryPersistence');
+    const loaded = mod.loadCycleHistoryFromStorage();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].forecastCycle.days[1]?.data.tornado).toBeUndefined();
+    expect(loaded[0].forecastCycle.days[1]?.data.wind).toBeUndefined();
+  });
+
   test('loadCycleHistoryFromStorage handles legacy format and computes stats when missing', async () => {
     jest.doMock('./forecastMetrics', () => ({
       countForecastMetrics: jest.fn(() => ({ computed: 42 })),

@@ -125,6 +125,30 @@ describe('processOutlooksToCategorical', () => {
     expect(result[0].properties?.outlookType).toBe('categorical');
   });
 
+  test('GFC-WEB-7: processDay12OutlooksToCategorical does not throw on empty legacy plain-object maps', () => {
+    const outlooks = {
+      tornado: {},
+      wind: {},
+      hail: {},
+      categorical: {},
+    } as unknown as OutlookData;
+
+    expect(() => processDay12OutlooksToCategorical(outlooks)).not.toThrow();
+    expect(processDay12OutlooksToCategorical(outlooks)).toEqual([]);
+  });
+
+  test('processDay12OutlooksToCategorical tolerates legacy plain-object probability maps', () => {
+    const outlooks = {
+      tornado: {},
+      wind: { '30%': [makeFeature('wind')] },
+      hail: new Map(),
+      categorical: {},
+    } as unknown as OutlookData;
+
+    expect(() => processDay12OutlooksToCategorical(outlooks)).not.toThrow();
+    expect(processDay12OutlooksToCategorical(outlooks).length).toBeGreaterThan(0);
+  });
+
   test('handles hatching intersections and union fallbacks for day 1 and day 2', () => {
     const outlooks: OutlookData = {
       tornado: new Map(),

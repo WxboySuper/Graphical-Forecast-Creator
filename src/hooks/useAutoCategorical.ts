@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { applyAutoCategoricalSync, selectCurrentOutlooks, selectCurrentDay } from '../store/forecastSlice';
 import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevereToCategorical } from '../utils/outlookUtils';
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
+import { coerceOutlookProbabilityMap } from '../utils/outlookMapCoercion';
 import { v4 as uuidv4 } from 'uuid';
 import * as turf from '@turf/turf';
 import { Feature, Polygon, MultiPolygon } from 'geojson';
@@ -304,8 +305,8 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
   const types = ['tornado', 'wind', 'hail'] as const;
   
   types.forEach(type => {
-    const probMap = outlooks[type];
-    if (!probMap) return; // Skip if outlook map doesn't exist for this day
+    const probMap = coerceOutlookProbabilityMap(outlooks[type]);
+    if (!probMap || probMap.size === 0) return;
     
     // Split into Probability Polygons and Hatching Polygons
     const probabilityFeatures = new Map<string, Feature<Polygon | MultiPolygon>[]>();
@@ -402,8 +403,8 @@ export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON
   const riskPolygons = new Map<CategoricalRiskLevel, Feature<Polygon | MultiPolygon>[]>();
 
   // Day 3 only has totalSevere
-  const probMap = outlooks.totalSevere;
-  if (!probMap) return []; // No totalSevere data
+  const probMap = coerceOutlookProbabilityMap(outlooks.totalSevere);
+  if (!probMap || probMap.size === 0) return [];
   
   // Split into Probability Polygons and Hatching Polygons
   const probabilityFeatures = new Map<string, Feature<Polygon | MultiPolygon>[]>();
