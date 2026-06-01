@@ -51,10 +51,12 @@ function readOptionalString(raw: Record<string, unknown>, key: string): string |
   return typeof raw[key] === 'string' ? (raw[key] as string) : undefined;
 }
 
+const VALID_ALERT_TYPES = new Set<AlertBannerType>(['info', 'warning', 'error']);
+
 function readAlertType(raw: Record<string, unknown>): AlertBannerType {
   const type = raw.type;
-  if (type === 'info' || type === 'warning' || type === 'error') {
-    return type;
+  if (typeof type === 'string' && VALID_ALERT_TYPES.has(type as AlertBannerType)) {
+    return type as AlertBannerType;
   }
   return DEFAULT_ALERT_BANNER_CONFIG.type;
 }

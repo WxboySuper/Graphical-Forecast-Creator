@@ -26,7 +26,6 @@ export function useAlertBanner(configPath: string) {
         const next = normalizeAlertBannerConfig(data);
         setConfig(next);
         setDismissed(false);
-        setScheduleActive(isAlertBannerScheduleActive(next));
       })
       .catch(() => {
         // Invalid or missing config should fail closed and keep the banner hidden.
