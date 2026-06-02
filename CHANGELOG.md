@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - **Monitor — outlook on map:** `buildMonitorOutlookOptions`, cloud outlook fetch hook, and OpenLayers outlook layer styling aligned with forecast outlook types.
 
 ### Changed
-- **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`), subscription webhook `current_period_end` from subscription items (Stripe API 2025-03-31+) with legacy fallback, and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
+- **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
 
 ### Dependencies
 <!-- dependabot-automation -->
