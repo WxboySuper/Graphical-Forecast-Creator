@@ -28,7 +28,8 @@ function readManifest() {
   return JSON.parse(readFileSync(manifestPath, 'utf8'));
 }
 
-let raw;
+/** @type {Record<string, unknown>} */
+let raw = {};
 try {
   raw = readManifest();
 } catch (error) {

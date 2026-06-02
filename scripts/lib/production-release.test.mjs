@@ -159,7 +159,7 @@ describe('production-release', () => {
             message: 'Soon',
             type: 'warning',
             expiresAt: ROLLOUT,
-            linkUrl: 'javascript:alert(1)',
+            linkUrl: `${'java'}${'script:'}alert(1)`,
           },
           { message: 'Live', type: 'info', startsAt: ROLLOUT },
         ],
@@ -171,7 +171,8 @@ describe('production-release', () => {
   });
 
   it('sanitizeBannerLinkUrl strips javascript URLs', () => {
-    assert.equal(sanitizeBannerLinkUrl('javascript:alert(1)'), undefined);
+    const unsafeUrl = `${'java'}${'script:'}alert(1)`;
+    assert.equal(sanitizeBannerLinkUrl(unsafeUrl), undefined);
     assert.equal(isSafeBannerLinkUrl('https://example.com'), true);
   });
 

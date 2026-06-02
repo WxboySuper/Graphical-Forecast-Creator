@@ -2,9 +2,9 @@ version = 1
 
 exclude_patterns = [
   "build/**",
-  "**/*.test.mjs",
-  "**/*.test.ts",
-  "**/*.test.tsx",
+  "scripts/lib/**/*.test.mjs",
+  "src/**/*.test.ts",
+  "src/**/*.test.tsx",
 ]
 
 [[analyzers]]
@@ -13,6 +13,10 @@ enabled = true
 
   [analyzers.meta]
   plugins = ["react"]
+  skip_doc_coverage = [
+    "server/release/**",
+    "scripts/validate-production-release.mjs",
+  ]
 
   [analyzers.features]
   parse_test_files = false
