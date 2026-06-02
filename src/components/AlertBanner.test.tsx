@@ -17,25 +17,9 @@ describe('AlertBanner', () => {
     });
   };
 
-  const renderBanner = () =>
-    render(
-      <MemoryRouter>
-        <AlertBanner />
-      </MemoryRouter>,
-    );
-
-  const waitForBanner = async (message: string) => {
-    await waitFor(() => expect(screen.getByText(message)).toBeInTheDocument());
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn();
-    jest.useFakeTimers();
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
   });
 
   test('renders alert when enabled', async () => {
@@ -48,6 +32,7 @@ describe('AlertBanner', () => {
 
     renderBanner();
 
+    await waitFor(() => expect(screen.getByText('Test Alert')).toBeInTheDocument());
     expect(screen.getByRole('status')).toHaveClass('alert-banner--warning');
   });
 
@@ -111,8 +96,8 @@ describe('AlertBanner', () => {
 
     renderBanner();
 
+    await waitFor(() => expect(screen.getByText('Dismiss me')).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText('Dismiss alert'));
-
     expect(screen.queryByText('Dismiss me')).not.toBeInTheDocument();
   });
 
@@ -138,15 +123,11 @@ describe('AlertBanner', () => {
       message: 'Permanent',
       type: 'info',
       dismissible: false,
-    };
-    mockBannerFetch(mockConfig);
+    });
 
     renderBanner();
 
     await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
-
-    renderBanner();
-    await waitForBanner('Permanent');
     expect(screen.queryByLabelText('Dismiss alert')).not.toBeInTheDocument();
   });
 });
