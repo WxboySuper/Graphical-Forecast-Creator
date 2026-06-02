@@ -238,5 +238,6 @@ export const useMonitorMapBootstrap = ({
     }
 
     baseLayer.setSource(createBaseSource(darkMode));
-  }, [darkMode, refs]);
+    // refs omitted: wrapper object from useMonitorMapRefs() is new each render.
+  }, [darkMode]);
 };

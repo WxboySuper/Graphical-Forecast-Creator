@@ -15,7 +15,8 @@ export const useMonitorRadarWmsSync = (
     if (refs.radarLayerRef.current) {
       applyWmsLayer(refs.radarLayerRef.current, radarLayer, radarOpacity, refs.radarLayerKeyRef);
     }
-  }, [darkMode, radarLayer, radarOpacity, refs]);
+    // refs omitted: useMonitorMapRefs() returns a new object each render; only darkMode should re-apply.
+  }, [darkMode, radarLayer, radarOpacity]);
 
   useEffect(() => {
     const source = refs.radarLayerRef.current?.getSource();
