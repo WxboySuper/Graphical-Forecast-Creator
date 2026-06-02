@@ -57,9 +57,13 @@ fi
 
 echo "Promoting release $VERSION ($RELEASE_ID) ..."
 
+STAGING_WEB_RELEASE="$GFC_STAGING_WEB_ROOT/releases/$RELEASE_DIR"
+
 ln -sfn "$WEB_RELEASE" "$GFC_WEB_ROOT/current"
 mkdir -p "$GFC_STAGING_WEB_ROOT"
-ln -sfn "$WEB_RELEASE" "$GFC_STAGING_WEB_ROOT/current"
+if [ -d "$STAGING_WEB_RELEASE" ]; then
+  ln -sfn "$STAGING_WEB_RELEASE" "$GFC_STAGING_WEB_ROOT/current"
+fi
 
 ln -sfn "$ANALYTICS_RELEASE" "$ANALYTICS_ROOT/current"
 

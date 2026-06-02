@@ -63,8 +63,14 @@ function isFutureScheduledLive(config, nowMs) {
   return rolloutAtMs > nowMs + ROLLOUT_MIN_LEAD_MS && config.status === 'scheduled';
 }
 
-/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors */
-function validateLiveAction(config, nowMs, errors) {
+/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors @param {string | undefined} previousVpsStatus @param {boolean} force */
+function validateLiveAction(config, nowMs, errors, previousVpsStatus, force) {
+  if (!force && previousVpsStatus === 'staged') {
+    errors.push(
+      'action "live" is blocked: a staged release is already waiting for timed rollout on the VPS; promote or cancel it before switching to action "live"',
+    );
+    return;
+  }
   if (!isFutureScheduledLive(config, nowMs)) {
     return;
   }
@@ -107,7 +113,7 @@ export function validateProductionReleaseForDeploy({
     validateStageAction(config, nowMs, errors, guards);
   }
   if (action === 'live') {
-    validateLiveAction(config, nowMs, errors);
+    validateLiveAction(config, nowMs, errors, previousVpsStatus, force);
   }
 
   errors.push(...validateBannerPhases(config, nowMs));

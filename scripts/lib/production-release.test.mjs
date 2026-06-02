@@ -134,4 +134,22 @@ describe('production-release', () => {
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.includes('already staged')));
   });
+
+  it('validateProductionReleaseForDeploy blocks live deploy when VPS has staged rollout', () => {
+    const config = normalizeProductionReleaseConfig({
+      releaseId: 'hotfix-1',
+      version: '1.6.0',
+      action: 'live',
+      status: 'live',
+    });
+    const result = validateProductionReleaseForDeploy({
+      config,
+      packageVersion: '1.6.0',
+      deployAction: 'live',
+      nowMs: NOW,
+      previousVpsStatus: 'staged',
+    });
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.includes('staged release is already waiting')));
+  });
 });
