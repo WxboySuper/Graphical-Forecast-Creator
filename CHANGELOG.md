@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **Monitor — outlook on map:** `buildMonitorOutlookOptions`, cloud outlook fetch hook, and OpenLayers outlook layer styling aligned with forecast outlook types.
 - **What's New page:** Public `/updates` route with v1.6 copy in `src/content/updates/v1.6.ts` and screenshot directory `public/updates/v1.6/` (hero promo image and section screenshots as assets are added).
 - **What's New navigation:** Navbar Resources overflow menu links to `/updates` so the release page is discoverable without typing the URL.
+- **What's New images:** Release screenshots open in a full-size lightbox when clicked so promo and section images remain readable on narrow layouts.
 
 ### Changed
 - **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
