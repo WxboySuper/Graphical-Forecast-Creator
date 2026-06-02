@@ -20,7 +20,7 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
 import { AppLayout } from './components/Layout';
-import { HomePage, ForecastPage, DiscussionPage, VerificationPage, MonitorPage, ComingSoonPage, AccountPage, PricingPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
+import { HomePage, ForecastPage, DiscussionPage, VerificationPage, MonitorPage, ComingSoonPage, AccountPage, PricingPage, UpdatesPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
 import CloudLibraryPage from './pages/CloudLibraryPage';
 import BetaAccessGuard from './components/Beta/BetaAccessGuard';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
@@ -136,8 +136,9 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
     <Routes>
       <Route path="beta" element={<BetaLandingPage />} />
       <Route path="beta-access/:invitePath?" element={<BetaInvitePage />} />
-      <Route element={<BetaAccessGuard />}>
       <Route element={<AppLayout />}>
+        <Route path="updates" element={<UpdatesPage />} />
+        <Route element={<BetaAccessGuard />}>
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="pricing" element={<PricingPage />} />
@@ -147,7 +148,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
         <Route path="monitor" element={<MonitorPage />} />
-      </Route>
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />
     </Routes>

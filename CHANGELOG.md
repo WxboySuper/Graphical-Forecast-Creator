@@ -24,6 +24,9 @@ All notable changes to this project will be documented in this file.
 - **ts-jest:** ^29.4.9 → ^29.4.11
 - **vite:** ^8.0.13 → ^8.0.14
 
+### Added
+- **What's New page:** Public `/updates` route with v1.6 copy in `src/content/updates/v1.6.ts` and screenshot directory `public/updates/v1.6/` (images optional until marketing adds them).
+
 ### Changed
 - **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
 
