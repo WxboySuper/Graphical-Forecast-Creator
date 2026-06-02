@@ -12,6 +12,35 @@ import {
 const NOW = Date.parse('2026-06-01T12:00:00.000Z');
 const ROLLOUT = '2026-06-06T23:00:00.000Z';
 
+const STAGE_BANNER = {
+  phases: [
+    { message: 'Soon', type: 'warning', expiresAt: ROLLOUT },
+    { message: 'Live', type: 'info', startsAt: ROLLOUT },
+  ],
+};
+
+function stageConfig(overrides = {}) {
+  return normalizeProductionReleaseConfig({
+    releaseId: 'v1.6.0',
+    version: '1.6.0',
+    rolloutAt: ROLLOUT,
+    action: 'stage',
+    status: 'scheduled',
+    banner: STAGE_BANNER,
+    ...overrides,
+  });
+}
+
+function validateStage(config, extra = {}) {
+  return validateProductionReleaseForDeploy({
+    config,
+    packageVersion: '1.6.0',
+    deployAction: 'stage',
+    nowMs: NOW,
+    ...extra,
+  });
+}
+
 describe('production-release', () => {
   it('isWithinScheduleWindow respects bounds', () => {
     assert.equal(isWithinScheduleWindow(undefined, undefined, NOW), true);
@@ -58,52 +87,22 @@ describe('production-release', () => {
   });
 
   it('validateProductionReleaseForDeploy requires future rolloutAt for stage', () => {
-    const config = normalizeProductionReleaseConfig({
-      releaseId: 'v1.6.0',
-      version: '1.6.0',
-      rolloutAt: '2026-06-01T12:01:00.000Z',
-      action: 'stage',
-      banner: {
-        phases: [
-          { message: 'Soon', type: 'warning', expiresAt: ROLLOUT },
-          { message: 'Live', type: 'info', startsAt: ROLLOUT },
-        ],
-      },
-    });
-
-    const result = validateProductionReleaseForDeploy({
-      config,
-      packageVersion: '1.6.0',
-      deployAction: 'stage',
-      nowMs: NOW,
-    });
-
+    const result = validateStage(stageConfig({ rolloutAt: '2026-06-01T12:01:00.000Z' }));
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.includes('rolloutAt')));
   });
 
   it('validateProductionReleaseForDeploy passes a valid stage manifest', () => {
-    const config = normalizeProductionReleaseConfig({
-      releaseId: 'v1.6.0',
-      version: '1.6.0',
-      rolloutAt: ROLLOUT,
-      action: 'stage',
-      status: 'scheduled',
-      banner: {
-        phases: [
-          { message: 'Soon', type: 'warning', expiresAt: ROLLOUT },
-          { message: 'Live', type: 'info', startsAt: ROLLOUT, linkUrl: '/updates' },
-        ],
-      },
-    });
-
-    const result = validateProductionReleaseForDeploy({
-      config,
-      packageVersion: '1.6.0',
-      deployAction: 'stage',
-      nowMs: NOW,
-    });
-
+    const result = validateStage(
+      stageConfig({
+        banner: {
+          phases: [
+            { message: 'Soon', type: 'warning', expiresAt: ROLLOUT },
+            { message: 'Live', type: 'info', startsAt: ROLLOUT, linkUrl: '/updates' },
+          ],
+        },
+      }),
+    );
     assert.equal(result.ok, true);
   });
 
@@ -128,29 +127,10 @@ describe('production-release', () => {
   });
 
   it('validateProductionReleaseForDeploy blocks duplicate stage when VPS is staged', () => {
-    const config = normalizeProductionReleaseConfig({
-      releaseId: 'v1.6.0',
-      version: '1.6.0',
-      rolloutAt: ROLLOUT,
-      action: 'stage',
-      status: 'scheduled',
-      banner: {
-        phases: [
-          { message: 'Soon', type: 'warning', expiresAt: ROLLOUT },
-          { message: 'Live', type: 'info', startsAt: ROLLOUT },
-        ],
-      },
-    });
-
-    const result = validateProductionReleaseForDeploy({
-      config,
-      packageVersion: '1.6.0',
-      deployAction: 'stage',
-      nowMs: NOW,
+    const result = validateStage(stageConfig(), {
       previousReleaseId: 'v1.6.0',
       previousVpsStatus: 'staged',
     });
-
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.includes('already staged')));
   });

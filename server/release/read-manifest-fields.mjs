@@ -16,6 +16,7 @@ function configPathFromArgs() {
   return process.env.CONFIG_PATH || '/opt/gfc-analytics/config/production-release.json';
 }
 
+/** Prints version, releaseId, rolloutAt, and status as TSV. */
 function main() {
   const path = configPathFromArgs();
   const config = normalizeProductionReleaseConfig(JSON.parse(readFileSync(path, 'utf8')));

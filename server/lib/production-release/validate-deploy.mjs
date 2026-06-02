@@ -54,20 +54,23 @@ function validateStageAction(config, nowMs, errors, guards) {
   }
 }
 
+/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs */
+function isFutureScheduledLive(config, nowMs) {
+  const rolloutAtMs = parseInstant(config.rolloutAt);
+  if (!config.rolloutAt || rolloutAtMs === null) {
+    return false;
+  }
+  return rolloutAtMs > nowMs + ROLLOUT_MIN_LEAD_MS && config.status === 'scheduled';
+}
+
 /** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors */
 function validateLiveAction(config, nowMs, errors) {
-  if (!config.rolloutAt) {
+  if (!isFutureScheduledLive(config, nowMs)) {
     return;
   }
-  const rolloutAtMs = parseInstant(config.rolloutAt);
-  if (rolloutAtMs === null) {
-    return;
-  }
-  if (rolloutAtMs > nowMs + ROLLOUT_MIN_LEAD_MS && config.status === 'scheduled') {
-    errors.push(
-      'action "live" is blocked while a future rollout is scheduled; use action "stage" or set action to live after promote',
-    );
-  }
+  errors.push(
+    'action "live" is blocked while a future rollout is scheduled; use action "stage" or set action to live after promote',
+  );
 }
 
 /**

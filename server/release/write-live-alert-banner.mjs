@@ -6,6 +6,7 @@ import {
   normalizeProductionReleaseConfig,
 } from '../lib/production-release.mjs';
 
+/** @param {string[]} argv */
 function parseArgs(argv) {
   const options = { config: '', webRoot: '' };
   for (let i = 2; i < argv.length; i += 1) {

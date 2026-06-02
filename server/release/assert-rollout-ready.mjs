@@ -21,6 +21,7 @@ function parseArgs() {
   return { rolloutAt, force };
 }
 
+/** Exits when rolloutAt is still in the future (unless --force). */
 function main() {
   const { rolloutAt, force } = parseArgs();
   if (force || !rolloutAt.trim()) {

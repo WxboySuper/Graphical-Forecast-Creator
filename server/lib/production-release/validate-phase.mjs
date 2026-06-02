@@ -1,5 +1,9 @@
 import { parseInstant } from './schedule.mjs';
-import { resolveActiveBannerPhase } from './banner.mjs';
+
+/** @param {string | undefined} value */
+function hasInvalidInstant(value) {
+  return Boolean(value?.trim()) && parseInstant(value) === null;
+}
 
 /** @param {import('./banner.mjs').BannerPhase} phase @param {number} index */
 function validatePhaseFields(phase, index) {
@@ -7,60 +11,65 @@ function validatePhaseFields(phase, index) {
   if (!phase.message.trim()) {
     errors.push(`banner.phases[${index}]: message is required`);
   }
-  if (phase.startsAt && parseInstant(phase.startsAt) === null) {
+  if (hasInvalidInstant(phase.startsAt)) {
     errors.push(`banner.phases[${index}]: invalid startsAt`);
   }
-  if (phase.expiresAt && parseInstant(phase.expiresAt) === null) {
+  if (hasInvalidInstant(phase.expiresAt)) {
     errors.push(`banner.phases[${index}]: invalid expiresAt`);
   }
   const start = parseInstant(phase.startsAt);
   const end = parseInstant(phase.expiresAt);
-  if (start !== null && end !== null && end <= start) {
+  const rangeInvalid = start !== null && end !== null && end <= start;
+  if (rangeInvalid) {
     errors.push(`banner.phases[${index}]: expiresAt must be after startsAt`);
   }
   return errors;
 }
 
-/** @param {import('./banner.mjs').BannerPhase[]} phases @param {number} rolloutAtMs */
+/** @param {import('./banner.mjs').BannerPhase} phase @param {number} rolloutAtMs */
+function isPreRolloutPhase(phase, rolloutAtMs) {
+  const end = parseInstant(phase.expiresAt);
+  return end !== null && end <= rolloutAtMs;
+}
+
+/** @param {import('./banner.mjs').BannerPhase} phase @param {number} rolloutAtMs */
+function isPostRolloutPhase(phase, rolloutAtMs) {
+  const start = parseInstant(phase.startsAt);
+  return start !== null && start >= rolloutAtMs;
+}
+
+/** @param {import('./banner.mjs').BannerPhase[]} phases @param {number} rolloutAtMs @param {string | undefined} action */
 function validateRolloutPhaseCoverage(phases, rolloutAtMs, action) {
   if (action !== 'stage') {
     return [];
   }
-  const prePhases = phases.filter((p) => {
-    const end = parseInstant(p.expiresAt);
-    return end !== null && end <= rolloutAtMs;
-  });
-  const postPhases = phases.filter((p) => {
-    const start = parseInstant(p.startsAt);
-    return start !== null && start >= rolloutAtMs;
-  });
+  const hasPre = phases.some((phase) => isPreRolloutPhase(phase, rolloutAtMs));
+  const hasPost = phases.some((phase) => isPostRolloutPhase(phase, rolloutAtMs));
   const errors = [];
-  if (prePhases.length === 0) {
+  if (!hasPre) {
     errors.push('banner.phases: include at least one pre-rollout phase ending at or before rolloutAt');
   }
-  if (postPhases.length === 0) {
+  if (!hasPost) {
     errors.push('banner.phases: include at least one post-rollout phase starting at or after rolloutAt');
   }
   return errors;
 }
 
+/** @param {{ banner?: { phases?: import('./banner.mjs').BannerPhase[] }, rolloutAt?: string, action?: string }} config */
+function bannerCoverageErrors(config) {
+  const phases = config.banner?.phases ?? [];
+  const rolloutAtMs = parseInstant(config.rolloutAt);
+  if (rolloutAtMs === null || phases.length === 0) {
+    return [];
+  }
+  return validateRolloutPhaseCoverage(phases, rolloutAtMs, config.action);
+}
+
 /**
  * @param {{ banner?: { phases?: import('./banner.mjs').BannerPhase[] }, rolloutAt?: string, action?: string }} config
- * @param {number} nowMs
  */
-export function validateBannerPhases(config, nowMs = Date.now()) {
+export function validateBannerPhases(config) {
   const phases = config.banner?.phases ?? [];
   const fieldErrors = phases.flatMap((phase, index) => validatePhaseFields(phase, index));
-
-  const rolloutAtMs = parseInstant(config.rolloutAt);
-  const coverageErrors =
-    rolloutAtMs !== null && phases.length > 0
-      ? validateRolloutPhaseCoverage(phases, rolloutAtMs, config.action)
-      : [];
-
-  if (phases.length > 0 && !resolveActiveBannerPhase(phases, nowMs) && config.action !== 'stage') {
-    // Non-fatal for stage deploys validating future schedules.
-  }
-
-  return [...fieldErrors, ...coverageErrors];
+  return [...fieldErrors, ...bannerCoverageErrors(config)];
 }

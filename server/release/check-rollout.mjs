@@ -15,28 +15,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = process.env.CONFIG_PATH || '/opt/gfc-analytics/config/production-release.json';
 const PROMOTE_SCRIPT = join(__dirname, 'promote-release.sh');
 
-/** @returns {ReturnType<typeof normalizeProductionReleaseConfig>} */
+/** Reads and normalizes the VPS production release manifest. */
 function loadConfig() {
   return normalizeProductionReleaseConfig(JSON.parse(readFileSync(CONFIG_PATH, 'utf8')));
 }
 
-/** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
+/** Persists manifest updates after a failed promote attempt. */
 function saveConfig(config) {
   writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }
 
 /** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
 function shouldSkipRollout(config) {
-  if (config.action !== 'stage') {
-    return true;
-  }
-  if (config.status === 'live' || config.status === 'cancelled') {
-    return true;
-  }
-  if (config.status !== 'scheduled' && config.status !== 'staged') {
-    return true;
-  }
-  return false;
+  const inactiveStatus = config.status === 'live' || config.status === 'cancelled';
+  const unknownStatus = config.status !== 'scheduled' && config.status !== 'staged';
+  return config.action !== 'stage' || inactiveStatus || unknownStatus;
 }
 
 /** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
@@ -49,15 +42,19 @@ function isRolloutDue(config) {
   return Date.now() >= rolloutAtMs;
 }
 
-/** Cron entry: promote when rolloutAt has passed. */
-function main() {
-  let config;
+/** Loads config or exits when the manifest cannot be read. */
+function loadConfigOrExit() {
   try {
-    config = loadConfig();
+    return loadConfig();
   } catch (error) {
     console.error('[rollout] unable to read config:', error);
     process.exit(1);
   }
+}
+
+/** Cron entry: promote when rolloutAt has passed. */
+function main() {
+  const config = loadConfigOrExit();
 
   if (shouldSkipRollout(config)) {
     process.exit(0);

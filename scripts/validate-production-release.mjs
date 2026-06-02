@@ -14,14 +14,16 @@ const force = process.env.DEPLOY_FORCE === 'true';
 const previousReleaseId = process.env.PREVIOUS_RELEASE_ID?.trim() || '';
 const previousVpsStatus = process.env.PREVIOUS_VPS_STATUS?.trim() || '';
 
-let raw = null;
-try {
-  raw = JSON.parse(readFileSync(manifestPath, 'utf8'));
-} catch (error) {
-  console.error(`Missing or invalid ${manifestPath}:`, error instanceof Error ? error.message : error);
-  process.exit(1);
+function readManifest() {
+  try {
+    return JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch (error) {
+    console.error(`Missing or invalid ${manifestPath}:`, error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 }
 
+const raw = readManifest();
 const config = normalizeProductionReleaseConfig(raw);
 const action = deployAction || config.action;
 

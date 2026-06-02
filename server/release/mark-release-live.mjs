@@ -15,6 +15,7 @@ function configPathFromArgs() {
   return process.env.CONFIG_PATH || '/opt/gfc-analytics/config/production-release.json';
 }
 
+/** Writes live status and promotedAt onto the VPS manifest. */
 function main() {
   const path = configPathFromArgs();
   const config = normalizeProductionReleaseConfig(JSON.parse(readFileSync(path, 'utf8')));
