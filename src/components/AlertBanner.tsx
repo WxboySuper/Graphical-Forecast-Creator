@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import './AlertBanner.css';
 
 export interface AlertConfig {
@@ -6,6 +7,8 @@ export interface AlertConfig {
   message: string;
   type: 'info' | 'warning' | 'error';
   dismissible: boolean;
+  linkUrl?: string;
+  linkLabel?: string;
 }
 
 const DEFAULT_CONFIG: AlertConfig = {
@@ -45,9 +48,25 @@ export function AlertBanner({ configPath = '/alert-banner.json' }: AlertBannerPr
     return null;
   }
 
+  const linkLabel = config.linkLabel?.trim() || 'Learn more';
+  const linkUrl = config.linkUrl?.trim();
+
   return (
     <div className={`alert-banner alert-banner--${config.type}`} role="status" aria-live="polite">
-      <span className="alert-banner__message">{config.message}</span>
+      <div className="alert-banner__content">
+        <span className="alert-banner__message">{config.message}</span>
+        {linkUrl ? (
+          linkUrl.startsWith('/') ? (
+            <Link className="alert-banner__link" to={linkUrl}>
+              {linkLabel}
+            </Link>
+          ) : (
+            <a className="alert-banner__link" href={linkUrl} target="_blank" rel="noopener noreferrer">
+              {linkLabel}
+            </a>
+          )
+        ) : null}
+      </div>
       {config.dismissible && (
         <button
           className="alert-banner__close"

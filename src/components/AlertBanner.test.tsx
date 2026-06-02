@@ -1,5 +1,13 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import AlertBanner from './AlertBanner';
+
+const renderBanner = () =>
+  render(
+    <MemoryRouter>
+      <AlertBanner />
+    </MemoryRouter>,
+  );
 
 describe('AlertBanner', () => {
   const mockBannerFetch = (config: unknown, ok = true) => {
@@ -23,7 +31,7 @@ describe('AlertBanner', () => {
     };
     mockBannerFetch(mockConfig);
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => expect(screen.getByText('Test Alert')).toBeInTheDocument());
 
@@ -44,7 +52,7 @@ describe('AlertBanner', () => {
       mockBannerFetch(config, ok ?? true);
     }
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -60,7 +68,7 @@ describe('AlertBanner', () => {
     };
     mockBannerFetch(mockConfig);
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => expect(screen.getByText('Dismiss me')).toBeInTheDocument());
 
@@ -79,7 +87,7 @@ describe('AlertBanner', () => {
     };
     mockBannerFetch(mockConfig);
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
 

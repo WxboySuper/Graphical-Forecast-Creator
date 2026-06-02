@@ -1,0 +1,7 @@
+{
+  "releaseId": "main-live-default",
+  "version": "1.5.3",
+  "action": "live",
+  "status": "live",
+  "strategy": "instant"
+}
