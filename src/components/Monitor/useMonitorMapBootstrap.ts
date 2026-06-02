@@ -86,7 +86,6 @@ export const useMonitorMapBootstrap = ({
       zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
     });
     const baseLayerInstance = new TileLayer({
-      source: createBaseSource(darkMode),
       zIndex: BASE_LAYER_Z_INDEX,
     });
 
@@ -239,5 +238,5 @@ export const useMonitorMapBootstrap = ({
     }
 
     baseLayer.setSource(createBaseSource(darkMode));
-  }, [darkMode]);
+  }, [darkMode, refs]);
 };
