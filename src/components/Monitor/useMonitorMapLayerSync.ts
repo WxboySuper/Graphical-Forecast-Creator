@@ -25,6 +25,13 @@ interface UseMonitorMapLayerSyncArgs {
 }
 
 export const useMonitorMapLayerSync = (args: UseMonitorMapLayerSyncArgs) => {
-  useMonitorMapWmsSync(args);
+  useMonitorMapWmsSync({
+    darkMode: args.darkMode,
+    radarLayer: args.radarLayer,
+    radarOpacity: args.radarOpacity,
+    satelliteLayer: args.satelliteLayer,
+    satelliteOpacity: args.satelliteOpacity,
+    refs: args.refs,
+  });
   useMonitorMapOverlaySync(args);
 };

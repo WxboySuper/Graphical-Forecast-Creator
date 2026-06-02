@@ -9,12 +9,13 @@ export const useMonitorRadarWmsSync = (
   radarLayer: WmsLayerConfig | null,
   radarOpacity: number,
   refs: MonitorMapRefs,
+  darkMode: boolean,
 ) => {
   useEffect(() => {
     if (refs.radarLayerRef.current) {
       applyWmsLayer(refs.radarLayerRef.current, radarLayer, radarOpacity, refs.radarLayerKeyRef);
     }
-  }, [radarLayer, radarOpacity]);
+  }, [darkMode, radarLayer, radarOpacity]);
 
   useEffect(() => {
     const source = refs.radarLayerRef.current?.getSource();

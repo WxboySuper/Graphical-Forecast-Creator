@@ -9,12 +9,13 @@ export const useMonitorSatelliteWmsSync = (
   satelliteLayer: WmsLayerConfig | null,
   satelliteOpacity: number,
   refs: MonitorMapRefs,
+  darkMode: boolean,
 ) => {
   useEffect(() => {
     if (refs.satelliteLayerRef.current) {
       applyWmsLayer(refs.satelliteLayerRef.current, satelliteLayer, satelliteOpacity, refs.satelliteLayerKeyRef);
     }
-  }, [satelliteLayer, satelliteOpacity]);
+  }, [darkMode, satelliteLayer, satelliteOpacity]);
 
   useEffect(() => {
     const source = refs.satelliteLayerRef.current?.getSource();

@@ -11,6 +11,7 @@ export const useMonitorMapRefs = () => ({
   overlayRef: useRef<Overlay | null>(null),
   popupElRef: useRef<HTMLDivElement | null>(null),
   mapRef: useRef<OLMap | null>(null),
+  baseLayerRef: useRef<TileLayer | null>(null),
   radarLayerRef: useRef<TileLayer<TileWMS> | null>(null),
   satelliteLayerRef: useRef<TileLayer<TileWMS> | null>(null),
   alertsLayerRef: useRef<VectorLayer<VectorSource> | null>(null),

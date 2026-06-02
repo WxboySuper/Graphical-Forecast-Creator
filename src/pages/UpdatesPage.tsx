@@ -27,6 +27,14 @@ export const UpdatesPage: React.FC = () => (
       <h1>{v16Update.title}</h1>
       <p className="updates-page__summary">{v16Update.summary}</p>
 
+      {v16Update.promoImages?.length ? (
+        <div className="updates-page__promo">
+          {v16Update.promoImages.map((shot) => (
+            <UpdateScreenshotFigure key={shot.src} shot={shot} />
+          ))}
+        </div>
+      ) : null}
+
       {v16Update.sections.map((section) => (
         <section key={section.title} className="updates-page__section">
           <h2>{section.title}</h2>
