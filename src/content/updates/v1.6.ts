@@ -10,12 +10,17 @@ export interface UpdateSection {
   screenshots?: UpdateScreenshot[];
 }
 
+export interface ReleaseImprovement {
+  id: string;
+  text: string;
+}
+
 export interface ReleaseUpdate {
   version: string;
   title: string;
   summary: string;
   sections: UpdateSection[];
-  improvements: string[];
+  improvements: ReleaseImprovement[];
 }
 
 /** Builds a screenshot descriptor under public/updates/v1.6/. */
@@ -61,10 +66,25 @@ export const v16Update: ReleaseUpdate = {
     },
   ],
   improvements: [
-    'Hosted accounts on Safari and macOS are less likely to lose connection after the computer sleeps overnight.',
-    'Forecast keyboard shortcuts no longer break when the browser sends an unusual key event.',
-    'Map layer transparency controls behave consistently again on the forecast editor.',
-    'Saving, loading, and exporting forecasts is more resilient when outlook data was stored in an unexpected shape.',
-    'Signed-in home page primary buttons are easier to read in light mode.',
+    {
+      id: 'safari-hosted-sleep',
+      text: 'Hosted accounts on Safari and macOS are less likely to lose connection after the computer sleeps overnight.',
+    },
+    {
+      id: 'forecast-shortcuts',
+      text: 'Forecast keyboard shortcuts no longer break when the browser sends an unusual key event.',
+    },
+    {
+      id: 'map-transparency',
+      text: 'Map layer transparency controls behave consistently again on the forecast editor.',
+    },
+    {
+      id: 'forecast-persistence',
+      text: 'Saving, loading, and exporting forecasts is more resilient when outlook data was stored in an unexpected shape.',
+    },
+    {
+      id: 'home-primary-cta',
+      text: 'Signed-in home page primary buttons are easier to read in light mode.',
+    },
   ],
 };

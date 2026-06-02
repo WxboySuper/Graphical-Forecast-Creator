@@ -13,7 +13,7 @@ describe('UpdatesPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: /Monitor/i })).toBeInTheDocument();
     expect(screen.getByText(/What's new · v1\.6/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Monitor workspace/i })).toBeInTheDocument();
-    expect(screen.getByText(/Signed-in home page primary buttons/i)).toBeInTheDocument();
+    expect(screen.getByText(/Signed-in home page primary buttons are easier to read/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Back to home/i })).toHaveAttribute('href', '/');
   });
 });

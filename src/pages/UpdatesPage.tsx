@@ -44,8 +44,8 @@ export const UpdatesPage: React.FC = () => (
       <section className="updates-page__improvements" aria-labelledby="updates-improvements-heading">
         <h2 id="updates-improvements-heading">Also improved</h2>
         <ul>
-          {v16Update.improvements.map((item, index) => (
-            <li key={`v16-improvement-${index}`}>{item}</li>
+          {v16Update.improvements.map((item) => (
+            <li key={item.id}>{item.text}</li>
           ))}
         </ul>
       </section>
