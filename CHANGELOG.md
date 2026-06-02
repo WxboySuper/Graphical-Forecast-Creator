@@ -3,7 +3,83 @@
 
 All notable changes to this project will be documented in this file.
 
+<<<<<<< HEAD
 ## [Unreleased]
+=======
+## v1.6
+
+### Added
+- **Monitor (`/monitor`):** Live weather workspace with radar and satellite WMS layers (site and composite modes, opacity, animation speed), read-only overlay of the active forecast cycle / saved local cycles / premium cloud library outlooks, NWS watches-warnings-advisories layer, and storm reports with hazard filters plus optional outlook-type matching. Redux `monitorSlice`, `MonitorControls` / `MonitorMap`, premium settings sync via `usePremiumMonitorSettingsSync`, and navbar route with shortcut.
+- **Monitor — NWS alerts & storm reports:** `useMonitorNwsAlerts` and `useMonitorStormReports` integrations, panel toggles, and map rendering for alert polygons and report markers.
+- **Monitor — outlook on map:** `buildMonitorOutlookOptions`, cloud outlook fetch hook, and OpenLayers outlook layer styling aligned with forecast outlook types.
+- **What's New page:** Public `/updates` route with v1.6 copy in `src/content/updates/v1.6.ts` and screenshot directory `public/updates/v1.6/` (hero promo image and section screenshots as assets are added).
+- **What's New navigation:** Navbar Resources overflow menu links to `/updates` so the release page is discoverable without typing the URL.
+- **What's New images:** Release screenshots open in a full-size lightbox when clicked so promo and section images remain readable on narrow layouts.
+
+### Changed
+- **Release automation:** Post-merge beta bump after `main` releases no longer resets an in-progress beta line when `main` is still on an older stable (e.g. `1.5.3` infra merge while beta stays on `1.6.0-beta.N`). New `X.Y.0-beta.1` only after a real promotion of that line.
+- **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
+- **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
+
+### Dependencies
+<!-- dependabot-automation -->
+
+- **express-rate-limit:** ^8.5.1 → ^8.5.2 (`server`)
+- **express:** ^4.21.2 → ^5.2.1 (`server`)
+- **stripe:** ^18.4.0 → ^22.1.1 (`server`)
+- **@types/node:** ^25.5.0 → ^25.9.1
+- **@types/react-dom:** 18.2.18 → 19.2.3
+- **immer:** ^11.1.4 → ^11.1.8
+- **react-redux:** ^9.2.0 → ^9.3.0
+- **react-router-dom:** ^7.14.2 → ^7.15.1
+- **rollup:** >=4.60.2 → >=4.60.4
+- **@babel/core:** ^7.29.0 → ^7.29.7
+- **@babel/preset-env:** ^7.29.2 → ^7.29.7
+- **@babel/preset-react:** ^7.28.5 → ^7.29.7
+- **@babel/preset-typescript:** ^7.28.5 → ^7.29.7
+- **ts-jest:** ^29.4.9 → ^29.4.11
+- **vite:** ^8.0.13 → ^8.0.14
+
+### Fixed
+- **Monitor radar/satellite after theme change:** Keep the OpenLayers map mounted when toggling light/dark mode (update basemap tiles only) and re-apply WMS layers on theme changes so satellite and radar imagery no longer disappear or show “Latest time unavailable” until a full page refresh.
+- **GFC-WEB-8 (beta routes after `/updates` split):** `BetaAccessGuard` forwards `AppLayout` outlet context so home, forecast, and other guarded routes can destructure `addToast` again.
+- **Signed-in home (light mode):** Primary gradient “Resume Forecast” buttons use white text instead of `#067aff` on the concept home layout (`.home-concept-top-primary`, `.home-concept-action-primary`).
+- **Analytics server tests:** Share `configureApp` with production so `/collect` stays rate-limited in server smoke tests (fixes CodeQL `js/missing-rate-limiting` on `beta`).
+- **Analytics server (beta):** Restored a broken partial merge in `server/analytics.js` so the hosted collector starts again before Express 5 / Stripe 22 land.
+- **Stripe subscription webhooks:** Read `current_period_end` from subscription items for Stripe API 2025-03-31+ (stripe-node v22) with fallback for older payloads.
+- **Map layer transparency:** Restored `transparencyScale` on forecast map fill/stroke opacity after the main sync dropped the multiplier (fixes CI on `beta`).
+- **OpenLayers popups:** Avoid `removeChild` NotFoundError when React popup nodes are moved during map teardown.
+- **Forecast keyboard shortcuts (GFC-WEB-3):** Ignore `keydown` events where the browser omits `KeyboardEvent.key` (Sentry on `/forecast`) instead of throwing when normalizing the key for shortcuts. Centralized the guard in `keyboardShortcutKey` and applied it to forecast, navbar, and day-selector shortcuts.
+- **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
+- **GFC-WEB-6 (auto-save/export crash):** Added runtime guards in `mapToArray` and `arrayToMap` so `serializeForecast`/`deserializeForecast` return fallback values instead of crashing when `OutlookData` Map fields are plain objects at runtime.
+- **GFC-WEB-7 (auto-categorical crash):** Coerce legacy plain-object probability maps to `Map` before auto-categorical iteration so `/forecast` no longer throws `forEach is not a function` when loading old saved cycles from localStorage.
+## v1.5.3
+
+### Changed
+- **Privacy policy v1.2.0:** Added a clear disclosure for hosted error monitoring (Sentry): what is collected, what is not (no session replay, no default IP/cookie payloads, forecast contents not sent in breadcrumbs), and separate production vs beta environments.
+- **In-app privacy modal:** Bumped to v1.2.0 with the same Sentry disclosure; users who accepted an older policy version will be prompted to accept again on next visit.
+- **Hosted error monitoring (Sentry):** Production and beta now use the same privacy-safe SDK settings — `sendDefaultPii: false`, session replay disabled, browser SDK routed through `/api/sentry-tunnel`, and server tunnel validation against the web project DSN (`SENTRY_BROWSER_DSN`).
+- **Analytics server:** Node Sentry init uses `sendDefaultPii: false`; deploy workflows set `SENTRY_BROWSER_DSN` from the web DSN secret so the tunnel accepts browser envelopes in the recommended two-project setup.
+- **Version:** Bumped package version to `1.5.3`.
+
+### Fixed
+- **Sentry tunnel security:** Removed client-controlled ingest URLs and query-string forwarding; malformed envelope bodies return 400 instead of 500.
+
+## v1.5.2
+
+### Fixed
+- Fixed the primary button on the signed-out Home Page being incorrectly white/blank
+- Fixed an issue where you couldn't export an outlook as an image
+
+## v1.5.1
+
+### Fixed
+- Fixed an issue where maps wouldn't render on Chromebooks
+- Updated package version to v1.5.1
+- Removed old beta selector from account screen
+
+## v1.5.0
+>>>>>>> 7b20049 (fix(release): do not reset beta line on older main stable releases)
 
 ### Dependencies
 <!-- dependabot-automation -->

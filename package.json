@@ -1,6 +1,10 @@
 {
   "name": "graphical-forecast-creator",
+<<<<<<< HEAD
   "version": "1.5.3",
+=======
+  "version": "1.6.0-beta.15",
+>>>>>>> 7b20049 (fix(release): do not reset beta line on older main stable releases)
   "private": true,
   "engines": {
     "node": ">=22.12.0 <23 || >=24 <26"

@@ -36,6 +36,7 @@ describe('bump-beta-after-main-release', () => {
     assert.equal(result.reason, 'promoted_stable_line');
   });
 
+<<<<<<< HEAD
   it('starts next minor beta.1 when beta was stable and main caught up', () => {
     const result = computeBetaVersionAfterMainRelease('1.6.0', '1.6.0');
     assert.equal(result.changed, true);
@@ -57,5 +58,12 @@ describe('bump-beta-after-main-release', () => {
     assert.ok(compareStableTriples(olderStable, newerStable) < 0);
     assert.ok(compareStableTriples(newerStable, olderStable) > 0);
     assert.equal(compareStableTriples(olderStable, olderStable), 0);
+=======
+  it('compareStableTriples orders semver', () => {
+    const a = parseStableTriple('1.5.3');
+    const b = parseStableTriple('1.6.0');
+    assert.ok(a && b);
+    assert.equal(compareStableTriples(a, b), -1);
+>>>>>>> 7b20049 (fix(release): do not reset beta line on older main stable releases)
   });
 });

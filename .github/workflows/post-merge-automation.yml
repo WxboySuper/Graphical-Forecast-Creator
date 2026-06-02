@@ -80,7 +80,12 @@ jobs:
           BETA_BEFORE=$(node scripts/read-package-version.mjs)
           git merge origin/main -X theirs -m "chore: sync release automation from main"
 
+<<<<<<< HEAD
           node scripts/bump-beta-after-main-release.mjs "$STABLE" "$BETA_BEFORE"
+=======
+          BETA_BEFORE=$(node scripts/read-package-version.mjs)
+          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+>>>>>>> 7b20049 (fix(release): do not reset beta line on older main stable releases)
           NEXT=$(node scripts/read-package-version.mjs)
 
           git add package.json
