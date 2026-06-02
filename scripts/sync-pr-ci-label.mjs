@@ -1,0 +1,65 @@
+import { ciLabelFromCheckRuns, diffCiLabels } from './lib/pr-ci-label-state.mjs';
+
+const token = process.env.GITHUB_TOKEN ?? '';
+const repository = process.env.GITHUB_REPOSITORY ?? '';
+const prNumber = process.env.PR_NUMBER ?? '';
+
+if (!token || !repository || !prNumber) {
+  console.error('GITHUB_TOKEN, GITHUB_REPOSITORY, and PR_NUMBER are required.');
+  process.exit(1);
+}
+
+const [owner, repo] = repository.split('/');
+
+/**
+ * @param {string} path
+ * @param {RequestInit} [init]
+ */
+async function githubApi(path, init = {}) {
+  const response = await fetch(`https://api.github.com${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(init.headers ?? {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}: ${await response.text()}`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+const pull = await githubApi(`/repos/${owner}/${repo}/pulls/${prNumber}`);
+const checkData = await githubApi(
+  `/repos/${owner}/${repo}/commits/${pull.head.sha}/check-runs?filter=latest&per_page=100`,
+);
+const existing = (await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels`)).map(
+  (label) => label.name,
+);
+
+const desired = ciLabelFromCheckRuns(
+  (checkData.check_runs ?? []).map((run) => ({
+    status: run.status,
+    conclusion: run.conclusion,
+  })),
+);
+
+const { add, remove } = diffCiLabels(existing, desired);
+
+for (const name of remove) {
+  await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  });
+}
+
+if (add.length > 0) {
+  await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ labels: add }),
+  });
+}
+
+console.log(`CI label for PR #${prNumber}: ${desired} (add=${add.join(',') || 'none'} remove=${remove.join(',') || 'none'})`);
