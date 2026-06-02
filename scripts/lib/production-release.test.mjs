@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
   deriveAlertBannerFile,
   isDuplicateStageDeploy,
+  isSafeBannerLinkUrl,
   isWithinScheduleWindow,
   normalizeProductionReleaseConfig,
   resolveActiveBannerPhase,
+  sanitizeBannerLinkUrl,
   validateProductionReleaseForDeploy,
 } from '../../server/lib/production-release.mjs';
 
@@ -133,6 +135,30 @@ describe('production-release', () => {
     });
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.includes('already staged')));
+  });
+
+  it('rejects unsafe banner linkUrl schemes at validation time', () => {
+    const config = stageConfig({
+      banner: {
+        phases: [
+          {
+            message: 'Soon',
+            type: 'warning',
+            expiresAt: ROLLOUT,
+            linkUrl: 'javascript:alert(1)',
+          },
+          { message: 'Live', type: 'info', startsAt: ROLLOUT },
+        ],
+      },
+    });
+    const result = validateStage(config);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.includes('linkUrl')));
+  });
+
+  it('sanitizeBannerLinkUrl strips javascript URLs', () => {
+    assert.equal(sanitizeBannerLinkUrl('javascript:alert(1)'), undefined);
+    assert.equal(isSafeBannerLinkUrl('https://example.com'), true);
   });
 
   it('validateProductionReleaseForDeploy blocks live deploy when VPS has staged rollout', () => {

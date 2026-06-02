@@ -78,6 +78,22 @@ describe('AlertBanner', () => {
     expect(screen.queryByText('Dismiss me')).not.toBeInTheDocument();
   });
 
+  test('does not render unsafe javascript banner links', async () => {
+    mockBannerFetch({
+      enabled: true,
+      message: 'Click me',
+      type: 'info',
+      dismissible: true,
+      linkUrl: 'javascript:alert(1)',
+      linkLabel: 'Bad link',
+    });
+
+    renderBanner();
+
+    await waitFor(() => expect(screen.getByText('Click me')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'Bad link' })).not.toBeInTheDocument();
+  });
+
   test('is not dismissible when dismissible is false', async () => {
     const mockConfig = {
       enabled: true,

@@ -1,5 +1,6 @@
 import { isWithinScheduleWindow, parseInstant } from './schedule.mjs';
 import { VALID_BANNER_TYPES } from './constants.mjs';
+import { sanitizeBannerLinkUrl } from './link-url.mjs';
 
 /** @typedef {'info' | 'warning' | 'error'} BannerType */
 
@@ -36,7 +37,7 @@ export function bannerPhaseToFlatConfig(phase) {
     type: phase.type,
     dismissible: phase.dismissible !== false,
     id: phase.id,
-    linkUrl: phase.linkUrl,
+    linkUrl: sanitizeBannerLinkUrl(phase.linkUrl),
     linkLabel: phase.linkLabel,
     startsAt: phase.startsAt,
     expiresAt: phase.expiresAt,

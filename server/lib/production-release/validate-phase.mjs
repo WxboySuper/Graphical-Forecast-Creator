@@ -1,4 +1,5 @@
 import { parseInstant } from './schedule.mjs';
+import { isSafeBannerLinkUrl } from './link-url.mjs';
 
 /** @param {string | undefined} value */
 function hasInvalidInstant(value) {
@@ -16,6 +17,10 @@ function validatePhaseFields(phase, index) {
   }
   if (hasInvalidInstant(phase.expiresAt)) {
     errors.push(`banner.phases[${index}]: invalid expiresAt`);
+  }
+  const linkUrl = phase.linkUrl?.trim();
+  if (linkUrl && !isSafeBannerLinkUrl(linkUrl)) {
+    errors.push(`banner.phases[${index}]: linkUrl must be a path or http(s) URL`);
   }
   const start = parseInstant(phase.startsAt);
   const end = parseInstant(phase.expiresAt);

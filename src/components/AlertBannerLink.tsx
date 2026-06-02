@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { isSafeBannerLinkUrl } from '../utils/bannerLinkUrl';
 
 interface AlertBannerLinkProps {
   linkUrl: string;
@@ -13,6 +14,10 @@ export function AlertBannerLink({ linkUrl, linkLabel }: AlertBannerLinkProps) {
         {linkLabel}
       </Link>
     );
+  }
+
+  if (!isSafeBannerLinkUrl(linkUrl)) {
+    return null;
   }
 
   return (

@@ -11,6 +11,7 @@ export {
 } from './constants.mjs';
 
 export { parseInstant, isWithinScheduleWindow } from './schedule.mjs';
+export { isSafeBannerLinkUrl, sanitizeBannerLinkUrl } from './link-url.mjs';
 
 export {
   isBannerPhaseActive,

@@ -71,6 +71,7 @@ cd "$ANALYTICS_ROOT/current"
 npm install --omit=dev --quiet
 mkdir -p "$ANALYTICS_ROOT/logs"
 
+# Production analytics only — gfc-staging-analytics uses /opt/gfc-staging-analytics/config/.env
 if [ -f "$ANALYTICS_ROOT/config/.env" ]; then
   cp "$ANALYTICS_ROOT/config/.env" "$ANALYTICS_ROOT/current/.env"
 elif [ -f "$ANALYTICS_ROOT/.env" ]; then

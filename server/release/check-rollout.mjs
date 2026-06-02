@@ -17,12 +17,14 @@ const PROMOTE_SCRIPT = join(__dirname, 'promote-release.sh');
 
 /** Reads and normalizes the VPS production release manifest. */
 function loadConfig() {
-  return normalizeProductionReleaseConfig(JSON.parse(readFileSync(CONFIG_PATH, 'utf8')));
+  const raw = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+  return { config: normalizeProductionReleaseConfig(raw), raw };
 }
 
 /** Persists manifest updates after a failed promote attempt. */
-function saveConfig(config) {
-  writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+function saveConfig(config, raw) {
+  const merged = raw ? { ...raw, ...config } : config;
+  writeFileSync(CONFIG_PATH, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
 }
 
 /** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
@@ -54,7 +56,11 @@ function loadConfigOrExit() {
 
 /** Cron entry: promote when rolloutAt has passed. */
 function main() {
-  const config = loadConfigOrExit();
+  const loaded = loadConfigOrExit();
+  if (!loaded) {
+    return;
+  }
+  const { config, raw } = loaded;
 
   if (shouldSkipRollout(config)) {
     process.exit(0);
@@ -68,7 +74,10 @@ function main() {
 
   const result = spawnSync('bash', [PROMOTE_SCRIPT], { stdio: 'inherit' });
   if (result.status !== 0) {
-    saveConfig({ ...config, lastPromoteErrorAt: new Date().toISOString(), status: config.status ?? 'staged' });
+    saveConfig(
+      { ...config, lastPromoteErrorAt: new Date().toISOString(), status: config.status ?? 'staged' },
+      raw,
+    );
     process.exit(result.status ?? 1);
   }
 
