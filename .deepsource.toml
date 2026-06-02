@@ -1,6 +1,12 @@
 version = 1
 
-exclude_patterns = ["build/**"]
+exclude_patterns = [
+  "build/**",
+  "server/release/**",
+  "scripts/lib/production-release.test.mjs",
+  "src/**/*.test.ts",
+  "src/**/*.test.tsx",
+]
 
 [[analyzers]]
 name = "javascript"

@@ -1,5 +1,13 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import AlertBanner from './AlertBanner';
+
+const renderBanner = () =>
+  render(
+    <MemoryRouter>
+      <AlertBanner />
+    </MemoryRouter>,
+  );
 
 describe('AlertBanner', () => {
   const mockBannerFetch = (config: unknown, ok = true) => {
@@ -23,7 +31,7 @@ describe('AlertBanner', () => {
     };
     mockBannerFetch(mockConfig);
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => expect(screen.getByText('Test Alert')).toBeInTheDocument());
 
@@ -44,7 +52,7 @@ describe('AlertBanner', () => {
       mockBannerFetch(config, ok ?? true);
     }
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -60,7 +68,7 @@ describe('AlertBanner', () => {
     };
     mockBannerFetch(mockConfig);
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => expect(screen.getByText('Dismiss me')).toBeInTheDocument());
 
@@ -68,6 +76,22 @@ describe('AlertBanner', () => {
     fireEvent.click(closeButton);
 
     expect(screen.queryByText('Dismiss me')).not.toBeInTheDocument();
+  });
+
+  test('does not render unsafe javascript banner links', async () => {
+    mockBannerFetch({
+      enabled: true,
+      message: 'Click me',
+      type: 'info',
+      dismissible: true,
+      linkUrl: 'javascript:alert(1)',
+      linkLabel: 'Bad link',
+    });
+
+    renderBanner();
+
+    await waitFor(() => expect(screen.getByText('Click me')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'Bad link' })).not.toBeInTheDocument();
   });
 
   test('is not dismissible when dismissible is false', async () => {
@@ -79,7 +103,7 @@ describe('AlertBanner', () => {
     };
     mockBannerFetch(mockConfig);
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
 

@@ -3,12 +3,26 @@ name: Deploy Production to VPS
 permissions:
   contents: read
 
-# Triggers on every push to main (including the automated promote-beta-to-main push)
-# and can also be triggered manually from the GitHub Actions tab.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_action:
+        description: 'Override manifest action (auto = use deploy/production-release.json)'
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - live
+          - stage
+          - none
+      force:
+        description: 'Allow re-staging the same releaseId'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   deploy:
@@ -41,14 +55,56 @@ jobs:
             echo "Invalid package version format: $RAW" >&2
             exit 1
           fi
-          echo "value=$RAW" >> "$GITHUB_OUTPUT"
+          RELEASE_DIR=$(node -e "console.log('$STABLE'.replace(/[^0-9A-Za-z.-]+/g, '_'))")
+          echo "raw=$RAW" >> "$GITHUB_OUTPUT"
+          echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
           echo "sentry_release=$STABLE" >> "$GITHUB_OUTPUT"
+          echo "release_dir=$RELEASE_DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Build
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Trust VPS host key
+        run: ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Validate production release manifest
+        id: manifest
+        env:
+          DEPLOY_ACTION: ${{ github.event.inputs.deploy_action == 'auto' && '' || github.event.inputs.deploy_action }}
+          DEPLOY_FORCE: ${{ github.event.inputs.force && 'true' || 'false' }}
+        run: |
+          PREVIOUS_RELEASE_ID=$(ssh -o StrictHostKeyChecking=yes \
+            "root@${{ secrets.PROD_SSH_HOST }}" \
+            "node -e \"try{const c=JSON.parse(require('fs').readFileSync('/opt/gfc-analytics/config/production-release.json','utf8'));process.stdout.write(c.releaseId||'')}catch(e){}\"" \
+            2>/dev/null || true)
+          PREVIOUS_VPS_STATUS=$(ssh -o StrictHostKeyChecking=yes \
+            "root@${{ secrets.PROD_SSH_HOST }}" \
+            "node -e \"try{const c=JSON.parse(require('fs').readFileSync('/opt/gfc-analytics/config/production-release.json','utf8'));process.stdout.write(c.status||'')}catch(e){}\"" \
+            2>/dev/null || true)
+          export PREVIOUS_RELEASE_ID
+          export PREVIOUS_VPS_STATUS
+          node scripts/validate-production-release.mjs | tee /tmp/validate-release.txt
+          ACTION=$(node -e "
+            const fs=require('fs');
+            const input=process.env.DEPLOY_ACTION||'';
+            const raw=JSON.parse(fs.readFileSync('deploy/production-release.json','utf8'));
+            const action=input||raw.action||'live';
+            console.log(action);
+          ")
+          echo "action=$ACTION" >> "$GITHUB_OUTPUT"
+          if [ "$ACTION" = "none" ]; then
+            echo "Deploy skipped (action=none)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build production frontend
+        if: steps.manifest.outputs.skip != 'true'
         run: pnpm run build
         env:
-          # homepage in package.json is already the production URL (gfc.weatherboysuper.com)
-          # so no PUBLIC_URL override is needed here.
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -60,29 +116,38 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          CI: false  # Prevent ESLint warnings from failing the build
+          CI: false
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
-
-      - name: Trust VPS host key
-        run: ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts
-
-      # Deploy the React build to the web root
-      - name: Deploy site files via rsync
+      - name: Build staging preview frontend (beta access gate)
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'stage'
         run: |
-          rsync -avz --delete \
-            build/ root@${{ secrets.PROD_SSH_HOST }}:/var/www/gfc/
+          mv build "build-production-${GITHUB_RUN_ID}"
+          pnpm run build
+          mv build build-staging
+          mv "build-production-${GITHUB_RUN_ID}" build
+        env:
+          PUBLIC_URL: https://staging-gfc.weatherboysuper.com
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_MODE: true
+          VITE_BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: staging
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          CI: false
 
-      # Deploy the analytics server source (excluding node_modules and logs)
-      - name: Deploy analytics server via rsync
+      - name: Write derived live alert banner
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'stage'
         run: |
-          rsync -avz --exclude='node_modules' --exclude='logs' \
-            server/ root@${{ secrets.PROD_SSH_HOST }}:/opt/gfc-analytics/
+          BANNER_SURFACE=live-pre-promote node scripts/write-derived-alert-banner.mjs
+          mv build/alert-banner.json build/alert-banner-live-pre.json
 
-      - name: Write production analytics env file
+      - name: Write analytics env files
+        if: steps.manifest.outputs.skip != 'true'
         run: |
           cat > prod-server.env <<EOF
           PORT=3006
@@ -108,19 +173,129 @@ jobs:
           SENTRY_ENVIRONMENT=production
           SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.sentry_release }}
           EOF
-          rsync -avz prod-server.env root@${{ secrets.PROD_SSH_HOST }}:/opt/gfc-analytics/.env
+          cat > staging-server.env <<EOF
+          PORT=3008
+          LOG_DIR=/opt/gfc-staging-analytics/logs
+          APP_BASE_URL=https://staging-gfc.weatherboysuper.com
+          BETA_MODE=true
+          BETA_INVITE_TOKEN=${{ secrets.BETA_INVITE_TOKEN }}
+          BETA_INVITE_PATH=${{ secrets.BETA_INVITE_PATH }}
+          ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
+          METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET=${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
+          STRIPE_PRICE_ANNUAL_STANDARD=${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
+          STRIPE_PRICE_ANNUAL_PROMO=
+          STRIPE_PROMO_START=
+          STRIPE_PROMO_END=
+          FIREBASE_ADMIN_PROJECT_ID=${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+          FIREBASE_ADMIN_CLIENT_EMAIL=${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+          FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+          SENTRY_BROWSER_DSN=${{ secrets.VITE_SENTRY_DSN }}
+          SENTRY_ENVIRONMENT=staging
+          SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.sentry_release }}
+          EOF
 
-      # Install prod dependencies and (re)start with PM2
-      - name: Install analytics dependencies and restart
+      - name: Deploy live release (full)
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live'
+        env:
+          RELEASE_DIR: ${{ steps.app_version.outputs.release_dir }}
         run: |
-          ssh root@${{ secrets.PROD_SSH_HOST }} '
-            cd /opt/gfc-analytics
-            npm install --omit=dev --quiet
-            mkdir -p /opt/gfc-analytics/logs
-            if pm2 describe gfc-analytics > /dev/null 2>&1; then
-              pm2 restart gfc-analytics
-            else
-              pm2 start analytics.js --name gfc-analytics
-            fi
-            pm2 save
-          '
+          set -euo pipefail
+          HOST="root@${{ secrets.PROD_SSH_HOST }}"
+
+          ssh "$HOST" "mkdir -p /var/www/gfc/releases /opt/gfc-analytics/releases /opt/gfc-analytics/config /opt/gfc-analytics/logs"
+
+          rsync -avz --delete build/ "$HOST:/var/www/gfc/releases/$RELEASE_DIR/"
+          rsync -avz --exclude='node_modules' --exclude='logs' server/ "$HOST:/opt/gfc-analytics/releases/$RELEASE_DIR/"
+          rsync -avz deploy/production-release.json "$HOST:/opt/gfc-analytics/config/production-release.json"
+          rsync -avz prod-server.env "$HOST:/opt/gfc-analytics/config/.env"
+
+          ssh "$HOST" "RELEASE_DIR='$RELEASE_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          WEB_ROOT=/var/www/gfc
+          ANALYTICS_ROOT=/opt/gfc-analytics
+
+          if [ ! -e "$WEB_ROOT/current" ] && [ -f "$WEB_ROOT/index.html" ]; then
+            mkdir -p "$WEB_ROOT/releases/legacy"
+            shopt -s dotglob
+            for item in "$WEB_ROOT"/*; do
+              base=$(basename "$item")
+              case "$base" in
+                releases|current) ;;
+                *) mv "$item" "$WEB_ROOT/releases/legacy/" ;;
+              esac
+            done
+          fi
+
+          ln -sfn "$WEB_ROOT/releases/$RELEASE_DIR" "$WEB_ROOT/current"
+          ln -sfn "$ANALYTICS_ROOT/releases/$RELEASE_DIR" "$ANALYTICS_ROOT/current"
+          cd "$ANALYTICS_ROOT/current"
+          npm install --omit=dev --quiet
+          cp "$ANALYTICS_ROOT/config/.env" "$ANALYTICS_ROOT/current/.env"
+
+          if pm2 describe gfc-analytics > /dev/null 2>&1; then
+            pm2 restart gfc-analytics
+          else
+            pm2 start analytics.js --name gfc-analytics
+          fi
+          pm2 save
+          REMOTE
+
+      - name: Stage release on VPS (timed rollout)
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'stage'
+        env:
+          RELEASE_DIR: ${{ steps.app_version.outputs.release_dir }}
+        run: |
+          set -euo pipefail
+          HOST="root@${{ secrets.PROD_SSH_HOST }}"
+
+          ssh "$HOST" "mkdir -p \
+            /var/www/gfc/releases \
+            /var/www/gfc-staging/releases \
+            /opt/gfc-analytics/releases \
+            /opt/gfc-analytics/config \
+            /opt/gfc-staging-analytics/config \
+            /opt/gfc-staging-analytics/logs"
+
+          rsync -avz --delete build/ "$HOST:/var/www/gfc/releases/$RELEASE_DIR/"
+          rsync -avz --delete build-staging/ "$HOST:/var/www/gfc-staging/releases/$RELEASE_DIR/"
+          rsync -avz --exclude='node_modules' --exclude='logs' server/ "$HOST:/opt/gfc-analytics/releases/$RELEASE_DIR/"
+          rsync -avz --exclude='node_modules' --exclude='logs' server/ "$HOST:/opt/gfc-staging-analytics/releases/$RELEASE_DIR/"
+          rsync -avz deploy/production-release.json "$HOST:/opt/gfc-analytics/config/production-release.json"
+          rsync -avz build/alert-banner-live-pre.json "$HOST:/tmp/alert-banner-live-pre.json"
+          rsync -avz staging-server.env "$HOST:/opt/gfc-staging-analytics/config/.env"
+
+          ssh "$HOST" "RELEASE_DIR='$RELEASE_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          WEB_ROOT=/var/www/gfc
+          STAGING_WEB_ROOT=/var/www/gfc-staging
+          ANALYTICS_ROOT=/opt/gfc-analytics
+          STAGING_ANALYTICS_ROOT=/opt/gfc-staging-analytics
+
+          ln -sfn "$STAGING_WEB_ROOT/releases/$RELEASE_DIR" "$STAGING_WEB_ROOT/current"
+
+          LIVE_WEB="$WEB_ROOT/current"
+          if [ ! -e "$LIVE_WEB" ]; then
+            LIVE_WEB="$WEB_ROOT"
+          fi
+          cp /tmp/alert-banner-live-pre.json "$LIVE_WEB/alert-banner.json"
+
+          mkdir -p "$STAGING_ANALYTICS_ROOT/releases"
+          ln -sfn "$STAGING_ANALYTICS_ROOT/releases/$RELEASE_DIR" "$STAGING_ANALYTICS_ROOT/current"
+          cd "$STAGING_ANALYTICS_ROOT/current"
+          npm install --omit=dev --quiet
+          cp "$STAGING_ANALYTICS_ROOT/config/.env" "$STAGING_ANALYTICS_ROOT/current/.env"
+
+          export CONFIG_PATH="$ANALYTICS_ROOT/config/production-release.json"
+          node "$ANALYTICS_ROOT/releases/$RELEASE_DIR/release/mark-release-staged.mjs"
+
+          if pm2 describe gfc-staging-analytics > /dev/null 2>&1; then
+            pm2 restart gfc-staging-analytics --update-env
+          else
+            pm2 start "$STAGING_ANALYTICS_ROOT/current/analytics.js" --name gfc-staging-analytics
+          fi
+          pm2 save
+          REMOTE
