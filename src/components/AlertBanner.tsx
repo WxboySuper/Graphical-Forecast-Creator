@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { AlertBannerLink } from './AlertBannerLink';
 import './AlertBanner.css';
 
 export interface AlertConfig {
@@ -48,34 +48,25 @@ export function AlertBanner({ configPath = '/alert-banner.json' }: AlertBannerPr
     return null;
   }
 
-  const linkLabel = config.linkLabel?.trim() || 'Learn more';
   const linkUrl = config.linkUrl?.trim();
+  const linkLabel = config.linkLabel?.trim() || 'Learn more';
 
   return (
     <div className={`alert-banner alert-banner--${config.type}`} role="status" aria-live="polite">
       <div className="alert-banner__content">
         <span className="alert-banner__message">{config.message}</span>
-        {linkUrl ? (
-          linkUrl.startsWith('/') ? (
-            <Link className="alert-banner__link" to={linkUrl}>
-              {linkLabel}
-            </Link>
-          ) : (
-            <a className="alert-banner__link" href={linkUrl} target="_blank" rel="noopener noreferrer">
-              {linkLabel}
-            </a>
-          )
-        ) : null}
+        {linkUrl ? <AlertBannerLink linkUrl={linkUrl} linkLabel={linkLabel} /> : null}
       </div>
-      {config.dismissible && (
+      {config.dismissible ? (
         <button
           className="alert-banner__close"
           onClick={() => setDismissed(true)}
           aria-label="Dismiss alert"
+          type="button"
         >
           &times;
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

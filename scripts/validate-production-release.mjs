@@ -12,8 +12,9 @@ const expectedVersion = deriveStableVersion(packageVersion) ?? packageVersion;
 const deployAction = process.env.DEPLOY_ACTION?.trim() || '';
 const force = process.env.DEPLOY_FORCE === 'true';
 const previousReleaseId = process.env.PREVIOUS_RELEASE_ID?.trim() || '';
+const previousVpsStatus = process.env.PREVIOUS_VPS_STATUS?.trim() || '';
 
-let raw;
+let raw = null;
 try {
   raw = JSON.parse(readFileSync(manifestPath, 'utf8'));
 } catch (error) {
@@ -30,6 +31,7 @@ const result = validateProductionReleaseForDeploy({
   deployAction: action,
   force,
   previousReleaseId,
+  previousVpsStatus,
 });
 
 if (!result.ok) {

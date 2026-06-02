@@ -21,6 +21,10 @@ Ops companion to [timed-production-rollout.md](./timed-production-rollout.md).
   logs/
 
 /opt/gfc-staging-analytics/   # beta-gated API on port 3008 for staging-gfc preview
+  releases/<version>/         # separate copy from prod (not symlinked to gfc-analytics)
+  current -> releases/<staged-version>
+  config/.env                 # staging-only credentials (never prod .env)
+  logs/
 ```
 
 ## One-time setup

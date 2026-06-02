@@ -79,7 +79,12 @@ jobs:
             "root@${{ secrets.PROD_SSH_HOST }}" \
             "node -e \"try{const c=JSON.parse(require('fs').readFileSync('/opt/gfc-analytics/config/production-release.json','utf8'));process.stdout.write(c.releaseId||'')}catch(e){}\"" \
             2>/dev/null || true)
+          PREVIOUS_VPS_STATUS=$(ssh -o StrictHostKeyChecking=yes \
+            "root@${{ secrets.PROD_SSH_HOST }}" \
+            "node -e \"try{const c=JSON.parse(require('fs').readFileSync('/opt/gfc-analytics/config/production-release.json','utf8'));process.stdout.write(c.status||'')}catch(e){}\"" \
+            2>/dev/null || true)
           export PREVIOUS_RELEASE_ID
+          export PREVIOUS_VPS_STATUS
           node scripts/validate-production-release.mjs | tee /tmp/validate-release.txt
           ACTION=$(node -e "
             const fs=require('fs');
@@ -258,6 +263,7 @@ jobs:
           rsync -avz --delete build/ "$HOST:/var/www/gfc/releases/$RELEASE_DIR/"
           rsync -avz --delete build-staging/ "$HOST:/var/www/gfc-staging/releases/$RELEASE_DIR/"
           rsync -avz --exclude='node_modules' --exclude='logs' server/ "$HOST:/opt/gfc-analytics/releases/$RELEASE_DIR/"
+          rsync -avz --exclude='node_modules' --exclude='logs' server/ "$HOST:/opt/gfc-staging-analytics/releases/$RELEASE_DIR/"
           rsync -avz deploy/production-release.json "$HOST:/opt/gfc-analytics/config/production-release.json"
           rsync -avz build/alert-banner-live-pre.json "$HOST:/tmp/alert-banner-live-pre.json"
           rsync -avz staging-server.env "$HOST:/opt/gfc-staging-analytics/config/.env"
@@ -278,7 +284,7 @@ jobs:
           cp /tmp/alert-banner-live-pre.json "$LIVE_WEB/alert-banner.json"
 
           mkdir -p "$STAGING_ANALYTICS_ROOT/releases"
-          ln -sfn "$ANALYTICS_ROOT/releases/$RELEASE_DIR" "$STAGING_ANALYTICS_ROOT/current"
+          ln -sfn "$STAGING_ANALYTICS_ROOT/releases/$RELEASE_DIR" "$STAGING_ANALYTICS_ROOT/current"
           cd "$STAGING_ANALYTICS_ROOT/current"
           npm install --omit=dev --quiet
           cp "$STAGING_ANALYTICS_ROOT/config/.env" "$STAGING_ANALYTICS_ROOT/current/.env"

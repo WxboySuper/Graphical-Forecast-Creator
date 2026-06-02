@@ -15,14 +15,41 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = process.env.CONFIG_PATH || '/opt/gfc-analytics/config/production-release.json';
 const PROMOTE_SCRIPT = join(__dirname, 'promote-release.sh');
 
+/** @returns {ReturnType<typeof normalizeProductionReleaseConfig>} */
 function loadConfig() {
   return normalizeProductionReleaseConfig(JSON.parse(readFileSync(CONFIG_PATH, 'utf8')));
 }
 
+/** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
 function saveConfig(config) {
   writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }
 
+/** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
+function shouldSkipRollout(config) {
+  if (config.action !== 'stage') {
+    return true;
+  }
+  if (config.status === 'live' || config.status === 'cancelled') {
+    return true;
+  }
+  if (config.status !== 'scheduled' && config.status !== 'staged') {
+    return true;
+  }
+  return false;
+}
+
+/** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
+function isRolloutDue(config) {
+  const rolloutAtMs = parseInstant(config.rolloutAt);
+  if (rolloutAtMs === null) {
+    console.error('[rollout] missing rolloutAt');
+    process.exit(1);
+  }
+  return Date.now() >= rolloutAtMs;
+}
+
+/** Cron entry: promote when rolloutAt has passed. */
 function main() {
   let config;
   try {
@@ -32,25 +59,11 @@ function main() {
     process.exit(1);
   }
 
-  if (config.action !== 'stage') {
+  if (shouldSkipRollout(config)) {
     process.exit(0);
   }
 
-  if (config.status === 'live' || config.status === 'cancelled') {
-    process.exit(0);
-  }
-
-  if (config.status !== 'scheduled' && config.status !== 'staged') {
-    process.exit(0);
-  }
-
-  const rolloutAtMs = parseInstant(config.rolloutAt);
-  if (rolloutAtMs === null) {
-    console.error('[rollout] missing rolloutAt');
-    process.exit(1);
-  }
-
-  if (Date.now() < rolloutAtMs) {
+  if (!isRolloutDue(config)) {
     process.exit(0);
   }
 
@@ -58,8 +71,7 @@ function main() {
 
   const result = spawnSync('bash', [PROMOTE_SCRIPT], { stdio: 'inherit' });
   if (result.status !== 0) {
-    config.lastPromoteErrorAt = new Date().toISOString();
-    saveConfig({ ...config, status: config.status ?? 'staged' });
+    saveConfig({ ...config, lastPromoteErrorAt: new Date().toISOString(), status: config.status ?? 'staged' });
     process.exit(result.status ?? 1);
   }
 

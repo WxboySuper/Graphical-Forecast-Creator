@@ -7,6 +7,7 @@ GFC_WEB_ROOT="${GFC_WEB_ROOT:-/var/www/gfc}"
 GFC_STAGING_WEB_ROOT="${GFC_STAGING_WEB_ROOT:-/var/www/gfc-staging}"
 ANALYTICS_ROOT="${ANALYTICS_ROOT:-/opt/gfc-analytics}"
 CONFIG_PATH="${CONFIG_PATH:-$ANALYTICS_ROOT/config/production-release.json}"
+RELEASE_LIB="${RELEASE_LIB:-$ANALYTICS_ROOT/current/release}"
 PM2_APP="${PM2_APP:-gfc-analytics}"
 FORCE="${1:-}"
 
@@ -15,15 +16,13 @@ if [ ! -f "$CONFIG_PATH" ]; then
   exit 1
 fi
 
-read_manifest() {
-  node -e "
-    const fs = require('fs');
-    const config = JSON.parse(fs.readFileSync('$CONFIG_PATH', 'utf8'));
-    console.log([config.version, config.releaseId, config.rolloutAt || '', config.status || ''].join('\t'));
-  "
-}
+if [ ! -d "$RELEASE_LIB" ]; then
+  RELEASE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 
-IFS=$'\t' read -r VERSION RELEASE_ID ROLLOUT_AT STATUS < <(read_manifest)
+IFS=$'\t' read -r VERSION RELEASE_ID ROLLOUT_AT STATUS < <(
+  node "$RELEASE_LIB/read-manifest-fields.mjs" --config "$CONFIG_PATH"
+)
 
 if [ -z "$VERSION" ]; then
   echo "Invalid manifest: missing version" >&2
@@ -50,18 +49,10 @@ if [ "$STATUS" = "live" ] && [ "$FORCE" != "--force" ]; then
   exit 0
 fi
 
-if [ -n "$ROLLOUT_AT" ] && [ "$FORCE" != "--force" ]; then
-  node -e "
-    const rolloutAt = Date.parse('$ROLLOUT_AT');
-    if (Number.isNaN(rolloutAt)) {
-      console.error('Invalid rolloutAt in manifest');
-      process.exit(1);
-    }
-    if (Date.now() < rolloutAt) {
-      console.error('rolloutAt has not passed yet:', '$ROLLOUT_AT');
-      process.exit(1);
-    }
-  "
+if [ "$FORCE" = "--force" ]; then
+  node "$RELEASE_LIB/assert-rollout-ready.mjs" --rollout-at "$ROLLOUT_AT" --force
+else
+  node "$RELEASE_LIB/assert-rollout-ready.mjs" --rollout-at "$ROLLOUT_AT"
 fi
 
 echo "Promoting release $VERSION ($RELEASE_ID) ..."
@@ -82,7 +73,7 @@ elif [ -f "$ANALYTICS_ROOT/.env" ]; then
   cp "$ANALYTICS_ROOT/.env" "$ANALYTICS_ROOT/current/.env"
 fi
 
-node "$ANALYTICS_ROOT/current/release/write-live-alert-banner.mjs" \
+node "$RELEASE_LIB/write-live-alert-banner.mjs" \
   --config "$CONFIG_PATH" \
   --web-root "$GFC_WEB_ROOT/current"
 
@@ -93,12 +84,6 @@ else
 fi
 pm2 save
 
-node -e "
-  const fs = require('fs');
-  const config = JSON.parse(fs.readFileSync('$CONFIG_PATH', 'utf8'));
-  config.status = 'live';
-  config.promotedAt = new Date().toISOString();
-  fs.writeFileSync('$CONFIG_PATH', JSON.stringify(config, null, 2) + '\n');
-"
+node "$RELEASE_LIB/mark-release-live.mjs" --config "$CONFIG_PATH"
 
 echo "Promote complete: $VERSION is live."

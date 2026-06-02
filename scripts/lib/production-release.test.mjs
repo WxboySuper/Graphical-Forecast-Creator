@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   deriveAlertBannerFile,
+  isDuplicateStageDeploy,
   isWithinScheduleWindow,
   normalizeProductionReleaseConfig,
   resolveActiveBannerPhase,
@@ -104,5 +105,53 @@ describe('production-release', () => {
     });
 
     assert.equal(result.ok, true);
+  });
+
+  it('isDuplicateStageDeploy uses VPS status not local manifest status', () => {
+    assert.equal(
+      isDuplicateStageDeploy({
+        releaseId: 'v1.6.0',
+        previousReleaseId: 'v1.6.0',
+        previousVpsStatus: 'staged',
+      }),
+      true,
+    );
+    assert.equal(
+      isDuplicateStageDeploy({
+        releaseId: 'v1.6.0',
+        previousReleaseId: 'v1.6.0',
+        previousVpsStatus: 'scheduled',
+        force: false,
+      }),
+      false,
+    );
+  });
+
+  it('validateProductionReleaseForDeploy blocks duplicate stage when VPS is staged', () => {
+    const config = normalizeProductionReleaseConfig({
+      releaseId: 'v1.6.0',
+      version: '1.6.0',
+      rolloutAt: ROLLOUT,
+      action: 'stage',
+      status: 'scheduled',
+      banner: {
+        phases: [
+          { message: 'Soon', type: 'warning', expiresAt: ROLLOUT },
+          { message: 'Live', type: 'info', startsAt: ROLLOUT },
+        ],
+      },
+    });
+
+    const result = validateProductionReleaseForDeploy({
+      config,
+      packageVersion: '1.6.0',
+      deployAction: 'stage',
+      nowMs: NOW,
+      previousReleaseId: 'v1.6.0',
+      previousVpsStatus: 'staged',
+    });
+
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.includes('already staged')));
   });
 });
