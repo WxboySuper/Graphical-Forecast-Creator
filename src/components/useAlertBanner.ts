@@ -38,9 +38,9 @@ export function useAlertBanner(configPath: string) {
       return undefined;
     }
 
-    const syncSchedule = () => {
+    function syncSchedule() {
       setScheduleActive(isAlertBannerScheduleActive(config));
-    };
+    }
 
     syncSchedule();
     const intervalId = window.setInterval(syncSchedule, SCHEDULE_POLL_MS);

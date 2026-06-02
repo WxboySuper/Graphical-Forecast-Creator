@@ -5,6 +5,7 @@ interface AlertBannerLinkProps {
   linkLabel: string;
 }
 
+/** True for in-app paths only (excludes protocol-relative `//` URLs). */
 const isInternalAppPath = (url: string): boolean => url.startsWith('/') && !url.startsWith('//');
 
 /** Renders an in-app or external CTA for the site-wide alert banner. */

@@ -47,12 +47,14 @@ export function isAlertBannerScheduleActive(
   return config.enabled && isWithinScheduleWindow(config.startsAt, config.expiresAt, nowMs);
 }
 
+/** Reads an optional string field from raw banner JSON. */
 function readOptionalString(raw: Record<string, unknown>, key: string): string | undefined {
   return typeof raw[key] === 'string' ? (raw[key] as string) : undefined;
 }
 
 const VALID_ALERT_TYPES = new Set<AlertBannerType>(['info', 'warning', 'error']);
 
+/** Coerces raw banner JSON `type` to a supported alert banner variant. */
 function readAlertType(raw: Record<string, unknown>): AlertBannerType {
   const type = raw.type;
   if (typeof type === 'string' && VALID_ALERT_TYPES.has(type as AlertBannerType)) {
