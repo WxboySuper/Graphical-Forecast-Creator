@@ -61,7 +61,14 @@ function UpdateImageLightbox({ shot, onClose }: UpdateImageLightboxProps) {
         <h2 id="updates-lightbox-title" className="updates-page__lightbox-title">
           Enlarged preview
         </h2>
-        <img className="updates-page__lightbox-image" src={shot.src} alt={shot.alt} />
+        <img
+          className="updates-page__lightbox-image"
+          src={shot.src}
+          alt={shot.alt}
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
         <p id="updates-lightbox-caption" className="updates-page__lightbox-caption">
           {shot.caption ?? shot.alt}
         </p>

@@ -121,6 +121,7 @@
   width: min(96vw, 72rem);
   max-width: none;
   max-height: 96vh;
+  overflow-y: auto;
   padding: 0;
   border: none;
   border-radius: 0.75rem;
