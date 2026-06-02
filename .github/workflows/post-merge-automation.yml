@@ -133,7 +133,9 @@ jobs:
 
           NEXT=$(node scripts/read-package-version.mjs)
           export NOTES_FILE=$(mktemp)
-          node scripts/create-github-release.mjs "$NEXT" beta
+          if [ "$NEXT" != "$BETA_VERSION" ]; then
+            node scripts/create-github-release.mjs "$NEXT" beta
+          fi
 
       - name: Release branch merged into main
         if: >-
@@ -164,7 +166,11 @@ jobs:
 
           NEXT=$(node scripts/read-package-version.mjs)
           export NOTES_FILE=$(mktemp)
-          node scripts/create-github-release.mjs "$NEXT" beta
+          if [ "$NEXT" != "$BETA_VERSION" ]; then
+            node scripts/create-github-release.mjs "$NEXT" beta
+          else
+            echo "Beta version unchanged at $NEXT after main v$STABLE; skipping beta GitHub release"
+          fi
 
       - name: Hotfix merged into main
         if: >-
