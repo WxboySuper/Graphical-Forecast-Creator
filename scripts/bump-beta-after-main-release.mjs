@@ -13,7 +13,11 @@ if (!stable) {
 }
 
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
+<<<<<<< HEAD
 const previous = currentBetaInput.trim() || pkg.version;
+=======
+const previous = pkg.version;
+>>>>>>> 8f39310 (fix(release): preserve beta line when main stable is behind beta)
 const result = computeBetaVersionAfterMainRelease(stable, previous);
 
 const outputPath = process.env.GITHUB_OUTPUT;
@@ -26,6 +30,7 @@ if (outputPath) {
 }
 
 if (!result.changed) {
+<<<<<<< HEAD
   if (pkg.version !== previous) {
     pkg.version = previous;
     writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
@@ -37,6 +42,11 @@ if (!result.changed) {
       `Keeping beta package.json at ${previous} (main stable ${stable}; ${result.reason})`,
     );
   }
+=======
+  console.log(
+    `Keeping beta package.json at ${previous} (main stable ${stable}; ${result.reason})`,
+  );
+>>>>>>> 8f39310 (fix(release): preserve beta line when main stable is behind beta)
   process.exit(0);
 }
 
