@@ -136,19 +136,19 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
     <Routes>
       <Route path="beta" element={<BetaLandingPage />} />
       <Route path="beta-access/:invitePath?" element={<BetaInvitePage />} />
-      <Route element={<BetaAccessGuard />}>
       <Route element={<AppLayout />}>
+        <Route path="updates" element={<UpdatesPage />} />
+        <Route element={<BetaAccessGuard />}>
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="pricing" element={<PricingPage />} />
-        <Route path="updates" element={<UpdatesPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route path="cloud" element={<CloudLibraryPage />} />
         <Route path="forecast" element={<ForecastPage />} />
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
         <Route path="monitor" element={<MonitorPage />} />
-      </Route>
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />
     </Routes>

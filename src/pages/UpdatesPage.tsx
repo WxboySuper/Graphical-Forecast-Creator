@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { v16Update, type UpdateScreenshot } from '../content/updates/v1.6';
 import './UpdatesPage.css';
 
-const UpdateScreenshotFigure: React.FC<{ shot: UpdateScreenshot }> = ({ shot }) => {
+/** Renders a release screenshot when the asset exists under public/updates. */
+function UpdateScreenshotFigure({ shot }: { shot: UpdateScreenshot }) {
   const [visible, setVisible] = useState(true);
 
   if (!visible) {
@@ -16,7 +17,7 @@ const UpdateScreenshotFigure: React.FC<{ shot: UpdateScreenshot }> = ({ shot }) 
       {shot.caption ? <figcaption>{shot.caption}</figcaption> : null}
     </figure>
   );
-};
+}
 
 /** Public What's New page for the current major release. */
 export const UpdatesPage: React.FC = () => (
@@ -43,8 +44,8 @@ export const UpdatesPage: React.FC = () => (
       <section className="updates-page__improvements" aria-labelledby="updates-improvements-heading">
         <h2 id="updates-improvements-heading">Also improved</h2>
         <ul>
-          {v16Update.improvements.map((item) => (
-            <li key={item}>{item}</li>
+          {v16Update.improvements.map((item, index) => (
+            <li key={`v16-improvement-${index}`}>{item}</li>
           ))}
         </ul>
       </section>

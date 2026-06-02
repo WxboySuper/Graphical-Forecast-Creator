@@ -12,6 +12,7 @@ jest.mock('./pages', () => ({
   ComingSoonPage: () => <div>ComingSoonPage Mock</div>,
   AccountPage: () => <div>AccountPage Mock</div>,
   PricingPage: () => <div>PricingPage Mock</div>,
+  UpdatesPage: () => <div>UpdatesPage Mock</div>,
   AdminPage: () => <div>AdminPage Mock</div>,
   BetaLandingPage: () => <div>BetaLandingPage Mock</div>,
   BetaInvitePage: () => <div>BetaInvitePage Mock</div>,

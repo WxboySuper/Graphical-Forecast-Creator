@@ -18,11 +18,14 @@ export interface ReleaseUpdate {
   improvements: string[];
 }
 
-const image = (fileName: string, alt: string, caption?: string): UpdateScreenshot => ({
+/** Builds a screenshot descriptor under public/updates/v1.6/. */
+function buildUpdateImage(fileName: string, alt: string, caption?: string): UpdateScreenshot {
+  return {
   src: `/updates/v1.6/${fileName}`,
   alt,
   caption,
-});
+  };
+}
 
 export const v16Update: ReleaseUpdate = {
   version: '1.6',
@@ -35,12 +38,12 @@ export const v16Update: ReleaseUpdate = {
       body:
         'Open Monitor from the main navigation to see radar and satellite imagery, animate recent frames, and keep your active or saved outlook on the map for context. Premium users can also pull outlooks from the cloud library.',
       screenshots: [
-        image(
+        buildUpdateImage(
           'monitor-overview.png',
           'Monitor page showing the map and control sidebar',
           'Monitor layout with map and controls',
         ),
-        image(
+        buildUpdateImage(
           'monitor-radar-outlook.png',
           'Radar imagery with a semi-transparent outlook overlay',
           'Radar plus your outlook overlay',
@@ -52,8 +55,8 @@ export const v16Update: ReleaseUpdate = {
       body:
         'Toggle NWS watches, warnings, and advisories with adjustable opacity. Layer storm reports and filter by hazard type, optionally matching your outlook type for faster verification.',
       screenshots: [
-        image('monitor-alerts.png', 'NWS alerts displayed on the Monitor map'),
-        image('monitor-storm-reports.png', 'Storm reports plotted on the Monitor map'),
+        buildUpdateImage('monitor-alerts.png', 'NWS alerts displayed on the Monitor map'),
+        buildUpdateImage('monitor-storm-reports.png', 'Storm reports plotted on the Monitor map'),
       ],
     },
   ],
