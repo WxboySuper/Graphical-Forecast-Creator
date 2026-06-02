@@ -63,20 +63,30 @@ function isFutureScheduledLive(config, nowMs) {
   return rolloutAtMs > nowMs + ROLLOUT_MIN_LEAD_MS && config.status === 'scheduled';
 }
 
-/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors @param {string | undefined} previousVpsStatus @param {boolean} force */
-function validateLiveAction(config, nowMs, errors, previousVpsStatus, force) {
-  if (!force && previousVpsStatus === 'staged') {
-    errors.push(
-      'action "live" is blocked: a staged release is already waiting for timed rollout on the VPS; promote or cancel it before switching to action "live"',
-    );
+/** @param {string[]} errors @param {string | undefined} previousVpsStatus @param {boolean} force */
+function validateLiveNotWhileVpsStaged(errors, previousVpsStatus, force) {
+  if (force || previousVpsStatus !== 'staged') {
     return;
   }
+  errors.push(
+    'action "live" is blocked: a staged release is already waiting for timed rollout on the VPS; promote or cancel it before switching to action "live"',
+  );
+}
+
+/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors */
+function validateLiveNotWhileFutureRolloutScheduled(config, nowMs, errors) {
   if (!isFutureScheduledLive(config, nowMs)) {
     return;
   }
   errors.push(
     'action "live" is blocked while a future rollout is scheduled; use action "stage" or set action to live after promote',
   );
+}
+
+/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors @param {string | undefined} previousVpsStatus @param {boolean} force */
+function validateLiveAction(config, nowMs, errors, previousVpsStatus, force) {
+  validateLiveNotWhileVpsStaged(errors, previousVpsStatus, force);
+  validateLiveNotWhileFutureRolloutScheduled(config, nowMs, errors);
 }
 
 /**
