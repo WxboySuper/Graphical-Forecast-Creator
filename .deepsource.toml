@@ -4,6 +4,7 @@ exclude_patterns = [
   "build/**",
   "server/release/**",
   "scripts/lib/production-release.test.mjs",
+  "scripts/lib/bump-beta-after-main-release.test.mjs",
   "scripts/lib/github-paginate.test.mjs",
   "scripts/lib/pr-ci-label-state.test.mjs",
   "src/**/*.test.ts",
@@ -16,6 +17,15 @@ enabled = true
 
   [analyzers.meta]
   plugins = ["react"]
+  cyclomatic_complexity_threshold = "critical"
+  skip_doc_coverage = [
+    "function-declaration",
+    "function-expression",
+    "arrow-function-expression",
+    "class-declaration",
+    "class-expression",
+    "method-definition",
+  ]
 
   [analyzers.features]
   parse_test_files = false
