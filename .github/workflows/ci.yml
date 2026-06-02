@@ -114,8 +114,8 @@ jobs:
       - name: Run analytics server tests
         working-directory: server
         run: |
-          npm ci
           if node -e "const s=require('./package.json').scripts; process.exit(s && s.test ? 0 : 1)"; then
+            npm ci
             npm test
           else
             echo "Skipping server tests: no test script in server/package.json on this branch."

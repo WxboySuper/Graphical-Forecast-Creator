@@ -1,4 +1,4 @@
-import { fetchAllPages } from './lib/github-paginate.mjs';
+import { fetchAllPages, GITHUB_PAGE_SIZE } from './lib/github-paginate.mjs';
 import { ciLabelFromCheckRuns, diffCiLabels } from './lib/pr-ci-label-state.mjs';
 
 const token = process.env.GITHUB_TOKEN ?? '';
@@ -35,7 +35,7 @@ async function githubApi(path, init = {}) {
 const pull = await githubApi(`/repos/${owner}/${repo}/pulls/${prNumber}`);
 const checkRuns = await fetchAllPages(async (page) => {
   const checkData = await githubApi(
-    `/repos/${owner}/${repo}/commits/${pull.head.sha}/check-runs?filter=latest&per_page=100&page=${page}`,
+    `/repos/${owner}/${repo}/commits/${pull.head.sha}/check-runs?filter=latest&per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
   );
   return checkData?.check_runs ?? [];
 });
