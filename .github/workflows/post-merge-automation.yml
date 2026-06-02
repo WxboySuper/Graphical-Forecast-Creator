@@ -77,10 +77,10 @@ jobs:
 
           git checkout beta
           git pull origin beta
+          BETA_BEFORE=$(node scripts/read-package-version.mjs)
           git merge origin/main -X theirs -m "chore: sync release automation from main"
 
-          BETA_BEFORE=$(node scripts/read-package-version.mjs)
-          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          node scripts/bump-beta-after-main-release.mjs "$STABLE" "$BETA_BEFORE"
           NEXT=$(node scripts/read-package-version.mjs)
 
           git add package.json
@@ -157,7 +157,7 @@ jobs:
           git pull --ff-only origin beta
           BETA_VERSION=$(node scripts/read-package-version.mjs)
           git merge origin/main -X theirs -m "chore: sync main into beta after release branch merge"
-          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          node scripts/bump-beta-after-main-release.mjs "$STABLE" "$BETA_VERSION"
           git add package.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"

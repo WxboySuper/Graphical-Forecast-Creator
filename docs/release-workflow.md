@@ -41,7 +41,7 @@ If both tried to port the same merge into `beta`, you would get a port PR and a 
 Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from **Prepare Beta → Main Release PR**:
 
 1. Merge the release PR to `main`.
-2. **Post-merge automation** merges **main** into **beta** (so beta always has the same code), creates the **stable GitHub Release**, bumps **beta** to the next line, and publishes a **prerelease** for the new beta version.
+2. **Post-merge automation** merges **main** into **beta** (so beta always has the same code), creates the **stable GitHub Release**, and bumps **beta** using the **pre-merge** beta version (merge must not overwrite `package.json` before the bump script runs). When `main` is still on an older stable line, beta keeps its current prerelease; otherwise beta moves to the next line and publishes a **prerelease**.
 
 Infrastructure fixes that land via `release/*` → `main` (not only `feature/release-*`) use the same **main → beta** merge; version-only bumps are not enough.
 
