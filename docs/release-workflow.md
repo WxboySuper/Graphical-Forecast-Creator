@@ -62,7 +62,8 @@ Infrastructure fixes that land via `release/*` → `main` (not only `feature/rel
 
 - Merges **main** into **beta** so beta gets workflows/scripts.
 - Creates the **stable GitHub Release** for the version on `main` (e.g. `v1.5.3`) if it is missing.
-- Sets **beta** to the next development line (e.g. main `1.5.3` → beta `1.6.0-beta.1`) and creates the matching **prerelease**.
+- **Does not reset** an in-progress beta line when `main` is still on an older stable (e.g. main `1.5.3` while beta is `1.6.0-beta.N` stays on `1.6.0-beta.N`).
+- Only starts a **new** `X.Y.0-beta.1` line after a **beta → main** promotion (or when `main` stable matches the line beta was building).
 - Does **not** change `main` again (the PR already set the stable version).
 
 If you merged release automation before this step existed, run **Post-merge automation** manually (`workflow_dispatch`, enable **sync beta from main**) to backfill the stable release and start the beta line.
