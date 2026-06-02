@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { BrandSection, MainTabs, RightActions } from './NavbarSections';
 
 const mockUseAuth = jest.fn();
@@ -17,9 +17,15 @@ jest.mock('../ui/tooltip', () => ({
 jest.mock('../ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) => (
-    <button onClick={onSelect}>{children}</button>
-  ),
+  DropdownMenuItem: ({
+    children,
+    onSelect,
+    asChild,
+  }: {
+    children: React.ReactNode;
+    onSelect?: () => void;
+    asChild?: boolean;
+  }) => (asChild ? <div>{children}</div> : <button type="button" onClick={onSelect}>{children}</button>),
   DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuSeparator: () => <hr />,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
@@ -52,21 +58,28 @@ describe('NavbarSections', () => {
     const onViewPrivacyPolicy = jest.fn();
 
     render(
-      <MemoryRouter>
-        <RightActions
-          darkMode={false}
-          onToggleDarkMode={onToggleDarkMode}
-          onToggleDocumentation={onToggleDocumentation}
-          onViewTerms={onViewTerms}
-          onViewPrivacyPolicy={onViewPrivacyPolicy}
-        />
-      </MemoryRouter>
+      <MemoryRouter initialEntries={['/forecast']}>
+        <Routes>
+          <Route
+            path="/forecast"
+            element={
+              <RightActions
+                darkMode={false}
+                onToggleDarkMode={onToggleDarkMode}
+                onToggleDocumentation={onToggleDocumentation}
+                onViewTerms={onViewTerms}
+                onViewPrivacyPolicy={onViewPrivacyPolicy}
+              />
+            }
+          />
+          <Route path="/updates" element={<div>Updates destination</div>} />
+        </Routes>
+      </MemoryRouter>,
     );
 
     expect(screen.getByLabelText(/Account \(user@example.com\)/i)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText(/Switch to dark mode/i));
     expect(onToggleDarkMode).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("What's New")).toBeInTheDocument();
     fireEvent.click(screen.getByText('Documentation'));
     expect(onToggleDocumentation).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByText('Terms of Service'));
@@ -79,6 +92,10 @@ describe('NavbarSections', () => {
       '_blank',
       'noopener,noreferrer'
     );
+    const whatsNewLink = screen.getByRole('link', { name: /What's New/i });
+    expect(whatsNewLink).toHaveAttribute('href', '/updates');
+    fireEvent.click(whatsNewLink);
+    expect(screen.getByText('Updates destination')).toBeInTheDocument();
   });
 
   test('renders signed-out and dark-mode labels', () => {
