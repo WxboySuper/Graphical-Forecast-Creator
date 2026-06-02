@@ -858,7 +858,7 @@
 .home-concept-action-primary {
     border: 1px solid var(--button-bg);
     background: linear-gradient(135deg, #7b61ff, var(--button-bg));
-    color: #067aff;
+    color: #fff;
     box-shadow: 0 1.15rem 2rem
         rgba(0, 123, 255, 0.18);
 }
@@ -958,7 +958,7 @@
 .home-concept-action.home-concept-action-primary {
     border-color: var(--button-bg);
     background: linear-gradient(135deg, #7b61ff, var(--button-bg));
-    color: #067aff;
+    color: #fff;
     box-shadow: 0 1.15rem 2rem
         rgba(0, 123, 255, 0.18);
 }
@@ -1332,6 +1332,7 @@
 
 .dark-mode .home-concept-top-primary,
 .dark-mode .home-concept-action.home-concept-action-primary {
+    /* Explicit dark-mode label color; light-mode gradient rule below uses #fff. */
     border-color: rgba(159, 178, 200, 0.28);
     background: linear-gradient(
         180deg,

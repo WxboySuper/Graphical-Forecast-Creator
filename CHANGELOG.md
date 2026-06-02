@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - **What's New page:** Public `/updates` route with v1.6 copy in `src/content/updates/v1.6.ts` and screenshot directory `public/updates/v1.6/` (images optional until marketing adds them).
 
 ### Fixed
+- **Signed-in home (light mode):** Primary gradient “Resume Forecast” buttons use white text instead of `#067aff` on the concept home layout (`.home-concept-top-primary`, `.home-concept-action-primary`).
 - **Analytics server tests:** Share `configureApp` with production so `/collect` stays rate-limited in server smoke tests (fixes CodeQL `js/missing-rate-limiting` on `beta`).
 - **Analytics server (beta):** Restored a broken partial merge in `server/analytics.js` so the hosted collector starts again before Express 5 / Stripe 22 land.
 - **Stripe subscription webhooks:** Read `current_period_end` from subscription items for Stripe API 2025-03-31+ (stripe-node v22) with fallback for older payloads.
