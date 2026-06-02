@@ -7,28 +7,38 @@ function hasInvalidInstant(value) {
 }
 
 /** @param {import('./banner.mjs').BannerPhase} phase @param {number} index */
-function validatePhaseFields(phase, index) {
+function validatePhaseMessageAndLink(phase, index) {
   const errors = [];
   if (!phase.message.trim()) {
     errors.push(`banner.phases[${index}]: message is required`);
   }
+  const linkUrl = phase.linkUrl?.trim();
+  if (linkUrl && !isSafeBannerLinkUrl(linkUrl)) {
+    errors.push(`banner.phases[${index}]: linkUrl must be a path or http(s) URL`);
+  }
+  return errors;
+}
+
+/** @param {import('./banner.mjs').BannerPhase} phase @param {number} index */
+function validatePhaseSchedule(phase, index) {
+  const errors = [];
   if (hasInvalidInstant(phase.startsAt)) {
     errors.push(`banner.phases[${index}]: invalid startsAt`);
   }
   if (hasInvalidInstant(phase.expiresAt)) {
     errors.push(`banner.phases[${index}]: invalid expiresAt`);
   }
-  const linkUrl = phase.linkUrl?.trim();
-  if (linkUrl && !isSafeBannerLinkUrl(linkUrl)) {
-    errors.push(`banner.phases[${index}]: linkUrl must be a path or http(s) URL`);
-  }
   const start = parseInstant(phase.startsAt);
   const end = parseInstant(phase.expiresAt);
-  const rangeInvalid = start !== null && end !== null && end <= start;
-  if (rangeInvalid) {
+  if (start !== null && end !== null && end <= start) {
     errors.push(`banner.phases[${index}]: expiresAt must be after startsAt`);
   }
   return errors;
+}
+
+/** @param {import('./banner.mjs').BannerPhase} phase @param {number} index */
+function validatePhaseFields(phase, index) {
+  return [...validatePhaseMessageAndLink(phase, index), ...validatePhaseSchedule(phase, index)];
 }
 
 /** @param {import('./banner.mjs').BannerPhase} phase @param {number} rolloutAtMs */
