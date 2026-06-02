@@ -113,6 +113,13 @@ describe('BetaAccessGuard', () => {
     };
 
     (isBetaModeEnabled as jest.Mock).mockReturnValue(false);
+    (isLocalBetaBypassEnabled as jest.Mock).mockReturnValue(false);
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_out',
+      betaAccessLoading: false,
+      betaAccess: false,
+    });
 
     render(
       <MemoryRouter initialEntries={['/protected']}>
