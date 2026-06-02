@@ -16,7 +16,7 @@ export function parseStableTriple(version) {
 /**
  * @param {{ major: number, minor: number, patch: number }} a
  * @param {{ major: number, minor: number, patch: number }} b
- * @returns {number}
+ * @returns {number} Negative if a < b, positive if a > b, zero if equal.
  */
 export function compareStableTriples(a, b) {
   if (a.major !== b.major) {

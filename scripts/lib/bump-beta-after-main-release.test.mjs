@@ -36,10 +36,26 @@ describe('bump-beta-after-main-release', () => {
     assert.equal(result.reason, 'promoted_stable_line');
   });
 
-  it('compareStableTriples orders semver', () => {
-    const a = parseStableTriple('1.5.3');
-    const b = parseStableTriple('1.6.0');
-    assert.ok(a && b);
-    assert.equal(compareStableTriples(a, b), -1);
+  it('starts next minor beta.1 when beta was stable and main caught up', () => {
+    const result = computeBetaVersionAfterMainRelease('1.6.0', '1.6.0');
+    assert.equal(result.changed, true);
+    assert.equal(result.next, '1.7.0-beta.1');
+    assert.equal(result.reason, 'beta_was_stable');
+  });
+
+  it('starts next line when main stable is ahead of beta stable line', () => {
+    const result = computeBetaVersionAfterMainRelease('1.7.0', '1.6.0-beta.14');
+    assert.equal(result.changed, true);
+    assert.equal(result.next, '1.8.0-beta.1');
+    assert.equal(result.reason, 'main_stable_ahead_of_beta_line');
+  });
+
+  it('compareStableTriples orders semver by sign only', () => {
+    const olderStable = parseStableTriple('1.5.3');
+    const newerStable = parseStableTriple('1.6.0');
+    assert.ok(olderStable && newerStable);
+    assert.ok(compareStableTriples(olderStable, newerStable) < 0);
+    assert.ok(compareStableTriples(newerStable, olderStable) > 0);
+    assert.equal(compareStableTriples(olderStable, olderStable), 0);
   });
 });
