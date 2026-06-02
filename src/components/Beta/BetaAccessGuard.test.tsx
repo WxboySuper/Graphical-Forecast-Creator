@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route, Outlet, useOutletContext } from 'react-router-dom';
 import BetaAccessGuard from './BetaAccessGuard';
 import { useAuth } from '../../auth/AuthProvider';
 import { isBetaModeEnabled, isLocalBetaBypassEnabled } from '../../lib/betaAccess';
@@ -96,6 +97,37 @@ describe('BetaAccessGuard', () => {
 
     renderGuard();
     expect(screen.getByText('Beta Page')).toBeInTheDocument();
+  });
+
+  it('forwards parent outlet context to nested routes', async () => {
+    const user = userEvent.setup();
+    const addToast = jest.fn();
+
+    const ContextConsumer = () => {
+      const { addToast: toast } = useOutletContext<{ addToast: typeof addToast }>();
+      return (
+        <button type="button" onClick={() => toast('hello')}>
+          Trigger toast
+        </button>
+      );
+    };
+
+    (isBetaModeEnabled as jest.Mock).mockReturnValue(false);
+
+    render(
+      <MemoryRouter initialEntries={['/protected']}>
+        <Routes>
+          <Route element={<Outlet context={{ addToast }} />}>
+            <Route element={<BetaAccessGuard />}>
+              <Route path="/protected" element={<ContextConsumer />} />
+            </Route>
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Trigger toast' }));
+    expect(addToast).toHaveBeenCalledWith('hello');
   });
 
   it.each([

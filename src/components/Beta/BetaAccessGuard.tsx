@@ -1,8 +1,17 @@
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useOutletContext } from 'react-router-dom';
+import type { AddToastFn } from '../Layout/AppLayout';
 import { useAuth } from '../../auth/AuthProvider';
 import { isBetaModeEnabled, isLocalBetaBypassEnabled } from '../../lib/betaAccess';
 import { BetaStatusPanel } from './BetaPageLayout';
+
+type AppLayoutOutletContext = { addToast: AddToastFn };
+
+/** Forwards `AppLayout` outlet context through the guard so nested routes keep `addToast`. */
+const GuardedOutlet: React.FC = () => {
+  const layoutContext = useOutletContext<AppLayoutOutletContext>();
+  return <Outlet context={layoutContext} />;
+};
 
 /** True when the beta gate should show an access-check loading state. */
 const isCheckingBetaAccess = (
@@ -22,11 +31,11 @@ const BetaAccessGuard: React.FC = () => {
   const { betaAccess, betaAccessLoading, hostedAuthEnabled, status } = useAuth();
 
   if (!isBetaModeEnabled()) {
-    return <Outlet />;
+    return <GuardedOutlet />;
   }
 
   if (isLocalBetaBypassEnabled(location.search)) {
-    return <Outlet />;
+    return <GuardedOutlet />;
   }
 
   if (!hostedAuthEnabled) {
@@ -43,7 +52,7 @@ const BetaAccessGuard: React.FC = () => {
   }
 
   if (status === 'signed_in' && betaAccess) {
-    return <Outlet />;
+    return <GuardedOutlet />;
   }
 
   return <Navigate to="/beta" replace />;
