@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
 - **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
+- **What's New navigation:** Resources overflow menu links to `/updates` so the v1.6 release page is discoverable without typing the URL.
 
 ### Dependencies
 <!-- dependabot-automation -->

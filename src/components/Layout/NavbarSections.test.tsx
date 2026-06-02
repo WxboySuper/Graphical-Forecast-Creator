@@ -66,6 +66,7 @@ describe('NavbarSections', () => {
     expect(screen.getByLabelText(/Account \(user@example.com\)/i)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText(/Switch to dark mode/i));
     expect(onToggleDarkMode).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("What's New")).toBeInTheDocument();
     fireEvent.click(screen.getByText('Documentation'));
     expect(onToggleDocumentation).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByText('Terms of Service'));

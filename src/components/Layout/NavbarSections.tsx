@@ -16,6 +16,7 @@ import {
   CircleUserRound,
   MoreHorizontal,
   Crown,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -212,6 +213,12 @@ const MoreActionsMenu: FC<{
         <DropdownMenuItem onSelect={onToggleDocumentation}>
           <HelpCircle className="h-4 w-4" />
           Documentation
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <NavLink to="/updates">
+            <Sparkles className="h-4 w-4" />
+            What&apos;s New
+          </NavLink>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onViewTerms}>
           <FileText className="h-4 w-4" />
