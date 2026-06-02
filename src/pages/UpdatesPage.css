@@ -158,6 +158,12 @@
   color: var(--button-bg);
 }
 
+.updates-page__lightbox-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
 .updates-page__lightbox-image {
   display: block;
   width: 100%;

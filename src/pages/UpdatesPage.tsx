@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { v16Update, type UpdateScreenshot } from '../content/updates/v1.6';
 import './UpdatesPage.css';
@@ -11,6 +11,8 @@ interface UpdateImageLightboxProps {
 /** Full-screen preview for a release screenshot. */
 function UpdateImageLightbox({ shot, onClose }: UpdateImageLightboxProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -23,7 +25,8 @@ function UpdateImageLightbox({ shot, onClose }: UpdateImageLightboxProps) {
     } else {
       dialog.setAttribute('open', '');
     }
-    const handleClose = () => onClose();
+    /** Sync parent state when the native dialog closes. */
+    const handleClose = () => onCloseRef.current();
     dialog.addEventListener('close', handleClose);
 
     return () => {
@@ -32,13 +35,14 @@ function UpdateImageLightbox({ shot, onClose }: UpdateImageLightboxProps) {
         dialog.close();
       }
     };
-  }, [onClose, shot]);
+  }, []);
 
   return (
     <dialog
       ref={dialogRef}
       className="updates-page__lightbox"
-      aria-labelledby="updates-lightbox-caption"
+      aria-labelledby="updates-lightbox-title"
+      aria-describedby="updates-lightbox-caption"
       onClick={(event) => {
         if (event.target === dialogRef.current) {
           dialogRef.current?.close();
@@ -54,12 +58,10 @@ function UpdateImageLightbox({ shot, onClose }: UpdateImageLightboxProps) {
         >
           Close
         </button>
-        <img
-          id="updates-lightbox-image"
-          className="updates-page__lightbox-image"
-          src={shot.src}
-          alt={shot.alt}
-        />
+        <h2 id="updates-lightbox-title" className="updates-page__lightbox-title">
+          Enlarged preview
+        </h2>
+        <img className="updates-page__lightbox-image" src={shot.src} alt={shot.alt} />
         <p id="updates-lightbox-caption" className="updates-page__lightbox-caption">
           {shot.caption ?? shot.alt}
         </p>
@@ -102,6 +104,7 @@ function UpdateScreenshotFigure({ shot, onExpand }: UpdateScreenshotFigureProps)
 /** Public What's New page for the current major release. */
 export const UpdatesPage: React.FC = () => {
   const [expandedShot, setExpandedShot] = useState<UpdateScreenshot | null>(null);
+  const closeLightbox = useCallback(() => setExpandedShot(null), []);
 
   return (
     <div className="updates-page">
@@ -147,7 +150,7 @@ export const UpdatesPage: React.FC = () => {
       </div>
 
       {expandedShot ? (
-        <UpdateImageLightbox shot={expandedShot} onClose={() => setExpandedShot(null)} />
+        <UpdateImageLightbox shot={expandedShot} onClose={closeLightbox} />
       ) : null}
     </div>
   );
