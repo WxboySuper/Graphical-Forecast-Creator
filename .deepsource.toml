@@ -2,16 +2,10 @@ version = 1
 
 exclude_patterns = [
   "build/**",
-  "**/src/components/Monitor/**",
-  "**/src/monitor/**",
-  "src/pages/MonitorPage.tsx",
-  "src/pages/useMonitorCloudOutlook.ts",
-  "src/pages/useLocalMonitorSettings.ts",
-  "src/pages/usePremiumMonitorSettingsSync.ts",
-  "src/utils/stormReportParser.ts",
-  "src/utils/stormReportTodayCsv.ts",
-  "src/utils/stormReportCsv.ts",
-  "src/utils/stormReportRows.ts",
+  "server/release/**",
+  "scripts/lib/production-release.test.mjs",
+  "src/**/*.test.ts",
+  "src/**/*.test.tsx",
 ]
 
 [[analyzers]]

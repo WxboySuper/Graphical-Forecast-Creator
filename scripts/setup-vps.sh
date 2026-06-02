@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time VPS setup for GFC production
+# One-time VPS setup for GFC production (timed rollout + staging preview)
 # Run as root on the VPS:  bash scripts/setup-vps.sh
 set -euo pipefail
 
@@ -8,11 +8,14 @@ echo "  GFC Production VPS Setup"
 echo "═══════════════════════════════════════════"
 
 echo ""
-echo ">> Creating web root /var/www/gfc ..."
-mkdir -p /var/www/gfc
-
-echo ">> Creating analytics directories ..."
+echo ">> Creating web and analytics directories ..."
+mkdir -p /var/www/gfc/releases
+mkdir -p /var/www/gfc-staging/releases
+mkdir -p /opt/gfc-analytics/releases
+mkdir -p /opt/gfc-analytics/config
 mkdir -p /opt/gfc-analytics/logs
+mkdir -p /opt/gfc-staging-analytics/config
+mkdir -p /opt/gfc-staging-analytics/logs
 
 echo ">> Checking for Node.js >= 18 ..."
 NODE_OK=false
@@ -34,11 +37,22 @@ echo ">> Checking for PM2 ..."
 if ! command -v pm2 &>/dev/null; then
   npm install -g pm2
 fi
-pm2 startup || true  # configure systemd service for PM2
+pm2 startup || true
 
 echo ">> Checking for Nginx ..."
 if ! command -v nginx &>/dev/null; then
   apt-get update && apt-get install -y nginx
+fi
+
+CRON_FILE=/etc/cron.d/gfc-rollout
+if [ ! -f "$CRON_FILE" ]; then
+  echo ">> Installing rollout cron (every minute) ..."
+  cat > "$CRON_FILE" <<'CRON'
+* * * * * root if [ -f /opt/gfc-analytics/current/release/check-rollout.mjs ]; then cd /opt/gfc-analytics/current && /usr/bin/env node release/check-rollout.mjs; fi >> /opt/gfc-analytics/logs/rollout-cron.log 2>&1
+CRON
+  chmod 644 "$CRON_FILE"
+else
+  echo ">> Rollout cron already present at $CRON_FILE"
 fi
 
 echo ""
@@ -46,18 +60,20 @@ echo "════════════════════════�
 echo "  Setup complete — next steps:"
 echo "═══════════════════════════════════════════"
 echo ""
-echo "  1. Copy nginx config:"
+echo "  1. Production nginx (symlink docroot):"
 echo "     cp server/nginx.conf /etc/nginx/sites-available/gfc"
-echo "     ln -s /etc/nginx/sites-available/gfc /etc/nginx/sites-enabled/gfc"
-echo "     nginx -t && systemctl reload nginx"
+echo "     ln -sf /etc/nginx/sites-available/gfc /etc/nginx/sites-enabled/gfc"
 echo ""
-echo "  2. Obtain SSL certificate:"
-echo "     certbot --nginx -d gfc.weatherboysuper.com"
+echo "  2. Staging preview (beta-gated build at rollout time):"
+echo "     cp server/nginx-staging.conf /etc/nginx/sites-available/gfc-staging"
+echo "     ln -sf /etc/nginx/sites-available/gfc-staging /etc/nginx/sites-enabled/gfc-staging"
+echo "     certbot --nginx -d staging-gfc.weatherboysuper.com"
 echo ""
-echo "  3. Add GitHub Actions secrets in your repo settings:"
-echo "     PROD_SSH_KEY  — private SSH key for this VPS"
-echo "     PROD_SSH_HOST — this VPS hostname / IP"
-echo "     GH_PAT        — GitHub Personal Access Token (repo scope)"
+echo "  3. nginx -t && systemctl reload nginx"
 echo ""
-echo "  4. Trigger 'Deploy Production to VPS' manually to do the first deploy."
+echo "  4. GitHub Actions secrets: PROD_SSH_KEY, PROD_SSH_HOST, BETA_INVITE_PATH, ..."
+echo ""
+echo "  5. Merge release automation PR, then run Deploy Production to VPS (action=live once to migrate layout)."
+echo ""
+echo "  See docs/hosted-rollout.md for timed beta→main promotion flow."
 echo ""

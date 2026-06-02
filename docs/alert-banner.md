@@ -1,45 +1,24 @@
 # Alert banner
 
-Site-wide banner loaded from `public/alert-banner.json` at runtime (deploy updates copy without rebuilding app logic).
+Site-wide banner from `public/alert-banner.json` at runtime.
 
-## Fields
+## Timed releases
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `enabled` | boolean | yes | Master switch |
-| `message` | string | yes | Banner text |
-| `type` | `info` \| `warning` \| `error` | yes | Visual style |
-| `dismissible` | boolean | yes | Show close button |
-| `id` | string | no | Identifier for tracking |
-| `linkUrl` | string | no | CTA URL; paths starting with `/` use in-app routing |
-| `linkLabel` | string | no | CTA label (default: "Learn more") |
-| `startsAt` | string (ISO 8601) | no | Hide before this instant |
-| `expiresAt` | string (ISO 8601) | no | Hide at or after this instant |
+For **beta → main** promotions with timed rollout, author banner copy in `deploy/production-release.json` under `banner.phases`. CI derives the flat JSON file during deploy:
 
-## v1.6 examples (production `hotfix/*` → `main`)
+- **Stage deploy:** pre-rollout phase written to the **live** site (users still on the previous version).
+- **Promote at `rolloutAt`:** post-rollout phase written to the new live build.
 
-**Pre-release maintenance**
+See [hosted-rollout.md](./hosted-rollout.md) and [production-release.example-v1.6-stage.json](../deploy/production-release.example-v1.6-stage.json).
 
-```json
-{
-  "enabled": true,
-  "id": "v1.6-maintenance",
-  "message": "v1.6 is deploying soon. You may see brief downtime while we update the site.",
-  "type": "warning",
-  "dismissible": true
-}
-```
+## Flat file fields (emergencies / hotfix)
 
-**Post-release**
-
-```json
-{
-  "enabled": true,
-  "id": "v1.6-released",
-  "message": "v1.6 is live — meet the new Monitor workspace.",
-  "type": "info",
-  "dismissible": true,
-  "linkUrl": "/updates",
-  "linkLabel": "What's new"
-}
-```
+| Field | Description |
+|-------|-------------|
+| `enabled` | Master switch |
+| `message` | Banner text |
+| `type` | `info` \| `warning` \| `error` |
+| `dismissible` | Show close button |
+| `linkUrl` | CTA; paths starting with `/` use in-app routing |
+| `linkLabel` | CTA label (default: Learn more) |
+| `startsAt` / `expiresAt` | Optional ISO schedule (client does not poll; use phased manifest for timed releases) |

@@ -1,16 +1,14 @@
 import { Link } from 'react-router-dom';
+import { isSafeBannerLinkUrl } from '../utils/bannerLinkUrl';
 
 interface AlertBannerLinkProps {
   linkUrl: string;
   linkLabel: string;
 }
 
-/** True for in-app paths only (excludes protocol-relative `//` URLs). */
-const isInternalAppPath = (url: string): boolean => url.startsWith('/') && !url.startsWith('//');
-
-/** Renders an in-app or external CTA for the site-wide alert banner. */
+/** Renders an internal route or external link for the alert banner. */
 export function AlertBannerLink({ linkUrl, linkLabel }: AlertBannerLinkProps) {
-  if (isInternalAppPath(linkUrl)) {
+  if (linkUrl.startsWith('/')) {
     return (
       <Link className="alert-banner__link" to={linkUrl}>
         {linkLabel}
@@ -18,8 +16,12 @@ export function AlertBannerLink({ linkUrl, linkLabel }: AlertBannerLinkProps) {
     );
   }
 
+  if (!isSafeBannerLinkUrl(linkUrl)) {
+    return null;
+  }
+
   return (
-    <a className="alert-banner__link" href={linkUrl} rel="noopener noreferrer" target="_blank">
+    <a className="alert-banner__link" href={linkUrl} target="_blank" rel="noopener noreferrer">
       {linkLabel}
     </a>
   );

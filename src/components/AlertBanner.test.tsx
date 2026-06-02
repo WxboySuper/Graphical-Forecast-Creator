@@ -2,6 +2,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AlertBanner from './AlertBanner';
 
+const renderBanner = () =>
+  render(
+    <MemoryRouter>
+      <AlertBanner />
+    </MemoryRouter>,
+  );
+
 describe('AlertBanner', () => {
   const mockBannerFetch = (config: unknown, ok = true) => {
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -40,7 +47,6 @@ describe('AlertBanner', () => {
     });
 
     renderBanner();
-    await waitForBanner('Test Alert');
 
     expect(screen.getByRole('status')).toHaveClass('alert-banner--warning');
   });
@@ -104,11 +110,26 @@ describe('AlertBanner', () => {
     });
 
     renderBanner();
-    await waitForBanner('Dismiss me');
 
     fireEvent.click(screen.getByLabelText('Dismiss alert'));
 
     expect(screen.queryByText('Dismiss me')).not.toBeInTheDocument();
+  });
+
+  test('does not render unsafe javascript banner links', async () => {
+    mockBannerFetch({
+      enabled: true,
+      message: 'Click me',
+      type: 'info',
+      dismissible: true,
+      linkUrl: 'javascript:alert(1)',
+      linkLabel: 'Bad link',
+    });
+
+    renderBanner();
+
+    await waitFor(() => expect(screen.getByText('Click me')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'Bad link' })).not.toBeInTheDocument();
   });
 
   test('is not dismissible when dismissible is false', async () => {
@@ -117,7 +138,12 @@ describe('AlertBanner', () => {
       message: 'Permanent',
       type: 'info',
       dismissible: false,
-    });
+    };
+    mockBannerFetch(mockConfig);
+
+    renderBanner();
+
+    await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
 
     renderBanner();
     await waitForBanner('Permanent');

@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import {
-  DEFAULT_ALERT_BANNER_CONFIG,
-  isAlertBannerScheduleActive,
-  normalizeAlertBannerConfig,
-  type AlertBannerConfig,
-} from './alertBannerConfig';
+import type { AlertConfig } from './AlertBanner';
 
-const SCHEDULE_POLL_MS = 60_000;
+const DEFAULT_CONFIG: AlertConfig = {
+  enabled: false,
+  message: '',
+  type: 'info',
+  dismissible: true,
+};
 
-/** Loads banner JSON and tracks whether the active schedule window includes now. */
+/** Loads alert banner JSON from the given public path. */
 export function useAlertBanner(configPath: string) {
-  const [config, setConfig] = useState<AlertBannerConfig>(DEFAULT_ALERT_BANNER_CONFIG);
+  const [config, setConfig] = useState<AlertConfig>(DEFAULT_CONFIG);
   const [dismissed, setDismissed] = useState(false);
-  const [scheduleActive, setScheduleActive] = useState(false);
 
   useEffect(() => {
     fetch(configPath)
@@ -22,9 +21,8 @@ export function useAlertBanner(configPath: string) {
         }
         return response.json();
       })
-      .then((data: unknown) => {
-        const next = normalizeAlertBannerConfig(data);
-        setConfig(next);
+      .then((data: AlertConfig) => {
+        setConfig(data);
         setDismissed(false);
       })
       .catch(() => {
@@ -32,26 +30,5 @@ export function useAlertBanner(configPath: string) {
       });
   }, [configPath]);
 
-  useEffect(() => {
-    if (!config.enabled) {
-      setScheduleActive(false);
-      return undefined;
-    }
-
-    function syncSchedule() {
-      setScheduleActive(isAlertBannerScheduleActive(config));
-    }
-
-    syncSchedule();
-    const intervalId = window.setInterval(syncSchedule, SCHEDULE_POLL_MS);
-    return () => window.clearInterval(intervalId);
-  }, [config]);
-
-  const visible = scheduleActive && !dismissed && config.message.trim().length > 0;
-
-  return {
-    config,
-    visible,
-    dismiss: () => setDismissed(true),
-  };
+  return { config, dismissed, dismiss: () => setDismissed(true) };
 }

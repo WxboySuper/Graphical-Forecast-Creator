@@ -30,27 +30,22 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem 0.75rem;
+  gap: 8px 12px;
 }
 
 .alert-banner__message {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
 }
 
 .alert-banner__link {
   color: inherit;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
-  text-underline-offset: 2px;
   white-space: nowrap;
 }
 
 .alert-banner__link:hover {
   opacity: 0.9;
-}
-
-.alert-banner--warning .alert-banner__link {
-  color: #1e3a8a;
 }
 
 .alert-banner__close {
