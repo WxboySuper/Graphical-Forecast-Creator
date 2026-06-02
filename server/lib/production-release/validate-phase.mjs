@@ -19,6 +19,14 @@ function validatePhaseMessageAndLink(phase, index) {
   return errors;
 }
 
+/** @param {number | null} start @param {number | null} end */
+function phaseRangeIsInvalid(start, end) {
+  if (start === null || end === null) {
+    return false;
+  }
+  return end <= start;
+}
+
 /** @param {import('./banner.mjs').BannerPhase} phase @param {number} index */
 function validatePhaseSchedule(phase, index) {
   const errors = [];
@@ -30,7 +38,7 @@ function validatePhaseSchedule(phase, index) {
   }
   const start = parseInstant(phase.startsAt);
   const end = parseInstant(phase.expiresAt);
-  if (start !== null && end !== null && end <= start) {
+  if (phaseRangeIsInvalid(start, end)) {
     errors.push(`banner.phases[${index}]: expiresAt must be after startsAt`);
   }
   return errors;

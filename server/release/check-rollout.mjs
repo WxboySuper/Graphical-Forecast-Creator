@@ -63,22 +63,25 @@ function isRolloutDue(config) {
 /**
  * Loads the VPS manifest or terminates the process on read/parse failure.
  * @returns {{ config: ReturnType<typeof normalizeProductionReleaseConfig>, raw: Record<string, unknown> }}
+ * @throws {Error} When the manifest cannot be read or parsed.
  */
 function loadConfigOrExit() {
-  try {
-    return loadConfig();
-  } catch (error) {
-    console.error('[rollout] unable to read config:', error);
-    process.exit(1);
-  }
-  return { config: normalizeProductionReleaseConfig({}), raw: {} };
+  return loadConfig();
 }
 
 /**
  * Cron entry point: promote when rolloutAt has passed.
  */
 function main() {
-  const { config, raw } = loadConfigOrExit();
+  let loaded;
+  try {
+    loaded = loadConfigOrExit();
+  } catch (error) {
+    console.error('[rollout] unable to read config:', error);
+    process.exit(1);
+  }
+
+  const { config, raw } = loaded;
 
   if (shouldSkipRollout(config)) {
     process.exit(0);

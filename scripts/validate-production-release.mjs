@@ -22,18 +22,20 @@ const previousVpsStatus = process.env.PREVIOUS_VPS_STATUS?.trim() || '';
 /**
  * Reads and parses deploy/production-release.json.
  * @returns {Record<string, unknown>} Parsed manifest object.
+ * @throws {Error} When the file is missing or contains invalid JSON.
  */
 function readManifest() {
-  try {
-    return JSON.parse(readFileSync(manifestPath, 'utf8'));
-  } catch (error) {
-    console.error(`Missing or invalid ${manifestPath}:`, error instanceof Error ? error.message : error);
-    process.exit(1);
-  }
-  return {};
+  return JSON.parse(readFileSync(manifestPath, 'utf8'));
 }
 
-const raw = readManifest();
+let raw;
+try {
+  raw = readManifest();
+} catch (error) {
+  console.error(`Missing or invalid ${manifestPath}:`, error instanceof Error ? error.message : error);
+  process.exit(1);
+}
+
 const config = normalizeProductionReleaseConfig(raw);
 const action = deployAction || config.action;
 
