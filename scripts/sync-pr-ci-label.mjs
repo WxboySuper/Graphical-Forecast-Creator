@@ -1,3 +1,4 @@
+import { fetchAllPages } from './lib/github-paginate.mjs';
 import { ciLabelFromCheckRuns, diffCiLabels } from './lib/pr-ci-label-state.mjs';
 
 const token = process.env.GITHUB_TOKEN ?? '';
@@ -32,15 +33,18 @@ async function githubApi(path, init = {}) {
 }
 
 const pull = await githubApi(`/repos/${owner}/${repo}/pulls/${prNumber}`);
-const checkData = await githubApi(
-  `/repos/${owner}/${repo}/commits/${pull.head.sha}/check-runs?filter=latest&per_page=100`,
-);
+const checkRuns = await fetchAllPages(async (page) => {
+  const checkData = await githubApi(
+    `/repos/${owner}/${repo}/commits/${pull.head.sha}/check-runs?filter=latest&per_page=100&page=${page}`,
+  );
+  return checkData?.check_runs ?? [];
+});
 const existing = (await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels`)).map(
   (label) => label.name,
 );
 
 const desired = ciLabelFromCheckRuns(
-  (checkData.check_runs ?? []).map((run) => ({
+  checkRuns.map((run) => ({
     status: run.status,
     conclusion: run.conclusion,
   })),
@@ -62,4 +66,6 @@ if (add.length > 0) {
   });
 }
 
-console.log(`CI label for PR #${prNumber}: ${desired} (add=${add.join(',') || 'none'} remove=${remove.join(',') || 'none'})`);
+console.log(
+  `CI label for PR #${prNumber}: ${desired} (${checkRuns.length} check runs; add=${add.join(',') || 'none'} remove=${remove.join(',') || 'none'})`,
+);
