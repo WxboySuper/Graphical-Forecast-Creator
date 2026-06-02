@@ -6,6 +6,7 @@ import { useMonitorSatelliteWmsSync } from './useMonitorSatelliteWmsSync';
 type MonitorMapRefs = ReturnType<typeof useMonitorMapRefs>;
 
 interface UseMonitorMapWmsSyncArgs {
+  darkMode: boolean;
   radarLayer: WmsLayerConfig | null;
   radarOpacity: number;
   satelliteLayer: WmsLayerConfig | null;
@@ -14,12 +15,13 @@ interface UseMonitorMapWmsSyncArgs {
 }
 
 export const useMonitorMapWmsSync = ({
+  darkMode,
   radarLayer,
   radarOpacity,
   satelliteLayer,
   satelliteOpacity,
   refs,
 }: UseMonitorMapWmsSyncArgs) => {
-  useMonitorRadarWmsSync(radarLayer, radarOpacity, refs);
-  useMonitorSatelliteWmsSync(satelliteLayer, satelliteOpacity, refs);
+  useMonitorRadarWmsSync(radarLayer, radarOpacity, refs, darkMode);
+  useMonitorSatelliteWmsSync(satelliteLayer, satelliteOpacity, refs, darkMode);
 };

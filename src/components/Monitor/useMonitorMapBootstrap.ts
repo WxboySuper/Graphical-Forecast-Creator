@@ -85,11 +85,14 @@ export const useMonitorMapBootstrap = ({
       visible: false,
       zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
     });
+    const baseLayerInstance = new TileLayer({
+      zIndex: BASE_LAYER_Z_INDEX,
+    });
 
     const map = new OLMap({
       target: mapElementRef.current,
       layers: [
-        new TileLayer({ source: createBaseSource(darkMode), zIndex: BASE_LAYER_Z_INDEX }),
+        baseLayerInstance,
         satelliteLayerInstance,
         radarLayerInstance,
         alertsLayer,
@@ -173,6 +176,7 @@ export const useMonitorMapBootstrap = ({
     refs.overlayRef.current = overlay;
 
     refs.mapRef.current = map;
+    refs.baseLayerRef.current = baseLayerInstance;
     refs.radarLayerRef.current = radarLayerInstance;
     refs.satelliteLayerRef.current = satelliteLayerInstance;
     refs.alertsLayerRef.current = alertsLayer;
@@ -217,6 +221,7 @@ export const useMonitorMapBootstrap = ({
       onCreatePopupElement(null);
       map.setTarget();
       refs.mapRef.current = null;
+      refs.baseLayerRef.current = null;
       refs.radarLayerRef.current = null;
       refs.satelliteLayerRef.current = null;
       refs.alertsLayerRef.current = null;
@@ -224,5 +229,15 @@ export const useMonitorMapBootstrap = ({
       refs.radarLayerKeyRef.current = null;
       refs.satelliteLayerKeyRef.current = null;
     };
-  }, [darkMode, dispatch]);
+  }, [dispatch]);
+
+  useEffect(() => {
+    const baseLayer = refs.baseLayerRef.current;
+    if (!baseLayer) {
+      return;
+    }
+
+    baseLayer.setSource(createBaseSource(darkMode));
+    // refs omitted: wrapper object from useMonitorMapRefs() is new each render.
+  }, [darkMode]);
 };

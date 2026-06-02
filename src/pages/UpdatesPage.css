@@ -34,6 +34,22 @@
   line-height: 1.6;
 }
 
+.updates-page__promo {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.75rem;
+}
+
+@media (min-width: 40rem) {
+  .updates-page__promo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.updates-page__promo .updates-page__figure {
+  box-shadow: var(--shadow-md);
+}
+
 .updates-page__section {
   margin-top: 2.5rem;
 }

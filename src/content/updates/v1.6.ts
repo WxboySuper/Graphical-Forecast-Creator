@@ -19,6 +19,8 @@ export interface ReleaseUpdate {
   version: string;
   title: string;
   summary: string;
+  /** Optional hero graphics under `public/updates/v{version}/`. */
+  promoImages?: UpdateScreenshot[];
   sections: UpdateSection[];
   improvements: ReleaseImprovement[];
 }
@@ -26,9 +28,9 @@ export interface ReleaseUpdate {
 /** Builds a screenshot descriptor under public/updates/v1.6/. */
 function buildUpdateImage(fileName: string, alt: string, caption?: string): UpdateScreenshot {
   return {
-  src: `/updates/v1.6/${fileName}`,
-  alt,
-  caption,
+    src: `/updates/v1.6/${fileName}`,
+    alt,
+    caption,
   };
 }
 
@@ -37,6 +39,18 @@ export const v16Update: ReleaseUpdate = {
   title: 'Monitor — live weather at a glance',
   summary:
     'Version 1.6 introduces Monitor: a dedicated workspace for live radar, satellite, your forecast outlook, NWS alerts, and storm reports — built for quick situational awareness while you work.',
+  promoImages: [
+    buildUpdateImage(
+      'v1.6-promo-image-light-mrms-visible.png',
+      'Monitor in light mode with MRMS reflectivity and GOES visible satellite',
+      'Light theme — CONUS MRMS reflectivity plus visible satellite on the Monitor map.',
+    ),
+    buildUpdateImage(
+      'v1.6-promo-image-dark-single-site-shortwave-ir.png',
+      'Monitor in dark mode with single-site reflectivity and GOES shortwave IR satellite',
+      'Dark theme — single-site base reflectivity plus shortwave IR satellite.',
+    ),
+  ],
   sections: [
     {
       title: 'Monitor workspace',
