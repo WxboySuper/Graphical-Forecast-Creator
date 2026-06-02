@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import AlertBanner from './AlertBanner';
 
 describe('AlertBanner', () => {
@@ -9,26 +10,69 @@ describe('AlertBanner', () => {
     });
   };
 
+  const renderBanner = () =>
+    render(
+      <MemoryRouter>
+        <AlertBanner />
+      </MemoryRouter>,
+    );
+
+  const waitForBanner = async (message: string) => {
+    await waitFor(() => expect(screen.getByText(message)).toBeInTheDocument());
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   test('renders alert when enabled', async () => {
-    const mockConfig = {
+    mockBannerFetch({
       enabled: true,
       message: 'Test Alert',
       type: 'warning',
       dismissible: true,
-    };
-    mockBannerFetch(mockConfig);
+    });
 
-    render(<AlertBanner />);
+    renderBanner();
+    await waitForBanner('Test Alert');
 
-    await waitFor(() => expect(screen.getByText('Test Alert')).toBeInTheDocument());
-
-    expect(screen.getByText('Test Alert')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveClass('alert-banner--warning');
+  });
+
+  test('renders internal link CTA', async () => {
+    mockBannerFetch({
+      enabled: true,
+      message: 'v1.6 is live',
+      type: 'info',
+      dismissible: true,
+      linkUrl: '/updates',
+      linkLabel: "What's new",
+    });
+
+    renderBanner();
+    await waitFor(() => expect(screen.getByRole('link', { name: "What's new" })).toHaveAttribute('href', '/updates'));
+  });
+
+  test('hides banner before startsAt', async () => {
+    mockBannerFetch({
+      enabled: true,
+      message: 'Future alert',
+      type: 'info',
+      dismissible: true,
+      startsAt: '2099-01-01T00:00:00.000Z',
+    });
+
+    renderBanner();
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
   });
 
   it.each([
@@ -44,7 +88,7 @@ describe('AlertBanner', () => {
       mockBannerFetch(config, ok ?? true);
     }
 
-    render(<AlertBanner />);
+    renderBanner();
 
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -52,37 +96,31 @@ describe('AlertBanner', () => {
   });
 
   test('can be dismissed', async () => {
-    const mockConfig = {
+    mockBannerFetch({
       enabled: true,
       message: 'Dismiss me',
       type: 'error',
       dismissible: true,
-    };
-    mockBannerFetch(mockConfig);
+    });
 
-    render(<AlertBanner />);
+    renderBanner();
+    await waitForBanner('Dismiss me');
 
-    await waitFor(() => expect(screen.getByText('Dismiss me')).toBeInTheDocument());
-
-    const closeButton = screen.getByLabelText('Dismiss alert');
-    fireEvent.click(closeButton);
+    fireEvent.click(screen.getByLabelText('Dismiss alert'));
 
     expect(screen.queryByText('Dismiss me')).not.toBeInTheDocument();
   });
 
   test('is not dismissible when dismissible is false', async () => {
-    const mockConfig = {
+    mockBannerFetch({
       enabled: true,
       message: 'Permanent',
       type: 'info',
       dismissible: false,
-    };
-    mockBannerFetch(mockConfig);
+    });
 
-    render(<AlertBanner />);
-
-    await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
-
+    renderBanner();
+    await waitForBanner('Permanent');
     expect(screen.queryByLabelText('Dismiss alert')).not.toBeInTheDocument();
   });
 });

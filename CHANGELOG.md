@@ -24,6 +24,8 @@ All notable changes to this project will be documented in this file.
 - **ts-jest:** ^29.4.9 → ^29.4.11
 - **vite:** ^8.0.13 → ^8.0.14
 
+### Changed
+- **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
 
 ### Fixed
 - **Signed-in home (light mode):** Primary gradient “Resume Forecast” buttons use white text instead of `#067aff` on the concept home layout (`.home-concept-top-primary`, `.home-concept-action-primary`).
