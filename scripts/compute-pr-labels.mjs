@@ -6,7 +6,7 @@ import {
   listDependencyBumpsBetweenRefs,
 } from './lib/dependabot-changelog.mjs';
 import { listChangedFilesBetweenRefs } from './lib/git-changed-files.mjs';
-import { MANAGED_LABELS, computePrLabels } from './lib/pr-labels.mjs';
+import { CONTENT_MANAGED_LABELS, computePrLabels } from './lib/pr-labels.mjs';
 
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const headRef = process.env.GITHUB_HEAD_REF ?? '';
@@ -49,4 +49,4 @@ const labels = computePrLabels({
   changelogOk,
 });
 
-console.log(JSON.stringify({ labels, managed: MANAGED_LABELS }));
+console.log(JSON.stringify({ labels, contentManaged: CONTENT_MANAGED_LABELS }));
