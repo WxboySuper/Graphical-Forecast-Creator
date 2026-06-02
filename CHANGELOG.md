@@ -9,9 +9,11 @@ All notable changes to this project will be documented in this file.
 - **Monitor (`/monitor`):** Live weather workspace with radar and satellite WMS layers (site and composite modes, opacity, animation speed), read-only overlay of the active forecast cycle / saved local cycles / premium cloud library outlooks, NWS watches-warnings-advisories layer, and storm reports with hazard filters plus optional outlook-type matching. Redux `monitorSlice`, `MonitorControls` / `MonitorMap`, premium settings sync via `usePremiumMonitorSettingsSync`, and navbar route with shortcut.
 - **Monitor — NWS alerts & storm reports:** `useMonitorNwsAlerts` and `useMonitorStormReports` integrations, panel toggles, and map rendering for alert polygons and report markers.
 - **Monitor — outlook on map:** `buildMonitorOutlookOptions`, cloud outlook fetch hook, and OpenLayers outlook layer styling aligned with forecast outlook types.
+- **What's New page:** Public `/updates` route with v1.6 copy in `src/content/updates/v1.6.ts` and screenshot directory `public/updates/v1.6/` (images optional until marketing adds them).
 
 ### Changed
 - **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
+- **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
 
 ### Dependencies
 <!-- dependabot-automation -->
@@ -32,13 +34,8 @@ All notable changes to this project will be documented in this file.
 - **ts-jest:** ^29.4.9 → ^29.4.11
 - **vite:** ^8.0.13 → ^8.0.14
 
-### Added
-- **What's New page:** Public `/updates` route with v1.6 copy in `src/content/updates/v1.6.ts` and screenshot directory `public/updates/v1.6/` (images optional until marketing adds them).
-
-### Changed
-- **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
-
 ### Fixed
+- **GFC-WEB-8 (beta routes after `/updates` split):** `BetaAccessGuard` forwards `AppLayout` outlet context so home, forecast, and other guarded routes can destructure `addToast` again.
 - **Signed-in home (light mode):** Primary gradient “Resume Forecast” buttons use white text instead of `#067aff` on the concept home layout (`.home-concept-top-primary`, `.home-concept-action-primary`).
 - **Analytics server tests:** Share `configureApp` with production so `/collect` stays rate-limited in server smoke tests (fixes CodeQL `js/missing-rate-limiting` on `beta`).
 - **Analytics server (beta):** Restored a broken partial merge in `server/analytics.js` so the hosted collector starts again before Express 5 / Stripe 22 land.
