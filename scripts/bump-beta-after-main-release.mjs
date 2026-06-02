@@ -2,6 +2,8 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { computeBetaVersionAfterMainRelease } from './lib/bump-beta-after-main-release.mjs';
 
 const stableInput = process.argv[2] ?? process.env.STABLE_VERSION ?? '';
+const currentBetaInput =
+  process.argv[3] ?? process.env.CURRENT_BETA_VERSION ?? '';
 const packagePath = 'package.json';
 
 const stable = stableInput.trim();
@@ -11,7 +13,7 @@ if (!stable) {
 }
 
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
-const previous = pkg.version;
+const previous = currentBetaInput.trim() || pkg.version;
 const result = computeBetaVersionAfterMainRelease(stable, previous);
 
 const outputPath = process.env.GITHUB_OUTPUT;
@@ -24,9 +26,17 @@ if (outputPath) {
 }
 
 if (!result.changed) {
-  console.log(
-    `Keeping beta package.json at ${previous} (main stable ${stable}; ${result.reason})`,
-  );
+  if (pkg.version !== previous) {
+    pkg.version = previous;
+    writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+    console.log(
+      `Restored beta package.json to ${previous} after merge (main stable ${stable}; ${result.reason})`,
+    );
+  } else {
+    console.log(
+      `Keeping beta package.json at ${previous} (main stable ${stable}; ${result.reason})`,
+    );
+  }
   process.exit(0);
 }
 
