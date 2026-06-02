@@ -1332,6 +1332,7 @@
 
 .dark-mode .home-concept-top-primary,
 .dark-mode .home-concept-action.home-concept-action-primary {
+    /* Explicit dark-mode label color; light-mode gradient rule below uses #fff. */
     border-color: rgba(159, 178, 200, 0.28);
     background: linear-gradient(
         180deg,
