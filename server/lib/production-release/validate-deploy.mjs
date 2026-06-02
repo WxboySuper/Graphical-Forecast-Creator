@@ -63,9 +63,9 @@ function isFutureScheduledLive(config, nowMs) {
   return rolloutAtMs > nowMs + ROLLOUT_MIN_LEAD_MS && config.status === 'scheduled';
 }
 
-/** @param {string[]} errors @param {string | undefined} previousVpsStatus @param {boolean} force */
-function validateLiveNotWhileVpsStaged(errors, previousVpsStatus, force) {
-  if (force || previousVpsStatus !== 'staged') {
+/** @param {string[]} errors @param {{ previousVpsStatus?: string, force?: boolean }} guards */
+function validateLiveNotWhileVpsStaged(errors, guards) {
+  if (guards.force || guards.previousVpsStatus !== 'staged') {
     return;
   }
   errors.push(
@@ -83,9 +83,9 @@ function validateLiveNotWhileFutureRolloutScheduled(config, nowMs, errors) {
   );
 }
 
-/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors @param {string | undefined} previousVpsStatus @param {boolean} force */
-function validateLiveAction(config, nowMs, errors, previousVpsStatus, force) {
-  validateLiveNotWhileVpsStaged(errors, previousVpsStatus, force);
+/** @param {import('./normalize.mjs').normalizeProductionReleaseConfig extends Function ? ReturnType<typeof import('./normalize.mjs').normalizeProductionReleaseConfig> : never} config @param {number} nowMs @param {string[]} errors @param {{ previousVpsStatus?: string, force?: boolean }} guards */
+function validateLiveAction(config, nowMs, errors, guards) {
+  validateLiveNotWhileVpsStaged(errors, guards);
   validateLiveNotWhileFutureRolloutScheduled(config, nowMs, errors);
 }
 
@@ -123,7 +123,7 @@ export function validateProductionReleaseForDeploy({
     validateStageAction(config, nowMs, errors, guards);
   }
   if (action === 'live') {
-    validateLiveAction(config, nowMs, errors, previousVpsStatus, force);
+    validateLiveAction(config, nowMs, errors, guards);
   }
 
   errors.push(...validateBannerPhases(config, nowMs));
