@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * VPS cron entry: promote staged release when rolloutAt has passed.
+ * Invoked from /etc/cron.d/gfc-rollout via promote-release.sh.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -15,26 +16,41 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = process.env.CONFIG_PATH || '/opt/gfc-analytics/config/production-release.json';
 const PROMOTE_SCRIPT = join(__dirname, 'promote-release.sh');
 
-/** Reads and normalizes the VPS production release manifest. */
+/**
+ * Reads the VPS production-release.json manifest.
+ * @returns {{ config: ReturnType<typeof normalizeProductionReleaseConfig>, raw: Record<string, unknown> }}
+ */
 function loadConfig() {
   const raw = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
   return { config: normalizeProductionReleaseConfig(raw), raw };
 }
 
-/** Persists manifest updates after a failed promote attempt. */
+/**
+ * Writes manifest updates after a failed promote attempt, preserving extra VPS fields.
+ * @param {ReturnType<typeof normalizeProductionReleaseConfig>} config Normalized manifest fields to merge.
+ * @param {Record<string, unknown>} raw Original JSON from disk (e.g. stagedAt).
+ */
 function saveConfig(config, raw) {
   const merged = raw ? { ...raw, ...config } : config;
   writeFileSync(CONFIG_PATH, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
 }
 
-/** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
+/**
+ * Returns true when cron should not attempt promotion for this manifest.
+ * @param {ReturnType<typeof normalizeProductionReleaseConfig>} config
+ * @returns {boolean}
+ */
 function shouldSkipRollout(config) {
   const inactiveStatus = config.status === 'live' || config.status === 'cancelled';
   const unknownStatus = config.status !== 'scheduled' && config.status !== 'staged';
   return config.action !== 'stage' || inactiveStatus || unknownStatus;
 }
 
-/** @param {ReturnType<typeof normalizeProductionReleaseConfig>} config */
+/**
+ * Returns true when rolloutAt has passed and promotion may proceed.
+ * @param {ReturnType<typeof normalizeProductionReleaseConfig>} config
+ * @returns {boolean}
+ */
 function isRolloutDue(config) {
   const rolloutAtMs = parseInstant(config.rolloutAt);
   if (rolloutAtMs === null) {
@@ -44,7 +60,10 @@ function isRolloutDue(config) {
   return Date.now() >= rolloutAtMs;
 }
 
-/** Loads config or exits when the manifest cannot be read. */
+/**
+ * Loads the VPS manifest or terminates the process on read/parse failure.
+ * @returns {{ config: ReturnType<typeof normalizeProductionReleaseConfig>, raw: Record<string, unknown> }}
+ */
 function loadConfigOrExit() {
   try {
     return loadConfig();
@@ -52,15 +71,14 @@ function loadConfigOrExit() {
     console.error('[rollout] unable to read config:', error);
     process.exit(1);
   }
+  return { config: normalizeProductionReleaseConfig({}), raw: {} };
 }
 
-/** Cron entry: promote when rolloutAt has passed. */
+/**
+ * Cron entry point: promote when rolloutAt has passed.
+ */
 function main() {
-  const loaded = loadConfigOrExit();
-  if (!loaded) {
-    return;
-  }
-  const { config, raw } = loaded;
+  const { config, raw } = loadConfigOrExit();
 
   if (shouldSkipRollout(config)) {
     process.exit(0);

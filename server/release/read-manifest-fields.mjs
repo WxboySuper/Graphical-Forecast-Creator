@@ -7,7 +7,10 @@
 import { readFileSync } from 'node:fs';
 import { normalizeProductionReleaseConfig } from '../lib/production-release.mjs';
 
-/** @returns {string} */
+/**
+ * Resolves manifest path from --config or CONFIG_PATH env.
+ * @returns {string} Path to production-release.json
+ */
 function configPathFromArgs() {
   const index = process.argv.indexOf('--config');
   if (index >= 0 && process.argv[index + 1]) {
@@ -16,7 +19,9 @@ function configPathFromArgs() {
   return process.env.CONFIG_PATH || '/opt/gfc-analytics/config/production-release.json';
 }
 
-/** Prints version, releaseId, rolloutAt, and status as TSV. */
+/**
+ * Prints version, releaseId, rolloutAt, and status as a single TSV line on stdout.
+ */
 function main() {
   const path = configPathFromArgs();
   const config = normalizeProductionReleaseConfig(JSON.parse(readFileSync(path, 'utf8')));

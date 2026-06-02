@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+/**
+ * Writes post-rollout alert-banner.json to the live web root after promotion.
+ * Usage: node write-live-alert-banner.mjs --config <path> --web-root <dir>
+ */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -6,7 +10,11 @@ import {
   normalizeProductionReleaseConfig,
 } from '../lib/production-release.mjs';
 
-/** @param {string[]} argv */
+/**
+ * Parses CLI flags for config path and live web root directory.
+ * @param {string[]} argv process.argv
+ * @returns {{ config: string, webRoot: string }}
+ */
 function parseArgs(argv) {
   const options = { config: '', webRoot: '' };
   for (let i = 2; i < argv.length; i += 1) {

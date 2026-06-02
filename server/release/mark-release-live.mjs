@@ -6,7 +6,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { normalizeProductionReleaseConfig } from '../lib/production-release.mjs';
 
-/** @returns {string} */
+/**
+ * Resolves manifest path from --config or CONFIG_PATH env.
+ * @returns {string} Absolute or relative path to production-release.json
+ */
 function configPathFromArgs() {
   const index = process.argv.indexOf('--config');
   if (index >= 0 && process.argv[index + 1]) {
@@ -15,7 +18,9 @@ function configPathFromArgs() {
   return process.env.CONFIG_PATH || '/opt/gfc-analytics/config/production-release.json';
 }
 
-/** Writes live status and promotedAt onto the VPS manifest. */
+/**
+ * Writes live status and promotedAt onto the VPS manifest.
+ */
 function main() {
   const path = configPathFromArgs();
   const config = normalizeProductionReleaseConfig(JSON.parse(readFileSync(path, 'utf8')));

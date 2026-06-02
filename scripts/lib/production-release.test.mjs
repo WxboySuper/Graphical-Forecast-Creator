@@ -1,3 +1,6 @@
+/**
+ * Unit tests for production release manifest validation and banner derivation.
+ */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -21,6 +24,11 @@ const STAGE_BANNER = {
   ],
 };
 
+/**
+ * Builds a normalized stage-deploy manifest for tests.
+ * @param {Record<string, unknown>} [overrides] Fields merged into the default stage manifest.
+ * @returns {ReturnType<typeof normalizeProductionReleaseConfig>}
+ */
 function stageConfig(overrides = {}) {
   return normalizeProductionReleaseConfig({
     releaseId: 'v1.6.0',
@@ -33,6 +41,12 @@ function stageConfig(overrides = {}) {
   });
 }
 
+/**
+ * Runs validateProductionReleaseForDeploy for a stage action at the fixed test time.
+ * @param {ReturnType<typeof normalizeProductionReleaseConfig>} config
+ * @param {Record<string, unknown>} [extra] Additional validator options (e.g. previousVpsStatus).
+ * @returns {ReturnType<typeof validateProductionReleaseForDeploy>}
+ */
 function validateStage(config, extra = {}) {
   return validateProductionReleaseForDeploy({
     config,

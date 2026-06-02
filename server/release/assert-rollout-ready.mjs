@@ -5,7 +5,10 @@
  */
 import { parseInstant } from '../lib/production-release.mjs';
 
-/** @returns {{ rolloutAt: string, force: boolean }} */
+/**
+ * Parses --rollout-at and optional --force from process.argv.
+ * @returns {{ rolloutAt: string, force: boolean }}
+ */
 function parseArgs() {
   let rolloutAt = '';
   let force = false;
@@ -21,7 +24,9 @@ function parseArgs() {
   return { rolloutAt, force };
 }
 
-/** Exits when rolloutAt is still in the future (unless --force). */
+/**
+ * Exits when rolloutAt is still in the future (unless --force).
+ */
 function main() {
   const { rolloutAt, force } = parseArgs();
   if (force || !rolloutAt.trim()) {
