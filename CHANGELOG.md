@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - **What's New images:** Release screenshots open in a full-size lightbox when clicked so promo and section images remain readable on narrow layouts.
 
 ### Changed
+- **Release automation:** Post-merge beta bump after `main` releases no longer resets an in-progress beta line when `main` is still on an older stable (e.g. `1.5.3` infra merge while beta stays on `1.6.0-beta.N`). New `X.Y.0-beta.1` only after a real promotion of that line.
 - **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
 - **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
 
