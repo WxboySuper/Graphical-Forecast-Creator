@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { configureApp } = require('./analytics-app');
 
@@ -13,32 +13,34 @@ const getServerPort = (server) => {
   return address.port;
 };
 
-describe('analytics server stack (express 5)', () => {
-  /** @type {import('node:http').Server | undefined} */
-  let server;
+/** @returns {Promise<import('node:http').Server>} */
+const startTestAnalyticsServer = async () => {
+  const express = require('express');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
 
-  before(async () => {
-    const express = require('express');
-    const fs = require('node:fs');
-    const os = require('node:os');
-    const path = require('node:path');
+  const logFile = path.join(os.tmpdir(), `gfc-analytics-test-${process.pid}.log`);
 
-    const logFile = path.join(os.tmpdir(), `gfc-analytics-test-${process.pid}.log`);
+  const app = express();
+  configureApp(app, express, fs, logFile);
 
-    const app = express();
-    configureApp(app, express, fs, logFile);
-
-    server = await new Promise((resolve, reject) => {
-      const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
-      instance.on('error', reject);
-    });
+  return new Promise((resolve, reject) => {
+    const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+    instance.on('error', reject);
   });
+};
 
-  after(() => {
-    server?.close();
+describe('analytics server stack (express 5)', () => {
+  const serverReady = startTestAnalyticsServer();
+
+  after(async () => {
+    const server = await serverReady;
+    server.close();
   });
 
   it('serves billing config on GET /api/billing/config', async () => {
+    const server = await serverReady;
     const port = getServerPort(server);
     const response = await fetch(`http://127.0.0.1:${port}/api/billing/config`);
     assert.equal(response.status, 200);
@@ -47,6 +49,7 @@ describe('analytics server stack (express 5)', () => {
   });
 
   it('accepts POST /collect with express.json middleware', async () => {
+    const server = await serverReady;
     const port = getServerPort(server);
     const response = await fetch(`http://127.0.0.1:${port}/collect`, {
       method: 'POST',
