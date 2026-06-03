@@ -39,12 +39,17 @@ export function ciLabelFromCheckRuns(checkRuns) {
     return 'ci:pending';
   }
 
+<<<<<<< HEAD
   if (checkRuns.some((run) => run.conclusion === null)) {
     return 'ci:pending';
   }
 
   const allOk = checkRuns.every((run) =>
     ['success', 'neutral', 'skipped'].includes(run.conclusion),
+=======
+  const allOk = checkRuns.every((run) =>
+    ['success', 'neutral', 'skipped'].includes(run.conclusion ?? ''),
+>>>>>>> origin/pr/396
   );
   return allOk ? 'ci:passing' : 'ci:failing';
 }

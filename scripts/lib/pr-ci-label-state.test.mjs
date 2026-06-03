@@ -36,6 +36,7 @@ describe('ciLabelFromCheckRuns', () => {
       'ci:passing',
     );
   });
+<<<<<<< HEAD
 
   it('returns pending when a completed check has a null conclusion', () => {
     assert.equal(
@@ -46,6 +47,8 @@ describe('ciLabelFromCheckRuns', () => {
       'ci:pending',
     );
   });
+=======
+>>>>>>> origin/pr/396
 });
 
 describe('diffCiLabels', () => {

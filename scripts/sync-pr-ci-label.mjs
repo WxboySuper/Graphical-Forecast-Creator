@@ -39,9 +39,15 @@ const checkRuns = await fetchAllPages(async (page) => {
   );
   return checkData?.check_runs ?? [];
 });
+<<<<<<< HEAD
 const existing = (
   await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels?per_page=100`)
 ).map((label) => label.name);
+=======
+const existing = (await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels`)).map(
+  (label) => label.name,
+);
+>>>>>>> origin/pr/396
 
 const desired = ciLabelFromCheckRuns(
   checkRuns.map((run) => ({
@@ -53,6 +59,7 @@ const desired = ciLabelFromCheckRuns(
 const { add, remove } = diffCiLabels(existing, desired);
 
 for (const name of remove) {
+<<<<<<< HEAD
   try {
     await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels/${encodeURIComponent(name)}`, {
       method: 'DELETE',
@@ -60,6 +67,11 @@ for (const name of remove) {
   } catch (err) {
     if (!(err instanceof Error) || !err.message.startsWith('404 ')) throw err;
   }
+=======
+  await githubApi(`/repos/${owner}/${repo}/issues/${prNumber}/labels/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  });
+>>>>>>> origin/pr/396
 }
 
 if (add.length > 0) {
