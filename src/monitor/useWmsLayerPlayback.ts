@@ -62,27 +62,26 @@ export const useLoadWmsLayerFrames = ({
     let active = true;
     setPlayback(emptyPlayback());
 
-    if (!config) {
-      return;
-    }
+    if (config) {
+      wms.fetchLayerTimeValues(config)
+        .then((timeValues) => {
+          if (!active) {
+            return undefined;
+          }
 
-    wms.fetchLayerTimeValues(config)
-      .then((timeValues) => {
-        if (!active) {
-          return;
-        }
-
-        const frameTimes = wms.selectAnimationFrameTimes(timeValues);
-        setPlayback({
-          frameTimes,
-          frameIndex: Math.max(0, frameTimes.length - 1),
+          const frameTimes = wms.selectAnimationFrameTimes(timeValues);
+          setPlayback({
+            frameTimes,
+            frameIndex: Math.max(0, frameTimes.length - 1),
+          });
+          return undefined;
+        })
+        .catch(() => {
+          if (active) {
+            addToast(unavailableMessage, 'warning');
+          }
         });
-      })
-      .catch(() => {
-        if (active) {
-          addToast(unavailableMessage, 'warning');
-        }
-      });
+    }
 
     return () => {
       active = false;

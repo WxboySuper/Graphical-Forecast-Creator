@@ -1,4 +1,4 @@
-import type { FeatureCollection, Geometry } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 import { Fill, Stroke, Style } from 'ol/style';
 
 export const NWS_ACTIVE_ALERTS_URL = 'https://api.weather.gov/alerts/active?status=actual';
@@ -102,9 +102,6 @@ export const fetchActiveNwsAlerts = async (): Promise<NwsAlertFeatureCollection>
   };
 };
 
-export const collectionHasGeometry = (collection: NwsAlertFeatureCollection): boolean =>
-  collection.features.some((feature) => Boolean(feature.geometry));
-
 export const snapshotCollectionKey = (collection: NwsAlertFeatureCollection): string =>
   collection.features
     .map((feature) => {
@@ -114,11 +111,3 @@ export const snapshotCollectionKey = (collection: NwsAlertFeatureCollection): st
     })
     .sort()
     .join('|');
-
-export const isPolygonalGeometry = (geometry: Geometry | null | undefined): geometry is Geometry =>
-  Boolean(
-    geometry &&
-    (geometry.type === 'Polygon' ||
-      geometry.type === 'MultiPolygon' ||
-      geometry.type === 'GeometryCollection'),
-  );

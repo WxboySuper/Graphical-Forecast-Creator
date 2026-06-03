@@ -11,12 +11,13 @@ export const useMonitorNwsAlertsFrameSync = (
 
   useEffect(() => {
     if (!enabled || !animationEnabled) {
-      return;
+      return undefined;
     }
 
     if (rawFrameCount > previousRawFrameCountRef.current) {
       setFrameIndex(rawFrameCount - 1);
     }
     previousRawFrameCountRef.current = rawFrameCount;
+    return undefined;
   }, [animationEnabled, enabled, rawFrameCount, setFrameIndex]);
 };

@@ -60,9 +60,8 @@ export const useMonitorMapBootstrap = ({
   const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => {
-    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     if (!mapElementRef.current) {
-      return;
+      return undefined;
     }
 
     const alertsLayer = new VectorLayer({
@@ -193,12 +192,13 @@ export const useMonitorMapBootstrap = ({
       })
       .then((nextReferenceGroup) => {
         if (refs.vectorStyleRequestRef.current !== requestId || !refs.vectorReferenceGroupRef.current) {
-          return;
+          return undefined;
         }
 
         replaceLayerGroupLayers(refs.vectorReferenceGroupRef.current, nextReferenceGroup);
         refs.vectorReferenceGroupRef.current.setZIndex(TOP_VECTOR_REFERENCE_LAYER_Z_INDEX);
         refs.vectorReferenceGroupRef.current.setVisible(true);
+        return undefined;
       })
       .catch(() => undefined);
 
@@ -234,10 +234,11 @@ export const useMonitorMapBootstrap = ({
   useEffect(() => {
     const baseLayer = refs.baseLayerRef.current;
     if (!baseLayer) {
-      return;
+      return undefined;
     }
 
     baseLayer.setSource(createBaseSource(darkMode));
     // refs omitted: wrapper object from useMonitorMapRefs() is new each render.
+    return undefined;
   }, [darkMode]);
 };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { filterNwsAlertCollection, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { useMonitorNwsAlertsLoad } from './useMonitorNwsAlertsLoad';

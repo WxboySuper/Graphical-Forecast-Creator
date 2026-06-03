@@ -9,7 +9,7 @@ import { db } from '../lib/firebase';
 export function useFirestoreSleepRecovery(): void {
   useEffect(() => {
     if (!db) {
-      return;
+      return undefined;
     }
 
     const firestore = db;

@@ -19,7 +19,7 @@ export const useMonitorNwsAlertsFrameAdvance = ({
   useEffect(() => {
     const shouldAdvance = enabled && animationEnabled && filteredFrameCount >= 2;
     if (!shouldAdvance) {
-      return;
+      return undefined;
     }
 
     const timeoutId = window.setInterval(() => {

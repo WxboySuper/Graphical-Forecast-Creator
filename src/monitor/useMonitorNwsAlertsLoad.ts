@@ -44,7 +44,7 @@ export const useMonitorNwsAlertsLoad = ({
       setFrameIndex(0);
       setError(null);
       setLoading(false);
-      return;
+      return undefined;
     }
 
     let active = true;
@@ -54,22 +54,24 @@ export const useMonitorNwsAlertsLoad = ({
     fetchActiveNwsAlerts()
       .then((collection) => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         const nextFrames = appendSnapshotFrame([], collection);
         setRawFrames(nextFrames);
         setFrameIndex(Math.max(0, nextFrames.length - 1));
         setFetchedAt(new Date().toISOString());
+        return undefined;
       })
       .catch(() => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         setRawFrames([]);
         setError('Official alerts are unavailable right now.');
         addToast('NWS watch/warning polygons could not be loaded.', 'warning');
+        return undefined;
       })
       .finally(() => {
         if (active) {

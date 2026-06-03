@@ -36,7 +36,7 @@ export const useMonitorStormReports = ({
       setReports([]);
       setError(null);
       setLoading(false);
-      return;
+      return undefined;
     }
 
     let active = true;
@@ -46,20 +46,22 @@ export const useMonitorStormReports = ({
     fetchTodayStormReports()
       .then((nextReports) => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         setReports(nextReports);
         setFetchedAt(new Date().toISOString());
+        return undefined;
       })
       .catch(() => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         setReports([]);
         setError('Storm reports are unavailable right now.');
         addToast('SPC storm reports could not be loaded.', 'warning');
+        return undefined;
       })
       .finally(() => {
         if (active) {
