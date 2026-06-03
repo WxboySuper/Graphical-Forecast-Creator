@@ -1,7 +1,6 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
-import * as wms from './wms';
-import type { WmsLayerConfig } from './wms';
+import { fetchLayerTimeValues, selectAnimationFrameTimes, type WmsLayerConfig } from './wms';
 
 export interface LayerPlaybackState {
   frameTimes: string[];
@@ -63,13 +62,13 @@ export const useLoadWmsLayerFrames = ({
     setPlayback(emptyPlayback());
 
     if (config) {
-      wms.fetchLayerTimeValues(config)
+      fetchLayerTimeValues(config)
         .then((timeValues) => {
           if (!active) {
             return undefined;
           }
 
-          const frameTimes = wms.selectAnimationFrameTimes(timeValues);
+          const frameTimes = selectAnimationFrameTimes(timeValues);
           setPlayback({
             frameTimes,
             frameIndex: Math.max(0, frameTimes.length - 1),

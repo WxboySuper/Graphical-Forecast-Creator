@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
 import type { RootState, AppDispatch } from '../store';
 import {
-  applyMonitorSettings,
   setAnimationEnabled,
   setAnimationSpeedMs,
   setMonitorOutlookSource,
