@@ -39,8 +39,12 @@ export function ciLabelFromCheckRuns(checkRuns) {
     return 'ci:pending';
   }
 
+  if (checkRuns.some((run) => run.conclusion === null)) {
+    return 'ci:pending';
+  }
+
   const allOk = checkRuns.every((run) =>
-    ['success', 'neutral', 'skipped'].includes(run.conclusion ?? ''),
+    ['success', 'neutral', 'skipped'].includes(run.conclusion),
   );
   return allOk ? 'ci:passing' : 'ci:failing';
 }

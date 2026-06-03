@@ -36,6 +36,16 @@ describe('ciLabelFromCheckRuns', () => {
       'ci:passing',
     );
   });
+
+  it('returns pending when a completed check has a null conclusion', () => {
+    assert.equal(
+      ciLabelFromCheckRuns([
+        { status: 'completed', conclusion: 'success' },
+        { status: 'completed', conclusion: null },
+      ]),
+      'ci:pending',
+    );
+  });
 });
 
 describe('diffCiLabels', () => {
