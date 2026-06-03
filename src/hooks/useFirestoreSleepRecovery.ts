@@ -9,7 +9,7 @@ import { db } from '../lib/firebase';
 export function useFirestoreSleepRecovery(): void {
   useEffect(() => {
     if (!db) {
-      return;
+      return undefined;
     }
 
     const firestore = db;
@@ -18,7 +18,7 @@ export function useFirestoreSleepRecovery(): void {
     const syncFirestoreNetworkToVisibility = (): void => {
       if (document.hidden) {
         disableNetwork(firestore).catch(() => undefined);
-        return;
+        return undefined;
       }
 
       enableNetwork(firestore).catch(() => undefined);

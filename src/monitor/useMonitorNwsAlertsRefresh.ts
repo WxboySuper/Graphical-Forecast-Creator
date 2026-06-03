@@ -32,7 +32,7 @@ export const useMonitorNwsAlertsRefresh = ({
 }: MonitorNwsAlertsRefreshOptions) => {
   useEffect(() => {
     if (!enabled || !animationEnabled) {
-      return;
+      return undefined;
     }
 
     const intervalId = window.setInterval(() => {

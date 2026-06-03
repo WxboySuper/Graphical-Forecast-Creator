@@ -10,6 +10,58 @@ const archiveUrlForDate = (date: string): string =>
   `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
 
 /**
+ * Parses archived *_rpts_raw.csv storm report text.
+ */
+export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
+  const reports: StormReport[] = [];
+  const lines = csvText.split('\n');
+
+  let currentSection: ReportType | null = null;
+  let headers: string[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      continue;
+    }
+
+    if (line.includes('Raw Tornado LSR')) {
+      currentSection = 'tornado';
+      continue;
+    }
+    if (line.includes('Raw Wind/Gust LSR') || line.includes('Raw Wind LSR')) {
+      currentSection = 'wind';
+      continue;
+    }
+    if (line.includes('Raw Hail LSR')) {
+      currentSection = 'hail';
+      continue;
+    }
+
+    if (line.startsWith('Time,')) {
+      headers = line.split(',');
+      continue;
+    }
+
+    if (!currentSection || headers.length === 0) {
+      continue;
+    }
+
+    try {
+      const report = parseArchiveCsvRow(line, currentSection, headers);
+      if (report) {
+        reports.push(report);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return reports;
+};
+
+/**
  * Fetches storm reports from NOAA archives for a given date
  * @param date Date in YYMMDD format (e.g., "260130" for January 30, 2026)
  * @returns Promise with array of storm reports
@@ -36,65 +88,6 @@ export async function fetchTodayStormReports(): Promise<StormReport[]> {
 }
 
 /**
- * Parses archived *_rpts_raw.csv storm report text.
- */
-export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
-  const reports: StormReport[] = [];
-  const lines = csvText.split('\n');
-  
-  let currentSection: ReportType | null = null;
-  let headers: string[] = [];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Skip empty lines
-    if (!line) {
-      continue;
-    }
-    
-    // Detect section headers
-    if (line.includes('Raw Tornado LSR')) {
-      currentSection = 'tornado';
-      continue;
-    } else if (line.includes('Raw Wind/Gust LSR') || line.includes('Raw Wind LSR')) {
-      currentSection = 'wind';
-      continue;
-    } else if (line.includes('Raw Hail LSR')) {
-      currentSection = 'hail';
-      continue;
-    }
-    
-    // Parse header row
-    if (line.startsWith('Time,')) {
-      headers = line.split(',');
-      continue;
-    }
-    
-    // Skip if we don't have a current section
-    if (!currentSection) {
-      continue;
-    }
-    
-    if (headers.length === 0) {
-      continue;
-    }
-    
-    // Parse data row
-    try {
-      const report = parseArchiveCsvRow(line, currentSection, headers);
-      if (report) {
-        reports.push(report);
-      }
-    } catch {
-      continue;
-    }
-  }
-  
-  return reports;
-}
-
-/**
  * Formats a date object to YYMMDD format for NOAA storm report archives
  */
 export function formatReportDate(date: Date): string {
@@ -108,8 +101,8 @@ export function formatReportDate(date: Date): string {
  * Parses YYMMDD format to Date object
  */
 export function parseReportDate(dateStr: string): Date {
-  const year = 2000 + parseInt(dateStr.slice(0, 2));
-  const month = parseInt(dateStr.slice(2, 4)) - 1;
-  const day = parseInt(dateStr.slice(4, 6));
+  const year = 2000 + parseInt(dateStr.slice(0, 2), 10);
+  const month = parseInt(dateStr.slice(2, 4), 10) - 1;
+  const day = parseInt(dateStr.slice(4, 6), 10);
   return new Date(year, month, day);
 }

@@ -36,7 +36,7 @@ export const useMonitorStormReports = ({
       setReports([]);
       setError(null);
       setLoading(false);
-      return;
+      return undefined;
     }
 
     let active = true;
@@ -46,7 +46,7 @@ export const useMonitorStormReports = ({
     fetchTodayStormReports()
       .then((nextReports) => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         setReports(nextReports);
@@ -54,7 +54,7 @@ export const useMonitorStormReports = ({
       })
       .catch(() => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         setReports([]);

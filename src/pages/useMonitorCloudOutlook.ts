@@ -38,7 +38,7 @@ export const useMonitorCloudOutlook = ({
   useEffect(() => {
     if (selectedOption.kind !== 'cloud-cycle') {
       setCloudOption(null);
-      return;
+      return undefined;
     }
 
     let active = true;
@@ -51,7 +51,7 @@ export const useMonitorCloudOutlook = ({
       })
       .catch(() => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         addToast('Cloud outlook could not be loaded.', 'error');

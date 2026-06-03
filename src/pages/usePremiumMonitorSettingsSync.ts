@@ -26,7 +26,7 @@ export const usePremiumMonitorSettingsSync = (settings: MonitorSettings) => {
 
   useEffect(() => {
     if (!shouldSyncPremiumMonitorSettings(premiumActive, status, lastSyncedRef.current, settings)) {
-      return;
+      return undefined;
     }
 
     const timeoutId = window.setTimeout(() => {

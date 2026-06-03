@@ -14,8 +14,7 @@ export const splitCsvLine = (line: string): string[] => {
   let currentValue = '';
   let inQuotes = false;
 
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
+  for (const char of line) {
 
     if (char === '"') {
       inQuotes = !inQuotes;
@@ -33,9 +32,11 @@ export const splitCsvLine = (line: string): string[] => {
 
 export const buildCsvRow = (headers: string[], values: string[]): Record<string, string> => {
   const row: Record<string, string> = {};
-  headers.forEach((header, index) => {
+  let index = 0;
+  for (const header of headers) {
     row[header] = values[index] || '';
-  });
+    index += 1;
+  }
   return row;
 };
 

@@ -1,3 +1,5 @@
+import { readRadarSiteProperties } from './radarSiteProperties';
+
 export interface RadarSiteOption {
   id: string;
   name: string;
@@ -14,8 +16,6 @@ let cachedRadarSites: RadarSiteOption[] | null = null;
 export const resetRadarSiteCacheForTests = (): void => {
   cachedRadarSites = null;
 };
-
-import { readRadarSiteProperties } from './radarSiteProperties';
 
 const parseRadarSiteFeature = (feature: unknown): RadarSiteOption | null => {
   const site = readRadarSiteProperties(feature);

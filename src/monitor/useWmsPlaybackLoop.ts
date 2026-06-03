@@ -25,7 +25,7 @@ export const useWmsPlaybackLoop = ({
     if (!shouldAnimate) {
       setRadarPlayback(snapToLatestFrame);
       setSatellitePlayback(snapToLatestFrame);
-      return;
+      return undefined;
     }
 
     const intervalId = window.setInterval(() => {

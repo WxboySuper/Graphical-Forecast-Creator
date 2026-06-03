@@ -39,7 +39,7 @@ export const flattenMonitorOutlookFeatures = (
   const items: Array<{ outlookType: OutlookType; probability: string; feature: GeoJsonFeature }> = [];
   map.forEach((features, probability) => {
     if (!isRenderableMonitorProbability(probability)) {
-      return;
+      return undefined;
     }
 
     features.forEach((feature) => {

@@ -44,7 +44,7 @@ export const useMonitorNwsAlertsLoad = ({
       setFrameIndex(0);
       setError(null);
       setLoading(false);
-      return;
+      return undefined;
     }
 
     let active = true;
@@ -54,7 +54,7 @@ export const useMonitorNwsAlertsLoad = ({
     fetchActiveNwsAlerts()
       .then((collection) => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         const nextFrames = appendSnapshotFrame([], collection);
@@ -64,7 +64,7 @@ export const useMonitorNwsAlertsLoad = ({
       })
       .catch(() => {
         if (!active) {
-          return;
+          return undefined;
         }
 
         setRawFrames([]);

@@ -11,7 +11,7 @@ export const useMonitorNwsAlertsFrameSync = (
 
   useEffect(() => {
     if (!enabled || !animationEnabled) {
-      return;
+      return undefined;
     }
 
     if (rawFrameCount > previousRawFrameCountRef.current) {
