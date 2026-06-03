@@ -1,5 +1,8 @@
-/** Labels this automation owns (removed before re-applying). */
-export const MANAGED_LABELS = [
+/** CI labels owned by check-run aggregation (not touched on pull_request sync). */
+export const CI_MANAGED_LABELS = ['ci:pending', 'ci:passing', 'ci:failing'];
+
+/** Labels recomputed on pull_request events (routing, changelog, descriptive). */
+export const CONTENT_MANAGED_LABELS = [
   'promotion',
   'feature',
   'fix',
@@ -11,9 +14,6 @@ export const MANAGED_LABELS = [
   'integration:other',
   'has conflicts',
   'draft',
-  'ci:pending',
-  'ci:passing',
-  'ci:failing',
   'changelog:ok',
   'changelog:missing',
   'Documentation',
@@ -32,3 +32,6 @@ export const MANAGED_LABELS = [
   'Component: UI',
   'Component: Storage',
 ];
+
+/** @deprecated Use CONTENT_MANAGED_LABELS or CI_MANAGED_LABELS */
+export const MANAGED_LABELS = [...CONTENT_MANAGED_LABELS, ...CI_MANAGED_LABELS];
