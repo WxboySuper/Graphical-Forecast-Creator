@@ -94,6 +94,8 @@ interface FillBuildInput {
 
 interface LayerStyleOptions {
   isTopLayer?: boolean;
+  /** Multiplier for fill/stroke alpha when imagery sits beneath outlooks (e.g. Monitor). */
+  transparencyScale?: number;
 }
 
 interface RgbaInput {
@@ -112,6 +114,7 @@ interface StrokeWidthInput {
 
 interface HatchPatternInput {
   cigLevel: string;
+  alpha?: number;
 }
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
@@ -222,7 +225,7 @@ export const createOutlookFill = ({
     });
   }
 
-  const pattern = createHatchPattern({ cigLevel: probability });
+  const pattern = createHatchPattern({ cigLevel: probability, alpha: fillOpacity });
   if (pattern) {
     return new Fill({ color: pattern as CanvasPattern });
   }
@@ -350,15 +353,18 @@ export const toOlStyle = (
   options: LayerStyleOptions = {},
 ) => {
   const { outlookType, probability } = selection;
-  const { isTopLayer = false } = options;
+  const { isTopLayer = false, transparencyScale = 1 } = options;
+  const alphaScale = Math.min(1, Math.max(0, transparencyScale));
 
   const style = getFeatureStyle(
     outlookType as EditableOutlookType,
     probability,
   );
   const fillColor = String(style.fillColor || "#ffffff");
-  const fillOpacity = resolveFillOpacity({ fillOpacity: style.fillOpacity });
-  const strokeOpacity = typeof style.opacity === "number" ? style.opacity : 1;
+  const fillOpacity =
+    resolveFillOpacity({ fillOpacity: style.fillOpacity }) * alphaScale;
+  const strokeOpacity =
+    (typeof style.opacity === "number" ? style.opacity : 1) * alphaScale;
   const strokeColor = String(style.color || "#000000");
   const zIndex = computeZIndex(outlookType as EditableOutlookType, probability);
   const fill = createOutlookFill({ probability, fillColor, fillOpacity });
@@ -798,19 +804,21 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         resizeObserver.observe(targetEl);
       }
 
-      // Create popup overlay
-      if (popupRef.current) {
-        const overlay = new Overlay({
-          element: popupRef.current,
-          autoPan: {
-            animation: {
-              duration: 250,
-            },
+      // Create popup element imperatively to prevent React/OpenLayers DOM ownership conflict.
+      const popupEl = document.createElement("div");
+      popupEl.className = "ol-popup";
+      popupEl.style.display = "none";
+      popupRef.current = popupEl;
+      const overlay = new Overlay({
+        element: popupEl,
+        autoPan: {
+          animation: {
+            duration: 250,
           },
-        });
-        map.addOverlay(overlay);
-        overlayRef.current = overlay;
-      }
+        },
+      });
+      map.addOverlay(overlay);
+      overlayRef.current = overlay;
 
       // Add click handler for pan mode
       map.on("click", (evt) => {
@@ -960,6 +968,14 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         if (selectRef.current) {
           map.removeInteraction(selectRef.current);
         }
+        if (overlayRef.current) {
+          map.removeOverlay(overlayRef.current);
+          overlayRef.current = null;
+        }
+        if (popupRef.current) {
+          popupRef.current.remove();
+          popupRef.current = null;
+        }
         map.setTarget();
         mapRef.current = null;
         vectorBaseGroupRef.current = null;
@@ -1000,6 +1016,31 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         ghostSnapRef.current.setActive(enableSnap);
       }
     }, [interactionMode]);
+
+    useEffect(() => {
+      const el = popupRef.current;
+      if (!el) return;
+      if (popupInfo) {
+        el.style.display = "block";
+        el.innerHTML = "";
+        const content = document.createElement("div");
+        content.className = "ol-popup-content";
+        const name = document.createElement("div");
+        name.className = "text-sm font-semibold capitalize";
+        name.textContent = popupInfo.outlookType;
+        const prob = document.createElement("div");
+        prob.className = "text-xs";
+        prob.textContent =
+          popupInfo.probability +
+          (popupInfo.isSignificant ? " (Significant)" : "");
+        content.appendChild(name);
+        content.appendChild(prob);
+        el.appendChild(content);
+      } else {
+        el.style.display = "none";
+        el.innerHTML = "";
+      }
+    }, [popupInfo]);
 
     useEffect(() => {
       const map = mapRef.current;
@@ -1420,25 +1461,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
     return (
       <div className="map-container">
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
-        <div
-          ref={popupRef}
-          className="ol-popup"
-          style={{
-            display: popupInfo ? "block" : "none",
-          }}
-        >
-          {popupInfo && (
-            <div className="ol-popup-content">
-              <div className="text-sm font-semibold capitalize">
-                {popupInfo.outlookType}
-              </div>
-              <div className="text-xs">
-                {popupInfo.probability}
-                {popupInfo.isSignificant ? " (Significant)" : ""}
-              </div>
-            </div>
-          )}
-        </div>
         <div className="map-toolbar-bottom-right">
           <div className="map-toolbar-surface">
             <button

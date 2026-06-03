@@ -4,6 +4,7 @@ import {
   Map,
   MessageSquare,
   CheckCircle,
+  RadioTower,
   Moon,
   Sun,
   HelpCircle,
@@ -15,6 +16,7 @@ import {
   CircleUserRound,
   MoreHorizontal,
   Crown,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -57,6 +59,7 @@ const navItems = [
   { to: '/forecast', label: 'Forecast', icon: Map, shortcut: '⌃1' },
   { to: '/discussion', label: 'Discussion', icon: MessageSquare, shortcut: '⌃2' },
   { to: '/verification', label: 'Verification', icon: CheckCircle, shortcut: '⌃3' },
+  { to: '/monitor', label: 'Monitor', icon: RadioTower, shortcut: '⌃4' },
 ];
 
 // Define external links for the right action buttons
@@ -210,6 +213,12 @@ const MoreActionsMenu: FC<{
         <DropdownMenuItem onSelect={onToggleDocumentation}>
           <HelpCircle className="h-4 w-4" />
           Documentation
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <NavLink to="/updates">
+            <Sparkles className="h-4 w-4" />
+            What&apos;s New
+          </NavLink>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onViewTerms}>
           <FileText className="h-4 w-4" />

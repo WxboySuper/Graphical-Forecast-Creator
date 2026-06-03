@@ -7,6 +7,7 @@ exclude_patterns = [
   "scripts/lib/bump-beta-after-main-release.test.mjs",
   "scripts/lib/github-paginate.test.mjs",
   "scripts/lib/pr-ci-label-state.test.mjs",
+  "server/**/*.test.js",
   "src/**/*.test.ts",
   "src/**/*.test.tsx",
 ]

@@ -11,6 +11,7 @@ import { RootState } from '../../store';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '../../lib/utils';
 import { NAVBAR_HEIGHT } from '../../lib/uiConstants';
+import { keyboardShortcutKey } from '../../utils/keyboardShortcutKey';
 
 export interface ToastItem {
   id: string;
@@ -117,18 +118,20 @@ export const AppLayout: React.FC = () => {
       }
 
       if (e.ctrlKey || e.metaKey) {
+        const key = keyboardShortcutKey(e);
+        if (!key) return;
+
         // Define Ctrl/Cmd+key shortcuts for navigation and actions
-        const key = e.key.toLowerCase();
-        // Define shortcuts for navigation and actions
         const shortcuts: Record<string, () => void> = {
           h: () => navigate('/'),
           '1': () => navigate('/forecast'),
           '2': () => navigate('/discussion'),
           '3': () => navigate('/verification'),
+          '4': () => navigate('/monitor'),
           d: () => document.documentElement.classList.toggle('dark-mode'),
         };
 
-        // Example: Ctrl+H for home, Ctrl+1 for forecast, Ctrl+2 for discussion, Ctrl+3 for verification, Ctrl+D to toggle dark mode
+        // Ctrl+H home, Ctrl+1 forecast, Ctrl+2 discussion, Ctrl+3 verification, Ctrl+4 monitor, Ctrl+D dark mode
         const action = shortcuts[key];
         if (action) {
           e.preventDefault();

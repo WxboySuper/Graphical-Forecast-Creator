@@ -8,6 +8,7 @@ import stormReportsReducer from './stormReportsSlice';
 import appModeReducer from './appModeSlice';
 import themeReducer from './themeSlice';
 import verificationReducer from './verificationSlice';
+import monitorReducer from './monitorSlice';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
     appMode: appModeReducer,
     theme: themeReducer,
     verification: verificationReducer,
+    monitor: monitorReducer,
   },
   enhancers: (getDefaultEnhancers) => appendSentryReduxEnhancer(getDefaultEnhancers),
   // Configure to handle Maps in Redux state - this allows for serialization of Map objects

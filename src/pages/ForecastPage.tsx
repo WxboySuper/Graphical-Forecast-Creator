@@ -44,6 +44,9 @@ import { useCloudSync } from '../hooks/useCloudSync';
 import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbarButton';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
+import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
+
+export { hasAnyModifierKey, isTypingTarget };
 import { queueProductMetric } from '../utils/productMetrics';
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
 import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
@@ -344,7 +347,6 @@ const useForecastLoadAction = (
 
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
 const INCREASE_PROBABILITY_KEYS = new Set(['arrowup', 'arrowright']);
-const MODIFIER_KEYS: Array<keyof Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>> = ['ctrlKey', 'metaKey', 'altKey', 'shiftKey'];
 type ShortcutDispatch = Dispatch<UnknownAction>;
 
 interface KeyboardShortcutContext {
@@ -372,11 +374,6 @@ const OUTLOOK_SHORTCUTS: Record<string, { type: OutlookType; label: string }> = 
   c: { type: 'categorical', label: 'Categorical' },
 };
 
-/** Returns true if the event target is an input or textarea that should receive keyboard text. */
-export const isTypingTarget = (target: EventTarget | null): boolean => {
-  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-};
-
 /** Normalises a probability string by converting legacy `#` suffix to `%` (e.g. `"10#"` → `"10%"`). */
 export const normalizeProbability = (value: string): string => value.replace('#', '%');
 
@@ -388,11 +385,6 @@ export const canToggleSignificantForState = (
   if (activeOutlookType === 'categorical') return false;
   if (activeOutlookType === 'tornado') return !['2%', '5%'].includes(activeProbability);
   return activeProbability !== '5%';
-};
-
-/** Returns true if any Ctrl / Meta / Alt / Shift modifier key is held during the event. */
-export const hasAnyModifierKey = (e: KeyboardEvent): boolean => {
-  return MODIFIER_KEYS.some((modifier) => e[modifier]);
 };
 
 const COMMAND_SHORTCUT_HANDLERS: Record<CommandShortcutKey, CommandShortcutHandler> = {
@@ -593,7 +585,8 @@ export const processShortcutKeyDown = (
   e: KeyboardEvent,
   context: KeyboardShortcutContext
 ) => {
-  const key = e.key.toLowerCase();
+  const key = keyboardShortcutKey(e);
+  if (!key) return;
   if (isTypingTarget(e.target)) return;
 
   if (handleUndoRedoShortcuts(e, key, context)) return;

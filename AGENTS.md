@@ -21,6 +21,8 @@ Agents should act like senior collaborators, not script runners. Prefer concrete
 
 - Make code changes on a branch based on `beta` unless the user specifies another base or the workspace is already on a fresh task branch.
 - If the current branch is not suitable for the requested change, create a new branch from `beta` before editing.
+- Do not implement on `beta` (or `main`) in place when the work is a discrete fix or feature—check out a new task branch first (for example `fix/sentry-gfc-web-7-short-description`).
+- For production bug fixes, Sentry investigations, and other shippable repairs: use a dedicated branch, commit there, push, and open a pull request targeting `beta` when the fix is complete and verified—unless the user explicitly asks to stay local-only.
 - Do not commit unless the user asks.
 - Do not push unless the user asks.
 - Do not open a pull request unless the user asks.

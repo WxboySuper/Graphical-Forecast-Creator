@@ -15,7 +15,7 @@ interface AlertBannerProps {
   configPath?: string;
 }
 
-/** Loads a static JSON banner config and renders a site-wide alert when enabled. */
+/** Loads static JSON banner config and renders a site-wide alert when enabled and in schedule. */
 export function AlertBanner({ configPath = '/alert-banner.json' }: AlertBannerProps) {
   const { config, dismissed, dismiss } = useAlertBanner(configPath);
 

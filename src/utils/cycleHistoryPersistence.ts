@@ -6,6 +6,7 @@ import { loadCycleHistory } from '../store/forecastSlice';
 import type { SavedCycle, SavedCycleStats } from '../store/forecastSlice';
 import { deserializeForecast, serializeForecast } from './fileUtils';
 import { countForecastMetrics } from './forecastMetrics';
+import { normalizeForecastCycle } from './outlookMapCoercion';
 import type { ForecastCycle, GFCForecastSaveData } from '../types/outlooks';
 
 const CYCLE_HISTORY_KEY = 'gfc-cycle-history';
@@ -52,14 +53,18 @@ const fromLegacySavedCycle = (cycle: {
   label?: string;
   forecastCycle: ForecastCycle;
   stats?: SavedCycleStats;
-}): SavedCycle => ({
-  id: cycle.id,
-  timestamp: cycle.timestamp,
-  cycleDate: cycle.cycleDate,
-  label: cycle.label,
-  forecastCycle: cycle.forecastCycle,
-  stats: cycle.stats ?? countForecastMetrics(cycle.forecastCycle),
-});
+}): SavedCycle => {
+  const forecastCycle = normalizeForecastCycle(cycle.forecastCycle);
+
+  return {
+    id: cycle.id,
+    timestamp: cycle.timestamp,
+    cycleDate: cycle.cycleDate,
+    label: cycle.label,
+    forecastCycle,
+    stats: cycle.stats ?? countForecastMetrics(forecastCycle),
+  };
+};
 
 /**
  * Save cycle history to localStorage

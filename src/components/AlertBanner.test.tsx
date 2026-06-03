@@ -23,20 +23,47 @@ describe('AlertBanner', () => {
   });
 
   test('renders alert when enabled', async () => {
-    const mockConfig = {
+    mockBannerFetch({
       enabled: true,
       message: 'Test Alert',
       type: 'warning',
       dismissible: true,
-    };
-    mockBannerFetch(mockConfig);
+    });
 
     renderBanner();
 
     await waitFor(() => expect(screen.getByText('Test Alert')).toBeInTheDocument());
-
-    expect(screen.getByText('Test Alert')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveClass('alert-banner--warning');
+  });
+
+  test('renders internal link CTA', async () => {
+    mockBannerFetch({
+      enabled: true,
+      message: 'v1.6 is live',
+      type: 'info',
+      dismissible: true,
+      linkUrl: '/updates',
+      linkLabel: "What's new",
+    });
+
+    renderBanner();
+    await waitFor(() => expect(screen.getByRole('link', { name: "What's new" })).toHaveAttribute('href', '/updates'));
+  });
+
+  test('hides banner before startsAt', async () => {
+    mockBannerFetch({
+      enabled: true,
+      message: 'Future alert',
+      type: 'info',
+      dismissible: true,
+      startsAt: '2099-01-01T00:00:00.000Z',
+    });
+
+    renderBanner();
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
   });
 
   it.each([
@@ -60,21 +87,17 @@ describe('AlertBanner', () => {
   });
 
   test('can be dismissed', async () => {
-    const mockConfig = {
+    mockBannerFetch({
       enabled: true,
       message: 'Dismiss me',
       type: 'error',
       dismissible: true,
-    };
-    mockBannerFetch(mockConfig);
+    });
 
     renderBanner();
 
     await waitFor(() => expect(screen.getByText('Dismiss me')).toBeInTheDocument());
-
-    const closeButton = screen.getByLabelText('Dismiss alert');
-    fireEvent.click(closeButton);
-
+    fireEvent.click(screen.getByLabelText('Dismiss alert'));
     expect(screen.queryByText('Dismiss me')).not.toBeInTheDocument();
   });
 
@@ -95,18 +118,16 @@ describe('AlertBanner', () => {
   });
 
   test('is not dismissible when dismissible is false', async () => {
-    const mockConfig = {
+    mockBannerFetch({
       enabled: true,
       message: 'Permanent',
       type: 'info',
       dismissible: false,
-    };
-    mockBannerFetch(mockConfig);
+    });
 
     renderBanner();
 
     await waitFor(() => expect(screen.getByText('Permanent')).toBeInTheDocument());
-
     expect(screen.queryByLabelText('Dismiss alert')).not.toBeInTheDocument();
   });
 });

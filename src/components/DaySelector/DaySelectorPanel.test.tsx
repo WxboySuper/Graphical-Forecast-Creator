@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import DaySelectorPanel from './DaySelectorPanel';
+import DaySelectorPanel, { getForecastDayFromDigitKeyDown } from './DaySelectorPanel';
 import forecastReducer from '../../store/forecastSlice';
 import type { OutlookDay } from '../../types/outlooks';
 
@@ -109,5 +109,18 @@ describe('DaySelectorPanel', () => {
     fireEvent.click(buttons[buttons.length - 1]);
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(4);
     expect(container.querySelector('.text-center')).toHaveTextContent('15% and 30% only');
+  });
+});
+
+describe('getForecastDayFromDigitKeyDown', () => {
+  it('returns null when the browser omits KeyboardEvent.key', () => {
+    const event = new KeyboardEvent('keydown', { bubbles: true });
+    Object.defineProperty(event, 'key', { value: undefined });
+
+    expect(getForecastDayFromDigitKeyDown(event)).toBeNull();
+  });
+
+  it('returns the matching day for digit keys 1-8', () => {
+    expect(getForecastDayFromDigitKeyDown(new KeyboardEvent('keydown', { key: '3' }))).toBe(3);
   });
 });
