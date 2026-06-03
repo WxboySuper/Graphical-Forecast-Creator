@@ -15,7 +15,7 @@ const getServerPort = (server) => {
 
 describe('analytics server stack (express 5)', () => {
   /** @type {import('node:http').Server | undefined} */
-  let server;
+  let server = undefined;
 
   before(async () => {
     const express = require('express');
