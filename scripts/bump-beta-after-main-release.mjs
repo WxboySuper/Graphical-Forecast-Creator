@@ -1,7 +1,9 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
-import { deriveStableVersion } from './lib/package-version.mjs';
+import { computeBetaVersionAfterMainRelease } from './lib/bump-beta-after-main-release.mjs';
 
 const stableInput = process.argv[2] ?? process.env.STABLE_VERSION ?? '';
+const currentBetaInput =
+  process.argv[3] ?? process.env.CURRENT_BETA_VERSION ?? '';
 const packagePath = 'package.json';
 
 const stable = stableInput.trim();
@@ -10,24 +12,36 @@ if (!stable) {
   process.exit(1);
 }
 
-const normalized = deriveStableVersion(stable) ?? stable;
-const parts = normalized.split('.').map(Number);
-if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
-  console.error(`Invalid stable version "${stable}".`);
-  process.exit(1);
-}
-
-const nextBeta = `${parts[0]}.${parts[1] + 1}.0-beta.1`;
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
-const previous = pkg.version;
-pkg.version = nextBeta;
-writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+const previous = currentBetaInput.trim() || pkg.version;
+const result = computeBetaVersionAfterMainRelease(stable, previous);
 
 const outputPath = process.env.GITHUB_OUTPUT;
 if (outputPath) {
   appendFileSync(outputPath, `previous_beta_version=${previous}\n`);
-  appendFileSync(outputPath, `next_beta_version=${nextBeta}\n`);
-  appendFileSync(outputPath, `stable_version=${normalized}\n`);
+  appendFileSync(outputPath, `next_beta_version=${result.next}\n`);
+  appendFileSync(outputPath, `stable_version=${stable}\n`);
+  appendFileSync(outputPath, `beta_version_changed=${result.changed}\n`);
+  appendFileSync(outputPath, `beta_bump_reason=${result.reason}\n`);
 }
 
-console.log(`Updated beta package.json: ${previous} -> ${nextBeta} (after main release ${normalized})`);
+if (!result.changed) {
+  if (pkg.version !== previous) {
+    pkg.version = previous;
+    writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+    console.log(
+      `Restored beta package.json to ${previous} after merge (main stable ${stable}; ${result.reason})`,
+    );
+  } else {
+    console.log(
+      `Keeping beta package.json at ${previous} (main stable ${stable}; ${result.reason})`,
+    );
+  }
+  process.exit(0);
+}
+
+pkg.version = result.next;
+writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+console.log(
+  `Updated beta package.json: ${previous} -> ${result.next} (after main release ${stable}; ${result.reason})`,
+);

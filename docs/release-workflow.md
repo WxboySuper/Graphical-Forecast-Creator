@@ -41,7 +41,7 @@ If both tried to port the same merge into `beta`, you would get a port PR and a 
 Same outcome as direct **beta → main**, but via a `release/vX.Y.Z` branch from **Prepare Beta → Main Release PR**:
 
 1. Merge the release PR to `main`.
-2. **Post-merge automation** merges **main** into **beta** (so beta always has the same code), creates the **stable GitHub Release**, bumps **beta** to the next line, and publishes a **prerelease** for the new beta version.
+2. **Post-merge automation** merges **main** into **beta** (so beta always has the same code), creates the **stable GitHub Release**, and bumps **beta** using the **pre-merge** beta version (merge must not overwrite `package.json` before the bump script runs). When `main` is still on an older stable line, beta keeps its current prerelease; otherwise beta moves to the next line and publishes a **prerelease**.
 
 Infrastructure fixes that land via `release/*` → `main` (not only `feature/release-*`) use the same **main → beta** merge; version-only bumps are not enough.
 
@@ -62,7 +62,8 @@ Infrastructure fixes that land via `release/*` → `main` (not only `feature/rel
 
 - Merges **main** into **beta** so beta gets workflows/scripts.
 - Creates the **stable GitHub Release** for the version on `main` (e.g. `v1.5.3`) if it is missing.
-- Sets **beta** to the next development line (e.g. main `1.5.3` → beta `1.6.0-beta.1`) and creates the matching **prerelease**.
+- **Does not reset** an in-progress beta line when `main` is still on an older stable (e.g. main `1.5.3` while beta is `1.6.0-beta.N` stays on `1.6.0-beta.N`).
+- Only starts a **new** `X.Y.0-beta.1` line after a **beta → main** promotion (or when `main` stable matches the line beta was building).
 - Does **not** change `main` again (the PR already set the stable version).
 
 If you merged release automation before this step existed, run **Post-merge automation** manually (`workflow_dispatch`, enable **sync beta from main**) to backfill the stable release and start the beta line.

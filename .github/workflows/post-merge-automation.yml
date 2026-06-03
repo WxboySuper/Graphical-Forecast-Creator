@@ -77,20 +77,25 @@ jobs:
 
           git checkout beta
           git pull origin beta
+          BETA_BEFORE=$(node scripts/read-package-version.mjs)
           git merge origin/main -X theirs -m "chore: sync release automation from main"
 
-          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          node scripts/bump-beta-after-main-release.mjs "$STABLE" "$BETA_BEFORE"
           NEXT=$(node scripts/read-package-version.mjs)
 
           git add package.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: start beta cycle at $NEXT after main release v$STABLE"
+          else
+            echo "Beta version unchanged at $NEXT after main v$STABLE (was $BETA_BEFORE)"
           fi
           git push origin beta
 
           export CHANGELOG_FILE=CHANGELOG.md
           export NOTES_FILE=$(mktemp)
-          node scripts/create-github-release.mjs "$NEXT" beta
+          if [ "$NEXT" != "$BETA_BEFORE" ]; then
+            node scripts/create-github-release.mjs "$NEXT" beta
+          fi
 
       - name: Beta promotion merged into main
         if: >-
@@ -128,7 +133,9 @@ jobs:
 
           NEXT=$(node scripts/read-package-version.mjs)
           export NOTES_FILE=$(mktemp)
-          node scripts/create-github-release.mjs "$NEXT" beta
+          if [ "$NEXT" != "$BETA_VERSION" ]; then
+            node scripts/create-github-release.mjs "$NEXT" beta
+          fi
 
       - name: Release branch merged into main
         if: >-
@@ -150,7 +157,7 @@ jobs:
           git pull --ff-only origin beta
           BETA_VERSION=$(node scripts/read-package-version.mjs)
           git merge origin/main -X theirs -m "chore: sync main into beta after release branch merge"
-          node scripts/bump-beta-after-main-release.mjs "$STABLE"
+          node scripts/bump-beta-after-main-release.mjs "$STABLE" "$BETA_VERSION"
           git add package.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: start next beta cycle after v$STABLE main release (was $BETA_VERSION)"
@@ -159,7 +166,11 @@ jobs:
 
           NEXT=$(node scripts/read-package-version.mjs)
           export NOTES_FILE=$(mktemp)
-          node scripts/create-github-release.mjs "$NEXT" beta
+          if [ "$NEXT" != "$BETA_VERSION" ]; then
+            node scripts/create-github-release.mjs "$NEXT" beta
+          else
+            echo "Beta version unchanged at $NEXT after main v$STABLE; skipping beta GitHub release"
+          fi
 
       - name: Hotfix merged into main
         if: >-
