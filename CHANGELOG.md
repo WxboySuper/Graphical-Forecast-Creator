@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 
 ## v1.6
 
+### Dependencies
+<!-- dependabot-automation -->
+
+- **express-rate-limit:** ^8.5.1 → ^8.5.2 (`server`)
+- **express:** ^4.21.2 → ^5.2.1 (`server`)
+- **stripe:** ^22.1.1 → ^22.2.0 (`server`)
+- **@types/node:** ^25.5.0 → ^25.9.1
+- **@types/react-dom:** 18.2.18 → 19.2.3
+- **immer:** ^11.1.4 → ^11.1.8
+- **react-redux:** ^9.2.0 → ^9.3.0
+- **react-router-dom:** ^7.15.1 → ^7.16.0
+- **rollup:** >=4.60.4 → >=4.61.0
+- **@babel/core:** ^7.29.0 → ^7.29.7
+- **@babel/preset-env:** ^7.29.2 → ^7.29.7
+- **@babel/preset-react:** ^7.28.5 → ^7.29.7
+- **@babel/preset-typescript:** ^7.28.5 → ^7.29.7
+- **ts-jest:** ^29.4.9 → ^29.4.11
+- **vite:** ^8.0.14 → ^8.0.16
+- **@sentry/react:** ^10.53.1 → ^10.56.0
+- **@types/react:** 19.2.15 → 19.2.16
+- **firebase:** ^12.12.0 → ^12.14.0
+- **lucide-react:** ^1.16.0 → ^1.17.0
+- **react:** ^19.2.6 → ^19.2.7
+- **react-dom:** ^19.2.6 → ^19.2.7
+- **web-vitals:** ^5.2.0 → ^5.3.0
+- **@sentry/node:** ^10.53.1 → ^10.56.0 (`server`)
+
 ### Added
 - **Monitor (`/monitor`):** Live weather workspace with radar and satellite WMS layers (site and composite modes, opacity, animation speed), read-only overlay of the active forecast cycle / saved local cycles / premium cloud library outlooks, NWS watches-warnings-advisories layer, and storm reports with hazard filters plus optional outlook-type matching. Redux `monitorSlice`, `MonitorControls` / `MonitorMap`, premium settings sync via `usePremiumMonitorSettingsSync`, and navbar route with shortcut.
 - **Monitor — NWS alerts & storm reports:** `useMonitorNwsAlerts` and `useMonitorStormReports` integrations, panel toggles, and map rendering for alert polygons and report markers.
@@ -19,24 +46,6 @@ All notable changes to this project will be documented in this file.
 - **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
 - **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
 
-### Dependencies
-<!-- dependabot-automation -->
-
-- **express-rate-limit:** ^8.5.1 → ^8.5.2 (`server`)
-- **express:** ^4.21.2 → ^5.2.1 (`server`)
-- **stripe:** ^18.4.0 → ^22.1.1 (`server`)
-- **@types/node:** ^25.5.0 → ^25.9.1
-- **@types/react-dom:** 18.2.18 → 19.2.3
-- **immer:** ^11.1.4 → ^11.1.8
-- **react-redux:** ^9.2.0 → ^9.3.0
-- **react-router-dom:** ^7.14.2 → ^7.15.1
-- **rollup:** >=4.60.2 → >=4.60.4
-- **@babel/core:** ^7.29.0 → ^7.29.7
-- **@babel/preset-env:** ^7.29.2 → ^7.29.7
-- **@babel/preset-react:** ^7.28.5 → ^7.29.7
-- **@babel/preset-typescript:** ^7.28.5 → ^7.29.7
-- **ts-jest:** ^29.4.9 → ^29.4.11
-- **vite:** ^8.0.13 → ^8.0.14
 
 ### Fixed
 - **Monitor radar/satellite after theme change:** Keep the OpenLayers map mounted when toggling light/dark mode (update basemap tiles only) and re-apply WMS layers on theme changes so satellite and radar imagery no longer disappear or show “Latest time unavailable” until a full page refresh.
