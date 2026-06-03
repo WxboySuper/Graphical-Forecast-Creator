@@ -74,6 +74,7 @@ export const useLoadWmsLayerFrames = ({
             frameTimes,
             frameIndex: Math.max(0, frameTimes.length - 1),
           });
+          return undefined;
         })
         .catch(() => {
           if (active) {

@@ -18,7 +18,7 @@ export function useFirestoreSleepRecovery(): void {
     const syncFirestoreNetworkToVisibility = (): void => {
       if (document.hidden) {
         disableNetwork(firestore).catch(() => undefined);
-        return undefined;
+        return;
       }
 
       enableNetwork(firestore).catch(() => undefined);

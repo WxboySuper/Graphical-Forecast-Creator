@@ -59,6 +59,7 @@ export const useMonitorCloudOutlook = ({
           ...selectedOption,
           status: 'Cloud outlook could not be loaded.',
         });
+        return undefined;
       });
 
     return () => {

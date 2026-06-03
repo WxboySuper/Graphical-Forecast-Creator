@@ -45,6 +45,7 @@ export const flattenMonitorOutlookFeatures = (
     features.forEach((feature) => {
       items.push({ outlookType, probability, feature });
     });
+    return undefined;
   });
 
   return items;

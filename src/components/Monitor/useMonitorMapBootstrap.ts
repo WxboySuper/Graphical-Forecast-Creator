@@ -198,6 +198,7 @@ export const useMonitorMapBootstrap = ({
         replaceLayerGroupLayers(refs.vectorReferenceGroupRef.current, nextReferenceGroup);
         refs.vectorReferenceGroupRef.current.setZIndex(TOP_VECTOR_REFERENCE_LAYER_Z_INDEX);
         refs.vectorReferenceGroupRef.current.setVisible(true);
+        return undefined;
       })
       .catch(() => undefined);
 
@@ -238,5 +239,6 @@ export const useMonitorMapBootstrap = ({
 
     baseLayer.setSource(createBaseSource(darkMode));
     // refs omitted: wrapper object from useMonitorMapRefs() is new each render.
+    return undefined;
   }, [darkMode]);
 };

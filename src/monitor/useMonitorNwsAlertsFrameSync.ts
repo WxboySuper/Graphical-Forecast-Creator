@@ -18,5 +18,6 @@ export const useMonitorNwsAlertsFrameSync = (
       setFrameIndex(rawFrameCount - 1);
     }
     previousRawFrameCountRef.current = rawFrameCount;
+    return undefined;
   }, [animationEnabled, enabled, rawFrameCount, setFrameIndex]);
 };
