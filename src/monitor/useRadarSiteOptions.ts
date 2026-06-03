@@ -14,7 +14,6 @@ export const useRadarSiteOptions = () => {
       .then((options) => {
         if (active) {
           setSites(options);
-          setError(undefined);
         }
       })
       .catch(() => {
