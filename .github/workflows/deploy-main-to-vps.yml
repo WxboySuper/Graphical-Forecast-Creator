@@ -257,6 +257,7 @@ jobs:
             /var/www/gfc-staging/releases \
             /opt/gfc-analytics/releases \
             /opt/gfc-analytics/config \
+            /opt/gfc-staging-analytics/releases \
             /opt/gfc-staging-analytics/config \
             /opt/gfc-staging-analytics/logs"
 

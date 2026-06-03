@@ -14,6 +14,7 @@ mkdir -p /var/www/gfc-staging/releases
 mkdir -p /opt/gfc-analytics/releases
 mkdir -p /opt/gfc-analytics/config
 mkdir -p /opt/gfc-analytics/logs
+mkdir -p /opt/gfc-staging-analytics/releases
 mkdir -p /opt/gfc-staging-analytics/config
 mkdir -p /opt/gfc-staging-analytics/logs
 
