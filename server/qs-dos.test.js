@@ -8,7 +8,7 @@ describe('qs dependency (Dependabot #125 DoS fix)', () => {
     const qsPackage = require('qs/package.json');
     const [major, minor, patch] = qsPackage.version.split('.').map(Number);
     assert.ok(
-      major > 6 || (major === 6 && minor > 14) || (major === 6 && minor === 14 && patch >= 0),
+      major > 6 || (major === 6 && minor >= 15),
       `qs must be >=6.15.0 to fix the arrayFormat:"comma" + encodeValuesOnly DoS, found ${qsPackage.version}`,
     );
     // Lock to the exact fixed line we ship (6.15.2) so a future regression is caught.
