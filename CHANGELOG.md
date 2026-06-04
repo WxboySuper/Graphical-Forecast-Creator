@@ -31,6 +31,7 @@ All notable changes to this project will be documented in this file.
 - **react-dom:** ^19.2.6 → ^19.2.7
 - **web-vitals:** ^5.2.0 → ^5.3.0
 - **@sentry/node:** ^10.53.1 → ^10.56.0 (`server`)
+- **qs:** ^6.14.2 → ^6.15.2 (override; `server` and root)
 
 ### Added
 - **Monitor (`/monitor`):** Live weather workspace with radar and satellite WMS layers (site and composite modes, opacity, animation speed), read-only overlay of the active forecast cycle / saved local cycles / premium cloud library outlooks, NWS watches-warnings-advisories layer, and storm reports with hazard filters plus optional outlook-type matching. Redux `monitorSlice`, `MonitorControls` / `MonitorMap`, premium settings sync via `usePremiumMonitorSettingsSync`, and navbar route with shortcut.
@@ -60,6 +61,7 @@ All notable changes to this project will be documented in this file.
 - **Safari overnight IndexedDB disconnects:** Switched hosted Firestore to an in-memory local cache so Safari/macOS sleep no longer hits WebKit’s “Connection to Indexed Database server lost” error from Firestore’s default IndexedDB persistence. Pauses Firestore network sync while the tab is hidden and resumes it on wake to reduce failures on long-lived forecast editor tabs.
 - **GFC-WEB-6 (auto-save/export crash):** Added runtime guards in `mapToArray` and `arrayToMap` so `serializeForecast`/`deserializeForecast` return fallback values instead of crashing when `OutlookData` Map fields are plain objects at runtime.
 - **GFC-WEB-7 (auto-categorical crash):** Coerce legacy plain-object probability maps to `Map` before auto-categorical iteration so `/forecast` no longer throws `forEach is not a function` when loading old saved cycles from localStorage.
+- **qs DoS in `stringify` (Dependabot #125):** Bumped the transitive `qs` override from `^6.14.2` to `^6.15.2` (root `pnpm.overrides` and a new `server` npm override) so `qs.stringify` no longer throws `TypeError` on null/undefined entries in comma-format arrays when `encodeValuesOnly` is set. Affects the analytics server's Express 5 / `body-parser` chain.
 ## v1.5.3
 
 ### Changed
