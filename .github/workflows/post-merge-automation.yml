@@ -180,6 +180,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          set -euo pipefail
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
@@ -207,7 +208,7 @@ jobs:
           NODE
           git add package.json
           git add deploy/production-release.json
-          git commit -m "chore: bump patch version after hotfix merge (was $PREVIOUS)"
+          git commit -m "chore: bump patch version and go live after hotfix merge (was $PREVIOUS)"
           git push origin main
 
           export NOTES_FILE=$(mktemp)
