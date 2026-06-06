@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
-import { disableNetwork, enableNetwork } from 'firebase/firestore';
+import {
+  disableNetwork,
+  enableNetwork,
+  waitForPendingWrites,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 /**
@@ -13,21 +17,38 @@ export function useFirestoreSleepRecovery(): void {
     }
 
     const firestore = db;
+    let isTransitioning = false;
 
     /** Pauses or resumes Firestore sync to match current tab visibility. */
-    const syncFirestoreNetworkToVisibility = (): void => {
+    const syncFirestoreNetworkToVisibility = async (): Promise<void> => {
+      if (isTransitioning) return;
+
       if (document.hidden) {
-        disableNetwork(firestore).catch(() => undefined);
+        isTransitioning = true;
+        try {
+          // Wait for pending writes before disabling network to prevent data loss or 
+          // aggressive disconnection during active sync (GFC-WEB-A).
+          await waitForPendingWrites(firestore);
+          await disableNetwork(firestore);
+        } catch {
+          // Ignore failures (e.g. if already disabled or network lost)
+        } finally {
+          isTransitioning = false;
+        }
         return;
       }
 
-      enableNetwork(firestore).catch(() => undefined);
+      try {
+        await enableNetwork(firestore);
+      } catch {
+        // Ignore failures
+      }
     };
 
-    syncFirestoreNetworkToVisibility();
-    document.addEventListener('visibilitychange', syncFirestoreNetworkToVisibility);
+    syncFirestoreNetworkToVisibility().catch(() => undefined);
+    document.addEventListener('visibilitychange', syncFirestoreNetworkToVisibility as any);
     return () => {
-      document.removeEventListener('visibilitychange', syncFirestoreNetworkToVisibility);
+      document.removeEventListener('visibilitychange', syncFirestoreNetworkToVisibility as any);
     };
   }, []);
 }
