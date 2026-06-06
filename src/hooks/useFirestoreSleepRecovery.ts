@@ -18,16 +18,34 @@ export function useFirestoreSleepRecovery(): void {
 
     const firestore = db;
     let pendingTransition: Promise<void> | null = null;
+    let destroyed = false;
+    const PENDING_WRITES_TIMEOUT_MS = 5_000;
+
+    const waitForPendingWritesWithTimeout = async (): Promise<void> => {
+      await Promise.race([
+        waitForPendingWrites(firestore),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, PENDING_WRITES_TIMEOUT_MS);
+        }),
+      ]);
+    };
 
     /**
      * Pauses or resumes Firestore sync based on visibility.
      * Handles race conditions to ensure the network state matches the final document state.
      */
     const updateNetworkState = async (): Promise<void> => {
+      if (destroyed) {
+        return;
+      }
+
       // If we are hidden, wait for writes then disable.
       if (document.hidden) {
         try {
-          await waitForPendingWrites(firestore);
+          await waitForPendingWritesWithTimeout();
+          if (destroyed) {
+            return;
+          }
           // Only disable if we are still hidden after the wait.
           if (document.hidden) {
             await disableNetwork(firestore);
@@ -38,6 +56,9 @@ export function useFirestoreSleepRecovery(): void {
       } else {
         // If visible, just enable.
         try {
+          if (destroyed) {
+            return;
+          }
           await enableNetwork(firestore);
         } catch {
           // Ignore failures
@@ -51,6 +72,10 @@ export function useFirestoreSleepRecovery(): void {
      */
     const handleVisibilityChange = (): void => {
       const runTransition = async (): Promise<void> => {
+        if (destroyed) {
+          return;
+        }
+
         // Wait for any existing transition to finish first.
         if (pendingTransition) {
           try {
@@ -59,6 +84,11 @@ export function useFirestoreSleepRecovery(): void {
             // Ignore previous errors
           }
         }
+
+        if (destroyed) {
+          return;
+        }
+
         pendingTransition = updateNetworkState();
         await pendingTransition;
       };
@@ -74,6 +104,7 @@ export function useFirestoreSleepRecovery(): void {
     handleVisibilityChange();
 
     return () => {
+      destroyed = true;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);

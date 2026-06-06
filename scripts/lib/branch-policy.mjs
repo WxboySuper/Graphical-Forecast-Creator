@@ -42,15 +42,12 @@ const evaluateMainTarget = (headRef) => {
   if (RELEASE_INFRA_BRANCH_PATTERN.test(headRef)) {
     return { ok: true, kind: 'release-infrastructure' };
   }
-  if (isFixBranch(headRef)) {
-    return { ok: true, kind: 'fix' };
-  }
   if (isFeatureBranch(headRef)) {
     return { ok: false, message: 'feature/* branches must merge into beta, not main.' };
   }
   return {
     ok: false,
-    message: `Branch "${headRef}" cannot target main. Use beta (promotion), fix/*, hotfix/*, or release/*.`,
+    message: `Branch "${headRef}" cannot target main. Use beta (promotion), hotfix/*, or release/*.`,
   };
 };
 

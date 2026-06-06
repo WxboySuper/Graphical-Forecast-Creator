@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import {
   disableNetwork,
   enableNetwork,
@@ -23,6 +23,7 @@ jest.mock('../lib/firebase', () => ({
 describe('useFirestoreSleepRecovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
     mockDb = { name: 'mock-db' };
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
   });
@@ -121,5 +122,53 @@ describe('useFirestoreSleepRecovery', () => {
     });
 
     expect(disableNetwork).not.toHaveBeenCalled();
+  });
+
+  it('times out pending writes and disables the network while hidden', async () => {
+    jest.useFakeTimers();
+    (waitForPendingWrites as jest.Mock).mockImplementation(
+      () => new Promise<void>(() => {}),
+    );
+
+    renderHook(() => useFirestoreSleepRecovery());
+
+    await waitFor(() => {
+      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+    });
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5_000);
+    });
+
+    await waitFor(() => {
+      expect(disableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+    });
+  });
+
+  it('stops pending transitions after unmount', async () => {
+    jest.useFakeTimers();
+    (waitForPendingWrites as jest.Mock).mockImplementation(
+      () => new Promise<void>(() => {}),
+    );
+
+    const { unmount } = renderHook(() => useFirestoreSleepRecovery());
+
+    await waitFor(() => {
+      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+    });
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    unmount();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(disableNetwork).not.toHaveBeenCalled();
+    expect(enableNetwork).toHaveBeenCalledTimes(1);
   });
 });
