@@ -1,6 +1,10 @@
 {
   "name": "graphical-forecast-creator",
+<<<<<<< HEAD
   "version": "1.7.0-beta.1",
+=======
+  "version": "1.6.1",
+>>>>>>> 5a8a0d3 (fix: make hotfix deploys go live on main)
   "private": true,
   "engines": {
     "node": ">=22.12.0 <23 || >=24 <26"
