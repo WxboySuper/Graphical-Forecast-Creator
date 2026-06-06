@@ -19,6 +19,12 @@ describe('branch policy', () => {
     assert.equal(result.ok, true);
   });
 
+  it('allows fix branches to main', () => {
+    const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/sentry-firebase-issues' });
+    assert.equal(result.ok, true);
+    assert.equal(result.kind, 'fix');
+  });
+
   it('prioritizes feature to beta', () => {
     const result = evaluateBranchPolicy({ baseRef: 'beta', headRef: 'feature/foo' });
     assert.equal(result.ok, true);
