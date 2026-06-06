@@ -6,7 +6,7 @@ name: Post-merge automation
 # beta → main: strip stable on main, release vX.Y.Z, start next beta line + prerelease for new beta.
 # release/* → main: merge main into beta, stable release + next beta line + prerelease.
 # feature/*|fix/*|other → beta: bump -beta.N and prerelease vX.Y.Z-beta.N.
-# hotfix/*|fix/* → main: patch bump on main + stable release.
+# hotfix/* → main: patch bump on main + stable release.
 # feature/release-*|workflow_dispatch: sync main→beta, stable release for main, prerelease for new beta.
 #
 # Required secret: GH_PAT (repo scope)
@@ -176,8 +176,7 @@ jobs:
         if: >-
           github.event_name == 'pull_request' &&
           github.event.pull_request.base.ref == 'main' &&
-          (startsWith(github.event.pull_request.head.ref, 'hotfix/') ||
-            startsWith(github.event.pull_request.head.ref, 'fix/'))
+          startsWith(github.event.pull_request.head.ref, 'hotfix/')
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
