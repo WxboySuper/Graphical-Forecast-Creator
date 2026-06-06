@@ -17,38 +17,64 @@ export function useFirestoreSleepRecovery(): void {
     }
 
     const firestore = db;
-    let isTransitioning = false;
+    let pendingTransition: Promise<void> | null = null;
 
-    /** Pauses or resumes Firestore sync to match current tab visibility. */
-    const syncFirestoreNetworkToVisibility = async (): Promise<void> => {
-      if (isTransitioning) return;
-
+    /**
+     * Pauses or resumes Firestore sync based on visibility.
+     * Handles race conditions to ensure the network state matches the final document state.
+     */
+    const updateNetworkState = async (): Promise<void> => {
+      // If we are hidden, wait for writes then disable.
       if (document.hidden) {
-        isTransitioning = true;
         try {
-          // Wait for pending writes before disabling network to prevent data loss or 
-          // aggressive disconnection during active sync (GFC-WEB-A).
           await waitForPendingWrites(firestore);
-          await disableNetwork(firestore);
+          // Only disable if we are still hidden after the wait.
+          if (document.hidden) {
+            await disableNetwork(firestore);
+          }
         } catch {
-          // Ignore failures (e.g. if already disabled or network lost)
-        } finally {
-          isTransitioning = false;
+          // Ignore failures
         }
-        return;
-      }
-
-      try {
-        await enableNetwork(firestore);
-      } catch {
-        // Ignore failures
+      } else {
+        // If visible, just enable.
+        try {
+          await enableNetwork(firestore);
+        } catch {
+          // Ignore failures
+        }
       }
     };
 
-    syncFirestoreNetworkToVisibility().catch(() => undefined);
-    document.addEventListener('visibilitychange', syncFirestoreNetworkToVisibility as any);
+    /**
+     * Serializes transitions to avoid race conditions where a 'disable'
+     * call finishes after a user has already returned to the tab.
+     */
+    const handleVisibilityChange = (): void => {
+      const runTransition = async (): Promise<void> => {
+        // Wait for any existing transition to finish first.
+        if (pendingTransition) {
+          try {
+            await pendingTransition;
+          } catch {
+            // Ignore previous errors
+          }
+        }
+        pendingTransition = updateNetworkState();
+        await pendingTransition;
+      };
+
+      runTransition().catch(() => {
+        // Final fallback for the serialized chain
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Initial sync
+    handleVisibilityChange();
+
     return () => {
-      document.removeEventListener('visibilitychange', syncFirestoreNetworkToVisibility as any);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 }
