@@ -180,14 +180,35 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          set -euo pipefail
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
           PREVIOUS=$(node scripts/read-package-version.mjs)
           node scripts/apply-version-bump.mjs main
           STABLE=$(node scripts/read-package-version.mjs)
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const manifestPath = 'deploy/production-release.json';
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
+
+          const liveManifest = {
+            ...manifest,
+            releaseId: `v${version}`,
+            version,
+            action: 'live',
+            status: 'live',
+          };
+
+          delete liveManifest.rolloutAt;
+          delete liveManifest.banner;
+
+          fs.writeFileSync(manifestPath, `${JSON.stringify(liveManifest, null, 2)}\n`);
+          NODE
           git add package.json
-          git commit -m "chore: bump patch version after hotfix merge (was $PREVIOUS)"
+          git add deploy/production-release.json
+          git commit -m "chore: bump patch version and go live after hotfix merge (was $PREVIOUS)"
           git push origin main
 
           export NOTES_FILE=$(mktemp)
