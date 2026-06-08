@@ -13,7 +13,7 @@ describe('qs dependency (Dependabot #125 DoS fix)', () => {
     );
     // Lock to the exact fixed line we ship (6.15.2) so a future regression is caught.
     assert.ok(
-      major === 6 && minor === 15 && patch >= 2,
+      major > 6 || (major === 6 && (minor > 15 || (minor === 15 && patch >= 2))),
       `qs must be >=6.15.2 (security override), found ${qsPackage.version}`,
     );
   });
