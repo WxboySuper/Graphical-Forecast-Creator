@@ -1,29 +1,7 @@
 {
-  "releaseId": "v1.6.0-rollout-1",
-  "version": "1.6.0",
-  "rolloutAt": "2026-06-04T20:00:00.000Z",
-  "action": "stage",
-  "status": "scheduled",
-  "strategy": "instant",
-  "banner": {
-    "phases": [
-      {
-        "id": "v1.6-teaser",
-        "message": "v1.6 goes live Wednesday, June 4 at 3:00 PM Central. Brief downtime is possible during the update.",
-        "type": "warning",
-        "dismissible": true,
-        "expiresAt": "2026-06-04T20:00:00.000Z"
-      },
-      {
-        "id": "v1.6-live",
-        "message": "v1.6 is live — meet the new Monitor workspace.",
-        "type": "info",
-        "dismissible": true,
-        "startsAt": "2026-06-04T20:00:00.000Z",
-        "expiresAt": "2026-06-11T20:00:00.000Z",
-        "linkUrl": "/updates",
-        "linkLabel": "What's new"
-      }
-    ]
-  }
+  "releaseId": "v1.6.3",
+  "version": "1.6.3",
+  "action": "live",
+  "status": "live",
+  "strategy": "instant"
 }

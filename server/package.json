@@ -6,7 +6,7 @@
   "main": "analytics.js",
   "scripts": {
     "start": "node analytics.js",
-    "test": "node --test billing-stripe-period.test.js server-stack.test.js"
+    "test": "node --test billing-stripe-period.test.js qs-dos.test.js server-stack.test.js"
   },
   "dependencies": {
     "@sentry/node": "^10.56.0",
@@ -19,7 +19,8 @@
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "@tootallnate/once": "3.0.1",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "qs": "^6.15.2"
   },
   "engines": {
     "node": ">=18"
