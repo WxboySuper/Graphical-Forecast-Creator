@@ -11,12 +11,12 @@ All notable changes to this project will be documented in this file.
 - **express-rate-limit:** ^8.5.1 → ^8.5.2 (`server`)
 - **express:** ^4.21.2 → ^5.2.1 (`server`)
 - **stripe:** ^22.1.1 → ^22.2.0 (`server`)
-- **@types/node:** ^25.5.0 → ^25.9.1
+- **@types/node:** ^25.9.1 → ^25.9.2
 - **@types/react-dom:** 18.2.18 → 19.2.3
 - **immer:** ^11.1.4 → ^11.1.8
 - **react-redux:** ^9.2.0 → ^9.3.0
-- **react-router-dom:** ^7.15.1 → ^7.16.0
-- **rollup:** >=4.60.4 → >=4.61.0
+- **react-router-dom:** ^7.16.0 → ^7.17.0
+- **rollup:** >=4.61.0 → >=4.61.1
 - **@babel/core:** ^7.29.0 → ^7.29.7
 - **@babel/preset-env:** ^7.29.2 → ^7.29.7
 - **@babel/preset-react:** ^7.28.5 → ^7.29.7
@@ -24,13 +24,20 @@ All notable changes to this project will be documented in this file.
 - **ts-jest:** ^29.4.9 → ^29.4.11
 - **vite:** ^8.0.14 → ^8.0.16
 - **@sentry/react:** ^10.53.1 → ^10.56.0
-- **@types/react:** 19.2.15 → 19.2.16
+- **@types/react:** 19.2.16 → 19.2.17
 - **firebase:** ^12.12.0 → ^12.14.0
 - **lucide-react:** ^1.16.0 → ^1.17.0
 - **react:** ^19.2.6 → ^19.2.7
 - **react-dom:** ^19.2.6 → ^19.2.7
 - **web-vitals:** ^5.2.0 → ^5.3.0
 - **@sentry/node:** ^10.53.1 → ^10.56.0 (`server`)
+- **@radix-ui/react-dialog:** ^1.1.15 → ^1.1.16
+- **@radix-ui/react-dropdown-menu:** ^2.1.16 → ^2.1.17
+- **@radix-ui/react-popover:** ^1.1.15 → ^1.1.16
+- **@radix-ui/react-slot:** ^1.2.4 → ^1.2.5
+- **@radix-ui/react-tabs:** ^1.1.13 → ^1.1.14
+- **@radix-ui/react-tooltip:** ^1.2.8 → ^1.2.9
+
 
 ### Added
 - **Monitor (`/monitor`):** Live weather workspace with radar and satellite WMS layers (site and composite modes, opacity, animation speed), read-only overlay of the active forecast cycle / saved local cycles / premium cloud library outlooks, NWS watches-warnings-advisories layer, and storm reports with hazard filters plus optional outlook-type matching. Redux `monitorSlice`, `MonitorControls` / `MonitorMap`, premium settings sync via `usePremiumMonitorSettingsSync`, and navbar route with shortcut.
