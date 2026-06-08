@@ -3,7 +3,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.7.0-beta.1
+## v1.6.1
 
 ### Dependencies
 - **qs:** ^6.14.2 → ^6.15.2 (override; `server` and root)
@@ -26,7 +26,7 @@ All notable changes to this project will be documented in this file.
 - **immer:** ^11.1.4 → ^11.1.8
 - **react-redux:** ^9.2.0 → ^9.3.0
 - **react-router-dom:** ^7.15.1 → ^7.16.0
-- **rollup:** >=4.61.0 → >=4.61.0
+- **rollup:** >=4.60.4 → >=4.61.0
 - **@babel/core:** ^7.29.0 → ^7.29.7
 - **@babel/preset-env:** ^7.29.2 → ^7.29.7
 - **@babel/preset-react:** ^7.28.5 → ^7.29.7
@@ -36,7 +36,7 @@ All notable changes to this project will be documented in this file.
 - **@sentry/react:** ^10.53.1 → ^10.56.0
 - **@types/react:** 19.2.15 → 19.2.16
 - **firebase:** ^12.12.0 → ^12.14.0
-- **lucide-react:** ^1.17.0 → ^1.17.0
+- **lucide-react:** ^1.16.0 → ^1.17.0
 - **react:** ^19.2.6 → ^19.2.7
 - **react-dom:** ^19.2.6 → ^19.2.7
 - **web-vitals:** ^5.2.0 → ^5.3.0

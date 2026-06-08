@@ -20,58 +20,64 @@ jest.mock('../lib/firebase', () => ({
   },
 }));
 
+const firestoreDb = { name: 'mock-db' };
+
+const renderRecoveryHook = () => renderHook(() => useFirestoreSleepRecovery());
+
+const waitForInitialEnable = async () => {
+  await waitFor(() => {
+    expect(enableNetwork).toHaveBeenCalledWith(firestoreDb);
+  });
+};
+
+const setHidden = (hidden: boolean) => {
+  Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+
 describe('useFirestoreSleepRecovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
-    mockDb = { name: 'mock-db' };
-    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    mockDb = firestoreDb;
+    setHidden(false);
   });
 
   it('disables Firestore network when the tab is hidden', async () => {
-    renderHook(() => useFirestoreSleepRecovery());
+    renderRecoveryHook();
+    await waitForInitialEnable();
+
+    setHidden(true);
 
     await waitFor(() => {
-      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
-    });
-
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-    document.dispatchEvent(new Event('visibilitychange'));
-
-    await waitFor(() => {
-      expect(disableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+      expect(disableNetwork).toHaveBeenCalledWith(firestoreDb);
     });
   });
 
   it('re-enables Firestore network when the tab becomes visible', async () => {
-    renderHook(() => useFirestoreSleepRecovery());
+    renderRecoveryHook();
+    await waitForInitialEnable();
+
+    setHidden(true);
 
     await waitFor(() => {
-      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+      expect(disableNetwork).toHaveBeenCalledWith(firestoreDb);
     });
 
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-    document.dispatchEvent(new Event('visibilitychange'));
+    setHidden(false);
 
     await waitFor(() => {
-      expect(disableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
-    });
-
-    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
-    document.dispatchEvent(new Event('visibilitychange'));
-
-    await waitFor(() => {
-      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+      expect(enableNetwork).toHaveBeenCalledWith(firestoreDb);
     });
   });
 
   it('disables Firestore network on mount when the tab is already hidden', async () => {
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    setHidden(true);
 
-    renderHook(() => useFirestoreSleepRecovery());
+    renderRecoveryHook();
 
     await waitFor(() => {
-      expect(disableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+      expect(disableNetwork).toHaveBeenCalledWith(firestoreDb);
       expect(enableNetwork).not.toHaveBeenCalled();
     });
   });
@@ -79,10 +85,9 @@ describe('useFirestoreSleepRecovery', () => {
   it('does nothing when Firestore is not configured', async () => {
     mockDb = null;
 
-    renderHook(() => useFirestoreSleepRecovery());
+    renderRecoveryHook();
 
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-    document.dispatchEvent(new Event('visibilitychange'));
+    setHidden(true);
 
     await waitFor(() => {
       expect(disableNetwork).not.toHaveBeenCalled();
@@ -99,26 +104,20 @@ describe('useFirestoreSleepRecovery', () => {
         }),
     );
 
-    renderHook(() => useFirestoreSleepRecovery());
+    renderRecoveryHook();
+    await waitForInitialEnable();
+
+    setHidden(true);
 
     await waitFor(() => {
-      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+      expect(waitForPendingWrites).toHaveBeenCalledWith(firestoreDb);
     });
 
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-    document.dispatchEvent(new Event('visibilitychange'));
-
-    await waitFor(() => {
-      expect(waitForPendingWrites).toHaveBeenCalledWith({ name: 'mock-db' });
-    });
-
-    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
-    document.dispatchEvent(new Event('visibilitychange'));
-
+    setHidden(false);
     resolvePendingWrites?.();
 
     await waitFor(() => {
-      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+      expect(enableNetwork).toHaveBeenCalledWith(firestoreDb);
     });
 
     expect(disableNetwork).not.toHaveBeenCalled();
@@ -130,21 +129,17 @@ describe('useFirestoreSleepRecovery', () => {
       () => new Promise<void>(() => {}),
     );
 
-    renderHook(() => useFirestoreSleepRecovery());
+    renderRecoveryHook();
+    await waitForInitialEnable();
 
-    await waitFor(() => {
-      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
-    });
-
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-    document.dispatchEvent(new Event('visibilitychange'));
+    setHidden(true);
 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(5_000);
     });
 
     await waitFor(() => {
-      expect(disableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
+      expect(disableNetwork).toHaveBeenCalledWith(firestoreDb);
     });
   });
 
@@ -154,14 +149,10 @@ describe('useFirestoreSleepRecovery', () => {
       () => new Promise<void>(() => {}),
     );
 
-    const { unmount } = renderHook(() => useFirestoreSleepRecovery());
+    const { unmount } = renderRecoveryHook();
+    await waitForInitialEnable();
 
-    await waitFor(() => {
-      expect(enableNetwork).toHaveBeenCalledWith({ name: 'mock-db' });
-    });
-
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-    document.dispatchEvent(new Event('visibilitychange'));
+    setHidden(true);
     unmount();
 
     await act(async () => {

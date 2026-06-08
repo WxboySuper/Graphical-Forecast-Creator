@@ -17,10 +17,14 @@ export function useFirestoreSleepRecovery(): void {
     }
 
     const firestore = db;
-    let pendingTransition: Promise<void> | null = null;
+    let transitionQueue = Promise.resolve();
     let destroyed = false;
     const PENDING_WRITES_TIMEOUT_MS = 5_000;
 
+    /**
+     * Waits for Firestore to flush writes, but gives up after a short delay so
+     * a hidden tab can still disconnect instead of hanging forever.
+     */
     const waitForPendingWritesWithTimeout = async (): Promise<void> => {
       await Promise.race([
         waitForPendingWrites(firestore),
@@ -39,31 +43,46 @@ export function useFirestoreSleepRecovery(): void {
         return;
       }
 
-      // If we are hidden, wait for writes then disable.
-      if (document.hidden) {
+      if (!document.hidden) {
         try {
-          await waitForPendingWritesWithTimeout();
-          if (destroyed) {
-            return;
-          }
-          // Only disable if we are still hidden after the wait.
-          if (document.hidden) {
-            await disableNetwork(firestore);
-          }
-        } catch {
-          // Ignore failures
-        }
-      } else {
-        // If visible, just enable.
-        try {
-          if (destroyed) {
-            return;
-          }
           await enableNetwork(firestore);
         } catch {
           // Ignore failures
         }
+        return;
       }
+
+      try {
+        await waitForPendingWritesWithTimeout();
+        if (destroyed || !document.hidden) {
+          return;
+        }
+
+        await disableNetwork(firestore);
+      } catch {
+        // Ignore failures
+      }
+    };
+
+    /**
+     * Runs one visibility transition at a time so late tab events cannot
+     * overwrite the queue state that a newer event is waiting on.
+     */
+    const runTransition = async (): Promise<void> => {
+      if (destroyed) {
+        return;
+      }
+
+      const nextTransition = transitionQueue.then(async () => {
+        if (destroyed) {
+          return;
+        }
+
+        await updateNetworkState();
+      });
+
+      transitionQueue = nextTransition.catch(() => undefined);
+      await nextTransition;
     };
 
     /**
@@ -71,35 +90,13 @@ export function useFirestoreSleepRecovery(): void {
      * call finishes after a user has already returned to the tab.
      */
     const handleVisibilityChange = (): void => {
-      const runTransition = async (): Promise<void> => {
-        if (destroyed) {
-          return;
-        }
-
-        // Wait for any existing transition to finish first.
-        if (pendingTransition) {
-          try {
-            await pendingTransition;
-          } catch {
-            // Ignore previous errors
-          }
-        }
-
-        if (destroyed) {
-          return;
-        }
-
-        pendingTransition = updateNetworkState();
-        await pendingTransition;
-      };
-
       runTransition().catch(() => {
         // Final fallback for the serialized chain
       });
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     // Initial sync
     handleVisibilityChange();
 
