@@ -222,6 +222,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          set -euo pipefail
           git fetch origin main beta
           git show origin/main:package.json > /tmp/main-package.json
           STABLE=$(node scripts/read-package-version.mjs /tmp/main-package.json)
