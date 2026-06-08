@@ -32,7 +32,7 @@ describe('port PR policy', () => {
     assert.equal(postMergeOwnsMainToBetaSync('beta'), true);
     assert.equal(postMergeOwnsMainToBetaSync('release/v1.0.0'), true);
     assert.equal(postMergeOwnsMainToBetaSync('feature/release-post-merge-github-release'), true);
-    assert.equal(postMergeOwnsMainToBetaSync('hotfix/urgent'), false);
+    assert.equal(postMergeOwnsMainToBetaSync('hotfix/urgent'), true);
   });
 
   it('detects redundant beta port PRs', () => {
@@ -52,7 +52,7 @@ describe('port PR policy', () => {
         sourcePrBaseRef: 'main',
         sourcePrHeadRef: 'hotfix/patch',
       }),
-      false,
+      true,
     );
   });
 
@@ -68,7 +68,7 @@ describe('port PR policy', () => {
     assert.equal(result.ok, false);
   });
 
-  it('allows hotfix ports into beta', () => {
+  it('blocks hotfix ports into beta', () => {
     const result = evaluatePortPrPolicy({
       headRef: 'port/99-to-beta',
       baseRef: 'beta',
@@ -77,6 +77,6 @@ describe('port PR policy', () => {
       sourcePrBaseRef: 'main',
       sourcePrNumber: 99,
     });
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
   });
 });

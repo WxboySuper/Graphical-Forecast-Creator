@@ -3,6 +3,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.1
+
+### Dependencies
+- **qs:** ^6.14.2 → ^6.15.2 (override; `server` and root)
+
+### Fixed
+- **GFC-WEB-B (Auth Persistence):** Explicitly set `browserLocalPersistence` for Firebase Auth to prevent session drops.
+- **GFC-WEB-A (Firestore Sync):** Aggressive background network disconnection now waits for pending writes and uses a serialized transition pattern to prevent race conditions.
+- **qs DoS in `stringify` (Dependabot #125):** Bumped `qs` to `^6.15.2` in root and analytics server to resolve the array-format DoS vulnerability.
+
 ## v1.6
 
 ### Dependencies
