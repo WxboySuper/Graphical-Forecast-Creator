@@ -34,7 +34,8 @@ export const targetBranchFromSlug = (slug) => {
 export const postMergeOwnsMainToBetaSync = (sourceHeadRef) =>
   sourceHeadRef === 'beta' ||
   sourceHeadRef.startsWith('release/') ||
-  sourceHeadRef.startsWith('feature/release-');
+  sourceHeadRef.startsWith('feature/release-') ||
+  sourceHeadRef.startsWith('hotfix/');
 
 /**
  * @param {{

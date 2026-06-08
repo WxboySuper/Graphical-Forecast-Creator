@@ -19,11 +19,11 @@ Two automations run on merged PRs; they are split on purpose:
 | Responsibility | Workflow | Mechanism |
 |----------------|----------|-----------|
 | **Versions and GitHub Releases** on `main` / `beta` | `post-merge-automation.yml` | Direct commits to `main` or `beta` |
-| **main → beta sync** after promotion, `release/*`, or `feature/release-*` | `post-merge-automation.yml` | Merge/bump on `beta` (no port PR) |
-| **hotfix → beta** (commits only) | `pr-porting.yml` | Port PR into `beta` |
+| **main → beta sync** after promotion, `release/*`, `feature/release-*`, or `hotfix/*` | `post-merge-automation.yml` | Merge/bump on `beta` (no port PR) |
+| **hotfix → beta** (commits only) | `pr-porting.yml` | Port PRs to other feature/hotfix branches, not `beta` |
 | **Fan-out to other `feature/*` / `hotfix/*`** | `pr-porting.yml` | Port PRs per target branch |
 
-If both tried to port the same merge into `beta`, you would get a port PR and a CI push fighting each other. **PR porting skips `beta`** when post-merge already owns that sync. CI **fails** new `port/* → beta` PRs that duplicate that path.
+If both tried to port the same merge into `beta`, you would get a port PR and a CI push fighting each other. **PR porting skips `beta`** when post-merge already owns that sync, including hotfix merges. CI **fails** new `port/* → beta` PRs that duplicate that path.
 
 ## What happens when you merge
 
@@ -57,6 +57,7 @@ Infrastructure fixes that land via `release/*` → `main` (not only `feature/rel
 
 - Automation bumps the **patch** on `main` after merge (e.g. `1.6.0` → `1.6.1`).
 - Creates a **GitHub Release** for the new patch version from `CHANGELOG.md`.
+- Post-merge automation then merges **main** into **beta** so beta picks up the hotfix code without a redundant port PR.
 
 ### `feature/release-*` → main (release infrastructure)
 
@@ -79,7 +80,7 @@ If you merged release automation before this step existed, run **Post-merge auto
 | `beta` | `main` | Yes (promotion) |
 | `feature/release-*` | `main` | Yes (release infrastructure) |
 | `feature/*`, `fix/*`, other | `main` | **Blocked** |
-| `hotfix/*` | `beta` | **Blocked** |
+| `hotfix/*` | `beta` | **Blocked** (beta sync is handled after the `main` merge) |
 
 `main` and `beta` are protected; direct pushes are already restricted.
 
