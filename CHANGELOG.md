@@ -4,9 +4,9 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
-
 ### Dependencies
-- **@types/node** ^25.9.1 → ^25.9.2
+<!-- dependabot-automation -->
+
 - **react-router-dom:** ^7.16.0 → ^7.17.0
 - **rollup:** >=4.61.0 → >=4.61.1
 - **@types/react:** 19.2.16 → 19.2.17
@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - **@radix-ui/react-slot:** ^1.2.4 → ^1.2.5
 - **@radix-ui/react-tabs:** ^1.1.13 → ^1.1.14
 - **@radix-ui/react-tooltip:** ^1.2.8 → ^1.2.9
+- **@types/node:** ^25.9.1 → ^25.9.2
 
 ## v1.6.1
 
