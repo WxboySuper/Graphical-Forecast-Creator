@@ -101,4 +101,72 @@ describe('dependabot changelog', () => {
       /`server`/,
     );
   });
+
+  it('finds Unreleased without brackets as the active section', () => {
+    const changelog = `# Changelog
+
+## Unreleased
+
+### Changed
+- Something
+
+## v1.0.0
+`;
+    const section = findDependabotChangelogSection(changelog);
+    assert.equal(section?.heading, '## Unreleased');
+  });
+
+  it('detects bumps documented in earlier version sections as duplicates', () => {
+    const changelog = `# Changelog
+
+## Unreleased
+
+## v1.0.0
+
+### Dependencies
+<!-- dependabot-automation -->
+- **lodash:** ^4.17.0 → ^4.17.21
+`;
+    const bump = { name: 'lodash', from: '^4.17.0', to: '^4.17.21', directory: 'root' };
+    const result = applyDependencyBumpsToChangelog(changelog, [bump]);
+    assert.equal(result, changelog);
+  });
+
+  it('puts new bumps under Unreleased even when a version section has Dependencies', () => {
+    const changelog = `# Changelog
+
+## Unreleased
+
+## v1.0.0
+
+### Dependencies
+<!-- dependabot-automation -->
+- **lodash:** ^4.17.0 → ^4.17.21
+`;
+    const bump = { name: 'express', from: '^4.18.0', to: '^4.19.0', directory: 'root' };
+    const result = applyDependencyBumpsToChangelog(changelog, [bump]);
+    const section = findDependabotChangelogSection(result);
+    assert.equal(section?.heading, '## Unreleased');
+    const deps = extractDependenciesSubsection(result, section);
+    assert.match(deps ?? '', /express/);
+    const versionSection = result.indexOf('## v1.0.0');
+    const versionDeps = result.slice(versionSection);
+    assert.ok(!versionDeps.includes('express'));
+  });
+
+  it('detects bumps documented in Unreleased as duplicates even when falling back to version section', () => {
+    const changelog = `# Changelog
+
+## Unreleased
+
+### Dependencies
+<!-- dependabot-automation -->
+- **lodash:** ^4.17.0 → ^4.17.21
+
+## v1.0.0
+`;
+    const bump = { name: 'lodash', from: '^4.17.0', to: '^4.17.21', directory: 'root' };
+    const result = applyDependencyBumpsToChangelog(changelog, [bump]);
+    assert.equal(result, changelog);
+  });
 });
