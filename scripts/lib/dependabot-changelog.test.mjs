@@ -64,10 +64,10 @@ describe("dependabot changelog", () => {
     const updated = applyDependencyBumpsToChangelog(sampleChangelog, bumps);
     const section = findDependabotChangelogSection(updated);
     const deps = extractDependenciesSubsection(updated, section);
-    assert.match(deps ?? "", /- \*\*axios:\*\* \^1\.7\.0 → \^1\.7\.9\n/);
+    assert.match(deps ?? "", /- \*\*axios:\*\* \^1\.7\.0 → \^1\.7\.9\n/u);
     assert.match(
       deps ?? "",
-      /- \*\*axios:\*\* \^1\.7\.0 → \^1\.7\.9 \(`server`\)/,
+      /- \*\*axios:\*\* \^1\.7\.0 → \^1\.7\.9 \(`server`\)/u,
     );
     assert.equal(
       dependabotChangelogTouchesPr(["CHANGELOG.md"], updated, bumps).ok,
