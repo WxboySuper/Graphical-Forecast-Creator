@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  setPersistence,
+  browserLocalPersistence,
+  type Auth,
+} from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
@@ -41,6 +47,11 @@ if (isHostedAuthEnabled) {
   firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseClientConfig);
   firebaseAuth = getAuth(firebaseApp);
   firestoreDb = getOrInitFirestore(firebaseApp);
+
+  // Explicitly set persistence to browser local to resolve session drops (GFC-WEB-B).
+  setPersistence(firebaseAuth, browserLocalPersistence).catch(() => {
+    // Fail silently; fallback to default persistence is handled by SDK.
+  });
 }
 
 export const app = firebaseApp;

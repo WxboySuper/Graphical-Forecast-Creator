@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
-import { disableNetwork, enableNetwork } from 'firebase/firestore';
+import {
+  disableNetwork,
+  enableNetwork,
+  waitForPendingWrites,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 /**
@@ -13,21 +17,92 @@ export function useFirestoreSleepRecovery(): void {
     }
 
     const firestore = db;
+    let transitionQueue = Promise.resolve();
+    let destroyed = false;
+    const PENDING_WRITES_TIMEOUT_MS = 5_000;
 
-    /** Pauses or resumes Firestore sync to match current tab visibility. */
-    const syncFirestoreNetworkToVisibility = (): void => {
-      if (document.hidden) {
-        disableNetwork(firestore).catch(() => undefined);
+    /**
+     * Waits for Firestore to flush writes, but gives up after a short delay so
+     * a hidden tab can still disconnect instead of hanging forever.
+     */
+    const waitForPendingWritesWithTimeout = async (): Promise<void> => {
+      await Promise.race([
+        waitForPendingWrites(firestore),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, PENDING_WRITES_TIMEOUT_MS);
+        }),
+      ]);
+    };
+
+    /**
+     * Pauses or resumes Firestore sync based on visibility.
+     * Handles race conditions to ensure the network state matches the final document state.
+     */
+    const updateNetworkState = async (): Promise<void> => {
+      if (destroyed) {
         return;
       }
 
-      enableNetwork(firestore).catch(() => undefined);
+      if (!document.hidden) {
+        try {
+          await enableNetwork(firestore);
+        } catch {
+          // Ignore failures
+        }
+        return;
+      }
+
+      try {
+        await waitForPendingWritesWithTimeout();
+        if (destroyed || !document.hidden) {
+          return;
+        }
+
+        await disableNetwork(firestore);
+      } catch {
+        // Ignore failures
+      }
     };
 
-    syncFirestoreNetworkToVisibility();
-    document.addEventListener('visibilitychange', syncFirestoreNetworkToVisibility);
+    /**
+     * Runs one visibility transition at a time so late tab events cannot
+     * overwrite the queue state that a newer event is waiting on.
+     */
+    const runTransition = async (): Promise<void> => {
+      if (destroyed) {
+        return;
+      }
+
+      const nextTransition = transitionQueue.then(async () => {
+        if (destroyed) {
+          return;
+        }
+
+        await updateNetworkState();
+      });
+
+      transitionQueue = nextTransition.catch(() => undefined);
+      await nextTransition;
+    };
+
+    /**
+     * Serializes transitions to avoid race conditions where a 'disable'
+     * call finishes after a user has already returned to the tab.
+     */
+    const handleVisibilityChange = (): void => {
+      runTransition().catch(() => {
+        // Final fallback for the serialized chain
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Initial sync
+    handleVisibilityChange();
+
     return () => {
-      document.removeEventListener('visibilitychange', syncFirestoreNetworkToVisibility);
+      destroyed = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 }
