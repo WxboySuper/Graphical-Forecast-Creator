@@ -17,14 +17,12 @@ export const getGoogleAnalyticsMeasurementId = (): string =>
  * Loads gtag.js and configures the property. No-op on localhost or when the ID is unset.
  */
 export const initGoogleAnalytics = (hostname?: string): void => {
-  if (initialized || typeof window === 'undefined' || typeof document === 'undefined') {
-    return;
-  }
+  if (initialized) return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
   const measurementId = getGoogleAnalyticsMeasurementId();
-  if (!measurementId || !shouldTrack(hostname)) {
-    return;
-  }
+  if (!measurementId) return;
+  if (!shouldTrack(hostname)) return;
 
   initialized = true;
   window.dataLayer = window.dataLayer ?? [];
@@ -34,7 +32,7 @@ export const initGoogleAnalytics = (hostname?: string): void => {
   };
 
   window.gtag('js', new Date());
-  window.gtag('config', measurementId);
+  window.gtag('config', measurementId, { send_page_view: false });
 
   const script = document.createElement('script');
   script.async = true;
