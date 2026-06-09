@@ -20,13 +20,25 @@ All notable changes to this project will be documented in this file.
 ## v1.6.1
 
 ### Dependencies
+<!-- dependabot-automation -->
+
 - **qs:** ^6.14.2 → ^6.15.2 (override; `server` and root)
+- **@radix-ui/react-dialog:** ^1.1.15 → ^1.1.16
+- **@radix-ui/react-dropdown-menu:** ^2.1.16 → ^2.1.17
+- **@radix-ui/react-popover:** ^1.1.15 → ^1.1.16
+- **@radix-ui/react-slot:** ^1.2.4 → ^1.2.5
+- **@radix-ui/react-tabs:** ^1.1.13 → ^1.1.14
+- **@radix-ui/react-tooltip:** ^1.2.8 → ^1.2.9
+- **@types/node:** ^25.9.1 → ^25.9.2
+- **@types/react:** 19.2.16 → 19.2.17
+- **react-router-dom:** ^7.16.0 → ^7.17.0
+- **rollup:** >=4.61.0 → >=4.61.1
+
 
 ### Fixed
 - **GFC-WEB-B (Auth Persistence):** Explicitly set `browserLocalPersistence` for Firebase Auth to prevent session drops.
 - **GFC-WEB-A (Firestore Sync):** Aggressive background network disconnection now waits for pending writes and uses a serialized transition pattern to prevent race conditions.
 - **qs DoS in `stringify` (Dependabot #125):** Bumped `qs` to `^6.15.2` in root and analytics server to resolve the array-format DoS vulnerability.
-
 ## v1.6
 
 ### Dependencies
