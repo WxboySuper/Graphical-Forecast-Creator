@@ -15,6 +15,7 @@ const globalScope = globalThis as typeof globalThis & {
   __GFC_FIREBASE_APP_ID__?: string;
   __GFC_SENTRY_DSN__?: string;
   __GFC_SENTRY_ENVIRONMENT__?: string;
+  __GFC_GA_MEASUREMENT_ID__?: string;
   __GFC_APP_VERSION__?: string;
   Headers?: typeof Headers;
   Request?: typeof Request;
@@ -47,6 +48,7 @@ if (typeof globalScope.__GFC_FIREBASE_PROJECT_ID__ === 'undefined') globalScope.
 if (typeof globalScope.__GFC_FIREBASE_APP_ID__ === 'undefined') globalScope.__GFC_FIREBASE_APP_ID__ = '';
 if (typeof globalScope.__GFC_SENTRY_DSN__ === 'undefined') globalScope.__GFC_SENTRY_DSN__ = '';
 if (typeof globalScope.__GFC_SENTRY_ENVIRONMENT__ === 'undefined') globalScope.__GFC_SENTRY_ENVIRONMENT__ = '';
+if (typeof globalScope.__GFC_GA_MEASUREMENT_ID__ === 'undefined') globalScope.__GFC_GA_MEASUREMENT_ID__ = '';
 if (typeof globalScope.__GFC_APP_VERSION__ === 'undefined') globalScope.__GFC_APP_VERSION__ = 'test';
 
 if (typeof globalScope.Headers === 'undefined') {

@@ -41,6 +41,7 @@ export default defineConfig(({ mode }) => {
       __GFC_FIREBASE_APP_ID__: JSON.stringify(env.VITE_FIREBASE_APP_ID ?? ''),
       __GFC_SENTRY_DSN__: JSON.stringify(env.VITE_SENTRY_DSN ?? ''),
       __GFC_SENTRY_ENVIRONMENT__: JSON.stringify(env.VITE_SENTRY_ENVIRONMENT ?? ''),
+      __GFC_GA_MEASUREMENT_ID__: JSON.stringify(env.VITE_GA_MEASUREMENT_ID ?? ''),
     },
     plugins: [react(), ...sentryPlugins],
     resolve: {

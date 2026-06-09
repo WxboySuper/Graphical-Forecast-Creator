@@ -18,6 +18,9 @@ All notable changes to this project will be documented in this file.
 - **@radix-ui/react-tooltip:** ^1.2.8 → ^1.2.9
 - **@types/node:** ^25.9.1 → ^25.9.2
 
+### Added
+- Added Google Analytics entry to deployment
+
 ## v1.6.1
 
 ### Dependencies
