@@ -72,8 +72,10 @@
     }
   },
   "scripts": {
-    "dev": "vite",
-    "start": "vite",
+    "dev": "node scripts/dev.js",
+    "start": "node scripts/dev.js",
+    "dev:vite": "vite",
+    "dev:api": "node server/analytics.js",
     "build": "vite build",
     "test": "jest",
     "test:e2e": "playwright test",

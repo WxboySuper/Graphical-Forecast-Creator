@@ -91,8 +91,12 @@ Use `pnpm` consistently for this repo so the checked-in `pnpm-lock.yaml` remains
 
 | Command | Description |
 |---------|-------------|
-| `pnpm start` | Vite dev server at http://localhost:3000 |
-| `pnpm run dev` | Vite dev server at http://localhost:3000 |
+| `pnpm start` | Local API server plus Vite dev server at http://localhost:3000 |
+| `pnpm run dev` | Local API server plus Vite dev server at http://localhost:3000 |
+| `pnpm run dev:vite` | Vite dev server only |
+| `pnpm run dev:api` | Local API server only at http://127.0.0.1:3006 |
+
+The HREF TSTM generator uses `PYTHON_BIN`/`PYTHON` when set, otherwise local Windows development auto-detects a conda Python from `~/miniforge3`, `~/miniconda3`, or `~/anaconda3` before falling back to `python`. It uses SPC-posted calibrated HREF thunder (`spc_post.tHHz.hrefct_full.fFFF.grib2`) first, then falls back to the 4-hour and 1-hour calibrated products before trying public HREF ingredient fields. Set `TSTM_HREF_HOUR_STEP=1` for denser fallback sampling, `TSTM_HREF_MAX_HOURS` to cap fallback requests, or `TSTM_ENABLE_LIGHTNING_SEARCH=false` to skip the last-resort lightning probability field.
 | `pnpm test` | Run Jest unit test suite |
 | `pnpm run test:e2e` | Run Playwright end-to-end tests |
 | `pnpm run build` | Production build to `/build` via Vite |

@@ -7,6 +7,7 @@ import { sentryVitePlugin } from '@sentry/vite-plugin';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const base = env.PUBLIC_URL || '/';
+  const apiTarget = env.VITE_API_TARGET || 'http://127.0.0.1:3006';
   const pkgPath = path.resolve(__dirname, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
   const releaseName = `graphical-forecast-creator@${pkg.version}`;
@@ -59,7 +60,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:3006',
+          target: apiTarget,
           changeOrigin: false,
         },
       },

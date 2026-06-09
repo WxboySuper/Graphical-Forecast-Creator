@@ -1,0 +1,7 @@
+herbie-data
+cfgrib
+xarray
+numpy
+scikit-image
+shapely
+geojson

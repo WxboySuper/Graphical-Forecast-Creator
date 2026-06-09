@@ -29,6 +29,7 @@ import {
   setForecastDay,
   redoLastEdit,
   undoLastEdit,
+  replaceTstmFeatures,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
@@ -57,6 +58,8 @@ import {
   type ForecastUiVariant,
 } from '../utils/forecastUiVariant';
 import './ForecastPage.css';
+import { canGenerateTstmForDay, generateTstmLines } from '../utils/tstmGeneration';
+import type { TstmGenerationResponse } from '../types/tstmGeneration';
 
 interface PageContext {
   addToast: AddToastFn;
@@ -1091,6 +1094,69 @@ const useCloudForecastActions = ({
   };
 };
 
+/** Creates callbacks for requesting, previewing, and applying HREF-generated TSTM polygons. */
+const useGeneratedTstmActions = ({
+  addToast,
+  currentDay,
+  dispatch,
+  forecastCycle,
+}: {
+  addToast: AddToastFn;
+  currentDay: DayType;
+  dispatch: ShortcutDispatch;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+}) => {
+  const [isTstmGenerating, setIsTstmGenerating] = useState(false);
+  const [generatedTstmPreview, setGeneratedTstmPreview] = useState<TstmGenerationResponse | null>(null);
+
+  const handleGenerateTstm = useCallback(async () => {
+    if (!canGenerateTstmForDay(currentDay)) {
+      addToast('HREF TSTM generation is only available for Day 1 and Day 2.', 'warning');
+      return;
+    }
+
+    const dayData = forecastCycle.days[currentDay];
+    setIsTstmGenerating(true);
+    try {
+      const result = await generateTstmLines({
+        day: currentDay,
+        cycleDate: forecastCycle.cycleDate,
+        issueDate: dayData?.metadata.issueDate,
+        validDate: dayData?.metadata.validDate,
+        issuanceTime: dayData?.metadata.issuanceTime,
+      });
+      setGeneratedTstmPreview(result);
+      addToast(`Generated ${result.features.length} TSTM polygon${result.features.length === 1 ? '' : 's'} for preview.`, 'success');
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : 'Unable to generate TSTM lines right now.', 'error');
+    } finally {
+      setIsTstmGenerating(false);
+    }
+  }, [addToast, currentDay, forecastCycle]);
+
+  const handleApplyGeneratedTstm = useCallback(() => {
+    if (!generatedTstmPreview) {
+      return;
+    }
+
+    dispatch(replaceTstmFeatures({ features: generatedTstmPreview.features }));
+    addToast('Applied generated TSTM lines. You can edit them on the map now.', 'success');
+    setGeneratedTstmPreview(null);
+  }, [addToast, dispatch, generatedTstmPreview]);
+
+  const handleCancelGeneratedTstm = useCallback(() => {
+    setGeneratedTstmPreview(null);
+  }, []);
+
+  return {
+    isTstmGenerating,
+    generatedTstmPreview,
+    handleGenerateTstm,
+    handleApplyGeneratedTstm,
+    handleCancelGeneratedTstm,
+  };
+};
+
 /** Creates the cloud toolbar node so the page body stays focused on layout. */
 const renderCloudToolbar = ({
   premiumActive,
@@ -1196,12 +1262,24 @@ const useForecastPageWorkspace = ({
     isSaved,
   });
 
+  const generatedTstmActions = useGeneratedTstmActions({
+    addToast,
+    currentDay: forecastCycle.currentDay,
+    dispatch,
+    forecastCycle,
+  });
+
   const workspaceController = useForecastWorkspaceController({
     onSave: handleSave,
     onLoad: handleLoad,
     mapRef,
     fileInputRef,
     addToast,
+    isTstmGenerating: generatedTstmActions.isTstmGenerating,
+    generatedTstmPreview: generatedTstmActions.generatedTstmPreview,
+    onGenerateTstm: generatedTstmActions.handleGenerateTstm,
+    onApplyGeneratedTstm: generatedTstmActions.handleApplyGeneratedTstm,
+    onCancelGeneratedTstm: generatedTstmActions.handleCancelGeneratedTstm,
     cloudTools: renderCloudToolbar({
       premiumActive,
       isExpiredPremium,

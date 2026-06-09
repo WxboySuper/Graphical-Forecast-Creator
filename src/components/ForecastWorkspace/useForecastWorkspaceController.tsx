@@ -10,6 +10,7 @@ import useOutlookPanelLogic from '../OutlookPanel/useOutlookPanelLogic';
 import { useExportMap } from '../DrawingTools/useExportMap';
 
 import { DayType, OutlookType } from '../../types/outlooks';
+import type { TstmGenerationResponse } from '../../types/tstmGeneration';
 import { getOutlookColor } from '../../utils/outlookUtils';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
@@ -63,6 +64,9 @@ export interface ForecastWorkspaceController {
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
   onOpenResetConfirm: () => void;
+  onGenerateTstm: () => void;
+  onApplyGeneratedTstm: () => void;
+  onCancelGeneratedTstm: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDateSave: () => void;
@@ -87,6 +91,8 @@ export interface ForecastWorkspaceController {
   onConfirmExport: (title: string) => Promise<void>;
   onCancelExport: () => void;
   isPackageDownloading: boolean;
+  isTstmGenerating: boolean;
+  generatedTstmPreview: TstmGenerationResponse | null;
   showHistoryModal: boolean;
   showCopyModal: boolean;
   showResetConfirm: boolean;
@@ -122,6 +128,11 @@ interface UseForecastWorkspaceControllerOptions {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   addToast: AddToastFn;
   cloudTools?: React.ReactNode;
+  isTstmGenerating?: boolean;
+  generatedTstmPreview?: TstmGenerationResponse | null;
+  onGenerateTstm?: () => void;
+  onApplyGeneratedTstm?: () => void;
+  onCancelGeneratedTstm?: () => void;
 }
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
@@ -140,6 +151,8 @@ interface BuildForecastWorkspaceControllerArgs {
   confirmExport: (title: string) => Promise<void>;
   cancelExport: () => void;
   isPackageDownloading: boolean;
+  isTstmGenerating: boolean;
+  generatedTstmPreview: TstmGenerationResponse | null;
   showHistoryModal: boolean;
   showCopyModal: boolean;
   showResetConfirm: boolean;
@@ -159,6 +172,9 @@ interface BuildForecastWorkspaceControllerArgs {
   handleOpenHistoryModal: () => void;
   handleOpenCopyModal: () => void;
   handleOpenResetConfirm: () => void;
+  handleGenerateTstm: () => void;
+  handleApplyGeneratedTstm: () => void;
+  handleCancelGeneratedTstm: () => void;
   handleCloseHistoryModal: () => void;
   handleCloseCopyModal: () => void;
   handleCancelReset: () => void;
@@ -184,6 +200,8 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     confirmExport,
     cancelExport,
     isPackageDownloading,
+    isTstmGenerating,
+    generatedTstmPreview,
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
@@ -203,6 +221,9 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     handleOpenHistoryModal,
     handleOpenCopyModal,
     handleOpenResetConfirm,
+    handleGenerateTstm,
+    handleApplyGeneratedTstm,
+    handleCancelGeneratedTstm,
     handleCloseHistoryModal,
     handleCloseCopyModal,
     handleCancelReset,
@@ -227,6 +248,8 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     onConfirmExport: confirmExport,
     onCancelExport: cancelExport,
     isPackageDownloading,
+    isTstmGenerating,
+    generatedTstmPreview,
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
@@ -255,6 +278,9 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     onOpenHistoryModal: handleOpenHistoryModal,
     onOpenCopyModal: handleOpenCopyModal,
     onOpenResetConfirm: handleOpenResetConfirm,
+    onGenerateTstm: handleGenerateTstm,
+    onApplyGeneratedTstm: handleApplyGeneratedTstm,
+    onCancelGeneratedTstm: handleCancelGeneratedTstm,
     onCloseHistoryModal: handleCloseHistoryModal,
     onCloseCopyModal: handleCloseCopyModal,
     onCancelReset: handleCancelReset,
@@ -273,6 +299,11 @@ export const useForecastWorkspaceController = ({
   fileInputRef,
   addToast,
   cloudTools = null,
+  isTstmGenerating = false,
+  generatedTstmPreview = null,
+  onGenerateTstm = () => undefined,
+  onApplyGeneratedTstm = () => undefined,
+  onCancelGeneratedTstm = () => undefined,
 }: UseForecastWorkspaceControllerOptions): ForecastWorkspaceController => {
   const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
@@ -361,6 +392,8 @@ export const useForecastWorkspaceController = ({
     confirmExport,
     cancelExport,
     isPackageDownloading,
+    isTstmGenerating,
+    generatedTstmPreview,
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
@@ -380,6 +413,9 @@ export const useForecastWorkspaceController = ({
     handleOpenHistoryModal,
     handleOpenCopyModal,
     handleOpenResetConfirm,
+    handleGenerateTstm: onGenerateTstm,
+    handleApplyGeneratedTstm: onApplyGeneratedTstm,
+    handleCancelGeneratedTstm: onCancelGeneratedTstm,
     handleCloseHistoryModal,
     handleCloseCopyModal,
     handleCancelReset,

@@ -16,6 +16,7 @@ import {
   Undo2,
   Upload,
   Wrench,
+  Zap,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -40,6 +41,7 @@ import {
   outlookShortcuts,
 } from '../ForecastWorkspace/workspaceMeta';
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
+import { canGenerateTstmForDay } from '../../utils/tstmGeneration';
 import './IntegratedToolbar.css';
 
 interface IntegratedToolbarProps {
@@ -875,6 +877,18 @@ const getTabbedToolbarActionItems = (
     accentClass: 'bg-teal-500/15 text-teal-700',
   },
   {
+    key: 'auto-tstm',
+    label: controller.isTstmGenerating ? 'Generating' : 'Auto TSTM',
+    description: canGenerateTstmForDay(controller.currentDay)
+      ? 'Generate editable TSTM lines from HREF'
+      : 'HREF TSTM generation is available for Day 1 and Day 2',
+    icon: <Zap className="h-4 w-4" />,
+    onClick: controller.onGenerateTstm,
+    disabled: controller.isTstmGenerating || !canGenerateTstmForDay(controller.currentDay),
+    tone: 'primary',
+    accentClass: 'bg-yellow-500/15 text-yellow-700',
+  },
+  {
     key: 'reset',
     label: 'Reset All',
     description: 'Clear every polygon',
@@ -916,7 +930,7 @@ const TabbedToolbarActionTile: React.FC<{ item: TabbedToolbarActionItem }> = ({ 
 const TabbedToolbarToolsTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const actionItems = getTabbedToolbarActionItems(controller);
   const historyItems = actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key));
-  const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package'].includes(item.key));
+  const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package', 'auto-tstm'].includes(item.key));
   const destructiveItems = actionItems.filter((item) => item.key === 'reset');
 
   return (

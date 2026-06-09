@@ -33,6 +33,62 @@ const ResetConfirmDialog: React.FC<{
   </Dialog>
 );
 
+/** Preview dialog for generated HREF TSTM polygons before they become editable forecast features. */
+const GeneratedTstmPreviewDialog: React.FC<{
+  controller: ForecastWorkspaceController;
+}> = ({ controller }) => {
+  const preview = controller.generatedTstmPreview;
+  const open = Boolean(preview);
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) controller.onCancelGeneratedTstm(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Preview Auto-Generated TSTM Lines</DialogTitle>
+          <DialogDescription>
+            {preview ? (
+              <>
+                Generated {preview.features.length} editable TSTM polygon{preview.features.length === 1 ? '' : 's'} from HREF run{' '}
+                {new Date(preview.run).toLocaleString()} using forecast hours {preview.forecastHours.join(', ') || 'none'}.
+              </>
+            ) : null}
+          </DialogDescription>
+        </DialogHeader>
+        {preview ? (
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border border-border bg-muted/40 p-3">
+              <div className="font-semibold">Effective window</div>
+              <div>{new Date(preview.effectiveStart).toLocaleString()} to {new Date(preview.effectiveEnd).toLocaleString()}</div>
+            </div>
+            {preview.sources ? (
+              <div className="rounded-md border border-border bg-muted/30 p-3">
+                <div className="font-semibold">Guidance sources</div>
+                <div className="text-xs text-muted-foreground">
+                  {Object.entries(preview.sources)
+                    .filter(([, source]) => Boolean(source))
+                    .map(([name, source]) => `${name}: ${source?.product} ${source?.search}`)
+                    .join(' • ') || 'No source fields matched.'}
+                </div>
+              </div>
+            ) : null}
+            {preview.warnings.length > 0 ? (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-200">
+                {preview.warnings[0]}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button variant="outline" onClick={controller.onCancelGeneratedTstm}>Cancel</Button>
+          <Button onClick={controller.onApplyGeneratedTstm} disabled={!preview || preview.features.length === 0}>
+            Apply TSTM Lines
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 /** Shared hidden file input plus modals used by every Forecast workspace layout. */
 export const ForecastWorkspaceModals: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <>
@@ -55,6 +111,7 @@ export const ForecastWorkspaceModals: React.FC<{ controller: ForecastWorkspaceCo
       onCancel={controller.onCancelReset}
       onReset={controller.onReset}
     />
+    <GeneratedTstmPreviewDialog controller={controller} />
   </>
 );
 
