@@ -31,13 +31,23 @@ const sectionEndIndex = (changelog, afterStart) => {
  * @returns {{ heading: string; start: number; end: number } | null}
  */
 export const findDependabotChangelogSection = (changelog) => {
-  const unreleased = changelog.indexOf('## [Unreleased]');
-  if (unreleased !== -1) {
+  const unreleasedBracket = changelog.indexOf('## [Unreleased]');
+  if (unreleasedBracket !== -1) {
     const heading = '## [Unreleased]';
     return {
       heading,
-      start: unreleased,
-      end: sectionEndIndex(changelog, unreleased + heading.length),
+      start: unreleasedBracket,
+      end: sectionEndIndex(changelog, unreleasedBracket + heading.length),
+    };
+  }
+
+  const unreleasedPlain = changelog.indexOf('## Unreleased');
+  if (unreleasedPlain !== -1) {
+    const heading = '## Unreleased';
+    return {
+      heading,
+      start: unreleasedPlain,
+      end: sectionEndIndex(changelog, unreleasedPlain + heading.length),
     };
   }
 
@@ -232,12 +242,18 @@ export const applyDependencyBumpsToChangelog = (changelog, bumps) => {
     );
   }
 
-  const existingDepsBody = extractDependenciesSubsection(changelog, section);
-  if (existingDepsBody && bumps.every((bump) => dependencyBumpDocumented(bump, existingDepsBody))) {
+  const fileTopBeforeSection = changelog.slice(0, section.start);
+  const bumpsToAdd = bumps.filter(
+    (bump) =>
+      !dependencyBumpDocumented(bump, fileTopBeforeSection) &&
+      !dependencyBumpDocumented(bump, changelog.slice(section.start)),
+  );
+  if (bumpsToAdd.length === 0) {
     return changelog;
   }
 
-  const lines = mergeDependencyLines(parseDependencyLines(existingDepsBody ?? ''), bumps);
+  const existingDepsBody = extractDependenciesSubsection(changelog, section);
+  const lines = mergeDependencyLines(parseDependencyLines(existingDepsBody ?? ''), bumpsToAdd);
   const sectionBody = replaceDependenciesBlock(
     changelog.slice(section.start, section.end),
     formatDependenciesBlock(lines),
