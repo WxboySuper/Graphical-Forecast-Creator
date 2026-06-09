@@ -45,9 +45,6 @@ const evaluateMainTarget = (headRef) => {
   if (isFeatureBranch(headRef)) {
     return { ok: false, message: 'feature/* branches must merge into beta, not main.' };
   }
-  if (isFixBranch(headRef)) {
-    return { ok: false, message: 'fix/* branches must merge into beta, not main.' };
-  }
   return {
     ok: false,
     message: `Branch "${headRef}" cannot target main. Use beta (promotion), hotfix/*, or release/*.`,
