@@ -3,7 +3,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.6
+## v1.7
 
 ### Dependencies
 <!-- dependabot-automation -->

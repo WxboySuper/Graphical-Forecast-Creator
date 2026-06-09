@@ -125,6 +125,15 @@ const PrivacyPolicyContent: React.FC<{ showWhatsNew?: boolean }> = ({ showWhatsN
       contents and are kept separate from the product metrics dashboard.
     </p>
     <p>
+      On the public production site (gfc.weatherboysuper.com), we use Google Analytics (GA4) to measure aggregate
+      traffic and navigation patterns in a separate property from other Weatherboy Super sites. GA is loaded only on
+      the hosted production domain, not on localhost development builds. Google&apos;s processing is governed by{' '}
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+        Google&apos;s privacy policy
+      </a>
+      .
+    </p>
+    <p>
       On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
       application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics
       above. We do not use Sentry for advertising or the sale of personal data. Error reports are designed to exclude

@@ -151,6 +151,10 @@ Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the analytics
 
 After the next `main` deploy, verify in Sentry with a test error from the browser console on production (not from DevTools while paused — use a one-off button or `throw new Error('Sentry test')` in the console on the live site).
 
+### Google Analytics (production web)
+
+Production builds set `VITE_GA_MEASUREMENT_ID` to the GFC-only GA4 property (`G-44J5RQTQDB`), separate from other Weatherboy Super sites. The tag loads only on hosted production (not localhost). SPA route changes send `page_path` updates via `GoogleAnalyticsRouteTracker`. First-party page metrics (`/api/collect`) remain unchanged.
+
 ---
 
 ## Project Structure

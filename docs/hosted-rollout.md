@@ -71,4 +71,5 @@ Set `"action": "live"` in `deploy/production-release.json` for immediate full de
 | Deploy rejected | `node scripts/validate-production-release.mjs` locally; version vs `package.json` |
 | Live updated early | `action` must be `stage`; verify `current` symlink on VPS |
 | Staging 403 / beta gate | Sign in + beta access; use invite URL |
-| Promote did not run | `config/status`, `rolloutAt`, `/opt/gfc-analytics/logs/rollout.log` |
+| Promote did not run | `config/status`, `rolloutAt`, `/opt/gfc-analytics/logs/rollout-cron.log` |
+| `/updates` or `/updates/` returns **403** on direct URL | `public/updates/` exists for screenshots; nginx must use exact `location = /updates` blocks in `server/nginx.conf` (see repo). In-app NavLink/banner links work without this because React Router never requests the path from nginx. |
