@@ -68,6 +68,7 @@ export const renderMonitorAlertPopup = (
   const dialog = document.createElement('div');
   dialog.className = 'monitor-alert-popup';
   dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
   dialog.setAttribute('aria-label', `${details.event} details`);
 
   const header = document.createElement('div');
