@@ -15,6 +15,12 @@ export interface ReleaseImprovement {
   text: string;
 }
 
+export interface ReleaseHotfixes {
+  title: string;
+  body: string;
+  items: ReleaseImprovement[];
+}
+
 export interface ReleaseUpdate {
   version: string;
   title: string;
@@ -22,6 +28,7 @@ export interface ReleaseUpdate {
   /** Optional hero graphics under `public/updates/v{version}/`. */
   promoImages?: UpdateScreenshot[];
   sections: UpdateSection[];
+  hotfixes?: ReleaseHotfixes;
   improvements: ReleaseImprovement[];
 }
 
@@ -79,6 +86,21 @@ export const v16Update: ReleaseUpdate = {
       ],
     },
   ],
+  hotfixes: {
+    title: 'v1.6 Hotfixes',
+    body:
+      'Stability fixes shipped after the v1.6 release for map-heavy workflows on forecast, verification, and monitor.',
+    items: [
+      {
+        id: 'openlayers-removechild',
+        text: 'Fixed a map error that could surface as a blank or unstable editor when OpenLayers and React disagreed about popup DOM ownership — especially on Monitor alert popups and when switching outlook types or routes.',
+      },
+      {
+        id: 'map-translation-guard',
+        text: 'Map shells and legends are now marked notranslate so Chrome auto-translate is less likely to rewrite map UI text and trigger React DOM errors on mobile browsers.',
+      },
+    ],
+  },
   improvements: [
     {
       id: 'safari-hosted-sleep',
