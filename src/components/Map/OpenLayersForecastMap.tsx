@@ -807,6 +807,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
       // Create popup element imperatively to prevent React/OpenLayers DOM ownership conflict.
       const popupEl = document.createElement("div");
       popupEl.className = "ol-popup";
+      popupEl.setAttribute("translate", "no");
       popupEl.style.display = "none";
       popupRef.current = popupEl;
       const overlay = new Overlay({
@@ -1459,7 +1460,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
     };
 
     return (
-      <div className="map-container">
+      <div className="map-container" translate="no">
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
         <div className="map-toolbar-bottom-right">
           <div className="map-toolbar-surface">

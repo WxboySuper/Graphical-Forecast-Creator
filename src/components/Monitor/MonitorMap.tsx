@@ -1,9 +1,7 @@
 import React, { useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import 'ol/ol.css';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
-import MonitorAlertPopup from './MonitorAlertPopup';
 import type { OutlookData } from '../../types/outlooks';
 import type { MonitorMapView, MonitorOutlookLayerType } from '../../monitor/types';
 import { flattenMonitorOutlookFeatures } from '../../monitor/outlookLayers';
@@ -41,7 +39,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     [outlookData, outlookType],
   );
 
-  const { selectedAlert, handleCloseAlertPopup, popupElement } = useMonitorOlMap({
+  useMonitorOlMap({
     mapView,
     radarLayer,
     radarOpacity,
@@ -55,15 +53,8 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   });
 
   return (
-    <div className="monitor-map" aria-label="Monitor map">
+    <div className="monitor-map" aria-label="Monitor map" translate="no">
       <div ref={mapElementRef} className="monitor-map__viewport" />
-      {popupElement &&
-        createPortal(
-          selectedAlert && (
-            <MonitorAlertPopup details={selectedAlert} onClose={handleCloseAlertPopup} />
-          ),
-          popupElement,
-        )}
       <div className="monitor-map__badge">Read-only monitor</div>
     </div>
   );
