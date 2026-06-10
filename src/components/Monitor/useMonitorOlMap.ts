@@ -1,4 +1,4 @@
-import { useCallback, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { useSelector } from 'react-redux';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
@@ -11,6 +11,10 @@ import type { SerializedMonitorOutlookFeature } from './monitorMapFeatureSync';
 import { useMonitorMapBootstrap } from './useMonitorMapBootstrap';
 import { useMonitorMapLayerSync } from './useMonitorMapLayerSync';
 import { useMonitorMapRefs } from './monitorMapRefs';
+import {
+  clearMonitorAlertPopup,
+  renderMonitorAlertPopup,
+} from './renderMonitorAlertPopup';
 
 interface UseMonitorOlMapArgs {
   mapView: MonitorMapView;
@@ -28,7 +32,6 @@ interface UseMonitorOlMapArgs {
 export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [selectedAlert, setSelectedAlert] = useState<NwsAlertDetails | null>(null);
-  const [popupElement, setPopupElement] = useState<HTMLDivElement | null>(null);
   const refs = useMonitorMapRefs();
 
   const clearSelectedAlert = useCallback(() => {
@@ -47,8 +50,22 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     mapElementRef: args.mapElementRef,
     refs,
     onSelectAlert: setSelectedAlert,
-    onCreatePopupElement: setPopupElement,
   });
+
+  useEffect(() => {
+    const container = refs.popupElRef.current;
+    if (!container) {
+      return undefined;
+    }
+
+    if (!selectedAlert) {
+      clearMonitorAlertPopup(container);
+      return undefined;
+    }
+
+    return renderMonitorAlertPopup(container, selectedAlert, clearSelectedAlert);
+    // refs omitted: wrapper object from useMonitorMapRefs() is new each render.
+  }, [clearSelectedAlert, selectedAlert]);
 
   useMonitorMapLayerSync({
     mapView: args.mapView,
@@ -68,6 +85,5 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   return {
     selectedAlert,
     handleCloseAlertPopup: clearSelectedAlert,
-    popupElement,
   };
 };

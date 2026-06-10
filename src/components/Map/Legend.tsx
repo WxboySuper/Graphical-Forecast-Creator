@@ -141,6 +141,7 @@ const Legend: React.FC<LegendProps> = React.memo(({
       className={`map-legend ${desktopOpen ? '' : 'map-legend--desktop-hidden'} ${mobileOpen ? 'map-legend--mobile-open' : ''}`}
       role="complementary"
       aria-label="Map Legend"
+      translate="no"
     >
       {activeOutlookType === 'categorical' ? renderCategoricalLegend() : renderProbabilisticLegend()}
     </div>
