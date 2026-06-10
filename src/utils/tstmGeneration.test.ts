@@ -23,7 +23,7 @@ describe('tstmGeneration utilities', () => {
       outlookType: 'categorical',
       probability: 'TSTM',
       isSignificant: false,
-      derivedFrom: 'href-auto-tstm',
+      derivedFrom: 'spc-calibrated-thunder',
     });
     expect(feature.id).toBe('generated-tstm-0');
   });

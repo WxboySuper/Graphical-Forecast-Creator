@@ -33,7 +33,7 @@ const ResetConfirmDialog: React.FC<{
   </Dialog>
 );
 
-/** Preview dialog for generated HREF TSTM polygons before they become editable forecast features. */
+/** Preview dialog for generated SPC-calibrated TSTM polygons before they become editable forecast features. */
 const GeneratedTstmPreviewDialog: React.FC<{
   controller: ForecastWorkspaceController;
 }> = ({ controller }) => {
@@ -48,7 +48,7 @@ const GeneratedTstmPreviewDialog: React.FC<{
           <DialogDescription>
             {preview ? (
               <>
-                Generated {preview.features.length} editable TSTM polygon{preview.features.length === 1 ? '' : 's'} from HREF run{' '}
+                Generated {preview.features.length} editable TSTM polygon{preview.features.length === 1 ? '' : 's'} from SPC run{' '}
                 {new Date(preview.run).toLocaleString()} using forecast hours {preview.forecastHours.join(', ') || 'none'}.
               </>
             ) : null}

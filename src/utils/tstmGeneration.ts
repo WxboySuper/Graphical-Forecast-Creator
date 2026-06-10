@@ -16,17 +16,17 @@ export const normalizeGeneratedTstmFeatures = (features: Feature[]): Feature[] =
       outlookType: 'categorical',
       probability: 'TSTM',
       isSignificant: false,
-      derivedFrom: 'href-auto-tstm',
+      derivedFrom: 'spc-calibrated-thunder',
       originalProbability: 'TSTM',
     },
   }));
 
-/** Calls the server-side Herbie/HREF generator and returns normalized editable TSTM features. */
+/** Calls the server-side SPC calibrated thunder generator and returns normalized editable TSTM features. */
 export const generateTstmLines = async (
   request: TstmGenerationRequest
 ): Promise<TstmGenerationResponse> => {
   if (!canGenerateTstmForDay(request.day)) {
-    throw new Error('HREF-based TSTM generation is only available for Day 1 and Day 2.');
+    throw new Error('SPC calibrated thunder generation is only available for Day 1 and Day 2.');
   }
 
   const response = await fetch(TSTM_GENERATION_ENDPOINT, {

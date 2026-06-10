@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Generate editable TSTM GeoJSON polygons from HREF guidance.
+"""Generate editable TSTM GeoJSON polygons from SPC calibrated HREF thunder.
 
 Input is a small JSON object on stdin. Output is a JSON response on stdout.
-The helper intentionally returns warnings with partial/empty output instead of
-failing when a HREF field is unavailable for a particular run/product.
+Uses the SPC calibrated thunder endpoint; returns empty features with warnings
+when the SPC data is unavailable for the requested period.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ import math
 import os
 import sys
 import warnings
-from contextlib import redirect_stdout
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -26,30 +25,14 @@ import numpy as np
 
 
 HREF_MAX_FORECAST_HOUR = 48
-HREF_CYCLE_HOURS = (0, 6, 12, 18)
 DEFAULT_DOMAIN = "conus"
 FORECAST_HOUR_STEP = max(1, int(os.environ.get("TSTM_HREF_HOUR_STEP", "3")))
 MAX_FORECAST_HOURS = max(1, int(os.environ.get("TSTM_HREF_MAX_HOURS", "17")))
-ENABLE_LIGHTNING_SEARCH = os.environ.get("TSTM_ENABLE_LIGHTNING_SEARCH", "true").lower() != "false"
 SPC_POST_BASE_URL = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/spc_post/prod"
 SPC_THUNDER_PERIODS = ("full", "4hr", "1hr")
-HREF_PRODUCTS = {
-    "qpf": ["lpmm", "avrg", "prob", "mean"],
-    "reflectivity": ["prob", "mean", "pmmn"],
-    "instability": ["mean", "prob"],
-    "lightning": ["prob"],
-}
 DEFAULT_THRESHOLDS = {
     "calibratedThunderCoreProbability": 0.30,
     "calibratedThunderSupportProbability": 0.10,
-    "lightningProbability": 0.25,
-    "qpfProbability": 0.50,
-    "reflectivityProbability": 0.40,
-    "qpfInches": 0.01,
-    "capeJkg": 500.0,
-    "cinJkg": 150.0,
-    "reflectivityDbz": 35.0,
-    "minAreaSqKm": 500.0,
 }
 
 
@@ -59,14 +42,6 @@ class EffectiveWindow:
     end: datetime
     href_run: datetime
     forecast_hours: list[int]
-
-
-@dataclass(frozen=True)
-class HrefSignal:
-    values: np.ndarray
-    template: Any
-    product: str
-    search: str
 
 
 @dataclass(frozen=True)
@@ -109,23 +84,11 @@ def parse_issuance_time(value: str | None) -> tuple[int, int]:
     return int(value[:2]), int(value[2:4])
 
 
-def previous_href_cycle(value: datetime) -> datetime:
-    value = value.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
-    for cycle_hour in reversed(HREF_CYCLE_HOURS):
-        if value.hour >= cycle_hour:
-            return value.replace(hour=cycle_hour)
-    return (value - timedelta(days=1)).replace(hour=18)
-
-
 def previous_spc_cycle(value: datetime) -> datetime:
     value = value.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
     if value.hour >= 12:
         return value.replace(hour=12)
     return value.replace(hour=0)
-
-
-def previous_12_hour_run(run: datetime) -> datetime:
-    return run - timedelta(hours=12)
 
 
 def build_forecast_hours(start: datetime, end: datetime, run: datetime) -> list[int]:
@@ -260,7 +223,12 @@ def data_array_valid_time(data_array: Any) -> datetime | None:
 
 def spc_candidate_windows(window: EffectiveWindow) -> list[EffectiveWindow]:
     candidates: list[EffectiveWindow] = []
-    for run in (window.href_run, previous_12_hour_run(window.href_run)):
+    if window.href_run.hour >= 12:
+        alternate = window.href_run.replace(hour=0)
+    else:
+        alternate = window.href_run - timedelta(days=1)
+        alternate = alternate.replace(hour=12)
+    for run in (window.href_run, alternate):
         forecast_hours = build_forecast_hours(window.start, window.end, run)
         if forecast_hours:
             candidates.append(replace(window, href_run=run, forecast_hours=forecast_hours))
@@ -344,82 +312,8 @@ def fetch_spc_calibrated_thunder(window: EffectiveWindow) -> tuple[SpcThunderSig
                     )
                 return signal, warnings
 
-    warnings.append("No SPC calibrated HREF thunder field was available; falling back to public HREF ingredients.")
+    warnings.append("No SPC calibrated HREF thunder field was available for the requested period.")
     return None, warnings
-
-
-def fetch_href_field(
-    run: datetime,
-    forecast_hours: list[int],
-    products: list[str],
-    searches: list[str],
-    label: str,
-    required: bool = False,
-) -> tuple[HrefSignal | None, list[str]]:
-    warnings: list[str] = []
-    arrays: list[np.ndarray] = []
-    template = None
-    matched_product = ""
-    matched_search = ""
-
-    try:
-        from herbie import Herbie
-    except Exception as exc:  # pragma: no cover - depends on deployment env
-        raise RuntimeError("Python dependency 'herbie-data' is not installed for the server runtime.") from exc
-
-    print(
-        f"fetching {label}: products={products}, searches={searches}, hours={forecast_hours}",
-        file=sys.stderr,
-        flush=True,
-    )
-
-    for forecast_hour in forecast_hours:
-        hour_arrays: list[np.ndarray] = []
-        for product in products:
-            for search in searches:
-                try:
-                    with redirect_stdout(sys.stderr):
-                        href = Herbie(
-                            run.strftime("%Y-%m-%d %H:%M"),
-                            model="href",
-                            product=product,
-                            domain=DEFAULT_DOMAIN,
-                            fxx=forecast_hour,
-                        )
-                        dataset = href.xarray(search=search, remove_grib=False)
-                    data_array = get_first_data_array(dataset)
-                    if data_array is None:
-                        continue
-                    if template is None:
-                        template = data_array
-                        matched_product = product
-                        matched_search = search
-                    hour_arrays.append(normalize_values(np.asarray(data_array.values)))
-                    break
-                except Exception:
-                    continue
-            if hour_arrays:
-                break
-        if hour_arrays:
-            arrays.append(np.nanmax(np.stack(hour_arrays), axis=0))
-
-    if not arrays:
-        if required:
-            warnings.append(f"No HREF {label} field matched available searches.")
-        print(f"no match for {label}", file=sys.stderr, flush=True)
-        return None, warnings
-
-    print(
-        f"matched {label}: product={matched_product}, search={matched_search}, hours={len(arrays)}",
-        file=sys.stderr,
-        flush=True,
-    )
-    return HrefSignal(
-        values=np.nanmax(np.stack(arrays), axis=0),
-        template=template,
-        product=matched_product,
-        search=matched_search,
-    ), warnings
 
 
 def as_probability(values: np.ndarray) -> np.ndarray:
@@ -528,15 +422,6 @@ def log_calibrated_thunder_components(
             file=sys.stderr,
             flush=True,
         )
-
-
-def threshold_signal(signal: HrefSignal | None, threshold: float) -> np.ndarray | None:
-    if signal is None:
-        return None
-    values = signal.values
-    if signal.product == "prob":
-        return as_probability(values) >= DEFAULT_THRESHOLDS["lightningProbability"]
-    return finite_threshold(values, threshold)
 
 
 def get_lat_lon(template: Any) -> tuple[np.ndarray, np.ndarray]:
@@ -756,12 +641,6 @@ def mask_to_features(mask: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> list
     return features
 
 
-def apply_template(template: Any | None, signal: HrefSignal | None) -> Any | None:
-    if template is None and signal is not None:
-        return signal.template
-    return template
-
-
 def build_response(payload: dict[str, Any]) -> dict[str, Any]:
     window = build_effective_window(payload)
     warnings: list[str] = []
@@ -805,136 +684,7 @@ def build_response(payload: dict[str, Any]) -> dict[str, Any]:
             },
         )
 
-    template = None
-    lightning = None
-
-    if ENABLE_LIGHTNING_SEARCH:
-        lightning, lightning_warnings = fetch_href_field(
-            window.href_run,
-            window.forecast_hours,
-            HREF_PRODUCTS["lightning"],
-            [":LTNG:", ":LTNG", ":LTG:", ":LTG", ":LTP:", ":LTP", ":TSTM:", ":TSTM"],
-            "lightning/thunder",
-            required=False,
-        )
-        warnings.extend(lightning_warnings)
-        template = apply_template(template, lightning)
-    else:
-        warnings.append("Lightning search skipped for speed; set TSTM_ENABLE_LIGHTNING_SEARCH=true to enable it.")
-
-    qpf, qpf_warnings = fetch_href_field(
-        window.href_run,
-        window.forecast_hours,
-        HREF_PRODUCTS["qpf"],
-        [":APCP:"],
-        "QPF",
-        required=True,
-    )
-    warnings.extend(qpf_warnings)
-    template = apply_template(template, qpf)
-
-    reflectivity, ref_warnings = fetch_href_field(
-        window.href_run,
-        window.forecast_hours,
-        HREF_PRODUCTS["reflectivity"],
-        [":REFC:", ":REFD:", ":MAXREF:"],
-        "reflectivity",
-        required=False,
-    )
-    warnings.extend(ref_warnings)
-    template = apply_template(template, reflectivity)
-
-    cape, cape_warnings = fetch_href_field(
-        window.href_run,
-        window.forecast_hours,
-        HREF_PRODUCTS["instability"],
-        [":CAPE:"],
-        "CAPE",
-        required=False,
-    )
-    warnings.extend(cape_warnings)
-    template = apply_template(template, cape)
-
-    cin, cin_warnings = fetch_href_field(
-        window.href_run,
-        window.forecast_hours,
-        HREF_PRODUCTS["instability"],
-        [":CIN:"],
-        "CIN",
-        required=False,
-    )
-    warnings.extend(cin_warnings)
-    template = apply_template(template, cin)
-
-    if template is None:
-        warnings.append("No usable HREF grid data was available for this effective period.")
-        return response_payload(window, [], warnings, {})
-
-    shape = normalize_values(np.asarray(template.values)).shape
-    lightning_mask = np.zeros(shape, dtype=bool)
-    qpf_mask = np.zeros(shape, dtype=bool)
-    reflectivity_mask = np.zeros(shape, dtype=bool)
-    cape_mask = np.zeros(shape, dtype=bool)
-
-    if lightning is not None:
-        if lightning.product == "prob":
-            lightning_values = as_probability(lightning.values)
-            lightning_mask = finite_threshold(lightning_values, DEFAULT_THRESHOLDS["lightningProbability"])
-        else:
-            lightning_mask = finite_threshold(lightning.values, 1)
-
-    if qpf is not None:
-        if qpf.product == "prob":
-            qpf_mask = finite_threshold(as_probability(qpf.values), DEFAULT_THRESHOLDS["qpfProbability"])
-        else:
-            qpf_inches = qpf.values / 25.4 if np.nanmax(qpf.values) > 10 else qpf.values
-            qpf_mask = finite_threshold(qpf_inches, DEFAULT_THRESHOLDS["qpfInches"])
-
-    if reflectivity is not None:
-        if reflectivity.product == "prob":
-            reflectivity_mask = finite_threshold(
-                as_probability(reflectivity.values),
-                DEFAULT_THRESHOLDS["reflectivityProbability"],
-            )
-        else:
-            ref_mask = threshold_signal(reflectivity, DEFAULT_THRESHOLDS["reflectivityDbz"])
-            if ref_mask is not None:
-                reflectivity_mask = ref_mask
-
-    if cape is not None:
-        thresholded_cape = threshold_signal(cape, DEFAULT_THRESHOLDS["capeJkg"])
-        if thresholded_cape is not None:
-            cape_mask = thresholded_cape
-        if cin is not None:
-            if cin.product == "prob":
-                cape_mask &= finite_threshold(as_probability(cin.values), DEFAULT_THRESHOLDS["lightningProbability"])
-            else:
-                cape_mask &= np.isfinite(cin.values) & (np.abs(cin.values) <= DEFAULT_THRESHOLDS["cinJkg"])
-
-    lightning_core = lightning_mask & (reflectivity_mask | cape_mask)
-    ingredient_core = reflectivity_mask & cape_mask & (qpf_mask | lightning_mask)
-    final_mask = lightning_core | ingredient_core
-    if not lightning and not any((qpf, reflectivity, cape)):
-        warnings.append("No HREF convection fields were available for this effective period.")
-    lat, lon = get_lat_lon(template)
-    features = mask_to_features(final_mask, lat, lon)
-    sources = {
-        "lightning": signal_source(lightning),
-        "qpf": signal_source(qpf),
-        "reflectivity": signal_source(reflectivity),
-        "cape": signal_source(cape),
-        "cin": signal_source(cin),
-    }
-    return response_payload(window, features, warnings, sources)
-
-
-def signal_source(signal: HrefSignal | None) -> dict[str, str] | None:
-    if signal is None:
-        return None
-    return {
-        "product": signal.product,
-        "search": signal.search,
-    }
+    return response_payload(window, [], warnings, {})
 
 
 def response_payload(

@@ -59,7 +59,7 @@ const runHrefTstmGenerator = (payload) =>
       if (didFinish) return;
       didFinish = true;
       child.kill('SIGTERM');
-      reject(new Error('Timed out while generating TSTM lines from HREF.'));
+      reject(new Error('Timed out while generating TSTM lines from SPC calibrated thunder.'));
     }, TSTM_GENERATION_TIMEOUT_MS);
 
     child.stdout.on('data', (chunk) => {
@@ -87,7 +87,7 @@ const runHrefTstmGenerator = (payload) =>
       clearTimeout(timeout);
 
       if (code !== 0) {
-        reject(new Error(stderr || `HREF TSTM generator exited with code ${code}.`));
+        reject(new Error(stderr || `SPC calibrated thunder generator exited with code ${code}.`));
         return;
       }
 

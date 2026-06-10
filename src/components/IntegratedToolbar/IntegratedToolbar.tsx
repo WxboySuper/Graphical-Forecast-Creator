@@ -880,8 +880,8 @@ const getTabbedToolbarActionItems = (
     key: 'auto-tstm',
     label: controller.isTstmGenerating ? 'Generating' : 'Auto TSTM',
     description: canGenerateTstmForDay(controller.currentDay)
-      ? 'Generate editable TSTM lines from HREF'
-      : 'HREF TSTM generation is available for Day 1 and Day 2',
+      ? 'Generate editable TSTM lines from SPC calibrated thunder'
+      : 'SPC calibrated thunder generation is available for Day 1 and Day 2',
     icon: <Zap className="h-4 w-4" />,
     onClick: controller.onGenerateTstm,
     disabled: controller.isTstmGenerating || !canGenerateTstmForDay(controller.currentDay),

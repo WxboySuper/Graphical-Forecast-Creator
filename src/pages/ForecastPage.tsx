@@ -1094,7 +1094,7 @@ const useCloudForecastActions = ({
   };
 };
 
-/** Creates callbacks for requesting, previewing, and applying HREF-generated TSTM polygons. */
+/** Creates callbacks for requesting, previewing, and applying SPC-calibrated TSTM polygons. */
 const useGeneratedTstmActions = ({
   addToast,
   currentDay,
@@ -1111,7 +1111,7 @@ const useGeneratedTstmActions = ({
 
   const handleGenerateTstm = useCallback(async () => {
     if (!canGenerateTstmForDay(currentDay)) {
-      addToast('HREF TSTM generation is only available for Day 1 and Day 2.', 'warning');
+      addToast('SPC calibrated thunder generation is only available for Day 1 and Day 2.', 'warning');
       return;
     }
 
