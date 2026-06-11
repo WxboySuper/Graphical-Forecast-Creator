@@ -38,6 +38,15 @@ try {
 }
 
 const sourcePr = JSON.parse(sourcePrJson);
+
+let betaContainsMain = true;
+try {
+  execFileSync('git', ['fetch', 'origin', 'beta', 'main'], { stdio: 'ignore' });
+  execFileSync('git', ['merge-base', '--is-ancestor', 'origin/main', 'origin/beta']);
+} catch {
+  betaContainsMain = false;
+}
+
 const result = evaluatePortPrPolicy({
   headRef,
   baseRef,
@@ -45,6 +54,7 @@ const result = evaluatePortPrPolicy({
   sourcePrHeadRef: sourcePr.headRefName,
   sourcePrBaseRef: sourcePr.baseRefName,
   sourcePrNumber: parsed.sourcePrNumber,
+  betaContainsMain,
 });
 
 if (!result.ok) {

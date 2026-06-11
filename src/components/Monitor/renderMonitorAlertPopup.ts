@@ -6,6 +6,7 @@ export const clearMonitorAlertPopup = (container: HTMLElement): void => {
   container.replaceChildren();
 };
 
+/** Appends a labeled metadata row when `value` is present. */
 const appendMetaRow = (
   parent: HTMLElement,
   label: string,
@@ -31,6 +32,7 @@ const appendMetaRow = (
   parent.appendChild(row);
 };
 
+/** Appends a titled description or instruction block to the popup. */
 const appendSection = (
   parent: HTMLElement,
   title: string,
@@ -66,6 +68,7 @@ export const renderMonitorAlertPopup = (
   const dialog = document.createElement('div');
   dialog.className = 'monitor-alert-popup';
   dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
   dialog.setAttribute('aria-label', `${details.event} details`);
 
   const header = document.createElement('div');
@@ -81,10 +84,7 @@ export const renderMonitorAlertPopup = (
   closeButton.setAttribute('aria-label', 'Close alert details');
   closeButton.textContent = '×';
 
-  const handleClose = () => {
-    onClose();
-  };
-  closeButton.addEventListener('click', handleClose);
+  closeButton.addEventListener('click', onClose);
 
   header.appendChild(title);
   header.appendChild(closeButton);
@@ -129,6 +129,6 @@ export const renderMonitorAlertPopup = (
   container.appendChild(dialog);
 
   return () => {
-    closeButton.removeEventListener('click', handleClose);
+    closeButton.removeEventListener('click', onClose);
   };
 };

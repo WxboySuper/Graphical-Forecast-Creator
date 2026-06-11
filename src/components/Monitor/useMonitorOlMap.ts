@@ -29,6 +29,7 @@ interface UseMonitorOlMapArgs {
   mapElementRef: RefObject<HTMLDivElement | null>;
 }
 
+/** Wires Monitor OpenLayers map bootstrap, layers, and imperative alert popups. */
 export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [selectedAlert, setSelectedAlert] = useState<NwsAlertDetails | null>(null);
@@ -39,7 +40,9 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
       hideOverlay(refs.overlayRef.current);
     }
     setSelectedAlert(null);
-  }, [refs]);
+    // refs omitted: wrapper object from useMonitorMapRefs() is new each render,
+    // but all inner refs are stable across renders.
+  }, []);
 
   useMonitorMapBootstrap({
     mapView: args.mapView,
@@ -82,8 +85,4 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     onClearSelectedAlert: clearSelectedAlert,
   });
 
-  return {
-    selectedAlert,
-    handleCloseAlertPopup: clearSelectedAlert,
-  };
 };
