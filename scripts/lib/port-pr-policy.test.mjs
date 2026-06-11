@@ -68,29 +68,23 @@ describe('port PR policy', () => {
     assert.equal(result.ok, false);
   });
 
-  it('blocks hotfix ports into beta when main is already on beta', () => {
-    const result = evaluatePortPrPolicy({
+  it('evaluates hotfix ports into beta based on whether main is on beta', () => {
+    const hotfixPort = {
       headRef: 'port/99-to-beta',
       baseRef: 'beta',
       targetBranch: 'beta',
       sourcePrHeadRef: 'hotfix/patch',
       sourcePrBaseRef: 'main',
       sourcePrNumber: 99,
-      betaContainsMain: true,
-    });
-    assert.equal(result.ok, false);
-  });
+    };
 
-  it('allows hotfix ports into beta when post-merge sync has not landed', () => {
-    const result = evaluatePortPrPolicy({
-      headRef: 'port/421-to-beta',
-      baseRef: 'beta',
-      targetBranch: 'beta',
-      sourcePrHeadRef: 'hotfix/sentry-gfc-web-5-removechild-regression',
-      sourcePrBaseRef: 'main',
-      sourcePrNumber: 421,
-      betaContainsMain: false,
-    });
-    assert.equal(result.ok, true);
+    assert.equal(
+      evaluatePortPrPolicy({ ...hotfixPort, betaContainsMain: true }).ok,
+      false,
+    );
+    assert.equal(
+      evaluatePortPrPolicy({ ...hotfixPort, betaContainsMain: false }).ok,
+      true,
+    );
   });
 });
