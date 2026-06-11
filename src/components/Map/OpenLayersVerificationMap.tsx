@@ -924,7 +924,7 @@ const OpenLayersVerificationMap = forwardRef<
   };
 
   return (
-    <div className="forecast-map-container">
+    <div className="forecast-map-container" translate="no">
       <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
       <div className="map-toolbar-bottom-right">
         <div className="flex items-center gap-1 rounded-md bg-white dark:bg-gray-800 p-1 shadow-md border border-gray-300 dark:border-gray-600">

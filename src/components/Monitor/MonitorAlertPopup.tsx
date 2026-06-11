@@ -26,7 +26,12 @@ const MonitorAlertPopup: React.FC<MonitorAlertPopupProps> = ({ details, onClose 
   const expires = formatNwsAlertTime(details.expires);
 
   return (
-    <div className="monitor-alert-popup" role="dialog" aria-label={`${details.event} details`}>
+    <div
+      className="monitor-alert-popup"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${details.event} details`}
+    >
       <div className="monitor-alert-popup__header">
         <h3 className="monitor-alert-popup__title">{details.event}</h3>
         <button
