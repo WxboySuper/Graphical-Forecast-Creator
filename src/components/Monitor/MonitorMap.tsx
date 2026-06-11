@@ -21,6 +21,7 @@ interface MonitorMapProps {
   alertsOpacity: number;
 }
 
+/** Monitor workspace map shell hosting radar, satellite, outlook, and alert layers. */
 const MonitorMap: React.FC<MonitorMapProps> = ({
   mapView,
   radarLayer,
