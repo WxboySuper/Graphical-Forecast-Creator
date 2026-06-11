@@ -68,15 +68,23 @@ describe('port PR policy', () => {
     assert.equal(result.ok, false);
   });
 
-  it('blocks hotfix ports into beta', () => {
-    const result = evaluatePortPrPolicy({
+  it('evaluates hotfix ports into beta based on whether main is on beta', () => {
+    const hotfixPort = {
       headRef: 'port/99-to-beta',
       baseRef: 'beta',
       targetBranch: 'beta',
       sourcePrHeadRef: 'hotfix/patch',
       sourcePrBaseRef: 'main',
       sourcePrNumber: 99,
-    });
-    assert.equal(result.ok, false);
+    };
+
+    assert.equal(
+      evaluatePortPrPolicy({ ...hotfixPort, betaContainsMain: true }).ok,
+      false,
+    );
+    assert.equal(
+      evaluatePortPrPolicy({ ...hotfixPort, betaContainsMain: false }).ok,
+      true,
+    );
   });
 });

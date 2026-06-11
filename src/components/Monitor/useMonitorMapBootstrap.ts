@@ -12,6 +12,7 @@ import { buildNwsAlertStyle } from '../../monitor/nwsAlerts';
 import { parseNwsAlertFromOlProperties } from '../../monitor/nwsAlertDetails';
 import type { NwsAlertDetails } from '../../monitor/nwsAlertDetails';
 import { hideOverlay } from '../Map/OpenLayersForecastMap';
+import { clearMonitorAlertPopup } from './renderMonitorAlertPopup';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../store';
 import { setMonitorMapView } from '../../store/monitorSlice';
@@ -43,7 +44,6 @@ interface UseMonitorMapBootstrapArgs {
   mapElementRef: RefObject<HTMLDivElement | null>;
   refs: MonitorMapRefs;
   onSelectAlert: (details: NwsAlertDetails | null) => void;
-  onCreatePopupElement: (el: HTMLDivElement | null) => void;
 }
 
 export const useMonitorMapBootstrap = ({
@@ -55,7 +55,6 @@ export const useMonitorMapBootstrap = ({
   mapElementRef,
   refs,
   onSelectAlert,
-  onCreatePopupElement,
 }: UseMonitorMapBootstrapArgs) => {
   const dispatch = useDispatch<AppDispatch>();
 
@@ -108,6 +107,7 @@ export const useMonitorMapBootstrap = ({
       }),
     });
 
+    /** Persists user pan/zoom into monitor map view state. */
     const handleMoveEnd = () => {
       if (refs.applyingExternalViewRef.current) {
         return;
@@ -123,6 +123,7 @@ export const useMonitorMapBootstrap = ({
       dispatch(setMonitorMapView({ center: [latitude, longitude], zoom }));
     };
 
+    /** Opens or dismisses the NWS alert popup for the clicked feature. */
     const handleMapClick = (evt: { pixel: number[]; coordinate: number[] }) => {
       const feature = map.forEachFeatureAtPixel(
         evt.pixel,
@@ -150,6 +151,7 @@ export const useMonitorMapBootstrap = ({
       onSelectAlert(null);
     };
 
+    /** Toggles the pointer cursor when hovering clickable alert features. */
     const handlePointerMove = (evt: { pixel: number[] }) => {
       const target = map.getTargetElement();
       if (!(target instanceof HTMLElement)) {
@@ -168,8 +170,8 @@ export const useMonitorMapBootstrap = ({
 
     const popupEl = document.createElement("div");
     popupEl.className = "monitor-map__alertOverlay";
+    popupEl.setAttribute("translate", "no");
     refs.popupElRef.current = popupEl;
-    onCreatePopupElement(popupEl);
     const overlay = new Overlay({ element: popupEl, autoPan: false });
     map.addOverlay(overlay);
     refs.overlayRef.current = overlay;
@@ -210,6 +212,10 @@ export const useMonitorMapBootstrap = ({
       if (target instanceof HTMLElement) {
         target.style.cursor = '';
       }
+      onSelectAlert(null);
+      if (refs.popupElRef.current) {
+        clearMonitorAlertPopup(refs.popupElRef.current);
+      }
       if (refs.overlayRef.current) {
         map.removeOverlay(refs.overlayRef.current);
         refs.overlayRef.current = null;
@@ -218,7 +224,6 @@ export const useMonitorMapBootstrap = ({
         refs.popupElRef.current.remove();
         refs.popupElRef.current = null;
       }
-      onCreatePopupElement(null);
       map.setTarget();
       refs.mapRef.current = null;
       refs.baseLayerRef.current = null;

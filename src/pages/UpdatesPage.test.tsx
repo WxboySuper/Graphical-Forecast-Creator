@@ -27,6 +27,8 @@ describe('UpdatesPage', () => {
     expect(document.querySelector('img[src="/updates/v1.6/v1.6-promo-image-light-mrms-visible.png"]')).toBeTruthy();
     expect(document.querySelector('img[src="/updates/v1.6/v1.6-promo-image-dark-single-site-shortwave-ir.png"]')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Monitor workspace/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /v1\.6 Hotfixes/i })).toBeInTheDocument();
+    expect(screen.getByText(/OpenLayers and React disagreed about popup DOM ownership/i)).toBeInTheDocument();
     expect(screen.getByText(/Signed-in home page primary buttons are easier to read/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Back to home/i })).toHaveAttribute('href', '/');
   });

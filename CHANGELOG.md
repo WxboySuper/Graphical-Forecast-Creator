@@ -21,6 +21,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added Google Analytics entry to deployment
 
+### Fixed
+- **OpenLayers map stability (GFC-WEB-5, GFC-WEB-9, GFC-WEB-C):** Completed the Monitor map popup fix by rendering NWS alert overlays imperatively instead of portaling React into OpenLayers-moved DOM nodes. Hardened map teardown order and marked map shells `notranslate` so Chrome auto-translate is less likely to trigger `removeChild` errors on forecast, verification, and monitor maps.
+
 ## v1.6.1
 
 ### Dependencies
