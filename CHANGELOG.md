@@ -3,26 +3,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
-### Dependencies
-<!-- dependabot-automation -->
-
-- **react-router-dom:** ^7.16.0 → ^7.17.0
-- **rollup:** >=4.61.0 → >=4.61.1
-- **@types/react:** 19.2.16 → 19.2.17
-- **@radix-ui/react-dialog:** ^1.1.15 → ^1.1.16
-- **@radix-ui/react-dropdown-menu:** ^2.1.16 → ^2.1.17
-- **@radix-ui/react-popover:** ^1.1.15 → ^1.1.16
-- **@radix-ui/react-slot:** ^1.2.4 → ^1.2.5
-- **@radix-ui/react-tabs:** ^1.1.13 → ^1.1.14
-- **@radix-ui/react-tooltip:** ^1.2.8 → ^1.2.9
-- **@types/node:** ^25.9.1 → ^25.9.2
-
-### Added
-- Added Google Analytics entry to deployment
+## v1.6.4
 
 ### Fixed
 - **OpenLayers map stability (GFC-WEB-5, GFC-WEB-9, GFC-WEB-C):** Completed the Monitor map popup fix by rendering NWS alert overlays imperatively instead of portaling React into OpenLayers-moved DOM nodes. Hardened map teardown order and marked map shells `notranslate` so Chrome auto-translate is less likely to trigger `removeChild` errors on forecast, verification, and monitor maps.
+- **Build dependency security (Dependabot #128 and #129):** Replaced the transitive `esbuild` 0.27.x installation with an explicit patched `esbuild` 0.28.1 development dependency and added a `pnpm.overrides` guard to prevent the vulnerable resolution from returning.
 
 ## v1.6.1
 
