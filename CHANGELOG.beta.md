@@ -4,6 +4,12 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+<<<<<<< HEAD
 ### PR #526
 
 - Preserve the hidden Auto-TSTM client API boundary, response validation, and stale-request identity without mounting unfinished controls.
+=======
+### PR #525
+
+- Preserve the Auto-TSTM Python GRIB2 generator and server adapter behind a default-off deployment capability with focused tests; retire the obsolete generic HREF inventory probe.
+>>>>>>> origin/pr/525

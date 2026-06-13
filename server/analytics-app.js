@@ -33,6 +33,7 @@ function configureApp(app, express, fs, LOG_FILE) {
   const { registerBillingRoutes } = require('./billing');
   const { registerMetricsRoutes } = require('./metrics');
   const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
+  const { registerTstmRoutes } = require('./tstm');
 
   app.set('trust proxy', 'loopback');
 
@@ -47,6 +48,7 @@ function configureApp(app, express, fs, LOG_FILE) {
   registerBillingRoutes(app, express);
   registerMetricsRoutes(app, express);
   registerBetaRoutes(app, express);
+  registerTstmRoutes(app, express);
 
   app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, createCollectHandler(fs, LOG_FILE));
 
