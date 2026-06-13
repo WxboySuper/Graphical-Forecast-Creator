@@ -8,9 +8,17 @@ const entryHeadingPattern = (prNumber, flags = '') => (
   new RegExp(`^${entryHeading(prNumber)}(?!\\d)`, flags.includes('m') ? flags : `${flags}m`)
 );
 
+/** Reports whether a value can identify a GitHub pull request. */
+const isValidPrNumber = (prNumber) => Number.isInteger(prNumber) && prNumber > 0;
+
+/** Counts complete headings for one PR without matching numeric prefixes. */
+const countEntryHeadings = (changelog, prNumber) => (
+  [...changelog.matchAll(entryHeadingPattern(prNumber, 'g'))].length
+);
+
 /** Rejects incomplete data before an entry is formatted. */
 const validateEntryInput = (prNumber, bullets) => {
-  if (!Number.isInteger(prNumber) || prNumber <= 0) {
+  if (!isValidPrNumber(prNumber)) {
     throw new Error('A positive PR number is required.');
   }
   if (!Array.isArray(bullets) || bullets.length === 0) {
@@ -43,7 +51,7 @@ export const extractBetaChangelogEntry = (changelog, prNumber) => {
 
 /** Validates that a beta PR has exactly one non-empty bullet entry. */
 export const betaChangelogTouchesPr = (changedFiles, changelog, prNumber) => {
-  if (!Number.isInteger(prNumber) || prNumber <= 0) {
+  if (!isValidPrNumber(prNumber)) {
     return { ok: false, reason: 'A valid PR_NUMBER is required for beta changelog validation.' };
   }
   if (!changedFiles.includes(BETA_CHANGELOG_PATH)) {
@@ -56,7 +64,7 @@ export const betaChangelogTouchesPr = (changedFiles, changelog, prNumber) => {
       reason: `${BETA_CHANGELOG_PATH} must include ${entryHeading(prNumber)} with at least one bullet.`,
     };
   }
-  const occurrences = [...changelog.matchAll(entryHeadingPattern(prNumber, 'g'))].length;
+  const occurrences = countEntryHeadings(changelog, prNumber);
   if (occurrences !== 1) {
     return { ok: false, reason: `${entryHeading(prNumber)} must appear exactly once.` };
   }
