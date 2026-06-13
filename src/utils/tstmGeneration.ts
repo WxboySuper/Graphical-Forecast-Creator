@@ -66,9 +66,12 @@ export const isCurrentTstmRequest = (
   activeRequest: TstmGenerationRequest
 ): boolean => getTstmRequestIdentity(request) === getTstmRequestIdentity(activeRequest);
 
+/** Narrows unknown API fields to strings. */
 const isString = (value: unknown): value is string => typeof value === 'string';
+/** Narrows unknown API fields to arrays. */
 const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
 
+/** Checks the required top-level response fields before normalization. */
 const hasResponseShape = (
   response: Partial<TstmGenerationResponse>
 ): response is Partial<TstmGenerationResponse> & Pick<
@@ -83,6 +86,7 @@ const hasResponseShape = (
   isArray(response.warnings),
 ].every(Boolean);
 
+/** Returns validated probability thresholds or the documented defaults. */
 const parseThresholds = (
   thresholds: Partial<TstmGenerationResponse['thresholds']> | undefined
 ): TstmGenerationResponse['thresholds'] => {
