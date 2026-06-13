@@ -65,6 +65,25 @@ const createTstmFeature = (id: string, offset: number): Feature =>
     probability: 'TSTM',
   });
 
+const createStateWithCategoricalFeatures = () => {
+  let state = reducer(undefined, setForecastDay(1));
+  state = reducer(
+    state,
+    applyAutoCategoricalSync({
+      map: new Map([
+        ['TSTM', [createTstmFeature('old-tstm', 0)]],
+        ['ENH', [createCategoricalFeature('enh', 2)]],
+      ]),
+    })
+  );
+  return state;
+};
+
+const getCategoricalFeatureId = (
+  state: ReturnType<typeof reducer>,
+  probability: string
+) => state.forecastCycle.days[1]?.data.categorical?.get(probability)?.[0].id;
+
 const createOutlookFeature = (
   id: string,
   offset: number,
@@ -327,26 +346,26 @@ describe('forecastSlice undo/redo', () => {
   });
 
   test('replaces only TSTM features and keeps generated categorical risks', () => {
-    let state = reducer(undefined, setForecastDay(1));
-    state = reducer(
-      state,
-      applyAutoCategoricalSync({
-        map: new Map([
-          ['TSTM', [createTstmFeature('old-tstm', 0)]],
-          ['ENH', [createCategoricalFeature('enh', 2)]],
-        ]),
-      })
+    const state = reducer(
+      createStateWithCategoricalFeatures(),
+      replaceTstmFeatures({ features: [createTstmFeature('new-tstm', 4)] })
     );
 
-    state = reducer(state, replaceTstmFeatures({ features: [createTstmFeature('new-tstm', 4)] }));
+    expect(getCategoricalFeatureId(state, 'TSTM')).toBe('new-tstm');
+    expect(getCategoricalFeatureId(state, 'ENH')).toBe('enh');
+  });
 
-    expect(state.forecastCycle.days[1]?.data.categorical?.get('TSTM')?.[0].id).toBe('new-tstm');
-    expect(state.forecastCycle.days[1]?.data.categorical?.get('ENH')?.[0].id).toBe('enh');
-    expect(selectCanUndo({ forecast: state } as never)).toBe(true);
+  test('records generated TSTM replacement as one undoable edit', () => {
+    const replacedState = reducer(
+      createStateWithCategoricalFeatures(),
+      replaceTstmFeatures({ features: [createTstmFeature('new-tstm', 4)] })
+    );
 
-    state = reducer(state, undoLastEdit());
-    expect(state.forecastCycle.days[1]?.data.categorical?.get('TSTM')?.[0].id).toBe('old-tstm');
-    expect(state.forecastCycle.days[1]?.data.categorical?.get('ENH')?.[0].id).toBe('enh');
+    expect(selectCanUndo({ forecast: replacedState } as never)).toBe(true);
+
+    const restoredState = reducer(replacedState, undoLastEdit());
+    expect(getCategoricalFeatureId(restoredState, 'TSTM')).toBe('old-tstm');
+    expect(getCategoricalFeatureId(restoredState, 'ENH')).toBe('enh');
   });
 
   test('importing and resetting clear all per-day history', () => {
