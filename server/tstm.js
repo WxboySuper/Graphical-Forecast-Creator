@@ -54,17 +54,17 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
   let stdout = '';
   let stderr = '';
   let finished = false;
-  let timer;
+  const timer = setTimeout(() => {
+    child.kill('SIGTERM');
+    finish(() => reject(new Error('TSTM_GENERATION_TIMEOUT')));
+  }, timeoutMs);
+  /** Settles the worker exactly once and clears its timeout. */
   const finish = (callback) => {
     if (finished) return;
     finished = true;
     clearTimeout(timer);
     callback();
   };
-  timer = setTimeout(() => {
-    child.kill('SIGTERM');
-    finish(() => reject(new Error('TSTM_GENERATION_TIMEOUT')));
-  }, timeoutMs);
 
   child.stdout.on('data', (chunk) => {
     stdout += chunk.toString();

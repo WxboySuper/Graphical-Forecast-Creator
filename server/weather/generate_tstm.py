@@ -79,7 +79,11 @@ def parse_cycle_date(value: str) -> datetime:
 
 
 def parse_issuance_time(value: str | None) -> tuple[int, int]:
-    if not value or len(value) < 4 or not value[:4].isdigit():
+    if not value:
+        return 6, 0
+    if len(value) < 4:
+        return 6, 0
+    if not value[:4].isdigit():
         return 6, 0
     return int(value[:2]), int(value[2:4])
 
@@ -131,18 +135,16 @@ def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
 
 
 def get_first_data_array(dataset: Any) -> Any | None:
-    if isinstance(dataset, list):
-        for item in dataset:
-            data_array = get_first_data_array(item)
-            if data_array is not None:
-                return data_array
-        return None
-
-    for data_array in getattr(dataset, "data_vars", {}).values():
-        values = np.asarray(data_array.values)
-        if values.size > 0:
-            return data_array
-    return None
+    datasets = dataset if isinstance(dataset, list) else [dataset]
+    arrays = (
+        data_array
+        for item in datasets
+        for data_array in getattr(item, "data_vars", {}).values()
+    )
+    return next(
+        (data_array for data_array in arrays if np.asarray(data_array.values).size > 0),
+        None,
+    )
 
 
 def normalize_values(values: np.ndarray) -> np.ndarray:
@@ -237,12 +239,9 @@ def spc_candidate_windows(window: EffectiveWindow) -> list[EffectiveWindow]:
 
 def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThunderSignal | None:
     end_hour = window.forecast_hours[-1]
-    if period == "full":
-        hours = sorted(set([max(1, end_hour - 23), end_hour]))
-    elif period == "4hr":
-        hours = sorted(set([max(1, end_hour - 3), end_hour]))
-    else:
-        hours = [end_hour]
+    period_offsets = {"full": 23, "4hr": 3}
+    offset = period_offsets.get(period)
+    hours = [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
     expected_valid_time = window.href_run + timedelta(hours=end_hour)
     arrays: list[np.ndarray] = []
     matched_hours: list[int] = []
@@ -301,16 +300,20 @@ def fetch_spc_calibrated_thunder(window: EffectiveWindow) -> tuple[SpcThunderSig
     if not candidates:
         return None, warnings
 
-    for period in SPC_THUNDER_PERIODS:
-        for candidate in candidates:
-            signal = fetch_spc_period_for_window(candidate, period)
-            if signal is not None:
-                if candidate.href_run != window.href_run:
-                    warnings.append(
-                        f"Latest SPC calibrated thunder run was incomplete; used "
-                        f"{candidate.href_run:%Y-%m-%d %HZ} instead."
-                    )
-                return signal, warnings
+    attempts = (
+        (candidate, fetch_spc_period_for_window(candidate, period))
+        for period in SPC_THUNDER_PERIODS
+        for candidate in candidates
+    )
+    for candidate, signal in attempts:
+        if signal is None:
+            continue
+        if candidate.href_run != window.href_run:
+            warnings.append(
+                f"Latest SPC calibrated thunder run was incomplete; used "
+                f"{candidate.href_run:%Y-%m-%d %HZ} instead."
+            )
+        return signal, warnings
 
     warnings.append("No SPC calibrated HREF thunder field was available for the requested period.")
     return None, warnings
@@ -361,21 +364,32 @@ def calibrated_thunder_mask(
         mask = morphology.remove_small_holes(mask, 64)
         mask = morphology.remove_small_objects(mask, 12)
     if lat is not None and lon is not None:
-        log_calibrated_thunder_components(values, smoothed, support, core, mask, lat, lon)
+        log_calibrated_thunder_components(
+            {
+                "raw_probability": values,
+                "smoothed_probability": smoothed,
+                "support": support,
+                "core": core,
+                "mask": mask,
+                "lat": lat,
+                "lon": lon,
+            }
+        )
     return mask
 
 
 def log_calibrated_thunder_components(
-    raw_probability: np.ndarray,
-    smoothed_probability: np.ndarray,
-    support: np.ndarray,
-    core: np.ndarray,
-    mask: np.ndarray,
-    lat: np.ndarray,
-    lon: np.ndarray,
+    fields: dict[str, np.ndarray],
 ) -> None:
     from skimage import measure
 
+    raw_probability = fields["raw_probability"]
+    smoothed_probability = fields["smoothed_probability"]
+    support = fields["support"]
+    core = fields["core"]
+    mask = fields["mask"]
+    lat = fields["lat"]
+    lon = fields["lon"]
     finite = raw_probability[np.isfinite(raw_probability)]
     if finite.size:
         percentiles = np.nanpercentile(finite, [50, 75, 90, 95, 99])
@@ -428,22 +442,16 @@ def get_lat_lon(template: Any) -> tuple[np.ndarray, np.ndarray]:
     if template is None:
         raise ValueError("No HREF template grid is available.")
 
-    lat = None
-    lon = None
-    for name in ("latitude", "lat"):
-        if hasattr(template, name):
-            lat = np.asarray(getattr(template, name).values)
-            break
-        if name in getattr(template, "coords", {}):
-            lat = np.asarray(template.coords[name].values)
-            break
-    for name in ("longitude", "lon"):
-        if hasattr(template, name):
-            lon = np.asarray(getattr(template, name).values)
-            break
-        if name in getattr(template, "coords", {}):
-            lon = np.asarray(template.coords[name].values)
-            break
+    def coordinate(names: tuple[str, ...]) -> np.ndarray | None:
+        direct = next((getattr(template, name) for name in names if hasattr(template, name)), None)
+        if direct is not None:
+            return np.asarray(direct.values)
+        coords = getattr(template, "coords", {})
+        match = next((coords[name] for name in names if name in coords), None)
+        return None if match is None else np.asarray(match.values)
+
+    lat = coordinate(("latitude", "lat"))
+    lon = coordinate(("longitude", "lon"))
 
     if lat is None or lon is None:
         raise ValueError("Unable to locate latitude/longitude coordinates in HREF data.")
@@ -593,18 +601,16 @@ def mask_to_features(mask: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> list
     from shapely.ops import unary_union
     from skimage import measure
 
-    contours = measure.find_contours(clean_mask(mask).astype(float), 0.5)
-    polygons = []
-    for contour in contours:
+    def contour_polygon(contour: np.ndarray) -> Any | None:
         coordinates = [grid_point_to_lon_lat(lat, lon, row, col) for row, col in contour]
         if len(coordinates) < 4:
-            continue
+            return None
         polygon = Polygon(coordinates)
-        if not polygon.is_valid:
-            polygon = polygon.buffer(0)
-        if polygon.is_empty:
-            continue
-        polygons.append(polygon.simplify(0.08, preserve_topology=True))
+        polygon = polygon if polygon.is_valid else polygon.buffer(0)
+        return None if polygon.is_empty else polygon.simplify(0.08, preserve_topology=True)
+
+    contours = measure.find_contours(clean_mask(mask).astype(float), 0.5)
+    polygons = [polygon for contour in contours if (polygon := contour_polygon(contour)) is not None]
 
     if not polygons:
         return []
@@ -614,16 +620,11 @@ def mask_to_features(mask: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> list
     if merged.is_empty:
         return []
 
-    if merged.geom_type == "Polygon":
-        geometries = [merged]
-    else:
-        geometries = list(getattr(merged, "geoms", []))
+    geometries = [merged] if merged.geom_type == "Polygon" else list(getattr(merged, "geoms", []))
 
     features = []
     for index, geometry in enumerate(geometries):
-        if geometry.is_empty:
-            continue
-        if geometry.area < 0.08:
+        if geometry.is_empty or geometry.area < 0.08:
             continue
         features.append(
             {
