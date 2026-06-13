@@ -6,6 +6,7 @@ import reducer, {
   copyFeaturesFromPrevious,
   importForecastCycle,
   redoLastEdit,
+  replaceTstmFeatures,
   resetForecasts,
   selectCanRedo,
   selectCanUndo,
@@ -57,6 +58,31 @@ const createCategoricalFeature = (id: string, offset: number): Feature =>
     probability: 'ENH',
     extras: { derivedFrom: 'auto-generated' },
   });
+
+const createTstmFeature = (id: string, offset: number): Feature =>
+  createBaseFeature(id, offset, {
+    outlookType: 'categorical',
+    probability: 'TSTM',
+  });
+
+const createStateWithCategoricalFeatures = () => {
+  let state = reducer(undefined, setForecastDay(1));
+  state = reducer(
+    state,
+    applyAutoCategoricalSync({
+      map: new Map([
+        ['TSTM', [createTstmFeature('old-tstm', 0)]],
+        ['ENH', [createCategoricalFeature('enh', 2)]],
+      ]),
+    })
+  );
+  return state;
+};
+
+const getCategoricalFeatureId = (
+  state: ReturnType<typeof reducer>,
+  probability: string
+) => state.forecastCycle.days[1]?.data.categorical?.get(probability)?.[0].id;
 
 const createOutlookFeature = (
   id: string,
@@ -317,6 +343,51 @@ describe('forecastSlice undo/redo', () => {
 
     expect(getTornadoFeatures(state)).toHaveLength(0);
     expect(state.forecastCycle.days[1]?.data.categorical?.size ?? 0).toBe(0);
+  });
+
+  test('replaces only TSTM features and keeps generated categorical risks', () => {
+    const state = reducer(
+      createStateWithCategoricalFeatures(),
+      replaceTstmFeatures({ features: [createTstmFeature('new-tstm', 4)] })
+    );
+
+    expect(getCategoricalFeatureId(state, 'TSTM')).toBe('new-tstm');
+    expect(getCategoricalFeatureId(state, 'ENH')).toBe('enh');
+  });
+
+  test('records generated TSTM replacement as one undoable edit', () => {
+    const replacedState = reducer(
+      createStateWithCategoricalFeatures(),
+      replaceTstmFeatures({ features: [createTstmFeature('new-tstm', 4)] })
+    );
+
+    expect(selectCanUndo({ forecast: replacedState } as never)).toBe(true);
+
+    const restoredState = reducer(replacedState, undoLastEdit());
+    expect(getCategoricalFeatureId(restoredState, 'TSTM')).toBe('old-tstm');
+    expect(getCategoricalFeatureId(restoredState, 'ENH')).toBe('enh');
+  });
+
+  test('does not add an undo entry for logically identical TSTM features', () => {
+    const firstFeature = createTstmFeature('generated-tstm', 0);
+    const secondFeature = createTstmFeature('generated-tstm', 0);
+    secondFeature.properties = {
+      originalProbability: 'TSTM',
+      derivedFrom: 'categorical',
+      probability: 'TSTM',
+      outlookType: 'categorical',
+      isSignificant: false,
+    };
+
+    let state = reducer(
+      reducer(undefined, setForecastDay(1)),
+      replaceTstmFeatures({ features: [firstFeature] })
+    );
+    state = reducer(state, replaceTstmFeatures({ features: [secondFeature] }));
+
+    state = reducer(state, undoLastEdit());
+    expect(selectCanUndo({ forecast: state } as never)).toBe(false);
+    expect(getCategoricalFeatureId(state, 'TSTM')).toBeUndefined();
   });
 
   test('importing and resetting clear all per-day history', () => {
