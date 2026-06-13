@@ -1,11 +1,47 @@
 export const BETA_CHANGELOG_PATH = 'CHANGELOG.beta.md';
 
+/** Builds the canonical heading for one beta changelog PR entry. */
 const entryHeading = (prNumber) => `### PR #${prNumber}`;
+
+/** Matches a complete PR heading without treating #50 as #500. */
+const entryHeadingPattern = (prNumber, flags = '') => (
+  new RegExp(`^${entryHeading(prNumber)}(?!\\d)`, flags.includes('m') ? flags : `${flags}m`)
+);
+
+/** Reports whether a value can identify a GitHub pull request. */
+const isValidPrNumber = (prNumber) => Number.isInteger(prNumber) && prNumber > 0;
+
+/** Counts complete headings for one PR without matching numeric prefixes. */
+const countEntryHeadings = (changelog, prNumber) => (
+  [...changelog.matchAll(entryHeadingPattern(prNumber, 'g'))].length
+);
+
+/** Rejects incomplete data before an entry is formatted. */
+const validateEntryInput = (prNumber, bullets) => {
+  if (!isValidPrNumber(prNumber)) {
+    throw new Error('A positive PR number is required.');
+  }
+  if (!Array.isArray(bullets) || bullets.length === 0) {
+    throw new Error('At least one beta changelog bullet is required.');
+  }
+  if (bullets.some((bullet) => !bullet.trim())) {
+    throw new Error('Beta changelog bullets cannot be empty.');
+  }
+};
+
+/** Formats normalized input as one machine-parseable PR section. */
+const formatEntry = (prNumber, bullets) => {
+  const body = bullets
+    .map((bullet) => `- ${bullet.replace(/^[-*]\s*/, '')}`)
+    .join('\n');
+  return `${entryHeading(prNumber)}\n\n${body}`;
+};
 
 /** Returns one PR entry body, or null when it is missing. */
 export const extractBetaChangelogEntry = (changelog, prNumber) => {
   const heading = entryHeading(prNumber);
-  const start = changelog.indexOf(heading);
+  const match = entryHeadingPattern(prNumber).exec(changelog);
+  const start = match?.index ?? -1;
   if (start === -1) return null;
   const rest = changelog.slice(start + heading.length);
   const next = rest.search(/\n### PR #|\n## /);
@@ -15,7 +51,7 @@ export const extractBetaChangelogEntry = (changelog, prNumber) => {
 
 /** Validates that a beta PR has exactly one non-empty bullet entry. */
 export const betaChangelogTouchesPr = (changedFiles, changelog, prNumber) => {
-  if (!Number.isInteger(prNumber) || prNumber <= 0) {
+  if (!isValidPrNumber(prNumber)) {
     return { ok: false, reason: 'A valid PR_NUMBER is required for beta changelog validation.' };
   }
   if (!changedFiles.includes(BETA_CHANGELOG_PATH)) {
@@ -28,7 +64,7 @@ export const betaChangelogTouchesPr = (changedFiles, changelog, prNumber) => {
       reason: `${BETA_CHANGELOG_PATH} must include ${entryHeading(prNumber)} with at least one bullet.`,
     };
   }
-  const occurrences = changelog.split(entryHeading(prNumber)).length - 1;
+  const occurrences = countEntryHeadings(changelog, prNumber);
   if (occurrences !== 1) {
     return { ok: false, reason: `${entryHeading(prNumber)} must appear exactly once.` };
   }
@@ -37,16 +73,10 @@ export const betaChangelogTouchesPr = (changedFiles, changelog, prNumber) => {
 
 /** Inserts or replaces one PR entry under Unreleased. */
 export const upsertBetaChangelogEntry = (changelog, prNumber, bullets) => {
-  if (!Number.isInteger(prNumber) || prNumber <= 0) {
-    throw new Error('A positive PR number is required.');
-  }
-  if (!Array.isArray(bullets) || bullets.length === 0 || bullets.some((bullet) => !bullet.trim())) {
-    throw new Error('At least one non-empty beta changelog bullet is required.');
-  }
-  const heading = entryHeading(prNumber);
-  const entry = `${heading}\n\n${bullets.map((bullet) => `- ${bullet.replace(/^[-*]\s*/, '')}`).join('\n')}`;
+  validateEntryInput(prNumber, bullets);
+  const entry = formatEntry(prNumber, bullets);
   const existing = extractBetaChangelogEntry(changelog, prNumber);
-  if (existing) return changelog.replace(existing, entry);
+  if (existing) return changelog.replace(existing, () => entry);
   const unreleased = '## Unreleased';
   const index = changelog.indexOf(unreleased);
   if (index === -1) throw new Error(`${BETA_CHANGELOG_PATH} must include ${unreleased}.`);
@@ -64,5 +94,5 @@ export const takeBetaChangelogEntries = (changelog, prNumbers) => {
     entries.push(...entry.split('\n').filter((line) => /^[-*]\s+/.test(line)).map((line) => line.replace(/^[-*]\s+/, '')));
     next = next.replace(entry, '').replace(/\n{3,}/g, '\n\n');
   }
-  return { changelog: next.trimEnd() + '\n', entries };
+  return { changelog: `${next.trimEnd()}\n`, entries };
 };
