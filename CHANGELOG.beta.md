@@ -4,6 +4,6 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### PR #TBD
+### PR #526
 
 - Preserve the hidden Auto-TSTM client API boundary, response validation, and stale-request identity without mounting unfinished controls.
