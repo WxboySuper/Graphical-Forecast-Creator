@@ -39,6 +39,13 @@ class GenerateTstmTests(unittest.TestCase):
         normalized = generate_tstm.as_probability(np.array([[np.nan, np.nan]]))
         self.assertTrue(np.isnan(normalized).all())
 
+    def test_spc_array_combination_preserves_all_nan_fields(self):
+        combined = generate_tstm.combine_spc_arrays(
+            [np.array([[np.nan, np.nan]]), np.array([[np.nan, np.nan]])]
+        )
+        self.assertEqual(combined.shape, (1, 2))
+        self.assertTrue(np.isnan(combined).all())
+
     def test_response_shape_preserves_source_metadata(self):
         window = generate_tstm.build_effective_window(
             {"day": 1, "cycleDate": "2026-06-13"}

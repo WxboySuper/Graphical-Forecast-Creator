@@ -296,7 +296,7 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
             flush=True,
         )
         return SpcThunderSignal(
-            values=np.nanmax(np.stack(arrays), axis=0),
+            values=combine_spc_arrays(arrays),
             template=template,
             run=window.href_run,
             period=period,
@@ -309,6 +309,13 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
 def spc_period_hours(end_hour: int, period: str) -> list[int]:
     offset = {"full": 23, "4hr": 3}.get(period)
     return [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
+
+
+def combine_spc_arrays(arrays: list[np.ndarray]) -> np.ndarray:
+    stacked = np.stack(arrays)
+    if np.all(np.isnan(stacked)):
+        return np.full(stacked.shape[1:], np.nan)
+    return np.nanmax(stacked, axis=0)
 
 
 def fetch_spc_calibrated_thunder(window: EffectiveWindow) -> tuple[SpcThunderSignal | None, list[str]]:
