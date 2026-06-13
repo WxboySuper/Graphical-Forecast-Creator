@@ -52,7 +52,13 @@ export const normalizeGeneratedTstmFeatures = (features: Feature[]): Feature[] =
 
 /** Identifies the forecast context that owns an asynchronous guidance result. */
 export const getTstmRequestIdentity = (request: TstmGenerationRequest): string =>
-  `${request.cycleDate}:day-${request.day}:${request.validDate ?? ''}:${request.issuanceTime ?? ''}`;
+  [
+    request.cycleDate,
+    `day-${request.day}`,
+    request.issueDate ?? '',
+    request.validDate ?? '',
+    request.issuanceTime ?? '',
+  ].join(':');
 
 /** Returns true only when a response still belongs to the active forecast context. */
 export const isCurrentTstmRequest = (
@@ -60,29 +66,50 @@ export const isCurrentTstmRequest = (
   activeRequest: TstmGenerationRequest
 ): boolean => getTstmRequestIdentity(request) === getTstmRequestIdentity(activeRequest);
 
+const isString = (value: unknown): value is string => typeof value === 'string';
+const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
+
+const hasResponseShape = (
+  response: Partial<TstmGenerationResponse>
+): response is Partial<TstmGenerationResponse> & Pick<
+  TstmGenerationResponse,
+  'features' | 'run' | 'forecastHours' | 'effectiveStart' | 'effectiveEnd' | 'warnings'
+> => [
+  isArray(response.features),
+  isString(response.run),
+  isArray(response.forecastHours),
+  isString(response.effectiveStart),
+  isString(response.effectiveEnd),
+  isArray(response.warnings),
+].every(Boolean);
+
+const parseThresholds = (
+  thresholds: Partial<TstmGenerationResponse['thresholds']> | undefined
+): TstmGenerationResponse['thresholds'] => {
+  const core = thresholds?.calibratedThunderCoreProbability;
+  const support = thresholds?.calibratedThunderSupportProbability;
+  if (typeof core === 'number' && typeof support === 'number') {
+    return { calibratedThunderCoreProbability: core, calibratedThunderSupportProbability: support };
+  }
+  return {
+    calibratedThunderCoreProbability: 0.3,
+    calibratedThunderSupportProbability: 0.1,
+  };
+};
+
 /** Validates and normalizes a cached Auto-TSTM API response. */
 export const parseTstmGenerationResponse = (payload: unknown): TstmGenerationResponse => {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Auto-TSTM returned an invalid response.');
   }
   const response = payload as Partial<TstmGenerationResponse>;
-  if (
-    typeof response.run !== 'string' ||
-    typeof response.effectiveStart !== 'string' ||
-    typeof response.effectiveEnd !== 'string' ||
-    !Array.isArray(response.features) ||
-    !Array.isArray(response.forecastHours) ||
-    !Array.isArray(response.warnings)
-  ) {
+  if (!hasResponseShape(response)) {
     throw new Error('Auto-TSTM returned an invalid response.');
   }
   return {
     ...response,
     domain: typeof response.domain === 'string' ? response.domain : 'conus',
-    thresholds: response.thresholds ?? {
-      calibratedThunderCoreProbability: 0.3,
-      calibratedThunderSupportProbability: 0.1,
-    },
+    thresholds: parseThresholds(response.thresholds),
     sources: response.sources ?? {},
     generatedAt: typeof response.generatedAt === 'string' ? response.generatedAt : '',
     features: normalizeGeneratedTstmFeatures(response.features),

@@ -77,11 +77,17 @@ describe('tstmGeneration utilities', () => {
   });
 
   test('distinguishes stale results when cycle, day, or validity changes', () => {
-    const request = { day: 1 as const, cycleDate: '2026-06-13', validDate: '2026-06-13T12:00:00Z' };
+    const request = {
+      day: 1 as const,
+      cycleDate: '2026-06-13',
+      issueDate: '2026-06-13T06:00:00Z',
+      validDate: '2026-06-13T12:00:00Z',
+    };
     expect(getTstmRequestIdentity(request)).toContain('day-1');
     expect(isCurrentTstmRequest(request, { ...request })).toBe(true);
     expect(isCurrentTstmRequest(request, { ...request, day: 2 })).toBe(false);
     expect(isCurrentTstmRequest(request, { ...request, cycleDate: '2026-06-14' })).toBe(false);
+    expect(isCurrentTstmRequest(request, { ...request, issueDate: '2026-06-13T09:00:00Z' })).toBe(false);
   });
 
   test('normalizes a valid server response and rejects malformed payloads', () => {
@@ -99,6 +105,14 @@ describe('tstmGeneration utilities', () => {
     });
     expect(response.features[0].properties).toMatchObject({ probability: 'TSTM' });
     expect(response.domain).toBe('conus');
+    const malformedThresholds = parseTstmGenerationResponse({
+      ...response,
+      thresholds: {} as never,
+    });
+    expect(malformedThresholds.thresholds).toEqual({
+      calibratedThunderCoreProbability: 0.3,
+      calibratedThunderSupportProbability: 0.1,
+    });
     expect(() => parseTstmGenerationResponse({ features: [] })).toThrow(/invalid response/);
   });
 
