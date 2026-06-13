@@ -35,6 +35,10 @@ class GenerateTstmTests(unittest.TestCase):
         normalized = generate_tstm.as_probability(np.array([[0.0, 30.0, 100.0]]))
         np.testing.assert_allclose(normalized, np.array([[0.0, 0.3, 1.0]]))
 
+    def test_probability_normalization_preserves_all_nan_fields(self):
+        normalized = generate_tstm.as_probability(np.array([[np.nan, np.nan]]))
+        self.assertTrue(np.isnan(normalized).all())
+
     def test_response_shape_preserves_source_metadata(self):
         window = generate_tstm.build_effective_window(
             {"day": 1, "cycleDate": "2026-06-13"}

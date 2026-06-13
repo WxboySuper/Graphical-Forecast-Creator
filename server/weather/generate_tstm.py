@@ -239,9 +239,7 @@ def spc_candidate_windows(window: EffectiveWindow) -> list[EffectiveWindow]:
 
 def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThunderSignal | None:
     end_hour = window.forecast_hours[-1]
-    period_offsets = {"full": 23, "4hr": 3}
-    offset = period_offsets.get(period)
-    hours = [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
+    hours = spc_period_hours(end_hour, period)
     expected_valid_time = window.href_run + timedelta(hours=end_hour)
     arrays: list[np.ndarray] = []
     matched_hours: list[int] = []
@@ -294,6 +292,11 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
     return None
 
 
+def spc_period_hours(end_hour: int, period: str) -> list[int]:
+    offset = {"full": 23, "4hr": 3}.get(period)
+    return [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
+
+
 def fetch_spc_calibrated_thunder(window: EffectiveWindow) -> tuple[SpcThunderSignal | None, list[str]]:
     warnings: list[str] = []
     candidates = spc_candidate_windows(window)
@@ -321,7 +324,9 @@ def fetch_spc_calibrated_thunder(window: EffectiveWindow) -> tuple[SpcThunderSig
 
 def as_probability(values: np.ndarray) -> np.ndarray:
     values = np.asarray(values, dtype=float)
-    return values / 100.0 if np.nanmax(values) > 1 else values
+    finite = values[np.isfinite(values)]
+    maximum = float(np.max(finite)) if finite.size else 0.0
+    return values / 100.0 if maximum > 1 else values
 
 
 def finite_threshold(values: np.ndarray, threshold: float) -> np.ndarray:
@@ -438,21 +443,20 @@ def log_calibrated_thunder_components(
         )
 
 
+def get_coordinate(template: Any, names: tuple[str, ...]) -> np.ndarray | None:
+    direct = next((getattr(template, name) for name in names if hasattr(template, name)), None)
+    if direct is not None:
+        return np.asarray(direct.values)
+    coords = getattr(template, "coords", {})
+    match = next((coords[name] for name in names if name in coords), None)
+    return None if match is None else np.asarray(match.values)
+
+
 def get_lat_lon(template: Any) -> tuple[np.ndarray, np.ndarray]:
     if template is None:
         raise ValueError("No HREF template grid is available.")
-
-    def coordinate(names: tuple[str, ...]) -> np.ndarray | None:
-        direct = next((getattr(template, name) for name in names if hasattr(template, name)), None)
-        if direct is not None:
-            return np.asarray(direct.values)
-        coords = getattr(template, "coords", {})
-        match = next((coords[name] for name in names if name in coords), None)
-        return None if match is None else np.asarray(match.values)
-
-    lat = coordinate(("latitude", "lat"))
-    lon = coordinate(("longitude", "lon"))
-
+    lat = get_coordinate(template, ("latitude", "lat"))
+    lon = get_coordinate(template, ("longitude", "lon"))
     if lat is None or lon is None:
         raise ValueError("Unable to locate latitude/longitude coordinates in HREF data.")
 
@@ -596,21 +600,28 @@ def grid_near_land_mask(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
     return contains_xy(conus_land_clip_geometry().buffer(0.75, join_style=1), lon, lat)
 
 
+def contour_polygon(contour: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> Any | None:
+    from shapely.geometry import Polygon
+
+    coordinates = [grid_point_to_lon_lat(lat, lon, row, col) for row, col in contour]
+    if len(coordinates) < 4:
+        return None
+    polygon = Polygon(coordinates)
+    polygon = polygon if polygon.is_valid else polygon.buffer(0)
+    return None if polygon.is_empty else polygon.simplify(0.08, preserve_topology=True)
+
+
 def mask_to_features(mask: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> list[dict[str, Any]]:
-    from shapely.geometry import Polygon, mapping
+    from shapely.geometry import mapping
     from shapely.ops import unary_union
     from skimage import measure
 
-    def contour_polygon(contour: np.ndarray) -> Any | None:
-        coordinates = [grid_point_to_lon_lat(lat, lon, row, col) for row, col in contour]
-        if len(coordinates) < 4:
-            return None
-        polygon = Polygon(coordinates)
-        polygon = polygon if polygon.is_valid else polygon.buffer(0)
-        return None if polygon.is_empty else polygon.simplify(0.08, preserve_topology=True)
-
     contours = measure.find_contours(clean_mask(mask).astype(float), 0.5)
-    polygons = [polygon for contour in contours if (polygon := contour_polygon(contour)) is not None]
+    polygons = [
+        polygon
+        for contour in contours
+        if (polygon := contour_polygon(contour, lat, lon)) is not None
+    ]
 
     if not polygons:
         return []

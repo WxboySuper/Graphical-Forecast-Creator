@@ -7,6 +7,7 @@ const path = require('path');
 
 const DEFAULT_TIMEOUT_MS = 480000;
 const MAX_STDERR_LENGTH = 2000;
+const MAX_STDOUT_LENGTH = 4 * 1024 * 1024;
 
 /** Returns true only when the experimental generator is explicitly enabled. */
 const isTstmGenerationEnabled = (env = process.env) => env.TSTM_GENERATION_ENABLED === 'true';
@@ -54,25 +55,32 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
   let stdout = '';
   let stderr = '';
   let finished = false;
-  const timer = setTimeout(() => {
-    child.kill('SIGTERM');
-    finish(() => reject(new Error('TSTM_GENERATION_TIMEOUT')));
-  }, timeoutMs);
   /** Settles the worker exactly once and clears its timeout. */
-  const finish = (callback) => {
+  function finish(callback) {
     if (finished) return;
     finished = true;
     clearTimeout(timer);
     callback();
-  };
+  }
+  const timer = setTimeout(() => {
+    child.kill('SIGTERM');
+    finish(() => reject(new Error('TSTM_GENERATION_TIMEOUT')));
+  }, timeoutMs);
 
   child.stdout.on('data', (chunk) => {
     stdout += chunk.toString();
+    if (stdout.length > MAX_STDOUT_LENGTH) {
+      child.kill('SIGTERM');
+      finish(() => reject(new Error('TSTM_GENERATOR_OUTPUT_TOO_LARGE')));
+    }
   });
   child.stderr.on('data', (chunk) => {
     stderr = `${stderr}${chunk.toString()}`.slice(-MAX_STDERR_LENGTH);
   });
   child.on('error', (error) => finish(() => reject(error)));
+  child.stdin.on('error', () => {
+    // Process failures are settled by the child error/close handlers.
+  });
   child.on('close', (code) => finish(() => {
     if (code !== 0) {
       reject(new Error(stderr || `TSTM_GENERATOR_EXIT_${code}`));
@@ -102,7 +110,14 @@ const validatePayload = (payload) => {
 const registerTstmRoutes = (app, express, options = {}) => {
   const env = options.env || process.env;
   const runGenerator = options.runGenerator || runTstmGenerator;
-  app.post('/api/tstm/generate', express.json({ limit: '4kb' }), async (req, res) => {
+  const rateLimit = options.rateLimit || require('express-rate-limit');
+  const generationLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 2,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.post('/api/tstm/generate', generationLimiter, express.json({ limit: '4kb' }), async (req, res) => {
     if (!isTstmGenerationEnabled(env)) {
       res.status(404).json({ error: 'Auto-TSTM is not enabled on this deployment.' });
       return;
