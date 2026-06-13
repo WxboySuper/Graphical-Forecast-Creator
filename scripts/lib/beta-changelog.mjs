@@ -1,6 +1,28 @@
 export const BETA_CHANGELOG_PATH = 'CHANGELOG.beta.md';
 
+/** Builds the canonical heading for one beta changelog PR entry. */
 const entryHeading = (prNumber) => `### PR #${prNumber}`;
+
+/** Rejects incomplete data before an entry is formatted. */
+const validateEntryInput = (prNumber, bullets) => {
+  if (!Number.isInteger(prNumber) || prNumber <= 0) {
+    throw new Error('A positive PR number is required.');
+  }
+  if (!Array.isArray(bullets) || bullets.length === 0) {
+    throw new Error('At least one beta changelog bullet is required.');
+  }
+  if (bullets.some((bullet) => !bullet.trim())) {
+    throw new Error('Beta changelog bullets cannot be empty.');
+  }
+};
+
+/** Formats normalized input as one machine-parseable PR section. */
+const formatEntry = (prNumber, bullets) => {
+  const body = bullets
+    .map((bullet) => `- ${bullet.replace(/^[-*]\s*/, '')}`)
+    .join('\n');
+  return `${entryHeading(prNumber)}\n\n${body}`;
+};
 
 /** Returns one PR entry body, or null when it is missing. */
 export const extractBetaChangelogEntry = (changelog, prNumber) => {
@@ -37,14 +59,8 @@ export const betaChangelogTouchesPr = (changedFiles, changelog, prNumber) => {
 
 /** Inserts or replaces one PR entry under Unreleased. */
 export const upsertBetaChangelogEntry = (changelog, prNumber, bullets) => {
-  if (!Number.isInteger(prNumber) || prNumber <= 0) {
-    throw new Error('A positive PR number is required.');
-  }
-  if (!Array.isArray(bullets) || bullets.length === 0 || bullets.some((bullet) => !bullet.trim())) {
-    throw new Error('At least one non-empty beta changelog bullet is required.');
-  }
-  const heading = entryHeading(prNumber);
-  const entry = `${heading}\n\n${bullets.map((bullet) => `- ${bullet.replace(/^[-*]\s*/, '')}`).join('\n')}`;
+  validateEntryInput(prNumber, bullets);
+  const entry = formatEntry(prNumber, bullets);
   const existing = extractBetaChangelogEntry(changelog, prNumber);
   if (existing) return changelog.replace(existing, entry);
   const unreleased = '## Unreleased';
@@ -64,5 +80,5 @@ export const takeBetaChangelogEntries = (changelog, prNumbers) => {
     entries.push(...entry.split('\n').filter((line) => /^[-*]\s+/.test(line)).map((line) => line.replace(/^[-*]\s+/, '')));
     next = next.replace(entry, '').replace(/\n{3,}/g, '\n\n');
   }
-  return { changelog: next.trimEnd() + '\n', entries };
+  return { changelog: `${next.trimEnd()}\n`, entries };
 };
