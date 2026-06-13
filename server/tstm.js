@@ -54,15 +54,15 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
 
   let stdout = '';
   let stderr = '';
-  let finished = false;
+  const state = { finished: false, timer: null };
   /** Settles the worker exactly once and clears its timeout. */
   function finish(callback) {
-    if (finished) return;
-    finished = true;
-    clearTimeout(timer);
+    if (state.finished) return;
+    state.finished = true;
+    clearTimeout(state.timer);
     callback();
   }
-  const timer = setTimeout(() => {
+  state.timer = setTimeout(() => {
     child.kill('SIGTERM');
     finish(() => reject(new Error('TSTM_GENERATION_TIMEOUT')));
   }, timeoutMs);

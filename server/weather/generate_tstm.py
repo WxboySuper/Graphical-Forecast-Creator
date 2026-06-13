@@ -237,10 +237,12 @@ def spc_candidate_windows(window: EffectiveWindow) -> list[EffectiveWindow]:
     return candidates
 
 
-def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThunderSignal | None:
-    end_hour = window.forecast_hours[-1]
-    hours = spc_period_hours(end_hour, period)
-    expected_valid_time = window.href_run + timedelta(hours=end_hour)
+def load_spc_period_arrays(
+    window: EffectiveWindow,
+    period: str,
+    hours: list[int],
+    expected_valid_time: datetime,
+) -> tuple[list[np.ndarray], list[int], list[str], Any | None]:
     arrays: list[np.ndarray] = []
     matched_hours: list[int] = []
     urls: list[str] = []
@@ -274,6 +276,18 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
         urls.append(url)
         if period == "full":
             break
+    return arrays, matched_hours, urls, template
+
+
+def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThunderSignal | None:
+    end_hour = window.forecast_hours[-1]
+    expected_valid_time = window.href_run + timedelta(hours=end_hour)
+    arrays, matched_hours, urls, template = load_spc_period_arrays(
+        window,
+        period,
+        spc_period_hours(end_hour, period),
+        expected_valid_time,
+    )
     if arrays and template is not None:
         print(
             f"matched SPC calibrated thunder: run={window.href_run:%Y-%m-%d %HZ}, "
