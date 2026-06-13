@@ -94,7 +94,7 @@ const runHrefTstmGenerator = (payload) =>
       try {
         resolve(JSON.parse(stdout));
       } catch {
-        reject(new Error('HREF TSTM generator returned invalid JSON.'));
+        reject(new Error('SPC calibrated thunder generator returned invalid JSON.'));
       }
     });
 
@@ -105,7 +105,7 @@ const handleTstmGeneration = async (req, res) => {
   const payload = createGenerationPayload(req.body);
 
   if (!isSupportedDay(payload.day)) {
-    res.status(400).json({ error: 'HREF-based TSTM generation is only available for Day 1 and Day 2.' });
+    res.status(400).json({ error: 'SPC calibrated thunder generation is only available for Day 1 and Day 2.' });
     return;
   }
 

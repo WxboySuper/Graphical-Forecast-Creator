@@ -1,7 +1,7 @@
 import { canGenerateTstmForDay, normalizeGeneratedTstmFeatures } from './tstmGeneration';
 
 describe('tstmGeneration utilities', () => {
-  test('limits HREF generation to day 1 and day 2', () => {
+  test('limits SPC calibrated thunder generation to day 1 and day 2', () => {
     expect(canGenerateTstmForDay(1)).toBe(true);
     expect(canGenerateTstmForDay(2)).toBe(true);
     expect(canGenerateTstmForDay(3)).toBe(false);

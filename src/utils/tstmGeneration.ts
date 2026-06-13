@@ -3,7 +3,7 @@ import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tst
 
 const TSTM_GENERATION_ENDPOINT = '/api/tstm/generate';
 
-/** Returns true when HREF can cover the given outlook day. */
+/** Returns true when SPC calibrated thunder can cover the given outlook day. */
 export const canGenerateTstmForDay = (day: number): boolean => day === 1 || day === 2;
 
 /** Normalizes generated polygons so they can enter the existing editable categorical/TSTM flow. */
