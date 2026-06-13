@@ -15,7 +15,11 @@ describe('tstmGeneration utilities', () => {
           type: 'Polygon',
           coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]],
         },
+<<<<<<< HEAD
         properties: { source: 'href' },
+=======
+        properties: { source: 'spc-href' },
+>>>>>>> d2114fe (feat: add gated Auto-TSTM forecast foundations)
       },
     ]);
 
@@ -23,8 +27,44 @@ describe('tstmGeneration utilities', () => {
       outlookType: 'categorical',
       probability: 'TSTM',
       isSignificant: false,
+<<<<<<< HEAD
       derivedFrom: 'spc-calibrated-thunder',
     });
     expect(feature.id).toBe('generated-tstm-0');
   });
+=======
+      derivedFrom: 'spc-href-calibrated-thunder',
+    });
+    expect(feature.id).toBe('generated-tstm-0');
+  });
+
+  test('keeps existing feature ids and accepts multipolygons', () => {
+    const [feature] = normalizeGeneratedTstmFeatures([
+      {
+        type: 'Feature',
+        id: 'cached-guidance-1',
+        geometry: {
+          type: 'MultiPolygon',
+          coordinates: [[[[0, 0], [1, 0], [1, 1], [0, 0]]]],
+        },
+        properties: {},
+      },
+    ]);
+
+    expect(feature.id).toBe('cached-guidance-1');
+    expect(feature.geometry.type).toBe('MultiPolygon');
+  });
+
+  test('drops non-polygon guidance instead of placing it in forecast state', () => {
+    const features = normalizeGeneratedTstmFeatures([
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: {},
+      },
+    ]);
+
+    expect(features).toEqual([]);
+  });
+>>>>>>> d2114fe (feat: add gated Auto-TSTM forecast foundations)
 });

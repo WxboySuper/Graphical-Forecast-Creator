@@ -1,13 +1,17 @@
 import type { Feature } from 'geojson';
+<<<<<<< HEAD
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
 
 const TSTM_GENERATION_ENDPOINT = '/api/tstm/generate';
+=======
+>>>>>>> d2114fe (feat: add gated Auto-TSTM forecast foundations)
 
 /** Returns true when SPC calibrated thunder can cover the given outlook day. */
 export const canGenerateTstmForDay = (day: number): boolean => day === 1 || day === 2;
 
 /** Normalizes generated polygons so they can enter the existing editable categorical/TSTM flow. */
 export const normalizeGeneratedTstmFeatures = (features: Feature[]): Feature[] =>
+<<<<<<< HEAD
   features.map((feature, index) => ({
     ...feature,
     id: feature.id ?? `generated-tstm-${index}`,
@@ -45,3 +49,23 @@ export const generateTstmLines = async (
     features: normalizeGeneratedTstmFeatures(Array.isArray(payload.features) ? payload.features : []),
   } as TstmGenerationResponse;
 };
+=======
+  features
+    .filter(
+      (feature) =>
+        feature.type === 'Feature' &&
+        (feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon')
+    )
+    .map((feature, index) => ({
+      ...feature,
+      id: feature.id ?? `generated-tstm-${index}`,
+      properties: {
+        ...feature.properties,
+        outlookType: 'categorical',
+        probability: 'TSTM',
+        isSignificant: false,
+        derivedFrom: 'spc-href-calibrated-thunder',
+        originalProbability: 'TSTM',
+      },
+    }));
+>>>>>>> d2114fe (feat: add gated Auto-TSTM forecast foundations)
