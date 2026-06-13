@@ -79,6 +79,7 @@
     "test": "jest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "changelog:consolidate-beta": "node scripts/consolidate-beta-changelog.mjs",
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d build"
   },
