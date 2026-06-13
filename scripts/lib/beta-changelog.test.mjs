@@ -53,6 +53,7 @@ test('requires valid content for generated entries and selected entries for cons
   assert.throws(() => upsertBetaChangelogEntry(sample, 503, []));
   assert.throws(() => takeBetaChangelogEntries(sample, [503]), /Missing beta changelog entry/);
 });
+<<<<<<< HEAD
 
 test('does not confuse PR numbers that share a numeric prefix', () => {
   const with500 = upsertBetaChangelogEntry(sample, 500, ['Higher-numbered PR']);
@@ -70,3 +71,5 @@ test('preserves dollar substitution tokens when replacing an entry', () => {
   const updated = upsertBetaChangelogEntry(inserted, 503, ['$& $1 $` $\' remain literal']);
   assert.match(updated, /\$& \$1 \$` \$' remain literal/);
 });
+=======
+>>>>>>> 1459319 (feat(governance): add beta changelog workflow)
