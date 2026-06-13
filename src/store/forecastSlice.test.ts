@@ -6,6 +6,7 @@ import reducer, {
   copyFeaturesFromPrevious,
   importForecastCycle,
   redoLastEdit,
+  replaceTstmFeatures,
   resetForecasts,
   selectCanRedo,
   selectCanUndo,
@@ -56,6 +57,12 @@ const createCategoricalFeature = (id: string, offset: number): Feature =>
     outlookType: 'categorical',
     probability: 'ENH',
     extras: { derivedFrom: 'auto-generated' },
+  });
+
+const createTstmFeature = (id: string, offset: number): Feature =>
+  createBaseFeature(id, offset, {
+    outlookType: 'categorical',
+    probability: 'TSTM',
   });
 
 const createOutlookFeature = (
@@ -317,6 +324,29 @@ describe('forecastSlice undo/redo', () => {
 
     expect(getTornadoFeatures(state)).toHaveLength(0);
     expect(state.forecastCycle.days[1]?.data.categorical?.size ?? 0).toBe(0);
+  });
+
+  test('replaces only TSTM features and keeps generated categorical risks', () => {
+    let state = reducer(undefined, setForecastDay(1));
+    state = reducer(
+      state,
+      applyAutoCategoricalSync({
+        map: new Map([
+          ['TSTM', [createTstmFeature('old-tstm', 0)]],
+          ['ENH', [createCategoricalFeature('enh', 2)]],
+        ]),
+      })
+    );
+
+    state = reducer(state, replaceTstmFeatures({ features: [createTstmFeature('new-tstm', 4)] }));
+
+    expect(state.forecastCycle.days[1]?.data.categorical?.get('TSTM')?.[0].id).toBe('new-tstm');
+    expect(state.forecastCycle.days[1]?.data.categorical?.get('ENH')?.[0].id).toBe('enh');
+    expect(selectCanUndo({ forecast: state } as never)).toBe(true);
+
+    state = reducer(state, undoLastEdit());
+    expect(state.forecastCycle.days[1]?.data.categorical?.get('TSTM')?.[0].id).toBe('old-tstm');
+    expect(state.forecastCycle.days[1]?.data.categorical?.get('ENH')?.[0].id).toBe('enh');
   });
 
   test('importing and resetting clear all per-day history', () => {
