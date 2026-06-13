@@ -10,6 +10,7 @@ export interface TstmGenerationRequest {
 }
 
 export interface TstmGenerationThresholds {
+<<<<<<< HEAD
   calibratedThunderProbability?: number;
   calibratedThunderCoreProbability?: number;
   calibratedThunderSupportProbability?: number;
@@ -21,6 +22,19 @@ export interface TstmGenerationThresholds {
   cinJkg: number;
   reflectivityDbz: number;
   minAreaSqKm: number;
+=======
+  calibratedThunderCoreProbability: number;
+  calibratedThunderSupportProbability: number;
+}
+
+export interface TstmGenerationSource {
+  product: string;
+  search?: string;
+  run?: string;
+  period?: string;
+  forecastHours?: string;
+  url?: string;
+>>>>>>> 0d5d372 (feat(auto-tstm): preserve hidden client boundary)
 }
 
 export interface TstmGenerationResponse {
@@ -32,6 +46,10 @@ export interface TstmGenerationResponse {
   effectiveEnd: string;
   thresholds: TstmGenerationThresholds;
   warnings: string[];
+<<<<<<< HEAD
   sources?: Record<string, { product: string; search: string; run?: string; period?: string; forecastHours?: string; url?: string } | null>;
+=======
+  sources: Record<string, TstmGenerationSource | null>;
+>>>>>>> 0d5d372 (feat(auto-tstm): preserve hidden client boundary)
   generatedAt: string;
 }
