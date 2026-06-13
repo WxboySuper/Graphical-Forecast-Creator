@@ -185,6 +185,7 @@
   font-size: 0.875rem;
 }
 
+.updates-page__hotfixes,
 .updates-page__improvements {
   margin: 2.5rem 0 0;
   padding: 1.25rem 1.35rem;
@@ -193,11 +194,19 @@
   background: var(--bg-secondary);
 }
 
+.updates-page__hotfixes p {
+  margin: 0 0 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.updates-page__hotfixes h2,
 .updates-page__improvements h2 {
   margin: 0 0 0.75rem;
   font-size: 1.2rem;
 }
 
+.updates-page__hotfixes ul,
 .updates-page__improvements ul {
   margin: 0;
   padding-left: 1.2rem;
@@ -205,6 +214,7 @@
   line-height: 1.65;
 }
 
+.updates-page__hotfixes li + li,
 .updates-page__improvements li + li {
   margin-top: 0.45rem;
 }

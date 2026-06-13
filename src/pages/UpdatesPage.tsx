@@ -142,6 +142,18 @@ export const UpdatesPage: React.FC = () => {
           </section>
         ))}
 
+        {v16Update.hotfixes ? (
+          <section className="updates-page__hotfixes" aria-labelledby="updates-hotfixes-heading">
+            <h2 id="updates-hotfixes-heading">{v16Update.hotfixes.title}</h2>
+            <p>{v16Update.hotfixes.body}</p>
+            <ul>
+              {v16Update.hotfixes.items.map((item) => (
+                <li key={item.id}>{item.text}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section className="updates-page__improvements" aria-labelledby="updates-improvements-heading">
           <h2 id="updates-improvements-heading">Also improved</h2>
           <ul>
