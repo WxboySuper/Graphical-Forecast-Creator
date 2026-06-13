@@ -28,7 +28,11 @@ const sectionBody = production.slice(sectionStart, sectionEnd);
 const changedHeadingIndex = sectionBody.indexOf(heading);
 const nextSectionBody = changedHeadingIndex === -1
   ? `${activeSection[0]}\n\n${heading}\n${bullets}\n${sectionBody.slice(activeSection[0].length).trimStart()}`
+<<<<<<< HEAD
   : sectionBody.replace(heading, `${heading}\n${bullets}`);
+=======
+  : sectionBody.replace(heading, () => `${heading}\n${bullets}`);
+>>>>>>> origin/pr/509
 const nextProduction = production.slice(0, sectionStart) + nextSectionBody + production.slice(sectionEnd);
 
 writeFileSync(betaPath, result.changelog);

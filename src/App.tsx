@@ -23,6 +23,7 @@ import { AppLayout } from './components/Layout';
 import { HomePage, ForecastPage, DiscussionPage, VerificationPage, MonitorPage, ComingSoonPage, AccountPage, PricingPage, UpdatesPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
 import CloudLibraryPage from './pages/CloudLibraryPage';
 import BetaAccessGuard from './components/Beta/BetaAccessGuard';
+import { GoogleAnalyticsRouteTracker } from './components/GoogleAnalyticsRouteTracker';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 
@@ -165,6 +166,7 @@ function App() {
       <AuthProvider>
         <EntitlementProvider>
           <BrowserRouter>
+            <GoogleAnalyticsRouteTracker />
             <AgreementGate showComingSoon={showComingSoon} />
             <AppRoutes showComingSoon={showComingSoon} />
           </BrowserRouter>

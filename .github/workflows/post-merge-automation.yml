@@ -6,7 +6,7 @@ name: Post-merge automation
 # beta → main: strip stable on main, release vX.Y.Z, start next beta line + prerelease for new beta.
 # release/* → main: merge main into beta, stable release + next beta line + prerelease.
 # feature/*|fix/*|other → beta: bump -beta.N and prerelease vX.Y.Z-beta.N.
-# hotfix/* → main: patch bump on main + stable release.
+# hotfix/* → main: patch bump on main + stable release + merge main into beta.
 # feature/release-*|workflow_dispatch: sync main→beta, stable release for main, prerelease for new beta.
 #
 # Required secret: GH_PAT (repo scope)
@@ -213,6 +213,35 @@ jobs:
 
           export NOTES_FILE=$(mktemp)
           node scripts/create-github-release.mjs "$STABLE" main
+
+      - name: Sync beta after hotfix merge
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref == 'main' &&
+          startsWith(github.event.pull_request.head.ref, 'hotfix/')
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          git fetch origin main beta
+          git show origin/main:package.json > /tmp/main-package.json
+          STABLE=$(node scripts/read-package-version.mjs /tmp/main-package.json)
+          git checkout beta
+          git pull --ff-only origin beta
+          BETA_VERSION=$(node scripts/read-package-version.mjs)
+          git merge origin/main -X theirs -m "chore: sync hotfix merge from main into beta"
+          node scripts/bump-beta-after-main-release.mjs "$STABLE" "$BETA_VERSION"
+          if ! git diff --quiet package.json; then
+            git add package.json
+            git commit -m "chore: start next beta cycle after hotfix merge (was $BETA_VERSION)"
+          fi
+          git push origin beta
+
+          NEXT=$(node scripts/read-package-version.mjs)
+          export NOTES_FILE=$(mktemp)
+          if [ "$NEXT" != "$BETA_VERSION" ]; then
+            node scripts/create-github-release.mjs "$NEXT" beta
+          fi
 
       - name: Integration merge into beta
         if: >-

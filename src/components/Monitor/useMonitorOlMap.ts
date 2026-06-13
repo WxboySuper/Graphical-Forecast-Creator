@@ -29,6 +29,7 @@ interface UseMonitorOlMapArgs {
   mapElementRef: RefObject<HTMLDivElement | null>;
 }
 
+/** Wires Monitor OpenLayers map bootstrap, layers, and imperative alert popups. */
 export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const [selectedAlert, setSelectedAlert] = useState<NwsAlertDetails | null>(null);

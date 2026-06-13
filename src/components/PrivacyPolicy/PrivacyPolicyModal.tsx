@@ -3,15 +3,23 @@ import './PrivacyPolicyModal.css';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.2.0';
-const PRIVACY_POLICY_LAST_UPDATED = 'May 22, 2026';
+const PRIVACY_POLICY_VERSION = '1.3.0';
+const PRIVACY_POLICY_LAST_UPDATED = 'June 9, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
-const PRIVACY_POLICY_WHATS_NEW: string[] = [
-  'We added a disclosure for hosted error monitoring (Sentry) on production and beta deployments.',
-  'Error monitoring does not use session replay and does not send IP addresses or cookies by default.',
-  'Forecast map data is not attached to error reports; only limited diagnostic data is collected to fix bugs.',
-];
+// Changelog of material privacy-policy changes, keyed by the version that introduced them.
+// When building the "What's New" list, only entries after the user's last-accepted version are shown.
+const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
+  '1.2.0': [
+    'We added a disclosure for hosted error monitoring (Sentry) on production and beta deployments.',
+    'Error monitoring does not use session replay and does not send IP addresses or cookies by default.',
+    'Forecast map data is not attached to error reports; only limited diagnostic data is collected to fix bugs.',
+  ],
+  '1.3.0': [
+    'We now use Google Analytics (GA4) to measure aggregate traffic on the production site.',
+    'GA4 is loaded only on the hosted production domain, not on localhost development builds.',
+  ],
+};
 
 /** Returns true if the user has accepted the current version of the Privacy Policy. */
 export function hasAcceptedPrivacyPolicy(): boolean {
@@ -32,6 +40,26 @@ export function isPrivacyPolicyUpgrade(): boolean {
   }
 }
 
+/** Returns the version string the user last accepted, or null if never accepted. */
+export function getStoredVersion(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Returns the ordered list of changelog entries newer than `lastAcceptedVersion`. */
+export function getWhatsNewItems(lastAcceptedVersion: string | null): string[] {
+  const items: string[] = [];
+  for (const [version, entries] of Object.entries(PRIVACY_POLICY_CHANGELOG)) {
+    if (lastAcceptedVersion == null || version > lastAcceptedVersion) {
+      items.push(...entries);
+    }
+  }
+  return items;
+}
+
 // Records acceptance of the current Privacy Policy version in localStorage.
 function acceptPrivacyPolicy(): void {
   try {
@@ -48,11 +76,11 @@ interface PrivacyPolicyModalProps {
 }
 
 /** Highlights material changes in the current policy version for users who must re-accept. */
-const PrivacyPolicyWhatsNew: React.FC = () => (
+const PrivacyPolicyWhatsNew: React.FC<{ items: string[] }> = ({ items }) => (
   <aside className="privacy-whats-new" aria-labelledby="privacy-whats-new-title" role="note">
     <h3 id="privacy-whats-new-title">What&apos;s new in version {PRIVACY_POLICY_VERSION}</h3>
     <ul>
-      {PRIVACY_POLICY_WHATS_NEW.map((item) => (
+      {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
     </ul>
@@ -60,9 +88,9 @@ const PrivacyPolicyWhatsNew: React.FC = () => (
 );
 
 /** Renders the current in-app Privacy Policy content for both acceptance and view-only modes. */
-const PrivacyPolicyContent: React.FC<{ showWhatsNew?: boolean }> = ({ showWhatsNew = false }) => (
+const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNewItems }) => (
   <>
-    {showWhatsNew && <PrivacyPolicyWhatsNew />}
+    {whatsNewItems && whatsNewItems.length > 0 && <PrivacyPolicyWhatsNew items={whatsNewItems} />}
     <p>
       <strong>TL;DR:</strong> Your local forecasts stay on your device. If you choose to make an account, we only
       collect what is strictly necessary to sync your work and securely manage your subscription.
@@ -123,6 +151,15 @@ const PrivacyPolicyContent: React.FC<{ showWhatsNew?: boolean }> = ({ showWhatsN
       Separately from product metrics, the hosted service may keep short operational request logs such as page path,
       referrer, timestamp, and user-agent for maintenance and debugging. These logs are not used to inspect forecast
       contents and are kept separate from the product metrics dashboard.
+    </p>
+    <p>
+      On the public production site (gfc.weatherboysuper.com), we use Google Analytics (GA4) to measure aggregate
+      traffic and navigation patterns in a separate property from other Weatherboy Super sites. GA is loaded only on
+      the hosted production domain, not on localhost development builds. Google&apos;s processing is governed by{' '}
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+        Google&apos;s privacy policy
+      </a>
+      .
     </p>
     <p>
       On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
@@ -252,7 +289,9 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept, viewO
       <div className="privacy-modal">
         <PrivacyPolicyHeader viewOnly={viewOnly} onClose={onClose} />
         <div className="privacy-modal-body">
-          <PrivacyPolicyContent showWhatsNew={!viewOnly && isPrivacyPolicyUpgrade()} />
+          <PrivacyPolicyContent
+            whatsNewItems={!viewOnly && isPrivacyPolicyUpgrade() ? getWhatsNewItems(getStoredVersion()) : undefined}
+          />
         </div>
 
         {viewOnly ? (

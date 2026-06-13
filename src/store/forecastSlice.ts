@@ -7,6 +7,7 @@ import { RootState } from './index'; // Need RootState for selectors
 import { cloneForecastCycle } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
+import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -622,6 +623,32 @@ export const forecastSlice = createSlice({
       state.isSaved = false;
     },
 
+    replaceTstmFeatures: (state, action: PayloadAction<{ features: Feature[] }>) => {
+      const outlookData = getCurrentOutlook(state);
+      if (!outlookData.categorical) {
+        return;
+      }
+
+      const normalizedFeatures = action.payload.features.map((feature) =>
+        buildFeatureWithProps(feature, 'categorical', 'TSTM', false)
+      );
+      const existingTstm = outlookData.categorical.get('TSTM') || [];
+
+      if (areTstmFeaturesEqual(existingTstm, normalizedFeatures)) {
+        return;
+      }
+
+      pushUndoSnapshot(state);
+
+      if (normalizedFeatures.length > 0) {
+        outlookData.categorical.set('TSTM', normalizedFeatures);
+      } else {
+        outlookData.categorical.delete('TSTM');
+      }
+
+      state.isSaved = false;
+    },
+
     setMapView: (state, action: PayloadAction<{ center: [number, number], zoom: number }>) => {
       state.currentMapView = action.payload;
     },
@@ -818,6 +845,7 @@ export const {
   resetCategorical,
   setOutlookMap,
   applyAutoCategoricalSync,
+  replaceTstmFeatures,
   setMapView,
   resetForecasts,
   markAsSaved,

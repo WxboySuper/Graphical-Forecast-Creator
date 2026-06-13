@@ -38,6 +38,22 @@ try {
 }
 
 const sourcePr = JSON.parse(sourcePrJson);
+
+try {
+  execFileSync('git', ['fetch', 'origin', 'beta', 'main'], { stdio: 'ignore' });
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`Port PR policy: could not fetch origin/beta and origin/main — ${message}`);
+  process.exit(1);
+}
+
+let betaContainsMain = true;
+try {
+  execFileSync('git', ['merge-base', '--is-ancestor', 'origin/main', 'origin/beta']);
+} catch {
+  betaContainsMain = false;
+}
+
 const result = evaluatePortPrPolicy({
   headRef,
   baseRef,
@@ -45,6 +61,7 @@ const result = evaluatePortPrPolicy({
   sourcePrHeadRef: sourcePr.headRefName,
   sourcePrBaseRef: sourcePr.baseRefName,
   sourcePrNumber: parsed.sourcePrNumber,
+  betaContainsMain,
 });
 
 if (!result.ok) {
