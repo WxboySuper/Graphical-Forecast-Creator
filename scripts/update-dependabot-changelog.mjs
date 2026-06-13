@@ -36,7 +36,7 @@ const next = baseRef === 'beta'
   : applyDependencyBumpsToChangelog(changelog, bumps);
 
 if (next === changelog) {
-  console.log('CHANGELOG.md already up to date for dependency bumps.');
+  console.log(`${changelogPath} already up to date for dependency bumps.`);
   process.exit(0);
 }
 

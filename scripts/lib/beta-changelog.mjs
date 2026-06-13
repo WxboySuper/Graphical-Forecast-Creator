@@ -3,6 +3,11 @@ export const BETA_CHANGELOG_PATH = 'CHANGELOG.beta.md';
 /** Builds the canonical heading for one beta changelog PR entry. */
 const entryHeading = (prNumber) => `### PR #${prNumber}`;
 
+/** Matches a complete PR heading without treating #50 as #500. */
+const entryHeadingPattern = (prNumber, flags = '') => (
+  new RegExp(`^${entryHeading(prNumber)}(?!\\d)`, flags.includes('m') ? flags : `${flags}m`)
+);
+
 /** Rejects incomplete data before an entry is formatted. */
 const validateEntryInput = (prNumber, bullets) => {
   if (!Number.isInteger(prNumber) || prNumber <= 0) {
@@ -27,7 +32,8 @@ const formatEntry = (prNumber, bullets) => {
 /** Returns one PR entry body, or null when it is missing. */
 export const extractBetaChangelogEntry = (changelog, prNumber) => {
   const heading = entryHeading(prNumber);
-  const start = changelog.indexOf(heading);
+  const match = entryHeadingPattern(prNumber).exec(changelog);
+  const start = match?.index ?? -1;
   if (start === -1) return null;
   const rest = changelog.slice(start + heading.length);
   const next = rest.search(/\n### PR #|\n## /);
@@ -50,7 +56,7 @@ export const betaChangelogTouchesPr = (changedFiles, changelog, prNumber) => {
       reason: `${BETA_CHANGELOG_PATH} must include ${entryHeading(prNumber)} with at least one bullet.`,
     };
   }
-  const occurrences = changelog.split(entryHeading(prNumber)).length - 1;
+  const occurrences = [...changelog.matchAll(entryHeadingPattern(prNumber, 'g'))].length;
   if (occurrences !== 1) {
     return { ok: false, reason: `${entryHeading(prNumber)} must appear exactly once.` };
   }
@@ -62,7 +68,7 @@ export const upsertBetaChangelogEntry = (changelog, prNumber, bullets) => {
   validateEntryInput(prNumber, bullets);
   const entry = formatEntry(prNumber, bullets);
   const existing = extractBetaChangelogEntry(changelog, prNumber);
-  if (existing) return changelog.replace(existing, entry);
+  if (existing) return changelog.replace(existing, () => entry);
   const unreleased = '## Unreleased';
   const index = changelog.indexOf(unreleased);
   if (index === -1) throw new Error(`${BETA_CHANGELOG_PATH} must include ${unreleased}.`);
