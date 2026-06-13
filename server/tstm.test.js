@@ -2,11 +2,14 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const { PassThrough } = require('node:stream');
 const express = require('express');
 const {
   createGenerationPayload,
   isTstmGenerationEnabled,
   registerTstmRoutes,
+  runTstmGenerator,
   validatePayload,
 } = require('./tstm');
 
@@ -22,6 +25,15 @@ const startServer = (env, runGenerator) => {
 const getUrl = (server) => {
   const address = server.address();
   return `http://127.0.0.1:${address.port}/api/tstm/generate`;
+};
+
+const createFakeChild = () => {
+  const child = new EventEmitter();
+  child.stdin = new PassThrough();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.kill = () => child.emit('close', null);
+  return child;
 };
 
 describe('Auto-TSTM server foundation', () => {
@@ -82,5 +94,36 @@ describe('Auto-TSTM server foundation', () => {
     } finally {
       server.close();
     }
+  });
+
+  it('rejects malformed generator output', async () => {
+    const child = createFakeChild();
+    const result = runTstmGenerator(
+      { day: 1, cycleDate: '2026-06-13' },
+      { spawnProcess: () => child },
+    );
+    child.stdout.end('not json');
+    child.emit('close', 0);
+    await assert.rejects(result, /TSTM_GENERATOR_INVALID_JSON/);
+  });
+
+  it('terminates a generator that exceeds its timeout', async () => {
+    const child = createFakeChild();
+    let killed = false;
+    child.kill = () => {
+      killed = true;
+      setImmediate(() => child.emit('close', null));
+    };
+    await assert.rejects(
+      runTstmGenerator(
+        { day: 1, cycleDate: '2026-06-13' },
+        {
+          env: { TSTM_GENERATION_TIMEOUT_MS: '1' },
+          spawnProcess: () => child,
+        },
+      ),
+      /TSTM_GENERATION_TIMEOUT/,
+    );
+    assert.equal(killed, true);
   });
 });
