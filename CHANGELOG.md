@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **OpenLayers map stability (GFC-WEB-5, GFC-WEB-9, GFC-WEB-C):** Completed the Monitor map popup fix by rendering NWS alert overlays imperatively instead of portaling React into OpenLayers-moved DOM nodes. Hardened map teardown order and marked map shells `notranslate` so Chrome auto-translate is less likely to trigger `removeChild` errors on forecast, verification, and monitor maps.
-- **Build dependency security (Dependabot #128 and #129):** Forced the transitive `esbuild` toolchain to `0.28.1` or newer to add binary integrity verification and close the Windows development-server path traversal advisory.
+- **Build dependency security (Dependabot #128 and #129):** Replaced the transitive `esbuild` 0.27.x installation with an explicit patched `esbuild` 0.28.1 development dependency and added a `pnpm.overrides` guard to prevent the vulnerable resolution from returning.
 
 ## v1.6.1
 
