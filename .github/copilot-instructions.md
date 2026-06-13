@@ -24,8 +24,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 **Example**: `feat(map): add support for high-resolution CWA boundaries`
 
 ## 📖 Change Documentation
-### 1. CHANGELOG.md
-Every user-facing change must be recorded in [CHANGELOG.md](../CHANGELOG.md) under the `[Unreleased]` or current version section using these categories:
+### 1. Changelogs
+PRs targeting `beta` add one concise entry to [CHANGELOG.beta.md](../CHANGELOG.beta.md) under `## Unreleased` using a `### PR #123` heading. PRs targeting `main` update [CHANGELOG.md](../CHANGELOG.md) under the current production version.
 *   `Added`: For new features.
 *   `Changed`: For changes in existing functionality.
 *   `Deprecated`: For soon-to-be removed features.

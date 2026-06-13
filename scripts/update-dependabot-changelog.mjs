@@ -3,10 +3,12 @@ import {
   applyDependencyBumpsToChangelog,
   listDependencyBumpsBetweenRefs,
 } from './lib/dependabot-changelog.mjs';
+import { upsertBetaChangelogEntry } from './lib/beta-changelog.mjs';
 
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const headRef = process.env.GITHUB_HEAD_REF ?? '';
-const changelogPath = process.env.CHANGELOG_FILE ?? 'CHANGELOG.md';
+const prNumber = Number(process.env.PR_NUMBER ?? 0);
+const changelogPath = process.env.CHANGELOG_FILE ?? (baseRef === 'beta' ? 'CHANGELOG.beta.md' : 'CHANGELOG.md');
 
 if (!baseRef || !headRef) {
   console.error('Set GITHUB_BASE_REF and GITHUB_HEAD_REF.');
@@ -25,14 +27,18 @@ if (bumps.length === 0) {
 }
 
 const changelog = readFileSync(changelogPath, 'utf8');
-const next = applyDependencyBumpsToChangelog(changelog, bumps);
+const next = baseRef === 'beta'
+  ? upsertBetaChangelogEntry(
+      changelog,
+      prNumber,
+      bumps.map((bump) => `Dependency: ${bump.name} ${bump.from} → ${bump.to}${bump.directory === 'root' ? '' : ` (\`${bump.directory}\`)`}`),
+    )
+  : applyDependencyBumpsToChangelog(changelog, bumps);
 
 if (next === changelog) {
-  console.log('CHANGELOG.md already up to date for dependency bumps.');
+  console.log(`${changelogPath} already up to date for dependency bumps.`);
   process.exit(0);
 }
 
 writeFileSync(changelogPath, next);
-console.log(
-  `Updated CHANGELOG.md ### Dependencies for: ${bumps.map((b) => b.name).join(', ')}`,
-);
+console.log(`Updated ${changelogPath} for: ${bumps.map((b) => b.name).join(', ')}`);
