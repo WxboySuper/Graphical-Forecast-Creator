@@ -1,4 +1,8 @@
-import { canGenerateTstmForDay, normalizeGeneratedTstmFeatures } from './tstmGeneration';
+import {
+  areTstmFeaturesEqual,
+  canGenerateTstmForDay,
+  normalizeGeneratedTstmFeatures,
+} from './tstmGeneration';
 
 describe('tstmGeneration utilities', () => {
   test('limits SPC calibrated thunder generation to day 1 and day 2', () => {
@@ -55,5 +59,16 @@ describe('tstmGeneration utilities', () => {
     ]);
 
     expect(features).toEqual([]);
+  });
+
+  test('compares equivalent features without depending on property key order', () => {
+    const geometry = {
+      type: 'Polygon' as const,
+      coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]],
+    };
+    const left = [{ type: 'Feature' as const, geometry, properties: { source: 'spc', probability: 'TSTM' } }];
+    const right = [{ type: 'Feature' as const, geometry, properties: { probability: 'TSTM', source: 'spc' } }];
+
+    expect(areTstmFeaturesEqual(left, right)).toBe(true);
   });
 });

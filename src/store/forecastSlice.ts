@@ -7,6 +7,7 @@ import { RootState } from './index'; // Need RootState for selectors
 import { cloneForecastCycle } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
+import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -633,7 +634,7 @@ export const forecastSlice = createSlice({
       );
       const existingTstm = outlookData.categorical.get('TSTM') || [];
 
-      if (JSON.stringify(existingTstm) === JSON.stringify(normalizedFeatures)) {
+      if (areTstmFeaturesEqual(existingTstm, normalizedFeatures)) {
         return;
       }
 

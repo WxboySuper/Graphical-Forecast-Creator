@@ -368,6 +368,28 @@ describe('forecastSlice undo/redo', () => {
     expect(getCategoricalFeatureId(restoredState, 'ENH')).toBe('enh');
   });
 
+  test('does not add an undo entry for logically identical TSTM features', () => {
+    const firstFeature = createTstmFeature('generated-tstm', 0);
+    const secondFeature = createTstmFeature('generated-tstm', 0);
+    secondFeature.properties = {
+      originalProbability: 'TSTM',
+      derivedFrom: 'categorical',
+      probability: 'TSTM',
+      outlookType: 'categorical',
+      isSignificant: false,
+    };
+
+    let state = reducer(
+      reducer(undefined, setForecastDay(1)),
+      replaceTstmFeatures({ features: [firstFeature] })
+    );
+    state = reducer(state, replaceTstmFeatures({ features: [secondFeature] }));
+
+    state = reducer(state, undoLastEdit());
+    expect(selectCanUndo({ forecast: state } as never)).toBe(false);
+    expect(getCategoricalFeatureId(state, 'TSTM')).toBeUndefined();
+  });
+
   test('importing and resetting clear all per-day history', () => {
     let state = reducer(undefined, addFeature({ feature: createFeature('feature-1', 0) }));
     state = reducer(state, setForecastDay(2));
