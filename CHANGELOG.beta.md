@@ -8,6 +8,18 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Document Auto-TSTM SPC calibrated thunder inputs, thresholds, and Day 1/2 window definitions; add fixture tests for period hours and thresholds.
 
+### PR #547
+
+- Dependency: @sentry/react ^10.56.0 → ^10.58.0
+- Dependency: @types/node ^25.9.2 → ^25.9.3
+- Dependency: lucide-react ^1.17.0 → ^1.18.0
+- Dependency: rollup >=4.61.1 → >=4.62.0
+- Dependency: @playwright/test ^1.59.1 → ^1.61.0
+- Dependency: @tailwindcss/postcss ^4.2.4 → ^4.3.1
+- Dependency: tailwindcss ^4.2.2 → ^4.3.1
+- Dependency: @sentry/node ^10.56.0 → ^10.58.0 (`server`)
+- Dependency: firebase-admin ^13.8.0 → ^14.0.0 (`server`)
+- Dependency: stripe ^22.2.0 → ^22.2.1 (`server`)
 ### PR #526
 
 - Preserve the hidden Auto-TSTM client API boundary, response validation, and stale-request identity without mounting unfinished controls.
