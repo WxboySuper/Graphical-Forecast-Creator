@@ -4,6 +4,34 @@
 Input is a small JSON object on stdin. Output is a JSON response on stdout.
 Uses the SPC calibrated thunder endpoint; returns empty features with warnings
 when the SPC data is unavailable for the requested period.
+
+Supported outlook days
+----------------------
+Day 1 and Day 2 only. Day 1 windows are defined by the issuance time (or
+valid/issue dates when provided) through the next 12Z boundary. Day 2 windows
+span the 12Z-to-12Z period one and two days out from the cycle date.
+
+SPC thunder periods
+-------------------
+The SPC calibrated HREF thunder product is available in three accumulation
+windows: ``full`` (24-hour), ``4hr``, and ``1hr``. The ``full`` period is the
+primary source; ``4hr`` and ``1hr`` act as fallbacks when the latest ``full``
+run has not yet been posted. Each period defines a pair of candidate forecast
+hours (start and end of its window); the ``full`` period breaks after the
+first successful download while ``4hr`` and ``1hr`` combine both frames.
+This fallback chain ensures guidance is available as early as possible in
+the operational cycle.
+
+Thresholds
+----------
+Two calibrated-thunder probability thresholds control the mask:
+- ``calibratedThunderCoreProbability`` (0.30): cells above this value are
+  treated as the core thunderstorm area.
+- ``calibratedThunderSupportProbability`` (0.10): connected support regions
+  that link core cells are included to produce a coherent polygon.
+
+These values are echoed in the response ``thresholds`` field so the client
+can display the exact thresholds used.
 """
 
 from __future__ import annotations
@@ -29,7 +57,17 @@ DEFAULT_DOMAIN = "conus"
 FORECAST_HOUR_STEP = max(1, int(os.environ.get("TSTM_HREF_HOUR_STEP", "3")))
 MAX_FORECAST_HOURS = max(1, int(os.environ.get("TSTM_HREF_MAX_HOURS", "17")))
 SPC_POST_BASE_URL = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/spc_post/prod"
+# SPC calibrated thunder periods in fallback order.  "full" is the 24-hour
+# accumulation and the primary source.  "4hr" and "1hr" are shorter windows
+# that may be posted earlier in the operational cycle; they are tried only
+# when "full" is not yet available for the requested run.
 SPC_THUNDER_PERIODS = ("full", "4hr", "1hr")
+
+# Probability thresholds used to derive the thunderstorm mask.  The core
+# threshold (30 %) identifies the high-confidence thunder area; the support
+# threshold (10 %) extends connected regions so the final polygon is
+# contiguous.  Any change here must be reflected in the TypeScript client
+# fallback defaults (src/utils/tstmGeneration.ts parseThresholds).
 DEFAULT_THRESHOLDS = {
     "calibratedThunderCoreProbability": 0.30,
     "calibratedThunderSupportProbability": 0.10,
@@ -85,6 +123,11 @@ def parse_issuance_time(value: str | None) -> tuple[int, int]:
 
 
 def previous_spc_cycle(value: datetime) -> datetime:
+    """Select the SPC run cycle to use for a given valid time.
+
+    SPC posts at 0Z and 12Z.  This returns the most recent posted cycle
+    that is not after ``value`` (floor to 0Z or 12Z on the same day).
+    """
     value = value.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
     if value.hour >= 12:
         return value.replace(hour=12)
@@ -107,6 +150,18 @@ def build_forecast_hours(start: datetime, end: datetime, run: datetime) -> list[
 
 
 def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
+    """Compute the valid-time window and HREF run for a Day 1 or Day 2 request.
+
+    Day 1 window
+        start: ``validDate`` > ``issueDate`` > cycle date at the issuance hour.
+        end:   cycle date + 1 day at 12Z.
+        run:   SPC cycle closest to (but not after) the start time.
+
+    Day 2 window
+        start: cycle date + 1 day at 12Z.
+        end:   cycle date + 2 days at 12Z.
+        run:   cycle date at 12Z.
+    """
     day = int(payload.get("day", 0))
     if day not in (1, 2):
         raise ValueError("HREF-based TSTM generation is only available for Day 1 and Day 2.")
@@ -295,6 +350,30 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
     return None
 
 
+<<<<<<< HEAD
+=======
+def spc_period_hours(end_hour: int, period: str) -> list[int]:
+    """Return the forecast hours to try for a given SPC period.
+
+    "full": two candidate frames spanning the 24-hour window
+            (``end_hour - 23`` and ``end_hour``).  In practice
+            ``load_spc_period_arrays`` breaks after the first match.
+    "4hr":  two frames spanning the 4-hour window (``end_hour - 3``
+            and ``end_hour``).
+    Any other period: single frame at ``end_hour``.
+    """
+    offset = {"full": 23, "4hr": 3}.get(period)
+    return [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
+
+
+def combine_spc_arrays(arrays: list[np.ndarray]) -> np.ndarray:
+    stacked = np.stack(arrays)
+    if np.all(np.isnan(stacked)):
+        return np.full(stacked.shape[1:], np.nan)
+    return np.nanmax(stacked, axis=0)
+
+
+>>>>>>> afe549d (docs: audit and document Auto-TSTM SPC HREF calibrated-thunder input)
 def fetch_spc_calibrated_thunder(window: EffectiveWindow) -> tuple[SpcThunderSignal | None, list[str]]:
     warnings: list[str] = []
     candidates = spc_candidate_windows(window)
@@ -337,6 +416,13 @@ def calibrated_thunder_mask(
     lat: np.ndarray | None = None,
     lon: np.ndarray | None = None,
 ) -> np.ndarray:
+    """Derive a boolean thunder mask from calibrated probability values.
+
+    Applies Gaussian smoothing, then uses the core threshold (30 %) to
+    identify high-confidence cells and the support threshold (10 %) to
+    connect them into contiguous regions.  Morphological closing, hole
+    removal, and small-object removal clean up the result.
+    """
     from skimage import filters, measure, morphology
 
     values = np.nan_to_num(np.asarray(probability, dtype=float), nan=0.0)
