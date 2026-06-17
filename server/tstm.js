@@ -12,7 +12,11 @@ const MAX_STDOUT_LENGTH = 4 * 1024 * 1024;
 /** Returns true only when the experimental generator is explicitly enabled. */
 const isTstmGenerationEnabled = (env = process.env) => env.TSTM_GENERATION_ENABLED === 'true';
 
-/** Returns true for the only outlook days covered by the preserved generator. */
+/**
+ * Returns true for the only outlook days covered by the preserved generator.
+ * Day 1: issuance time through next 12Z.  Day 2: 12Z-to-12Z one day out.
+ * SPC calibrated HREF thunder data is only available for these two windows.
+ */
 const isSupportedDay = (day) => day === 1 || day === 2;
 
 /** Normalizes the request payload passed to the Python process. */
@@ -23,6 +27,9 @@ const createGenerationPayload = (body = {}) => ({
   validDate: typeof body.validDate === 'string' ? body.validDate : undefined,
   issuanceTime: typeof body.issuanceTime === 'string' ? body.issuanceTime : undefined,
 });
+// Thresholds are not accepted from the client; the Python generator uses its
+// own DEFAULT_THRESHOLDS (core=0.30, support=0.10) and echoes them in the
+// response so the client can display the exact values used.
 
 /** Finds a common local Conda Python on Windows. */
 const getDefaultCondaPython = () => {
