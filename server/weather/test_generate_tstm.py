@@ -9,41 +9,28 @@ import generate_tstm
 
 
 class GenerateTstmTests(unittest.TestCase):
+    def _build_day1_window(self, **overrides):
+        payload = {"day": 1, "cycleDate": "2026-06-13", **overrides}
+        return generate_tstm.build_effective_window(payload)
+
     def test_day_one_window_ends_at_upcoming_12z(self):
-        window = generate_tstm.build_effective_window(
-            {"day": 1, "cycleDate": "2026-06-13", "issuanceTime": "0600"}
-        )
+        window = self._build_day1_window(issuanceTime="0600")
         self.assertEqual(window.start, datetime(2026, 6, 13, 6, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
         self.assertTrue(window.forecast_hours)
 
     def test_day_one_window_uses_valid_date_when_provided(self):
-        window = generate_tstm.build_effective_window(
-            {
-                "day": 1,
-                "cycleDate": "2026-06-13",
-                "validDate": "2026-06-13T18:00:00Z",
-            }
-        )
+        window = self._build_day1_window(validDate="2026-06-13T18:00:00Z")
         self.assertEqual(window.start, datetime(2026, 6, 13, 18, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
 
     def test_day_one_window_falls_back_to_issue_date(self):
-        window = generate_tstm.build_effective_window(
-            {
-                "day": 1,
-                "cycleDate": "2026-06-13",
-                "issueDate": "2026-06-13T20:00:00Z",
-            }
-        )
+        window = self._build_day1_window(issueDate="2026-06-13T20:00:00Z")
         self.assertEqual(window.start, datetime(2026, 6, 13, 20, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
 
     def test_day_one_window_falls_back_to_cycle_start_hour(self):
-        window = generate_tstm.build_effective_window(
-            {"day": 1, "cycleDate": "2026-06-13"}
-        )
-        # Default issuance time is 06Z when no dates are provided
+        window = self._build_day1_window()
         self.assertEqual(window.start, datetime(2026, 6, 13, 6, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
 
