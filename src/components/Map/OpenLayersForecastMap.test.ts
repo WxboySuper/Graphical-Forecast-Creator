@@ -156,18 +156,21 @@ describe('OpenLayersForecastMap helpers', () => {
 
   test('GFC-WEB-D: clears the delayed pointer callback before map teardown', () => {
     jest.useFakeTimers();
-    const pendingCallback = jest.fn();
-    const timeout = setTimeout(pendingCallback, 250);
-    const draw = { downTimeout_: timeout };
-    const map = { removeInteraction: jest.fn() };
+    try {
+      const pendingCallback = jest.fn();
+      const timeout = setTimeout(pendingCallback, 250);
+      const draw = { downTimeout_: timeout };
+      const map = { removeInteraction: jest.fn() };
 
-    removeDrawInteraction(map as never, draw as never);
-    jest.advanceTimersByTime(250);
+      removeDrawInteraction(map as never, draw as never);
+      jest.advanceTimersByTime(250);
 
-    expect(pendingCallback).not.toHaveBeenCalled();
-    expect(draw.downTimeout_).toBeUndefined();
-    expect(map.removeInteraction).toHaveBeenCalledWith(draw);
-    jest.useRealTimers();
+      expect(pendingCallback).not.toHaveBeenCalled();
+      expect(draw.downTimeout_).toBeUndefined();
+      expect(map.removeInteraction).toHaveBeenCalledWith(draw);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('toOlStyle and toGhostOlStyle return style objects', () => {
