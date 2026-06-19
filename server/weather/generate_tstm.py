@@ -445,7 +445,7 @@ def log_calibrated_thunder_components(fields: dict[str, np.ndarray]) -> None:
         if n < 5:
             continue
         print(
-            f"[tstm:spc] component id={label} kept={bool(np.any(mask & comp))} "
+            f"[tstm:spc] component id={label} kept={str(bool(np.any(mask & comp))).lower()} "
             f"cells={n} bounds=({float(np.nanmin(lon[comp])):.2f},"
             f"{float(np.nanmin(lat[comp])):.2f},{float(np.nanmax(lon[comp])):.2f},"
             f"{float(np.nanmax(lat[comp])):.2f}) "

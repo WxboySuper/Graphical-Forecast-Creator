@@ -29,7 +29,7 @@ class GenerateTstmTests(unittest.TestCase):
         self.assertEqual(window.start, datetime(2026, 6, 13, 20, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
 
-    def test_day_one_window_falls_back_to_cycle_start_hour(self):
+    def test_day_one_window_falls_back_to_default_issuance_hour(self):
         window = self._build_day1_window()
         self.assertEqual(window.start, datetime(2026, 6, 13, 6, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
@@ -57,7 +57,6 @@ class GenerateTstmTests(unittest.TestCase):
     def test_spc_thunder_periods_are_full_only_in_primary_position(self):
         """The primary period must be "full" (24-hour accumulation)."""
         self.assertEqual(generate_tstm.SPC_THUNDER_PERIODS[0], "full")
-        self.assertIn("full", generate_tstm.SPC_THUNDER_PERIODS)
 
     def test_spc_period_hours_full_returns_two_frames(self):
         hours = generate_tstm.spc_period_hours(24, "full")
