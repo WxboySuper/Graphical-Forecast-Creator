@@ -34,6 +34,7 @@ import {
   isDrawableOutlookType,
   toOlStyle,
   toGhostOlStyle,
+  removeDrawInteraction,
 } from './OpenLayersForecastMap';
 
 type FeatureStub = {
@@ -151,6 +152,22 @@ describe('OpenLayersForecastMap helpers', () => {
   test('isDrawableOutlookType recognizes drawable types', () => {
     expect(isDrawableOutlookType({ outlookType: 'categorical' })).toBe(true);
     expect(isDrawableOutlookType({ outlookType: 'nonexistent' })).toBe(false);
+  });
+
+  test('GFC-WEB-D: clears the delayed pointer callback before map teardown', () => {
+    jest.useFakeTimers();
+    const pendingCallback = jest.fn();
+    const timeout = setTimeout(pendingCallback, 250);
+    const draw = { downTimeout_: timeout };
+    const map = { removeInteraction: jest.fn() };
+
+    removeDrawInteraction(map as never, draw as never);
+    jest.advanceTimersByTime(250);
+
+    expect(pendingCallback).not.toHaveBeenCalled();
+    expect(draw.downTimeout_).toBeUndefined();
+    expect(map.removeInteraction).toHaveBeenCalledWith(draw);
+    jest.useRealTimers();
   });
 
   test('toOlStyle and toGhostOlStyle return style objects', () => {
