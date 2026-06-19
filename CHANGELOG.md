@@ -3,6 +3,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.6.6
+
+### Security
+- **Dependency vulnerability remediation:** Upgraded `protobufjs` to 7.6.4 across the browser and analytics server dependency graphs, `js-yaml` to 4.2.0 in test tooling, and `ws` to 8.21.0 in jsdom tooling to resolve Dependabot denial-of-service and schema-name collision advisories.
+
 ## v1.6.4
 
 ### Fixed
