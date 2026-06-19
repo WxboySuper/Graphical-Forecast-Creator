@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #548
+
+- Document Auto-TSTM SPC calibrated thunder inputs, thresholds, and Day 1/2 window definitions; add fixture tests for period hours and thresholds.
+
 ### PR #526
 
 - Preserve the hidden Auto-TSTM client API boundary, response validation, and stale-request identity without mounting unfinished controls.

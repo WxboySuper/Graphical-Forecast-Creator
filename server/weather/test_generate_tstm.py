@@ -9,13 +9,37 @@ import generate_tstm
 
 
 class GenerateTstmTests(unittest.TestCase):
+    def _build_day1_window(self, **overrides):
+        payload = {"day": 1, "cycleDate": "2026-06-13", **overrides}
+        return generate_tstm.build_effective_window(payload)
+
     def test_day_one_window_ends_at_upcoming_12z(self):
-        window = generate_tstm.build_effective_window(
-            {"day": 1, "cycleDate": "2026-06-13", "issuanceTime": "0600"}
-        )
+        window = self._build_day1_window(issuanceTime="0600")
         self.assertEqual(window.start, datetime(2026, 6, 13, 6, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
         self.assertTrue(window.forecast_hours)
+
+    def test_day_one_window_uses_valid_date_when_provided(self):
+        window = self._build_day1_window(validDate="2026-06-13T18:00:00Z")
+        self.assertEqual(window.start, datetime(2026, 6, 13, 18, tzinfo=timezone.utc))
+        self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
+
+    def test_day_one_window_falls_back_to_issue_date(self):
+        window = self._build_day1_window(issueDate="2026-06-13T20:00:00Z")
+        self.assertEqual(window.start, datetime(2026, 6, 13, 20, tzinfo=timezone.utc))
+        self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
+
+    def test_day_one_window_falls_back_to_default_issuance_hour(self):
+        window = self._build_day1_window()
+        self.assertEqual(window.start, datetime(2026, 6, 13, 6, tzinfo=timezone.utc))
+        self.assertEqual(window.end, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
+
+    def test_day_one_window_href_run_is_previous_spc_cycle(self):
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13", "issuanceTime": "1600"}
+        )
+        # Start is 16Z; previous SPC cycle is 12Z same day
+        self.assertEqual(window.href_run, datetime(2026, 6, 13, 12, tzinfo=timezone.utc))
 
     def test_day_two_window_is_12z_to_12z(self):
         window = generate_tstm.build_effective_window(
@@ -23,6 +47,38 @@ class GenerateTstmTests(unittest.TestCase):
         )
         self.assertEqual(window.start, datetime(2026, 6, 14, 12, tzinfo=timezone.utc))
         self.assertEqual(window.end, datetime(2026, 6, 15, 12, tzinfo=timezone.utc))
+
+    def test_day_two_window_href_run_is_cycle_12z(self):
+        window = generate_tstm.build_effective_window(
+            {"day": 2, "cycleDate": "2026-06-13"}
+        )
+        self.assertEqual(window.href_run, datetime(2026, 6, 13, 12, tzinfo=timezone.utc))
+
+    def test_spc_thunder_periods_are_full_only_in_primary_position(self):
+        """The primary period must be "full" (24-hour accumulation)."""
+        self.assertEqual(generate_tstm.SPC_THUNDER_PERIODS[0], "full")
+
+    def test_spc_period_hours_full_returns_two_frames(self):
+        hours = generate_tstm.spc_period_hours(24, "full")
+        self.assertEqual(hours, [1, 24])
+
+    def test_spc_period_hours_4hr_returns_two_frames(self):
+        hours = generate_tstm.spc_period_hours(24, "4hr")
+        self.assertEqual(hours, [21, 24])
+
+    def test_spc_period_hours_unknown_returns_single_frame(self):
+        hours = generate_tstm.spc_period_hours(24, "unknown")
+        self.assertEqual(hours, [24])
+
+    def test_default_thresholds_are_explicit(self):
+        """Fixture: core=0.30, support=0.10.  Any change must be intentional."""
+        self.assertEqual(
+            generate_tstm.DEFAULT_THRESHOLDS,
+            {
+                "calibratedThunderCoreProbability": 0.30,
+                "calibratedThunderSupportProbability": 0.10,
+            },
+        )
 
     def test_spc_url_uses_calibrated_thunder_product(self):
         url, filename = generate_tstm.spc_thunder_url(
@@ -62,6 +118,13 @@ class GenerateTstmTests(unittest.TestCase):
             response["sources"]["calibratedThunder"]["product"],
             "spc_hrefct_full",
         )
+
+    def test_response_thresholds_match_defaults(self):
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13"}
+        )
+        response = generate_tstm.response_payload(window, [], [], {})
+        self.assertEqual(response["thresholds"], generate_tstm.DEFAULT_THRESHOLDS)
 
 
 if __name__ == "__main__":

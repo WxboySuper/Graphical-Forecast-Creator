@@ -4,6 +4,10 @@
 Input is a small JSON object on stdin. Output is a JSON response on stdout.
 Uses the SPC calibrated thunder endpoint; returns empty features with warnings
 when the SPC data is unavailable for the requested period.
+
+Supported days: Day 1 (issuance→next 12Z) and Day 2 (12Z→12Z).
+SPC periods: "full" (24h, primary), "4hr" and "1hr" (fallbacks).
+Thresholds: core=0.30, support=0.10 (mirrored in client defaults).
 """
 
 from __future__ import annotations
@@ -29,7 +33,14 @@ DEFAULT_DOMAIN = "conus"
 FORECAST_HOUR_STEP = max(1, int(os.environ.get("TSTM_HREF_HOUR_STEP", "3")))
 MAX_FORECAST_HOURS = max(1, int(os.environ.get("TSTM_HREF_MAX_HOURS", "17")))
 SPC_POST_BASE_URL = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/spc_post/prod"
+# SPC calibrated thunder periods in fallback order.  "full" (24h) is the
+# primary source; "4hr" and "1hr" are shorter windows tried when "full"
+# is not yet posted for the requested run.
 SPC_THUNDER_PERIODS = ("full", "4hr", "1hr")
+
+# Probability thresholds for the thunder mask.  Core (30%) identifies the
+# high-confidence area; support (10%) connects core cells into contiguous
+# regions.  Must stay in sync with TypeScript client fallbacks.
 DEFAULT_THRESHOLDS = {
     "calibratedThunderCoreProbability": 0.30,
     "calibratedThunderSupportProbability": 0.10,
@@ -89,6 +100,7 @@ def parse_issuance_time(value: str | None) -> tuple[int, int]:
 
 
 def previous_spc_cycle(value: datetime) -> datetime:
+    """Floor a valid time to the most recent SPC cycle (0Z or 12Z)."""
     value = value.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
     if value.hour >= 12:
         return value.replace(hour=12)
@@ -111,6 +123,7 @@ def build_forecast_hours(start: datetime, end: datetime, run: datetime) -> list[
 
 
 def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
+    """Compute valid-time window and HREF run for Day 1 (→12Z) or Day 2 (12Z→12Z)."""
     day = int(payload.get("day", 0))
     if day not in (1, 2):
         raise ValueError("HREF-based TSTM generation is only available for Day 1 and Day 2.")
@@ -307,6 +320,7 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
 
 
 def spc_period_hours(end_hour: int, period: str) -> list[int]:
+    """Candidate forecast hours: "full"=2 frames/24h, "4hr"=2 frames/4h, else=[end]."""
     offset = {"full": 23, "4hr": 3}.get(period)
     return [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
 
@@ -366,6 +380,7 @@ def calibrated_thunder_mask(
     lat: np.ndarray | None = None,
     lon: np.ndarray | None = None,
 ) -> np.ndarray:
+    """Boolean thunder mask from calibrated probability via smoothing + morphology."""
     from skimage import filters, measure, morphology
 
     values = np.nan_to_num(np.asarray(probability, dtype=float), nan=0.0)
@@ -390,77 +405,53 @@ def calibrated_thunder_mask(
         mask = morphology.remove_small_holes(mask, 64)
         mask = morphology.remove_small_objects(mask, 12)
     if lat is not None and lon is not None:
-        log_calibrated_thunder_components(
-            {
-                "raw_probability": values,
-                "smoothed_probability": smoothed,
-                "support": support,
-                "core": core,
-                "mask": mask,
-                "lat": lat,
-                "lon": lon,
-            }
-        )
+        log_calibrated_thunder_components({
+            "raw_probability": values, "smoothed_probability": smoothed,
+            "support": support, "core": core, "mask": mask, "lat": lat, "lon": lon,
+        })
     return mask
 
 
-def log_calibrated_thunder_components(
-    fields: dict[str, np.ndarray],
-) -> None:
+def log_calibrated_thunder_components(fields: dict[str, np.ndarray]) -> None:
     from skimage import measure
 
-    raw_probability = fields["raw_probability"]
-    smoothed_probability = fields["smoothed_probability"]
-    support = fields["support"]
-    core = fields["core"]
-    mask = fields["mask"]
-    lat = fields["lat"]
-    lon = fields["lon"]
-    finite = raw_probability[np.isfinite(raw_probability)]
+    raw = fields["raw_probability"]
+    smoothed = fields["smoothed_probability"]
+    support, core, mask = fields["support"], fields["core"], fields["mask"]
+    lat, lon = fields["lat"], fields["lon"]
+    finite = raw[np.isfinite(raw)]
     if finite.size:
-        percentiles = np.nanpercentile(finite, [50, 75, 90, 95, 99])
+        pcts = np.nanpercentile(finite, [50, 75, 90, 95, 99])
         print(
-            "[tstm:spc] calibrated thunder stats "
-            f"shape={raw_probability.shape} "
-            f"lat={float(np.nanmin(lat)):.2f}..{float(np.nanmax(lat)):.2f} "
+            f"[tstm:spc] calibrated thunder stats "
+            f"shape={raw.shape} lat={float(np.nanmin(lat)):.2f}..{float(np.nanmax(lat)):.2f} "
             f"lon={float(np.nanmin(lon)):.2f}..{float(np.nanmax(lon)):.2f} "
             f"min={float(np.nanmin(finite)):.3f} max={float(np.nanmax(finite)):.3f} "
-            f"p50/p75/p90/p95/p99={','.join(f'{value:.3f}' for value in percentiles)}",
-            file=sys.stderr,
-            flush=True,
+            f"p50/p75/p90/p95/p99={','.join(f'{v:.3f}' for v in pcts)}",
+            file=sys.stderr, flush=True,
         )
-
     labels = measure.label(support, connectivity=2)
     print(
-        "[tstm:spc] calibrated thunder mask "
+        f"[tstm:spc] calibrated thunder mask "
         f"support_cells={int(np.count_nonzero(support))} "
         f"core_cells={int(np.count_nonzero(core))} "
         f"kept_cells={int(np.count_nonzero(mask))} "
         f"support_components={int(labels.max())}",
-        file=sys.stderr,
-        flush=True,
+        file=sys.stderr, flush=True,
     )
     for label in range(1, labels.max() + 1):
-        component = labels == label
-        cell_count = int(np.count_nonzero(component))
-        if cell_count < 5:
+        comp = labels == label
+        n = int(np.count_nonzero(comp))
+        if n < 5:
             continue
-        component_lat = lat[component]
-        component_lon = lon[component]
-        component_raw = raw_probability[component]
-        component_smooth = smoothed_probability[component]
-        is_kept = bool(np.any(mask & component))
         print(
-            "[tstm:spc] component "
-            f"id={label} kept={str(is_kept).lower()} cells={cell_count} "
-            f"bounds=({float(np.nanmin(component_lon)):.2f},"
-            f"{float(np.nanmin(component_lat)):.2f},"
-            f"{float(np.nanmax(component_lon)):.2f},"
-            f"{float(np.nanmax(component_lat)):.2f}) "
-            f"raw_max={float(np.nanmax(component_raw)):.3f} "
-            f"smooth_max={float(np.nanmax(component_smooth)):.3f}",
-            file=sys.stderr,
-            flush=True,
+            f"[tstm:spc] component id={label} kept={str(bool(np.any(mask & comp))).lower()} "
+            f"cells={n} bounds=({float(np.nanmin(lon[comp])):.2f},"
+            f"{float(np.nanmin(lat[comp])):.2f},{float(np.nanmax(lon[comp])):.2f},"
+            f"{float(np.nanmax(lat[comp])):.2f}) "
+            f"raw_max={float(np.nanmax(raw[comp])):.3f} "
+            f"smooth_max={float(np.nanmax(smoothed[comp])):.3f}",
+            file=sys.stderr, flush=True,
         )
 
 
@@ -504,72 +495,30 @@ def clean_mask(mask: np.ndarray) -> np.ndarray:
         cleaned = morphology.opening(cleaned, morphology.disk(1))
         cleaned = morphology.remove_small_holes(cleaned, 36)
         cleaned = morphology.remove_small_objects(cleaned, 12)
-    cleaned[0, :] = False
-    cleaned[-1, :] = False
-    cleaned[:, 0] = False
-    cleaned[:, -1] = False
+    cleaned[0, :] = cleaned[-1, :] = cleaned[:, 0] = cleaned[:, -1] = False
     return cleaned
 
 
 def conus_land_clip_geometry() -> Any:
     from shapely.geometry import Polygon
-
-    return Polygon(
-        [
-            (-124.8, 48.9),
-            (-122.8, 49.0),
-            (-117.0, 49.1),
-            (-111.0, 49.1),
-            (-104.0, 49.0),
-            (-96.0, 49.0),
-            (-89.0, 48.8),
-            (-82.5, 46.4),
-            (-75.0, 44.9),
-            (-67.0, 47.3),
-            (-66.8, 45.0),
-            (-69.0, 43.5),
-            (-70.5, 42.5),
-            (-72.8, 41.1),
-            (-74.8, 40.3),
-            (-75.5, 38.8),
-            (-76.2, 36.6),
-            (-77.6, 34.6),
-            (-79.0, 33.1),
-            (-80.4, 31.0),
-            (-81.0, 29.6),
-            (-80.4, 27.6),
-            (-80.0, 25.2),
-            (-81.1, 24.5),
-            (-82.8, 24.7),
-            (-83.2, 25.8),
-            (-83.2, 27.0),
-            (-82.8, 28.1),
-            (-83.3, 29.2),
-            (-84.7, 29.8),
-            (-86.0, 30.2),
-            (-87.6, 30.3),
-            (-89.2, 30.1),
-            (-91.4, 29.2),
-            (-93.7, 29.7),
-            (-95.7, 29.2),
-            (-97.2, 25.8),
-            (-99.2, 26.4),
-            (-100.4, 28.4),
-            (-101.8, 29.0),
-            (-103.2, 29.0),
-            (-104.9, 30.2),
-            (-106.5, 31.8),
-            (-111.1, 31.3),
-            (-114.8, 32.7),
-            (-117.2, 32.5),
-            (-119.8, 34.1),
-            (-121.2, 36.4),
-            (-122.6, 38.1),
-            (-124.0, 41.6),
-            (-124.6, 45.6),
-            (-124.8, 48.9),
-        ]
-    ).buffer(0)
+    # fmt: off
+    coords = [
+        (-124.8, 48.9), (-122.8, 49.0), (-117.0, 49.1), (-111.0, 49.1),
+        (-104.0, 49.0), (-96.0, 49.0), (-89.0, 48.8), (-82.5, 46.4),
+        (-75.0, 44.9), (-67.0, 47.3), (-66.8, 45.0), (-69.0, 43.5),
+        (-70.5, 42.5), (-72.8, 41.1), (-74.8, 40.3), (-75.5, 38.8),
+        (-76.2, 36.6), (-77.6, 34.6), (-79.0, 33.1), (-80.4, 31.0),
+        (-81.0, 29.6), (-80.4, 27.6), (-80.0, 25.2), (-81.1, 24.5),
+        (-82.8, 24.7), (-83.2, 25.8), (-83.2, 27.0), (-82.8, 28.1),
+        (-83.3, 29.2), (-84.7, 29.8), (-86.0, 30.2), (-87.6, 30.3),
+        (-89.2, 30.1), (-91.4, 29.2), (-93.7, 29.7), (-95.7, 29.2),
+        (-97.2, 25.8), (-99.2, 26.4), (-100.4, 28.4), (-101.8, 29.0),
+        (-103.2, 29.0), (-104.9, 30.2), (-106.5, 31.8), (-111.1, 31.3),
+        (-114.8, 32.7), (-117.2, 32.5), (-119.8, 34.1), (-121.2, 36.4),
+        (-122.6, 38.1), (-124.0, 41.6), (-124.6, 45.6), (-124.8, 48.9),
+    ]
+    # fmt: on
+    return Polygon(coords).buffer(0)
 
 
 def smooth_and_clip_geometry(geometry: Any) -> Any:
@@ -607,12 +556,6 @@ def smooth_geometry(geometry: Any) -> Any:
     if geometry.geom_type == "MultiPolygon":
         return MultiPolygon([smooth_geometry(part) for part in geometry.geoms if not part.is_empty]).buffer(0)
     return geometry
-
-
-def grid_land_mask(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
-    from shapely import contains_xy
-
-    return contains_xy(conus_land_clip_geometry(), lon, lat)
 
 
 def grid_near_land_mask(lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
