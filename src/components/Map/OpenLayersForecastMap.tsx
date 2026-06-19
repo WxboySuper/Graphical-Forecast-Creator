@@ -131,6 +131,28 @@ const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
   "day4-8",
 ]);
 
+// OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
+// https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
+// Recheck this workaround whenever `ol` is upgraded; remove it once upstream
+// guarantees that detaching Draw cancels the pending callback.
+type DrawWithPendingPointerMove = Draw & {
+  downTimeout_?: ReturnType<typeof setTimeout>;
+};
+
+/**
+ * OpenLayers Draw keeps a delayed pointer-move callback after removal.
+ * Cancel it before detaching so it cannot read map pixels after map teardown.
+ */
+export const removeDrawInteraction = (map: OLMap, interaction: Draw): void => {
+  const draw = interaction as DrawWithPendingPointerMove;
+  if (draw.downTimeout_ !== undefined) {
+    clearTimeout(draw.downTimeout_);
+    draw.downTimeout_ = undefined;
+  }
+
+  map.removeInteraction(interaction);
+};
+
 // Helper to convert hex/rgb/hsl color strings to rgba with specified alpha
 export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
   if (!color) {
@@ -949,7 +971,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
           resizeObserver.disconnect();
         }
         if (drawRef.current) {
-          map.removeInteraction(drawRef.current);
+          removeDrawInteraction(map, drawRef.current);
+          drawRef.current = null;
         }
         if (modifyRef.current) {
           map.removeInteraction(modifyRef.current);
@@ -1267,7 +1290,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
       if (!map) return;
 
       if (drawRef.current) {
-        map.removeInteraction(drawRef.current);
+        removeDrawInteraction(map, drawRef.current);
         drawRef.current = null;
       }
 
