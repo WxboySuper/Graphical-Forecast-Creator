@@ -131,6 +131,10 @@ const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
   "day4-8",
 ]);
 
+// OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
+// https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
+// Recheck this workaround whenever `ol` is upgraded; remove it once upstream
+// guarantees that detaching Draw cancels the pending callback.
 type DrawWithPendingPointerMove = Draw & {
   downTimeout_?: ReturnType<typeof setTimeout>;
 };
