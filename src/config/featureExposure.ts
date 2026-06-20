@@ -85,6 +85,7 @@ export type FeatureKey = keyof typeof FEATURE_EXPOSURE_REGISTRY;
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Ensures every build target has a boolean exposure value. */
 function assertExposureMatrix(featureKey: string, exposure: FeatureExposureMatrix): void {
   for (const target of BUILD_TARGETS) {
     if (typeof exposure[target] !== 'boolean') {
@@ -93,12 +94,14 @@ function assertExposureMatrix(featureKey: string, exposure: FeatureExposureMatri
   }
 }
 
+/** Ensures addedDate uses the registry ISO date format. */
 function assertAddedDate(featureKey: string, addedDate: string): void {
   if (!ISO_DATE_PATTERN.test(addedDate)) {
     throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(addedDate)}.`);
   }
 }
 
+/** Ensures temporary features declare when they should be removed. */
 function assertTemporaryMetadata(
   featureKey: string,
   temporary: boolean,
@@ -109,6 +112,7 @@ function assertTemporaryMetadata(
   }
 }
 
+/** Ensures server-backed metadata matches the declared capability key. */
 function assertServerBackedMetadata(
   featureKey: string,
   serverBacked: boolean,
@@ -123,6 +127,7 @@ function assertServerBackedMetadata(
   }
 }
 
+/** Runs every registry lifecycle assertion for one feature entry. */
 function assertFeatureExposureDefinition(featureKey: string, definition: FeatureExposureDefinition): void {
   assertExposureMatrix(featureKey, definition.exposure);
   assertAddedDate(featureKey, definition.addedDate);
