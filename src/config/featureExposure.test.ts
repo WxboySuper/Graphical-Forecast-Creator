@@ -7,9 +7,10 @@ import {
   validateFeatureExposureRegistry,
   type FeatureExposureDefinition,
   type FeatureKey,
+  type TemporaryFeatureExposureDefinition,
 } from './featureExposure';
 
-const BASE_DEFINITION: FeatureExposureDefinition = {
+const BASE_DEFINITION: TemporaryFeatureExposureDefinition = {
   exposure: { local: false, beta: false, staging: false, production: false },
   owner: 'WxboySuper',
   addedDate: '2026-06-20',
@@ -19,12 +20,12 @@ const BASE_DEFINITION: FeatureExposureDefinition = {
 };
 
 const expectRegistryValidationError = (
-  definition: Partial<FeatureExposureDefinition>,
+  overrides: Partial<TemporaryFeatureExposureDefinition> & Record<string, unknown>,
   pattern: RegExp
 ): void => {
   expect(() =>
     validateFeatureExposureRegistry({
-      sample: { ...BASE_DEFINITION, ...definition },
+      sample: { ...BASE_DEFINITION, ...overrides } as FeatureExposureDefinition,
     })
   ).toThrow(pattern);
 };
@@ -43,6 +44,12 @@ describe('featureExposure registry', () => {
   test.each([
     ['temporary features without removal metadata', { removalCondition: '   ' }, /removalCondition/],
     ['server-backed features without capability keys', { serverBacked: true }, /serverCapabilityKey/],
+    [
+      'non-server-backed features with capability keys',
+      { serverBacked: false, serverCapabilityKey: 'TSTM_GENERATION_ENABLED' },
+      /serverCapabilityKey/,
+    ],
+    ['added dates with impossible calendar values', { addedDate: '2026-13-40' }, /addedDate/],
   ] as const)('rejects %s', (_label, overrides, pattern) => {
     expectRegistryValidationError(overrides, pattern);
   });

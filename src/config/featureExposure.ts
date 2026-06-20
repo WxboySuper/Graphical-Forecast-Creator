@@ -2,16 +2,31 @@ import { BUILD_TARGETS, type BuildTarget, getBuildTarget } from './buildTarget';
 
 export type FeatureExposureMatrix = Record<BuildTarget, boolean>;
 
-export interface FeatureExposureDefinition {
+type FeatureExposureBase = {
   exposure: FeatureExposureMatrix;
   owner: string;
   addedDate: string;
-  temporary: boolean;
-  removalCondition: string;
-  serverBacked: boolean;
-  serverCapabilityKey?: string;
   trackingIssue?: number;
-}
+};
+
+type ServerBackedMetadata =
+  | { serverBacked: true; serverCapabilityKey: string }
+  | { serverBacked: false; serverCapabilityKey?: never };
+
+export type TemporaryFeatureExposureDefinition = FeatureExposureBase & {
+  temporary: true;
+  removalCondition: string;
+} & ServerBackedMetadata;
+
+export type PermanentFeatureExposureDefinition = FeatureExposureBase & {
+  temporary: false;
+  serverBacked: false;
+  serverCapabilityKey?: never;
+};
+
+export type FeatureExposureDefinition =
+  | TemporaryFeatureExposureDefinition
+  | PermanentFeatureExposureDefinition;
 
 const ALL_TARGETS_OFF: FeatureExposureMatrix = {
   local: false,
@@ -94,35 +109,37 @@ function assertExposureMatrix(featureKey: string, exposure: FeatureExposureMatri
   }
 }
 
-/** Ensures addedDate uses the registry ISO date format. */
+/** Ensures addedDate uses a real ISO calendar date. */
 function assertAddedDate(featureKey: string, addedDate: string): void {
   if (!ISO_DATE_PATTERN.test(addedDate)) {
+    throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(addedDate)}.`);
+  }
+
+  const [year, month, day] = addedDate.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
     throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(addedDate)}.`);
   }
 }
 
 /** Ensures temporary features declare when they should be removed. */
-function assertTemporaryMetadata(
-  featureKey: string,
-  temporary: boolean,
-  removalCondition: string
-): void {
-  if (temporary && removalCondition.trim().length === 0) {
+function assertTemporaryMetadata(featureKey: string, definition: FeatureExposureDefinition): void {
+  if (definition.temporary && definition.removalCondition.trim().length === 0) {
     throw new Error(`Temporary feature ${featureKey} must declare a removalCondition.`);
   }
 }
 
 /** Ensures server-backed metadata matches the declared capability key. */
-function assertServerBackedMetadata(
-  featureKey: string,
-  serverBacked: boolean,
-  serverCapabilityKey?: string
-): void {
-  if (serverBacked && !serverCapabilityKey?.trim()) {
+function assertServerBackedMetadata(featureKey: string, definition: FeatureExposureDefinition): void {
+  if (definition.serverBacked && !definition.serverCapabilityKey?.trim()) {
     throw new Error(`Server-backed feature ${featureKey} must declare serverCapabilityKey.`);
   }
 
-  if (!serverBacked && serverCapabilityKey) {
+  if (!definition.serverBacked && definition.serverCapabilityKey) {
     throw new Error(`Feature ${featureKey} must not declare serverCapabilityKey when serverBacked is false.`);
   }
 }
@@ -131,8 +148,8 @@ function assertServerBackedMetadata(
 function assertFeatureExposureDefinition(featureKey: string, definition: FeatureExposureDefinition): void {
   assertExposureMatrix(featureKey, definition.exposure);
   assertAddedDate(featureKey, definition.addedDate);
-  assertTemporaryMetadata(featureKey, definition.temporary, definition.removalCondition);
-  assertServerBackedMetadata(featureKey, definition.serverBacked, definition.serverCapabilityKey);
+  assertTemporaryMetadata(featureKey, definition);
+  assertServerBackedMetadata(featureKey, definition);
 }
 
 /** Validates registry shape and lifecycle metadata for tests and future CI policy checks. */
