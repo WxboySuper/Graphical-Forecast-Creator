@@ -10,7 +10,7 @@ test('resolves every supported build target', () => {
 });
 
 test('defaults an omitted build target to local', () => {
-  assert.equal(resolveBuildTarget(undefined), 'local');
+  assert.equal(resolveBuildTarget(), 'local');
 });
 
 test('rejects empty, unknown, or differently-cased targets', () => {
