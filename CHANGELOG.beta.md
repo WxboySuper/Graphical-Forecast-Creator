@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #568
+
+- Add explicit, validated local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
+
 ### PR #548
 
 - Document Auto-TSTM SPC calibrated thunder inputs, thresholds, and Day 1/2 window definitions; add fixture tests for period hours and thresholds.
