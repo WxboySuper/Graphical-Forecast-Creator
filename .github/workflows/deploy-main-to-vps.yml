@@ -105,6 +105,7 @@ jobs:
         if: steps.manifest.outputs.skip != 'true'
         run: pnpm run build
         env:
+          VITE_BUILD_TARGET: production
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -127,6 +128,7 @@ jobs:
           mv build build-staging
           mv "build-production-${GITHUB_RUN_ID}" build
         env:
+          VITE_BUILD_TARGET: staging
           PUBLIC_URL: https://staging-gfc.weatherboysuper.com
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
