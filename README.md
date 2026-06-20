@@ -101,6 +101,12 @@ Use `pnpm` consistently for this repo so the checked-in `pnpm-lock.yaml` remains
 
 Every frontend build resolves one deployment target through `VITE_BUILD_TARGET`: `local`, `beta`, `staging`, or `production`. Local development and builds default to `local`; hosted deployment workflows set their target explicitly and invalid values stop the build. This target identifies the deployment surface and is separate from Vite's bundling mode and the existing beta access gate.
 
+### Feature exposure registry
+
+v1.7 feature rollout is declared in `src/config/featureExposure.ts`. That registry is the single source of truth for which unfinished features may appear on each build target. Every key records an owner, added date, per-target exposure matrix, whether server capability is required, and removal metadata for temporary flags.
+
+Use `isFeatureExposed('featureKey')` for typed enablement checks. Unknown keys fail at compile time. Route, navigation, Redux, and server gates will adopt this registry in follow-up foundation work; this issue only establishes the contract and helpers.
+
 ### Local Beta Mode (developer)
 
 Run the app with beta-only features locally (useful for testing forecast redesigns, verification flows, and discussion changes).
