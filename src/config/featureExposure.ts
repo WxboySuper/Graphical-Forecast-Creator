@@ -100,6 +100,12 @@ export type FeatureKey = keyof typeof FEATURE_EXPOSURE_REGISTRY;
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+type FeatureValidationContext = {
+  featureKey: string;
+  definition: FeatureExposureDefinition;
+};
+
+/** Returns true when addedDate is a real YYYY-MM-DD calendar value. */
 function isValidIsoCalendarDate(addedDate: string): boolean {
   if (!ISO_DATE_PATTERN.test(addedDate)) {
     return false;
@@ -116,30 +122,32 @@ function isValidIsoCalendarDate(addedDate: string): boolean {
 }
 
 /** Ensures every build target has a boolean exposure value. */
-function assertExposureMatrix(featureKey: string, exposure: FeatureExposureMatrix): void {
+function assertExposureMatrix({ featureKey, definition }: FeatureValidationContext): void {
   for (const target of BUILD_TARGETS) {
-    if (typeof exposure[target] !== 'boolean') {
+    if (typeof definition.exposure[target] !== 'boolean') {
       throw new Error(`Feature ${featureKey} is missing exposure for target ${target}.`);
     }
   }
 }
 
 /** Ensures addedDate uses a real ISO calendar date. */
-function assertAddedDate(featureKey: string, addedDate: string): void {
-  if (!isValidIsoCalendarDate(addedDate)) {
-    throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(addedDate)}.`);
+function assertAddedDate({ featureKey, definition }: FeatureValidationContext): void {
+  if (!isValidIsoCalendarDate(definition.addedDate)) {
+    throw new Error(
+      `Feature ${featureKey} has an invalid addedDate ${JSON.stringify(definition.addedDate)}.`
+    );
   }
 }
 
 /** Ensures temporary features declare when they should be removed. */
-function assertTemporaryMetadata(featureKey: string, definition: FeatureExposureDefinition): void {
+function assertTemporaryMetadata({ featureKey, definition }: FeatureValidationContext): void {
   if (definition.temporary && definition.removalCondition.trim().length === 0) {
     throw new Error(`Temporary feature ${featureKey} must declare a removalCondition.`);
   }
 }
 
 /** Ensures server-backed metadata matches the declared capability key. */
-function assertServerBackedMetadata(featureKey: string, definition: FeatureExposureDefinition): void {
+function assertServerBackedMetadata({ featureKey, definition }: FeatureValidationContext): void {
   if (definition.serverBacked && !definition.serverCapabilityKey?.trim()) {
     throw new Error(`Server-backed feature ${featureKey} must declare serverCapabilityKey.`);
   }
@@ -151,10 +159,12 @@ function assertServerBackedMetadata(featureKey: string, definition: FeatureExpos
 
 /** Runs every registry lifecycle assertion for one feature entry. */
 function assertFeatureExposureDefinition(featureKey: string, definition: FeatureExposureDefinition): void {
-  assertExposureMatrix(featureKey, definition.exposure);
-  assertAddedDate(featureKey, definition.addedDate);
-  assertTemporaryMetadata(featureKey, definition);
-  assertServerBackedMetadata(featureKey, definition);
+  const context: FeatureValidationContext = { featureKey, definition };
+
+  assertExposureMatrix(context);
+  assertAddedDate(context);
+  assertTemporaryMetadata(context);
+  assertServerBackedMetadata(context);
 }
 
 /** Validates registry shape and lifecycle metadata for tests and future CI policy checks. */
