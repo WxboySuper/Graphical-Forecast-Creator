@@ -100,6 +100,21 @@ export type FeatureKey = keyof typeof FEATURE_EXPOSURE_REGISTRY;
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+function isValidIsoCalendarDate(addedDate: string): boolean {
+  if (!ISO_DATE_PATTERN.test(addedDate)) {
+    return false;
+  }
+
+  const [year, month, day] = addedDate.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
+
 /** Ensures every build target has a boolean exposure value. */
 function assertExposureMatrix(featureKey: string, exposure: FeatureExposureMatrix): void {
   for (const target of BUILD_TARGETS) {
@@ -111,17 +126,7 @@ function assertExposureMatrix(featureKey: string, exposure: FeatureExposureMatri
 
 /** Ensures addedDate uses a real ISO calendar date. */
 function assertAddedDate(featureKey: string, addedDate: string): void {
-  if (!ISO_DATE_PATTERN.test(addedDate)) {
-    throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(addedDate)}.`);
-  }
-
-  const [year, month, day] = addedDate.split('-').map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
+  if (!isValidIsoCalendarDate(addedDate)) {
     throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(addedDate)}.`);
   }
 }
