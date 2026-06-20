@@ -5,8 +5,29 @@ import {
   isFeatureExposed,
   isFeatureExposedOnTarget,
   validateFeatureExposureRegistry,
+  type FeatureExposureDefinition,
   type FeatureKey,
 } from './featureExposure';
+
+const BASE_DEFINITION: FeatureExposureDefinition = {
+  exposure: { local: false, beta: false, staging: false, production: false },
+  owner: 'WxboySuper',
+  addedDate: '2026-06-20',
+  temporary: true,
+  removalCondition: 'Remove after launch.',
+  serverBacked: false,
+};
+
+const expectRegistryValidationError = (
+  definition: Partial<FeatureExposureDefinition>,
+  pattern: RegExp
+): void => {
+  expect(() =>
+    validateFeatureExposureRegistry({
+      sample: { ...BASE_DEFINITION, ...definition },
+    })
+  ).toThrow(pattern);
+};
 
 describe('featureExposure registry', () => {
   const originalTarget = globalThis.__GFC_BUILD_TARGET__;
@@ -19,34 +40,11 @@ describe('featureExposure registry', () => {
     expect(() => validateFeatureExposureRegistry()).not.toThrow();
   });
 
-  test('rejects temporary features without removal metadata', () => {
-    expect(() =>
-      validateFeatureExposureRegistry({
-        sample: {
-          exposure: { local: false, beta: false, staging: false, production: false },
-          owner: 'WxboySuper',
-          addedDate: '2026-06-20',
-          temporary: true,
-          removalCondition: '   ',
-          serverBacked: false,
-        },
-      })
-    ).toThrow(/removalCondition/);
-  });
-
-  test('rejects server-backed features without capability keys', () => {
-    expect(() =>
-      validateFeatureExposureRegistry({
-        sample: {
-          exposure: { local: false, beta: false, staging: false, production: false },
-          owner: 'WxboySuper',
-          addedDate: '2026-06-20',
-          temporary: true,
-          removalCondition: 'Remove after launch.',
-          serverBacked: true,
-        },
-      })
-    ).toThrow(/serverCapabilityKey/);
+  test.each([
+    ['temporary features without removal metadata', { removalCondition: '   ' }, /removalCondition/],
+    ['server-backed features without capability keys', { serverBacked: true }, /serverCapabilityKey/],
+  ] as const)('rejects %s', (_label, overrides, pattern) => {
+    expectRegistryValidationError(overrides, pattern);
   });
 
   test('lists every registry key in typed order', () => {

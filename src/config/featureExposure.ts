@@ -85,32 +85,57 @@ export type FeatureKey = keyof typeof FEATURE_EXPOSURE_REGISTRY;
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+const assertExposureMatrix = (featureKey: string, exposure: FeatureExposureMatrix): void => {
+  for (const target of BUILD_TARGETS) {
+    if (typeof exposure[target] !== 'boolean') {
+      throw new Error(`Feature ${featureKey} is missing exposure for target ${target}.`);
+    }
+  }
+};
+
+const assertAddedDate = (featureKey: string, addedDate: string): void => {
+  if (!ISO_DATE_PATTERN.test(addedDate)) {
+    throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(addedDate)}.`);
+  }
+};
+
+const assertTemporaryMetadata = (
+  featureKey: string,
+  temporary: boolean,
+  removalCondition: string
+): void => {
+  if (temporary && removalCondition.trim().length === 0) {
+    throw new Error(`Temporary feature ${featureKey} must declare a removalCondition.`);
+  }
+};
+
+const assertServerBackedMetadata = (
+  featureKey: string,
+  serverBacked: boolean,
+  serverCapabilityKey?: string
+): void => {
+  if (serverBacked && !serverCapabilityKey?.trim()) {
+    throw new Error(`Server-backed feature ${featureKey} must declare serverCapabilityKey.`);
+  }
+
+  if (!serverBacked && serverCapabilityKey) {
+    throw new Error(`Feature ${featureKey} must not declare serverCapabilityKey when serverBacked is false.`);
+  }
+};
+
+const assertFeatureExposureDefinition = (featureKey: string, definition: FeatureExposureDefinition): void => {
+  assertExposureMatrix(featureKey, definition.exposure);
+  assertAddedDate(featureKey, definition.addedDate);
+  assertTemporaryMetadata(featureKey, definition.temporary, definition.removalCondition);
+  assertServerBackedMetadata(featureKey, definition.serverBacked, definition.serverCapabilityKey);
+};
+
 /** Validates registry shape and lifecycle metadata for tests and future CI policy checks. */
 export const validateFeatureExposureRegistry = (
   registry: Record<string, FeatureExposureDefinition> = FEATURE_EXPOSURE_REGISTRY
 ): void => {
   for (const [featureKey, definition] of Object.entries(registry)) {
-    for (const target of BUILD_TARGETS) {
-      if (typeof definition.exposure[target] !== 'boolean') {
-        throw new Error(`Feature ${featureKey} is missing exposure for target ${target}.`);
-      }
-    }
-
-    if (!ISO_DATE_PATTERN.test(definition.addedDate)) {
-      throw new Error(`Feature ${featureKey} has an invalid addedDate ${JSON.stringify(definition.addedDate)}.`);
-    }
-
-    if (definition.temporary && definition.removalCondition.trim().length === 0) {
-      throw new Error(`Temporary feature ${featureKey} must declare a removalCondition.`);
-    }
-
-    if (definition.serverBacked && !definition.serverCapabilityKey?.trim()) {
-      throw new Error(`Server-backed feature ${featureKey} must declare serverCapabilityKey.`);
-    }
-
-    if (!definition.serverBacked && definition.serverCapabilityKey) {
-      throw new Error(`Feature ${featureKey} must not declare serverCapabilityKey when serverBacked is false.`);
-    }
+    assertFeatureExposureDefinition(featureKey, definition);
   }
 };
 
