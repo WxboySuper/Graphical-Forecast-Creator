@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #571
+
+- Add the typed feature exposure registry with per-target matrices, lifecycle metadata, and `isFeatureExposed` helpers for v1.7 workstreams.
+
 ### PR #568
 
 - Add explicit, validated local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
