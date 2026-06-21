@@ -58,11 +58,12 @@ const createServerCapabilityGate = (capabilityKey, options = {}) => {
   const env = options.env || process.env;
   const feature = findFeatureByCapabilityKey(capabilityKey);
   const label = options.label || feature?.definition?.label || 'This capability';
+  const target = options.target ?? getServerTarget(env);
 
   return (_req, res, next) => {
     if (!isServerCapabilityEnabled(capabilityKey, {
       env,
-      target: options.target,
+      target,
       exposureOverride: options.exposureOverride,
     })) {
       sendDisabledCapabilityResponse(res, { label });

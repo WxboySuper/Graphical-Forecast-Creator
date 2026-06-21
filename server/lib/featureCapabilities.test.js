@@ -64,6 +64,15 @@ describe('server capability gates', () => {
     }
   });
 
+  it('fails route registration when SERVER_TARGET is invalid', () => {
+    assert.throws(
+      () => createServerCapabilityGate('TSTM_GENERATION_ENABLED', {
+        env: { SERVER_TARGET: 'preview' },
+      }),
+      /Invalid SERVER_TARGET/
+    );
+  });
+
   it('uses a consistent disabled response helper', () => {
     const response = {
       statusCode: null,
