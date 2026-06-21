@@ -1,16 +1,17 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Provider, useDispatch, useSelector } from 'react-redux';
+import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { store } from './store';
-import type { RootState } from './store';
 import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
-import { OutlookType } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
 // Import required libraries 
 import 'leaflet/dist/leaflet.css';
-import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from './utils/featureFlagsUtils';
+import {
+  getFirstExposedOutlookType,
+  shouldActivateEmergencyMode,
+} from './config/productExposureSelectors';
 
 import { useAutoSave } from './hooks/useAutoSave';
 import { useFirestoreSleepRecovery } from './hooks/useFirestoreSleepRecovery';
@@ -57,7 +58,6 @@ function useLaunchGate(): boolean {
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
   const dispatch = useDispatch();
-  const featureFlags = useSelector((state: RootState) => state.featureFlags);
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
@@ -71,13 +71,11 @@ const AppHooks = () => {
   // Load cycle history from localStorage
   useCycleHistoryPersistence();
 
-  // Initialize feature flags state
+  // Derive emergency mode and the first exposed outlook from build-target exposure.
   useEffect(() => {
-    const anyEnabled = isAnyOutlookEnabled(featureFlags);
-    dispatch(setEmergencyMode(!anyEnabled));
-    const firstEnabled = getFirstEnabledOutlookType(featureFlags);
-    dispatch(setActiveOutlookType(firstEnabled as OutlookType));
-  }, [dispatch, featureFlags]);
+    dispatch(setEmergencyMode(shouldActivateEmergencyMode()));
+    dispatch(setActiveOutlookType(getFirstExposedOutlookType()));
+  }, [dispatch]);
 
   return null;
 };

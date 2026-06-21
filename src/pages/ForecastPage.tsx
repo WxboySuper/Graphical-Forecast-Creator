@@ -32,7 +32,10 @@ import {
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
-import { isAnyOutlookEnabled, getFirstEnabledOutlookType } from '../utils/featureFlagsUtils';
+import {
+  getFirstExposedOutlookType,
+  shouldActivateEmergencyMode,
+} from '../config/productExposureSelectors';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useCycleHistoryPersistence } from '../utils/cycleHistoryPersistence';
 import useAutoCategorical from '../hooks/useAutoCategorical';
@@ -596,17 +599,12 @@ export const processShortcutKeyDown = (
   handleStandardShortcuts(key, context);
 };
 
-/** Syncs the Redux active outlook type and emergency mode whenever feature flags change. */
-const useFeatureFlagSync = (
-  dispatch: ShortcutDispatch,
-  featureFlags: RootState['featureFlags']
-) => {
+/** Syncs the Redux active outlook type and emergency mode from build-target exposure. */
+const useOutlookExposureSync = (dispatch: ShortcutDispatch) => {
   useEffect(() => {
-    const anyEnabled = isAnyOutlookEnabled(featureFlags);
-    dispatch(setEmergencyMode(!anyEnabled));
-    const firstEnabled = getFirstEnabledOutlookType(featureFlags);
-    dispatch(setActiveOutlookType(firstEnabled as OutlookType));
-  }, [dispatch, featureFlags]);
+    dispatch(setEmergencyMode(shouldActivateEmergencyMode()));
+    dispatch(setActiveOutlookType(getFirstExposedOutlookType()));
+  }, [dispatch]);
 };
 
 /** Reads and validates one stored forecast payload string from browser storage. */
@@ -1133,7 +1131,6 @@ const useForecastPageWorkspace = ({
   mapRef: React.RefObject<ForecastMapHandle | null>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 }) => {
-  const featureFlags = useSelector((state: RootState) => state.featureFlags);
   const forecastCycle = useSelector(selectForecastCycle);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
@@ -1152,7 +1149,7 @@ const useForecastPageWorkspace = ({
   useAutoCategorical();
   useAutoSave();
   useCycleHistoryPersistence();
-  useFeatureFlagSync(dispatch, featureFlags);
+  useOutlookExposureSync(dispatch);
 
   const { handleCloudCycleLoaded, handleSaveToCloud } = useCloudForecastActions({
     addToast,

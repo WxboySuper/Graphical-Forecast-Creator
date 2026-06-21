@@ -35,8 +35,74 @@ const ALL_TARGETS_OFF: FeatureExposureMatrix = {
   production: false,
 };
 
+const ALL_TARGETS_ON: FeatureExposureMatrix = {
+  local: true,
+  beta: true,
+  staging: true,
+  production: true,
+};
+
+const CORE_PRODUCT_OWNER = 'WxboySuper';
+const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
+
 /** Single source of truth for v1.7 feature exposure and lifecycle metadata. */
 export const FEATURE_EXPOSURE_REGISTRY = {
+  exportMap: {
+    exposure: { ...ALL_TARGETS_ON },
+    owner: CORE_PRODUCT_OWNER,
+    addedDate: CORE_PRODUCT_ADDED_DATE,
+    temporary: false,
+    serverBacked: false,
+    trackingIssue: 440,
+  },
+  saveLoad: {
+    exposure: { ...ALL_TARGETS_ON },
+    owner: CORE_PRODUCT_OWNER,
+    addedDate: CORE_PRODUCT_ADDED_DATE,
+    temporary: false,
+    serverBacked: false,
+    trackingIssue: 440,
+  },
+  tornadoOutlook: {
+    exposure: { ...ALL_TARGETS_ON },
+    owner: CORE_PRODUCT_OWNER,
+    addedDate: CORE_PRODUCT_ADDED_DATE,
+    temporary: false,
+    serverBacked: false,
+    trackingIssue: 440,
+  },
+  windOutlook: {
+    exposure: { ...ALL_TARGETS_ON },
+    owner: CORE_PRODUCT_OWNER,
+    addedDate: CORE_PRODUCT_ADDED_DATE,
+    temporary: false,
+    serverBacked: false,
+    trackingIssue: 440,
+  },
+  hailOutlook: {
+    exposure: { ...ALL_TARGETS_ON },
+    owner: CORE_PRODUCT_OWNER,
+    addedDate: CORE_PRODUCT_ADDED_DATE,
+    temporary: false,
+    serverBacked: false,
+    trackingIssue: 440,
+  },
+  categoricalOutlook: {
+    exposure: { ...ALL_TARGETS_ON },
+    owner: CORE_PRODUCT_OWNER,
+    addedDate: CORE_PRODUCT_ADDED_DATE,
+    temporary: false,
+    serverBacked: false,
+    trackingIssue: 440,
+  },
+  significantThreats: {
+    exposure: { ...ALL_TARGETS_ON },
+    owner: CORE_PRODUCT_OWNER,
+    addedDate: CORE_PRODUCT_ADDED_DATE,
+    temporary: false,
+    serverBacked: false,
+    trackingIssue: 440,
+  },
   autoTstm: {
     exposure: { ...ALL_TARGETS_OFF },
     owner: 'WxboySuper',

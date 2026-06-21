@@ -7,6 +7,7 @@ import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import type { AddToastFn } from '../Layout';
 import useOutlookPanelLogic from '../OutlookPanel/useOutlookPanelLogic';
+import { isExportMapExposed } from '../../config/productExposureSelectors';
 import { useExportMap } from '../DrawingTools/useExportMap';
 
 import { DayType, OutlookType } from '../../types/outlooks';
@@ -288,7 +289,7 @@ export const useForecastWorkspaceController = ({
   const outlooks = useSelector((state: RootState) =>
     state.forecast.forecastCycle.days[currentDay]?.data || {}
   );
-  const isExportDisabled = useSelector((state: RootState) => state.featureFlags.exportMapEnabled === false);
+  const isExportDisabled = !isExportMapExposed();
   const panel = useOutlookPanelLogic();
   const { isExporting, isModalOpen, initiateExport, confirmExport, cancelExport } = useExportMap({
     mapRef,
