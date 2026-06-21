@@ -6,7 +6,7 @@
   "main": "analytics.js",
   "scripts": {
     "start": "node analytics.js",
-    "test": "node --test billing-stripe-period.test.js qs-dos.test.js server-stack.test.js tstm.test.js"
+    "test": "node --test billing-stripe-period.test.js qs-dos.test.js lib/serverTarget.test.js lib/featureCapabilities.test.js server-stack.test.js tstm.test.js"
   },
   "dependencies": {
     "@sentry/node": "^10.58.0",

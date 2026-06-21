@@ -5,12 +5,16 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { createServerCapabilityGate, isServerCapabilityEnabled } = require('./lib/featureCapabilities');
+
 const DEFAULT_TIMEOUT_MS = 480000;
 const MAX_STDERR_LENGTH = 2000;
 const MAX_STDOUT_LENGTH = 4 * 1024 * 1024;
+const TSTM_CAPABILITY_KEY = 'TSTM_GENERATION_ENABLED';
 
-/** Returns true only when the experimental generator is explicitly enabled. */
-const isTstmGenerationEnabled = (env = process.env) => env.TSTM_GENERATION_ENABLED === 'true';
+/** Returns true when Auto-TSTM is exposed on this deployment target and capability env. */
+const isTstmGenerationEnabled = (env = process.env, options = {}) =>
+  isServerCapabilityEnabled(TSTM_CAPABILITY_KEY, { env, ...options });
 
 /**
  * Returns true for the only outlook days covered by the preserved generator.
@@ -124,23 +128,30 @@ const registerTstmRoutes = (app, express, options = {}) => {
     standardHeaders: true,
     legacyHeaders: false,
   });
-  app.post('/api/tstm/generate', generationLimiter, express.json({ limit: '4kb' }), async (req, res) => {
-    if (!isTstmGenerationEnabled(env)) {
-      res.status(404).json({ error: 'Auto-TSTM is not enabled on this deployment.' });
-      return;
-    }
-    const payload = createGenerationPayload(req.body);
-    const validationError = validatePayload(payload);
-    if (validationError) {
-      res.status(400).json({ error: validationError });
-      return;
-    }
-    try {
-      res.json(await runGenerator(payload));
-    } catch {
-      res.status(503).json({ error: 'Auto-TSTM guidance is temporarily unavailable.' });
-    }
-  });
+  const capabilityOptions = {
+    env,
+    exposureOverride: options.exposureOverride,
+    target: options.target,
+  };
+  app.post(
+    '/api/tstm/generate',
+    createServerCapabilityGate(TSTM_CAPABILITY_KEY, capabilityOptions),
+    generationLimiter,
+    express.json({ limit: '4kb' }),
+    async (req, res) => {
+      const payload = createGenerationPayload(req.body);
+      const validationError = validatePayload(payload);
+      if (validationError) {
+        res.status(400).json({ error: validationError });
+        return;
+      }
+      try {
+        res.json(await runGenerator(payload));
+      } catch {
+        res.status(503).json({ error: 'Auto-TSTM guidance is temporarily unavailable.' });
+      }
+    },
+  );
 };
 
 module.exports = {

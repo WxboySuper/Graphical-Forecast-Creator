@@ -156,6 +156,7 @@ jobs:
           PORT=3006
           LOG_DIR=/opt/gfc-analytics/logs
           APP_BASE_URL=https://gfc.weatherboysuper.com
+          SERVER_TARGET=production
           BETA_MODE=false
           BETA_INVITE_TOKEN=
           BETA_INVITE_PATH=
@@ -180,6 +181,7 @@ jobs:
           PORT=3008
           LOG_DIR=/opt/gfc-staging-analytics/logs
           APP_BASE_URL=https://staging-gfc.weatherboysuper.com
+          SERVER_TARGET=staging
           BETA_MODE=true
           BETA_INVITE_TOKEN=${{ secrets.BETA_INVITE_TOKEN }}
           BETA_INVITE_PATH=${{ secrets.BETA_INVITE_PATH }}

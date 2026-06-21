@@ -141,6 +141,31 @@ describe('featureExposure registry', () => {
       }
     }
   });
+
+  test('keeps server capability metadata aligned with the analytics registry', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const {
+      KNOWN_SERVER_CAPABILITY_KEYS,
+      SERVER_FEATURE_EXPOSURE_REGISTRY,
+    } = require('../../server/lib/serverFeatureExposure');
+
+    const clientBackedKeys = getFeatureKeys()
+      .filter((feature) => getFeatureExposure(feature).serverBacked)
+      .map((feature) => ({
+        feature,
+        definition: getFeatureExposure(feature),
+      }));
+
+    expect(clientBackedKeys).toHaveLength(1);
+    expect(KNOWN_SERVER_CAPABILITY_KEYS).toEqual(['TSTM_GENERATION_ENABLED']);
+
+    for (const { feature, definition } of clientBackedKeys) {
+      const serverDefinition = SERVER_FEATURE_EXPOSURE_REGISTRY[feature];
+      expect(serverDefinition).toBeDefined();
+      expect(serverDefinition.serverCapabilityKey).toBe(definition.serverCapabilityKey);
+      expect(serverDefinition.exposure).toEqual(definition.exposure);
+    }
+  });
 });
 
 type ExpectFalse<T extends false> = T;
