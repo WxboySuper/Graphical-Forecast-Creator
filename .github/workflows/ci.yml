@@ -67,7 +67,7 @@ jobs:
           node-version: '24.x'
 
       - name: Validate release automation unit tests
-        run: node --test scripts/lib/package-version.test.mjs scripts/lib/bump-beta-after-main-release.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/port-pr-policy.test.mjs scripts/lib/version-bump.test.mjs scripts/lib/glob-match.test.mjs scripts/lib/pr-labels.test.mjs scripts/lib/pr-ci-label-state.test.mjs scripts/lib/github-paginate.test.mjs scripts/lib/changelog.test.mjs scripts/lib/beta-changelog.test.mjs scripts/lib/dependabot-changelog.test.mjs scripts/lib/production-release.test.mjs
+        run: node --test scripts/lib/package-version.test.mjs scripts/lib/bump-beta-after-main-release.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/port-pr-policy.test.mjs scripts/lib/version-bump.test.mjs scripts/lib/glob-match.test.mjs scripts/lib/pr-labels.test.mjs scripts/lib/pr-ci-label-state.test.mjs scripts/lib/github-paginate.test.mjs scripts/lib/changelog.test.mjs scripts/lib/beta-changelog.test.mjs scripts/lib/dependabot-changelog.test.mjs scripts/lib/production-release.test.mjs scripts/lib/feature-exposure-policy.test.mjs
 
       - name: Validate package version for target branch
         env:
@@ -77,11 +77,28 @@ jobs:
           GITHUB_HEAD_REF: ${{ github.head_ref }}
         run: node scripts/validate-package-version.mjs
 
+  feature-exposure-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Validate feature exposure policy
+        run: node scripts/validate-feature-exposure.mjs
+
   build-and-test:
-    needs: [package-version-policy, pr-governance]
+    needs: [package-version-policy, pr-governance, feature-exposure-policy]
     if: >-
       always() &&
       needs.package-version-policy.result == 'success' &&
+      needs.feature-exposure-policy.result == 'success' &&
       (needs.pr-governance.result == 'success' || needs.pr-governance.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
