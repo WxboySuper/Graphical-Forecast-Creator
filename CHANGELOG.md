@@ -5,9 +5,6 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### Changed
-- **Deploy env:** Add explicit `SERVER_TARGET` values to beta, staging, and production analytics server deploy env files.
-
 ### Added
 - **Explicit build targets:** Define and validate local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
 

@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #579
+
+- Add CI policy validation for feature exposure metadata, gated routes, navigation, and matching server capabilities.
+
 ### PR #577
 
 - Replace mutable Redux product flags with typed build-target exposure selectors so core forecast capabilities read from the feature registry instead of browser state.
