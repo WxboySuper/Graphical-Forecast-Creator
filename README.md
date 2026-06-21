@@ -114,7 +114,15 @@ Client gates live in:
 - `src/routing/buildFeatureGatedRoutes.tsx` — registers routes only for exposed features
 - `src/features/FeatureBoundary.tsx` — mounts children and effects only inside enabled boundaries
 
-Gated routes use `React.lazy` so disabled modules never load. Server capability gates adopt the same registry keys in follow-up foundation work.
+Gated routes use `React.lazy` so disabled modules never load.
+
+Server capability gates live in:
+
+- `server/lib/serverFeatureExposure.js` — server-backed slice of the registry
+- `server/lib/featureCapabilities.js` — deployment env + target exposure lookup and route middleware
+- `server/lib/serverTarget.js` — resolves `SERVER_TARGET` (with `SENTRY_ENVIRONMENT` fallback)
+
+Experimental APIs register `createServerCapabilityGate(serverCapabilityKey)` before auth and handlers. A capability is enabled only when the registry exposes it for the server target and the deployment env key is `true`. Disabled routes return `404` with `{ error: "<label> is not enabled on this deployment." }`.
 
 ### Local Beta Mode (developer)
 

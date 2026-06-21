@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #573
+
+- Add centralized server capability lookup, route gates, and `SERVER_TARGET` deploy env wiring so experimental APIs reject before expensive work and stay aligned with the client feature exposure registry.
+
 ### PR #572
 
 - Gate client routes, navigation, lazy modules, and mount boundaries through the feature exposure registry so disabled v1.7 work never registers paths, shows nav links, or initializes effects.
