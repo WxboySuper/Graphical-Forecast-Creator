@@ -13,9 +13,13 @@ const {
   validatePayload,
 } = require('./tstm');
 
-const startServer = (env, runGenerator) => {
+const ENABLED_CAPABILITY_OPTIONS = {
+  exposureOverride: { local: true, beta: true, staging: true, production: true },
+};
+
+const startServer = (env, runGenerator, routeOptions = {}) => {
   const app = express();
-  registerTstmRoutes(app, express, { env, runGenerator });
+  registerTstmRoutes(app, express, { env, runGenerator, ...routeOptions });
   return new Promise((resolve, reject) => {
     const server = app.listen(0, '127.0.0.1', () => resolve(server));
     server.on('error', reject);
@@ -37,10 +41,14 @@ const createFakeChild = () => {
 };
 
 describe('Auto-TSTM server foundation', () => {
-  it('stays disabled unless explicitly enabled', () => {
+  it('stays disabled unless registry exposure and deployment env are both enabled', () => {
     assert.equal(isTstmGenerationEnabled({}), false);
     assert.equal(isTstmGenerationEnabled({ TSTM_GENERATION_ENABLED: 'false' }), false);
-    assert.equal(isTstmGenerationEnabled({ TSTM_GENERATION_ENABLED: 'true' }), true);
+    assert.equal(isTstmGenerationEnabled({ TSTM_GENERATION_ENABLED: 'true' }), false);
+    assert.equal(
+      isTstmGenerationEnabled({ TSTM_GENERATION_ENABLED: 'true' }, ENABLED_CAPABILITY_OPTIONS),
+      true
+    );
   });
 
   it('normalizes and validates request payloads', () => {
@@ -70,6 +78,28 @@ describe('Auto-TSTM server foundation', () => {
         body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
       });
       assert.equal(response.status, 404);
+      assert.deepEqual(await response.json(), {
+        error: 'Auto-TSTM is not enabled on this deployment.',
+      });
+      assert.equal(calls, 0);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('does not invoke the generator when only the deployment env is enabled', async () => {
+    let calls = 0;
+    const server = await startServer({ TSTM_GENERATION_ENABLED: 'true' }, async () => {
+      calls += 1;
+      return {};
+    });
+    try {
+      const response = await fetch(getUrl(server), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
+      });
+      assert.equal(response.status, 404);
       assert.equal(calls, 0);
     } finally {
       server.close();
@@ -80,6 +110,7 @@ describe('Auto-TSTM server foundation', () => {
     const server = await startServer(
       { TSTM_GENERATION_ENABLED: 'true' },
       async () => { throw new Error('internal path and stderr'); },
+      ENABLED_CAPABILITY_OPTIONS,
     );
     try {
       const response = await fetch(getUrl(server), {
