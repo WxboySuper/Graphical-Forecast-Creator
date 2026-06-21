@@ -25,6 +25,7 @@ export const getExposedGatedRoutePaths = (target: BuildTarget = getBuildTarget()
     (definition) => `/${definition.path}`
   );
 
+/** Minimal loading placeholder shown while a gated lazy route chunk downloads. */
 const GatedRouteFallback = () => (
   <div className="flex h-full items-center justify-center p-6" aria-busy="true" aria-label="Loading page" />
 );
