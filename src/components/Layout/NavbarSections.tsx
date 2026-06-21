@@ -34,6 +34,7 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
+import { getVisibleNavigationItems } from '../../config/featureNavigation';
 declare const __GFC_APP_VERSION__: string;
 
 const appVersion = typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : 'dev';
@@ -53,14 +54,25 @@ interface RightActionsProps {
   onToggleDarkMode: () => void;
 }
 
-// Define the navigation items for the main tabs
-const navItems = [
-  { to: '/', label: 'Home', icon: Home, shortcut: '⌃H', end: true },
-  { to: '/forecast', label: 'Forecast', icon: Map, shortcut: '⌃1' },
-  { to: '/discussion', label: 'Discussion', icon: MessageSquare, shortcut: '⌃2' },
-  { to: '/verification', label: 'Verification', icon: CheckCircle, shortcut: '⌃3' },
-  { to: '/monitor', label: 'Monitor', icon: RadioTower, shortcut: '⌃4' },
-];
+const NAV_ITEM_ICONS = {
+  home: Home,
+  forecast: Map,
+  discussion: MessageSquare,
+  verification: CheckCircle,
+  monitor: RadioTower,
+  'tropical-workspace': Map,
+  'collaboration-room': MessageSquare,
+} as const;
+
+const NAV_ITEM_SHORTCUTS = {
+  home: '⌃H',
+  forecast: '⌃1',
+  discussion: '⌃2',
+  verification: '⌃3',
+  monitor: '⌃4',
+  'tropical-workspace': '⌃5',
+  'collaboration-room': '⌃6',
+} as const;
 
 // Define external links for the right action buttons
 const externalLinks: ExternalActionLink[] = [
@@ -117,14 +129,19 @@ export const BrandSection: FC = () => (
 // The MainTabs component keeps primary navigation next to the brand so the header reads left-to-right instead of as separate islands.
 export const MainTabs: FC = () => {
   const { pathname } = useLocation();
+  const navItems = getVisibleNavigationItems().map((item) => ({
+    ...item,
+    icon: NAV_ITEM_ICONS[item.id as keyof typeof NAV_ITEM_ICONS],
+    shortcut: NAV_ITEM_SHORTCUTS[item.id as keyof typeof NAV_ITEM_SHORTCUTS],
+  }));
 
   return (
     <div className="app-navbar__tabs">
-      {navItems.map(({ to, label, icon: Icon, shortcut, end }) => {
+      {navItems.map(({ id, to, label, icon: Icon, shortcut, end }) => {
         const isActive = end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
 
         return (
-          <Tooltip key={to}>
+          <Tooltip key={id}>
             <TooltipTrigger asChild>
               <NavLink to={to} end={end} className={getNavLinkClassName(isActive)}>
                 <Icon className="app-navbar__tabIcon h-4 w-4" />

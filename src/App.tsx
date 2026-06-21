@@ -26,6 +26,7 @@ import BetaAccessGuard from './components/Beta/BetaAccessGuard';
 import { GoogleAnalyticsRouteTracker } from './components/GoogleAnalyticsRouteTracker';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
+import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 
 // Launch gate: set VITE_COMING_SOON=true in the public build to enable pre-launch mode.
 // The app auto-unlocks at the launch date/time regardless of the env var.
@@ -149,6 +150,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
         <Route path="monitor" element={<MonitorPage />} />
+        {buildFeatureGatedRoutes()}
         </Route>
       </Route>
       <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />
