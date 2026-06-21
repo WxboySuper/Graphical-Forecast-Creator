@@ -48,6 +48,7 @@ greptile-comment.txt
 .vscode
 
 .playwright-mcp
+.playwright-cli/
 
 # Playwright
 /playwright-report/

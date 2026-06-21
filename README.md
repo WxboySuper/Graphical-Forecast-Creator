@@ -105,7 +105,16 @@ Every frontend build resolves one deployment target through `VITE_BUILD_TARGET`:
 
 v1.7 feature rollout is declared in `src/config/featureExposure.ts`. That registry is the single source of truth for which unfinished features may appear on each build target. Every key records an owner, added date, per-target exposure matrix, whether server capability is required, and removal metadata for temporary flags.
 
-Use `isFeatureExposed('featureKey')` for typed enablement checks. Unknown keys fail at compile time. Route, navigation, Redux, and server gates will adopt this registry in follow-up foundation work; this issue only establishes the contract and helpers.
+Use `isFeatureExposed('featureKey')` for typed enablement checks. Unknown keys fail at compile time.
+
+Client gates live in:
+
+- `src/config/featureSurfaces.ts` — declares gated lazy routes and side-effect module ownership
+- `src/config/featureNavigation.ts` — filters navbar items and keyboard shortcuts
+- `src/routing/buildFeatureGatedRoutes.tsx` — registers routes only for exposed features
+- `src/features/FeatureBoundary.tsx` — mounts children and effects only inside enabled boundaries
+
+Gated routes use `React.lazy` so disabled modules never load. Server capability gates adopt the same registry keys in follow-up foundation work.
 
 ### Local Beta Mode (developer)
 
