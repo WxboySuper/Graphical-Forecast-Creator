@@ -3,7 +3,6 @@ import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { store } from './store';
 import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
-import { OutlookType } from './types/outlooks';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
@@ -75,7 +74,7 @@ const AppHooks = () => {
   // Derive emergency mode and the first exposed outlook from build-target exposure.
   useEffect(() => {
     dispatch(setEmergencyMode(shouldActivateEmergencyMode()));
-    dispatch(setActiveOutlookType(getFirstExposedOutlookType() as OutlookType));
+    dispatch(setActiveOutlookType(getFirstExposedOutlookType()));
   }, [dispatch]);
 
   return null;

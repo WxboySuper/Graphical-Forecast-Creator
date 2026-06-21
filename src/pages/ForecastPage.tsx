@@ -603,7 +603,7 @@ export const processShortcutKeyDown = (
 const useOutlookExposureSync = (dispatch: ShortcutDispatch) => {
   useEffect(() => {
     dispatch(setEmergencyMode(shouldActivateEmergencyMode()));
-    dispatch(setActiveOutlookType(getFirstExposedOutlookType() as OutlookType));
+    dispatch(setActiveOutlookType(getFirstExposedOutlookType()));
   }, [dispatch]);
 };
 

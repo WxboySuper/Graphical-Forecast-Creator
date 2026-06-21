@@ -9,12 +9,21 @@ const OUTLOOK_EXPOSURE_BY_TYPE = {
   categorical: 'categoricalOutlook',
 } as const satisfies Partial<Record<OutlookType, FeatureKey>>;
 
-const OUTLOOK_EXPOSURE_PRIORITY: FeatureKey[] = [
+type OutlookExposureFeatureKey = (typeof OUTLOOK_EXPOSURE_BY_TYPE)[keyof typeof OUTLOOK_EXPOSURE_BY_TYPE];
+
+const OUTLOOK_TYPE_BY_FEATURE = {
+  tornadoOutlook: 'tornado',
+  windOutlook: 'wind',
+  hailOutlook: 'hail',
+  categoricalOutlook: 'categorical',
+} as const satisfies Record<OutlookExposureFeatureKey, keyof typeof OUTLOOK_EXPOSURE_BY_TYPE>;
+
+const OUTLOOK_EXPOSURE_PRIORITY = [
   'tornadoOutlook',
   'windOutlook',
   'hailOutlook',
   'categoricalOutlook',
-];
+] as const satisfies readonly OutlookExposureFeatureKey[];
 
 /** Returns whether map export is exposed on the current build target. */
 export const isExportMapExposed = (target: BuildTarget = getBuildTarget()): boolean =>
@@ -52,13 +61,7 @@ export const isAnyOutlookExposed = (target: BuildTarget = getBuildTarget()): boo
 export const getFirstExposedOutlookType = (target: BuildTarget = getBuildTarget()): OutlookType => {
   for (const feature of OUTLOOK_EXPOSURE_PRIORITY) {
     if (isFeatureExposedOnTarget(feature, target)) {
-      const outlookType = Object.entries(OUTLOOK_EXPOSURE_BY_TYPE).find(
-        ([, mappedFeature]) => mappedFeature === feature
-      )?.[0];
-
-      if (outlookType) {
-        return outlookType as OutlookType;
-      }
+      return OUTLOOK_TYPE_BY_FEATURE[feature];
     }
   }
 
