@@ -4,7 +4,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### FND-04
+### PR #573
 
 - Add centralized server capability lookup, route gates, and `SERVER_TARGET` deploy env wiring so experimental APIs reject before expensive work and stay aligned with the client feature exposure registry.
 
