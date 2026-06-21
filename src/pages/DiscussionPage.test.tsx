@@ -3,7 +3,6 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { DiscussionPage } from './DiscussionPage';
 import forecastReducer from '../store/forecastSlice';
-import featureFlagsReducer from '../store/featureFlagsSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -27,7 +26,6 @@ const createStore = () =>
   configureStore({
     reducer: {
       forecast: forecastReducer,
-      featureFlags: featureFlagsReducer,
       overlays: overlaysReducer,
       stormReports: stormReportsReducer,
       appMode: appModeReducer,

@@ -6,7 +6,6 @@ import { configureStore } from '@reduxjs/toolkit';
 import { IntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, { addFeature } from '../../store/forecastSlice';
-import featureFlagsReducer from '../../store/featureFlagsSlice';
 import overlaysReducer from '../../store/overlaysSlice';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 
@@ -45,7 +44,6 @@ const mockAddToast = jest.fn();
 const createStore = () => configureStore({
   reducer: {
     forecast: forecastReducer,
-    featureFlags: featureFlagsReducer,
     overlays: overlaysReducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware({

@@ -26,7 +26,6 @@ import ForecastPage, {
   writeStoredDayValue,
 } from './ForecastPage';
 import forecastReducer from '../store/forecastSlice';
-import featureFlagsReducer from '../store/featureFlagsSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -88,7 +87,6 @@ jest.mock('react-router-dom', () => ({
 const createStore = () => configureStore({
   reducer: {
     forecast: forecastReducer,
-    featureFlags: featureFlagsReducer,
     overlays: overlaysReducer,
     stormReports: stormReportsReducer,
     appMode: appModeReducer,

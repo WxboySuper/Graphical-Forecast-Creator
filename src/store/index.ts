@@ -2,7 +2,6 @@ import '../immerSetup';
 import { configureStore } from '@reduxjs/toolkit';
 import { appendSentryReduxEnhancer } from './sentryEnhancer';
 import forecastReducer from './forecastSlice';
-import featureFlagsReducer from './featureFlagsSlice';
 import overlaysReducer from './overlaysSlice';
 import stormReportsReducer from './stormReportsSlice';
 import appModeReducer from './appModeSlice';
@@ -13,7 +12,6 @@ import monitorReducer from './monitorSlice';
 export const store = configureStore({
   reducer: {
     forecast: forecastReducer,
-    featureFlags: featureFlagsReducer,
     overlays: overlaysReducer,
     stormReports: stormReportsReducer,
     appMode: appModeReducer,

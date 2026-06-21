@@ -56,6 +56,13 @@ describe('featureExposure registry', () => {
 
   test('lists every registry key in typed order', () => {
     expect(getFeatureKeys()).toEqual([
+      'exportMap',
+      'saveLoad',
+      'tornadoOutlook',
+      'windOutlook',
+      'hailOutlook',
+      'categoricalOutlook',
+      'significantThreats',
       'autoTstm',
       'forecastWorkflowV2',
       'verificationRelaunch',
@@ -87,8 +94,35 @@ describe('featureExposure registry', () => {
     expect(isFeatureExposed('collaborationRoom')).toBe(false);
   });
 
+  test('keeps core product capabilities enabled on every target', () => {
+    const coreProductKeys = [
+      'exportMap',
+      'saveLoad',
+      'tornadoOutlook',
+      'windOutlook',
+      'hailOutlook',
+      'categoricalOutlook',
+      'significantThreats',
+    ] as const;
+
+    for (const feature of coreProductKeys) {
+      for (const target of ['local', 'beta', 'staging', 'production'] as const) {
+        expect(isFeatureExposedOnTarget(feature, target)).toBe(true);
+      }
+    }
+  });
+
   test('keeps v1.7 workstream keys disabled on every target until adoption', () => {
-    for (const feature of getFeatureKeys()) {
+    const workstreamKeys = [
+      'autoTstm',
+      'forecastWorkflowV2',
+      'verificationRelaunch',
+      'customProducts',
+      'tropicalWorkspace',
+      'collaborationRoom',
+    ] as const;
+
+    for (const feature of workstreamKeys) {
       for (const target of ['local', 'beta', 'staging', 'production'] as const) {
         expect(isFeatureExposedOnTarget(feature, target)).toBe(false);
       }

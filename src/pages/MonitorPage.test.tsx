@@ -6,7 +6,6 @@ import MonitorPage from './MonitorPage';
 import monitorReducer from '../store/monitorSlice';
 import forecastReducer from '../store/forecastSlice';
 import themeReducer from '../store/themeSlice';
-import featureFlagsReducer from '../store/featureFlagsSlice';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 
 const addToast = jest.fn();
@@ -72,7 +71,6 @@ const renderMonitorPage = () => {
       monitor: monitorReducer,
       forecast: forecastReducer,
       theme: themeReducer,
-      featureFlags: featureFlagsReducer,
     },
     preloadedState: {
       monitor: {
