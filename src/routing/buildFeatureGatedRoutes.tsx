@@ -25,6 +25,10 @@ export const getExposedGatedRoutePaths = (target: BuildTarget = getBuildTarget()
     (definition) => `/${definition.path}`
   );
 
+const GatedRouteFallback = () => (
+  <div className="flex h-full items-center justify-center p-6" aria-busy="true" aria-label="Loading page" />
+);
+
 /** Registers lazy routes only for features exposed on the current build target. */
 export const buildFeatureGatedRoutes = (target: BuildTarget = getBuildTarget()): ReactElement[] =>
   GATED_ROUTE_DEFINITIONS.filter((definition) => isFeatureExposedOnTarget(definition.feature, target)).map(
@@ -36,7 +40,7 @@ export const buildFeatureGatedRoutes = (target: BuildTarget = getBuildTarget()):
           key={definition.path}
           path={definition.path}
           element={
-            <Suspense fallback={null}>
+            <Suspense fallback={<GatedRouteFallback />}>
               <Page />
             </Suspense>
           }

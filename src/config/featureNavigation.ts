@@ -7,22 +7,24 @@ export type AppNavigationItem = {
   to: string;
   label: string;
   shortcutKey?: string;
+  shortcutLabel?: string;
   end?: boolean;
   feature?: FeatureKey;
 };
 
 /** Primary navbar destinations. Items with a feature key render only when that feature is exposed. */
 export const APP_NAVIGATION_ITEMS = [
-  { id: 'home', to: '/', label: 'Home', shortcutKey: 'h', end: true },
-  { id: 'forecast', to: '/forecast', label: 'Forecast', shortcutKey: '1' },
-  { id: 'discussion', to: '/discussion', label: 'Discussion', shortcutKey: '2' },
-  { id: 'verification', to: '/verification', label: 'Verification', shortcutKey: '3' },
-  { id: 'monitor', to: '/monitor', label: 'Monitor', shortcutKey: '4' },
+  { id: 'home', to: '/', label: 'Home', shortcutKey: 'h', shortcutLabel: '⌃H', end: true },
+  { id: 'forecast', to: '/forecast', label: 'Forecast', shortcutKey: '1', shortcutLabel: '⌃1' },
+  { id: 'discussion', to: '/discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
+  { id: 'verification', to: '/verification', label: 'Verification', shortcutKey: '3', shortcutLabel: '⌃3' },
+  { id: 'monitor', to: '/monitor', label: 'Monitor', shortcutKey: '4', shortcutLabel: '⌃4' },
   {
     id: 'tropical-workspace',
     to: '/tropical',
     label: 'Tropical',
     shortcutKey: '5',
+    shortcutLabel: '⌃5',
     feature: 'tropicalWorkspace',
   },
   {
@@ -30,14 +32,17 @@ export const APP_NAVIGATION_ITEMS = [
     to: '/collaborate',
     label: 'Collaborate',
     shortcutKey: '6',
+    shortcutLabel: '⌃6',
     feature: 'collaborationRoom',
   },
 ] as const satisfies readonly AppNavigationItem[];
 
+export type AppNavigationItemId = (typeof APP_NAVIGATION_ITEMS)[number]['id'];
+
 /** Returns navbar items visible for the given deployment target. */
 export const getVisibleNavigationItems = (
   target: BuildTarget = getBuildTarget()
-): AppNavigationItem[] =>
+): (typeof APP_NAVIGATION_ITEMS)[number][] =>
   APP_NAVIGATION_ITEMS.filter(
     (item) => !item.feature || isFeatureExposedOnTarget(item.feature, target)
   );

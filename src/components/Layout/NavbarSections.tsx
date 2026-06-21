@@ -34,7 +34,8 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
-import { getVisibleNavigationItems } from '../../config/featureNavigation';
+import { getVisibleNavigationItems, type AppNavigationItemId } from '../../config/featureNavigation';
+import type { LucideIcon } from 'lucide-react';
 declare const __GFC_APP_VERSION__: string;
 
 const appVersion = typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : 'dev';
@@ -62,17 +63,7 @@ const NAV_ITEM_ICONS = {
   monitor: RadioTower,
   'tropical-workspace': Map,
   'collaboration-room': MessageSquare,
-} as const;
-
-const NAV_ITEM_SHORTCUTS = {
-  home: '⌃H',
-  forecast: '⌃1',
-  discussion: '⌃2',
-  verification: '⌃3',
-  monitor: '⌃4',
-  'tropical-workspace': '⌃5',
-  'collaboration-room': '⌃6',
-} as const;
+} satisfies Record<AppNavigationItemId, LucideIcon>;
 
 // Define external links for the right action buttons
 const externalLinks: ExternalActionLink[] = [
@@ -131,13 +122,12 @@ export const MainTabs: FC = () => {
   const { pathname } = useLocation();
   const navItems = getVisibleNavigationItems().map((item) => ({
     ...item,
-    icon: NAV_ITEM_ICONS[item.id as keyof typeof NAV_ITEM_ICONS],
-    shortcut: NAV_ITEM_SHORTCUTS[item.id as keyof typeof NAV_ITEM_SHORTCUTS],
+    icon: NAV_ITEM_ICONS[item.id],
   }));
 
   return (
     <div className="app-navbar__tabs">
-      {navItems.map(({ id, to, label, icon: Icon, shortcut, end }) => {
+      {navItems.map(({ id, to, label, icon: Icon, shortcutLabel, end }) => {
         const isActive = end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
 
         return (
@@ -149,7 +139,7 @@ export const MainTabs: FC = () => {
               </NavLink>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{label} <span className="text-muted-foreground ml-2">{shortcut}</span></p>
+              <p>{label} {shortcutLabel ? <span className="text-muted-foreground ml-2">{shortcutLabel}</span> : null}</p>
             </TooltipContent>
           </Tooltip>
         );
