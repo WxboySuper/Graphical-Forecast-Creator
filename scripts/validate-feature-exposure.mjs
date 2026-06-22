@@ -111,21 +111,30 @@ function evaluateObject(expression, constants, resolving) {
   return value;
 }
 
+const LITERAL_READERS = [
+  { matches: ts.isStringLiteralLike, read: (node) => node.text },
+  { matches: ts.isNumericLiteral, read: (node) => Number(node.text) },
+  { matches: (node) => node.kind === ts.SyntaxKind.TrueKeyword, read: () => true },
+  { matches: (node) => node.kind === ts.SyntaxKind.FalseKeyword, read: () => false },
+  { matches: (node) => node.kind === ts.SyntaxKind.NullKeyword, read: () => null },
+  { matches: ts.isPrefixUnaryExpression, read: evaluateSignedNumber },
+  { matches: ts.isArrowFunction, read: () => undefined },
+  { matches: ts.isFunctionExpression, read: () => undefined },
+  { matches: ts.isIdentifier, read: evaluateIdentifier },
+  {
+    matches: ts.isArrayLiteralExpression,
+    read: (node, constants, resolving) =>
+      node.elements.map((element) => evaluateLiteral(element, constants, resolving)),
+  },
+  { matches: ts.isObjectLiteralExpression, read: evaluateObject },
+];
+
 /** Safely evaluates the limited literal syntax used by policy configuration. */
 function evaluateLiteral(node, constants, resolving = new Set()) {
   const expression = unwrapExpression(node);
-  if (ts.isStringLiteralLike(expression)) return expression.text;
-  if (ts.isNumericLiteral(expression)) return Number(expression.text);
-  if (expression.kind === ts.SyntaxKind.TrueKeyword) return true;
-  if (expression.kind === ts.SyntaxKind.FalseKeyword) return false;
-  if (expression.kind === ts.SyntaxKind.NullKeyword) return null;
-  if (ts.isPrefixUnaryExpression(expression)) return evaluateSignedNumber(expression);
-  if (ts.isArrowFunction(expression)) return undefined;
-  if (ts.isFunctionExpression(expression)) return undefined;
-  if (ts.isIdentifier(expression)) return evaluateIdentifier(expression, constants, resolving);
-  if (ts.isArrayLiteralExpression(expression)) return expression.elements.map((element) => evaluateLiteral(element, constants, resolving));
-  if (ts.isObjectLiteralExpression(expression)) return evaluateObject(expression, constants, resolving);
-  throw new Error(`Unsupported non-literal expression: ${expression.getText()}`);
+  const reader = LITERAL_READERS.find(({ matches }) => matches(expression));
+  if (!reader) throw new Error(`Unsupported non-literal expression: ${expression.getText()}`);
+  return reader.read(expression, constants, resolving);
 }
 
 /** Extracts and safely evaluates a named top-level constant. */

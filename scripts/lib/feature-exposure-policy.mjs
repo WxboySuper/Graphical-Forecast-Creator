@@ -85,9 +85,10 @@ function validateSurfaceReferences(registry, surfaces, errors) {
 /** Adds server-backed registry entries that lack a matching server capability. */
 function validateServerCapabilities(registry, serverCapabilityKeys, errors) {
   for (const [featureKey, definition] of Object.entries(registry)) {
-    if (definition.serverBacked && definition.serverCapabilityKey && !serverCapabilityKeys.includes(definition.serverCapabilityKey)) {
-      errors.push(`Feature "${featureKey}" declares serverCapabilityKey "${definition.serverCapabilityKey}" but it is not in the server capability keys list.`);
-    }
+    if (!definition.serverBacked) continue;
+    if (!definition.serverCapabilityKey) continue;
+    if (serverCapabilityKeys.includes(definition.serverCapabilityKey)) continue;
+    errors.push(`Feature "${featureKey}" declares serverCapabilityKey "${definition.serverCapabilityKey}" but it is not in the server capability keys list.`);
   }
 }
 
