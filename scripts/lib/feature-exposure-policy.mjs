@@ -101,6 +101,11 @@ function validateProductionSafety(registry, errors) {
   }
 }
 
+/** Converts collected violations into the public policy result shape. */
+function createPolicyResult(errors) {
+  return errors.length === 0 ? { ok: true } : { ok: false, errors };
+}
+
 /**
  * Validates the feature exposure registry and cross-file surface references.
  *
@@ -115,5 +120,5 @@ export function evaluateFeatureExposurePolicy(registry, surfaces, serverCapabili
   validateSurfaceReferences(registry, surfaces, errors);
   validateServerCapabilities(registry, serverCapabilityKeys, errors);
   validateProductionSafety(registry, errors);
-  return errors.length === 0 ? { ok: true } : { ok: false, errors };
+  return createPolicyResult(errors);
 }

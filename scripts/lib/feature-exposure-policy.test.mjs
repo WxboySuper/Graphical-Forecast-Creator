@@ -27,6 +27,12 @@ const validRegistry = {
 
 const emptySurfaces = { gatedRoutes: [], navigationItems: [] };
 
+function assertPolicyErrors(registry, patterns, surfaces = emptySurfaces, serverCapabilityKeys = []) {
+  const result = evaluateFeatureExposurePolicy(registry, surfaces, serverCapabilityKeys);
+  assert.equal(result.ok, false);
+  for (const pattern of patterns) assert.ok(result.errors.some((error) => pattern.test(error)));
+}
+
 describe('feature exposure policy', () => {
   it('passes for a valid registry with no surface references', () => {
     const result = evaluateFeatureExposurePolicy(validRegistry, emptySurfaces);
@@ -44,10 +50,7 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /staging/.test(e)));
-    assert.ok(result.errors.some((e) => /production/.test(e)));
+    assertPolicyErrors(registry, [/staging/, /production/]);
   });
 
   it('fails when addedDate is invalid', () => {
@@ -61,9 +64,7 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /addedDate/.test(e)));
+    assertPolicyErrors(registry, [/addedDate/]);
   });
 
   it('fails when temporary feature has no removalCondition', () => {
@@ -78,9 +79,7 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /removalCondition/.test(e)));
+    assertPolicyErrors(registry, [/removalCondition/]);
   });
 
   it('fails when server-backed feature has no capability key', () => {
@@ -94,9 +93,7 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /serverCapabilityKey/.test(e)));
+    assertPolicyErrors(registry, [/serverCapabilityKey/]);
   });
 
   it('fails when non-server-backed feature has a capability key', () => {
@@ -111,9 +108,7 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /must not declare serverCapabilityKey/.test(e)));
+    assertPolicyErrors(registry, [/must not declare serverCapabilityKey/]);
   });
 
   it('fails when feature is missing trackingIssue', () => {
@@ -126,9 +121,7 @@ describe('feature exposure policy', () => {
         serverBacked: false,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /trackingIssue/.test(e)));
+    assertPolicyErrors(registry, [/trackingIssue/]);
   });
 
   it('fails when trackingIssue is not a positive number', () => {
@@ -142,9 +135,7 @@ describe('feature exposure policy', () => {
         trackingIssue: -5,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /trackingIssue/.test(e)));
+    assertPolicyErrors(registry, [/trackingIssue/]);
   });
 
   it('fails when gated route references unknown feature', () => {
@@ -152,9 +143,7 @@ describe('feature exposure policy', () => {
       gatedRoutes: [{ feature: 'nonExistent', path: '/foo' }],
       navigationItems: [],
     };
-    const result = evaluateFeatureExposurePolicy(validRegistry, surfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /nonExistent/.test(e) && /does not exist/.test(e)));
+    assertPolicyErrors(validRegistry, [/nonExistent.*does not exist/], surfaces);
   });
 
   it('fails when navigation item references unknown feature', () => {
@@ -162,9 +151,7 @@ describe('feature exposure policy', () => {
       gatedRoutes: [],
       navigationItems: [{ id: 'foo', to: '/foo', label: 'Foo', feature: 'nonExistent' }],
     };
-    const result = evaluateFeatureExposurePolicy(validRegistry, surfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /nonExistent/.test(e) && /does not exist/.test(e)));
+    assertPolicyErrors(validRegistry, [/nonExistent.*does not exist/], surfaces);
   });
 
   it('passes when surface references match registry keys', () => {
@@ -188,9 +175,7 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces, []);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /MY_FEATURE_ENABLED/.test(e) && /server capability keys/.test(e)));
+    assertPolicyErrors(registry, [/MY_FEATURE_ENABLED.*server capability keys/]);
   });
 
   it('passes when server-backed feature capability key matches server list', () => {
@@ -221,9 +206,7 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => /prod/.test(e) && /production/.test(e)));
+    assertPolicyErrors(registry, [/prod.*production/]);
   });
 
   it('allows permanent features exposed on production', () => {
