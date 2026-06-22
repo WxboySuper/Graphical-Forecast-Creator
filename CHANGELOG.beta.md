@@ -4,6 +4,27 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #582
+
+- Dependency: @radix-ui/react-dialog ^1.1.16 → ^1.1.17
+- Dependency: @radix-ui/react-dropdown-menu ^2.1.17 → ^2.1.18
+- Dependency: @radix-ui/react-popover ^1.1.16 → ^1.1.17
+- Dependency: @radix-ui/react-slot ^1.2.5 → ^1.3.0
+- Dependency: @radix-ui/react-tabs ^1.1.14 → ^1.1.15
+- Dependency: @radix-ui/react-tooltip ^1.2.9 → ^1.2.10
+- Dependency: @sentry/react ^10.58.0 → ^10.59.0
+- Dependency: @types/node ^25.9.3 → ^26.0.0
+- Dependency: firebase ^12.14.0 → ^12.15.0
+- Dependency: lucide-react ^1.18.0 → ^1.21.0
+- Dependency: react-router-dom ^7.17.0 → ^7.18.0
+- Dependency: rollup >=4.62.0 → >=4.62.2
+- Dependency: uuid ^14.0.0 → ^14.0.1
+- Dependency: @babel/core ^7.29.7 → ^8.0.1
+- Dependency: @babel/preset-env ^7.29.7 → ^8.0.2
+- Dependency: @babel/preset-react ^7.29.7 → ^8.0.1
+- Dependency: @babel/preset-typescript ^7.29.7 → ^8.0.1
+- Dependency: @sentry/node ^10.58.0 → ^10.59.0 (`server`)
+- Dependency: stripe ^22.2.1 → ^22.2.2 (`server`)
 ### PR #579
 
 - Add CI policy validation for feature exposure metadata, gated routes, navigation, and matching server capabilities.
