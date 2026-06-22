@@ -27,6 +27,79 @@ function isValidIsoCalendarDate(addedDate) {
   );
 }
 
+/** Adds exposure matrix violations for one feature. */
+function validateExposureMatrix(featureKey, definition, errors) {
+  for (const target of BUILD_TARGET_LIST) {
+    if (typeof definition.exposure?.[target] !== 'boolean') {
+      errors.push(`Feature "${featureKey}" is missing exposure for target "${target}".`);
+    }
+  }
+}
+
+/** Adds lifecycle metadata violations for one feature. */
+function validateLifecycleMetadata(featureKey, definition, errors) {
+  if (!isValidIsoCalendarDate(definition.addedDate)) {
+    errors.push(`Feature "${featureKey}" has an invalid addedDate ${JSON.stringify(definition.addedDate)}.`);
+  }
+  if (definition.temporary && !definition.removalCondition?.trim()) {
+    errors.push(`Temporary feature "${featureKey}" must declare a removalCondition.`);
+  }
+  if (typeof definition.trackingIssue !== 'number' || definition.trackingIssue <= 0) {
+    errors.push(`Feature "${featureKey}" must declare a positive trackingIssue number.`);
+  }
+}
+
+/** Adds server capability metadata violations for one feature. */
+function validateServerMetadata(featureKey, definition, errors) {
+  if (definition.serverBacked && !definition.serverCapabilityKey?.trim()) {
+    errors.push(`Server-backed feature "${featureKey}" must declare serverCapabilityKey.`);
+  }
+  if (!definition.serverBacked && definition.serverCapabilityKey) {
+    errors.push(`Feature "${featureKey}" must not declare serverCapabilityKey when serverBacked is false.`);
+  }
+}
+
+/** Adds all registry-entry violations. */
+function validateRegistryEntries(registry, errors) {
+  for (const [featureKey, definition] of Object.entries(registry)) {
+    validateExposureMatrix(featureKey, definition, errors);
+    validateLifecycleMetadata(featureKey, definition, errors);
+    validateServerMetadata(featureKey, definition, errors);
+  }
+}
+
+/** Adds references to surface features missing from the registry. */
+function validateSurfaceReferences(registry, surfaces, errors) {
+  const registryKeys = new Set(Object.keys(registry));
+  const features = new Set([
+    ...surfaces.gatedRoutes.map(({ feature }) => feature),
+    ...surfaces.navigationItems.map(({ feature }) => feature).filter(Boolean),
+  ]);
+  for (const featureKey of features) {
+    if (!registryKeys.has(featureKey)) {
+      errors.push(`Surface feature "${featureKey}" is referenced in routes/navigation but does not exist in the feature exposure registry.`);
+    }
+  }
+}
+
+/** Adds server-backed registry entries that lack a matching server capability. */
+function validateServerCapabilities(registry, serverCapabilityKeys, errors) {
+  for (const [featureKey, definition] of Object.entries(registry)) {
+    if (definition.serverBacked && definition.serverCapabilityKey && !serverCapabilityKeys.includes(definition.serverCapabilityKey)) {
+      errors.push(`Feature "${featureKey}" declares serverCapabilityKey "${definition.serverCapabilityKey}" but it is not in the server capability keys list.`);
+    }
+  }
+}
+
+/** Adds temporary features that are prematurely exposed in production. */
+function validateProductionSafety(registry, errors) {
+  for (const [featureKey, definition] of Object.entries(registry)) {
+    if (definition.temporary && definition.exposure?.production === true) {
+      errors.push(`Temporary feature "${featureKey}" is exposed on production. Temporary features must not be enabled on production until explicitly promoted.`);
+    }
+  }
+}
+
 /**
  * Validates the feature exposure registry and cross-file surface references.
  *
@@ -37,103 +110,9 @@ function isValidIsoCalendarDate(addedDate) {
  */
 export function evaluateFeatureExposurePolicy(registry, surfaces, serverCapabilityKeys = []) {
   const errors = [];
-
-  // ── 1. Registry metadata integrity ──────────────────────────────
-  for (const [featureKey, definition] of Object.entries(registry)) {
-    // Exposure matrix must cover all build targets
-    for (const target of BUILD_TARGET_LIST) {
-      if (typeof definition.exposure?.[target] !== 'boolean') {
-        errors.push(
-          `Feature "${featureKey}" is missing exposure for target "${target}".`
-        );
-      }
-    }
-
-    // addedDate must be a valid ISO calendar date
-    if (!isValidIsoCalendarDate(definition.addedDate)) {
-      errors.push(
-        `Feature "${featureKey}" has an invalid addedDate ${JSON.stringify(definition.addedDate)}.`
-      );
-    }
-
-    // Temporary features must declare a removalCondition
-    if (definition.temporary && (!definition.removalCondition || definition.removalCondition.trim().length === 0)) {
-      errors.push(
-        `Temporary feature "${featureKey}" must declare a removalCondition.`
-      );
-    }
-
-    // Server-backed features must have a capability key
-    if (definition.serverBacked && !definition.serverCapabilityKey?.trim()) {
-      errors.push(
-        `Server-backed feature "${featureKey}" must declare serverCapabilityKey.`
-      );
-    }
-
-    // Non-server-backed features must not have a capability key
-    if (!definition.serverBacked && definition.serverCapabilityKey) {
-      errors.push(
-        `Feature "${featureKey}" must not declare serverCapabilityKey when serverBacked is false.`
-      );
-    }
-
-    // Every feature must have a tracking issue
-    if (typeof definition.trackingIssue !== 'number' || definition.trackingIssue <= 0) {
-      errors.push(
-        `Feature "${featureKey}" must declare a positive trackingIssue number.`
-      );
-    }
-  }
-
-  // ── 2. Unknown surface key detection ────────────────────────────
-  const registryKeys = new Set(Object.keys(registry));
-
-  const gatedRouteFeatures = surfaces.gatedRoutes.map((r) => r.feature);
-  const navigationFeatures = surfaces.navigationItems
-    .map((item) => item.feature)
-    .filter(Boolean);
-  const allSurfaceFeatures = [...new Set([...gatedRouteFeatures, ...navigationFeatures])];
-
-  for (const featureKey of allSurfaceFeatures) {
-    if (!registryKeys.has(featureKey)) {
-      errors.push(
-        `Surface feature "${featureKey}" is referenced in routes/navigation but does not exist in the feature exposure registry.`
-      );
-    }
-  }
-
-  // ── 3. Server capability alignment ──────────────────────────────
-  const serverBackedFeatures = Object.entries(registry).filter(
-    ([, def]) => def.serverBacked
-  );
-
-  for (const [featureKey, definition] of serverBackedFeatures) {
-    if (!definition.serverCapabilityKey) {
-      // Already caught by metadata check above, but be explicit
-      continue;
-    }
-
-    if (!serverCapabilityKeys.includes(definition.serverCapabilityKey)) {
-      errors.push(
-        `Feature "${featureKey}" declares serverCapabilityKey "${definition.serverCapabilityKey}" but it is not in the server capability keys list.`
-      );
-    }
-  }
-
-  // ── 4. Production safety ────────────────────────────────────────
-  // Only flag temporary (in-development) features exposed on production.
-  // Permanent features are expected to be on in all targets.
-  for (const [featureKey, definition] of Object.entries(registry)) {
-    if (definition.temporary && definition.exposure?.production === true) {
-      errors.push(
-        `Temporary feature "${featureKey}" is exposed on production. Temporary features must not be enabled on production until explicitly promoted.`
-      );
-    }
-  }
-
-  if (errors.length > 0) {
-    return { ok: false, errors };
-  }
-
-  return { ok: true };
+  validateRegistryEntries(registry, errors);
+  validateSurfaceReferences(registry, surfaces, errors);
+  validateServerCapabilities(registry, serverCapabilityKeys, errors);
+  validateProductionSafety(registry, errors);
+  return errors.length === 0 ? { ok: true } : { ok: false, errors };
 }

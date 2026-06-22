@@ -149,7 +149,7 @@ describe('feature exposure policy', () => {
 
   it('fails when gated route references unknown feature', () => {
     const surfaces = {
-      gatedRoutes: [{ feature: 'nonExistent', path: '/foo', loadPage: () => {} }],
+      gatedRoutes: [{ feature: 'nonExistent', path: '/foo' }],
       navigationItems: [],
     };
     const result = evaluateFeatureExposurePolicy(validRegistry, surfaces);
@@ -169,7 +169,7 @@ describe('feature exposure policy', () => {
 
   it('passes when surface references match registry keys', () => {
     const surfaces = {
-      gatedRoutes: [{ feature: 'betaFeature', path: '/beta', loadPage: () => {} }],
+      gatedRoutes: [{ feature: 'betaFeature', path: '/beta' }],
       navigationItems: [{ id: 'nav', to: '/nav', label: 'Nav', feature: 'betaFeature' }],
     };
     const result = evaluateFeatureExposurePolicy(validRegistry, surfaces);
