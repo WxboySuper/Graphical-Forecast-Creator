@@ -92,14 +92,17 @@ function applySpread(property, value, constants, resolving) {
 
 /** Applies one supported property to an evaluated object literal. */
 function applyObjectProperty(property, value, constants, resolving) {
-  if (ts.isSpreadAssignment(property)) return applySpread(property, value, constants, resolving);
+  if (ts.isSpreadAssignment(property)) {
+    applySpread(property, value, constants, resolving);
+    return null;
+  }
   if (ts.isPropertyAssignment(property)) {
     value[propertyName(property.name)] = evaluateLiteral(property.initializer, constants, resolving);
-    return;
+    return null;
   }
   if (ts.isShorthandPropertyAssignment(property)) {
     value[property.name.text] = evaluateLiteral(property.name, constants, resolving);
-    return;
+    return null;
   }
   throw new Error(`Unsupported object member: ${property.getText()}`);
 }

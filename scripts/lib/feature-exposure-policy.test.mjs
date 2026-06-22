@@ -27,6 +27,7 @@ const validRegistry = {
 
 const emptySurfaces = { gatedRoutes: [], navigationItems: [] };
 
+/** Asserts that a policy input fails with every expected message pattern. */
 function assertPolicyErrors(registry, patterns, surfaces = emptySurfaces, serverCapabilityKeys = []) {
   const result = evaluateFeatureExposurePolicy(registry, surfaces, serverCapabilityKeys);
   assert.equal(result.ok, false);
