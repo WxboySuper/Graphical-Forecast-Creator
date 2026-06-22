@@ -90,8 +90,21 @@ jobs:
         with:
           node-version: '24.x'
 
+<<<<<<< HEAD
       - name: Validate feature exposure policy
         run: node scripts/validate-feature-exposure.mjs
+=======
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate feature exposure policy
+        run: pnpm validate:feature-exposure
+>>>>>>> origin/pr/579
 
   build-and-test:
     needs: [package-version-policy, pr-governance, feature-exposure-policy]

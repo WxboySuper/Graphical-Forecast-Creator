@@ -1,0 +1,14 @@
+{
+  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable.",
+  "rule_sets": [
+    {
+      "matching_content_path": "scripts/lib/feature-exposure-policy.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    }
+  ]
+}

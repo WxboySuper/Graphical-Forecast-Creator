@@ -27,6 +27,88 @@ function isValidIsoCalendarDate(addedDate) {
   );
 }
 
+<<<<<<< HEAD
+=======
+/** Adds exposure matrix violations for one feature. */
+function validateExposureMatrix(featureKey, definition, errors) {
+  for (const target of BUILD_TARGET_LIST) {
+    if (typeof definition.exposure?.[target] !== 'boolean') {
+      errors.push(`Feature "${featureKey}" is missing exposure for target "${target}".`);
+    }
+  }
+}
+
+/** Adds lifecycle metadata violations for one feature. */
+function validateLifecycleMetadata(featureKey, definition, errors) {
+  if (!isValidIsoCalendarDate(definition.addedDate)) {
+    errors.push(`Feature "${featureKey}" has an invalid addedDate ${JSON.stringify(definition.addedDate)}.`);
+  }
+  if (definition.temporary && !definition.removalCondition?.trim()) {
+    errors.push(`Temporary feature "${featureKey}" must declare a removalCondition.`);
+  }
+  if (typeof definition.trackingIssue !== 'number' || definition.trackingIssue <= 0) {
+    errors.push(`Feature "${featureKey}" must declare a positive trackingIssue number.`);
+  }
+}
+
+/** Adds server capability metadata violations for one feature. */
+function validateServerMetadata(featureKey, definition, errors) {
+  if (definition.serverBacked && !definition.serverCapabilityKey?.trim()) {
+    errors.push(`Server-backed feature "${featureKey}" must declare serverCapabilityKey.`);
+  }
+  if (!definition.serverBacked && definition.serverCapabilityKey) {
+    errors.push(`Feature "${featureKey}" must not declare serverCapabilityKey when serverBacked is false.`);
+  }
+}
+
+/** Adds all registry-entry violations. */
+function validateRegistryEntries(registry, errors) {
+  for (const [featureKey, definition] of Object.entries(registry)) {
+    validateExposureMatrix(featureKey, definition, errors);
+    validateLifecycleMetadata(featureKey, definition, errors);
+    validateServerMetadata(featureKey, definition, errors);
+  }
+}
+
+/** Adds references to surface features missing from the registry. */
+function validateSurfaceReferences(registry, surfaces, errors) {
+  const registryKeys = new Set(Object.keys(registry));
+  const features = new Set([
+    ...surfaces.gatedRoutes.map(({ feature }) => feature),
+    ...surfaces.navigationItems.map(({ feature }) => feature).filter(Boolean),
+  ]);
+  for (const featureKey of features) {
+    if (!registryKeys.has(featureKey)) {
+      errors.push(`Surface feature "${featureKey}" is referenced in routes/navigation but does not exist in the feature exposure registry.`);
+    }
+  }
+}
+
+/** Adds server-backed registry entries that lack a matching server capability. */
+function validateServerCapabilities(registry, serverCapabilityKeys, errors) {
+  for (const [featureKey, definition] of Object.entries(registry)) {
+    if (!definition.serverBacked) continue;
+    if (!definition.serverCapabilityKey) continue;
+    if (serverCapabilityKeys.includes(definition.serverCapabilityKey)) continue;
+    errors.push(`Feature "${featureKey}" declares serverCapabilityKey "${definition.serverCapabilityKey}" but it is not in the server capability keys list.`);
+  }
+}
+
+/** Adds temporary features that are prematurely exposed in production. */
+function validateProductionSafety(registry, errors) {
+  for (const [featureKey, definition] of Object.entries(registry)) {
+    if (definition.temporary && definition.exposure?.production === true) {
+      errors.push(`Temporary feature "${featureKey}" is exposed on production. Temporary features must not be enabled on production until explicitly promoted.`);
+    }
+  }
+}
+
+/** Converts collected violations into the public policy result shape. */
+function createPolicyResult(errors) {
+  return errors.length === 0 ? { ok: true } : { ok: false, errors };
+}
+
+>>>>>>> origin/pr/579
 /**
  * Validates the feature exposure registry and cross-file surface references.
  *
@@ -37,6 +119,7 @@ function isValidIsoCalendarDate(addedDate) {
  */
 export function evaluateFeatureExposurePolicy(registry, surfaces, serverCapabilityKeys = []) {
   const errors = [];
+<<<<<<< HEAD
 
   // ── 1. Registry metadata integrity ──────────────────────────────
   for (const [featureKey, definition] of Object.entries(registry)) {
@@ -136,4 +219,11 @@ export function evaluateFeatureExposurePolicy(registry, surfaces, serverCapabili
   }
 
   return { ok: true };
+=======
+  validateRegistryEntries(registry, errors);
+  validateSurfaceReferences(registry, surfaces, errors);
+  validateServerCapabilities(registry, serverCapabilityKeys, errors);
+  validateProductionSafety(registry, errors);
+  return createPolicyResult(errors);
+>>>>>>> origin/pr/579
 }
