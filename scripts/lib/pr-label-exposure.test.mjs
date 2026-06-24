@@ -62,4 +62,18 @@ describe('exposureLabels', () => {
     const labels = exposureLabels({ changedFiles: [] });
     assert.equal(labels.size, 0);
   });
+
+  it('never applies exposure:beta-only for any file pattern', () => {
+    const testCases = [
+      ['src/config/featureExposure.ts'],
+      ['server/lib/featureCapabilities.js'],
+      ['src/components/FeatureBoundary.tsx'],
+      ['src/config/featureSurfaces.ts'],
+      ['src/config/featureNavigation.ts'],
+    ];
+    for (const changedFiles of testCases) {
+      const labels = exposureLabels({ changedFiles });
+      assert.ok(!labels.has('exposure:beta-only'), `exposure:beta-only should not be produced for ${changedFiles.join(', ')}`);
+    }
+  });
 });
