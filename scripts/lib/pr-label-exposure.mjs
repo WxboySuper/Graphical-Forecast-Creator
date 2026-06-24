@@ -2,6 +2,7 @@ import { anyFileMatches } from './glob-match.mjs';
 
 /** @typedef {{ changedFiles: string[] }} ExposureContext */
 
+<<<<<<< HEAD
 // Exact file paths (no glob) — these are the canonical exposure registry files.
 const REGISTRY_FILE_PATTERNS = [
   'src/config/featureExposure.ts',
@@ -18,6 +19,22 @@ const FEATURE_GATING_FILE_PATTERNS = [
   'src/components/FeatureBoundary.tsx',
   'src/config/featureSurfaces.ts',
   'src/config/featureNavigation.ts',
+=======
+const REGISTRY_FILE_PATTERNS = [
+  'src/config/featureExposure.ts',
+  'src/config/featureExposure.test.ts',
+];
+
+const SERVER_EXPOSURE_FILE_PATTERNS = [
+  'server/lib/serverFeatureExposure.*',
+  'server/lib/featureCapabilities.*',
+];
+
+const FEATURE_GATING_FILE_PATTERNS = [
+  'src/components/FeatureBoundary.*',
+  'src/config/featureSurfaces.*',
+  'src/config/featureNavigation.*',
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
 ];
 
 /**
@@ -49,8 +66,12 @@ export const exposureLabels = ({ changedFiles }) => {
     labels.add('exposure:server-backed');
   }
 
+<<<<<<< HEAD
   const affectsProduction = hasRegistryChange || hasGatingChange || hasServerExposureChange;
   if (affectsProduction) {
+=======
+  if (hasRegistryChange || hasGatingChange) {
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
     labels.add('exposure:production');
   }
 

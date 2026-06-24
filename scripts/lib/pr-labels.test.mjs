@@ -93,19 +93,41 @@ describe('computePrLabels', () => {
   });
 
   it('includes exposure labels when exposure files are changed', () => {
+<<<<<<< HEAD
     const labels = computePrLabels(makeComputeArgs({
       head: 'feature/exposure',
       changedFiles: ['src/config/featureExposure.ts'],
     }));
+=======
+    const labels = computePrLabels({
+      head: 'feature/exposure',
+      base: 'beta',
+      changedFiles: ['src/config/featureExposure.ts'],
+      mergeable: null,
+      draft: false,
+      changelogOk: true,
+    });
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
     assert.ok(labels.includes('exposure:registry-change'));
     assert.ok(labels.includes('exposure:production'));
   });
 
   it('includes no exposure labels for unrelated changes', () => {
+<<<<<<< HEAD
     const labels = computePrLabels(makeComputeArgs({
       head: 'fix/typo',
       changedFiles: ['src/components/Map/MapContainer.tsx'],
     }));
+=======
+    const labels = computePrLabels({
+      head: 'fix/typo',
+      base: 'beta',
+      changedFiles: ['src/components/Map/MapContainer.tsx'],
+      mergeable: null,
+      draft: false,
+      changelogOk: true,
+    });
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
     assert.ok(!labels.includes('exposure:registry-change'));
     assert.ok(!labels.includes('exposure:server-backed'));
   });

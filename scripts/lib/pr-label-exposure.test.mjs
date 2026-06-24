@@ -8,6 +8,7 @@ describe('exposureLabels', () => {
     assert.ok(labels.has('exposure:registry-change'));
   });
 
+<<<<<<< HEAD
   it('does not apply exposure:registry-change when only the test file is changed', () => {
     const labels = exposureLabels({ changedFiles: ['src/config/featureExposure.test.ts'] });
     assert.ok(!labels.has('exposure:registry-change'));
@@ -24,6 +25,16 @@ describe('exposureLabels', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/serverFeatureExposure.test.js'] });
     assert.ok(!labels.has('exposure:server-backed'));
     assert.ok(!labels.has('exposure:production'));
+=======
+  it('applies exposure:registry-change when featureExposure.test.ts is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['src/config/featureExposure.test.ts'] });
+    assert.ok(labels.has('exposure:registry-change'));
+  });
+
+  it('applies exposure:server-backed when serverFeatureExposure.js is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['server/lib/serverFeatureExposure.js'] });
+    assert.ok(labels.has('exposure:server-backed'));
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
   });
 
   it('applies exposure:server-backed when featureCapabilities.js is changed', () => {
@@ -31,6 +42,7 @@ describe('exposureLabels', () => {
     assert.ok(labels.has('exposure:server-backed'));
   });
 
+<<<<<<< HEAD
   it('applies both exposure:server-backed and exposure:production when server feature exposure is changed', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/featureCapabilities.js'] });
     assert.ok(labels.has('exposure:server-backed'));
@@ -41,6 +53,11 @@ describe('exposureLabels', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/featureCapabilities.test.js'] });
     assert.ok(!labels.has('exposure:server-backed'));
     assert.ok(!labels.has('exposure:production'));
+=======
+  it('applies exposure:server-backed when featureCapabilities.test.js is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['server/lib/featureCapabilities.test.js'] });
+    assert.ok(labels.has('exposure:server-backed'));
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
   });
 
   it('applies exposure:production when feature surfaces are changed', () => {
@@ -77,6 +94,7 @@ describe('exposureLabels', () => {
     const labels = exposureLabels({ changedFiles: [] });
     assert.equal(labels.size, 0);
   });
+<<<<<<< HEAD
 
   it('does not apply exposure labels for gating test files', () => {
     const testFiles = [
@@ -103,4 +121,6 @@ describe('exposureLabels', () => {
       assert.ok(!labels.has('exposure:beta-only'), `exposure:beta-only should not be produced for ${changedFiles.join(', ')}`);
     }
   });
+=======
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
 });

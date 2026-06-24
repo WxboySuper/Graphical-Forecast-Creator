@@ -85,6 +85,10 @@ jobs:
               ['Component: UI', 'd4c5f9'],
               ['Component: Storage', 'fef2c0'],
               ['exposure:production', '0e8a16'],
+<<<<<<< HEAD
+=======
+              ['exposure:beta-only', 'fbca04'],
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
               ['exposure:server-backed', 'd73a4a'],
               ['exposure:registry-change', '1f6feb'],
             ];

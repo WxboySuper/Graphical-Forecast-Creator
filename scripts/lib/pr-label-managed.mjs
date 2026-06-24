@@ -32,6 +32,10 @@ export const CONTENT_MANAGED_LABELS = [
   'Component: UI',
   'Component: Storage',
   'exposure:production',
+<<<<<<< HEAD
+=======
+  'exposure:beta-only',
+>>>>>>> fc1e174 (feat: add feature exposure labels to PR governance)
   'exposure:server-backed',
   'exposure:registry-change',
 ];
