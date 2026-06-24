@@ -31,6 +31,10 @@ export const CONTENT_MANAGED_LABELS = [
   'Component: Export',
   'Component: UI',
   'Component: Storage',
+  'exposure:production',
+  'exposure:beta-only',
+  'exposure:server-backed',
+  'exposure:registry-change',
 ];
 
 /** @deprecated Use CONTENT_MANAGED_LABELS or CI_MANAGED_LABELS */
