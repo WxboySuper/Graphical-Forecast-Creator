@@ -16,6 +16,25 @@ This PR promotes **beta** to **production** (`main`).
 - [ ] Beta deployment smoke-tested
 - [ ] Plan to verify **staging-gfc.weatherboysuper.com** after merge (beta-gated build)
 
+### Feature exposure
+
+- [ ] Exposure report generated and reviewed (see `pnpm run exposure:report`)
+- [ ] All newly production-visible features are listed below
+- [ ] No beta-only or experimental features leak into production exposure
+- [ ] Server-backed features have matching server capability configuration
+- [ ] Temporary features approaching removal have removal condition metadata confirmed
+
+#### Newly production-visible features in this release
+
+| Feature | Target state | Server-backed | Removal condition |
+|---|---|---|---|
+| (list features promoted to production here, or write "None") | | | |
+
+### Review requests
+
+- [ ] Server-backed feature changes reviewed by server owner
+- [ ] Security-sensitive feature changes flagged for security review
+
 ### After merge (automatic)
 
 - Stable version committed on `main`
