@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { computePrLabels, descriptiveLabels, routingLabels } from './pr-labels.mjs';
 
+/** Helper to build default computePrLabels arguments with optional overrides. */
 const makeComputeArgs = (overrides) => ({
   head: 'feature/test',
   base: 'beta',
