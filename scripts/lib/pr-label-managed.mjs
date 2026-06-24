@@ -32,7 +32,6 @@ export const CONTENT_MANAGED_LABELS = [
   'Component: UI',
   'Component: Storage',
   'exposure:production',
-  'exposure:beta-only',
   'exposure:server-backed',
   'exposure:registry-change',
 ];
