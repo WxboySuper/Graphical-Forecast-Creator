@@ -85,7 +85,6 @@ jobs:
               ['Component: UI', 'd4c5f9'],
               ['Component: Storage', 'fef2c0'],
               ['exposure:production', '0e8a16'],
-              ['exposure:beta-only', 'fbca04'],
               ['exposure:server-backed', 'd73a4a'],
               ['exposure:registry-change', '1f6feb'],
             ];
