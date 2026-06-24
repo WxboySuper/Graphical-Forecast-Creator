@@ -83,4 +83,30 @@ describe('computePrLabels', () => {
     assert.ok(labels.includes('Component: Map'));
     assert.ok(labels.includes('changelog:ok'));
   });
+
+  it('includes exposure labels when exposure files are changed', () => {
+    const labels = computePrLabels({
+      head: 'feature/exposure',
+      base: 'beta',
+      changedFiles: ['src/config/featureExposure.ts'],
+      mergeable: null,
+      draft: false,
+      changelogOk: true,
+    });
+    assert.ok(labels.includes('exposure:registry-change'));
+    assert.ok(labels.includes('exposure:production'));
+  });
+
+  it('includes no exposure labels for unrelated changes', () => {
+    const labels = computePrLabels({
+      head: 'fix/typo',
+      base: 'beta',
+      changedFiles: ['src/components/Map/MapContainer.tsx'],
+      mergeable: null,
+      draft: false,
+      changelogOk: true,
+    });
+    assert.ok(!labels.includes('exposure:registry-change'));
+    assert.ok(!labels.includes('exposure:server-backed'));
+  });
 });
