@@ -4,7 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-- **PR governance:** Add feature exposure labels (`exposure:production`, `exposure:server-backed`, `exposure:registry-change`) to automatically tag PRs that change feature exposure configuration.
+### PR #590
+
+- Add feature exposure labels (`exposure:production`, `exposure:server-backed`, `exposure:registry-change`) to automatically tag PRs that change feature exposure configuration.
 
 ### PR #582
 
