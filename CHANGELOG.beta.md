@@ -4,6 +4,8 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+- **PR governance:** Add feature exposure labels (`exposure:production`, `exposure:server-backed`, `exposure:registry-change`) to automatically tag PRs that change feature exposure configuration.
+
 ### PR #582
 
 - Dependency: @radix-ui/react-dialog ^1.1.16 → ^1.1.17
