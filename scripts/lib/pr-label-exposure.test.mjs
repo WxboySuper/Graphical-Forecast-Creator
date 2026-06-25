@@ -8,24 +8,28 @@ describe('exposureLabels', () => {
     assert.ok(labels.has('exposure:registry-change'));
   });
 
-  it('applies exposure:registry-change when featureExposure.test.ts is changed', () => {
+  it('does not apply exposure labels when only the registry test file is changed', () => {
     const labels = exposureLabels({ changedFiles: ['src/config/featureExposure.test.ts'] });
-    assert.ok(labels.has('exposure:registry-change'));
+    assert.ok(!labels.has('exposure:registry-change'));
+    assert.ok(!labels.has('exposure:production'));
   });
 
   it('applies exposure:server-backed when serverFeatureExposure.js is changed', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/serverFeatureExposure.js'] });
     assert.ok(labels.has('exposure:server-backed'));
+    assert.ok(labels.has('exposure:production'));
   });
 
   it('applies exposure:server-backed when featureCapabilities.js is changed', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/featureCapabilities.js'] });
     assert.ok(labels.has('exposure:server-backed'));
+    assert.ok(labels.has('exposure:production'));
   });
 
-  it('applies exposure:server-backed when featureCapabilities.test.js is changed', () => {
+  it('does not apply exposure labels when featureCapabilities test is changed', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/featureCapabilities.test.js'] });
-    assert.ok(labels.has('exposure:server-backed'));
+    assert.ok(!labels.has('exposure:server-backed'));
+    assert.ok(!labels.has('exposure:production'));
   });
 
   it('applies exposure:production when feature surfaces are changed', () => {
@@ -61,6 +65,18 @@ describe('exposureLabels', () => {
   it('applies no exposure labels for empty changed files', () => {
     const labels = exposureLabels({ changedFiles: [] });
     assert.equal(labels.size, 0);
+  });
+
+  it('does not apply exposure labels for gating test files', () => {
+    const testFiles = [
+      'src/components/FeatureBoundary.test.tsx',
+      'src/config/featureSurfaces.test.ts',
+      'src/config/featureNavigation.test.ts',
+    ];
+    for (const file of testFiles) {
+      const labels = exposureLabels({ changedFiles: [file] });
+      assert.ok(!labels.has('exposure:production'), `exposure:production should not be produced for ${file}`);
+    }
   });
 
   it('never applies exposure:beta-only for any file pattern', () => {
