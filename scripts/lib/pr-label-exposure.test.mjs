@@ -8,9 +8,9 @@ describe('exposureLabels', () => {
     assert.ok(labels.has('exposure:registry-change'));
   });
 
-  it('does not apply exposure labels when only the registry test file is changed', () => {
+  it('applies exposure:registry-change but not exposure:production when only the registry test file is changed', () => {
     const labels = exposureLabels({ changedFiles: ['src/config/featureExposure.test.ts'] });
-    assert.ok(!labels.has('exposure:registry-change'));
+    assert.ok(labels.has('exposure:registry-change'));
     assert.ok(!labels.has('exposure:production'));
   });
 
@@ -45,6 +45,16 @@ describe('exposureLabels', () => {
 
   it('applies exposure:production when FeatureBoundary is changed', () => {
     const labels = exposureLabels({ changedFiles: ['src/components/FeatureBoundary.tsx'] });
+    assert.ok(labels.has('exposure:production'));
+  });
+
+  it('applies exposure:production when FeatureBoundary directory index is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['src/components/FeatureBoundary/index.tsx'] });
+    assert.ok(labels.has('exposure:production'));
+  });
+
+  it('applies exposure:production when featureSurfaces directory module is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['src/config/featureSurfaces/index.ts'] });
     assert.ok(labels.has('exposure:production'));
   });
 

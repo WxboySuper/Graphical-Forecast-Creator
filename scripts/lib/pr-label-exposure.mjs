@@ -7,17 +7,26 @@ const REGISTRY_FILE_PATTERNS = [
   'src/config/featureExposure.ts',
 ];
 
+// Test files for the registry — trigger registry-change but not production labels.
+const REGISTRY_TEST_PATTERNS = [
+  'src/config/featureExposure.test.ts',
+];
+
 // Exact file paths for server-side exposure and capability files.
 const SERVER_EXPOSURE_FILE_PATTERNS = [
   'server/lib/serverFeatureExposure.js',
   'server/lib/featureCapabilities.js',
 ];
 
-// Exact file paths for client-side feature gating and surface configuration.
+// Client-side feature gating and surface configuration.
+// Exact files cover flat-file layout; directory globs cover future index-based modules.
 const FEATURE_GATING_FILE_PATTERNS = [
   'src/components/FeatureBoundary.tsx',
+  'src/components/FeatureBoundary/**',
   'src/config/featureSurfaces.ts',
+  'src/config/featureSurfaces/**',
   'src/config/featureNavigation.ts',
+  'src/config/featureNavigation/**',
 ];
 
 /**
@@ -33,6 +42,10 @@ export const exposureLabels = ({ changedFiles }) => {
     anyFileMatches(changedFiles, pattern),
   );
 
+  const hasRegistryTestChange = REGISTRY_TEST_PATTERNS.some((pattern) =>
+    anyFileMatches(changedFiles, pattern),
+  );
+
   const hasServerExposureChange = SERVER_EXPOSURE_FILE_PATTERNS.some((pattern) =>
     anyFileMatches(changedFiles, pattern),
   );
@@ -41,7 +54,7 @@ export const exposureLabels = ({ changedFiles }) => {
     anyFileMatches(changedFiles, pattern),
   );
 
-  if (hasRegistryChange) {
+  if (hasRegistryChange || hasRegistryTestChange) {
     labels.add('exposure:registry-change');
   }
 
