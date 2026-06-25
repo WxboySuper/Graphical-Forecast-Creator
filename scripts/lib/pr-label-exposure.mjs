@@ -54,6 +54,8 @@ export const exposureLabels = ({ changedFiles }) => {
     anyFileMatches(changedFiles, pattern),
   );
 
+  const affectsProduction = hasRegistryChange || hasGatingChange || hasServerExposureChange;
+
   if (hasRegistryChange || hasRegistryTestChange) {
     labels.add('exposure:registry-change');
   }
@@ -62,7 +64,7 @@ export const exposureLabels = ({ changedFiles }) => {
     labels.add('exposure:server-backed');
   }
 
-  if (hasRegistryChange || hasGatingChange || hasServerExposureChange) {
+  if (affectsProduction) {
     labels.add('exposure:production');
   }
 
