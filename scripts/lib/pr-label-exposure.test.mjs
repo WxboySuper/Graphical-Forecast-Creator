@@ -20,10 +20,10 @@ describe('exposureLabels', () => {
     assert.ok(labels.has('exposure:production'));
   });
 
-  it('applies both exposure:server-backed and exposure:production when serverFeatureExposure test is changed', () => {
+  it('does not apply exposure labels when serverFeatureExposure test is changed', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/serverFeatureExposure.test.js'] });
-    assert.ok(labels.has('exposure:server-backed'));
-    assert.ok(labels.has('exposure:production'));
+    assert.ok(!labels.has('exposure:server-backed'));
+    assert.ok(!labels.has('exposure:production'));
   });
 
   it('applies exposure:server-backed when featureCapabilities.js is changed', () => {
@@ -37,10 +37,10 @@ describe('exposureLabels', () => {
     assert.ok(labels.has('exposure:production'));
   });
 
-  it('applies both exposure:server-backed and exposure:production when server feature exposure test is changed', () => {
+  it('does not apply exposure labels when featureCapabilities test is changed', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/featureCapabilities.test.js'] });
-    assert.ok(labels.has('exposure:server-backed'));
-    assert.ok(labels.has('exposure:production'));
+    assert.ok(!labels.has('exposure:server-backed'));
+    assert.ok(!labels.has('exposure:production'));
   });
 
   it('applies exposure:production when feature surfaces are changed', () => {

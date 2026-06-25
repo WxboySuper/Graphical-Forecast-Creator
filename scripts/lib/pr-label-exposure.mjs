@@ -7,10 +7,10 @@ const REGISTRY_FILE_PATTERNS = [
   'src/config/featureExposure.ts',
 ];
 
-// Glob patterns for server-side exposure and capability files.
+// Exact file paths for server-side exposure and capability files.
 const SERVER_EXPOSURE_FILE_PATTERNS = [
-  'server/lib/serverFeatureExposure.*',
-  'server/lib/featureCapabilities.*',
+  'server/lib/serverFeatureExposure.js',
+  'server/lib/featureCapabilities.js',
 ];
 
 // Exact file paths for client-side feature gating and surface configuration.
