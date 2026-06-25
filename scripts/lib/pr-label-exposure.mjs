@@ -49,7 +49,8 @@ export const exposureLabels = ({ changedFiles }) => {
     labels.add('exposure:server-backed');
   }
 
-  if (hasRegistryChange || hasGatingChange || hasServerExposureChange) {
+  const affectsProduction = hasRegistryChange || hasGatingChange || hasServerExposureChange;
+  if (affectsProduction) {
     labels.add('exposure:production');
   }
 
