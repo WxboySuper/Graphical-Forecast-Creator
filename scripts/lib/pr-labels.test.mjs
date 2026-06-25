@@ -2,6 +2,17 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { computePrLabels, descriptiveLabels, routingLabels } from './pr-labels.mjs';
 
+/** Helper to build default computePrLabels arguments with optional overrides. */
+const makeComputeArgs = (overrides) => ({
+  head: 'feature/test',
+  base: 'beta',
+  changedFiles: ['src/App.tsx'],
+  mergeable: null,
+  draft: false,
+  changelogOk: true,
+  ...overrides,
+});
+
 describe('pr routing labels', () => {
   it('tags beta promotion', () => {
     const labels = routingLabels({ head: 'beta', base: 'main' });
@@ -70,17 +81,32 @@ describe('pr descriptive labels', () => {
 
 describe('computePrLabels', () => {
   it('merges routing, descriptive, and changelog status', () => {
-    const labels = computePrLabels({
+    const labels = computePrLabels(makeComputeArgs({
       head: 'fix/keyboard',
-      base: 'beta',
       changedFiles: ['src/components/Map/x.ts', 'CHANGELOG.md'],
       mergeable: true,
-      draft: false,
-      changelogOk: true,
-    });
+    }));
     assert.ok(labels.includes('fix'));
     assert.ok(labels.includes('Bug'));
     assert.ok(labels.includes('Component: Map'));
     assert.ok(labels.includes('changelog:ok'));
+  });
+
+  it('includes exposure labels when exposure files are changed', () => {
+    const labels = computePrLabels(makeComputeArgs({
+      head: 'feature/exposure',
+      changedFiles: ['src/config/featureExposure.ts'],
+    }));
+    assert.ok(labels.includes('exposure:registry-change'));
+    assert.ok(labels.includes('exposure:production'));
+  });
+
+  it('includes no exposure labels for unrelated changes', () => {
+    const labels = computePrLabels(makeComputeArgs({
+      head: 'fix/typo',
+      changedFiles: ['src/components/Map/MapContainer.tsx'],
+    }));
+    assert.ok(!labels.includes('exposure:registry-change'));
+    assert.ok(!labels.includes('exposure:server-backed'));
   });
 });
