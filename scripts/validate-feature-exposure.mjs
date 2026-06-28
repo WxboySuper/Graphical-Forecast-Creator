@@ -200,13 +200,21 @@ function extractSideEffectModules(source) {
   return extractConst(source, 'featureSurfaces.ts', 'FEATURE_SIDE_EFFECT_MODULES');
 }
 
+/** Ensures acknowledgement JSON parsed to a plain object map. */
+function assertAcknowledgementsShape(acknowledgements) {
+  const isObjectMap =
+    acknowledgements &&
+    typeof acknowledgements === 'object' &&
+    !Array.isArray(acknowledgements);
+
+  if (isObjectMap) return;
+  throw new Error('featureExposure.acknowledgements.json must contain a top-level object.');
+}
+
 /** Loads acknowledgement entries for gated features without dedicated tests. */
 function loadAcknowledgements() {
-  const source = readSource('src/config/featureExposure.acknowledgements.json');
-  const acknowledgements = JSON.parse(source);
-  if (!acknowledgements || typeof acknowledgements !== 'object' || Array.isArray(acknowledgements)) {
-    throw new Error('featureExposure.acknowledgements.json must contain a top-level object.');
-  }
+  const acknowledgements = JSON.parse(readSource('src/config/featureExposure.acknowledgements.json'));
+  assertAcknowledgementsShape(acknowledgements);
   return acknowledgements;
 }
 

@@ -120,24 +120,27 @@ function validateServerCapabilities(registry, serverCapabilityKeys, errors) {
   }
 }
 
-/** Aligns client and server registry keys and capability ownership. */
-function validateClientServerRegistryAlignment(registry, serverRegistry, errors) {
+/** Reports server registry keys that are absent from the client registry. */
+function validateServerFeaturesExistOnClient(registry, serverRegistry, errors) {
   const clientKeys = new Set(Object.keys(registry));
-  const serverKeys = new Set(Object.keys(serverRegistry));
-
-  for (const featureKey of serverKeys) {
-    if (!clientKeys.has(featureKey)) {
-      errors.push(`Server registry feature "${featureKey}" is missing from client FEATURE_EXPOSURE_REGISTRY.`);
-    }
+  for (const featureKey of Object.keys(serverRegistry)) {
+    if (clientKeys.has(featureKey)) continue;
+    errors.push(`Server registry feature "${featureKey}" is missing from client FEATURE_EXPOSURE_REGISTRY.`);
   }
+}
 
+/** Reports client server-backed features missing from the server registry. */
+function validateServerBackedFeaturesExistOnServer(registry, serverRegistry, errors) {
+  const serverKeys = new Set(Object.keys(serverRegistry));
   for (const [featureKey, definition] of Object.entries(registry)) {
     if (!definition.serverBacked) continue;
-    if (!serverKeys.has(featureKey)) {
-      errors.push(`Client server-backed feature "${featureKey}" is missing from SERVER_FEATURE_EXPOSURE_REGISTRY.`);
-    }
+    if (serverKeys.has(featureKey)) continue;
+    errors.push(`Client server-backed feature "${featureKey}" is missing from SERVER_FEATURE_EXPOSURE_REGISTRY.`);
   }
+}
 
+/** Reports orphan server capability keys with no matching client owner. */
+function validateServerCapabilitiesHaveClientOwners(registry, serverRegistry, errors) {
   const clientCapabilityKeys = new Set(
     Object.values(registry)
       .filter((definition) => definition.serverBacked && definition.serverCapabilityKey)
@@ -150,6 +153,13 @@ function validateClientServerRegistryAlignment(registry, serverRegistry, errors)
       `Server capability key "${definition.serverCapabilityKey}" (feature "${featureKey}") has no matching client serverBacked feature.`
     );
   }
+}
+
+/** Aligns client and server registry keys and capability ownership. */
+function validateClientServerRegistryAlignment(registry, serverRegistry, errors) {
+  validateServerFeaturesExistOnClient(registry, serverRegistry, errors);
+  validateServerBackedFeaturesExistOnServer(registry, serverRegistry, errors);
+  validateServerCapabilitiesHaveClientOwners(registry, serverRegistry, errors);
 }
 
 /** Ensures client and server exposure matrices and capability keys stay aligned. */
@@ -202,7 +212,8 @@ function hasValidAcknowledgement(featureKey, acknowledgements) {
 }
 
 /** Requires exposure tests or explicit acknowledgement for every gated feature. */
-function validateExposureTestContract(surfaces, sideEffectModules, acknowledgements, existingTestFiles, errors) {
+function validateExposureTestContract(contract, errors) {
+  const { surfaces, sideEffectModules, acknowledgements, existingTestFiles } = contract;
   for (const featureKey of collectGatedFeatures(surfaces, sideEffectModules)) {
     if (hasPerFeatureTestFile(featureKey, existingTestFiles)) continue;
     if (hasValidAcknowledgement(featureKey, acknowledgements)) continue;
@@ -254,7 +265,10 @@ export function evaluateFeatureExposurePolicy(registry, surfaces, options = {}) 
   validateServerCapabilities(registry, serverCapabilityKeys, errors);
   validateClientServerRegistryAlignment(registry, serverRegistry, errors);
   validateClientServerExposureMatrices(registry, serverRegistry, errors);
-  validateExposureTestContract(surfaces, sideEffectModules, acknowledgements, existingTestFiles, errors);
+  validateExposureTestContract(
+    { surfaces, sideEffectModules, acknowledgements, existingTestFiles },
+    errors
+  );
   validateProductionSafety(registry, errors);
   return createPolicyResult(errors);
 }
