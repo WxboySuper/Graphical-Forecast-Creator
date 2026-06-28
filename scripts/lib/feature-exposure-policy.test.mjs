@@ -28,8 +28,9 @@ const validRegistry = {
 const emptySurfaces = { gatedRoutes: [], navigationItems: [] };
 
 /** Asserts that a policy input fails with every expected message pattern. */
-function assertPolicyErrors(registry, patterns, surfaces = emptySurfaces, serverCapabilityKeys = []) {
-  const result = evaluateFeatureExposurePolicy(registry, surfaces, serverCapabilityKeys);
+function assertPolicyErrors(registry, patterns, surfaces = emptySurfaces, options = {}) {
+  const normalizedOptions = Array.isArray(options) ? { serverCapabilityKeys: options } : options;
+  const result = evaluateFeatureExposurePolicy(registry, surfaces, normalizedOptions);
   assert.equal(result.ok, false);
   for (const pattern of patterns) assert.ok(result.errors.some((error) => pattern.test(error)));
 }
@@ -155,12 +156,16 @@ describe('feature exposure policy', () => {
     assertPolicyErrors(validRegistry, [/nonExistent.*does not exist/], surfaces);
   });
 
-  it('passes when surface references match registry keys', () => {
+  it('passes when surface references match registry keys and acknowledgements exist', () => {
     const surfaces = {
       gatedRoutes: [{ feature: 'betaFeature', path: '/beta' }],
       navigationItems: [{ id: 'nav', to: '/nav', label: 'Nav', feature: 'betaFeature' }],
     };
-    const result = evaluateFeatureExposurePolicy(validRegistry, surfaces);
+    const result = evaluateFeatureExposurePolicy(validRegistry, surfaces, {
+      acknowledgements: {
+        betaFeature: { reason: 'Covered by buildFeatureGatedRoutes.test.tsx', trackingIssue: 200 },
+      },
+    });
     assert.equal(result.ok, true);
   });
 
@@ -191,7 +196,15 @@ describe('feature exposure policy', () => {
         trackingIssue: 1,
       },
     };
-    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces, ['MY_FEATURE_ENABLED']);
+    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces, {
+      serverCapabilityKeys: ['MY_FEATURE_ENABLED'],
+      serverRegistry: {
+        backed: {
+          serverCapabilityKey: 'MY_FEATURE_ENABLED',
+          exposure: { ...ALL_OFF },
+        },
+      },
+    });
     assert.equal(result.ok, true);
   });
 
@@ -268,7 +281,98 @@ describe('feature exposure policy', () => {
         { id: 'collab', feature: 'collaborationRoom' },
       ],
     };
-    const result = evaluateFeatureExposurePolicy(currentRegistry, surfaces, ['TSTM_GENERATION_ENABLED']);
+    const result = evaluateFeatureExposurePolicy(currentRegistry, surfaces, {
+      serverCapabilityKeys: ['TSTM_GENERATION_ENABLED'],
+      serverRegistry: {
+        autoTstm: {
+          serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
+          exposure: { ...ALL_OFF },
+          label: 'Auto-TSTM',
+        },
+      },
+      sideEffectModules: { autoTstm: ['../utils/tstmGeneration'] },
+      acknowledgements: {
+        autoTstm: { reason: 'Covered by FeatureBoundary.test.tsx', trackingIssue: 427 },
+        tropicalWorkspace: { reason: 'Covered by buildFeatureGatedRoutes.test.tsx', trackingIssue: 432 },
+        collaborationRoom: { reason: 'Covered by buildFeatureGatedRoutes.test.tsx', trackingIssue: 433 },
+      },
+    });
+    assert.equal(result.ok, true);
+  });
+
+  it('fails when side-effect module references unknown feature', () => {
+    assertPolicyErrors(validRegistry, [/unknownFeature/], emptySurfaces, {
+      sideEffectModules: { unknownFeature: ['../utils/example'] },
+    });
+  });
+
+  it('fails when server registry feature is missing from client registry', () => {
+    assertPolicyErrors(validRegistry, [/orphanServer.*missing from client/], emptySurfaces, {
+      serverRegistry: {
+        orphanServer: {
+          serverCapabilityKey: 'ORPHAN_ENABLED',
+          exposure: { ...ALL_OFF },
+        },
+      },
+    });
+  });
+
+  it('fails when client server-backed feature is missing from server registry', () => {
+    const registry = {
+      backed: {
+        exposure: { ...ALL_OFF },
+        owner: 'test',
+        addedDate: '2026-06-20',
+        temporary: false,
+        serverBacked: true,
+        serverCapabilityKey: 'MY_FEATURE_ENABLED',
+        trackingIssue: 1,
+      },
+    };
+    assertPolicyErrors(registry, [/missing from SERVER_FEATURE_EXPOSURE_REGISTRY/], emptySurfaces, {
+      serverCapabilityKeys: ['MY_FEATURE_ENABLED'],
+    });
+  });
+
+  it('fails when client and server exposure matrices disagree', () => {
+    const registry = {
+      backed: {
+        exposure: { ...ALL_OFF, beta: true },
+        owner: 'test',
+        addedDate: '2026-06-20',
+        temporary: false,
+        serverBacked: true,
+        serverCapabilityKey: 'MY_FEATURE_ENABLED',
+        trackingIssue: 1,
+      },
+    };
+    assertPolicyErrors(registry, [/exposure\.beta is true on client but false on server/], emptySurfaces, {
+      serverCapabilityKeys: ['MY_FEATURE_ENABLED'],
+      serverRegistry: {
+        backed: {
+          serverCapabilityKey: 'MY_FEATURE_ENABLED',
+          exposure: { ...ALL_OFF },
+        },
+      },
+    });
+  });
+
+  it('fails when gated feature lacks exposure test coverage and acknowledgement', () => {
+    const surfaces = {
+      gatedRoutes: [{ feature: 'betaFeature', path: '/beta' }],
+      navigationItems: [],
+    };
+    assertPolicyErrors(validRegistry, [/no exposure test coverage or acknowledgement/], surfaces);
+  });
+
+  it('passes when gated feature has a per-feature test file on disk', () => {
+    const surfaces = {
+      gatedRoutes: [{ feature: 'betaFeature', path: '/beta' }],
+      navigationItems: [],
+    };
+    const result = evaluateFeatureExposurePolicy(validRegistry, surfaces, {
+      existingTestFiles: ['src/features/betaFeature.test.tsx'],
+    });
     assert.equal(result.ok, true);
   });
 });

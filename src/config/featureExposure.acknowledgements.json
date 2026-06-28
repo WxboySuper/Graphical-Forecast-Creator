@@ -1,0 +1,14 @@
+{
+  "autoTstm": {
+    "reason": "Mount and effect gating covered by src/features/FeatureBoundary.test.tsx",
+    "trackingIssue": 427
+  },
+  "tropicalWorkspace": {
+    "reason": "Route and navigation gating covered by src/routing/buildFeatureGatedRoutes.test.tsx",
+    "trackingIssue": 432
+  },
+  "collaborationRoom": {
+    "reason": "Route and navigation gating covered by src/routing/buildFeatureGatedRoutes.test.tsx",
+    "trackingIssue": 433
+  }
+}

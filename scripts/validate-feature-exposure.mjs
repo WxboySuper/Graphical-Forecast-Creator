@@ -2,12 +2,18 @@
 
 /** Deterministic, non-executing feature exposure policy check for CI. */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
 import { evaluateFeatureExposurePolicy } from './lib/feature-exposure-policy.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
+const PER_FEATURE_TEST_PATTERNS = (featureKey) => [
+  `src/features/${featureKey}.test.tsx`,
+  `src/features/${featureKey}.test.ts`,
+  `src/features/${featureKey}/${featureKey}.test.tsx`,
+  `src/features/${featureKey}/${featureKey}.test.ts`,
+];
 
 /** Reads a repository source file as UTF-8 text. */
 function readSource(relativePath) {
@@ -177,16 +183,57 @@ function extractNavigationItems(source) {
   }));
 }
 
+/** Extracts the server-backed feature registry. */
+function extractServerRegistry(source) {
+  return extractConst(source, 'serverFeatureExposure.js', 'SERVER_FEATURE_EXPOSURE_REGISTRY');
+}
+
 /** Extracts declared server capability keys. */
-function extractServerCapabilityKeys(source) {
-  const registry = extractConst(source, 'serverFeatureExposure.js', 'SERVER_FEATURE_EXPOSURE_REGISTRY');
-  return Object.values(registry)
+function extractServerCapabilityKeys(serverRegistry) {
+  return Object.values(serverRegistry)
     .map((definition) => definition.serverCapabilityKey)
     .filter((key) => typeof key === 'string');
 }
 
+/** Extracts side-effect module declarations keyed by feature. */
+function extractSideEffectModules(source) {
+  return extractConst(source, 'featureSurfaces.ts', 'FEATURE_SIDE_EFFECT_MODULES');
+}
+
+/** Loads acknowledgement entries for gated features without dedicated tests. */
+function loadAcknowledgements() {
+  const source = readSource('src/config/featureExposure.acknowledgements.json');
+  const acknowledgements = JSON.parse(source);
+  if (!acknowledgements || typeof acknowledgements !== 'object' || Array.isArray(acknowledgements)) {
+    throw new Error('featureExposure.acknowledgements.json must contain a top-level object.');
+  }
+  return acknowledgements;
+}
+
+/** Collects gated feature keys from routes, navigation, and side-effect modules. */
+function collectGatedFeatureKeys(gatedRoutes, navigationItems, sideEffectModules) {
+  return new Set([
+    ...gatedRoutes.map(({ feature }) => feature),
+    ...navigationItems.map(({ feature }) => feature).filter(Boolean),
+    ...Object.keys(sideEffectModules),
+  ]);
+}
+
+/** Returns repository-relative per-feature test files that exist on disk. */
+function collectExistingTestFiles(gatedFeatureKeys) {
+  const existingTestFiles = [];
+  for (const featureKey of gatedFeatureKeys) {
+    for (const pattern of PER_FEATURE_TEST_PATTERNS(featureKey)) {
+      if (existsSync(resolve(ROOT, pattern))) {
+        existingTestFiles.push(pattern);
+      }
+    }
+  }
+  return existingTestFiles;
+}
+
 /** Loads every policy input from repository sources. */
-function loadPolicyInputs() {
+export function loadPolicyInputs() {
   const registry = extractConst(
     readSource('src/config/featureExposure.ts'),
     'featureExposure.ts',
@@ -194,10 +241,24 @@ function loadPolicyInputs() {
   );
   const gatedRoutes = extractGatedRoutes(readSource('src/config/featureSurfaces.ts'));
   const navigationItems = extractNavigationItems(readSource('src/config/featureNavigation.ts'));
-  const serverCapabilityKeys = extractServerCapabilityKeys(
-    readSource('server/lib/serverFeatureExposure.js')
+  const sideEffectModules = extractSideEffectModules(readSource('src/config/featureSurfaces.ts'));
+  const serverRegistry = extractServerRegistry(readSource('server/lib/serverFeatureExposure.js'));
+  const serverCapabilityKeys = extractServerCapabilityKeys(serverRegistry);
+  const acknowledgements = loadAcknowledgements();
+  const existingTestFiles = collectExistingTestFiles(
+    collectGatedFeatureKeys(gatedRoutes, navigationItems, sideEffectModules)
   );
-  return { registry, gatedRoutes, navigationItems, serverCapabilityKeys };
+
+  return {
+    registry,
+    gatedRoutes,
+    navigationItems,
+    sideEffectModules,
+    serverRegistry,
+    serverCapabilityKeys,
+    acknowledgements,
+    existingTestFiles,
+  };
 }
 
 /** Executes the policy check and prints CI diagnostics. */
@@ -211,11 +272,26 @@ function main() {
     return;
   }
 
-  const { registry, gatedRoutes, navigationItems, serverCapabilityKeys } = inputs;
+  const {
+    registry,
+    gatedRoutes,
+    navigationItems,
+    sideEffectModules,
+    serverRegistry,
+    serverCapabilityKeys,
+    acknowledgements,
+    existingTestFiles,
+  } = inputs;
   const result = evaluateFeatureExposurePolicy(
     registry,
     { gatedRoutes, navigationItems },
-    serverCapabilityKeys
+    {
+      serverCapabilityKeys,
+      serverRegistry,
+      sideEffectModules,
+      acknowledgements,
+      existingTestFiles,
+    }
   );
 
   if (!result.ok) {
@@ -230,7 +306,9 @@ function main() {
   console.log(`  Registry: ${Object.keys(registry).length} features`);
   console.log(`  Gated routes: ${gatedRoutes.length}`);
   console.log(`  Navigation items: ${navigationItems.length}`);
-  console.log(`  Server capability keys: ${serverCapabilityKeys.length}`);
+  console.log(`  Side-effect modules: ${Object.keys(sideEffectModules).length}`);
+  console.log(`  Server registry entries: ${Object.keys(serverRegistry).length}`);
+  console.log(`  Exposure acknowledgements: ${Object.keys(acknowledgements).length}`);
 }
 
 main();
