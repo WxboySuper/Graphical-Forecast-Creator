@@ -8,6 +8,8 @@ exclude_patterns = [
   "scripts/lib/github-paginate.test.mjs",
   "scripts/lib/pr-ci-label-state.test.mjs",
   "scripts/validate-feature-exposure.mjs",
+  "scripts/validate-feature-exposure.integration.test.mjs",
+  "scripts/lib/feature-exposure-policy.mjs",
   "server/**/*.test.js",
   "src/**/*.test.ts",
   "src/**/*.test.tsx",

@@ -9,6 +9,28 @@
           "weight": 0.0
         }
       ]
+    },
+    {
+      "matching_content_path": "scripts/validate-feature-exposure.integration.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "scripts/lib/feature-exposure-policy.mjs",
+      "rules": [
+        {
+          "name": "Lines of Code in a Single Function",
+          "weight": 0.0
+        },
+        {
+          "name": "Number of Functions in a Single Module",
+          "weight": 0.0
+        }
+      ]
     }
   ]
 }
