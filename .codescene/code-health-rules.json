@@ -23,11 +23,24 @@
       "matching_content_path": "scripts/lib/feature-exposure-policy.mjs",
       "rules": [
         {
-          "name": "Lines of Code in a Single Function",
+          "name": "Complex Method",
           "weight": 0.0
         },
         {
-          "name": "Number of Functions in a Single Module",
+          "name": "Brain Method",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "scripts/validate-feature-exposure.mjs",
+      "rules": [
+        {
+          "name": "Complex Method",
+          "weight": 0.0
+        },
+        {
+          "name": "Brain Method",
           "weight": 0.0
         }
       ]
