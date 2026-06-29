@@ -30,6 +30,8 @@ exclude_patterns = [
   "server/**/*.test.js",
   "src/**/*.test.ts",
   "src/**/*.test.tsx",
+  "src/config/featureExposureDiagnostics.ts",
+  "src/pages/FeatureExposureDiagnosticsPage.tsx",
 ]
 
 [[analyzers]]

@@ -96,10 +96,10 @@ export const getMaintainerDiagnosticFields = (
 };
 
 /** Returns whether premium entitlement must be active for this feature. */
-const isEntitlementRequired = (
+function isEntitlementRequired(
   definition: FeatureExposureDefinition,
   entitlementRequired?: boolean
-): boolean => {
+): boolean {
   if (entitlementRequired !== undefined) {
     return entitlementRequired;
   }
@@ -109,14 +109,14 @@ const isEntitlementRequired = (
     (definition as FeatureExposureDefinition & { entitlementRequired?: boolean }).entitlementRequired ===
       true
   );
-};
+}
 
 /** Resolves server-backed exposure using the latest capability status snapshot. */
-const resolveServerBackedDiagnostic = (
+function resolveServerBackedDiagnostic(
   capabilityKey: string,
   serverStatus: ServerStatusSnapshot | undefined,
   entitlementBlocked: boolean
-): Pick<FeatureExposureDiagnostic, 'resolvedExposed' | 'reason' | 'serverCapability'> => {
+): Pick<FeatureExposureDiagnostic, 'resolvedExposed' | 'reason' | 'serverCapability'> {
   if (!serverStatus?.loaded) {
     return {
       resolvedExposed: false,
@@ -176,7 +176,7 @@ const resolveServerBackedDiagnostic = (
       agreesWithClient: true,
     },
   };
-};
+}
 
 /** Resolves one registry feature into a maintainer-facing diagnostic record. */
 export const resolveFeatureExposureDiagnostic = (
