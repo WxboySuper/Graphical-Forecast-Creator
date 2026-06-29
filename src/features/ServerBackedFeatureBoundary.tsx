@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { getFeatureExposure, isFeatureExposed, type FeatureKey } from '../config/featureExposure';
-import { useServerCapabilityAvailable } from '../config/serverCapabilityStatus';
+import {
+  useServerBackedFeatureRuntimeState,
+  useServerCapabilityAvailable,
+} from '../config/serverCapabilityStatus';
 import { FeatureBoundary } from './FeatureBoundary';
 
 type ServerBackedFeatureBoundaryProps = {
@@ -46,14 +49,18 @@ const ServerBackedFeatureRuntimeBoundary = ({
   children,
   unavailableMessage,
 }: ServerBackedFeatureBoundaryProps) => {
-  const available = useServerBackedFeatureAvailable(feature);
+  const runtimeState = useServerBackedFeatureRuntimeState(feature);
   const definition = getFeatureExposure(feature);
 
   if (!definition.serverBacked) {
     return children;
   }
 
-  if (!available) {
+  if (runtimeState === 'loading') {
+    return null;
+  }
+
+  if (runtimeState === 'unavailable') {
     return <ServerBackedFeatureUnavailable message={unavailableMessage} />;
   }
 

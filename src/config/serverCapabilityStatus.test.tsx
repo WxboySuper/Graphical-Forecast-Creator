@@ -5,6 +5,7 @@ import {
   loadSharedServerCapabilityStatus,
   markServerCapabilityUnavailable,
   resetServerCapabilityStatusState,
+  resolveServerBackedFeatureRuntimeState,
   useServerCapabilityAvailable,
 } from './serverCapabilityStatus';
 import { ServerBackedFeatureBoundary } from '../features/ServerBackedFeatureBoundary';
@@ -22,6 +23,7 @@ describe('serverCapabilityStatus', () => {
 
   test('fails closed before status is loaded', () => {
     expect(isServerCapabilityAvailable('TSTM_GENERATION_ENABLED')).toBe(false);
+    expect(resolveServerBackedFeatureRuntimeState('autoTstm')).toBe('loading');
   });
 
   test('treats unavailable server status as disabled', () => {

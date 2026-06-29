@@ -81,4 +81,23 @@ describe('ServerBackedFeatureBoundary', () => {
     expect(screen.queryByText('Auto-TSTM controls')).not.toBeInTheDocument();
     expect(screen.queryByText(/temporarily unavailable/i)).not.toBeInTheDocument();
   });
+
+  test('does not render unavailable fallback while server status is loading', () => {
+    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn(() => new Promise(() => {})) as jest.Mock;
+
+    try {
+      render(
+        <ServerBackedFeatureBoundary feature="autoTstm">
+          <div>Auto-TSTM controls</div>
+        </ServerBackedFeatureBoundary>
+      );
+
+      expect(screen.queryByText('Auto-TSTM controls')).not.toBeInTheDocument();
+      expect(screen.queryByText(/temporarily unavailable/i)).not.toBeInTheDocument();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

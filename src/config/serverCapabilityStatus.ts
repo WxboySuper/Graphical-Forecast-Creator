@@ -24,6 +24,8 @@ type CapabilityStatusSnapshot = {
   capabilities: Record<string, CapabilityStatusEntry>;
 };
 
+export type ServerBackedFeatureRuntimeState = 'loading' | 'available' | 'unavailable';
+
 const EMPTY_STATUS: CapabilityStatusSnapshot = {
   loaded: false,
   capabilities: {},
@@ -139,6 +141,28 @@ export const isServerCapabilityAvailable = (
   return entry?.available === true;
 };
 
+/** Resolves runtime UI state for a server-backed registry feature. */
+export const resolveServerBackedFeatureRuntimeState = (
+  feature: FeatureKey,
+  status: CapabilityStatusSnapshot = EMPTY_STATUS
+): ServerBackedFeatureRuntimeState => {
+  const definition = getFeatureExposure(feature);
+  if (!definition.serverBacked) {
+    return 'available';
+  }
+
+  const capabilityKey = definition.serverCapabilityKey;
+  if (unavailableCapabilityKeys.has(capabilityKey)) {
+    return 'unavailable';
+  }
+
+  if (!status.loaded) {
+    return 'loading';
+  }
+
+  return isServerCapabilityAvailable(capabilityKey, status) ? 'available' : 'unavailable';
+};
+
 /** Loads server capability status once and keeps local unavailable markers in sync. */
 export const useServerCapabilityStatus = (): CapabilityStatusSnapshot => {
   const [status, setStatus] = useState<CapabilityStatusSnapshot>(cachedStatusSnapshot);
@@ -181,3 +205,11 @@ export const useServerCapabilityAvailable = (feature: FeatureKey): boolean => {
 /** Returns whether a server-backed feature should allow server API calls. */
 export const useServerCapabilityApiEnabled = (feature: FeatureKey): boolean =>
   useServerCapabilityAvailable(feature);
+
+/** Returns runtime UI state for a server-backed registry feature. */
+export const useServerBackedFeatureRuntimeState = (
+  feature: FeatureKey
+): ServerBackedFeatureRuntimeState => {
+  const status = useServerCapabilityStatus();
+  return resolveServerBackedFeatureRuntimeState(feature, status);
+};
