@@ -3,6 +3,7 @@
 declare const __GFC_COMING_SOON__: boolean;
 declare const __GFC_APP_VERSION__: string;
 declare const __GFC_BUILD_TARGET__: import('./config/buildTarget').BuildTarget;
+declare const __GFC_DEV_MODE__: boolean;
 declare const __GFC_BETA_MODE__: boolean;
 declare const __GFC_BETA_INVITE_PATH__: string;
 declare const __GFC_FIREBASE_API_KEY__: string;
@@ -32,6 +33,7 @@ declare global {
   var __GFC_COMING_SOON__: boolean;
   var __GFC_APP_VERSION__: string;
   var __GFC_BUILD_TARGET__: import('./config/buildTarget').BuildTarget;
+  var __GFC_DEV_MODE__: boolean;
   var __GFC_BETA_MODE__: boolean;
   var __GFC_BETA_INVITE_PATH__: string;
   var __GFC_FIREBASE_API_KEY__: string;

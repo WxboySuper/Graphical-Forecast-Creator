@@ -3,6 +3,7 @@ name: Post-merge automation
 # Runs after a PR merges. No manual workflow dispatch needed for normal releases.
 #
 # Every package.json version bump creates a GitHub Release (stable or --prerelease for -beta.N).
+# Deploy Beta / Deploy Production run on those releases (prereleased / released), not on branch pushes.
 # beta → main: strip stable on main, release vX.Y.Z, start next beta line + prerelease for new beta.
 # release/* → main: merge main into beta, stable release + next beta line + prerelease.
 # feature/*|fix/*|other → beta: bump -beta.N and prerelease vX.Y.Z-beta.N.
