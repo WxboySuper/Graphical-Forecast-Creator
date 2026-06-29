@@ -39,6 +39,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Trust VPS host key
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS || vars.PROD_SSH_KNOWN_HOSTS }}
+          SSH_KNOWN_HOSTS_FILE: .github/known_hosts/production
+        run: bash scripts/ci/trust-vps-host-key.sh
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -67,37 +79,6 @@ jobs:
           echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
           echo "sentry_release=$STABLE" >> "$GITHUB_OUTPUT"
           echo "release_dir=$RELEASE_DIR" >> "$GITHUB_OUTPUT"
-
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
-
-      - name: Trust VPS host key
-        env:
-          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
-          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          if [ -n "$SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
-          else
-            for attempt in 1 2 3 4 5; do
-              if scan_output=$(ssh-keyscan -T 15 -p 22 -H "$SSH_HOST" 2>/tmp/ssh-keyscan.err) && [ -n "$scan_output" ]; then
-                printf '%s\n' "$scan_output" >> ~/.ssh/known_hosts
-                exit 0
-              fi
-              cat /tmp/ssh-keyscan.err >&2 || true
-              if [ "$attempt" -lt 5 ]; then
-                echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
-                sleep $((attempt * 5))
-              fi
-            done
-            echo "ssh-keyscan failed after 5 attempts" >&2
-            exit 1
-          fi
 
       - name: Validate production release manifest
         id: manifest

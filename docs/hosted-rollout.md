@@ -32,7 +32,7 @@ Ops companion to [timed-production-rollout.md](./timed-production-rollout.md).
 1. Run `scripts/setup-vps.sh` on the production VPS (creates dirs + cron).
 2. Point production nginx at `server/nginx.conf` (`root` = `/var/www/gfc/current`).
 3. Enable `server/nginx-staging.conf` for `staging-gfc.weatherboysuper.com`.
-4. Ensure GitHub secrets: `PROD_SSH_*`, `BETA_INVITE_PATH`, `BETA_INVITE_TOKEN` (staging uses same invite gate as beta).
+4. Ensure GitHub secrets: `PROD_SSH_*`, `PROD_SSH_KNOWN_HOSTS`, `BETA_SSH_KNOWN_HOSTS` (pin host keys — see `.github/known_hosts/README.md`), `BETA_INVITE_PATH`, `BETA_INVITE_TOKEN` (staging uses same invite gate as beta).
 
 ## Cron promote
 
@@ -69,6 +69,7 @@ Set `"action": "live"` in `deploy/production-release.json` for immediate full de
 | Symptom | Check |
 |---------|--------|
 | Deploy rejected | `node scripts/validate-production-release.mjs` locally; version vs `package.json` |
+| `ssh-keyscan failed` / Trust VPS host key | Pin `PROD_SSH_KNOWN_HOSTS` / `BETA_SSH_KNOWN_HOSTS` (see `.github/known_hosts/README.md`); keyscan from GitHub runners is unreliable |
 | Live updated early | `action` must be `stage`; verify `current` symlink on VPS |
 | Staging 403 / beta gate | Sign in + beta access; use invite URL |
 | Promote did not run | `config/status`, `rolloutAt`, `/opt/gfc-analytics/logs/rollout.log` |

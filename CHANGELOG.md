@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Deploy reliability:** Harden beta and production VPS deploy workflows against flaky `ssh-keyscan` host-key discovery with pinned known-host secrets, retries, deploy concurrency (cancel stale beta runs; queue production), and explicit `StrictHostKeyChecking` on SSH/rsync.
+- **Deploy host-key pinning:** Prefer pinned VPS host keys (secret, variable, or `.github/known_hosts/`) over runtime `ssh-keyscan`; run trust step before build and surface actionable errors when discovery fails.
 
 ### Added
 - **Explicit build targets:** Define and validate local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
