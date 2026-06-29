@@ -190,7 +190,6 @@ export function resolveAllFeatureExposureDiagnostics(registry, options) {
  *   target: string,
  *   env?: Record<string, string | undefined>,
  *   includeInternalMetadata?: boolean,
- *   generatedAt?: string,
  * }} options
  */
 export function generateFeatureExposureDiagnostics(inputs, options) {
@@ -207,7 +206,7 @@ export function generateFeatureExposureDiagnostics(inputs, options) {
   });
 
   return {
-    generatedAt: options.generatedAt ?? new Date().toISOString(),
+    generatedAt: new Date().toISOString(),
     buildTarget: options.target,
     features: diagnostics,
   };

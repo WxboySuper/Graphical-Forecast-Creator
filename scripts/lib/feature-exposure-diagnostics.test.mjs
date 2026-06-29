@@ -128,7 +128,6 @@ describe('feature exposure diagnostics', () => {
         target: 'beta',
         env: { SERVER_TARGET: 'beta' },
         includeInternalMetadata: true,
-        generatedAt: '1970-01-01T00:00:00.000Z',
       }
     );
 
@@ -143,7 +142,7 @@ describe('feature exposure diagnostics', () => {
     assert.equal(reparsed.features[0].reason, 'deployment_disabled');
     assert.equal(reparsed.features[1].reason, 'available');
     assert.equal(reparsed.features[2].reason, 'entitlement');
-    assert.match(serialized, /"generatedAt": "1970-01-01T00:00:00.000Z"/);
+    assert.match(serialized, /"generatedAt": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/);
   });
 
   it('strips maintainer metadata in public mode', () => {
