@@ -107,3 +107,55 @@ pnpm exec playwright test e2e/smoke.spec.ts
 - Call out any verification that could not be run.
 - Mention unrelated dirty files only when they matter.
 - Do not bury the result under process narration.
+
+## Porting main → beta
+
+Use this when you need to land a **main** change on **beta** yourself, or when automated porting opened a draft conflict PR.
+
+### When automation runs
+
+| Merge | What happens |
+|-------|----------------|
+| `hotfix/*` → `main` | Automation opens a `[Port] … to beta` PR after merge |
+| `beta` → `main`, `release/*` → `main`, `feature/release-*` → `main` | Post-merge automation syncs beta directly (no port PR) |
+| Anything → `beta` | No downstream porting |
+
+### When to port manually
+
+- The user asks you to port before or instead of waiting on automation.
+- A `[Port][Conflicts]` draft PR has real code conflicts (not just version files).
+- You want the beta change reviewed and merged on your timeline.
+
+### Block duplicate automated ports
+
+Before merging the source PR on `main`, either:
+
+- Add the **`porting/manual`** label to that PR, or
+- Open a non-`port/*` PR to `beta` first (same head branch as the main PR, or title/body referencing `#<sourcePr>`).
+
+Automation detects both and skips creating a duplicate `port/*` PR.
+
+### Manual port workflow
+
+1. Branch from **`beta`** (not `main`).
+2. Cherry-pick or merge only the commits you need from the main PR.
+3. **Keep beta's versions** of `package.json`, lockfiles, `CHANGELOG.md`, and `deploy/production-release.json` unless the port intentionally changes dependencies.
+4. Open a PR **`your-branch → beta`**; include `Ports #<sourcePr>` in the title or body.
+5. Run targeted tests. Beta PRs follow normal changelog policy.
+6. Use a `port/*` branch only when finishing an automated draft port PR.
+
+### Resolving an automated draft port PR
+
+1. Check out `port/<n>-to-beta`.
+2. Fix remaining conflict markers (version-policy files are usually auto-resolved now).
+3. Mark the draft PR ready for review and merge when CI passes.
+4. Close any duplicate manual PR if automation already opened the port PR.
+
+### Do not
+
+- Fan out to `feature/*` branches (removed; not supported).
+- Open redundant `port/* → beta` PRs for merges post-merge already synced (CI blocks these via `scripts/lib/port-pr-policy.mjs`).
+- Push directly to `beta` for port work — always use a PR.
+
+Full release policy: [`docs/release-workflow.md`](docs/release-workflow.md). Key automation: [`.github/scripts/port-changes.sh`](.github/scripts/port-changes.sh), [`scripts/lib/port-targets.mjs`](scripts/lib/port-targets.mjs), [`scripts/lib/port-conflicts.mjs`](scripts/lib/port-conflicts.mjs).
+

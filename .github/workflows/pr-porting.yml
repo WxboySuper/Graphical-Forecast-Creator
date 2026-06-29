@@ -1,17 +1,14 @@
 name: PR Porting System
 
-# Automates porting changes across the branch hierarchy via Pull Requests.
+# Automates porting merged PR commits from main to beta via reviewable port PRs.
 #
-# main → beta is NOT ported here when post-merge-automation.yml already syncs beta
-# (beta promotion, release/*, feature/release-*). Those use direct CI pushes with version bumps.
-# hotfix/* → main still opens port PRs into beta (post-merge only bumps main).
+# Scope: main → beta only (hotfix/* and other merges not owned by post-merge-automation).
+# post-merge-automation.yml still owns direct beta sync for beta promotion, release/*,
+# and feature/release-* merges.
 #
-# Flows:
-# 1. hotfix/* → main (port PRs to beta, other hotfix/*, and all feature/*)
-# 2. feature/* → beta (port PRs to all other feature/*)
-#
-# On conflicts: opens draft port PRs with conflict markers, files a tracking issue,
-# and annotates the workflow run so ports are not silently dropped.
+# Skips when the source PR has porting/manual or an open manual beta port PR exists.
+# On conflicts: auto-resolves version-policy files when possible; otherwise opens a
+# draft port PR (no tracking issues).
 #
 # Required secrets: GH_PAT (repo scope)
 
@@ -37,6 +34,11 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
 
       - name: Configure Git Identity
         run: |
