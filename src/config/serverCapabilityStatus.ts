@@ -63,6 +63,17 @@ export const getServerCapabilityKeyForFeature = (feature: FeatureKey): string | 
   return definition.serverCapabilityKey;
 };
 
+/** Returns true when the payload matches the public capability status shape. */
+export const isServerCapabilityStatusResponse = (
+  payload: unknown
+): payload is ServerCapabilityStatusResponse => {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+
+  return typeof (payload as ServerCapabilityStatusResponse).capabilities === 'object';
+};
+
 /** Reads the public server capability status document. */
 export const fetchServerCapabilityStatus = async (): Promise<ServerCapabilityStatusResponse> => {
   const response = await fetch(CAPABILITY_STATUS_ENDPOINT);
@@ -71,11 +82,11 @@ export const fetchServerCapabilityStatus = async (): Promise<ServerCapabilitySta
   }
 
   const payload = await response.json();
-  if (!payload || typeof payload !== 'object' || typeof payload.capabilities !== 'object') {
+  if (!isServerCapabilityStatusResponse(payload)) {
     throw new Error('Server capability status response was malformed.');
   }
 
-  return payload as ServerCapabilityStatusResponse;
+  return payload;
 };
 
 /** Returns whether a capability is currently treated as unavailable on the client. */

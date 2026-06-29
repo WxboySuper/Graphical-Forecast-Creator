@@ -6,6 +6,12 @@ const EMERGENCY_DISABLED_ENV_KEY = 'EMERGENCY_DISABLED_CAPABILITIES';
 const KNOWN_CAPABILITY_KEY_SET = new Set(KNOWN_SERVER_CAPABILITY_KEYS);
 const MALFORMED_SENTINEL_VALUES = new Set(['true', 'false']);
 
+const emptyParseResult = (malformed = false) => ({
+  disabledKeys: new Set(),
+  malformed,
+  ignoredUnknownKeys: [],
+});
+
 /** Returns true when the raw env value is safe to parse as a disable list. */
 const isValidEmergencyDisableValue = (value) => {
   if (typeof value !== 'string') {
@@ -21,53 +27,15 @@ const isValidEmergencyDisableValue = (value) => {
     return false;
   }
 
-  if (/[\x00-\x1F\x7F]/.test(trimmed)) {
-    return false;
-  }
-
-  return true;
+  return !/[\x00-\x1F\x7F]/.test(trimmed);
 };
 
-/**
- * Parses EMERGENCY_DISABLED_CAPABILITIES into a validated disable set.
- * Malformed values fail closed by applying zero emergency disables.
- */
-const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => {
-  const log = options.log || console;
-  const rawValue = env[EMERGENCY_DISABLED_ENV_KEY];
-
-  if (rawValue === undefined || rawValue === '') {
-    return {
-      disabledKeys: new Set(),
-      malformed: false,
-      ignoredUnknownKeys: [],
-    };
-  }
-
-  if (!isValidEmergencyDisableValue(rawValue)) {
-    log.error?.(
-      `[capabilities] malformed ${EMERGENCY_DISABLED_ENV_KEY}; applying zero emergency disables`
-    );
-    return {
-      disabledKeys: new Set(),
-      malformed: true,
-      ignoredUnknownKeys: [],
-    };
-  }
-
-  const trimmed = rawValue.trim();
-  if (!trimmed) {
-    return {
-      disabledKeys: new Set(),
-      malformed: false,
-      ignoredUnknownKeys: [],
-    };
-  }
-
+/** Collects validated disable keys from a comma-separated env value. */
+const collectEmergencyDisabledKeys = (rawValue) => {
   const disabledKeys = new Set();
   const ignoredUnknownKeys = [];
 
-  for (const entry of trimmed.split(',')) {
+  for (const entry of rawValue.split(',')) {
     const capabilityKey = entry.trim();
     if (!capabilityKey) {
       continue;
@@ -81,11 +49,44 @@ const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => 
     disabledKeys.add(capabilityKey);
   }
 
+  return { disabledKeys, ignoredUnknownKeys };
+};
+
+/** Logs ignored unknown keys from the emergency disable env var. */
+const logUnknownEmergencyDisableKeys = (ignoredUnknownKeys, log) => {
   for (const capabilityKey of ignoredUnknownKeys) {
     log.warn?.(
       `[capabilities] ignoring unknown emergency disable key ${JSON.stringify(capabilityKey)}`
     );
   }
+};
+
+/**
+ * Parses EMERGENCY_DISABLED_CAPABILITIES into a validated disable set.
+ * Malformed values fail closed by applying zero emergency disables.
+ */
+const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => {
+  const log = options.log || console;
+  const rawValue = env[EMERGENCY_DISABLED_ENV_KEY];
+
+  if (rawValue === undefined || rawValue === '') {
+    return emptyParseResult();
+  }
+
+  if (!isValidEmergencyDisableValue(rawValue)) {
+    log.error?.(
+      `[capabilities] malformed ${EMERGENCY_DISABLED_ENV_KEY}; applying zero emergency disables`
+    );
+    return emptyParseResult(true);
+  }
+
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return emptyParseResult();
+  }
+
+  const { disabledKeys, ignoredUnknownKeys } = collectEmergencyDisabledKeys(trimmed);
+  logUnknownEmergencyDisableKeys(ignoredUnknownKeys, log);
 
   return {
     disabledKeys,

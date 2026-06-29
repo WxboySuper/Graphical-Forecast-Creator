@@ -31,6 +31,17 @@ const sendDisabledCapabilityResponse = (res, { label }) => {
   });
 };
 
+/** Logs emergency rejections for audit without exposing secrets. */
+const logEmergencyGateRejection = (capabilityKey, reason, log) => {
+  if (reason !== CAPABILITY_REASON.EMERGENCY_DISABLED) {
+    return;
+  }
+
+  log.info?.(
+    `[capabilities] rejected capability=${capabilityKey} reason=${reason}`
+  );
+};
+
 /** Rejects disabled capabilities before route handlers, auth, or expensive work run. */
 const createServerCapabilityGate = (capabilityKey, options = {}) => {
   const env = options.env || process.env;
@@ -53,12 +64,7 @@ const createServerCapabilityGate = (capabilityKey, options = {}) => {
     }
 
     const reason = getServerCapabilityDisableReason(capabilityKey, gateOptions);
-    if (reason === CAPABILITY_REASON.EMERGENCY_DISABLED) {
-      log.info?.(
-        `[capabilities] rejected capability=${capabilityKey} reason=${reason}`
-      );
-    }
-
+    logEmergencyGateRejection(capabilityKey, reason, log);
     sendDisabledCapabilityResponse(res, { label });
   };
 };
