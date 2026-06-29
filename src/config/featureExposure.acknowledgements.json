@@ -1,14 +1,14 @@
 {
   "autoTstm": {
-    "reason": "Mount and effect gating covered by src/features/FeatureBoundary.test.tsx",
-    "trackingIssue": 427
+    "reason": "Disabled-side-effect coverage in src/testing/featureExposure/exemplar.exposure.test.tsx and server/testing/autoTstm.exposure.test.js",
+    "trackingIssue": 529
   },
   "tropicalWorkspace": {
-    "reason": "Route and navigation gating covered by src/routing/buildFeatureGatedRoutes.test.tsx",
-    "trackingIssue": 432
+    "reason": "Route and navigation gating covered by src/testing/featureExposure/exemplar.exposure.test.tsx and src/routing/buildFeatureGatedRoutes.test.tsx",
+    "trackingIssue": 529
   },
   "collaborationRoom": {
-    "reason": "Route and navigation gating covered by src/routing/buildFeatureGatedRoutes.test.tsx",
-    "trackingIssue": 433
+    "reason": "Route and navigation gating covered by src/testing/featureExposure/exemplar.exposure.test.tsx and src/routing/buildFeatureGatedRoutes.test.tsx",
+    "trackingIssue": 529
   }
 }

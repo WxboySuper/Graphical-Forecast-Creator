@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes } from 'react-router-dom';
-import * as featureExposure from '../config/featureExposure';
+import {
+  assertGatedRoutesAbsent,
+  mockFeatureExposureOnTarget,
+  runWithBuildTarget,
+  singleTargetOn,
+} from '../testing/featureExposure/harness';
 import { buildFeatureGatedRoutes, getExposedGatedRoutePaths } from './buildFeatureGatedRoutes';
 
 jest.mock('../pages/gated/TropicalWorkspacePage', () => ({
@@ -14,24 +19,21 @@ jest.mock('../pages/gated/CollaborationRoomPage', () => ({
 }));
 
 describe('buildFeatureGatedRoutes', () => {
-  const originalTarget = globalThis.__GFC_BUILD_TARGET__;
-
   afterEach(() => {
-    globalThis.__GFC_BUILD_TARGET__ = originalTarget;
     jest.restoreAllMocks();
   });
 
   test('does not register gated routes while every feature remains disabled', () => {
-    globalThis.__GFC_BUILD_TARGET__ = 'beta';
-
-    expect(getExposedGatedRoutePaths('beta')).toEqual([]);
-    expect(buildFeatureGatedRoutes('beta')).toEqual([]);
+    runWithBuildTarget('beta', () => {
+      assertGatedRoutesAbsent('tropicalWorkspace', ['beta']);
+      assertGatedRoutesAbsent('collaborationRoom', ['beta']);
+      expect(getExposedGatedRoutePaths('beta')).toEqual([]);
+      expect(buildFeatureGatedRoutes('beta')).toEqual([]);
+    });
   });
 
   test('registers exposed gated routes and lazy-loads their modules', async () => {
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockImplementation(
-      (feature, target) => feature === 'tropicalWorkspace' && target === 'local'
-    );
+    const exposureSpy = mockFeatureExposureOnTarget('tropicalWorkspace', singleTargetOn('local'));
 
     expect(getExposedGatedRoutePaths('local')).toEqual(['/tropical']);
 
@@ -42,5 +44,6 @@ describe('buildFeatureGatedRoutes', () => {
     );
 
     expect(await screen.findByText('Tropical workspace page')).toBeInTheDocument();
+    exposureSpy.mockRestore();
   });
 });

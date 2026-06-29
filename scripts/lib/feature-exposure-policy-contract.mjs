@@ -4,6 +4,10 @@ export const PER_FEATURE_TEST_PATTERNS = (featureKey) => [
   `src/features/${featureKey}.test.ts`,
   `src/features/${featureKey}/${featureKey}.test.tsx`,
   `src/features/${featureKey}/${featureKey}.test.ts`,
+  `src/features/${featureKey}.exposure.test.tsx`,
+  `src/features/${featureKey}.exposure.test.ts`,
+  `src/features/${featureKey}/${featureKey}.exposure.test.tsx`,
+  `src/features/${featureKey}/${featureKey}.exposure.test.ts`,
 ];
 
 /** Collects every feature key that is gated by routes, navigation, or side effects. */

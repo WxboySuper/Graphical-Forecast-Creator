@@ -131,6 +131,8 @@ Client runtime fallback for server-backed features lives in:
 - `src/config/serverCapabilityStatus.ts` — fetches `/api/capabilities/status` and tracks locally unavailable capabilities
 - `src/features/ServerBackedFeatureBoundary.tsx` — hides already-mounted server-backed UI when the server disables a capability after page load
 
+Disabled-side-effect test fixtures and the minimum per-feature contract are documented in [docs/feature-exposure-testing.md](docs/feature-exposure-testing.md). Run `pnpm test:exposure` locally or adopt `src/testing/featureExposure/harness.tsx` in a new `*.exposure.test.ts` file.
+
 ### Local Beta Mode (developer)
 
 Run the app with beta-only features locally (useful for testing forecast redesigns, verification flows, and discussion changes).

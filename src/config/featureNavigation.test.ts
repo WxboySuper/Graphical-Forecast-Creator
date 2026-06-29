@@ -1,4 +1,9 @@
-import * as featureExposure from './featureExposure';
+import {
+  assertNavigationHidden,
+  mockFeatureExposureOnTarget,
+  runWithBuildTarget,
+  singleTargetOn,
+} from '../testing/featureExposure/harness';
 import {
   APP_NAVIGATION_ITEMS,
   getNavigationKeyboardShortcuts,
@@ -6,32 +11,33 @@ import {
 } from './featureNavigation';
 
 describe('featureNavigation', () => {
-  const originalTarget = globalThis.__GFC_BUILD_TARGET__;
-
   afterEach(() => {
-    globalThis.__GFC_BUILD_TARGET__ = originalTarget;
     jest.restoreAllMocks();
   });
 
   test('keeps core navigation visible when gated features are disabled', () => {
-    globalThis.__GFC_BUILD_TARGET__ = 'production';
-
-    expect(getVisibleNavigationItems('production').map((item) => item.id)).toEqual([
-      'home',
-      'forecast',
-      'discussion',
-      'verification',
-      'monitor',
-    ]);
+    runWithBuildTarget('production', () => {
+      expect(getVisibleNavigationItems('production').map((item) => item.id)).toEqual([
+        'home',
+        'forecast',
+        'discussion',
+        'verification',
+        'monitor',
+      ]);
+      assertNavigationHidden('tropicalWorkspace', ['production']);
+      assertNavigationHidden('collaborationRoom', ['production']);
+    });
   });
 
   test('includes gated navigation only when the feature is exposed on the target', () => {
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockImplementation(
-      (feature, target) => feature === 'tropicalWorkspace' && target === 'local'
-    );
+    const exposureSpy = mockFeatureExposureOnTarget('tropicalWorkspace', singleTargetOn('local'));
 
     expect(getVisibleNavigationItems('local').map((item) => item.id)).toContain('tropical-workspace');
-    expect(getVisibleNavigationItems('production').map((item) => item.id)).not.toContain('tropical-workspace');
+    expect(getVisibleNavigationItems('production').map((item) => item.id)).not.toContain(
+      'tropical-workspace'
+    );
+
+    exposureSpy.mockRestore();
   });
 
   test('omits keyboard shortcuts for hidden gated destinations', () => {

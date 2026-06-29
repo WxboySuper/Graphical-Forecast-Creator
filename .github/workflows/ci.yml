@@ -135,6 +135,9 @@ jobs:
       - name: Validate feature exposure policy
         run: pnpm validate:feature-exposure
 
+      - name: Run feature exposure test suite
+        run: pnpm test:exposure
+
       - name: Run feature exposure integration tests
         run: node --test scripts/validate-feature-exposure.integration.test.mjs scripts/generate-exposure-report.integration.test.mjs
 

@@ -386,4 +386,15 @@ describe('feature exposure policy', () => {
     });
     assert.equal(result.ok, true);
   });
+
+  it('passes when gated feature has a per-feature exposure contract test file on disk', () => {
+    const surfaces = {
+      gatedRoutes: [{ feature: 'betaFeature', path: '/beta' }],
+      navigationItems: [],
+    };
+    const result = evaluateFeatureExposurePolicy(validRegistry, surfaces, {
+      existingTestFiles: ['src/features/betaFeature.exposure.test.ts'],
+    });
+    assert.equal(result.ok, true);
+  });
 });
