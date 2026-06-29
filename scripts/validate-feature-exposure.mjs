@@ -5,7 +5,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { evaluateFeatureExposurePolicy } from './lib/feature-exposure-policy.mjs';
-import { collectGatedFeatures } from './lib/feature-exposure-policy-contract.mjs';
+import {
+  collectGatedFeatures,
+  PER_FEATURE_TEST_PATTERNS,
+} from './lib/feature-exposure-policy-contract.mjs';
 import {
   assertAcknowledgementsShape,
   extractConst,
@@ -17,12 +20,6 @@ import {
 } from './lib/feature-exposure-source-parser.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const PER_FEATURE_TEST_PATTERNS = (featureKey) => [
-  `src/features/${featureKey}.test.tsx`,
-  `src/features/${featureKey}.test.ts`,
-  `src/features/${featureKey}/${featureKey}.test.tsx`,
-  `src/features/${featureKey}/${featureKey}.test.ts`,
-];
 
 /** Reads a repository source file as UTF-8 text. */
 function readSource(relativePath) {

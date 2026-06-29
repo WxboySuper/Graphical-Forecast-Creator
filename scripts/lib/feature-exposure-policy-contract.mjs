@@ -1,4 +1,5 @@
-const PER_FEATURE_TEST_PATTERNS = (featureKey) => [
+/** Returns repository-relative paths checked for per-feature exposure tests. */
+export const PER_FEATURE_TEST_PATTERNS = (featureKey) => [
   `src/features/${featureKey}.test.tsx`,
   `src/features/${featureKey}.test.ts`,
   `src/features/${featureKey}/${featureKey}.test.tsx`,
