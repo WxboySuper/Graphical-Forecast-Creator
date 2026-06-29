@@ -1,29 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import { FEATURE_EXPOSURE_REGISTRY } from '../config/featureExposure';
-import { FeatureBoundary, useFeatureEffect } from './FeatureBoundary';
-
-const effectSpy = jest.fn();
-
-const EffectProbe = () => {
-  useFeatureEffect('autoTstm', () => {
-    effectSpy();
-    return undefined;
-  }, []);
-
-  return <div>Effect probe</div>;
-};
+import { FeatureBoundary } from './FeatureBoundary';
+import {
+  ALL_TARGETS_OFF,
+  createSideEffectProbe,
+  mockFeatureExposure,
+  runWithBuildTarget,
+  singleTargetOn,
+} from '../testing/featureExposure/harness';
 
 describe('FeatureBoundary', () => {
   afterEach(() => {
     jest.restoreAllMocks();
-    effectSpy.mockReset();
   });
 
   test('renders children only when the feature is exposed', () => {
-    jest.spyOn(
-      require('../config/featureExposure'),
-      'isFeatureExposed'
-    ).mockReturnValue(false);
+    mockFeatureExposure('autoTstm', ALL_TARGETS_OFF);
 
     const { rerender } = render(
       <FeatureBoundary feature="autoTstm">
@@ -33,34 +25,42 @@ describe('FeatureBoundary', () => {
 
     expect(screen.queryByText('Auto-TSTM controls')).not.toBeInTheDocument();
 
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
-    rerender(
-      <FeatureBoundary feature="autoTstm">
-        <div>Auto-TSTM controls</div>
-      </FeatureBoundary>
-    );
+    jest.restoreAllMocks();
+    runWithBuildTarget('beta', () => {
+      mockFeatureExposure('autoTstm', singleTargetOn('beta'));
 
-    expect(screen.getByText('Auto-TSTM controls')).toBeInTheDocument();
+      rerender(
+        <FeatureBoundary feature="autoTstm">
+          <div>Auto-TSTM controls</div>
+        </FeatureBoundary>
+      );
+
+      expect(screen.getByText('Auto-TSTM controls')).toBeInTheDocument();
+    });
   });
 
   test('does not run gated effects while the feature remains disabled', () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    mockFeatureExposure('autoTstm', ALL_TARGETS_OFF);
+    const { spy, Probe } = createSideEffectProbe('autoTstm');
 
     render(
       <FeatureBoundary feature="autoTstm">
-        <EffectProbe />
+        <Probe />
       </FeatureBoundary>
     );
 
-    expect(effectSpy).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   test('runs gated effects when the feature is exposed', () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    runWithBuildTarget('beta', () => {
+      mockFeatureExposure('autoTstm', singleTargetOn('beta'));
+      const { spy, Probe } = createSideEffectProbe('autoTstm');
 
-    render(<EffectProbe />);
+      render(<Probe />);
 
-    expect(effectSpy).toHaveBeenCalledTimes(1);
-    expect(FEATURE_EXPOSURE_REGISTRY.autoTstm.serverCapabilityKey).toBe('TSTM_GENERATION_ENABLED');
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(FEATURE_EXPOSURE_REGISTRY.autoTstm.serverCapabilityKey).toBe('TSTM_GENERATION_ENABLED');
+    });
   });
 });

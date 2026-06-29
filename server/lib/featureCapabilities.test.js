@@ -2,7 +2,6 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const express = require('express');
 const {
   CAPABILITY_REASON,
   DISABLED_CAPABILITY_STATUS,
@@ -11,11 +10,14 @@ const {
   isServerCapabilityEnabled,
   sendDisabledCapabilityResponse,
 } = require('./featureCapabilities');
-
-const getUrl = (server) => {
-  const address = server.address();
-  return `http://127.0.0.1:${address.port}/api/test`;
-};
+const {
+  assertCapabilityRouteRejectsWithoutWork,
+  createTestAppWithGate,
+  disabledCapabilityStatusFixtures,
+  getServerUrl,
+  startTestServer,
+} = require('../testing/featureExposureHarness');
+const { allTargetsEnabledRouteOptions } = require('../testing/featureExposureTargetMatrix');
 
 describe('server capability gates', () => {
   it('stays disabled for unknown capability keys', () => {
@@ -39,56 +41,47 @@ describe('server capability gates', () => {
   });
 
   it('emergency disable overrides registry exposure and deployment env', () => {
-    const env = {
-      TSTM_GENERATION_ENABLED: 'true',
-      SERVER_TARGET: 'beta',
-      EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
-    };
+    const fixture = disabledCapabilityStatusFixtures.emergency_disabled;
 
     assert.equal(
       isServerCapabilityEnabled('TSTM_GENERATION_ENABLED', {
-        env,
-        exposureOverride: { beta: true },
+        env: fixture.env,
+        exposureOverride: fixture.routeOptions.exposureOverride,
       }),
       false
     );
     assert.equal(
       getServerCapabilityDisableReason('TSTM_GENERATION_ENABLED', {
-        env,
-        exposureOverride: { beta: true },
+        env: fixture.env,
+        exposureOverride: fixture.routeOptions.exposureOverride,
       }),
       CAPABILITY_REASON.EMERGENCY_DISABLED
     );
   });
 
   it('logs emergency rejections without invoking handlers', async () => {
-    let calls = 0;
+    const fixture = disabledCapabilityStatusFixtures.emergency_disabled;
     const logEntries = [];
-    const gate = createServerCapabilityGate('TSTM_GENERATION_ENABLED', {
-      env: {
-        TSTM_GENERATION_ENABLED: 'true',
-        SERVER_TARGET: 'beta',
-        EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
+    let calls = 0;
+    const app = createTestAppWithGate(
+      'TSTM_GENERATION_ENABLED',
+      () => {
+        calls += 1;
       },
-      exposureOverride: { beta: true },
-      log: {
-        info(message) {
-          logEntries.push(message);
+      {
+        env: fixture.env,
+        exposureOverride: fixture.routeOptions.exposureOverride,
+        log: {
+          info(message) {
+            logEntries.push(message);
+          },
         },
-      },
-    });
-    const app = express();
-    app.post('/api/test', gate, (_req, res) => {
-      calls += 1;
-      res.status(200).json({ ok: true });
-    });
-    const server = await new Promise((resolve, reject) => {
-      const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
-      instance.on('error', reject);
-    });
+      }
+    );
+    const server = await startTestServer(app);
 
     try {
-      const response = await fetch(getUrl(server), { method: 'POST' });
+      const response = await fetch(getServerUrl(server), { method: 'POST' });
       assert.equal(response.status, DISABLED_CAPABILITY_STATUS);
       assert.equal(calls, 0);
       assert.match(logEntries[0], /reason=emergency_disabled/);
@@ -98,38 +91,22 @@ describe('server capability gates', () => {
   });
 
   it('rejects disabled capabilities before handlers run', async () => {
-    let calls = 0;
-    const gate = createServerCapabilityGate('TSTM_GENERATION_ENABLED', {
+    await assertCapabilityRouteRejectsWithoutWork({
+      capabilityKey: 'TSTM_GENERATION_ENABLED',
       env: { TSTM_GENERATION_ENABLED: 'true', SERVER_TARGET: 'beta' },
-      exposureOverride: { beta: false },
-    });
-    const app = express();
-    app.post('/api/test', gate, (_req, res) => {
-      calls += 1;
-      res.status(200).json({ ok: true });
-    });
-    const server = await new Promise((resolve, reject) => {
-      const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
-      instance.on('error', reject);
-    });
-
-    try {
-      const response = await fetch(getUrl(server), { method: 'POST' });
-      assert.equal(response.status, DISABLED_CAPABILITY_STATUS);
-      assert.deepEqual(await response.json(), {
+      routeOptions: { exposureOverride: { beta: false } },
+      expectedBody: {
         error: 'Auto-TSTM is not enabled on this deployment.',
-      });
-      assert.equal(calls, 0);
-    } finally {
-      server.close();
-    }
+      },
+    });
   });
 
   it('fails route registration when SERVER_TARGET is invalid', () => {
     assert.throws(
-      () => createServerCapabilityGate('TSTM_GENERATION_ENABLED', {
-        env: { SERVER_TARGET: 'preview' },
-      }),
+      () =>
+        createServerCapabilityGate('TSTM_GENERATION_ENABLED', {
+          env: { SERVER_TARGET: 'preview' },
+        }),
       /Invalid SERVER_TARGET/
     );
   });
@@ -152,5 +129,31 @@ describe('server capability gates', () => {
     assert.deepEqual(response.body, {
       error: 'Auto-TSTM is not enabled on this deployment.',
     });
+  });
+
+  it('allows handlers when registry exposure and deployment env are enabled', async () => {
+    let calls = 0;
+    const app = createTestAppWithGate(
+      'TSTM_GENERATION_ENABLED',
+      () => {
+        calls += 1;
+      },
+      {
+        env: {
+          TSTM_GENERATION_ENABLED: 'true',
+          SERVER_TARGET: 'beta',
+        },
+        ...allTargetsEnabledRouteOptions(),
+      }
+    );
+    const server = await startTestServer(app);
+
+    try {
+      const response = await fetch(getServerUrl(server), { method: 'POST' });
+      assert.equal(response.status, 200);
+      assert.equal(calls, 1);
+    } finally {
+      server.close();
+    }
   });
 });

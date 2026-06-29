@@ -83,6 +83,7 @@
     "changelog:consolidate-beta": "node scripts/consolidate-beta-changelog.mjs",
     "validate:feature-exposure": "node scripts/validate-feature-exposure.mjs",
     "exposure:report": "node scripts/generate-exposure-report.mjs",
+    "test:exposure": "node scripts/run-exposure-suite.mjs",
     "exposure:diagnostics": "node scripts/generate-exposure-diagnostics.mjs",
     "branches:report": "cross-env DRY_RUN=1 node scripts/generate-stale-branch-report.mjs",
     "predeploy": "pnpm run build",
