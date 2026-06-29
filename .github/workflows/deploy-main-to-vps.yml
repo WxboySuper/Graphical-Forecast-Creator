@@ -3,6 +3,9 @@ name: Deploy Production to VPS
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-production
+
 on:
   push:
     branches: [main]
