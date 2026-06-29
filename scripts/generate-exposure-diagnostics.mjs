@@ -60,8 +60,6 @@ export function runExposureDiagnostics(argv = process.argv.slice(2)) {
     includeInternalMetadata: !options.public,
   });
 
-  report.generatedAt = new Date().toISOString();
-
   if (options.json) {
     console.log(serializeFeatureExposureDiagnostics(report));
   } else {
