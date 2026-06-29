@@ -4,7 +4,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### PR #TBD
+### PR #613
 
 - Align beta porting and post-merge automation with `main` (PR #612 baseline): hotfix merges use reviewable port PRs instead of direct beta sync, and restore main's port PR policy checks.
 
