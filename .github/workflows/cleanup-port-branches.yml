@@ -10,9 +10,6 @@ on:
   pull_request:
     types: [closed]
 
-permissions:
-  contents: write
-
 jobs:
   delete-merged-port-branch:
     if: >-

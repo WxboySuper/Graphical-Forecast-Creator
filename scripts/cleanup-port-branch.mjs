@@ -32,7 +32,14 @@ try {
   console.log(`Deleted port branch ${portBranch}.`);
 } catch (err) {
   const message = err instanceof Error ? err.message : String(err);
-  if (message.includes('404') || message.includes('Reference does not exist')) {
+  const stdout =
+    err && typeof err === 'object' && 'stdout' in err ? String(err.stdout) : '';
+  const combined = message + stdout;
+  if (
+    combined.includes('404') ||
+    combined.includes('422') ||
+    combined.includes('Reference does not exist')
+  ) {
     console.log(`Port branch ${portBranch} was already removed or is protected.`);
     process.exit(0);
   }
