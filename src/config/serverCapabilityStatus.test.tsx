@@ -2,10 +2,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import {
   fetchServerCapabilityStatus,
   isServerCapabilityAvailable,
+  loadSharedServerCapabilityStatus,
   markServerCapabilityUnavailable,
   resetServerCapabilityStatusState,
   useServerCapabilityAvailable,
 } from './serverCapabilityStatus';
+import { ServerBackedFeatureBoundary } from '../features/ServerBackedFeatureBoundary';
 
 const CapabilityProbe = () => {
   const available = useServerCapabilityAvailable('autoTstm');
@@ -112,6 +114,69 @@ describe('serverCapabilityStatus', () => {
       await waitFor(() => {
         expect(screen.getByText('unavailable')).toBeInTheDocument();
       });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('loadSharedServerCapabilityStatus fetches once for concurrent consumers', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        capabilities: {
+          TSTM_GENERATION_ENABLED: {
+            available: true,
+            reason: 'available',
+          },
+        },
+      }),
+    }) as jest.Mock;
+
+    try {
+      await Promise.all([
+        loadSharedServerCapabilityStatus(),
+        loadSharedServerCapabilityStatus(),
+      ]);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('multiple mounted server-backed boundaries share one status fetch', async () => {
+    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        capabilities: {
+          TSTM_GENERATION_ENABLED: {
+            available: true,
+            reason: 'available',
+          },
+        },
+      }),
+    }) as jest.Mock;
+
+    try {
+      render(
+        <>
+          <ServerBackedFeatureBoundary feature="autoTstm">
+            <div>First boundary</div>
+          </ServerBackedFeatureBoundary>
+          <ServerBackedFeatureBoundary feature="autoTstm">
+            <div>Second boundary</div>
+          </ServerBackedFeatureBoundary>
+        </>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('First boundary')).toBeInTheDocument();
+        expect(screen.getByText('Second boundary')).toBeInTheDocument();
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     } finally {
       global.fetch = originalFetch;
     }

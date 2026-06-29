@@ -31,6 +31,8 @@ No frontend rebuild or redeploy is required.
 
 ## Verification
 
+Prerequisite: the capability must be registry-exposed on the deployment target you are testing. Today that means `autoTstm.exposure.beta` is `true` in both `src/config/featureExposure.ts` and `server/lib/serverFeatureExposure.js`. Emergency disable only appears in `/api/capabilities/status` for capabilities the registry already exposes on that target.
+
 From a shell with access to the beta site:
 
 ```bash
@@ -64,7 +66,18 @@ Already-open beta sessions should stop showing server-backed controls after the 
 
 ## Local incident drill
 
-1. Start the analytics server locally with emergency disable enabled:
+The manual curl drill below mirrors production only after the registry exposes Auto-TSTM on the target under test. Until that beta enablement lands, use the automated gate test instead.
+
+Automated gate verification (works with the current all-off registry via test overrides):
+
+```powershell
+node --test server/tstm.test.js
+```
+
+Manual server drill (requires registry exposure on the target):
+
+1. Confirm `autoTstm.exposure.beta` is `true` in `server/lib/serverFeatureExposure.js`, or run this drill against a deployment where Auto-TSTM is already live on beta.
+2. Start the analytics server locally with emergency disable enabled:
 
 ```powershell
 $env:SERVER_TARGET='beta'
@@ -73,7 +86,7 @@ $env:EMERGENCY_DISABLED_CAPABILITIES='TSTM_GENERATION_ENABLED'
 node server/analytics.js
 ```
 
-2. In another shell:
+3. In another shell:
 
 ```powershell
 curl http://127.0.0.1:3006/api/capabilities/status
@@ -82,11 +95,15 @@ curl -X POST http://127.0.0.1:3006/api/tstm/generate `
   -d '{"day":1,"cycleDate":"2026-06-13"}'
 ```
 
-3. Confirm the status reason is `emergency_disabled`, the generate route returns `404`, and no Python worker starts.
-4. Remove the env var, restart the server, and confirm normal disabled/enabled behavior resumes according to the registry matrix.
+4. Confirm the status payload includes `TSTM_GENERATION_ENABLED` with reason `emergency_disabled`, the generate route returns `404`, and no Python worker starts.
+5. Remove the env var, restart the server, and confirm normal disabled/enabled behavior resumes according to the registry matrix.
+
+## Public status endpoint security
+
+`GET /api/capabilities/status` is intentionally unauthenticated and rate-limited. It returns only non-sensitive availability booleans and reason codes for registry-exposed server-backed capabilities. The `emergency_disabled` reason can signal incident response state, so treat the endpoint as operational metadata rather than a secret control plane.
 
 ## Malformed override behavior
 
 If `EMERGENCY_DISABLED_CAPABILITIES` is malformed (for example `true`, `false`, or control characters), the server logs an error and applies **zero** emergency disables. Malformed input must never enable a capability.
 
-Unknown keys in the list are ignored with a warning.
+Unknown keys in the list are ignored with a startup warning logged once when the analytics server boots.

@@ -31,6 +31,8 @@ const EMPTY_STATUS: CapabilityStatusSnapshot = {
 
 const unavailableCapabilityKeys = new Set<string>();
 const statusListeners = new Set<() => void>();
+let cachedStatusSnapshot: CapabilityStatusSnapshot = EMPTY_STATUS;
+let cachedStatusRequest: Promise<CapabilityStatusSnapshot> | null = null;
 
 /** Notifies runtime hooks when a capability becomes unavailable after page load. */
 const notifyCapabilityStatusListeners = (): void => {
@@ -47,9 +49,11 @@ export const markServerCapabilityUnavailable = (capabilityKey: string): void => 
   notifyCapabilityStatusListeners();
 };
 
-/** Resets local unavailable markers. Intended for tests. */
+/** Resets local unavailable markers and the shared status cache. Intended for tests. */
 export const resetServerCapabilityStatusState = (): void => {
   unavailableCapabilityKeys.clear();
+  cachedStatusSnapshot = EMPTY_STATUS;
+  cachedStatusRequest = null;
   notifyCapabilityStatusListeners();
 };
 
@@ -89,6 +93,35 @@ export const fetchServerCapabilityStatus = async (): Promise<ServerCapabilitySta
   return payload;
 };
 
+/** Loads capability status once per page and reuses the settled result. */
+export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnapshot> => {
+  if (cachedStatusSnapshot.loaded) {
+    return Promise.resolve(cachedStatusSnapshot);
+  }
+
+  if (!cachedStatusRequest) {
+    cachedStatusRequest = fetchServerCapabilityStatus()
+      .then((response) => {
+        cachedStatusSnapshot = {
+          loaded: true,
+          capabilities: response.capabilities,
+        };
+        notifyCapabilityStatusListeners();
+        return cachedStatusSnapshot;
+      })
+      .catch(() => {
+        cachedStatusSnapshot = {
+          loaded: true,
+          capabilities: {},
+        };
+        notifyCapabilityStatusListeners();
+        return cachedStatusSnapshot;
+      });
+  }
+
+  return cachedStatusRequest;
+};
+
 /** Returns whether a capability is currently treated as unavailable on the client. */
 export const isServerCapabilityAvailable = (
   capabilityKey: string,
@@ -108,48 +141,20 @@ export const isServerCapabilityAvailable = (
 
 /** Loads server capability status once and keeps local unavailable markers in sync. */
 export const useServerCapabilityStatus = (): CapabilityStatusSnapshot => {
-  const [status, setStatus] = useState<CapabilityStatusSnapshot>(EMPTY_STATUS);
+  const [status, setStatus] = useState<CapabilityStatusSnapshot>(cachedStatusSnapshot);
 
   const reload = useCallback(() => {
-    setStatus((current) => ({ ...current }));
+    setStatus({ ...cachedStatusSnapshot });
   }, []);
 
   useEffect(() => {
     statusListeners.add(reload);
+    void loadSharedServerCapabilityStatus().then(reload);
+
     return () => {
       statusListeners.delete(reload);
     };
   }, [reload]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetchServerCapabilityStatus()
-      .then((response) => {
-        if (cancelled) {
-          return;
-        }
-
-        setStatus({
-          loaded: true,
-          capabilities: response.capabilities,
-        });
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-
-        setStatus({
-          loaded: true,
-          capabilities: {},
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return status;
 };

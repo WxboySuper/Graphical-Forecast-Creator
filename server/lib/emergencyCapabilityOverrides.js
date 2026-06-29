@@ -79,7 +79,6 @@ const logUnknownEmergencyDisableKeys = (ignoredUnknownKeys, log) => {
  * Malformed values fail closed by applying zero emergency disables.
  */
 const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => {
-  const log = options.log || console;
   const rawValue = env[EMERGENCY_DISABLED_ENV_KEY];
 
   if (rawValue === undefined || rawValue === '') {
@@ -87,9 +86,6 @@ const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => 
   }
 
   if (!isValidEmergencyDisableValue(rawValue)) {
-    log.error?.(
-      `[capabilities] malformed ${EMERGENCY_DISABLED_ENV_KEY}; applying zero emergency disables`
-    );
     return emptyParseResult(true);
   }
 
@@ -99,7 +95,6 @@ const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => 
   }
 
   const { disabledKeys, ignoredUnknownKeys } = collectEmergencyDisabledKeys(trimmed);
-  logUnknownEmergencyDisableKeys(ignoredUnknownKeys, log);
 
   return {
     disabledKeys,
@@ -114,15 +109,20 @@ const isEmergencyDisabledCapability = (capabilityKey, env = process.env, options
   return disabledKeys.has(capabilityKey);
 };
 
-/** Logs the active emergency disable set once at startup. */
+/** Logs active emergency disable overrides once at startup. */
 const logEmergencyCapabilityOverrides = (env = process.env, options = {}) => {
   const log = options.log || console;
   const target = options.target || env.SERVER_TARGET || 'local';
-  const { disabledKeys, malformed } = parseEmergencyDisabledCapabilities(env, options);
+  const { disabledKeys, malformed, ignoredUnknownKeys } = parseEmergencyDisabledCapabilities(env, options);
 
   if (malformed) {
+    log.error?.(
+      `[capabilities] malformed ${EMERGENCY_DISABLED_ENV_KEY}; applying zero emergency disables`
+    );
     return;
   }
+
+  logUnknownEmergencyDisableKeys(ignoredUnknownKeys, log);
 
   const disabledList = [...disabledKeys].sort();
   if (disabledList.length === 0) {

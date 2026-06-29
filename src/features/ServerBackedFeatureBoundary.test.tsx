@@ -1,8 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { resetServerCapabilityStatusState } from '../config/serverCapabilityStatus';
 import { ServerBackedFeatureBoundary } from './ServerBackedFeatureBoundary';
 
 describe('ServerBackedFeatureBoundary', () => {
   afterEach(() => {
+    resetServerCapabilityStatusState();
     jest.restoreAllMocks();
   });
 

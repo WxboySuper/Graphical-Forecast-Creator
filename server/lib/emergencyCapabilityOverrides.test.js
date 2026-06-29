@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   isEmergencyDisabledCapability,
   isValidEmergencyDisableValue,
+  logEmergencyCapabilityOverrides,
   parseEmergencyDisabledCapabilities,
 } = require('./emergencyCapabilityOverrides');
 
@@ -40,7 +41,7 @@ describe('emergency capability overrides', () => {
     assert.deepEqual([...result.disabledKeys], ['TSTM_GENERATION_ENABLED']);
   });
 
-  it('ignores unknown keys and logs a warning', () => {
+  it('ignores unknown keys without logging during per-request parsing', () => {
     const { log, entries } = createLogSpy();
     const result = parseEmergencyDisabledCapabilities(
       { EMERGENCY_DISABLED_CAPABILITIES: 'UNKNOWN,TSTM_GENERATION_ENABLED' },
@@ -49,7 +50,19 @@ describe('emergency capability overrides', () => {
 
     assert.deepEqual([...result.disabledKeys], ['TSTM_GENERATION_ENABLED']);
     assert.deepEqual(result.ignoredUnknownKeys, ['UNKNOWN']);
+    assert.equal(entries.length, 0);
+  });
+
+  it('logs unknown keys only during startup logging', () => {
+    const { log, entries } = createLogSpy();
+    logEmergencyCapabilityOverrides(
+      { EMERGENCY_DISABLED_CAPABILITIES: 'UNKNOWN,TSTM_GENERATION_ENABLED', SERVER_TARGET: 'beta' },
+      { log }
+    );
+
     assert.match(entries[0].message, /UNKNOWN/);
+    assert.equal(entries[0].level, 'warn');
+    assert.match(entries[1].message, /emergency_disabled=\["TSTM_GENERATION_ENABLED"\]/);
   });
 
   it('treats malformed sentinel values as zero emergency disables', () => {
@@ -61,7 +74,19 @@ describe('emergency capability overrides', () => {
 
     assert.deepEqual([...result.disabledKeys], []);
     assert.equal(result.malformed, true);
+    assert.equal(entries.length, 0);
+  });
+
+  it('logs malformed override values only during startup logging', () => {
+    const { log, entries } = createLogSpy();
+    logEmergencyCapabilityOverrides(
+      { EMERGENCY_DISABLED_CAPABILITIES: 'true', SERVER_TARGET: 'beta' },
+      { log }
+    );
+
+    assert.equal(entries.length, 1);
     assert.equal(entries[0].level, 'error');
+    assert.match(entries[0].message, /malformed EMERGENCY_DISABLED_CAPABILITIES/);
   });
 
   it('treats control characters as malformed', () => {
