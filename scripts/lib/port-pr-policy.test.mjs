@@ -8,22 +8,6 @@ import {
   targetBranchFromSlug,
 } from './port-pr-policy.mjs';
 
-const evaluateBetaPortPr = ({
-  headRef,
-  sourcePrHeadRef,
-  sourcePrNumber,
-  betaContainsMain,
-}) =>
-  evaluatePortPrPolicy({
-    headRef,
-    baseRef: 'beta',
-    targetBranch: 'beta',
-    sourcePrHeadRef,
-    sourcePrBaseRef: 'main',
-    sourcePrNumber,
-    ...(betaContainsMain === undefined ? {} : { betaContainsMain }),
-  });
-
 describe('port PR policy', () => {
   it('parses port branch names', () => {
     assert.deepEqual(parsePortBranch('port/346-to-beta'), {
@@ -73,27 +57,36 @@ describe('port PR policy', () => {
   });
 
   it('blocks redundant port PR into beta after release infrastructure merge', () => {
-    const result = evaluateBetaPortPr({
+    const result = evaluatePortPrPolicy({
       headRef: 'port/346-to-beta',
+      baseRef: 'beta',
+      targetBranch: 'beta',
       sourcePrHeadRef: 'feature/release-post-merge-github-release',
+      sourcePrBaseRef: 'main',
       sourcePrNumber: 346,
     });
     assert.equal(result.ok, false);
   });
 
   it('allows hotfix ports into beta', () => {
-    const result = evaluateBetaPortPr({
+    const result = evaluatePortPrPolicy({
       headRef: 'port/99-to-beta',
+      baseRef: 'beta',
+      targetBranch: 'beta',
       sourcePrHeadRef: 'hotfix/patch',
+      sourcePrBaseRef: 'main',
       sourcePrNumber: 99,
     });
     assert.equal(result.ok, true);
   });
 
   it('allows release ports into beta when post-merge sync has not landed', () => {
-    const result = evaluateBetaPortPr({
+    const result = evaluatePortPrPolicy({
       headRef: 'port/421-to-beta',
+      baseRef: 'beta',
+      targetBranch: 'beta',
       sourcePrHeadRef: 'release/v1.0.0',
+      sourcePrBaseRef: 'main',
       sourcePrNumber: 421,
       betaContainsMain: false,
     });
