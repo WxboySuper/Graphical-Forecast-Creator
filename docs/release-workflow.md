@@ -123,6 +123,16 @@ For PRs into **beta** (feature/fix) and **hotfix → main**:
 
 **Status:** `has conflicts`, `draft`, `ci:pending`, `ci:passing`, `ci:failing`, `changelog:ok`, `changelog:missing`
 
+**Feature exposure** (from the file diff; unrelated quick fixes get none):
+
+| Label | When applied |
+|-------|--------------|
+| `exposure:registry-change` | `src/config/featureExposure.ts` or its test file changed |
+| `exposure:server-backed` | `server/lib/serverFeatureExposure.js` or `server/lib/featureCapabilities.js` changed |
+| `exposure:production` | Any registry, gating, or server exposure file changed (not test-only gating files) |
+
+Authors should fill the **Feature exposure**, **Temporary feature removal**, and **Review requests** sections in the default PR template when exposure changes.
+
 Labels are created in the repo if missing; only automation-managed labels are refreshed each run (manual labels you add are left alone).
 
 ## Optional / legacy workflows
