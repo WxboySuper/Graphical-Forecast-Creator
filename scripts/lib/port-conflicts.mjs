@@ -4,6 +4,7 @@ export const BETA_PORT_KEEP_TARGET_PATHS = [
   'server/package.json',
   'pnpm-lock.yaml',
   'package-lock.json',
+  'server/package-lock.json',
   'CHANGELOG.md',
   'deploy/production-release.json',
 ];
