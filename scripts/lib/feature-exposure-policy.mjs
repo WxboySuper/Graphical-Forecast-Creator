@@ -6,10 +6,27 @@
  * and surface data from source files, then passes it here.
  */
 
+import {
+  validateClientServerExposureMatrices,
+  validateClientServerRegistryAlignment,
+} from './feature-exposure-policy-alignment.mjs';
+import { validateExposureTestContract } from './feature-exposure-policy-contract.mjs';
+
 /**
  * @typedef {{ ok: true }} PolicyOk
  * @typedef {{ ok: false, errors: string[] }} PolicyFail
  * @typedef {PolicyOk | PolicyFail} PolicyResult
+ * @typedef {{
+ *   gatedRoutes: { feature: string }[],
+ *   navigationItems: { feature?: string }[]
+ * }} FeatureSurfaces
+ * @typedef {{
+ *   serverCapabilityKeys?: string[],
+ *   serverRegistry?: Record<string, any>,
+ *   sideEffectModules?: Record<string, readonly string[]>,
+ *   acknowledgements?: Record<string, { reason?: string, trackingIssue?: number }>,
+ *   existingTestFiles?: string[]
+ * }} FeatureExposurePolicyOptions
  */
 
 const BUILD_TARGET_LIST = ['local', 'beta', 'staging', 'production'];
@@ -82,6 +99,16 @@ function validateSurfaceReferences(registry, surfaces, errors) {
   }
 }
 
+/** Adds side-effect module references to unknown registry keys. */
+function validateSideEffectModuleReferences(registry, sideEffectModules, errors) {
+  const registryKeys = new Set(Object.keys(registry));
+  for (const featureKey of Object.keys(sideEffectModules)) {
+    if (!registryKeys.has(featureKey)) {
+      errors.push(`Side-effect module references unknown feature "${featureKey}".`);
+    }
+  }
+}
+
 /** Adds server-backed registry entries that lack a matching server capability. */
 function validateServerCapabilities(registry, serverCapabilityKeys, errors) {
   for (const [featureKey, definition] of Object.entries(registry)) {
@@ -110,15 +137,34 @@ function createPolicyResult(errors) {
  * Validates the feature exposure registry and cross-file surface references.
  *
  * @param {Record<string, any>} registry — the FEATURE_EXPOSURE_REGISTRY
- * @param {{ gatedRoutes: { feature: string }[], navigationItems: { feature?: string }[] }} surfaces
- * @param {string[]} [serverCapabilityKeys] — known server capability keys
+ * @param {FeatureSurfaces} surfaces
+ * @param {FeatureExposurePolicyOptions | string[]} [options] — policy options or legacy serverCapabilityKeys array
  * @returns {PolicyResult}
  */
-export function evaluateFeatureExposurePolicy(registry, surfaces, serverCapabilityKeys = []) {
+export function evaluateFeatureExposurePolicy(registry, surfaces, options = {}) {
+  const normalizedOptions = Array.isArray(options)
+    ? { serverCapabilityKeys: options }
+    : options;
+
+  const {
+    serverCapabilityKeys = [],
+    serverRegistry = {},
+    sideEffectModules = {},
+    acknowledgements = {},
+    existingTestFiles = [],
+  } = normalizedOptions;
+
   const errors = [];
   validateRegistryEntries(registry, errors);
   validateSurfaceReferences(registry, surfaces, errors);
+  validateSideEffectModuleReferences(registry, sideEffectModules, errors);
   validateServerCapabilities(registry, serverCapabilityKeys, errors);
+  validateClientServerRegistryAlignment(registry, serverRegistry, errors);
+  validateClientServerExposureMatrices(registry, serverRegistry, errors);
+  validateExposureTestContract(
+    { surfaces, sideEffectModules, acknowledgements, existingTestFiles },
+    errors
+  );
   validateProductionSafety(registry, errors);
   return createPolicyResult(errors);
 }

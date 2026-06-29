@@ -101,6 +101,9 @@ jobs:
       - name: Validate feature exposure policy
         run: pnpm validate:feature-exposure
 
+      - name: Run feature exposure integration tests
+        run: node --test scripts/validate-feature-exposure.integration.test.mjs
+
   build-and-test:
     needs: [package-version-policy, pr-governance, feature-exposure-policy]
     if: >-

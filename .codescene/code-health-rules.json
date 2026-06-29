@@ -9,6 +9,15 @@
           "weight": 0.0
         }
       ]
+    },
+    {
+      "matching_content_path": "scripts/validate-feature-exposure.integration.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
     }
   ]
 }
