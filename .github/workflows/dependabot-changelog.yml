@@ -16,18 +16,22 @@ jobs:
   update-changelog:
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'dependabot/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout head branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.0
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           token: ${{ secrets.GH_PAT || github.token }}
 
       - name: Fetch base branch
-        run: git fetch origin "${{ github.base_ref }}"
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "$GITHUB_BASE_REF"
 
       - name: Update CHANGELOG dependencies
         env:
@@ -37,9 +41,11 @@ jobs:
         run: node scripts/update-dependabot-changelog.mjs
 
       - name: Commit and push
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
         run: |
           CHANGELOG_FILE="CHANGELOG.md"
-          if [ "${{ github.base_ref }}" = "beta" ]; then CHANGELOG_FILE="CHANGELOG.beta.md"; fi
+          if [ "$GITHUB_BASE_REF" = "beta" ]; then CHANGELOG_FILE="CHANGELOG.beta.md"; fi
           if git diff --quiet "$CHANGELOG_FILE"; then
             echo "No changelog changes to commit."
             exit 0
