@@ -1,23 +1,37 @@
 name: Cleanup Port Branches
 
+# SECURITY: This workflow deletes git refs with contents:write. Guards below are
+# security-critical and must not be removed or loosened:
+# - Same-repo PR only (blocks fork PRs from triggering base-repo ref deletion).
+# - port/* coarse pre-filter at job level; strict allowlist in cleanup-port-branch.mjs.
+# - Uses pull_request (not pull_request_target): port branches are same-repo only
+#   and this workflow never checks out PR code, so elevated fork context is unnecessary.
 on:
-  pull_request_target:
+  pull_request:
     types: [closed]
+
+permissions:
+  contents: write
 
 jobs:
   delete-merged-port-branch:
-    if: github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'port/')
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'port/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
+      - name: Checkout base branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
       - name: Delete closed port branch
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           PORT_BRANCH: ${{ github.event.pull_request.head.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          echo "Cleaning up remote port branch $PORT_BRANCH from PR #$PR_NUMBER"
-          gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/"$PORT_BRANCH" || \
-            echo "Port branch $PORT_BRANCH was already removed or is protected."
+        run: node scripts/cleanup-port-branch.mjs

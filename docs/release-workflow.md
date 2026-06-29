@@ -33,6 +33,12 @@ If both tried to port the same merge into `beta`, you would get a port PR and a 
 
 Automation auto-resolves version-policy file conflicts on beta ports (`package.json`, lockfiles, `CHANGELOG.md`, `deploy/production-release.json`). Remaining code conflicts open a **draft** `[Port][Conflicts]` PR — no tracking issue. See [`AGENTS.md`](../AGENTS.md) for manual port steps.
 
+### Port branch cleanup (security)
+
+When a port PR closes, [`cleanup-port-branches.yml`](../.github/workflows/cleanup-port-branches.yml) deletes the remote head branch. This is intentional hygiene for temporary `port/<pr>-to-<target>` branches created by [`port-changes.sh`](../.github/scripts/port-changes.sh).
+
+**Do not loosen the workflow guards.** The job only runs for same-repo PRs whose head ref starts with `port/`, and the cleanup script enforces the stricter allowlist in [`scripts/lib/port-pr-policy.mjs`](../scripts/lib/port-pr-policy.mjs) (`^port\/(\d+)-to-(.+)$`). Those checks prevent arbitrary ref deletion. Port branch naming must stay aligned across `port-changes.sh`, `port-pr-policy.mjs`, and this workflow.
+
 ## What happens when you merge
 
 ### beta → main (promotion)

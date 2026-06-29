@@ -11,6 +11,14 @@ export const parsePortBranch = (headRef) => {
 };
 
 /**
+ * Port branches eligible for automated cleanup after their PR closes.
+ * Must stay aligned with port-changes.sh naming and cleanup-port-branches.yml guards.
+ *
+ * @param {string} headRef
+ */
+export const isDeletablePortBranch = (headRef) => parsePortBranch(headRef) !== null;
+
+/**
  * Reverse port-changes.sh slugging: `feature/foo-bar` → `feature/foo/bar` only for known prefixes.
  *
  * @param {string} slug
