@@ -12,6 +12,9 @@ permissions:
 jobs:
   pr-governance:
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -53,6 +56,17 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: node scripts/validate-production-release-pr.mjs
 
+      - name: Production exposure report (beta → main)
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/validate-promotion-exposure-pr.mjs
+
   package-version-policy:
     runs-on: ubuntu-latest
     steps:
@@ -67,7 +81,7 @@ jobs:
           node-version: '24.x'
 
       - name: Validate release automation unit tests
-        run: node --test scripts/lib/package-version.test.mjs scripts/lib/bump-beta-after-main-release.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/port-pr-policy.test.mjs scripts/lib/version-bump.test.mjs scripts/lib/glob-match.test.mjs scripts/lib/pr-labels.test.mjs scripts/lib/pr-ci-label-state.test.mjs scripts/lib/github-paginate.test.mjs scripts/lib/changelog.test.mjs scripts/lib/beta-changelog.test.mjs scripts/lib/dependabot-changelog.test.mjs scripts/lib/production-release.test.mjs scripts/lib/feature-exposure-policy.test.mjs
+        run: node --test scripts/lib/package-version.test.mjs scripts/lib/bump-beta-after-main-release.test.mjs scripts/lib/branch-policy.test.mjs scripts/lib/port-pr-policy.test.mjs scripts/lib/version-bump.test.mjs scripts/lib/glob-match.test.mjs scripts/lib/pr-labels.test.mjs scripts/lib/pr-ci-label-state.test.mjs scripts/lib/github-paginate.test.mjs scripts/lib/changelog.test.mjs scripts/lib/beta-changelog.test.mjs scripts/lib/dependabot-changelog.test.mjs scripts/lib/production-release.test.mjs scripts/lib/feature-exposure-policy.test.mjs scripts/lib/feature-exposure-report.test.mjs
 
       - name: Validate package version for target branch
         env:
@@ -102,7 +116,7 @@ jobs:
         run: pnpm validate:feature-exposure
 
       - name: Run feature exposure integration tests
-        run: node --test scripts/validate-feature-exposure.integration.test.mjs
+        run: node --test scripts/validate-feature-exposure.integration.test.mjs scripts/generate-exposure-report.integration.test.mjs
 
   build-and-test:
     needs: [package-version-policy, pr-governance, feature-exposure-policy]
