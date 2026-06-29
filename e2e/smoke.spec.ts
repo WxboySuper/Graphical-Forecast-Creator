@@ -145,4 +145,15 @@ test.describe('App smoke tests', () => {
     // App shell (navbar) should still render — not a blank page
     await expect(page.locator('body')).not.toBeEmpty();
   });
+
+  test('gated workstream routes stay unreachable while disabled', async ({ page }) => {
+    await bypassLocalBeta(page);
+    await page.goto('/tropical?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+    await expect(page.getByRole('heading', { name: /Tropical Workspace/i })).not.toBeVisible();
+
+    await page.goto('/collaborate?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+    await expect(page.getByRole('heading', { name: /Collaboration Room/i })).not.toBeVisible();
+  });
 });

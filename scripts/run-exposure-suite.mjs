@@ -10,6 +10,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLIENT_EXPOSURE_TESTS = [
   'src/testing/featureExposure/exemplar.exposure.test.tsx',
   'src/testing/featureExposure/targetMatrix.test.ts',
+  'src/config/v17WorkstreamAdoption.exposure.test.ts',
   'src/routing/buildFeatureGatedRoutes.test.tsx',
   'src/config/featureNavigation.test.ts',
   'src/features/FeatureBoundary.test.tsx',

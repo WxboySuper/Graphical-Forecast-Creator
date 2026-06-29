@@ -10,7 +10,7 @@ import {
   validateClientServerExposureMatrices,
   validateClientServerRegistryAlignment,
 } from './feature-exposure-policy-alignment.mjs';
-import { validateExposureTestContract } from './feature-exposure-policy-contract.mjs';
+import { validateExposureTestContract, validateV17WorkstreamAdoption } from './feature-exposure-policy-contract.mjs';
 
 /**
  * @typedef {{ ok: true }} PolicyOk
@@ -162,6 +162,11 @@ export function evaluateFeatureExposurePolicy(registry, surfaces, options = {}) 
   validateClientServerRegistryAlignment(registry, serverRegistry, errors);
   validateClientServerExposureMatrices(registry, serverRegistry, errors);
   validateExposureTestContract(
+    { surfaces, sideEffectModules, acknowledgements, existingTestFiles },
+    errors
+  );
+  validateV17WorkstreamAdoption(
+    registry,
     { surfaces, sideEffectModules, acknowledgements, existingTestFiles },
     errors
   );

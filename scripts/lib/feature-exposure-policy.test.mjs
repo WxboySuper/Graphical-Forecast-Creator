@@ -27,6 +27,24 @@ const validRegistry = {
 
 const emptySurfaces = { gatedRoutes: [], navigationItems: [] };
 
+const v17WorkstreamRegistry = {
+  autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Enable on beta.', serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
+  forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after v2.', serverBacked: false, trackingIssue: 429 },
+  verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after relaunch.', serverBacked: false, trackingIssue: 430 },
+  customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 431 },
+  tropicalWorkspace: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Keep disabled.', serverBacked: false, trackingIssue: 432 },
+  collaborationRoom: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 433 },
+};
+
+const v17Acknowledgements = {
+  autoTstm: { reason: 'Covered by exemplar exposure tests', trackingIssue: 529 },
+  tropicalWorkspace: { reason: 'Covered by route and nav tests', trackingIssue: 529 },
+  collaborationRoom: { reason: 'Covered by route and nav tests', trackingIssue: 529 },
+  forecastWorkflowV2: { reason: 'Registry-only adoption acknowledgement', trackingIssue: 530 },
+  verificationRelaunch: { reason: 'Registry-only adoption acknowledgement', trackingIssue: 530 },
+  customProducts: { reason: 'Registry-only adoption acknowledgement', trackingIssue: 530 },
+};
+
 /** Asserts that a policy input fails with every expected message pattern. */
 function assertPolicyErrors(registry, patterns, surfaces = emptySurfaces, options = {}) {
   const normalizedOptions = Array.isArray(options) ? { serverCapabilityKeys: options } : options;
@@ -295,6 +313,9 @@ describe('feature exposure policy', () => {
         autoTstm: { reason: 'Covered by FeatureBoundary.test.tsx', trackingIssue: 427 },
         tropicalWorkspace: { reason: 'Covered by buildFeatureGatedRoutes.test.tsx', trackingIssue: 432 },
         collaborationRoom: { reason: 'Covered by buildFeatureGatedRoutes.test.tsx', trackingIssue: 433 },
+        forecastWorkflowV2: { reason: 'Registry-only adoption acknowledgement', trackingIssue: 530 },
+        verificationRelaunch: { reason: 'Registry-only adoption acknowledgement', trackingIssue: 530 },
+        customProducts: { reason: 'Registry-only adoption acknowledgement', trackingIssue: 530 },
       },
     });
     assert.equal(result.ok, true);
@@ -396,5 +417,32 @@ describe('feature exposure policy', () => {
       existingTestFiles: ['src/features/betaFeature.exposure.test.ts'],
     });
     assert.equal(result.ok, true);
+  });
+
+  it('fails when a registry-only v1.7 workstream lacks acknowledgement', () => {
+    const { forecastWorkflowV2, ...withoutWorkflow } = v17WorkstreamRegistry;
+    const registry = {
+      ...withoutWorkflow,
+      forecastWorkflowV2,
+    };
+    const acknowledgements = { ...v17Acknowledgements };
+    delete acknowledgements.forecastWorkflowV2;
+
+    assertPolicyErrors(registry, [/forecastWorkflowV2.*requires a valid acknowledgement/], emptySurfaces, {
+      acknowledgements,
+    });
+  });
+
+  it('fails when a v1.7 workstream is enabled on beta prematurely', () => {
+    const registry = {
+      ...v17WorkstreamRegistry,
+      customProducts: {
+        ...v17WorkstreamRegistry.customProducts,
+        exposure: { ...ALL_OFF, beta: true },
+      },
+    };
+    assertPolicyErrors(registry, [/customProducts.*disabled on target "beta"/], emptySurfaces, {
+      acknowledgements: v17Acknowledgements,
+    });
   });
 });

@@ -34,8 +34,18 @@ function hasValidAcknowledgementTrackingIssue(acknowledgement) {
   return typeof acknowledgement?.trackingIssue === 'number' && acknowledgement.trackingIssue > 0;
 }
 
+/** Canonical v1.7 workstream keys — keep aligned with featureExposure.test.ts and v17WorkstreamAdoption.exposure.test.ts */
+export const V17_WORKSTREAM_KEYS = [
+  'autoTstm',
+  'forecastWorkflowV2',
+  'verificationRelaunch',
+  'customProducts',
+  'tropicalWorkspace',
+  'collaborationRoom',
+];
+
 /** Returns true when a gated feature has a valid acknowledgement entry. */
-function hasValidAcknowledgement(featureKey, acknowledgements) {
+export function hasValidAcknowledgement(featureKey, acknowledgements) {
   const acknowledgement = acknowledgements[featureKey];
   return hasValidAcknowledgementReason(acknowledgement) && hasValidAcknowledgementTrackingIssue(acknowledgement);
 }
@@ -49,5 +59,52 @@ export function validateExposureTestContract(contract, errors) {
     errors.push(
       `Gated feature "${featureKey}" has no exposure test coverage or acknowledgement. Add a per-feature test or an entry to src/config/featureExposure.acknowledgements.json.`
     );
+  }
+}
+
+/** Requires every v1.7 workstream key to stay fully disabled with documented adoption coverage. */
+export function validateV17WorkstreamAdoption(registry, contract, errors) {
+  const presentKeys = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry);
+  if (presentKeys.length === 0) {
+    return;
+  }
+
+  if (presentKeys.length !== V17_WORKSTREAM_KEYS.length) {
+    errors.push(
+      `Registry declares ${presentKeys.length} of ${V17_WORKSTREAM_KEYS.length} v1.7 workstream keys; partial adoption is not allowed.`
+    );
+    return;
+  }
+
+  const { surfaces, sideEffectModules, acknowledgements, existingTestFiles } = contract;
+  const gatedFeatures = collectGatedFeatures(surfaces, sideEffectModules);
+
+  for (const featureKey of V17_WORKSTREAM_KEYS) {
+    const definition = registry[featureKey];
+
+    if (definition.temporary !== true) {
+      errors.push(`v1.7 workstream "${featureKey}" must remain temporary until production promotion.`);
+    }
+
+    for (const target of ['local', 'beta', 'staging', 'production']) {
+      if (definition.exposure?.[target] !== false) {
+        errors.push(`v1.7 workstream "${featureKey}" must stay disabled on target "${target}" until adoption enables it.`);
+      }
+    }
+
+    if (gatedFeatures.has(featureKey)) {
+      if (hasPerFeatureTestFile(featureKey, existingTestFiles)) continue;
+      if (hasValidAcknowledgement(featureKey, acknowledgements)) continue;
+      errors.push(
+        `v1.7 workstream "${featureKey}" is gated but has no exposure test coverage or acknowledgement.`
+      );
+      continue;
+    }
+
+    if (!hasValidAcknowledgement(featureKey, acknowledgements)) {
+      errors.push(
+        `v1.7 workstream "${featureKey}" has no gated surfaces yet and requires a valid acknowledgement in src/config/featureExposure.acknowledgements.json.`
+      );
+    }
   }
 }
