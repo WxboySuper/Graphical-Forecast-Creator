@@ -18,6 +18,24 @@
           "weight": 0.0
         }
       ]
+    },
+    {
+      "matching_content_path": "scripts/lib/feature-exposure-report.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "scripts/generate-exposure-report.integration.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
     }
   ]
 }

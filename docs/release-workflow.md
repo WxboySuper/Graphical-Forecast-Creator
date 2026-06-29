@@ -29,6 +29,8 @@ If both tried to port the same merge into `beta`, you would get a port PR and a 
 
 ### beta → main (promotion)
 
+Before opening the promotion PR, run `pnpm exposure:report` locally to review production, beta-only, and disabled features. On every **beta → main** pull request, CI validates promotion exposure, prints the same report in the workflow log, and updates a single PR comment with ✅/❌ status rows plus an exposure summary table. Merge is blocked when experimental features would leak into production.
+
 1. You merge the **beta → main** PR (same as today).
 2. **Post-merge automation** (`post-merge-automation.yml`):
    - Strips `-beta` from `package.json` on `main` (e.g. `1.6.0-beta.3` → `1.6.0`) and pushes.
