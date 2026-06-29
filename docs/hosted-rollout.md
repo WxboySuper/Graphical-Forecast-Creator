@@ -56,7 +56,7 @@ bash /opt/gfc-analytics/current/release/promote-release.sh
    - `rolloutAt`: ISO UTC instant
    - `releaseId`: unique per attempt
    - `banner.phases`: pre-rollout + post-rollout
-2. Merge → **Deploy Production to VPS** stages build; **live site stays on previous `current`**.
+2. Merge → post-merge publishes a stable GitHub Release → **Deploy Production to VPS** stages the build from that release tag; **live site stays on previous `current`**.
 3. Smoke **staging-gfc** (beta access guard, same as beta-gfc).
 4. At `rolloutAt`, cron promotes; live banner switches via `write-live-alert-banner.mjs`.
 

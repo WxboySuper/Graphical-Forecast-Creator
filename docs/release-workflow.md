@@ -42,7 +42,8 @@ Automation auto-resolves version-policy file conflicts on beta ports (`package.j
    - Strips `-beta` from `package.json` on `main` (e.g. `1.6.0-beta.3` → `1.6.0`) and pushes.
    - Creates a **GitHub Release** `v1.6.0` using the matching section in `CHANGELOG.md`.
    - Bumps **beta** to the next line (e.g. `1.7.0-beta.1`) and creates a **prerelease** `v1.7.0-beta.1`.
-3. **Deploy Production to VPS** runs on the push to `main` (Sentry release uses the **stable** version even if the merge commit still had `-beta` briefly).
+3. **Deploy Production to VPS** runs when the stable GitHub Release is published (checks out tag `v1.6.0`, so the build matches the released version).
+4. **Deploy Beta** runs when the new beta prerelease is published (e.g. `v1.7.0-beta.1`).
 
 ### release/* → main (optional prepare workflow)
 
@@ -59,12 +60,14 @@ Infrastructure fixes that land via `release/*` → `main` (not only `feature/rel
 - Other branch names are allowed into beta except `hotfix/*` (labeled `integration:other`).
 - Automation increments the beta prerelease on each merge: `1.6.0-beta.1` → `1.6.0-beta.2`, etc.
 - Each bump creates a **GitHub prerelease** (`v1.6.0-beta.2`) from the matching `CHANGELOG.md` line section, or from **\[Unreleased\]** when no line section exists yet.
+- **Deploy Beta** runs when that prerelease is published (not on the merge or version-bump pushes).
 - Port branches (`port/*`) skip the version bump.
 
 ### hotfix/* → main
 
 - Automation bumps the **patch** on `main` after merge (e.g. `1.6.0` → `1.6.1`).
 - Creates a **GitHub Release** for the new patch version from `CHANGELOG.md`.
+- **Deploy Production to VPS** runs when that stable release is published.
 
 ### `feature/release-*` → main (release infrastructure)
 

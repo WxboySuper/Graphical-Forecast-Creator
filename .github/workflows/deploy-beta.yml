@@ -3,17 +3,20 @@ name: Deploy Beta
 permissions:
   contents: read
 
-# Cancel stale beta deploys when merge + version-bump pushes arrive back-to-back.
-# Tradeoff: a push during active rsync can leave mixed assets until the next run
-# finishes; avoid pushing to beta while a deploy is mid-transfer.
+# One deploy per beta prerelease. post-merge-automation publishes vX.Y.Z-beta.N after
+# the version-bump push, so merge pushes no longer trigger duplicate deploys.
 concurrency:
   group: deploy-beta
-  cancel-in-progress: true
 
 on:
-  push:
-    branches: [beta]
-  workflow_dispatch:   # lets you trigger manually from the GitHub Actions tab
+  release:
+    types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git tag or branch to deploy (default: beta HEAD)'
+        required: false
+        type: string
 
 jobs:
   deploy:
@@ -22,8 +25,21 @@ jobs:
       RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
 
     steps:
+      - name: Resolve checkout ref
+        id: checkout_ref
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "ref=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.ref }}" ]; then
+            echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=beta" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.checkout_ref.outputs.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

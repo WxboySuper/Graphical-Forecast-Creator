@@ -3,16 +3,20 @@ name: Deploy Production to VPS
 permissions:
   contents: read
 
-# Queue overlapping main deploys; release dirs are versioned but symlink swap and
+# Queue overlapping production deploys; release dirs are versioned but symlink swap and
 # pm2 restart are not safe to run concurrently across SSH sessions.
 concurrency:
   group: deploy-production
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [released]
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Git tag or branch to deploy (default: main HEAD)'
+        required: false
+        type: string
       deploy_action:
         description: 'Override manifest action (auto = use deploy/production-release.json)'
         required: false
@@ -36,8 +40,21 @@ jobs:
       RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
 
     steps:
+      - name: Resolve checkout ref
+        id: checkout_ref
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "ref=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.ref }}" ]; then
+            echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.checkout_ref.outputs.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
