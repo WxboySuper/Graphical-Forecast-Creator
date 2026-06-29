@@ -161,6 +161,28 @@ Labels are created in the repo if missing; only automation-managed labels are re
 
 - **GH_PAT** — same token as PR porting (`repo` scope), used for post-merge commits and releases.
 
+## Stale branch hygiene
+
+Maintainers get a weekly **informational** report of drifting work branches. This does **not** delete branches, close PRs, or block merges.
+
+| Item | Policy |
+|------|--------|
+| Tracked prefixes | `feature/*`, `fix/*`, `research/*` |
+| Grace period | **14 days** since the branch tip commit |
+| Compared against | `beta` (`behind beta` commit count) |
+| Schedule | Mondays 14:00 UTC via [`stale-branch-report.yml`](../.github/workflows/stale-branch-report.yml) |
+| Reporting surface | One auto-maintained GitHub issue (upserted each run) plus the workflow step summary |
+
+Branches with an open PR are listed separately from **orphaned** branches (no open PR). Protected integration branches (`main`, `beta`) and automation-managed prefixes (`port/*`, `dependabot/*`, `release/*`, `hotfix/*`, `feature/release-*`) are excluded.
+
+Manual runs:
+
+1. GitHub Actions → **Stale branch report** → **Run workflow**
+2. Optional **dry run** uses checked-in fixture data (no issue upsert side effects beyond the workflow log/summary)
+3. Local dry run: `pnpm branches:report` (uses checked-in fixture data by default)
+
+This is separate from [`cleanup-port-branches.yml`](../.github/workflows/cleanup-port-branches.yml), which deletes merged temporary `port/*` branches after their PR closes.
+
 ## Local scripts
 
 | Script | Purpose |
@@ -168,4 +190,5 @@ Labels are created in the repo if missing; only automation-managed labels are re
 | `node scripts/validate-branch-policy.mjs` | Branch routing check |
 | `node scripts/validate-package-version.mjs` | Version policy check |
 | `node scripts/check-changelog-pr.mjs` | Changelog check |
+| `pnpm branches:report` | Stale branch report dry run (fixture data) |
 | `node --test scripts/lib/package-version.test.mjs` | Policy unit tests |
