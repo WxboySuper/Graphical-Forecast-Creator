@@ -78,7 +78,7 @@ const logUnknownEmergencyDisableKeys = (ignoredUnknownKeys, log) => {
  * Parses EMERGENCY_DISABLED_CAPABILITIES into a validated disable set.
  * Malformed values fail closed by applying zero emergency disables.
  */
-const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => {
+const parseEmergencyDisabledCapabilities = (env = process.env) => {
   const rawValue = env[EMERGENCY_DISABLED_ENV_KEY];
 
   if (rawValue === undefined || rawValue === '') {
@@ -104,8 +104,8 @@ const parseEmergencyDisabledCapabilities = (env = process.env, options = {}) => 
 };
 
 /** Returns true when a capability key is emergency-disabled for this deployment. */
-const isEmergencyDisabledCapability = (capabilityKey, env = process.env, options = {}) => {
-  const { disabledKeys } = parseEmergencyDisabledCapabilities(env, options);
+const isEmergencyDisabledCapability = (capabilityKey, env = process.env) => {
+  const { disabledKeys } = parseEmergencyDisabledCapabilities(env);
   return disabledKeys.has(capabilityKey);
 };
 
@@ -113,7 +113,7 @@ const isEmergencyDisabledCapability = (capabilityKey, env = process.env, options
 const logEmergencyCapabilityOverrides = (env = process.env, options = {}) => {
   const log = options.log || console;
   const target = options.target || env.SERVER_TARGET || 'local';
-  const { disabledKeys, malformed, ignoredUnknownKeys } = parseEmergencyDisabledCapabilities(env, options);
+  const { disabledKeys, malformed, ignoredUnknownKeys } = parseEmergencyDisabledCapabilities(env);
 
   if (malformed) {
     log.error?.(

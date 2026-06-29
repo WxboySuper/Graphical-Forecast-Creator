@@ -149,9 +149,16 @@ export const useServerCapabilityStatus = (): CapabilityStatusSnapshot => {
 
   useEffect(() => {
     statusListeners.add(reload);
-    void loadSharedServerCapabilityStatus().then(reload);
+    let active = true;
+
+    loadSharedServerCapabilityStatus().then(() => {
+      if (active) {
+        reload();
+      }
+    });
 
     return () => {
+      active = false;
       statusListeners.delete(reload);
     };
   }, [reload]);

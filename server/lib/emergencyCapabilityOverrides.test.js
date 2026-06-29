@@ -42,15 +42,12 @@ describe('emergency capability overrides', () => {
   });
 
   it('ignores unknown keys without logging during per-request parsing', () => {
-    const { log, entries } = createLogSpy();
-    const result = parseEmergencyDisabledCapabilities(
-      { EMERGENCY_DISABLED_CAPABILITIES: 'UNKNOWN,TSTM_GENERATION_ENABLED' },
-      { log }
-    );
+    const result = parseEmergencyDisabledCapabilities({
+      EMERGENCY_DISABLED_CAPABILITIES: 'UNKNOWN,TSTM_GENERATION_ENABLED',
+    });
 
     assert.deepEqual([...result.disabledKeys], ['TSTM_GENERATION_ENABLED']);
     assert.deepEqual(result.ignoredUnknownKeys, ['UNKNOWN']);
-    assert.equal(entries.length, 0);
   });
 
   it('logs unknown keys only during startup logging', () => {
@@ -66,15 +63,12 @@ describe('emergency capability overrides', () => {
   });
 
   it('treats malformed sentinel values as zero emergency disables', () => {
-    const { log, entries } = createLogSpy();
     const result = parseEmergencyDisabledCapabilities(
-      { EMERGENCY_DISABLED_CAPABILITIES: 'true' },
-      { log }
+      { EMERGENCY_DISABLED_CAPABILITIES: 'true' }
     );
 
     assert.deepEqual([...result.disabledKeys], []);
     assert.equal(result.malformed, true);
-    assert.equal(entries.length, 0);
   });
 
   it('logs malformed override values only during startup logging', () => {
