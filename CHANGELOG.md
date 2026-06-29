@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Security
+- **CI shell injection:** Pass PR branch refs through `env` in `ci.yml` and `pr-governance.yml` `git fetch` steps so branch names cannot break out of the shell command.
+
 ### Changed
 - **Deploy env:** Add explicit `SERVER_TARGET` values to beta, staging, and production analytics server deploy env files.
 
