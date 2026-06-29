@@ -152,6 +152,7 @@ export function evaluateFeatureExposurePolicy(registry, surfaces, options = {}) 
     sideEffectModules = {},
     acknowledgements = {},
     existingTestFiles = [],
+    requireV17WorkstreamRegistry = false,
   } = normalizedOptions;
 
   const errors = [];
@@ -168,7 +169,8 @@ export function evaluateFeatureExposurePolicy(registry, surfaces, options = {}) 
   validateV17WorkstreamAdoption(
     registry,
     { surfaces, sideEffectModules, acknowledgements, existingTestFiles },
-    errors
+    errors,
+    { requireV17WorkstreamRegistry }
   );
   validateProductionSafety(registry, errors);
   return createPolicyResult(errors);

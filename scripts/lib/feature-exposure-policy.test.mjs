@@ -441,8 +441,46 @@ describe('feature exposure policy', () => {
         exposure: { ...ALL_OFF, beta: true },
       },
     };
-    assertPolicyErrors(registry, [/customProducts.*disabled on target "beta"/], emptySurfaces, {
+    assertPolicyErrors(registry, [/customProducts.*betaEnablementApproved/], emptySurfaces, {
       acknowledgements: v17Acknowledgements,
     });
+  });
+
+  it('fails when all v1.7 workstream keys are removed from the registry', () => {
+    const registry = {
+      coreFeature: validRegistry.coreFeature,
+    };
+    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces, {
+      requireV17WorkstreamRegistry: true,
+    });
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((error) => /missing all 6 required v1\.7 workstream keys/.test(error)));
+  });
+
+  it('passes when a v1.7 workstream enables beta with explicit approval', () => {
+    const registry = {
+      ...v17WorkstreamRegistry,
+      autoTstm: {
+        ...v17WorkstreamRegistry.autoTstm,
+        exposure: { ...ALL_OFF, beta: true },
+      },
+    };
+    const acknowledgements = {
+      ...v17Acknowledgements,
+      autoTstm: { ...v17Acknowledgements.autoTstm, betaEnablementApproved: true },
+    };
+    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces, {
+      acknowledgements,
+      serverCapabilityKeys: ['TSTM_GENERATION_ENABLED'],
+      serverRegistry: {
+        autoTstm: {
+          serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
+          exposure: { ...ALL_OFF, beta: true },
+        },
+      },
+      sideEffectModules: { autoTstm: ['../utils/tstmGeneration'] },
+      existingTestFiles: ['server/testing/autoTstm.exposure.test.js'],
+    });
+    assert.equal(result.ok, true);
   });
 });

@@ -44,45 +44,44 @@ export const V17_WORKSTREAM_KEYS = [
   'collaborationRoom',
 ];
 
-const V17_BUILD_TARGETS = ['local', 'beta', 'staging', 'production'];
-
-/** Returns true when the registry includes the full v1.7 workstream key set. */
-function hasCompleteV17WorkstreamRegistry(registry) {
-  const presentKeys = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry);
-  if (presentKeys.length === 0) {
-    return false;
-  }
-
-  return presentKeys.length === V17_WORKSTREAM_KEYS.length;
-}
-
 /** Adds an error when the registry declares only part of the v1.7 workstream key set. */
 function validateV17RegistryCompleteness(registry, errors) {
-  if (!hasCompleteV17WorkstreamRegistry(registry)) {
-    const presentCount = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry).length;
-    if (presentCount > 0) {
-      errors.push(
-        `Registry declares ${presentCount} of ${V17_WORKSTREAM_KEYS.length} v1.7 workstream keys; partial adoption is not allowed.`
-      );
-    }
-    return false;
+  const presentKeys = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry);
+  if (presentKeys.length === V17_WORKSTREAM_KEYS.length) {
+    return true;
   }
 
-  return true;
+  errors.push(
+    `Registry declares ${presentKeys.length} of ${V17_WORKSTREAM_KEYS.length} v1.7 workstream keys; partial adoption is not allowed.`
+  );
+  return false;
+}
+
+/** Returns true when a workstream acknowledgement explicitly approves beta enablement. */
+function isV17BetaEnablementApproved(featureKey, acknowledgements) {
+  return acknowledgements[featureKey]?.betaEnablementApproved === true;
 }
 
 /** Adds lifecycle violations for one v1.7 workstream registry entry. */
-function validateV17WorkstreamLifecycle(featureKey, definition, errors) {
+function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors) {
+  const { acknowledgements } = contract;
+
   if (definition.temporary !== true) {
     errors.push(`v1.7 workstream "${featureKey}" must remain temporary until production promotion.`);
   }
 
-  for (const target of V17_BUILD_TARGETS) {
+  for (const target of ['local', 'staging', 'production']) {
     if (definition.exposure?.[target] !== false) {
       errors.push(
         `v1.7 workstream "${featureKey}" must stay disabled on target "${target}" until adoption enables it.`
       );
     }
+  }
+
+  if (definition.exposure?.beta === true && !isV17BetaEnablementApproved(featureKey, acknowledgements)) {
+    errors.push(
+      `v1.7 workstream "${featureKey}" cannot enable beta without betaEnablementApproved in src/config/featureExposure.acknowledgements.json.`
+    );
   }
 }
 
@@ -133,7 +132,19 @@ export function validateExposureTestContract(contract, errors) {
 }
 
 /** Requires every v1.7 workstream key to stay fully disabled with documented adoption coverage. */
-export function validateV17WorkstreamAdoption(registry, contract, errors) {
+export function validateV17WorkstreamAdoption(registry, contract, errors, options = {}) {
+  const { requireV17WorkstreamRegistry = false } = options;
+  const presentCount = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry).length;
+
+  if (presentCount === 0) {
+    if (requireV17WorkstreamRegistry) {
+      errors.push(
+        `Registry is missing all ${V17_WORKSTREAM_KEYS.length} required v1.7 workstream keys.`
+      );
+    }
+    return;
+  }
+
   if (!validateV17RegistryCompleteness(registry, errors)) {
     return;
   }
@@ -142,7 +153,7 @@ export function validateV17WorkstreamAdoption(registry, contract, errors) {
 
   for (const featureKey of V17_WORKSTREAM_KEYS) {
     const definition = registry[featureKey];
-    validateV17WorkstreamLifecycle(featureKey, definition, errors);
+    validateV17WorkstreamLifecycle(featureKey, definition, contract, errors);
     validateV17WorkstreamCoverage(featureKey, gatedFeatures, contract, errors);
   }
 }

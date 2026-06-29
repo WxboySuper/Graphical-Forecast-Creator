@@ -106,6 +106,7 @@ function main() {
       sideEffectModules,
       acknowledgements,
       existingTestFiles,
+      requireV17WorkstreamRegistry: true,
     }
   );
 

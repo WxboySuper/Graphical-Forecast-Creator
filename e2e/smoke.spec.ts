@@ -148,12 +148,15 @@ test.describe('App smoke tests', () => {
 
   test('gated workstream routes stay unreachable while disabled', async ({ page }) => {
     await bypassLocalBeta(page);
+
     await page.goto('/tropical?localBetaBypass=true');
     await acceptAgreementsIfPresent(page);
-    await expect(page.getByRole('heading', { name: /Tropical Workspace/i })).not.toBeVisible();
+    await expect(page).not.toHaveURL(/\/tropical(?:\?|$)/);
+    await expect(page.getByRole('heading', { name: /Tropical Workspace/i })).not.toBeVisible({ timeout: 5000 });
 
     await page.goto('/collaborate?localBetaBypass=true');
     await acceptAgreementsIfPresent(page);
-    await expect(page.getByRole('heading', { name: /Collaboration Room/i })).not.toBeVisible();
+    await expect(page).not.toHaveURL(/\/collaborate(?:\?|$)/);
+    await expect(page.getByRole('heading', { name: /Collaboration Room/i })).not.toBeVisible({ timeout: 5000 });
   });
 });
