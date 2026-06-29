@@ -217,6 +217,16 @@ export function serializeFeatureExposureDiagnostics(report) {
   return JSON.stringify(report, null, 2);
 }
 
+/** @param {string} value */
+function stripMatchingQuotes(value) {
+  const quote = value[0];
+  if ((quote === '"' || quote === "'") && value.endsWith(quote)) {
+    return value.slice(1, -1);
+  }
+
+  return value;
+}
+
 /**
  * @param {string} envFilePath
  * @returns {Record<string, string>}
@@ -238,15 +248,7 @@ export function loadEnvFile(envFilePath) {
     }
 
     const key = trimmed.slice(0, separatorIndex).trim();
-    let value = trimmed.slice(separatorIndex + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    env[key] = value;
+    env[key] = stripMatchingQuotes(trimmed.slice(separatorIndex + 1).trim());
   }
 
   return env;

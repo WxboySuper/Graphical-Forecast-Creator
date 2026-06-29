@@ -54,6 +54,33 @@
           "weight": 0.0
         }
       ]
+    },
+    {
+      "matching_content_path": "src/config/featureExposureDiagnostics.test.ts",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "scripts/lib/feature-exposure-diagnostics.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "scripts/generate-exposure-diagnostics.integration.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
     }
   ]
 }

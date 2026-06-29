@@ -4,7 +4,9 @@ import {
   mapServerReasonToResolution,
   resolveAllFeatureExposureDiagnostics,
   resolveFeatureExposureDiagnostic,
+  type FeatureExposureDiagnosticResolveOptions,
 } from './featureExposureDiagnostics';
+import type { CapabilityAvailabilityReason } from './serverCapabilityStatus';
 
 const SERVER_BACKED_AUTO_TSTM = {
   exposure: { local: true, beta: true, staging: false, production: false },
@@ -15,6 +17,29 @@ const SERVER_BACKED_AUTO_TSTM = {
   serverBacked: true as const,
   serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
   trackingIssue: 427,
+};
+
+const mockServerBackedAutoTstm = () => {
+  jest.spyOn(featureExposure, 'getFeatureExposure').mockReturnValue(SERVER_BACKED_AUTO_TSTM);
+  jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockReturnValue(true);
+};
+
+const resolveAutoTstmWithCapability = (
+  capability: { available: boolean; reason: CapabilityAvailabilityReason },
+  options: FeatureExposureDiagnosticResolveOptions = {}
+) => {
+  mockServerBackedAutoTstm();
+
+  return resolveFeatureExposureDiagnostic('autoTstm', {
+    buildTarget: 'beta',
+    serverStatus: {
+      loaded: true,
+      capabilities: {
+        TSTM_GENERATION_ENABLED: capability,
+      },
+    },
+    ...options,
+  });
 };
 
 describe('featureExposureDiagnostics', () => {
@@ -78,20 +103,9 @@ describe('featureExposureDiagnostics', () => {
   });
 
   test('resolves server-backed emergency_disabled from capability status', () => {
-    jest.spyOn(featureExposure, 'getFeatureExposure').mockReturnValue(SERVER_BACKED_AUTO_TSTM);
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockReturnValue(true);
-
-    const diagnostic = resolveFeatureExposureDiagnostic('autoTstm', {
-      buildTarget: 'beta',
-      serverStatus: {
-        loaded: true,
-        capabilities: {
-          TSTM_GENERATION_ENABLED: {
-            available: false,
-            reason: 'emergency_disabled',
-          },
-        },
-      },
+    const diagnostic = resolveAutoTstmWithCapability({
+      available: false,
+      reason: 'emergency_disabled',
     });
 
     expect(diagnostic).toMatchObject({
@@ -107,20 +121,9 @@ describe('featureExposureDiagnostics', () => {
   });
 
   test('resolves server-backed deployment_disabled from capability status', () => {
-    jest.spyOn(featureExposure, 'getFeatureExposure').mockReturnValue(SERVER_BACKED_AUTO_TSTM);
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockReturnValue(true);
-
-    const diagnostic = resolveFeatureExposureDiagnostic('autoTstm', {
-      buildTarget: 'beta',
-      serverStatus: {
-        loaded: true,
-        capabilities: {
-          TSTM_GENERATION_ENABLED: {
-            available: false,
-            reason: 'deployment_disabled',
-          },
-        },
-      },
+    const diagnostic = resolveAutoTstmWithCapability({
+      available: false,
+      reason: 'deployment_disabled',
     });
 
     expect(diagnostic.reason).toBe('deployment_disabled');
@@ -128,8 +131,7 @@ describe('featureExposureDiagnostics', () => {
   });
 
   test('resolves server_capability_unavailable when capability status is missing', () => {
-    jest.spyOn(featureExposure, 'getFeatureExposure').mockReturnValue(SERVER_BACKED_AUTO_TSTM);
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockReturnValue(true);
+    mockServerBackedAutoTstm();
 
     const diagnostic = resolveFeatureExposureDiagnostic('autoTstm', {
       buildTarget: 'beta',
@@ -151,20 +153,9 @@ describe('featureExposureDiagnostics', () => {
   });
 
   test('resolves server-backed available state', () => {
-    jest.spyOn(featureExposure, 'getFeatureExposure').mockReturnValue(SERVER_BACKED_AUTO_TSTM);
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockReturnValue(true);
-
-    const diagnostic = resolveFeatureExposureDiagnostic('autoTstm', {
-      buildTarget: 'beta',
-      serverStatus: {
-        loaded: true,
-        capabilities: {
-          TSTM_GENERATION_ENABLED: {
-            available: true,
-            reason: 'available',
-          },
-        },
-      },
+    const diagnostic = resolveAutoTstmWithCapability({
+      available: true,
+      reason: 'available',
     });
 
     expect(diagnostic).toMatchObject({
@@ -187,23 +178,16 @@ describe('featureExposureDiagnostics', () => {
   });
 
   test('marks server disagreement when entitlement blocks a server-available feature', () => {
-    jest.spyOn(featureExposure, 'getFeatureExposure').mockReturnValue(SERVER_BACKED_AUTO_TSTM);
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockReturnValue(true);
-
-    const diagnostic = resolveFeatureExposureDiagnostic('autoTstm', {
-      buildTarget: 'beta',
-      entitlementRequired: true,
-      entitlement: { premiumActive: false },
-      serverStatus: {
-        loaded: true,
-        capabilities: {
-          TSTM_GENERATION_ENABLED: {
-            available: true,
-            reason: 'available',
-          },
-        },
+    const diagnostic = resolveAutoTstmWithCapability(
+      {
+        available: true,
+        reason: 'available',
       },
-    });
+      {
+        entitlementRequired: true,
+        entitlement: { premiumActive: false },
+      }
+    );
 
     expect(diagnostic).toMatchObject({
       resolvedExposed: false,
