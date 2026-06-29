@@ -6,6 +6,19 @@ const EMERGENCY_DISABLED_ENV_KEY = 'EMERGENCY_DISABLED_CAPABILITIES';
 const KNOWN_CAPABILITY_KEY_SET = new Set(KNOWN_SERVER_CAPABILITY_KEYS);
 const MALFORMED_SENTINEL_VALUES = new Set(['true', 'false']);
 
+/** Returns true when the value contains ASCII control characters. */
+const hasControlCharacters = (value) => {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/** Returns the default emergency override parse result. */
 const emptyParseResult = (malformed = false) => ({
   disabledKeys: new Set(),
   malformed,
@@ -27,7 +40,7 @@ const isValidEmergencyDisableValue = (value) => {
     return false;
   }
 
-  return !/[\x00-\x1F\x7F]/.test(trimmed);
+  return !hasControlCharacters(trimmed);
 };
 
 /** Collects validated disable keys from a comma-separated env value. */

@@ -40,22 +40,7 @@ export const useServerBackedFeatureAvailable = (feature: FeatureKey): boolean =>
   return serverAvailable;
 };
 
-/** Mounts children only when compile-time exposure and runtime server availability both allow it. */
-export const ServerBackedFeatureBoundary = ({
-  feature,
-  children,
-  unavailableMessage,
-}: ServerBackedFeatureBoundaryProps) => (
-  <FeatureBoundary feature={feature}>
-    <ServerBackedFeatureRuntimeBoundary
-      feature={feature}
-      unavailableMessage={unavailableMessage}
-    >
-      {children}
-    </ServerBackedFeatureRuntimeBoundary>
-  </FeatureBoundary>
-);
-
+/** Applies runtime server availability checks inside a compile-time feature boundary. */
 const ServerBackedFeatureRuntimeBoundary = ({
   feature,
   children,
@@ -74,3 +59,19 @@ const ServerBackedFeatureRuntimeBoundary = ({
 
   return children;
 };
+
+/** Mounts children only when compile-time exposure and runtime server availability both allow it. */
+export const ServerBackedFeatureBoundary = ({
+  feature,
+  children,
+  unavailableMessage,
+}: ServerBackedFeatureBoundaryProps) => (
+  <FeatureBoundary feature={feature}>
+    <ServerBackedFeatureRuntimeBoundary
+      feature={feature}
+      unavailableMessage={unavailableMessage}
+    >
+      {children}
+    </ServerBackedFeatureRuntimeBoundary>
+  </FeatureBoundary>
+);
