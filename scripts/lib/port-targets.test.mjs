@@ -64,6 +64,21 @@ describe('port targets', () => {
     );
   });
 
+  it('ignores incidental source PR mentions in beta PR bodies', () => {
+    assert.equal(
+      isManualBetaPortPr(
+        {
+          headRefName: 'fix/unrelated',
+          title: 'Unrelated beta work',
+          body: 'See context in #591 and closes #591 eventually',
+        },
+        591,
+        'hotfix/exposure-pr-labels-main',
+      ),
+      false,
+    );
+  });
+
   it('ignores automated port branches', () => {
     assert.equal(
       isManualBetaPortPr({ headRefName: 'port/591-to-beta', title: '[Port] foo' }, 591, 'hotfix/x'),

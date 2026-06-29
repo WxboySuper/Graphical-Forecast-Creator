@@ -303,7 +303,7 @@ handle_port_conflicts() {
   fi
 
   echo "Unresolved conflicts remain for ${target}; publishing draft port PR."
-  commit_conflict_wip "${target}" "${port_branch}" "${port_method}"
+  commit_conflict_wip "${target}" "${port_branch}" "${port_method}" || true
   PORTED=false
   return 0
 }

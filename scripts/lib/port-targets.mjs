@@ -26,7 +26,9 @@ export const resolvePortTargets = ({ baseBranch, sourceBranch }) => {
 const referencesSourcePr = (text, sourcePrNumber) => {
   if (!text) return false;
   const patterns = [
-    new RegExp(`#${sourcePrNumber}(?!\\d)`),
+    new RegExp(`\\bports?\\s+#${sourcePrNumber}(?!\\d)`, 'i'),
+    new RegExp(`\\bcherry.picks?\\s+#?${sourcePrNumber}(?!\\d)`, 'i'),
+    new RegExp(`\\bport\\s+of\\s+#?${sourcePrNumber}(?!\\d)`, 'i'),
     new RegExp(`\\bPR\\s*#?${sourcePrNumber}(?!\\d)`, 'i'),
     new RegExp(`pull\\s+request\\s+#?${sourcePrNumber}(?!\\d)`, 'i'),
   ];
