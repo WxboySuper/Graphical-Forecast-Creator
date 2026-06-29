@@ -4,6 +4,21 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #637
+
+- Dependency: @sentry/react ^10.59.0 → ^10.62.0
+- Dependency: @types/node ^26.0.0 → ^26.0.1
+- Dependency: lucide-react ^1.21.0 → ^1.22.0
+- Dependency: @playwright/test ^1.61.0 → ^1.61.1
+- Dependency: @tailwindcss/postcss ^4.3.1 → ^4.3.2
+- Dependency: @vitejs/plugin-react ^6.0.2 → ^6.0.3
+- Dependency: autoprefixer ^10.4.27 → ^10.5.2
+- Dependency: tailwindcss ^4.3.1 → ^4.3.2
+- Dependency: vite ^8.0.16 → ^8.1.0
+- Dependency: @sentry/node ^10.59.0 → ^10.62.0 (`server`)
+- Dependency: firebase-admin ^14.0.0 → ^14.1.0 (`server`)
+- Dependency: stripe ^22.2.2 → ^22.3.0 (`server`)
+
 ### PR #635
 
 - Add feature exposure diagnostics for maintainers: typed resolution helpers, `pnpm exposure:diagnostics` CLI, and a local-only dev page showing why each feature is enabled or disabled (FND-12).
