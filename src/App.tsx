@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { store } from './store';
@@ -28,6 +28,15 @@ import { GoogleAnalyticsRouteTracker } from './components/GoogleAnalyticsRouteTr
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
+import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
+
+const FeatureExposureDiagnosticsPage = __GFC_DEV_MODE__
+  ? lazy(() =>
+      import('./pages/FeatureExposureDiagnosticsPage').then((module) => ({
+        default: module.FeatureExposureDiagnosticsPage,
+      }))
+    )
+  : null;
 
 // Launch gate: set VITE_COMING_SOON=true in the public build to enable pre-launch mode.
 // The app auto-unlocks at the launch date/time regardless of the env var.
@@ -148,6 +157,16 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="discussion" element={<DiscussionPage />} />
         <Route path="verification" element={<VerificationPage />} />
         <Route path="monitor" element={<MonitorPage />} />
+        {__GFC_DEV_MODE__ && isFeatureExposureDiagnosticsEnabled() && FeatureExposureDiagnosticsPage ? (
+          <Route
+            path="dev/feature-exposure"
+            element={
+              <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading diagnostics…</div>}>
+                <FeatureExposureDiagnosticsPage />
+              </Suspense>
+            }
+          />
+        ) : null}
         {buildFeatureGatedRoutes()}
         </Route>
       </Route>

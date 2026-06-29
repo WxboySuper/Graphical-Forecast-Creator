@@ -35,6 +35,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __GFC_APP_VERSION__: JSON.stringify(pkg.version),
       __GFC_BUILD_TARGET__: JSON.stringify(buildTarget),
+      __GFC_DEV_MODE__: JSON.stringify(mode === 'development'),
       __GFC_COMING_SOON__: JSON.stringify(env.VITE_COMING_SOON === 'true'),
       __GFC_BETA_MODE__: JSON.stringify(env.VITE_BETA_MODE === 'true'),
       __GFC_BETA_INVITE_PATH__: JSON.stringify(env.VITE_BETA_INVITE_PATH ?? ''),
