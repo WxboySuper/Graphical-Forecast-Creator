@@ -34,8 +34,7 @@ export const targetBranchFromSlug = (slug) => {
 export const postMergeOwnsMainToBetaSync = (sourceHeadRef) =>
   sourceHeadRef === 'beta' ||
   sourceHeadRef.startsWith('release/') ||
-  sourceHeadRef.startsWith('feature/release-') ||
-  sourceHeadRef.startsWith('hotfix/');
+  sourceHeadRef.startsWith('feature/release-');
 
 /**
  * @param {{
@@ -43,7 +42,6 @@ export const postMergeOwnsMainToBetaSync = (sourceHeadRef) =>
  *   baseRef: string;
  *   sourcePrBaseRef: string;
  *   sourcePrHeadRef: string;
- *   betaContainsMain?: boolean;
  * }} context
  */
 export const isRedundantBetaPortPr = ({
@@ -51,13 +49,11 @@ export const isRedundantBetaPortPr = ({
   baseRef,
   sourcePrBaseRef,
   sourcePrHeadRef,
-  betaContainsMain = true,
 }) =>
   targetBranch === 'beta' &&
   baseRef === 'beta' &&
   sourcePrBaseRef === 'main' &&
-  postMergeOwnsMainToBetaSync(sourcePrHeadRef) &&
-  betaContainsMain;
+  postMergeOwnsMainToBetaSync(sourcePrHeadRef);
 
 /**
  * @param {{
@@ -67,7 +63,6 @@ export const isRedundantBetaPortPr = ({
  *   sourcePrHeadRef: string;
  *   sourcePrBaseRef: string;
  *   sourcePrNumber: number;
- *   betaContainsMain?: boolean;
  * }} context
  */
 export const evaluatePortPrPolicy = ({
@@ -77,7 +72,6 @@ export const evaluatePortPrPolicy = ({
   sourcePrHeadRef,
   sourcePrBaseRef,
   sourcePrNumber,
-  betaContainsMain = true,
 }) => {
   if (!parsePortBranch(headRef)) {
     return { ok: true };
@@ -89,7 +83,6 @@ export const evaluatePortPrPolicy = ({
       baseRef,
       sourcePrBaseRef,
       sourcePrHeadRef,
-      betaContainsMain,
     })
   ) {
     return {

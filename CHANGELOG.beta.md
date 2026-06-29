@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #TBD
+
+- Align beta porting and post-merge automation with `main` (PR #612 baseline): hotfix merges use reviewable port PRs instead of direct beta sync, and restore main's port PR policy checks.
+
 ### PR #610
 
 - Add beta-to-main production exposure report (\`pnpm exposure:report\`), promotion CI gate, and single upserted PR comment with pass/fail status tables for promotion PRs (FND-07).
