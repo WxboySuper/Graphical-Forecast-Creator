@@ -20,10 +20,18 @@ Two automations run on merged PRs; they are split on purpose:
 |----------------|----------|-----------|
 | **Versions and GitHub Releases** on `main` / `beta` | `post-merge-automation.yml` | Direct commits to `main` or `beta` |
 | **main → beta sync** after promotion, `release/*`, or `feature/release-*` | `post-merge-automation.yml` | Merge/bump on `beta` (no port PR) |
-| **hotfix → beta** (commits only) | `pr-porting.yml` | Port PR into `beta` |
-| **Fan-out to other `feature/*` / `hotfix/*`** | `pr-porting.yml` | Port PRs per target branch |
+| **hotfix → beta** (and other main merges not owned by post-merge) | `pr-porting.yml` | Single port PR into `beta` |
 
-If both tried to port the same merge into `beta`, you would get a port PR and a CI push fighting each other. **PR porting skips `beta`** when post-merge already owns that sync. CI **fails** new `port/* → beta` PRs that duplicate that path.
+If both tried to port the same merge into `beta`, you would get a port PR and a CI push fighting each other. **PR porting skips `beta`** when post-merge already owns that sync. CI **fails** redundant `port/* → beta` PRs that duplicate that path.
+
+### Skipping automated ports
+
+- Add **`porting/manual`** to the source PR on `main` before merge to block automation entirely.
+- Or open a manual **`your-branch → beta`** PR first (same head branch or body referencing `#<sourcePr>`); automation detects it and skips.
+
+### Conflicts
+
+Automation auto-resolves version-policy file conflicts on beta ports (`package.json`, lockfiles, `CHANGELOG.md`, `deploy/production-release.json`). Remaining code conflicts open a **draft** `[Port][Conflicts]` PR — no tracking issue. See [`AGENTS.md`](../AGENTS.md) for manual port steps.
 
 ## What happens when you merge
 

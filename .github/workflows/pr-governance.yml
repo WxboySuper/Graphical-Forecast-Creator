@@ -78,6 +78,8 @@ jobs:
               ['quality', 'fbca04'],
               ['e2e-validated', '0e8a16'],
               ['porting', 'FBCA04'],
+              ['porting/manual', 'd876e3'],
+              ['porting/conflicts', 'B60205'],
               ['Component: Map', '1d76db'],
               ['Component: Outlooks', 'fbca04'],
               ['Component: Drawing-Tools', '0e8a16'],

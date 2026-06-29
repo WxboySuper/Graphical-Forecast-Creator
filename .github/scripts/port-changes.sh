@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Merging ${SOURCE_BRANCH} into ${BASE_BRANCH}. Porting to relevant branches..."
+# Ports merged PR commits to beta only (main merges not owned by post-merge-automation).
+# Skips when porting/manual is set or an open manual beta port PR exists.
+# Auto-resolves version-policy file conflicts on beta ports before opening draft PRs.
+
+echo "Merged ${SOURCE_BRANCH} into ${BASE_BRANCH}. Evaluating port targets..."
 
 append_summary() {
   echo "$1" >> "${GITHUB_STEP_SUMMARY}"
@@ -16,11 +20,49 @@ REPO_OWNER="${REPO%%/*}"
 WORK_DIR="${RUNNER_TEMP:-/tmp}/gfc-port-${GITHUB_RUN_ID:-$$}"
 mkdir -p "${WORK_DIR}"
 
-# Fetch all active branches
-gh api repos/"${REPO}"/branches --paginate > "${WORK_DIR}/branches.json"
+PR_LABELS="$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json labels -q '.labels[].name' 2>/dev/null | paste -sd, - || true)"
+OPEN_BETA_PRS_JSON="$(gh pr list --repo "${REPO}" --base beta --state open \
+  --json number,headRefName,title,body,url 2>/dev/null || echo '[]')"
 
-# Resolve the original PR commits so port branches only carry the
-# intended change set instead of every commit missing from target.
+export BASE_BRANCH SOURCE_BRANCH PR_NUMBER PR_LABELS OPEN_BETA_PRS_JSON
+PORT_DECISION="$(node scripts/porting-decision.mjs)"
+SKIP_PORTING="$(echo "${PORT_DECISION}" | jq -r '.skip')"
+SKIP_REASON="$(echo "${PORT_DECISION}" | jq -r '.skipReason // empty')"
+MANUAL_PR_NUMBER="$(echo "${PORT_DECISION}" | jq -r '.manualPr.number // empty')"
+MANUAL_PR_URL="$(echo "${PORT_DECISION}" | jq -r '.manualPr.url // empty')"
+
+mapfile -t TARGETS < <(echo "${PORT_DECISION}" | jq -r '.targets[]?')
+
+if [[ "${SKIP_PORTING}" == "true" ]]; then
+  echo "Skipping automated porting: ${SKIP_REASON}"
+  append_summary "### Result: skipped"
+  append_summary "${SKIP_REASON}"
+  if [[ -n "${MANUAL_PR_URL}" ]]; then
+    append_summary ""
+    append_summary "Manual port PR: ${MANUAL_PR_URL}"
+    gh pr comment "${PR_NUMBER}" --repo "${REPO}" --body "$(cat <<EOF
+Automated porting skipped: ${SKIP_REASON}
+
+Use the existing manual port PR: ${MANUAL_PR_URL}
+EOF
+)" || true
+  else
+    gh pr comment "${PR_NUMBER}" --repo "${REPO}" --body "Automated porting skipped: ${SKIP_REASON}" || true
+  fi
+  exit 0
+fi
+
+if [[ ${#TARGETS[@]} -eq 0 ]]; then
+  if [[ "${BASE_BRANCH}" == "main" ]]; then
+    echo "No port targets for ${SOURCE_BRANCH} → main (post-merge-automation may own beta sync)."
+    append_summary "_No automated port targets. Beta sync may be handled by **Post-merge automation**._"
+  else
+    echo "No port targets for merge into ${BASE_BRANCH}."
+    append_summary "_No automated port targets for this merge._"
+  fi
+  exit 0
+fi
+
 git fetch origin pull/"${PR_NUMBER}"/head:refs/remotes/origin/pr/"${PR_NUMBER}"
 gh api repos/"${REPO}"/pulls/"${PR_NUMBER}"/commits --paginate > "${WORK_DIR}/pr-commits.json"
 mapfile -t PR_COMMIT_SHAS < <(jq -r '.[].sha' "${WORK_DIR}/pr-commits.json")
@@ -32,49 +74,8 @@ if [[ ${#PR_COMMIT_SHAS[@]} -eq 0 ]]; then
   exit 1
 fi
 
-TARGETS=()
-
-# post-merge-automation.yml owns main→beta for promotion and release infrastructure
-# (version strip/bump, merge main into beta, GitHub releases). Porting the same merge
-# here would race or duplicate that work with a second port PR.
-post_merge_owns_beta_sync() {
-  [[ "${BASE_BRANCH}" == "main" ]] || return 1
-  [[ "${SOURCE_BRANCH}" == "beta" ]] && return 0
-  [[ "${SOURCE_BRANCH}" == release/* ]] && return 0
-  [[ "${SOURCE_BRANCH}" == feature/release-* ]] && return 0
-  return 1
-}
-
-if [[ "${BASE_BRANCH}" == "main" ]]; then
-  if post_merge_owns_beta_sync; then
-    echo "Skipping beta: post-merge-automation handles main→beta for ${SOURCE_BRANCH}."
-    append_summary "_Beta sync is handled by **Post-merge automation** (not a port PR)._"
-  else
-    TARGETS+=("beta")
-  fi
-
-  HOTFIX_BRANCHES=$(jq -r '.[].name | select(startswith("hotfix/"))' "${WORK_DIR}/branches.json")
-  for b in $HOTFIX_BRANCHES; do
-    if [[ "${b}" != "${SOURCE_BRANCH}" ]]; then
-      TARGETS+=("${b}")
-    fi
-  done
-
-  FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' "${WORK_DIR}/branches.json")
-  for b in $FEATURE_BRANCHES; do
-    TARGETS+=("${b}")
-  done
-
-elif [[ "${BASE_BRANCH}" == "beta" ]]; then
-  FEATURE_BRANCHES=$(jq -r '.[].name | select(startswith("feature/"))' "${WORK_DIR}/branches.json")
-  for b in $FEATURE_BRANCHES; do
-    if [[ "${b}" != "${SOURCE_BRANCH}" ]]; then
-      TARGETS+=("${b}")
-    fi
-  done
-fi
-
-FAILURES=()
+ATTENTION_COUNT=0
+HARD_FAILURES=()
 CONFLICT_PR_URLS=()
 PRESERVED_PORT_BRANCHES=()
 SUCCESS_COUNT=0
@@ -103,6 +104,47 @@ find_open_port_pr() {
   local target="$2"
   gh pr list --repo "${REPO}" --head "${REPO_OWNER}:${port_branch}" --base "${target}" --state open \
     --json number,url --jq '.[0] // empty | [.number, .url] | @tsv' 2>/dev/null || true
+}
+
+has_unmerged_conflicts() {
+  [[ -n "$(git diff --name-only --diff-filter=U)" ]]
+}
+
+try_auto_resolve_beta_conflicts() {
+  mapfile -t conflict_paths < <(git diff --name-only --diff-filter=U)
+  if [[ ${#conflict_paths[@]} -eq 0 ]]; then
+    return 1
+  fi
+
+  local classification can_auto
+  classification="$(node scripts/classify-port-conflicts.mjs "${conflict_paths[@]}")"
+  can_auto="$(echo "${classification}" | jq -r '.canAutoResolveAll')"
+
+  if [[ "${can_auto}" != "true" ]]; then
+    return 1
+  fi
+
+  mapfile -t auto_paths < <(echo "${classification}" | jq -r '.autoResolvable[]')
+  for path in "${auto_paths[@]}"; do
+    git checkout --ours -- "${path}"
+    git add -- "${path}"
+  done
+
+  if git diff --name-only --diff-filter=U | grep -q .; then
+    return 1
+  fi
+
+  if git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null 2>&1; then
+    GIT_EDITOR=true git -c core.hooksPath=/dev/null cherry-pick --continue
+    return $?
+  fi
+
+  if [[ -f .git/MERGE_HEAD ]]; then
+    git -c core.hooksPath=/dev/null commit --no-edit
+    return $?
+  fi
+
+  return 1
 }
 
 create_or_update_conflict_pr() {
@@ -186,6 +228,9 @@ EOF
       else
         pr_url="$(compare_url_for_port_branch "${target}" "${port_branch}")"
         echo "::warning title=Port PR not created::${create_output} — open manually: ${pr_url}"
+        HARD_FAILURES+=("${target}")
+        record_preserved_port_branch "${target}" "${port_branch}"
+        return 1
       fi
     fi
     echo "Opened draft conflict port PR for ${target}: ${pr_url}"
@@ -197,11 +242,9 @@ EOF
 
   CONFLICT_PR_URLS+=("${target}|${pr_url}|${conflict_files}")
   record_preserved_port_branch "${target}" "${port_branch}"
-  FAILURES+=("${target}")
-}
-
-has_unmerged_conflicts() {
-  [[ -n "$(git diff --name-only --diff-filter=U)" ]]
+  ATTENTION_COUNT=$((ATTENTION_COUNT + 1))
+  echo "::warning title=Port conflicts::#${PR_NUMBER} → ${target} needs conflict resolution. Draft PR: ${pr_url}"
+  return 0
 }
 
 commit_conflict_wip() {
@@ -232,7 +275,7 @@ Port method attempted: ${port_method}
 Conflicted paths:
 $(printf '%s\n' "${conflict_paths[@]}")"; then
     echo "::error title=Port conflicts not committed::Could not commit conflict state for ${target}."
-    FAILURES+=("${target}")
+    HARD_FAILURES+=("${target}")
     return 1
   fi
 
@@ -247,10 +290,30 @@ reset_port_branch() {
   git checkout -B "${port_branch}" "origin/${target}"
 }
 
+handle_port_conflicts() {
+  local target="$1"
+  local port_branch="$2"
+  local port_method="$3"
+
+  if try_auto_resolve_beta_conflicts; then
+    echo "Auto-resolved version-policy conflicts for ${target}."
+    PORTED=true
+    PORT_METHOD="${port_method} (auto-resolved policy files)"
+    return 0
+  fi
+
+  echo "Unresolved conflicts remain for ${target}; publishing draft port PR."
+  commit_conflict_wip "${target}" "${port_branch}" "${port_method}" || true
+  PORTED=false
+  return 0
+}
+
 for TARGET in "${TARGETS[@]}"; do
   echo "--- Attempting to port to ${TARGET} ---"
 
   PORT_BRANCH="port/${PR_NUMBER}-to-${TARGET//\//-}"
+  PORTED=false
+  PORT_METHOD="cherry-pick"
 
   if ! git ls-remote --exit-code --heads origin "${TARGET}" > /dev/null; then
     echo "Branch ${TARGET} no longer exists. Skipping."
@@ -278,20 +341,11 @@ for TARGET in "${TARGETS[@]}"; do
     continue
   fi
 
-  PORTED=false
-  PORT_METHOD="cherry-pick"
-
   if git cherry-pick "${COMMITS_TO_PICK[@]}"; then
     PORTED=true
   elif has_unmerged_conflicts; then
-    echo "Cherry-pick stopped on conflicts for ${TARGET}; publishing draft port PR."
     PORT_METHOD="cherry-pick (conflicts)"
-    if commit_conflict_wip "${TARGET}" "${PORT_BRANCH}" "${PORT_METHOD}"; then
-      echo "::error title=Port conflicts::#${PR_NUMBER} → ${TARGET} needs conflict resolution. Draft PR pushed on ${PORT_BRANCH}."
-    fi
-    git checkout "${BASE_BRANCH}"
-    git branch -D "${PORT_BRANCH}" || true
-    continue
+    handle_port_conflicts "${TARGET}" "${PORT_BRANCH}" "${PORT_METHOD}"
   else
     echo "Cherry-pick failed for ${TARGET} without index conflicts; trying merge fallback."
     reset_port_branch "${TARGET}" "${PORT_BRANCH}"
@@ -301,16 +355,10 @@ for TARGET in "${TARGETS[@]}"; do
     if git merge --no-ff -m "${MERGE_MSG}" "origin/pr/${PR_NUMBER}"; then
       PORTED=true
     elif has_unmerged_conflicts; then
-      echo "Merge fallback has conflicts for ${TARGET}; publishing draft port PR."
-      if commit_conflict_wip "${TARGET}" "${PORT_BRANCH}" "${PORT_METHOD}"; then
-        echo "::error title=Port conflicts::#${PR_NUMBER} → ${TARGET} needs conflict resolution. Draft PR pushed on ${PORT_BRANCH}."
-      fi
-      git checkout "${BASE_BRANCH}"
-      git branch -D "${PORT_BRANCH}" || true
-      continue
+      handle_port_conflicts "${TARGET}" "${PORT_BRANCH}" "${PORT_METHOD}"
     else
       echo "::error title=Port failed::Cherry-pick and merge both failed for ${TARGET} without resolvable conflict state."
-      FAILURES+=("${TARGET}")
+      HARD_FAILURES+=("${TARGET}")
       git checkout "${BASE_BRANCH}"
       git branch -D "${PORT_BRANCH}" || true
       continue
@@ -318,7 +366,6 @@ for TARGET in "${TARGETS[@]}"; do
   fi
 
   if [[ "${PORTED}" != "true" ]]; then
-    FAILURES+=("${TARGET}")
     git checkout "${BASE_BRANCH}"
     git branch -D "${PORT_BRANCH}" || true
     continue
@@ -330,7 +377,7 @@ for TARGET in "${TARGETS[@]}"; do
   if [[ "${PORT_METHOD}" != "cherry-pick" ]]; then
     PR_BODY="${PR_BODY}
 
-> Note: Changes were applied via **${PORT_METHOD}** because cherry-pick did not apply cleanly."
+> Note: Changes were applied via **${PORT_METHOD}**."
   fi
 
   if ! gh pr create --repo "${REPO}" \
@@ -340,7 +387,7 @@ for TARGET in "${TARGETS[@]}"; do
     --body "${PR_BODY}"; then
     echo "::warning title=Port PR not created::Could not open a port PR for ${TARGET}. Remote branch ${PORT_BRANCH} was kept for manual fallback."
     record_preserved_port_branch "${TARGET}" "${PORT_BRANCH}"
-    FAILURES+=("${TARGET}")
+    HARD_FAILURES+=("${TARGET}")
   else
     echo "Successfully created port PR for ${TARGET} using ${PORT_BRANCH}"
     SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
@@ -362,31 +409,32 @@ fi
 append_summary "### Summary"
 append_summary "- Successful port PRs: **${SUCCESS_COUNT}**"
 append_summary "- Skipped (already synced / missing branch): **${SKIPPED_COUNT}**"
-append_summary "- Needs attention: **${#FAILURES[@]}**"
+append_summary "- Draft conflict PRs opened: **${ATTENTION_COUNT}**"
+append_summary "- Hard failures: **${#HARD_FAILURES[@]}**"
 append_summary ""
 
-if [[ ${#FAILURES[@]} -eq 0 ]]; then
-  append_summary "All required targets were ported or already up to date."
-  echo "Porting completed successfully."
-  exit 0
+if [[ ${#HARD_FAILURES[@]} -gt 0 ]]; then
+  append_summary "### Hard failures"
+  append_summary ""
+  for f in "${HARD_FAILURES[@]}"; do
+    append_summary "- \`${f}\`"
+  done
+  append_summary ""
 fi
 
-append_summary "### Targets needing attention"
-append_summary ""
-append_summary "| Target | Draft conflict PR |"
-append_summary "| --- | --- |"
-for entry in "${CONFLICT_PR_URLS[@]}"; do
-  IFS='|' read -r t url _ <<< "${entry}"
-  append_summary "| \`${t}\` | [open draft PR](${url}) |"
-done
-for f in "${FAILURES[@]}"; do
-  if [[ ${#CONFLICT_PR_URLS[@]} -eq 0 ]] || ! printf '%s\n' "${CONFLICT_PR_URLS[@]}" | grep -q "^${f}|"; then
-    append_summary "| \`${f}\` | _(no draft PR — see workflow log)_ |"
-  fi
-done
+if [[ ${ATTENTION_COUNT} -gt 0 ]]; then
+  append_summary "### Draft conflict PRs"
+  append_summary ""
+  append_summary "| Target | Draft PR |"
+  append_summary "| --- | --- |"
+  for entry in "${CONFLICT_PR_URLS[@]}"; do
+    IFS='|' read -r t url _ <<< "${entry}"
+    append_summary "| \`${t}\` | [open draft PR](${url}) |"
+  done
+  append_summary ""
+fi
 
 if [[ ${#PRESERVED_PORT_BRANCHES[@]} -gt 0 ]]; then
-  append_summary ""
   append_summary "### Fallback port branches (kept on origin)"
   append_summary ""
   append_summary "| Target | Branch | Open PR from branch |"
@@ -395,99 +443,39 @@ if [[ ${#PRESERVED_PORT_BRANCHES[@]} -gt 0 ]]; then
     IFS='|' read -r t branch url <<< "${entry}"
     append_summary "| \`${t}\` | \`${branch}\` | [compare & open PR](${url}) |"
   done
+  append_summary ""
 fi
 
-ISSUE_TITLE="[Port] Conflict resolution needed for PR #${PR_NUMBER}"
-ISSUE_BODY="$(cat <<EOF
-## Automated porting could not finish cleanly
+if [[ ${ATTENTION_COUNT} -gt 0 ]]; then
+  NOTICE_COMMENT="$(cat <<EOF
+### Automated porting opened draft conflict PR(s)
 
-PR #${PR_NUMBER} (**${PR_TITLE}**) was merged into \`${BASE_BRANCH}\`, but one or more downstream branches still need a manual port.
-
-| Target branch | Action |
-| --- | --- |
-EOF
-)"
-for entry in "${CONFLICT_PR_URLS[@]}"; do
-  IFS='|' read -r t url files <<< "${entry}"
-  ISSUE_BODY+=$'\n'"| \`${t}\` | Resolve [draft port PR](${url}) |"
-done
-for f in "${FAILURES[@]}"; do
-  if ! printf '%s\n' "${CONFLICT_PR_URLS[@]}" | grep -q "^${f}|"; then
-    ISSUE_BODY+=$'\n'"| \`${f}\` | Check the [failed workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) |"
-  fi
-done
-if [[ ${#PRESERVED_PORT_BRANCHES[@]} -gt 0 ]]; then
-  ISSUE_BODY+=$'\n\n'"### Fallback port branches (left on origin)
-
-| Target | Branch | Action |
-| --- | --- | --- |"
-  for entry in "${PRESERVED_PORT_BRANCHES[@]}"; do
-    IFS='|' read -r t branch url <<< "${entry}"
-    ISSUE_BODY+=$'\n'"| \`${t}\` | \`${branch}\` | [Open a PR from this branch](${url}) |"
-  done
-fi
-ISSUE_BODY+=$'\n\n'"Author: @${PR_AUTHOR}
-
-When these draft PRs are merged, \`${BASE_BRANCH}\` changes will stay aligned across active feature and hotfix branches."
-
-EXISTING_ISSUE="$(gh issue list --repo "${REPO}" --search "in:title \"${ISSUE_TITLE}\"" --state open --json number -q '.[0].number' 2>/dev/null || true)"
-if [[ -n "${EXISTING_ISSUE}" && "${EXISTING_ISSUE}" != "null" ]]; then
-  gh issue comment "${EXISTING_ISSUE}" --repo "${REPO}" --body "${ISSUE_BODY}" || true
-  ISSUE_URL="${GITHUB_SERVER_URL}/${REPO}/issues/${EXISTING_ISSUE}"
-  echo "Updated open tracking issue #${EXISTING_ISSUE}"
-else
-  gh label create "porting" --repo "${REPO}" --color "FBCA04" --description "Branch porting automation follow-up" 2>/dev/null || true
-  ISSUE_URL="$(gh issue create --repo "${REPO}" \
-    --title "${ISSUE_TITLE}" \
-    --body "${ISSUE_BODY}" \
-    --label "porting" \
-    --assignee "${PR_AUTHOR}" 2>/dev/null)" || \
-  ISSUE_URL="$(gh issue create --repo "${REPO}" \
-    --title "${ISSUE_TITLE}" \
-    --body "${ISSUE_BODY}" \
-    --label "porting")"
-  echo "Created tracking issue: ${ISSUE_URL}"
-fi
-
-append_summary ""
-append_summary "Tracking issue: ${ISSUE_URL}"
-
-FAILURE_COMMENT="$(cat <<EOF
-### ⚠️ Automated porting needs your attention
-
-PR #${PR_NUMBER} was merged into \`${BASE_BRANCH}\`, but **${#FAILURES[@]}** branch(es) still need a port.
+PR #${PR_NUMBER} was merged into \`${BASE_BRANCH}\`. **${ATTENTION_COUNT}** target(s) need manual conflict resolution.
 
 EOF
 )"
-if [[ ${#CONFLICT_PR_URLS[@]} -gt 0 ]]; then
-  FAILURE_COMMENT+="**Draft PRs were opened with conflict markers** — resolve them and mark ready for review:\n\n"
   for entry in "${CONFLICT_PR_URLS[@]}"; do
     IFS='|' read -r t url _ <<< "${entry}"
-    FAILURE_COMMENT+="- \`${t}\`: ${url}\n"
+    NOTICE_COMMENT+="- \`${t}\`: ${url}\n"
   done
-  FAILURE_COMMENT+="\n"
+  NOTICE_COMMENT+="\nWorkflow summary: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+  gh pr comment "${PR_NUMBER}" --repo "${REPO}" --body "$(echo -e "${NOTICE_COMMENT}")" || true
 fi
 
-for f in "${FAILURES[@]}"; do
-  if ! printf '%s\n' "${CONFLICT_PR_URLS[@]}" | grep -q "^${f}|"; then
-    FAILURE_COMMENT+="- \`${f}\`: port PR could not be created (see [workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))\n"
-  fi
-done
-
-if [[ ${#PRESERVED_PORT_BRANCHES[@]} -gt 0 ]]; then
-  FAILURE_COMMENT+="\n**Fallback port branches were left on origin** (open a PR manually if automation did not):\n\n"
-  for entry in "${PRESERVED_PORT_BRANCHES[@]}"; do
-    IFS='|' read -r t branch url <<< "${entry}"
-    FAILURE_COMMENT+="- \`${t}\`: \`${branch}\` → ${url}\n"
+if [[ ${#HARD_FAILURES[@]} -gt 0 ]]; then
+  for f in "${HARD_FAILURES[@]}"; do
+    echo "::error title=Port failed::${f} — see workflow log"
   done
+  exit 1
 fi
 
-FAILURE_COMMENT+="\nTracking issue: ${ISSUE_URL}\n\nWorkflow summary: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+if [[ ${SUCCESS_COUNT} -eq 0 && ${ATTENTION_COUNT} -eq 0 && ${SKIPPED_COUNT} -eq 0 ]]; then
+  append_summary "No port work was performed."
+fi
 
-gh pr comment "${PR_NUMBER}" --repo "${REPO}" --body "$(echo -e "${FAILURE_COMMENT}")"
+if [[ ${SUCCESS_COUNT} -gt 0 || ${ATTENTION_COUNT} -gt 0 || ${SKIPPED_COUNT} -gt 0 ]]; then
+  append_summary "Porting completed."
+fi
 
-for f in "${FAILURES[@]}"; do
-  echo "::error title=Port needs attention::${f} — see draft port PRs and ${ISSUE_URL}"
-done
-
-exit 1
+echo "Porting completed."
+exit 0
