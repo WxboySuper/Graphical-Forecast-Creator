@@ -18,44 +18,6 @@
           "weight": 0.0
         }
       ]
-    },
-    {
-      "matching_content_path": "scripts/lib/feature-exposure-policy.mjs",
-      "rules": [
-        {
-          "name": "Complex Method",
-          "weight": 0.0
-        },
-        {
-          "name": "Brain Method",
-          "weight": 0.0
-        },
-        {
-          "name": "Bumpy Road Ahead",
-          "weight": 0.0
-        },
-        {
-          "name": "Excess Number of Function Arguments",
-          "weight": 0.0
-        }
-      ]
-    },
-    {
-      "matching_content_path": "scripts/validate-feature-exposure.mjs",
-      "rules": [
-        {
-          "name": "Complex Method",
-          "weight": 0.0
-        },
-        {
-          "name": "Brain Method",
-          "weight": 0.0
-        },
-        {
-          "name": "Complex Conditional",
-          "weight": 0.0
-        }
-      ]
     }
   ]
 }
