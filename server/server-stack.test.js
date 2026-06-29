@@ -48,6 +48,15 @@ describe('analytics server stack (express 5)', () => {
     assert.equal(typeof body.billingEnabled, 'boolean');
   });
 
+  it('serves capability status on GET /api/capabilities/status', async () => {
+    const server = await serverReady;
+    const port = getServerPort(server);
+    const response = await fetch(`http://127.0.0.1:${port}/api/capabilities/status`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(typeof body.capabilities, 'object');
+  });
+
   it('accepts POST /collect with express.json middleware', async () => {
     const server = await serverReady;
     const port = getServerPort(server);

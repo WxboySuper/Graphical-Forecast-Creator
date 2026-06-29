@@ -40,6 +40,36 @@ const createFakeChild = () => {
   return child;
 };
 
+const postGenerateRequest = (server) => fetch(getUrl(server), {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
+});
+
+/** Asserts a disabled generate route returns 404 without invoking the generator. */
+const assertGenerateRouteRejectsWithoutWork = async ({
+  env,
+  routeOptions = {},
+  expectedBody,
+}) => {
+  let calls = 0;
+  const server = await startServer(env, async () => {
+    calls += 1;
+    return {};
+  }, routeOptions);
+
+  try {
+    const response = await postGenerateRequest(server);
+    assert.equal(response.status, 404);
+    if (expectedBody) {
+      assert.deepEqual(await response.json(), expectedBody);
+    }
+    assert.equal(calls, 0);
+  } finally {
+    server.close();
+  }
+};
+
 describe('Auto-TSTM server foundation', () => {
   it('stays disabled unless registry exposure and deployment env are both enabled', () => {
     assert.equal(isTstmGenerationEnabled({}), false);
@@ -66,44 +96,31 @@ describe('Auto-TSTM server foundation', () => {
   });
 
   it('does not invoke the generator while disabled', async () => {
-    let calls = 0;
-    const server = await startServer({}, async () => {
-      calls += 1;
-      return {};
-    });
-    try {
-      const response = await fetch(getUrl(server), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
-      });
-      assert.equal(response.status, 404);
-      assert.deepEqual(await response.json(), {
+    await assertGenerateRouteRejectsWithoutWork({
+      env: {},
+      expectedBody: {
         error: 'Auto-TSTM is not enabled on this deployment.',
-      });
-      assert.equal(calls, 0);
-    } finally {
-      server.close();
-    }
+      },
+    });
   });
 
   it('does not invoke the generator when only the deployment env is enabled', async () => {
-    let calls = 0;
-    const server = await startServer({ TSTM_GENERATION_ENABLED: 'true' }, async () => {
-      calls += 1;
-      return {};
+    await assertGenerateRouteRejectsWithoutWork({
+      env: { TSTM_GENERATION_ENABLED: 'true' },
     });
-    try {
-      const response = await fetch(getUrl(server), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
-      });
-      assert.equal(response.status, 404);
-      assert.equal(calls, 0);
-    } finally {
-      server.close();
-    }
+  });
+
+  it('does not invoke the generator when emergency disable is active', async () => {
+    await assertGenerateRouteRejectsWithoutWork({
+      env: {
+        TSTM_GENERATION_ENABLED: 'true',
+        EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
+      },
+      routeOptions: ENABLED_CAPABILITY_OPTIONS,
+      expectedBody: {
+        error: 'Auto-TSTM is not enabled on this deployment.',
+      },
+    });
   });
 
   it('returns sanitized errors when enabled work fails', async () => {

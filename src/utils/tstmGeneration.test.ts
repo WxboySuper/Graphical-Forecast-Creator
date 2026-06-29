@@ -7,8 +7,16 @@ import {
   parseTstmGenerationResponse,
   requestTstmGeneration,
 } from './tstmGeneration';
+import {
+  isServerCapabilityAvailable,
+  resetServerCapabilityStatusState,
+} from '../config/serverCapabilityStatus';
 
 describe('tstmGeneration utilities', () => {
+  afterEach(() => {
+    resetServerCapabilityStatusState();
+  });
+
   test('limits SPC calibrated thunder generation to day 1 and day 2', () => {
     expect(canGenerateTstmForDay(1)).toBe(true);
     expect(canGenerateTstmForDay(2)).toBe(true);
@@ -132,6 +140,7 @@ describe('tstmGeneration utilities', () => {
       })
       .mockResolvedValueOnce({
         ok: false,
+        status: 404,
         json: async () => ({ error: 'Auto-TSTM is not enabled on this deployment.' }),
       }) as jest.Mock;
     try {
@@ -139,6 +148,17 @@ describe('tstmGeneration utilities', () => {
         .resolves.toMatchObject({ features: [] });
       await expect(requestTstmGeneration({ day: 1, cycleDate: '2026-06-13' }))
         .rejects.toThrow(/not enabled/);
+      expect(
+        isServerCapabilityAvailable('TSTM_GENERATION_ENABLED', {
+          loaded: true,
+          capabilities: {
+            TSTM_GENERATION_ENABLED: {
+              available: true,
+              reason: 'available',
+            },
+          },
+        })
+      ).toBe(false);
     } finally {
       global.fetch = originalFetch;
     }

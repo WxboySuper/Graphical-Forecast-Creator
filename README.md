@@ -124,6 +124,13 @@ Server capability gates live in:
 
 Experimental APIs register `createServerCapabilityGate(serverCapabilityKey)` before auth and handlers. A capability is enabled only when the registry exposes it for the server target and the deployment env key is `true`. Disabled routes return `404` with `{ error: "<label> is not enabled on this deployment." }`.
 
+Emergency incident disable is server-authoritative via `EMERGENCY_DISABLED_CAPABILITIES` on the analytics server. That override is disable-only, overrides registry and deployment env for server-backed capabilities, and does not require a frontend rebuild. See [docs/emergency-feature-disable.md](docs/emergency-feature-disable.md) for activation, verification, rollback, and a local drill.
+
+Client runtime fallback for server-backed features lives in:
+
+- `src/config/serverCapabilityStatus.ts` — fetches `/api/capabilities/status` and tracks locally unavailable capabilities
+- `src/features/ServerBackedFeatureBoundary.tsx` — hides already-mounted server-backed UI when the server disables a capability after page load
+
 ### Local Beta Mode (developer)
 
 Run the app with beta-only features locally (useful for testing forecast redesigns, verification flows, and discussion changes).

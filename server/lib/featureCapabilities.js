@@ -1,50 +1,28 @@
 'use strict';
 
 const { getServerTarget } = require('./serverTarget');
-const { SERVER_FEATURE_EXPOSURE_REGISTRY } = require('./serverFeatureExposure');
+const {
+  CAPABILITY_REASON,
+  findFeatureByCapabilityKey,
+  isDeploymentCapabilityEnabled,
+  resolveCapabilityAvailability,
+} = require('./capabilityStatus');
+const { isEmergencyDisabledCapability } = require('./emergencyCapabilityOverrides');
 
 const DISABLED_CAPABILITY_STATUS = 404;
 
-/** Returns the server-backed feature entry for a capability key, if declared. */
-const findFeatureByCapabilityKey = (capabilityKey) => {
-  for (const [featureKey, definition] of Object.entries(SERVER_FEATURE_EXPOSURE_REGISTRY)) {
-    if (definition.serverCapabilityKey === capabilityKey) {
-      return { featureKey, definition };
-    }
-  }
-
-  return null;
-};
-
-/** Returns true when ops explicitly enabled the deployment capability env switch. */
-const isDeploymentCapabilityEnabled = (capabilityKey, env = process.env) =>
-  env[capabilityKey] === 'true';
-
 /**
- * Returns true when registry exposure and the deployment capability env are both enabled.
+ * Returns true when registry exposure, deployment env, and emergency overrides all allow use.
  * Authorization is intentionally separate and must run after this gate.
  */
 const isServerCapabilityEnabled = (capabilityKey, options = {}) => {
-  const env = options.env || process.env;
-  const feature = findFeatureByCapabilityKey(capabilityKey);
-
-  if (!feature) {
-    return false;
-  }
-
-  const target = options.target ?? getServerTarget(env);
-  const exposureOverride = options.exposureOverride?.[target];
-  const exposedOnTarget =
-    typeof exposureOverride === 'boolean'
-      ? exposureOverride
-      : feature.definition.exposure[target] === true;
-
-  if (!exposedOnTarget) {
-    return false;
-  }
-
-  return isDeploymentCapabilityEnabled(capabilityKey, env);
+  const status = resolveCapabilityAvailability(capabilityKey, options);
+  return status.available;
 };
+
+/** Returns the disable reason for a capability on the current deployment target. */
+const getServerCapabilityDisableReason = (capabilityKey, options = {}) =>
+  resolveCapabilityAvailability(capabilityKey, options).reason;
 
 /** Sends the standard fail-closed response for disabled experimental APIs. */
 const sendDisabledCapabilityResponse = (res, { label }) => {
@@ -53,32 +31,52 @@ const sendDisabledCapabilityResponse = (res, { label }) => {
   });
 };
 
+/** Logs emergency rejections for audit without exposing secrets. */
+const logEmergencyGateRejection = (capabilityKey, reason, log) => {
+  if (reason !== CAPABILITY_REASON.EMERGENCY_DISABLED) {
+    return;
+  }
+
+  log.info?.(
+    `[capabilities] rejected capability=${capabilityKey} reason=${reason}`
+  );
+};
+
 /** Rejects disabled capabilities before route handlers, auth, or expensive work run. */
 const createServerCapabilityGate = (capabilityKey, options = {}) => {
   const env = options.env || process.env;
   const feature = findFeatureByCapabilityKey(capabilityKey);
   const label = options.label || feature?.definition?.label || 'This capability';
   const target = options.target ?? getServerTarget(env);
+  const log = options.log || console;
 
   return (_req, res, next) => {
-    if (!isServerCapabilityEnabled(capabilityKey, {
+    const gateOptions = {
       env,
       target,
       exposureOverride: options.exposureOverride,
-    })) {
-      sendDisabledCapabilityResponse(res, { label });
+      log,
+    };
+
+    if (isServerCapabilityEnabled(capabilityKey, gateOptions)) {
+      next();
       return;
     }
 
-    next();
+    const reason = getServerCapabilityDisableReason(capabilityKey, gateOptions);
+    logEmergencyGateRejection(capabilityKey, reason, log);
+    sendDisabledCapabilityResponse(res, { label });
   };
 };
 
 module.exports = {
+  CAPABILITY_REASON,
   DISABLED_CAPABILITY_STATUS,
   createServerCapabilityGate,
   findFeatureByCapabilityKey,
+  getServerCapabilityDisableReason,
   isDeploymentCapabilityEnabled,
+  isEmergencyDisabledCapability,
   isServerCapabilityEnabled,
   sendDisabledCapabilityResponse,
 };

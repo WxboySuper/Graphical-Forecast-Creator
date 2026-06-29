@@ -4,8 +4,32 @@ import type {
   TstmGenerationRequest,
   TstmGenerationResponse,
 } from '../types/tstmGeneration';
+import { markServerCapabilityUnavailable } from '../config/serverCapabilityStatus';
 
 const TSTM_GENERATION_ENDPOINT = '/api/tstm/generate';
+const TSTM_CAPABILITY_KEY = 'TSTM_GENERATION_ENABLED';
+const DISABLED_CAPABILITY_MESSAGE = 'Auto-TSTM is not enabled on this deployment.';
+
+/** Returns the server error message from an Auto-TSTM API payload when present. */
+const readTstmGenerationErrorMessage = (payload: unknown): string | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const error = (payload as { error?: unknown }).error;
+  return typeof error === 'string' ? error : null;
+};
+
+/** Returns the error message for a failed Auto-TSTM generation request. */
+const getTstmGenerationErrorMessage = (payload: unknown): string =>
+  readTstmGenerationErrorMessage(payload) ?? 'Auto-TSTM guidance is temporarily unavailable.';
+
+/** Marks the server capability unavailable when the API returns the standard disabled response. */
+const handleDisabledTstmCapability = (response: Response, error: string): void => {
+  if (response.status === 404 && error === DISABLED_CAPABILITY_MESSAGE) {
+    markServerCapabilityUnavailable(TSTM_CAPABILITY_KEY);
+  }
+};
 
 /** Returns true when SPC calibrated thunder can cover the given outlook day. */
 export const canGenerateTstmForDay = (day: DayType): boolean => day === 1 || day === 2;
@@ -136,9 +160,8 @@ export const requestTstmGeneration = async (
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = payload && typeof payload.error === 'string'
-      ? payload.error
-      : 'Auto-TSTM guidance is temporarily unavailable.';
+    const error = getTstmGenerationErrorMessage(payload);
+    handleDisabledTstmCapability(response, error);
     throw new Error(error);
   }
   return parseTstmGenerationResponse(payload);
