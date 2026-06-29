@@ -4,6 +4,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { evaluateFeatureExposurePolicy } from './lib/feature-exposure-policy.mjs';
 import {
   collectGatedFeatures,
@@ -125,4 +126,6 @@ function main() {
   console.log(`  Exposure acknowledgements: ${Object.keys(acknowledgements).length}`);
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

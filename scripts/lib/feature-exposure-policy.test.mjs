@@ -317,6 +317,17 @@ describe('feature exposure policy', () => {
     });
   });
 
+  it('ignores server registry entries without a serverCapabilityKey', () => {
+    const result = evaluateFeatureExposurePolicy(validRegistry, emptySurfaces, {
+      serverRegistry: {
+        coreFeature: {
+          exposure: { ...ALL_ON },
+        },
+      },
+    });
+    assert.equal(result.ok, true);
+  });
+
   it('fails when client server-backed feature is missing from server registry', () => {
     const registry = {
       backed: {

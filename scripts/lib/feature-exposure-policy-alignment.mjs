@@ -28,6 +28,7 @@ export function validateServerCapabilitiesHaveClientOwners(registry, serverRegis
   );
 
   for (const [featureKey, definition] of Object.entries(serverRegistry)) {
+    if (!definition.serverCapabilityKey) continue;
     if (clientCapabilityKeys.has(definition.serverCapabilityKey)) continue;
     errors.push(
       `Server capability key "${definition.serverCapabilityKey}" (feature "${featureKey}") has no matching client serverBacked feature.`
