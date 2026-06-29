@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #629
+
+- Pin all third-party workflow actions to immutable commit SHAs; enable Dependabot `github-actions` updates (#604).
+
 ### PR #616
 
 - Complete PR #612 porting on beta: hotfix merges into `main` use reviewable port PRs instead of direct post-merge beta sync. Preserves `betaContainsMain` port PR policy checks from earlier beta work.
