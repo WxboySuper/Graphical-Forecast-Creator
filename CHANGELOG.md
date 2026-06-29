@@ -5,8 +5,6 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-<<<<<<< HEAD
-=======
 ### Security
 - **CI shell injection:** Pass PR branch refs through `env` in `ci.yml` and `pr-governance.yml` `git fetch` steps so branch names cannot break out of the shell command.
 - **Dependabot changelog workflow:** Require Dependabot PR provenance before checking out PR head code with `GH_PAT`; pass base ref through env in shell steps; pin `actions/checkout` to an immutable SHA.
@@ -20,7 +18,6 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Deploy reliability:** Harden beta and production VPS deploy workflows against flaky `ssh-keyscan` host-key discovery with pinned known-host secrets, retries, deploy concurrency, and explicit `StrictHostKeyChecking` on SSH/rsync.
 
->>>>>>> 541ab3e (fix(ci): trigger VPS deploys on GitHub Release publish)
 ### Added
 - **Explicit build targets:** Define and validate local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
 - **PR governance:** Add feature exposure labels (`exposure:production`, `exposure:server-backed`, `exposure:registry-change`) to automatically tag PRs that change feature exposure configuration.

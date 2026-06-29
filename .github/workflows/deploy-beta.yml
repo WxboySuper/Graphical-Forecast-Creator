@@ -3,14 +3,11 @@ name: Deploy Beta
 permissions:
   contents: read
 
-<<<<<<< HEAD
-=======
 # One deploy per beta prerelease. post-merge-automation publishes vX.Y.Z-beta.N after
 # the version-bump push, so merge pushes no longer trigger duplicate deploys.
 concurrency:
   group: deploy-beta
 
->>>>>>> 541ab3e (fix(ci): trigger VPS deploys on GitHub Release publish)
 on:
   release:
     types: [prereleased]
@@ -23,28 +20,49 @@ on:
 
 jobs:
   deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.release.target_commitish == 'beta'
     runs-on: ubuntu-latest
+    env:
+      RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
 
     steps:
       - name: Resolve checkout ref
         id: checkout_ref
+        env:
+          GHA_EVENT_NAME: ${{ github.event_name }}
+          GHA_TAG_NAME: ${{ github.event.release.tag_name }}
+          GHA_INPUT_REF: ${{ inputs.ref }}
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "ref=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ inputs.ref }}" ]; then
-            echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          if [ "$GHA_EVENT_NAME" = "release" ]; then
+            echo "ref=${GHA_TAG_NAME}" >> "$GITHUB_OUTPUT"
+          elif [ -n "$GHA_INPUT_REF" ]; then
+            echo "ref=${GHA_INPUT_REF}" >> "$GITHUB_OUTPUT"
           else
             echo "ref=beta" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout
-<<<<<<< HEAD
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-=======
-        uses: actions/checkout@v4
         with:
           ref: ${{ steps.checkout_ref.outputs.ref }}
->>>>>>> 541ab3e (fix(ci): trigger VPS deploys on GitHub Release publish)
+
+      - name: Verify beta release tag matches package.json
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          PKG=$(node -p "require('./package.json').version")
+          if [ "v${PKG}" != "$RELEASE_TAG" ]; then
+            echo "::error::Release tag ${RELEASE_TAG} does not match package.json version ${PKG}" >&2
+            exit 1
+          fi
+          if ! printf '%s' "$PKG" | grep -Eq -- '-beta\.[0-9]+$'; then
+            echo "::error::Deploy Beta requires a -beta.N package.json version, got ${PKG}" >&2
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -90,7 +108,30 @@ jobs:
           ssh-private-key: ${{ secrets.BETA_SSH_KEY }}
 
       - name: Trust VPS host key
-        run: ssh-keyscan -H ${{ secrets.BETA_SSH_HOST }} >> ~/.ssh/known_hosts
+        env:
+          SSH_HOST: ${{ secrets.BETA_SSH_HOST }}
+          SSH_KNOWN_HOSTS: ${{ secrets.BETA_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            for attempt in 1 2 3 4 5; do
+              if scan_output=$(ssh-keyscan -T 15 -p 22 -H "$SSH_HOST" 2>/tmp/ssh-keyscan.err) && [ -n "$scan_output" ]; then
+                printf '%s\n' "$scan_output" >> ~/.ssh/known_hosts
+                exit 0
+              fi
+              cat /tmp/ssh-keyscan.err >&2 || true
+              if [ "$attempt" -lt 5 ]; then
+                echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
+                sleep $((attempt * 5))
+              fi
+            done
+            echo "ssh-keyscan failed after 5 attempts" >&2
+            exit 1
+          fi
 
       - name: Deploy via rsync
         run: |
@@ -133,7 +174,7 @@ jobs:
 
       - name: Install analytics dependencies and restart
         run: |
-          ssh root@${{ secrets.BETA_SSH_HOST }} '
+          ssh -o StrictHostKeyChecking=yes root@${{ secrets.BETA_SSH_HOST }} '
             cd /opt/gfc-beta-analytics
             npm install --omit=dev --quiet
             mkdir -p /opt/gfc-beta-analytics/logs
