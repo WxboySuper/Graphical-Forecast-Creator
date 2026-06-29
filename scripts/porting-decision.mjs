@@ -1,4 +1,3 @@
-import { classifyBetaPortConflicts } from './lib/port-conflicts.mjs';
 import { resolvePortTargets, shouldSkipPorting } from './lib/port-targets.mjs';
 
 const baseBranch = process.env.BASE_BRANCH ?? '';

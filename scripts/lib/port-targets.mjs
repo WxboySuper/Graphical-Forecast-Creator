@@ -47,19 +47,11 @@ export const isManualBetaPortPr = (pr, sourcePrNumber, sourceBranch) => {
     return false;
   }
 
-  if (pr.headRefName === sourceBranch) {
-    return true;
-  }
-
-  if (referencesSourcePr(pr.title ?? '', sourcePrNumber)) {
-    return true;
-  }
-
-  if (referencesSourcePr(pr.body ?? '', sourcePrNumber)) {
-    return true;
-  }
-
-  return false;
+  return (
+    pr.headRefName === sourceBranch ||
+    referencesSourcePr(pr.title ?? '', sourcePrNumber) ||
+    referencesSourcePr(pr.body ?? '', sourcePrNumber)
+  );
 };
 
 /**
