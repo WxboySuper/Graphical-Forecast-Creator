@@ -219,12 +219,8 @@ export function serializeFeatureExposureDiagnostics(report) {
 
 /** @param {string} value */
 function stripMatchingQuotes(value) {
-  const quote = value[0];
-  if ((quote === '"' || quote === "'") && value.endsWith(quote)) {
-    return value.slice(1, -1);
-  }
-
-  return value;
+  const match = /^(['"])(.*)\1$/u.exec(value);
+  return match ? match[2] : value;
 }
 
 /**
