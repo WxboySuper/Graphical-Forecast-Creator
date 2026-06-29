@@ -4,8 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### Security
-- **GitHub Actions supply chain:** Pin all third-party workflow actions to immutable commit SHAs; enable Dependabot `github-actions` updates.
+### PR #629
+
+- Pin all third-party workflow actions to immutable commit SHAs; enable Dependabot `github-actions` updates (#604).
 
 ### PR #616
 
