@@ -43,51 +43,102 @@ function writeStepSummary(body) {
  *   publishIssue?: boolean,
  * }} [options]
  */
-export async function runStaleBranchReport(options = {}) {
-  const dryRun = options.dryRun ?? process.env.DRY_RUN === '1';
-  const repository = options.repository ?? process.env.GITHUB_REPOSITORY ?? '';
-  const token = options.token ?? process.env.GITHUB_TOKEN ?? '';
-  const runId = options.runId ?? process.env.GITHUB_RUN_ID ?? '';
-  const publishIssue = options.publishIssue ?? true;
-  const publishErrors = [];
+function resolveReportConfig(options = {}) {
+  return {
+    dryRun: options.dryRun ?? process.env.DRY_RUN === '1',
+    repository: options.repository ?? process.env.GITHUB_REPOSITORY ?? '',
+    token: options.token ?? process.env.GITHUB_TOKEN ?? '',
+    runId: options.runId ?? process.env.GITHUB_RUN_ID ?? '',
+    publishIssue: options.publishIssue ?? true,
+  };
+}
 
-  let inputs;
-  if (dryRun) {
-    inputs = await loadFixtureInputs();
-  } else {
-    if (!repository || !token) {
-      throw new Error('GITHUB_REPOSITORY and GITHUB_TOKEN are required unless DRY_RUN=1.');
-    }
-    inputs = await fetchStaleBranchInputs({ repository, token });
+/**
+ * @param {{
+ *   dryRun: boolean,
+ *   repository: string,
+ *   token: string,
+ * }} config
+ */
+async function loadReportInputs(config) {
+  if (config.dryRun) {
+    return loadFixtureInputs();
   }
+  if (!config.repository || !config.token) {
+    throw new Error('GITHUB_REPOSITORY and GITHUB_TOKEN are required unless DRY_RUN=1.');
+  }
+  return fetchStaleBranchInputs({ repository: config.repository, token: config.token });
+}
 
+/**
+ * @param {Awaited<ReturnType<typeof loadReportInputs>>} inputs
+ * @param {{
+ *   repository: string,
+ *   runId: string,
+ * }} config
+ */
+function buildReportBody(inputs, config) {
   const report = buildStaleBranchReport(inputs);
   const body = formatStaleBranchReport({
     ...report,
-    errors: [...(inputs.errors ?? []), ...publishErrors],
-    runUrl: buildRunUrl(repository, runId),
-    repository: repository || undefined,
+    errors: inputs.errors ?? [],
+    runUrl: buildRunUrl(config.repository, config.runId),
+    repository: config.repository || undefined,
   });
+  return { report, body };
+}
 
-  console.log(body);
-
-  writeStepSummary(body);
-
-  if (!dryRun && publishIssue && repository && token) {
-    try {
-      const result = await upsertStaleBranchReportIssue({ repository, token, body });
-      console.log(`Stale branch report issue ${result.action} (#${result.issueNumber}).`);
-    } catch (error) {
-      const message = `Failed to upsert stale branch report issue: ${error instanceof Error ? error.message : String(error)}`;
-      console.warn(message);
-      publishErrors.push(message);
-      writeStepSummary(`\n### Publish errors\n\n- ${message}\n`);
-    }
-  } else if (!dryRun && publishIssue) {
+/**
+ * @param {{
+ *   dryRun: boolean,
+ *   publishIssue: boolean,
+ *   repository: string,
+ *   token: string,
+ * }} config
+ * @param {string} body
+ */
+async function maybePublishIssue(config, body) {
+  if (config.dryRun || !config.publishIssue) {
+    return;
+  }
+  if (!config.repository || !config.token) {
     console.log('Skipping issue upsert (GITHUB_REPOSITORY or GITHUB_TOKEN unset).');
+    return;
   }
 
-  return { report, body, dryRun };
+  try {
+    const result = await upsertStaleBranchReportIssue({
+      repository: config.repository,
+      token: config.token,
+      body,
+    });
+    console.log(`Stale branch report issue ${result.action} (#${result.issueNumber}).`);
+  } catch (error) {
+    const message = `Failed to upsert stale branch report issue: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(message);
+    writeStepSummary(`\n### Publish errors\n\n- ${message}\n`);
+  }
+}
+
+/**
+ * @param {{
+ *   dryRun?: boolean,
+ *   repository?: string,
+ *   token?: string,
+ *   runId?: string,
+ *   publishIssue?: boolean,
+ * }} [options]
+ */
+export async function runStaleBranchReport(options = {}) {
+  const config = resolveReportConfig(options);
+  const inputs = await loadReportInputs(config);
+  const { report, body } = buildReportBody(inputs, config);
+
+  console.log(body);
+  writeStepSummary(body);
+  await maybePublishIssue(config, body);
+
+  return { report, body, dryRun: config.dryRun };
 }
 
 async function main() {

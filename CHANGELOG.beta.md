@@ -4,7 +4,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### Stale branch report (FND-10)
+### PR #631
 
 - Add weekly/manual stale branch reporting for `feature/*`, `fix/*`, and `research/*` branches with a 14-day grace period, orphaned vs open-PR grouping, and commits-behind-`beta` metadata (#494).
 
