@@ -10,5 +10,17 @@
   "collaborationRoom": {
     "reason": "Route and navigation gating covered by src/testing/featureExposure/exemplar.exposure.test.tsx and src/routing/buildFeatureGatedRoutes.test.tsx",
     "trackingIssue": 529
+  },
+  "forecastWorkflowV2": {
+    "reason": "Registry-only until workflow v2 surfaces merge; adoption contract in src/config/v17WorkstreamAdoption.exposure.test.ts",
+    "trackingIssue": 530
+  },
+  "verificationRelaunch": {
+    "reason": "Registry-only until verification relaunch surfaces merge; core /verification is separate; adoption contract in src/config/v17WorkstreamAdoption.exposure.test.ts",
+    "trackingIssue": 530
+  },
+  "customProducts": {
+    "reason": "Registry-only until custom product surfaces merge; adoption contract in src/config/v17WorkstreamAdoption.exposure.test.ts",
+    "trackingIssue": 530
   }
 }

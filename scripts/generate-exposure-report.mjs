@@ -30,6 +30,7 @@ function runPolicy(inputs) {
       sideEffectModules,
       acknowledgements,
       existingTestFiles,
+      requireV17WorkstreamRegistry: true,
     }
   );
 }

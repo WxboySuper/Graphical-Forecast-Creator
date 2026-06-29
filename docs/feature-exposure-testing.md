@@ -2,6 +2,8 @@
 
 Reusable fixtures and assertions for proving gated features stay inert while disabled. This is the minimum contract expected by FND-13 (#529) before a v1.7 workstream enables beta exposure in FND-14 (#530).
 
+Workstream registry keys, surfaces, and beta-enablement records: [feature-exposure-workstreams.md](./feature-exposure-workstreams.md).
+
 ## Minimum test contract
 
 Every gated feature must either:

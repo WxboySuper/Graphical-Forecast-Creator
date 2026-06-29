@@ -31,6 +31,7 @@ describe('validate-feature-exposure integration', () => {
         sideEffectModules: inputs.sideEffectModules,
         acknowledgements: inputs.acknowledgements,
         existingTestFiles: inputs.existingTestFiles,
+        requireV17WorkstreamRegistry: true,
       }
     );
     assert.equal(result.ok, true, result.ok ? '' : result.errors.join('\n'));

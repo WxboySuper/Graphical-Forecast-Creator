@@ -133,6 +133,8 @@ Client runtime fallback for server-backed features lives in:
 
 Disabled-side-effect test fixtures and the minimum per-feature contract are documented in [docs/feature-exposure-testing.md](docs/feature-exposure-testing.md). Run `pnpm test:exposure` locally or adopt `src/testing/featureExposure/harness.tsx` in a new `*.exposure.test.ts` file.
 
+v1.7 workstream adoption (registry keys, gates, beta-enablement records) is documented in [docs/feature-exposure-workstreams.md](docs/feature-exposure-workstreams.md).
+
 ### Local Beta Mode (developer)
 
 Run the app with beta-only features locally (useful for testing forecast redesigns, verification flows, and discussion changes).

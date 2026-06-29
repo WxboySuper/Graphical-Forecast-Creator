@@ -49,6 +49,7 @@ function evaluateHeadPolicy(inputs) {
       sideEffectModules: inputs.sideEffectModules,
       acknowledgements: inputs.acknowledgements,
       existingTestFiles: inputs.existingTestFiles,
+      requireV17WorkstreamRegistry: true,
     }
   );
 }
