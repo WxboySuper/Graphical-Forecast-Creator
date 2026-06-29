@@ -43,7 +43,7 @@ export function validateClientServerRegistryAlignment(registry, serverRegistry, 
 }
 
 /** Reports one mismatched exposure target between client and server registries. */
-function validateExposureTargetAlignment(featureKey, clientDefinition, serverDefinition, target, errors) {
+function validateExposureTargetAlignment({ featureKey, clientDefinition, serverDefinition, target }, errors) {
   const clientValue = clientDefinition.exposure?.[target];
   const serverValue = serverDefinition.exposure?.[target];
   if (clientValue === serverValue) return;
@@ -53,7 +53,7 @@ function validateExposureTargetAlignment(featureKey, clientDefinition, serverDef
 }
 
 /** Reports mismatched server capability keys between client and server registries. */
-function validateServerCapabilityKeyAlignment(featureKey, clientDefinition, serverDefinition, errors) {
+function validateServerCapabilityKeyAlignment({ featureKey, clientDefinition, serverDefinition }, errors) {
   if (clientDefinition.serverCapabilityKey === serverDefinition.serverCapabilityKey) return;
   errors.push(
     `Feature "${featureKey}" serverCapabilityKey is "${clientDefinition.serverCapabilityKey}" on client but "${serverDefinition.serverCapabilityKey}" on server.`
@@ -66,9 +66,10 @@ export function validateClientServerExposureMatrices(registry, serverRegistry, e
     const clientDefinition = registry[featureKey];
     if (!clientDefinition) continue;
 
+    const alignmentContext = { featureKey, clientDefinition, serverDefinition };
     for (const target of BUILD_TARGET_LIST) {
-      validateExposureTargetAlignment(featureKey, clientDefinition, serverDefinition, target, errors);
+      validateExposureTargetAlignment({ ...alignmentContext, target }, errors);
     }
-    validateServerCapabilityKeyAlignment(featureKey, clientDefinition, serverDefinition, errors);
+    validateServerCapabilityKeyAlignment(alignmentContext, errors);
   }
 }

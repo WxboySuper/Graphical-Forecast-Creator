@@ -11,6 +11,8 @@ exclude_patterns = [
   "scripts/validate-feature-exposure.integration.test.mjs",
   "scripts/lib/feature-exposure-source-parser.mjs",
   "scripts/lib/feature-exposure-policy.mjs",
+  "scripts/lib/feature-exposure-policy-alignment.mjs",
+  "scripts/lib/feature-exposure-policy-contract.mjs",
   "server/**/*.test.js",
   "src/**/*.test.ts",
   "src/**/*.test.tsx",
