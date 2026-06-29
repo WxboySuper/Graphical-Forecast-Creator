@@ -3,6 +3,20 @@ import { postMergeOwnsMainToBetaSync } from './port-pr-policy.mjs';
 export const PORTING_MANUAL_LABEL = 'porting/manual';
 
 /**
+ * @param {string | undefined} json
+ * @returns {Array<{ number: number; headRefName: string; title?: string; body?: string; url?: string }>}
+ */
+export const parseOpenBetaPrsJson = (json) => {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
  * @param {string} baseBranch
  * @param {string} sourceBranch
  * @returns {string[]}
@@ -26,11 +40,9 @@ export const resolvePortTargets = ({ baseBranch, sourceBranch }) => {
 const referencesSourcePr = (text, sourcePrNumber) => {
   if (!text) return false;
   const patterns = [
-    new RegExp(`\\bports?\\s+#${sourcePrNumber}(?!\\d)`, 'i'),
+    new RegExp(`\\bports?\\s+(?:PR\\s*)?#${sourcePrNumber}(?!\\d)`, 'i'),
     new RegExp(`\\bcherry.picks?\\s+#?${sourcePrNumber}(?!\\d)`, 'i'),
     new RegExp(`\\bport\\s+of\\s+#?${sourcePrNumber}(?!\\d)`, 'i'),
-    new RegExp(`\\bPR\\s*#?${sourcePrNumber}(?!\\d)`, 'i'),
-    new RegExp(`pull\\s+request\\s+#?${sourcePrNumber}(?!\\d)`, 'i'),
   ];
   return patterns.some((pattern) => pattern.test(text));
 };

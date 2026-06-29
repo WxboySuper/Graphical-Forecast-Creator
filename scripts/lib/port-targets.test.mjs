@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   PORTING_MANUAL_LABEL,
   isManualBetaPortPr,
+  parseOpenBetaPrsJson,
   resolvePortTargets,
   shouldSkipPorting,
 } from './port-targets.mjs';
@@ -77,6 +78,27 @@ describe('port targets', () => {
       ),
       false,
     );
+    assert.equal(
+      isManualBetaPortPr(
+        {
+          headRefName: 'fix/unrelated',
+          title: 'Follow-up',
+          body: 'Fixes issue discussed in PR #591',
+        },
+        591,
+        'hotfix/exposure-pr-labels-main',
+      ),
+      false,
+    );
+  });
+
+  it('parses open beta PR JSON defensively', () => {
+    assert.deepEqual(parseOpenBetaPrsJson('[{"number":1,"headRefName":"hotfix/x"}]'), [
+      { number: 1, headRefName: 'hotfix/x' },
+    ]);
+    assert.deepEqual(parseOpenBetaPrsJson('not-json'), []);
+    assert.deepEqual(parseOpenBetaPrsJson(undefined), []);
+    assert.deepEqual(parseOpenBetaPrsJson('{"not":"array"}'), []);
   });
 
   it('ignores automated port branches', () => {
