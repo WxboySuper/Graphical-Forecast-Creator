@@ -139,6 +139,13 @@ export function evaluateClientServerAlignment(registry, serverRegistry) {
   return errors.length === 0 ? { ok: true, errors: [] } : { ok: false, errors };
 }
 
+/** Policy wording for temporary production exposure overlaps with leakage checks. */
+function isTemporaryProductionPolicyError(error) {
+  return /^Temporary feature "[^"]+" is exposed on production\. Temporary features must not be enabled/u.test(
+    error
+  );
+}
+
 /**
  * @param {{
  *   headRegistry: Record<string, any>,
@@ -147,15 +154,12 @@ export function evaluateClientServerAlignment(registry, serverRegistry) {
  * }} context
  */
 export function validatePromotionExposure({ headRegistry, baseRegistry = {}, policyResult }) {
-  const errors = [];
   const leakage = evaluateExperimentalLeakage(headRegistry, baseRegistry);
-
-  if (!policyResult.ok) {
-    errors.push(...(policyResult.errors ?? []));
-  }
-  if (!leakage.ok) {
-    errors.push(...leakage.errors);
-  }
+  const policyErrors = policyResult.ok ? [] : (policyResult.errors ?? []);
+  const errors = [
+    ...(leakage.ok ? policyErrors : policyErrors.filter((error) => !isTemporaryProductionPolicyError(error))),
+    ...(leakage.ok ? [] : leakage.errors),
+  ];
 
   const uniqueErrors = [...new Set(errors)];
   return uniqueErrors.length === 0 ? { ok: true, errors: [] } : { ok: false, errors: uniqueErrors };

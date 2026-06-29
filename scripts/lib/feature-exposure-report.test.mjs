@@ -176,6 +176,37 @@ describe('feature exposure report', () => {
     assert.ok(promotion.errors.some((error) => /leaky/.test(error)));
   });
 
+  it('dedupes temporary production violations between policy and leakage checks', () => {
+    const headRegistry = {
+      leaky: {
+        exposure: { ...ALL_ON },
+        temporary: true,
+        trackingIssue: 30,
+      },
+    };
+    const baseRegistry = {
+      leaky: {
+        exposure: { ...ALL_ON },
+        temporary: true,
+        trackingIssue: 30,
+      },
+    };
+    const promotion = validatePromotionExposure({
+      headRegistry,
+      baseRegistry,
+      policyResult: {
+        ok: false,
+        errors: [
+          'Temporary feature "leaky" is exposed on production. Temporary features must not be enabled on production until explicitly promoted.',
+        ],
+      },
+    });
+
+    assert.equal(promotion.ok, false);
+    assert.equal(promotion.errors.length, 1);
+    assert.match(promotion.errors[0], /leaky.*#30/u);
+  });
+
   it('formats the text exposure report', () => {
     const report = generateProductionExposureReport(sampleRegistry);
     const text = formatExposureReport({ report, newlyProductionVisible: [] });

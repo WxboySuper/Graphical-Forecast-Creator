@@ -8,7 +8,7 @@ import {
 } from './lib/feature-exposure-report.mjs';
 import { loadPolicyInputs } from './validate-feature-exposure.mjs';
 
-/** @param {import('./lib/feature-exposure-policy.mjs').PolicyResult} policyResult */
+/** @param {ReturnType<typeof loadPolicyInputs>} inputs */
 function runPolicy(inputs) {
   const {
     registry,

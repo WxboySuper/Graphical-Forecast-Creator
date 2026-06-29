@@ -56,7 +56,6 @@ function evaluateHeadPolicy(inputs) {
 /** Builds the GitHub Actions run URL when repository and run id are available. */
 function buildRunUrl() {
   if (!repository || !runId) return undefined;
-  const [owner] = repository.split('/');
   return `https://github.com/${repository}/actions/runs/${runId}`;
 }
 
