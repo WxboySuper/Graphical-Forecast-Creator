@@ -73,6 +73,17 @@ export function formatBehindBeta(behindBy) {
 }
 
 /**
+ * @param {string | null} authorLogin
+ * @param {string} authorName
+ */
+export function formatAuthor(authorLogin, authorName) {
+  if (authorLogin) {
+    return `\`${authorLogin}\``;
+  }
+  return authorName;
+}
+
+/**
  * @param {number | null} openPrNumber
  * @param {string} [repository]
  */
@@ -143,7 +154,7 @@ function formatBranchTable(rows, repository) {
     '| Branch | Age (days) | Last commit | Author | Open PR | Behind beta |',
     '|---|---:|---|---|---|---:|',
     ...rows.map((row) => {
-      const author = row.authorLogin ? `@${row.authorLogin}` : row.authorName;
+      const author = formatAuthor(row.authorLogin, row.authorName);
       const lastCommit = `${row.sha} (${row.committedAt.slice(0, 10)})`;
       return `| \`${escapeMarkdownTableCell(row.name)}\` | ${row.ageDays} | ${escapeMarkdownTableCell(lastCommit)} | ${escapeMarkdownTableCell(author)} | ${formatOpenPr(row.openPrNumber, repository)} | ${formatBehindBeta(row.behindBy)} |`;
     }),

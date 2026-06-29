@@ -235,12 +235,5 @@ export async function upsertStaleBranchReportIssue({ repository, token, body }) 
     },
   });
 
-  if (!created?.body?.includes(REPORT_ISSUE_MARKER)) {
-    await githubRequest(repository, token, `/issues/${created.number}`, {
-      method: 'PATCH',
-      body: { body },
-    });
-  }
-
   return { action: 'created', issueNumber: created.number };
 }

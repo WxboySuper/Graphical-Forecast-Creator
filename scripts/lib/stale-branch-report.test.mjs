@@ -9,6 +9,7 @@ import {
   ageInDays,
   buildStaleBranchReport,
   findExistingReportIssue,
+  formatAuthor,
   formatBehindBeta,
   formatOpenPr,
   formatStaleBranchReport,
@@ -79,6 +80,8 @@ describe('stale branch report', () => {
     assert.equal(formatBehindBeta(12), '12');
     assert.equal(formatBehindBeta(null), 'unknown');
     assert.equal(formatOpenPr(null), 'orphaned');
+    assert.equal(formatAuthor('alice', 'Alice Example'), '`alice`');
+    assert.equal(formatAuthor(null, 'Alice Example'), 'Alice Example');
     assert.equal(
       formatOpenPr(501, 'WxboySuper/Graphical-Forecast-Creator'),
       '[#501](https://github.com/WxboySuper/Graphical-Forecast-Creator/pull/501)'
