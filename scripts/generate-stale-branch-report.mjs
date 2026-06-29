@@ -148,7 +148,7 @@ async function main() {
     const message = `Stale branch report failed: ${error instanceof Error ? error.message : String(error)}`;
     console.error(message);
     writeStepSummary(`### Stale branch report failed\n\n${message}\n`);
-    process.exitCode = 0;
+    process.exitCode = 1;
   }
 }
 
