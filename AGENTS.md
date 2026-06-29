@@ -108,6 +108,16 @@ pnpm exec playwright test e2e/smoke.spec.ts
 - Mention unrelated dirty files only when they matter.
 - Do not bury the result under process narration.
 
+## GitHub PR and issue bodies
+
+When writing or updating PR descriptions, issue comments, or `gh pr create` / `gh pr edit` bodies:
+
+- Use real Markdown backticks for inline code: `` `ci.yml` ``, `` `$GITHUB_HEAD_REF` ``, `` `main` ``.
+- Never escape backticks for the shell (`\``) inside PR/issue bodies — that renders as garbage on GitHub.
+- On Windows/PowerShell, prefer `gh pr edit <n> --body-file path/to/body.md` (or a here-string written to a temp file) instead of passing `--body` with nested quotes and backticks on the command line.
+- Use normal Markdown structure: `##` headings, `- [ ]` checklists, and fenced code blocks only for multi-line snippets.
+- File paths and branch names belong in backticks; issue/PR references use `#123` without backticks.
+
 ## Porting main → beta
 
 Use this when you need to land a **main** change on **beta** yourself, or when automated porting opened a draft conflict PR.
