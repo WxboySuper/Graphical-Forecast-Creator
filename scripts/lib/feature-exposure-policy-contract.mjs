@@ -44,6 +44,76 @@ export const V17_WORKSTREAM_KEYS = [
   'collaborationRoom',
 ];
 
+const V17_BUILD_TARGETS = ['local', 'beta', 'staging', 'production'];
+
+/** Returns true when the registry includes the full v1.7 workstream key set. */
+function hasCompleteV17WorkstreamRegistry(registry) {
+  const presentKeys = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry);
+  if (presentKeys.length === 0) {
+    return false;
+  }
+
+  return presentKeys.length === V17_WORKSTREAM_KEYS.length;
+}
+
+/** Adds an error when the registry declares only part of the v1.7 workstream key set. */
+function validateV17RegistryCompleteness(registry, errors) {
+  if (!hasCompleteV17WorkstreamRegistry(registry)) {
+    const presentCount = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry).length;
+    if (presentCount > 0) {
+      errors.push(
+        `Registry declares ${presentCount} of ${V17_WORKSTREAM_KEYS.length} v1.7 workstream keys; partial adoption is not allowed.`
+      );
+    }
+    return false;
+  }
+
+  return true;
+}
+
+/** Adds lifecycle violations for one v1.7 workstream registry entry. */
+function validateV17WorkstreamLifecycle(featureKey, definition, errors) {
+  if (definition.temporary !== true) {
+    errors.push(`v1.7 workstream "${featureKey}" must remain temporary until production promotion.`);
+  }
+
+  for (const target of V17_BUILD_TARGETS) {
+    if (definition.exposure?.[target] !== false) {
+      errors.push(
+        `v1.7 workstream "${featureKey}" must stay disabled on target "${target}" until adoption enables it.`
+      );
+    }
+  }
+}
+
+/** Returns true when a v1.7 workstream has per-feature tests or a valid acknowledgement. */
+function hasV17WorkstreamCoverage(featureKey, contract) {
+  const { acknowledgements, existingTestFiles } = contract;
+  if (hasPerFeatureTestFile(featureKey, existingTestFiles)) {
+    return true;
+  }
+
+  return hasValidAcknowledgement(featureKey, acknowledgements);
+}
+
+/** Adds coverage violations for one v1.7 workstream registry entry. */
+function validateV17WorkstreamCoverage(featureKey, gatedFeatures, contract, errors) {
+  if (hasV17WorkstreamCoverage(featureKey, contract)) {
+    return;
+  }
+
+  if (gatedFeatures.has(featureKey)) {
+    errors.push(
+      `v1.7 workstream "${featureKey}" is gated but has no exposure test coverage or acknowledgement.`
+    );
+    return;
+  }
+
+  errors.push(
+    `v1.7 workstream "${featureKey}" has no gated surfaces yet and requires a valid acknowledgement in src/config/featureExposure.acknowledgements.json.`
+  );
+}
+
 /** Returns true when a gated feature has a valid acknowledgement entry. */
 export function hasValidAcknowledgement(featureKey, acknowledgements) {
   const acknowledgement = acknowledgements[featureKey];
@@ -64,47 +134,15 @@ export function validateExposureTestContract(contract, errors) {
 
 /** Requires every v1.7 workstream key to stay fully disabled with documented adoption coverage. */
 export function validateV17WorkstreamAdoption(registry, contract, errors) {
-  const presentKeys = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry);
-  if (presentKeys.length === 0) {
+  if (!validateV17RegistryCompleteness(registry, errors)) {
     return;
   }
 
-  if (presentKeys.length !== V17_WORKSTREAM_KEYS.length) {
-    errors.push(
-      `Registry declares ${presentKeys.length} of ${V17_WORKSTREAM_KEYS.length} v1.7 workstream keys; partial adoption is not allowed.`
-    );
-    return;
-  }
-
-  const { surfaces, sideEffectModules, acknowledgements, existingTestFiles } = contract;
-  const gatedFeatures = collectGatedFeatures(surfaces, sideEffectModules);
+  const gatedFeatures = collectGatedFeatures(contract.surfaces, contract.sideEffectModules);
 
   for (const featureKey of V17_WORKSTREAM_KEYS) {
     const definition = registry[featureKey];
-
-    if (definition.temporary !== true) {
-      errors.push(`v1.7 workstream "${featureKey}" must remain temporary until production promotion.`);
-    }
-
-    for (const target of ['local', 'beta', 'staging', 'production']) {
-      if (definition.exposure?.[target] !== false) {
-        errors.push(`v1.7 workstream "${featureKey}" must stay disabled on target "${target}" until adoption enables it.`);
-      }
-    }
-
-    if (gatedFeatures.has(featureKey)) {
-      if (hasPerFeatureTestFile(featureKey, existingTestFiles)) continue;
-      if (hasValidAcknowledgement(featureKey, acknowledgements)) continue;
-      errors.push(
-        `v1.7 workstream "${featureKey}" is gated but has no exposure test coverage or acknowledgement.`
-      );
-      continue;
-    }
-
-    if (!hasValidAcknowledgement(featureKey, acknowledgements)) {
-      errors.push(
-        `v1.7 workstream "${featureKey}" has no gated surfaces yet and requires a valid acknowledgement in src/config/featureExposure.acknowledgements.json.`
-      );
-    }
+    validateV17WorkstreamLifecycle(featureKey, definition, errors);
+    validateV17WorkstreamCoverage(featureKey, gatedFeatures, contract, errors);
   }
 }
