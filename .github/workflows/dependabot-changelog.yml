@@ -30,22 +30,20 @@ jobs:
 
       - name: Fetch base branch
         env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
-        run: git fetch origin "$GITHUB_BASE_REF"
+          PR_BASE_REF: ${{ github.base_ref }}
+        run: git fetch origin "$PR_BASE_REF"
 
       - name: Update CHANGELOG dependencies
         env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
-          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/update-dependabot-changelog.mjs
 
       - name: Commit and push
         env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
+          PR_BASE_REF: ${{ github.base_ref }}
         run: |
           CHANGELOG_FILE="CHANGELOG.md"
-          if [ "$GITHUB_BASE_REF" = "beta" ]; then CHANGELOG_FILE="CHANGELOG.beta.md"; fi
+          if [ "$PR_BASE_REF" = "beta" ]; then CHANGELOG_FILE="CHANGELOG.beta.md"; fi
           if git diff --quiet "$CHANGELOG_FILE"; then
             echo "No changelog changes to commit."
             exit 0
