@@ -3,6 +3,13 @@ name: Deploy Beta
 permissions:
   contents: read
 
+# Cancel stale beta deploys when merge + version-bump pushes arrive back-to-back.
+# Tradeoff: a push during active rsync can leave mixed assets until the next run
+# finishes; avoid pushing to beta while a deploy is mid-transfer.
+concurrency:
+  group: deploy-beta
+  cancel-in-progress: true
+
 on:
   push:
     branches: [beta]
@@ -11,6 +18,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
 
     steps:
       - name: Checkout
@@ -60,7 +69,30 @@ jobs:
           ssh-private-key: ${{ secrets.BETA_SSH_KEY }}
 
       - name: Trust VPS host key
-        run: ssh-keyscan -H ${{ secrets.BETA_SSH_HOST }} >> ~/.ssh/known_hosts
+        env:
+          SSH_HOST: ${{ secrets.BETA_SSH_HOST }}
+          SSH_KNOWN_HOSTS: ${{ secrets.BETA_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            for attempt in 1 2 3 4 5; do
+              if scan_output=$(ssh-keyscan -T 15 -p 22 -H "$SSH_HOST" 2>/tmp/ssh-keyscan.err) && [ -n "$scan_output" ]; then
+                printf '%s\n' "$scan_output" >> ~/.ssh/known_hosts
+                exit 0
+              fi
+              cat /tmp/ssh-keyscan.err >&2 || true
+              if [ "$attempt" -lt 5 ]; then
+                echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
+                sleep $((attempt * 5))
+              fi
+            done
+            echo "ssh-keyscan failed after 5 attempts" >&2
+            exit 1
+          fi
 
       - name: Deploy via rsync
         run: |
@@ -103,7 +135,7 @@ jobs:
 
       - name: Install analytics dependencies and restart
         run: |
-          ssh root@${{ secrets.BETA_SSH_HOST }} '
+          ssh -o StrictHostKeyChecking=yes root@${{ secrets.BETA_SSH_HOST }} '
             cd /opt/gfc-beta-analytics
             npm install --omit=dev --quiet
             mkdir -p /opt/gfc-beta-analytics/logs

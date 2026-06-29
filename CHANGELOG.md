@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **Deploy env:** Add explicit `SERVER_TARGET` values to beta, staging, and production analytics server deploy env files.
 
+### Fixed
+- **Deploy reliability:** Harden beta and production VPS deploy workflows against flaky `ssh-keyscan` host-key discovery with pinned known-host secrets, retries, deploy concurrency (cancel stale beta runs; queue production), and explicit `StrictHostKeyChecking` on SSH/rsync.
+
 ### Added
 - **Explicit build targets:** Define and validate local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
 - **PR governance:** Add feature exposure labels (`exposure:production`, `exposure:server-backed`, `exposure:registry-change`) to automatically tag PRs that change feature exposure configuration.

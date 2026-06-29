@@ -3,6 +3,11 @@ name: Deploy Production to VPS
 permissions:
   contents: read
 
+# Queue overlapping main deploys; release dirs are versioned but symlink swap and
+# pm2 restart are not safe to run concurrently across SSH sessions.
+concurrency:
+  group: deploy-production
+
 on:
   push:
     branches: [main]
@@ -27,6 +32,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
 
     steps:
       - name: Checkout
@@ -67,7 +74,30 @@ jobs:
           ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
 
       - name: Trust VPS host key
-        run: ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            for attempt in 1 2 3 4 5; do
+              if scan_output=$(ssh-keyscan -T 15 -p 22 -H "$SSH_HOST" 2>/tmp/ssh-keyscan.err) && [ -n "$scan_output" ]; then
+                printf '%s\n' "$scan_output" >> ~/.ssh/known_hosts
+                exit 0
+              fi
+              cat /tmp/ssh-keyscan.err >&2 || true
+              if [ "$attempt" -lt 5 ]; then
+                echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
+                sleep $((attempt * 5))
+              fi
+            done
+            echo "ssh-keyscan failed after 5 attempts" >&2
+            exit 1
+          fi
 
       - name: Validate production release manifest
         id: manifest
@@ -210,14 +240,14 @@ jobs:
           set -euo pipefail
           HOST="root@${{ secrets.PROD_SSH_HOST }}"
 
-          ssh "$HOST" "mkdir -p /var/www/gfc/releases /opt/gfc-analytics/releases /opt/gfc-analytics/config /opt/gfc-analytics/logs"
+          ssh -o StrictHostKeyChecking=yes "$HOST" "mkdir -p /var/www/gfc/releases /opt/gfc-analytics/releases /opt/gfc-analytics/config /opt/gfc-analytics/logs"
 
           rsync -avz --delete build/ "$HOST:/var/www/gfc/releases/$RELEASE_DIR/"
           rsync -avz --exclude='node_modules' --exclude='logs' server/ "$HOST:/opt/gfc-analytics/releases/$RELEASE_DIR/"
           rsync -avz deploy/production-release.json "$HOST:/opt/gfc-analytics/config/production-release.json"
           rsync -avz prod-server.env "$HOST:/opt/gfc-analytics/config/.env"
 
-          ssh "$HOST" "RELEASE_DIR='$RELEASE_DIR' bash -s" <<'REMOTE'
+          ssh -o StrictHostKeyChecking=yes "$HOST" "RELEASE_DIR='$RELEASE_DIR' bash -s" <<'REMOTE'
           set -euo pipefail
           WEB_ROOT=/var/www/gfc
           ANALYTICS_ROOT=/opt/gfc-analytics
@@ -256,7 +286,7 @@ jobs:
           set -euo pipefail
           HOST="root@${{ secrets.PROD_SSH_HOST }}"
 
-          ssh "$HOST" "mkdir -p \
+          ssh -o StrictHostKeyChecking=yes "$HOST" "mkdir -p \
             /var/www/gfc/releases \
             /var/www/gfc-staging/releases \
             /opt/gfc-analytics/releases \
@@ -272,7 +302,7 @@ jobs:
           rsync -avz build/alert-banner-live-pre.json "$HOST:/tmp/alert-banner-live-pre.json"
           rsync -avz staging-server.env "$HOST:/opt/gfc-staging-analytics/config/.env"
 
-          ssh "$HOST" "RELEASE_DIR='$RELEASE_DIR' bash -s" <<'REMOTE'
+          ssh -o StrictHostKeyChecking=yes "$HOST" "RELEASE_DIR='$RELEASE_DIR' bash -s" <<'REMOTE'
           set -euo pipefail
           WEB_ROOT=/var/www/gfc
           STAGING_WEB_ROOT=/var/www/gfc-staging
