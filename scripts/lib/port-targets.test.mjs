@@ -97,7 +97,7 @@ describe('port targets', () => {
       { number: 1, headRefName: 'hotfix/x' },
     ]);
     assert.deepEqual(parseOpenBetaPrsJson('not-json'), []);
-    assert.deepEqual(parseOpenBetaPrsJson(undefined), []);
+    assert.deepEqual(parseOpenBetaPrsJson(), []);
     assert.deepEqual(parseOpenBetaPrsJson('{"not":"array"}'), []);
   });
 
