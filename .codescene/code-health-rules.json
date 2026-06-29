@@ -45,6 +45,15 @@
           "weight": 0.0
         }
       ]
+    },
+    {
+      "matching_content_path": "scripts/lib/stale-branch-report.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
     }
   ]
 }
