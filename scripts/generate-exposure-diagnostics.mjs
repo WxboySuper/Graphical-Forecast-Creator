@@ -82,6 +82,7 @@ export function runExposureDiagnostics(argv = process.argv.slice(2)) {
   return report;
 }
 
+/** CLI entry point for `pnpm exposure:diagnostics`. */
 function main() {
   try {
     runExposureDiagnostics();
