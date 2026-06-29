@@ -3,6 +3,9 @@ name: Deploy Beta
 permissions:
   contents: read
 
+# Cancel stale beta deploys when merge + version-bump pushes arrive back-to-back.
+# Tradeoff: a push during active rsync can leave mixed assets until the next run
+# finishes; avoid pushing to beta while a deploy is mid-transfer.
 concurrency:
   group: deploy-beta
   cancel-in-progress: true
@@ -82,9 +85,12 @@ jobs:
                 exit 0
               fi
               cat /tmp/ssh-keyscan.err >&2 || true
-              echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
-              sleep $((attempt * 5))
+              if [ "$attempt" -lt 5 ]; then
+                echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
+                sleep $((attempt * 5))
+              fi
             done
+            echo "ssh-keyscan failed after 5 attempts" >&2
             exit 1
           fi
 

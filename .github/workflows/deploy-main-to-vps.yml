@@ -3,6 +3,11 @@ name: Deploy Production to VPS
 permissions:
   contents: read
 
+# Queue overlapping main deploys; release dirs are versioned but symlink swap and
+# pm2 restart are not safe to run concurrently across SSH sessions.
+concurrency:
+  group: deploy-production
+
 on:
   push:
     branches: [main]
@@ -85,9 +90,12 @@ jobs:
                 exit 0
               fi
               cat /tmp/ssh-keyscan.err >&2 || true
-              echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
-              sleep $((attempt * 5))
+              if [ "$attempt" -lt 5 ]; then
+                echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
+                sleep $((attempt * 5))
+              fi
             done
+            echo "ssh-keyscan failed after 5 attempts" >&2
             exit 1
           fi
 
