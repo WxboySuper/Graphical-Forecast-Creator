@@ -95,6 +95,7 @@ export const getMaintainerDiagnosticFields = (
   };
 };
 
+/** Returns whether premium entitlement must be active for this feature. */
 const isEntitlementRequired = (
   definition: FeatureExposureDefinition,
   entitlementRequired?: boolean
@@ -110,6 +111,7 @@ const isEntitlementRequired = (
   );
 };
 
+/** Resolves server-backed exposure using the latest capability status snapshot. */
 const resolveServerBackedDiagnostic = (
   capabilityKey: string,
   serverStatus: ServerStatusSnapshot | undefined,

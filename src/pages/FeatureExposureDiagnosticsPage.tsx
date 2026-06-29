@@ -1,3 +1,4 @@
+// skipcq: JS-W1028
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getBuildTarget } from '../config/buildTarget';
@@ -11,8 +12,10 @@ import {
   type ServerCapabilityStatusResponse,
 } from '../config/serverCapabilityStatus';
 
+/** Renders boolean diagnostic values as yes/no for the maintainer table. */
 const formatBoolean = (value: boolean): string => (value ? 'yes' : 'no');
 
+/** Loads live server capability status for local diagnostics. */
 const useServerCapabilityStatus = () => {
   const [serverStatus, setServerStatus] = useState<ServerCapabilityStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,7 @@ const useServerCapabilityStatus = () => {
   return { serverStatus, error };
 };
 
+/** Shown when diagnostics are disabled outside local development builds. */
 const DiagnosticsUnavailableNotice = () => (
   <div className="p-6">
     <h1 className="text-xl font-semibold">Feature exposure diagnostics</h1>
@@ -57,6 +61,7 @@ const DiagnosticsUnavailableNotice = () => (
   </div>
 );
 
+/** Page header with build target context and navigation back to home. */
 const DiagnosticsPageHeader = ({ buildTarget }: { buildTarget: string }) => (
   <div className="mb-4 flex items-center justify-between gap-4">
     <div>
@@ -71,12 +76,39 @@ const DiagnosticsPageHeader = ({ buildTarget }: { buildTarget: string }) => (
   </div>
 );
 
+/** Warns when live server capability status could not be loaded. */
 const ServerStatusError = ({ message }: { message: string }) => (
   <p className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
     Server capability status unavailable: {message}
   </p>
 );
 
+/** Renders the server capability column for one diagnostic row. */
+const formatServerCapability = (diagnostic: FeatureExposureDiagnostic): string => {
+  if (!diagnostic.serverCapability) {
+    return '—';
+  }
+
+  return `${diagnostic.serverCapability.serverReason} (agrees=${formatBoolean(
+    diagnostic.serverCapability.agreesWithClient
+  )})`;
+};
+
+/** Renders one feature row in the diagnostics table. */
+const DiagnosticRow = ({ diagnostic }: { diagnostic: FeatureExposureDiagnostic }) => (
+  <tr className="border-t border-border">
+    <td className="px-3 py-2 font-mono text-xs">{diagnostic.featureKey}</td>
+    <td className="px-3 py-2">{diagnostic.lifecycle}</td>
+    <td className="px-3 py-2">{formatBoolean(diagnostic.registryExposed)}</td>
+    <td className="px-3 py-2">{formatBoolean(diagnostic.resolvedExposed)}</td>
+    <td className="px-3 py-2 font-mono text-xs">{diagnostic.reason}</td>
+    <td className="px-3 py-2 font-mono text-xs">{formatServerCapability(diagnostic)}</td>
+    <td className="px-3 py-2 text-xs">{diagnostic.owner ?? '—'}</td>
+    <td className="px-3 py-2 text-xs">{diagnostic.removalCondition ?? '—'}</td>
+  </tr>
+);
+
+/** Tabular view of resolved feature exposure diagnostics. */
 const DiagnosticsTable = ({ diagnostics }: { diagnostics: FeatureExposureDiagnostic[] }) => (
   <div className="overflow-x-auto rounded-md border border-border">
     <table className="min-w-full text-left text-sm">
@@ -94,22 +126,7 @@ const DiagnosticsTable = ({ diagnostics }: { diagnostics: FeatureExposureDiagnos
       </thead>
       <tbody>
         {diagnostics.map((diagnostic) => (
-          <tr key={diagnostic.featureKey} className="border-t border-border">
-            <td className="px-3 py-2 font-mono text-xs">{diagnostic.featureKey}</td>
-            <td className="px-3 py-2">{diagnostic.lifecycle}</td>
-            <td className="px-3 py-2">{formatBoolean(diagnostic.registryExposed)}</td>
-            <td className="px-3 py-2">{formatBoolean(diagnostic.resolvedExposed)}</td>
-            <td className="px-3 py-2 font-mono text-xs">{diagnostic.reason}</td>
-            <td className="px-3 py-2 font-mono text-xs">
-              {diagnostic.serverCapability
-                ? `${diagnostic.serverCapability.serverReason} (agrees=${formatBoolean(
-                    diagnostic.serverCapability.agreesWithClient
-                  )})`
-                : '—'}
-            </td>
-            <td className="px-3 py-2 text-xs">{diagnostic.owner ?? '—'}</td>
-            <td className="px-3 py-2 text-xs">{diagnostic.removalCondition ?? '—'}</td>
-          </tr>
+          <DiagnosticRow key={diagnostic.featureKey} diagnostic={diagnostic} />
         ))}
       </tbody>
     </table>
