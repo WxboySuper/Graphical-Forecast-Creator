@@ -10,17 +10,19 @@ const TSTM_GENERATION_ENDPOINT = '/api/tstm/generate';
 const TSTM_CAPABILITY_KEY = 'TSTM_GENERATION_ENABLED';
 const DISABLED_CAPABILITY_MESSAGE = 'Auto-TSTM is not enabled on this deployment.';
 
-/** Returns the error message for a failed Auto-TSTM generation request. */
-const getTstmGenerationErrorMessage = (
-  response: Response,
-  payload: unknown
-): string => {
-  if (payload && typeof payload === 'object' && typeof (payload as { error?: unknown }).error === 'string') {
-    return (payload as { error: string }).error;
+/** Returns the server error message from an Auto-TSTM API payload when present. */
+const readTstmGenerationErrorMessage = (payload: unknown): string | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
   }
 
-  return 'Auto-TSTM guidance is temporarily unavailable.';
+  const error = (payload as { error?: unknown }).error;
+  return typeof error === 'string' ? error : null;
 };
+
+/** Returns the error message for a failed Auto-TSTM generation request. */
+const getTstmGenerationErrorMessage = (payload: unknown): string =>
+  readTstmGenerationErrorMessage(payload) ?? 'Auto-TSTM guidance is temporarily unavailable.';
 
 /** Marks the server capability unavailable when the API returns the standard disabled response. */
 const handleDisabledTstmCapability = (response: Response, error: string): void => {
@@ -158,7 +160,7 @@ export const requestTstmGeneration = async (
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = getTstmGenerationErrorMessage(response, payload);
+    const error = getTstmGenerationErrorMessage(payload);
     handleDisabledTstmCapability(response, error);
     throw new Error(error);
   }
