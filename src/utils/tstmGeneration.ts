@@ -4,8 +4,11 @@ import type {
   TstmGenerationRequest,
   TstmGenerationResponse,
 } from '../types/tstmGeneration';
+import { markServerCapabilityUnavailable } from '../config/serverCapabilityStatus';
 
 const TSTM_GENERATION_ENDPOINT = '/api/tstm/generate';
+const TSTM_CAPABILITY_KEY = 'TSTM_GENERATION_ENABLED';
+const DISABLED_CAPABILITY_MESSAGE = 'Auto-TSTM is not enabled on this deployment.';
 
 /** Returns true when SPC calibrated thunder can cover the given outlook day. */
 export const canGenerateTstmForDay = (day: DayType): boolean => day === 1 || day === 2;
@@ -139,6 +142,9 @@ export const requestTstmGeneration = async (
     const error = payload && typeof payload.error === 'string'
       ? payload.error
       : 'Auto-TSTM guidance is temporarily unavailable.';
+    if (response.status === 404 && error === DISABLED_CAPABILITY_MESSAGE) {
+      markServerCapabilityUnavailable(TSTM_CAPABILITY_KEY);
+    }
     throw new Error(error);
   }
   return parseTstmGenerationResponse(payload);

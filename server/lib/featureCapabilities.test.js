@@ -4,8 +4,10 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const {
+  CAPABILITY_REASON,
   DISABLED_CAPABILITY_STATUS,
   createServerCapabilityGate,
+  getServerCapabilityDisableReason,
   isServerCapabilityEnabled,
   sendDisabledCapabilityResponse,
 } = require('./featureCapabilities');
@@ -34,6 +36,65 @@ describe('server capability gates', () => {
       }),
       true
     );
+  });
+
+  it('emergency disable overrides registry exposure and deployment env', () => {
+    const env = {
+      TSTM_GENERATION_ENABLED: 'true',
+      SERVER_TARGET: 'beta',
+      EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
+    };
+
+    assert.equal(
+      isServerCapabilityEnabled('TSTM_GENERATION_ENABLED', {
+        env,
+        exposureOverride: { beta: true },
+      }),
+      false
+    );
+    assert.equal(
+      getServerCapabilityDisableReason('TSTM_GENERATION_ENABLED', {
+        env,
+        exposureOverride: { beta: true },
+      }),
+      CAPABILITY_REASON.EMERGENCY_DISABLED
+    );
+  });
+
+  it('logs emergency rejections without invoking handlers', async () => {
+    let calls = 0;
+    const logEntries = [];
+    const gate = createServerCapabilityGate('TSTM_GENERATION_ENABLED', {
+      env: {
+        TSTM_GENERATION_ENABLED: 'true',
+        SERVER_TARGET: 'beta',
+        EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
+      },
+      exposureOverride: { beta: true },
+      log: {
+        info(message) {
+          logEntries.push(message);
+        },
+      },
+    });
+    const app = express();
+    app.post('/api/test', gate, (_req, res) => {
+      calls += 1;
+      res.status(200).json({ ok: true });
+    });
+    const server = await new Promise((resolve, reject) => {
+      const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+      instance.on('error', reject);
+    });
+
+    try {
+      const response = await fetch(getUrl(server), { method: 'POST' });
+      assert.equal(response.status, DISABLED_CAPABILITY_STATUS);
+      assert.equal(calls, 0);
+      assert.match(logEntries[0], /reason=emergency_disabled/);
+    } finally {
+      server.close();
+    }
   });
 
   it('rejects disabled capabilities before handlers run', async () => {

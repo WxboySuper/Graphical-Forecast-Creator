@@ -24,6 +24,8 @@ async function start() {
 
   const app = express();
   configureApp(app, express, fs, LOG_FILE);
+  const { logCapabilityStartupState } = require('./capabilities');
+  logCapabilityStartupState(process.env);
 
   // Bind to loopback only — never exposed to the internet directly (nginx proxies in)
   app.listen(PORT, '127.0.0.1', () => {

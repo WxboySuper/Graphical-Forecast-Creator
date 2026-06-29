@@ -106,6 +106,35 @@ describe('Auto-TSTM server foundation', () => {
     }
   });
 
+  it('does not invoke the generator when emergency disable is active', async () => {
+    let calls = 0;
+    const server = await startServer(
+      {
+        TSTM_GENERATION_ENABLED: 'true',
+        EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
+      },
+      async () => {
+        calls += 1;
+        return {};
+      },
+      ENABLED_CAPABILITY_OPTIONS,
+    );
+    try {
+      const response = await fetch(getUrl(server), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
+      });
+      assert.equal(response.status, 404);
+      assert.deepEqual(await response.json(), {
+        error: 'Auto-TSTM is not enabled on this deployment.',
+      });
+      assert.equal(calls, 0);
+    } finally {
+      server.close();
+    }
+  });
+
   it('returns sanitized errors when enabled work fails', async () => {
     const server = await startServer(
       { TSTM_GENERATION_ENABLED: 'true' },
