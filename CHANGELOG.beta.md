@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #631
+
+- Add weekly/manual stale branch reporting for `feature/*`, `fix/*`, and `research/*` branches with a 14-day grace period, orphaned vs open-PR grouping, and commits-behind-`beta` metadata (#494).
+
 ### PR #630
 
 - Harden `cleanup-port-branches` workflow: replace `pull_request_target` with `pull_request`, validate port branch names against the automation allowlist before ref deletion, and document security-critical guards (#606).
