@@ -4,7 +4,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### PR #TBD
+### PR #644
 
 - Adopt the feature exposure registry across all six v1.7 workstreams: adoption manifest, registry-only acknowledgements, v1.7 adoption policy rule, adoption exposure tests, gated-route smoke checks, and tracker cross-links (FND-14, #530).
 
