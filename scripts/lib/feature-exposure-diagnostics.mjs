@@ -191,9 +191,11 @@ export function resolveAllFeatureExposureDiagnostics(registry, options) {
  *   env?: Record<string, string | undefined>,
  *   includeInternalMetadata?: boolean,
  * }} options
+ * @returns {{ generatedAt: string, buildTarget: string, features: ReturnType<typeof resolveAllFeatureExposureDiagnostics> }}
  */
 export function generateFeatureExposureDiagnostics(inputs, options) {
   assertBuildTarget(options.target);
+  const generatedAt = new Date().toISOString();
 
   const diagnostics = resolveAllFeatureExposureDiagnostics(inputs.registry, {
     target: options.target,
@@ -206,7 +208,7 @@ export function generateFeatureExposureDiagnostics(inputs, options) {
   });
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     buildTarget: options.target,
     features: diagnostics,
   };
