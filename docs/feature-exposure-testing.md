@@ -94,8 +94,7 @@ Every acknowledgement must include a non-empty `reason` and positive `trackingIs
 ```powershell
 pnpm test:exposure
 pnpm validate:feature-exposure
-pnpm test -- --runTestsByPath src/testing/featureExposure/exemplar.exposure.test.tsx
-node --test server/testing/featureExposureHarness.test.js server/testing/autoTstm.exposure.test.js
+node scripts/run-exposure-suite.mjs
 ```
 
 The exposure suite also runs in CI inside the `feature-exposure-policy` job.

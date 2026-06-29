@@ -140,19 +140,22 @@ export const assertNoFetchTo = async (
   urlPattern: RegExp | string,
   run: () => void | Promise<void>
 ): Promise<void> => {
-  const fetchMock = global.fetch as jest.Mock;
-  const callsBefore = fetchMock.mock.calls.length;
+  const fetchSpy = jest.spyOn(global, 'fetch');
+  const callsBefore = fetchSpy.mock.calls.length;
 
-  await run();
-
-  const newCalls = fetchMock.mock.calls.slice(callsBefore);
-  for (const [request] of newCalls) {
-    const url = typeof request === 'string' ? request : request?.url;
-    if (typeof url === 'string') {
-      const matches =
-        typeof urlPattern === 'string' ? url.includes(urlPattern) : urlPattern.test(url);
-      expect(matches).toBe(false);
+  try {
+    await run();
+  } finally {
+    const newCalls = fetchSpy.mock.calls.slice(callsBefore);
+    for (const [request] of newCalls) {
+      const url = typeof request === 'string' ? request : request?.url;
+      if (typeof url === 'string') {
+        const matches =
+          typeof urlPattern === 'string' ? url.includes(urlPattern) : urlPattern.test(url);
+        expect(matches).toBe(false);
+      }
     }
+    fetchSpy.mockRestore();
   }
 };
 
@@ -174,6 +177,16 @@ export function withNoAsyncSideEffects<T>(run: () => T): T {
     return 0 as unknown as ReturnType<typeof setTimeout>;
   }) as typeof setTimeout);
 
+  const hadWorker = 'Worker' in global;
+  const originalWorker = global.Worker;
+  if (!hadWorker) {
+    Object.defineProperty(global, 'Worker', {
+      configurable: true,
+      writable: true,
+      value: jest.fn(),
+    });
+  }
+
   const workerSpy = jest.spyOn(global, 'Worker').mockImplementation(() => {
     throw new Error('Unexpected Worker started while feature is disabled');
   });
@@ -183,6 +196,11 @@ export function withNoAsyncSideEffects<T>(run: () => T): T {
   } finally {
     setTimeoutSpy.mockRestore();
     workerSpy.mockRestore();
+    if (!hadWorker) {
+      Reflect.deleteProperty(global, 'Worker');
+    } else {
+      global.Worker = originalWorker;
+    }
   }
 }
 
