@@ -89,10 +89,12 @@ export function findNewlyProductionVisible(baseRegistry, headRegistry) {
 
 /**
  * @param {Record<string, any>} headRegistry
+ * @param {Set<string>} [excludeFeatureKeys]
  */
-function collectTemporaryProductionErrors(headRegistry) {
+function collectTemporaryProductionErrors(headRegistry, excludeFeatureKeys = new Set()) {
   const errors = [];
   for (const [featureKey, definition] of Object.entries(headRegistry)) {
+    if (excludeFeatureKeys.has(featureKey)) continue;
     if (definition.temporary !== true || definition.exposure?.production !== true) continue;
     errors.push(
       `Temporary feature "${featureKey}" is exposed on production (#${definition.trackingIssue}).`
@@ -121,8 +123,13 @@ function collectNewlyVisibleTemporaryErrors(headRegistry, baseRegistry) {
  * @param {Record<string, any>} [baseRegistry]
  */
 export function evaluateExperimentalLeakage(headRegistry, baseRegistry = {}) {
+  const newlyVisibleTemporaryKeys = new Set(
+    findNewlyProductionVisible(baseRegistry, headRegistry)
+      .filter((entry) => entry.temporary)
+      .map((entry) => entry.featureKey)
+  );
   const errors = [
-    ...collectTemporaryProductionErrors(headRegistry),
+    ...collectTemporaryProductionErrors(headRegistry, newlyVisibleTemporaryKeys),
     ...collectNewlyVisibleTemporaryErrors(headRegistry, baseRegistry),
   ];
   return errors.length === 0 ? { ok: true, errors: [] } : { ok: false, errors };

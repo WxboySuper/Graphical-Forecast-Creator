@@ -126,7 +126,9 @@ describe('feature exposure report', () => {
       },
     });
     assert.equal(leakage.ok, false);
-    assert.match(leakage.errors.join(' '), /leaky/);
+    assert.equal(leakage.errors.length, 1);
+    assert.match(leakage.errors[0], /leaky/);
+    assert.match(leakage.errors[0], /newly production-visible/);
 
     const headRegistry = {
       graduate: {
@@ -144,7 +146,32 @@ describe('feature exposure report', () => {
     };
     const newlyVisibleLeakage = evaluateExperimentalLeakage(headRegistry, baseRegistry);
     assert.equal(newlyVisibleLeakage.ok, false);
-    assert.match(newlyVisibleLeakage.errors.join(' '), /newly production-visible/);
+    assert.equal(newlyVisibleLeakage.errors.length, 1);
+    assert.match(newlyVisibleLeakage.errors[0], /graduate/);
+    assert.match(newlyVisibleLeakage.errors[0], /newly production-visible/);
+  });
+
+  it('reports pre-existing temporary production exposure without a promotion duplicate', () => {
+    const headRegistry = {
+      leaky: {
+        exposure: { ...ALL_ON },
+        temporary: true,
+        trackingIssue: 22,
+      },
+    };
+    const baseRegistry = {
+      leaky: {
+        exposure: { ...ALL_ON },
+        temporary: true,
+        trackingIssue: 22,
+      },
+    };
+
+    const leakage = evaluateExperimentalLeakage(headRegistry, baseRegistry);
+    assert.equal(leakage.ok, false);
+    assert.equal(leakage.errors.length, 1);
+    assert.match(leakage.errors[0], /exposed on production/);
+    assert.doesNotMatch(leakage.errors[0], /newly production-visible/);
   });
 
   it('validates client/server alignment independently', () => {
