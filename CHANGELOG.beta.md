@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #630
+
+- Harden `cleanup-port-branches` workflow: replace `pull_request_target` with `pull_request`, validate port branch names against the automation allowlist before ref deletion, and document security-critical guards (#606).
+
 ### PR #629
 
 - Pin all third-party workflow actions to immutable commit SHAs; enable Dependabot `github-actions` updates (#604).

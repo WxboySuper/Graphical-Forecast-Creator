@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   evaluatePortPrPolicy,
+  isDeletablePortBranch,
   isRedundantBetaPortPr,
   parsePortBranch,
   postMergeOwnsMainToBetaSync,
@@ -9,6 +10,16 @@ import {
 } from './port-pr-policy.mjs';
 
 describe('port PR policy', () => {
+  it('identifies deletable automation port branches', () => {
+    assert.equal(isDeletablePortBranch('port/346-to-beta'), true);
+    assert.equal(isDeletablePortBranch('port/346-to-feature-dependabot-changelog-skip'), true);
+    assert.equal(isDeletablePortBranch('port/beta'), false);
+    assert.equal(isDeletablePortBranch('port/main'), false);
+    assert.equal(isDeletablePortBranch('feature/foo'), false);
+    assert.equal(isDeletablePortBranch('port/'), false);
+    assert.equal(isDeletablePortBranch('port/abc'), false);
+  });
+
   it('parses port branch names', () => {
     assert.deepEqual(parsePortBranch('port/346-to-beta'), {
       sourcePrNumber: 346,
