@@ -18,6 +18,13 @@ function statusEmoji(ok) {
 }
 
 /**
+ * @param {string} value
+ */
+export function escapeMarkdownTableCell(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+/**
  * @param {{ name: string, ok: boolean, details: string }[]} checkRows
  */
 function formatCheckTable(checkRows) {
@@ -25,7 +32,7 @@ function formatCheckTable(checkRows) {
     '| Check | Status | Details |',
     '|---|---|---|',
     ...checkRows.map(
-      (row) => `| ${row.name} | ${statusEmoji(row.ok)} | ${row.details.replace(/\|/g, '\\|')} |`
+      (row) => `| ${row.name} | ${statusEmoji(row.ok)} | ${escapeMarkdownTableCell(row.details)} |`
     ),
   ];
   return lines.join('\n');

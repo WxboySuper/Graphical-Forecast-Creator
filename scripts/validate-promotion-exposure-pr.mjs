@@ -60,9 +60,14 @@ function buildRunUrl() {
   return `https://github.com/${repository}/actions/runs/${runId}`;
 }
 
+/** Returns true when PR comment upsert credentials are available. */
+function hasPrCommentCredentials() {
+  return Boolean(prNumber && repository && token);
+}
+
 /** Posts or updates the single promotion exposure PR comment. */
 async function maybeUpsertComment({ checkRows, report, newlyProductionVisible }) {
-  if (!prNumber || !repository || !token) {
+  if (!hasPrCommentCredentials()) {
     console.log('Skipping PR comment upsert (PR_NUMBER, GITHUB_REPOSITORY, or GITHUB_TOKEN unset).');
     return;
   }

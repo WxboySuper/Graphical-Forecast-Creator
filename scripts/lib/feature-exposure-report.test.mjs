@@ -15,6 +15,7 @@ import {
 import {
   findExistingExposureComment,
   formatPromotionExposureComment,
+  escapeMarkdownTableCell,
   PROMOTION_EXPOSURE_COMMENT_MARKER,
 } from './pr-exposure-comment.mjs';
 
@@ -241,6 +242,12 @@ describe('promotion exposure PR comment', () => {
     assert.match(body, /\| \*\*Overall\*\* \| ✅ \| Ready to promote \|/);
     assert.match(body, /\| Production-enabled \| core \(1\) \|/);
     assert.match(body, /pnpm exposure:report/);
+  });
+
+  it('escapes markdown table cell values', () => {
+    assert.equal(escapeMarkdownTableCell('a|b'), 'a\\|b');
+    assert.equal(escapeMarkdownTableCell('a\\b'), 'a\\\\b');
+    assert.equal(escapeMarkdownTableCell('line\nbreak'), 'line break');
   });
 
   it('shows failing rows with x marks and violation details', () => {

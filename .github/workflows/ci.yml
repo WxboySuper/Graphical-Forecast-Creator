@@ -56,7 +56,24 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: node scripts/validate-production-release-pr.mjs
 
+      - name: Setup Node.js for promotion exposure report
+        if: github.base_ref == 'main' && github.head_ref == 'beta'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Setup pnpm for promotion exposure report
+        if: github.base_ref == 'main' && github.head_ref == 'beta'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies for promotion exposure report
+        if: github.base_ref == 'main' && github.head_ref == 'beta'
+        run: pnpm install --frozen-lockfile
+
       - name: Production exposure report (beta → main)
+        if: github.base_ref == 'main' && github.head_ref == 'beta'
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
           GITHUB_HEAD_REF: ${{ github.head_ref }}

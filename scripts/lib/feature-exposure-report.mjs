@@ -89,27 +89,42 @@ export function findNewlyProductionVisible(baseRegistry, headRegistry) {
 
 /**
  * @param {Record<string, any>} headRegistry
+ */
+function collectTemporaryProductionErrors(headRegistry) {
+  const errors = [];
+  for (const [featureKey, definition] of Object.entries(headRegistry)) {
+    if (definition.temporary !== true || definition.exposure?.production !== true) continue;
+    errors.push(
+      `Temporary feature "${featureKey}" is exposed on production (#${definition.trackingIssue}).`
+    );
+  }
+  return errors;
+}
+
+/**
+ * @param {Record<string, any>} headRegistry
+ * @param {Record<string, any>} baseRegistry
+ */
+function collectNewlyVisibleTemporaryErrors(headRegistry, baseRegistry) {
+  const errors = [];
+  for (const entry of findNewlyProductionVisible(baseRegistry, headRegistry)) {
+    if (!entry.temporary) continue;
+    errors.push(
+      `Temporary feature "${entry.featureKey}" is newly production-visible (#${entry.trackingIssue}).`
+    );
+  }
+  return errors;
+}
+
+/**
+ * @param {Record<string, any>} headRegistry
  * @param {Record<string, any>} [baseRegistry]
  */
 export function evaluateExperimentalLeakage(headRegistry, baseRegistry = {}) {
-  const errors = [];
-
-  for (const [featureKey, definition] of Object.entries(headRegistry)) {
-    if (definition.temporary === true && definition.exposure?.production === true) {
-      errors.push(
-        `Temporary feature "${featureKey}" is exposed on production (#${definition.trackingIssue}).`
-      );
-    }
-  }
-
-  for (const entry of findNewlyProductionVisible(baseRegistry, headRegistry)) {
-    if (entry.temporary) {
-      errors.push(
-        `Temporary feature "${entry.featureKey}" is newly production-visible (#${entry.trackingIssue}).`
-      );
-    }
-  }
-
+  const errors = [
+    ...collectTemporaryProductionErrors(headRegistry),
+    ...collectNewlyVisibleTemporaryErrors(headRegistry, baseRegistry),
+  ];
   return errors.length === 0 ? { ok: true, errors: [] } : { ok: false, errors };
 }
 
@@ -168,35 +183,37 @@ export function formatFeatureList(entries) {
 }
 
 /**
+ * @param {string} title
+ * @param {{ featureKey: string }[]} entries
+ */
+function formatReportSection(title, entries) {
+  const lines = [`${title}:`];
+  if (entries.length === 0) {
+    lines.push('  (none)');
+  } else {
+    lines.push(...entries.map((entry) => `  ${entry.featureKey}`));
+  }
+  return lines;
+}
+
+/**
  * @param {{
  *   report: ReturnType<typeof generateProductionExposureReport>,
  *   newlyProductionVisible: ReturnType<typeof findNewlyProductionVisible>,
  * }} context
  */
 export function formatExposureReport({ report, newlyProductionVisible }) {
-  const lines = [
-    'Production-enabled:',
-    ...report.sections.production.map((entry) => `  ${entry.featureKey}`),
-    report.sections.production.length === 0 ? '  (none)' : '',
+  return [
+    ...formatReportSection('Production-enabled', report.sections.production),
     '',
-    'Beta-only:',
-    ...report.sections.betaOnly.map((entry) => `  ${entry.featureKey}`),
-    report.sections.betaOnly.length === 0 ? '  (none)' : '',
+    ...formatReportSection('Beta-only', report.sections.betaOnly),
     '',
-    'Disabled everywhere except local:',
-    ...report.sections.localOnly.map((entry) => `  ${entry.featureKey}`),
-    report.sections.localOnly.length === 0 ? '  (none)' : '',
+    ...formatReportSection('Disabled everywhere except local', report.sections.localOnly),
     '',
-    'Disabled:',
-    ...report.sections.disabled.map((entry) => `  ${entry.featureKey}`),
-    report.sections.disabled.length === 0 ? '  (none)' : '',
+    ...formatReportSection('Disabled', report.sections.disabled),
     '',
-    'Newly production-visible (vs main):',
-    ...newlyProductionVisible.map((entry) => `  ${entry.featureKey}`),
-    newlyProductionVisible.length === 0 ? '  (none)' : '',
-  ];
-
-  return lines.filter((line, index, all) => !(line === '' && all[index - 1] === '')).join('\n');
+    ...formatReportSection('Newly production-visible (vs main)', newlyProductionVisible),
+  ].join('\n');
 }
 
 /**
