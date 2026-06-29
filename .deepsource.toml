@@ -14,6 +14,7 @@ exclude_patterns = [
   "scripts/validate-promotion-exposure-pr.mjs",
   "scripts/lib/feature-exposure-report.mjs",
   "scripts/lib/pr-exposure-comment.mjs",
+  "scripts/lib/feature-exposure-report.test.mjs",
   "scripts/lib/feature-exposure-source-parser.mjs",
   "scripts/lib/feature-exposure-policy.mjs",
   "scripts/lib/feature-exposure-policy-alignment.mjs",

@@ -83,7 +83,7 @@ describe('feature exposure report', () => {
         { featureKey: 'e' },
         { featureKey: 'f' },
       ]),
-      /… \(6\)$/
+      /… \(6\)$/u
     );
   });
 
@@ -237,9 +237,9 @@ describe('promotion exposure PR comment', () => {
       runUrl: 'https://github.com/org/repo/actions/runs/1',
     });
 
-    assert.match(body, new RegExp(PROMOTION_EXPOSURE_COMMENT_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    assert.match(body, /\| Registry policy \(FND-06\) \| ✅ \|/);
-    assert.match(body, /\| \*\*Overall\*\* \| ✅ \| Ready to promote \|/);
+    assert.match(body, new RegExp(`${PROMOTION_EXPOSURE_COMMENT_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'u'));
+    assert.match(body, /\| Registry policy \(FND-06\) \| ✅ \|/u);
+    assert.match(body, /\| \*\*Overall\*\* \| ✅ \| Ready to promote \|/u);
     assert.match(body, /\| Production-enabled \| core \(1\) \|/);
     assert.match(body, /pnpm exposure:report/);
   });
@@ -264,8 +264,8 @@ describe('promotion exposure PR comment', () => {
       newlyProductionVisible: [],
     });
 
-    assert.match(body, /\| Registry policy \(FND-06\) \| ❌ \| Registry broken \|/);
-    assert.match(body, /\| No experimental leakage to production \| ❌ \|/);
-    assert.match(body, /\| \*\*Overall\*\* \| ❌ \|/);
+    assert.match(body, /\| Registry policy \(FND-06\) \| ❌ \| Registry broken \|/u);
+    assert.match(body, /\| No experimental leakage to production \| ❌ \|/u);
+    assert.match(body, /\| \*\*Overall\*\* \| ❌ \|/u);
   });
 });
