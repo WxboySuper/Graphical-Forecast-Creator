@@ -14,18 +14,19 @@ export const hasDayData = (
   return Object.values(day.data).some((map) => Boolean(map && map.size > 0));
 };
 
-/** Formats the summary for a saved cycle using cached stats or a day-by-day fallback. */
-export const getDaySummary = (cycle: SavedCycle): string => {
-  const forecastDays = cycle.stats?.forecastDays;
-  if (typeof forecastDays === 'number') {
-    if (forecastDays > 0) {
-      const label = forecastDays === 1 ? 'forecast day' : 'forecast days';
-      return `${forecastDays} ${label}`;
-    }
+const formatStatsSummary = (forecastDays: number | undefined): string | null => {
+  if (typeof forecastDays !== 'number') {
+    return null;
+  }
+  if (forecastDays <= 0) {
     return 'No polygons';
   }
 
-  const days = cycle.forecastCycle?.days;
+  const label = forecastDays === 1 ? 'forecast day' : 'forecast days';
+  return `${forecastDays} ${label}`;
+};
+
+const formatLegacyDaySummary = (days: SavedCycle['forecastCycle']['days']): string => {
   if (!days) {
     return 'No data';
   }
@@ -37,6 +38,16 @@ export const getDaySummary = (cycle: SavedCycle): string => {
 
   const daysWithData = keys.filter((dayKey) => hasDayData(dayKey, days));
   return daysWithData.length > 0 ? `Days: ${daysWithData.join(', ')}` : 'No polygons';
+};
+
+/** Formats the summary for a saved cycle using cached stats or a day-by-day fallback. */
+export const getDaySummary = (cycle: SavedCycle): string => {
+  const statsSummary = formatStatsSummary(cycle.stats?.forecastDays);
+  if (statsSummary) {
+    return statsSummary;
+  }
+
+  return formatLegacyDaySummary(cycle.forecastCycle?.days);
 };
 
 /** Defers closing the parent modal until nested confirm UI has unmounted. */

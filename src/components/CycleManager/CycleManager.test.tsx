@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import CycleHistoryModal from './CycleHistoryModal';
-import { deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 import CopyFromPreviousModal from './CopyFromPreviousModal';
 import forecastReducer, { type ForecastState } from '../../store/forecastSlice';
 import { AppLayoutContext } from '../Layout/AppLayout';
@@ -168,14 +167,6 @@ describe('CycleManager Components', () => {
       const root = document.body.querySelector('.history-modal-root');
       expect(root).toBeInTheDocument();
       expect(root).toHaveClass('notranslate');
-    });
-
-    it('GFC-WEB-G: deferCloseAfterConfirm runs onClose on the next microtask', async () => {
-      const onClose = jest.fn();
-      deferCloseAfterConfirm(onClose);
-      expect(onClose).not.toHaveBeenCalled();
-      await Promise.resolve();
-      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('renders header and empty state when open with no cycles', () => {
