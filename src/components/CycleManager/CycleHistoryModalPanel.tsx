@@ -60,14 +60,11 @@ const CycleHistoryModalPanel: React.FC<CycleHistoryModalPanelProps> = ({
         onCancelSaveForm={onCancelSaveForm}
       />
 
-      <div className="history-list-section">
-        <h3>Saved Cycles ({savedCycles.length})</h3>
-        <CycleHistorySavedList
-          savedCycles={savedCycles}
-          onLoadClick={onLoadClick}
-          onDeleteClick={onDeleteClick}
-        />
-      </div>
+      <CycleHistorySavedList
+        savedCycles={savedCycles}
+        onLoadClick={onLoadClick}
+        onDeleteClick={onDeleteClick}
+      />
     </div>
 
     <div className="history-modal-footer">

@@ -10,8 +10,7 @@ import {
 import { useAppLayout } from '../Layout/AppLayout';
 import ModalPortal from '../ui/ModalPortal';
 import './CycleHistoryModal.css';
-import ConfirmationModal from '../DrawingTools/ConfirmationModal';
-import CycleHistoryModalDialog from './CycleHistoryModalDialog';
+import CycleHistoryModalDialog, { type CycleHistoryConfirmAction } from './CycleHistoryModalDialog';
 import { deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 import { useCycleHistoryModalKeyboard } from './useCycleHistoryModalKeyboard';
 
@@ -32,11 +31,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
-  const [confirmAction, setConfirmAction] = useState<{
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<CycleHistoryConfirmAction | null>(null);
 
   useCycleHistoryModalKeyboard({
     isOpen,
@@ -48,16 +43,14 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
 
   if (!isOpen) return null;
 
-  /** Persists the current forecast cycle with an optional label. */
-  const handleSaveCurrent = () => {
+  function handleSaveCurrent(): void {
     dispatch(saveCurrentCycle({ label: newLabel.trim() || undefined }));
     setNewLabel('');
     setShowSaveForm(false);
     addToast('Cycle saved successfully!', 'success');
-  };
+  }
 
-  /** Prompts before replacing the active cycle with a saved one. */
-  const handleLoadCycle = (cycleId: string) => {
+  function handleLoadCycle(cycleId: string): void {
     setConfirmAction({
       title: 'Load Cycle',
       message: 'Load this cycle? Unsaved changes to your current cycle will be lost.',
@@ -68,10 +61,9 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
         deferCloseAfterConfirm(onClose);
       },
     });
-  };
+  }
 
-  /** Prompts before deleting a saved cycle permanently. */
-  const handleDeleteCycle = (cycleId: string) => {
+  function handleDeleteCycle(cycleId: string): void {
     setConfirmAction({
       title: 'Delete Cycle',
       message: 'Delete this saved cycle permanently?',
@@ -80,48 +72,42 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
         setConfirmAction(null);
       },
     });
-  };
+  }
 
-  /** Opens the load-cycle confirmation dialog for the clicked saved cycle. */
-  const handleCycleLoadClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  function handleCycleLoadClick(event: React.MouseEvent<HTMLButtonElement>): void {
     const cycleId = event.currentTarget.dataset.cycleId;
     if (!cycleId) {
       return;
     }
 
     handleLoadCycle(cycleId);
-  };
+  }
 
-  /** Opens the delete-cycle confirmation dialog for the clicked saved cycle. */
-  const handleCycleDeleteClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  function handleCycleDeleteClick(event: React.MouseEvent<HTMLButtonElement>): void {
     const cycleId = event.currentTarget.dataset.cycleId;
     if (!cycleId) {
       return;
     }
 
     handleDeleteCycle(cycleId);
-  };
+  }
 
-  /** Reveals the optional-label save form. */
-  const handleOpenSaveForm = () => {
+  function handleOpenSaveForm(): void {
     setShowSaveForm(true);
-  };
+  }
 
-  /** Updates the optional label for the cycle being saved. */
-  const handleNewLabelChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  function handleNewLabelChange(event: React.ChangeEvent<HTMLInputElement>): void {
     setNewLabel(event.target.value);
-  };
+  }
 
-  /** Hides the save form and clears the draft label. */
-  const handleCancelSaveForm = () => {
+  function handleCancelSaveForm(): void {
     setShowSaveForm(false);
     setNewLabel('');
-  };
+  }
 
-  /** Dismisses the nested confirmation dialog without acting. */
-  const handleCancelConfirm = () => {
+  function handleCancelConfirm(): void {
     setConfirmAction(null);
-  };
+  }
 
   return (
     <ModalPortal>
@@ -131,6 +117,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
         savedCycles={savedCycles}
         showSaveForm={showSaveForm}
         newLabel={newLabel}
+        confirmAction={confirmAction}
         onClose={onClose}
         onOpenSaveForm={handleOpenSaveForm}
         onNewLabelChange={handleNewLabelChange}
@@ -138,19 +125,8 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
         onCancelSaveForm={handleCancelSaveForm}
         onLoadClick={handleCycleLoadClick}
         onDeleteClick={handleCycleDeleteClick}
+        onCancelConfirm={handleCancelConfirm}
       />
-      {confirmAction && (
-        <ConfirmationModal
-          isOpen={true}
-          title={confirmAction.title}
-          message={confirmAction.message}
-          onConfirm={confirmAction.onConfirm}
-          onCancel={handleCancelConfirm}
-          confirmLabel="Confirm"
-          cancelLabel="Cancel"
-          overlayClassName="export-modal-overlay--stacked"
-        />
-      )}
     </ModalPortal>
   );
 };

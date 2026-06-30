@@ -61,6 +61,7 @@ const CycleHistorySavedList: React.FC<CycleHistorySavedListProps> = ({
   if (savedCycles.length === 0) {
     return (
       <div className="history-empty-state">
+        <h3>Saved Cycles (0)</h3>
         <p>No saved cycles yet.</p>
         <p>Save your current cycle to build up a history for reference.</p>
       </div>
@@ -72,7 +73,9 @@ const CycleHistorySavedList: React.FC<CycleHistorySavedListProps> = ({
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
-    <div className="history-list">
+    <div className="history-list-section">
+      <h3>Saved Cycles ({savedCycles.length})</h3>
+      <div className="history-list">
       {sortedCycles.map((cycle) => (
         <CycleHistorySavedItem
           key={cycle.id}
@@ -81,6 +84,7 @@ const CycleHistorySavedList: React.FC<CycleHistorySavedListProps> = ({
           onDeleteClick={onDeleteClick}
         />
       ))}
+      </div>
     </div>
   );
 };
