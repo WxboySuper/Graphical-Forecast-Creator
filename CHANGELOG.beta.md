@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #645
+
+- Fix Sentry GFC-WEB-G by portaling the Forecast Cycle History modal to `document.body`, unifying its overlay/dialog shell with `notranslate`, deferring parent close after nested confirm actions, and stacking confirm overlays above the history dialog.
+
 ### PR #644
 
 - Adopt the feature exposure registry across all six v1.7 workstreams: adoption manifest, registry-only acknowledgements, v1.7 adoption policy rule, adoption exposure tests, gated-route smoke checks, and tracker cross-links (FND-14, #530).
