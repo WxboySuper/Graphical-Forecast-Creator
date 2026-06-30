@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import CycleHistoryModal from './CycleHistoryModal';
+import CycleHistoryModal, { deferCloseAfterConfirm } from './CycleHistoryModal';
 import CopyFromPreviousModal from './CopyFromPreviousModal';
 import forecastReducer, { type ForecastState } from '../../store/forecastSlice';
 import { AppLayoutContext } from '../Layout/AppLayout';
@@ -159,6 +159,22 @@ describe('CycleManager Components', () => {
         </Provider>
       );
       expect(container.firstChild).toBeNull();
+      expect(document.body.querySelector('.history-modal-root')).toBeNull();
+    });
+
+    it('GFC-WEB-G: portals the modal shell to document.body with notranslate', () => {
+      renderCycleHistoryModal();
+      const root = document.body.querySelector('.history-modal-root');
+      expect(root).toBeInTheDocument();
+      expect(root).toHaveClass('notranslate');
+    });
+
+    it('GFC-WEB-G: deferCloseAfterConfirm runs onClose on the next microtask', async () => {
+      const onClose = jest.fn();
+      deferCloseAfterConfirm(onClose);
+      expect(onClose).not.toHaveBeenCalled();
+      await Promise.resolve();
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('renders header and empty state when open with no cycles', () => {
@@ -194,7 +210,7 @@ describe('CycleManager Components', () => {
       expect(screen.queryByPlaceholderText(/Optional label/i)).not.toBeInTheDocument();
     });
 
-    it('renders saved cycles and allows loading', () => {
+    it('renders saved cycles and allows loading', async () => {
       const savedCycles = [
         {
           id: 'cycle-1',
@@ -216,7 +232,7 @@ describe('CycleManager Components', () => {
       expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
       fireEvent.click(screen.getByText('Confirm'));
       expect(mockAddToast).toHaveBeenCalledWith('Cycle loaded!', 'success');
-      expect(onClose).toHaveBeenCalled();
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
     });
 
     it('renders cycle with single day summary', () => {

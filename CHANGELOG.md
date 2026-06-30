@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - **Deploy triggers:** Run **Deploy Beta** on beta prerelease publish and **Deploy Production** on stable release publish (one deploy per version bump; merge pushes no longer trigger VPS deploys).
 
 ### Fixed
+- **GFC-WEB-G (cycle history modal):** Portal the Forecast Cycle History modal to `document.body`, unify its overlay/dialog shell, defer parent close after nested confirm actions, and stack confirm overlays above the history dialog so React no longer throws `removeChild` on `/`.
 - **Deploy reliability:** Harden beta and production VPS deploy workflows against flaky `ssh-keyscan` host-key discovery with pinned known-host secrets, retries, deploy concurrency, and explicit `StrictHostKeyChecking` on SSH/rsync.
 
 ### Added

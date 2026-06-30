@@ -10,6 +10,7 @@ import {
 } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
+import ModalPortal from '../ui/ModalPortal';
 import './CycleHistoryModal.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
@@ -17,6 +18,11 @@ interface CycleHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+/** Defers closing the parent modal until nested confirm UI has unmounted. */
+export const deferCloseAfterConfirm = (onClose: () => void): void => {
+  queueMicrotask(onClose);
+};
 
 /** Modal for browsing, saving, loading, and deleting saved forecast cycles. */
 const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }) => {
@@ -115,7 +121,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
         dispatch(loadSavedCycle(cycleId));
         addToast('Cycle loaded!', 'success');
         setConfirmAction(null);
-        onClose();
+        deferCloseAfterConfirm(onClose);
       }
     });
   };
@@ -209,15 +215,17 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   };
 
   return (
-    <>
-      <div className="history-modal-overlay" onClick={onClose} />
-      <div
-        className="history-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cycle-history-title"
-        ref={modalRef}
-      >
+    <ModalPortal>
+      <div className="history-modal-root notranslate">
+        <div className="history-modal-overlay" onClick={onClose} aria-hidden="true" />
+        <div
+          className="history-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cycle-history-title"
+          ref={modalRef}
+          onClick={(event) => event.stopPropagation()}
+        >
         <div className="history-modal-header">
           <h2 id="cycle-history-title">Forecast Cycle History</h2>
           <button className="history-modal-close" onClick={onClose} aria-label="Close cycle history modal">✕</button>
@@ -325,6 +333,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
             Close
           </button>
         </div>
+        </div>
       </div>
       {confirmAction && (
         <ConfirmationModal
@@ -335,9 +344,10 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
           onCancel={handleCancelConfirmAction}
           confirmLabel="Confirm"
           cancelLabel="Cancel"
+          overlayClassName="export-modal-overlay--stacked"
         />
       )}
-    </>
+    </ModalPortal>
   );
 };
 
