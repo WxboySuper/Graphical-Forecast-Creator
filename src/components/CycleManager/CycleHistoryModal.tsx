@@ -137,6 +137,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     });
   };
 
+  /** Opens the load-cycle confirmation dialog for the clicked saved cycle. */
   const handleCycleLoadClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     const cycleId = event.currentTarget.dataset.cycleId;
     if (!cycleId) {
@@ -146,6 +147,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     handleLoadCycle(cycleId);
   };
 
+  /** Opens the delete-cycle confirmation dialog for the clicked saved cycle. */
   const handleCycleDeleteClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     const cycleId = event.currentTarget.dataset.cycleId;
     if (!cycleId) {
