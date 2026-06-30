@@ -82,6 +82,7 @@ export const useCycleHistoryModalKeyboard = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    /** Focuses the first tabbable control when the modal opens. */
     const syncFocus = () => {
       if (!modalRef.current) return;
       const focusable = getFocusableElements(modalRef.current);

@@ -14,6 +14,7 @@ export const hasDayData = (
   return Object.values(day.data).some((map) => Boolean(map && map.size > 0));
 };
 
+/** Formats cached forecast-day stats when present on a saved cycle. */
 const formatStatsSummary = (forecastDays: number | undefined): string | null => {
   if (typeof forecastDays !== 'number') {
     return null;
@@ -26,6 +27,7 @@ const formatStatsSummary = (forecastDays: number | undefined): string | null => 
   return `${forecastDays} ${label}`;
 };
 
+/** Builds a legacy day-key summary when cached stats are unavailable. */
 const formatLegacyDaySummary = (days: SavedCycle['forecastCycle']['days']): string => {
   if (!days) {
     return 'No data';
