@@ -50,6 +50,28 @@ const handleEscapeKey = (
   return true;
 };
 
+/** Traps Tab navigation while the history modal is active and no confirm is open. */
+const handleModalTabKey = (
+  event: KeyboardEvent,
+  modalRef: React.RefObject<HTMLDivElement | null>,
+  confirmAction: unknown,
+): void => {
+  if (event.key !== 'Tab') {
+    return;
+  }
+
+  if (confirmAction) {
+    return;
+  }
+
+  const root = modalRef.current;
+  if (!root) {
+    return;
+  }
+
+  handleTabNavigation(event, root);
+};
+
 interface UseCycleHistoryModalKeyboardOptions {
   isOpen: boolean;
   modalRef: React.RefObject<HTMLDivElement | null>;
@@ -72,9 +94,7 @@ export const useCycleHistoryModalKeyboard = ({
         return;
       }
 
-      if (event.key === 'Tab' && modalRef.current && !confirmAction) {
-        handleTabNavigation(event, modalRef.current);
-      }
+      handleModalTabKey(event, modalRef, confirmAction);
     },
     [confirmAction, modalRef, onClose, onDismissConfirm],
   );
@@ -92,6 +112,7 @@ export const useCycleHistoryModalKeyboard = ({
     window.addEventListener('keydown', handleModalKeyDown);
     syncFocus();
 
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return () => {
       window.removeEventListener('keydown', handleModalKeyDown);
     };

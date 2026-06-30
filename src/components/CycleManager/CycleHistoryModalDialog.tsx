@@ -40,7 +40,7 @@ const CycleHistoryModalDialog: React.FC<CycleHistoryModalDialogProps> = ({
     <CycleHistoryModalPanel onClose={onClose} {...panelProps} />
     {confirmAction ? (
       <ConfirmationModal
-        isOpen={true}
+        isOpen
         title={confirmAction.title}
         message={confirmAction.message}
         onConfirm={confirmAction.onConfirm}
