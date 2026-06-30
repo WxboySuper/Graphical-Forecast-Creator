@@ -30,6 +30,26 @@ const handleTabNavigation = (event: KeyboardEvent, root: HTMLElement | null): vo
   }
 };
 
+/** Handles Escape for the history modal or its nested confirm dialog. */
+const handleEscapeKey = (
+  event: KeyboardEvent,
+  confirmAction: unknown,
+  onDismissConfirm: () => void,
+  onClose: () => void,
+): boolean => {
+  if (event.key !== 'Escape') {
+    return false;
+  }
+
+  if (confirmAction) {
+    onDismissConfirm();
+  } else {
+    onClose();
+  }
+
+  return true;
+};
+
 interface UseCycleHistoryModalKeyboardOptions {
   isOpen: boolean;
   modalRef: React.RefObject<HTMLDivElement | null>;
@@ -48,20 +68,11 @@ export const useCycleHistoryModalKeyboard = ({
 }: UseCycleHistoryModalKeyboardOptions): void => {
   const handleModalKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      const isEscape = event.key === 'Escape';
-      const isTab = event.key === 'Tab';
-      const canTab = Boolean(modalRef.current && !confirmAction);
-
-      if (isEscape) {
-        if (confirmAction) {
-          onDismissConfirm();
-        } else {
-          onClose();
-        }
+      if (handleEscapeKey(event, confirmAction, onDismissConfirm, onClose)) {
         return;
       }
 
-      if (isTab && canTab) {
+      if (event.key === 'Tab' && modalRef.current && !confirmAction) {
         handleTabNavigation(event, modalRef.current);
       }
     },

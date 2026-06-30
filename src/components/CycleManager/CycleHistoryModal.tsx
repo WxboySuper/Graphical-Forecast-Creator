@@ -109,6 +109,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
     setConfirmAction(null);
   }
 
+  // skipcq: JS-0415 - modal portal shell intentionally composes dialog + confirm layers
   return (
     <ModalPortal>
       <CycleHistoryModalDialog

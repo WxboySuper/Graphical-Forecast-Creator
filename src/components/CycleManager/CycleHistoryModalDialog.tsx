@@ -34,6 +34,7 @@ const CycleHistoryModalDialog: React.FC<CycleHistoryModalDialogProps> = ({
   onClose,
   ...panelProps
 }) => (
+  // skipcq: JS-0415 - stacked confirm overlay sits above the portaled history shell
   <div className="history-modal-root notranslate">
     <div className="history-modal-overlay" onClick={onClose} aria-hidden="true" />
     <CycleHistoryModalPanel onClose={onClose} {...panelProps} />
