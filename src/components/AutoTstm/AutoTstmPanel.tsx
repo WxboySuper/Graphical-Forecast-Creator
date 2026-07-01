@@ -11,7 +11,8 @@ import {
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 
-const formatTimestamp = (value: string): string => {
+/** Formats an ISO timestamp for display in the preview panel. */
+function formatTimestamp(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return value;
@@ -23,9 +24,10 @@ const formatTimestamp = (value: string): string => {
     minute: '2-digit',
     timeZoneName: 'short',
   });
-};
+}
 
-const formatSourceSummary = (response: TstmGenerationResponse): string => {
+/** Summarizes source metadata from a cached Auto-TSTM response. */
+function formatSourceSummary(response: TstmGenerationResponse): string {
   const entries = Object.values(response.sources).filter(Boolean);
   if (entries.length === 0) {
     return 'SPC HREF calibrated thunder';
@@ -33,7 +35,7 @@ const formatSourceSummary = (response: TstmGenerationResponse): string => {
   return entries
     .map((source) => [source?.product, source?.run, source?.period].filter(Boolean).join(' · '))
     .join('; ');
-};
+}
 
 /** Modal for reviewing cached Auto-TSTM guidance before applying it to the forecast. */
 export const AutoTstmPanel: React.FC<{

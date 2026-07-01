@@ -579,6 +579,39 @@ export const hideOverlay = (overlay: Overlay): void => {
   overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 
+/** Replaces Auto-TSTM preview features on a dedicated map source. */
+const syncTstmPreviewSource = (
+  previewSource: VectorSource,
+  tstmPreviewFeatures: GeoJsonFeature[],
+) => {
+  previewSource.clear();
+  const format = new GeoJSON();
+  const previewStyle = toTstmPreviewOlStyle();
+
+  tstmPreviewFeatures.forEach((feature) => {
+    const olFeature = format.readFeature(feature, {
+      dataProjection: "EPSG:4326",
+      featureProjection: "EPSG:3857",
+    });
+
+    const applyPreviewProps = (item: OLFeature<Geometry>) => {
+      item.setStyle(previewStyle);
+      item.set("featureId", String(feature.id ?? "tstm-preview"));
+      item.set("outlookType", "categorical");
+      item.set("probability", "TSTM");
+      previewSource.addFeature(item);
+    };
+
+    if (Array.isArray(olFeature)) {
+      olFeature.forEach((item: FeatureLike) =>
+        applyPreviewProps(item as OLFeature<Geometry>),
+      );
+    } else {
+      applyPreviewProps(olFeature as OLFeature<Geometry>);
+    }
+  });
+};
+
 type OpenLayersForecastMapProps = {
   tstmPreviewFeatures?: GeoJsonFeature[];
 };
@@ -1500,33 +1533,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     ]);
 
     useEffect(() => {
-      const previewSource = tstmPreviewSourceRef.current;
-      previewSource.clear();
-      const format = new GeoJSON();
-      const previewStyle = toTstmPreviewOlStyle();
-
-      tstmPreviewFeatures.forEach((feature) => {
-        const olFeature = format.readFeature(feature, {
-          dataProjection: "EPSG:4326",
-          featureProjection: "EPSG:3857",
-        });
-
-        const applyPreviewProps = (item: OLFeature<Geometry>) => {
-          item.setStyle(previewStyle);
-          item.set("featureId", String(feature.id ?? "tstm-preview"));
-          item.set("outlookType", "categorical");
-          item.set("probability", "TSTM");
-          previewSource.addFeature(item);
-        };
-
-        if (Array.isArray(olFeature)) {
-          olFeature.forEach((item: FeatureLike) =>
-            applyPreviewProps(item as OLFeature<Geometry>),
-          );
-        } else {
-          applyPreviewProps(olFeature as OLFeature<Geometry>);
-        }
-      });
+      syncTstmPreviewSource(tstmPreviewSourceRef.current, tstmPreviewFeatures);
     }, [tstmPreviewFeatures]);
 
     // Handlers for toolbar buttons to switch interaction modes and toggle style picker.

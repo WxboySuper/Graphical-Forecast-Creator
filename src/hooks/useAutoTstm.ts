@@ -8,6 +8,7 @@ import {
 } from '../store/forecastSlice';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
 import { buildTstmRequest } from '../utils/buildTstmRequest';
+import { resolveTstmFetchOutcome } from './autoTstmFetch';
 import {
   canGenerateTstmForDay,
   isCurrentTstmRequest,
@@ -83,34 +84,46 @@ export const useAutoTstm = () => {
 
     try {
       const response = await requestLatestTstmData(currentDay, 'full', controller.signal);
-      if (controller.signal.aborted) {
-        return;
-      }
-      if (!isCurrentTstmRequest(request, activeRequestRef.current ?? request)) {
-        return;
-      }
+      const outcome = resolveTstmFetchOutcome(
+        request,
+        activeRequestRef.current,
+        response,
+        controller.signal.aborted,
+        null
+      );
 
-      if (!response) {
+      if (outcome.kind === 'aborted' || outcome.kind === 'stale') {
+        return;
+      }
+      if (outcome.kind === 'unavailable') {
         setPreview(null);
         setStatus('error');
         setErrorMessage(describeUnavailableGuidance());
         return;
       }
-
-      setPreview({ request, response });
-      setStatus('preview');
-    } catch (error) {
-      if (controller.signal.aborted) {
+      if (outcome.kind === 'error') {
+        setPreview(null);
+        setStatus('error');
+        setErrorMessage(outcome.message);
         return;
       }
-      if (!isCurrentTstmRequest(request, activeRequestRef.current ?? request)) {
+
+      setPreview({ request: outcome.request, response: outcome.response });
+      setStatus('preview');
+    } catch (error) {
+      const outcome = resolveTstmFetchOutcome(
+        request,
+        activeRequestRef.current,
+        null,
+        controller.signal.aborted,
+        error
+      );
+      if (outcome.kind === 'aborted' || outcome.kind === 'stale') {
         return;
       }
       setPreview(null);
       setStatus('error');
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Auto-TSTM guidance is temporarily unavailable.'
-      );
+      setErrorMessage(outcome.kind === 'error' ? outcome.message : describeUnavailableGuidance());
     } finally {
       if (abortRef.current === controller) {
         abortRef.current = null;
@@ -145,7 +158,7 @@ export const useAutoTstm = () => {
     if (!isPanelOpen) {
       return;
     }
-    void fetchPreviewRef.current?.();
+    fetchPreviewRef.current?.().catch(() => undefined);
   }, [isPanelOpen]);
 
   useEffect(() => {

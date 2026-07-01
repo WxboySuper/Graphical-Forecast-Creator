@@ -39,7 +39,9 @@ export const AutoTstmWorkspaceTools: React.FC<{
       previewResponse={autoTstm.previewResponse}
       errorMessage={autoTstm.errorMessage}
       onClose={autoTstm.closePanel}
-      onRetry={() => { void autoTstm.fetchPreview(); }}
+      onRetry={() => {
+        autoTstm.fetchPreview().catch(() => undefined);
+      }}
       onApply={autoTstm.applyPreview}
       onCancel={autoTstm.cancelPreview}
     />
