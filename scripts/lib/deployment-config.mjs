@@ -1,5 +1,4 @@
 const ENV_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
-const ENV_VALUE_PATTERN = /^[^\r\n]*$/;
 
 /** Returns true when value is a plain object map rather than an array or primitive. */
 function isPlainObject(value) {
@@ -19,22 +18,32 @@ export function normalizeDeploymentConfig(config) {
 
   const normalizedServerEnv = {};
   for (const [key, value] of Object.entries(serverEnv)) {
-    if (!ENV_KEY_PATTERN.test(key)) {
-      throw new Error(`Invalid serverEnv key ${JSON.stringify(key)}.`);
-    }
-
-    if (typeof value !== 'string') {
-      throw new Error(`serverEnv.${key} must be a string.`);
-    }
-
-    if (!ENV_VALUE_PATTERN.test(value)) {
-      throw new Error(`serverEnv.${key} must not contain line breaks.`);
-    }
-
-    normalizedServerEnv[key] = value;
+    normalizedServerEnv[normalizeServerEnvKey(key)] = normalizeServerEnvValue(key, value);
   }
 
   return { serverEnv: normalizedServerEnv };
+}
+
+/** Validates one env key and returns it unchanged for map construction. */
+function normalizeServerEnvKey(key) {
+  if (!ENV_KEY_PATTERN.test(key)) {
+    throw new Error(`Invalid serverEnv key ${JSON.stringify(key)}.`);
+  }
+
+  return key;
+}
+
+/** Validates one env value and returns it unchanged for map construction. */
+function normalizeServerEnvValue(key, value) {
+  if (typeof value !== 'string') {
+    throw new Error(`serverEnv.${key} must be a string.`);
+  }
+
+  if (/\r|\n/.test(value)) {
+    throw new Error(`serverEnv.${key} must not contain line breaks.`);
+  }
+
+  return value;
 }
 
 /** Renders env-file lines that can be appended to an analytics .env. */

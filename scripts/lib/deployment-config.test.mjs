@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   normalizeDeploymentConfig,
   renderServerEnvFile,
 } from './deployment-config.mjs';
+
+const ROOT = resolve(import.meta.dirname, '../..');
+const WRITE_DEPLOYMENT_ENV_SCRIPT = resolve(ROOT, 'scripts/write-deployment-env.mjs');
 
 describe('deployment config', () => {
   it('normalizes server env values', () => {
@@ -55,5 +62,52 @@ describe('deployment config', () => {
       () => normalizeDeploymentConfig({ serverEnv: { TSTM_GENERATION_ENABLED: 'true\nBAD=1' } }),
       /line breaks/
     );
+    assert.throws(
+      () => normalizeDeploymentConfig({ serverEnv: { TSTM_GENERATION_ENABLED: 'true\n' } }),
+      /line breaks/
+    );
+  });
+
+  it('renders checked-in deployment config through the CLI', () => {
+    assert.equal(
+      execFileSync(process.execPath, [
+        WRITE_DEPLOYMENT_ENV_SCRIPT,
+        'deploy/production-deployment-config.json',
+      ], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }),
+      'TSTM_GENERATION_ENABLED=false\nTSTM_INGESTION_ENABLED=false\n'
+    );
+  });
+
+  it('rejects config paths outside deploy', () => {
+    const outsideConfig = resolve(tmpdir(), `gfc-deploy-config-${Date.now()}.json`);
+    writeFileSync(outsideConfig, '{"serverEnv":{"TSTM_GENERATION_ENABLED":"true"}}');
+
+    const result = spawnSync(process.execPath, [
+      WRITE_DEPLOYMENT_ENV_SCRIPT,
+      outsideConfig,
+    ], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /under deploy/);
+  });
+
+  it('prints readable errors for missing config files', () => {
+    const result = spawnSync(process.execPath, [
+      WRITE_DEPLOYMENT_ENV_SCRIPT,
+      'deploy/missing-deployment-config.json',
+    ], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Failed to read deployment config/);
+    assert.doesNotMatch(result.stderr, /at async|at ModuleJob|at file:/);
   });
 });
