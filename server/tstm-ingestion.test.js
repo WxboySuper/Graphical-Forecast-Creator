@@ -98,6 +98,10 @@ describe('tstm-ingestion', () => {
     it('returns true for null data', () => {
       assert.equal(isCacheExpired(null), true);
     });
+
+    it('returns true for invalid effectiveEnd date', () => {
+      assert.equal(isCacheExpired({ effectiveEnd: 'not-a-date' }), true);
+    });
   });
 
   describe('computeCandidateRuns', () => {

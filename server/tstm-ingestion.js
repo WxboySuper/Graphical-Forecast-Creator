@@ -54,7 +54,9 @@ const deleteCache = (target, day, period, env = process.env) => {
 const isCacheExpired = (data, now = Date.now(), expirationHours = DEFAULT_EXPIRATION_HOURS) => {
   if (!data?.effectiveEnd) return true;
   try {
-    return now > new Date(data.effectiveEnd).getTime() + expirationHours * 3600_000;
+    const effectiveEndMs = new Date(data.effectiveEnd).getTime();
+    if (!Number.isFinite(effectiveEndMs)) return true;
+    return now > effectiveEndMs + expirationHours * 3600_000;
   } catch {
     return true;
   }
