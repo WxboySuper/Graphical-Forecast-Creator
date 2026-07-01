@@ -228,7 +228,7 @@ export function processOutlooksToCategorical(outlooks: OutlookData, day: number 
 
 type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
 
-/** Reusable two-feature collection for Turf v7 intersect/difference/union calls. */
+/** Builds a reusable two-feature collection shell for Turf v7 boolean ops. */
 const createPairFeatureCollection = (): turf.FeatureCollection<Polygon | MultiPolygon> => ({
   type: 'FeatureCollection',
   features: [
@@ -237,6 +237,7 @@ const createPairFeatureCollection = (): turf.FeatureCollection<Polygon | MultiPo
   ],
 });
 
+/** Assigns two polygon features into a reusable collection before Turf calls. */
 const setPairFeatures = (
   collection: turf.FeatureCollection<Polygon | MultiPolygon>,
   first: PolygonOutlookFeature,
