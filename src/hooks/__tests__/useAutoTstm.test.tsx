@@ -1,71 +1,12 @@
-import React from 'react';
-import { Provider } from 'react-redux';
-import { act, renderHook, waitFor } from '@testing-library/react';
-import { configureStore } from '@reduxjs/toolkit';
-import forecastReducer, { setForecastDay } from '../../store/forecastSlice';
-import { useAutoTstm } from '../useAutoTstm';
-import { requestLatestTstmData } from '../../utils/tstmGeneration';
-
-jest.mock('../../utils/tstmGeneration', () => {
-  const actual = jest.requireActual<typeof import('../../utils/tstmGeneration')>('../../utils/tstmGeneration');
-  return {
-    ...actual,
-    requestLatestTstmData: jest.fn(),
-  };
-});
-
-const mockedRequestLatest = requestLatestTstmData as jest.MockedFunction<typeof requestLatestTstmData>;
-
-export const cachedResponse = {
-  features: [{
-    type: 'Feature' as const,
-    geometry: {
-      type: 'Polygon' as const,
-      coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]],
-    },
-    properties: { probability: 'TSTM' },
-  }],
-  run: '2026-06-13T12:00:00Z',
-  domain: 'conus',
-  forecastHours: [24],
-  effectiveStart: '2026-06-13T12:00:00Z',
-  effectiveEnd: '2026-06-14T12:00:00Z',
-  thresholds: {
-    calibratedThunderCoreProbability: 0.3,
-    calibratedThunderSupportProbability: 0.1,
-  },
-  warnings: [],
-  sources: {},
-  generatedAt: '2026-06-13T12:00:00Z',
-};
-
-const createStore = () => configureStore({
-  reducer: { forecast: forecastReducer },
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware({
-    serializableCheck: false,
-    immutableCheck: false,
-  }),
-});
-
-const renderAutoTstm = () => {
-  const store = createStore();
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <Provider store={store}>{children}</Provider>
-  );
-  const hook = renderHook(() => useAutoTstm(), { wrapper });
-  return { store, ...hook };
-};
-
-const openPanelAndWaitForPreview = async (
-  result: ReturnType<typeof renderAutoTstm>['result'],
-) => {
-  await act(async () => {
-    result.current.openPanel();
-  });
-  await waitFor(() => {
-    expect(result.current.status).toBe('preview');
-  });
-};
+import { act, waitFor } from '@testing-library/react';
+import { setForecastDay } from '../../store/forecastSlice';
+import {
+  cachedResponse,
+  mockedRequestLatest,
+  openPanelAndWaitForError,
+  openPanelAndWaitForPreview,
+  renderAutoTstm,
+} from './useAutoTstm.testHelpers';
 
 describe('useAutoTstm', () => {
   beforeEach(() => {
@@ -92,44 +33,46 @@ describe('useAutoTstm', () => {
     mockedRequestLatest.mockResolvedValue(null);
     const { store, result } = renderAutoTstm();
 
-    await act(async () => {
-      result.current.openPanel();
-    });
-
-    await waitFor(() => {
-      expect(result.current.status).toBe('error');
-    });
+    await openPanelAndWaitForError(result);
 
     expect(store.getState().forecast.forecastCycle.days[1]?.data.categorical?.get('TSTM')).toBeUndefined();
   });
 
-  test('apply dispatches one undoable replacement and closes the panel', async () => {
+  test.each([
+  {
+    label: 'apply',
+    action: (result: ReturnType<typeof renderAutoTstm>['result']) => result.current.applyPreview(),
+    expectCommitted: true,
+    expectPanelClosed: true,
+  },
+  {
+    label: 'cancel',
+    action: (result: ReturnType<typeof renderAutoTstm>['result']) => result.current.cancelPreview(),
+    expectCommitted: false,
+    expectPanelClosed: false,
+  },
+] as const)('$label preview updates state without unintended forecast mutation', async ({
+  action,
+  expectCommitted,
+  expectPanelClosed,
+}) => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
     const { store, result } = renderAutoTstm();
 
     await openPanelAndWaitForPreview(result);
 
     await act(async () => {
-      result.current.applyPreview();
+      action(result);
     });
 
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.categorical?.get('TSTM')).toHaveLength(1);
-    expect(result.current.isPanelOpen).toBe(false);
-    expect(result.current.previewFeatures).toHaveLength(0);
-  });
-
-  test('cancel clears preview without mutating forecast state', async () => {
-    mockedRequestLatest.mockResolvedValue(cachedResponse);
-    const { store, result } = renderAutoTstm();
-
-    await openPanelAndWaitForPreview(result);
-
-    await act(async () => {
-      result.current.cancelPreview();
-    });
-
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.categorical?.get('TSTM')).toBeUndefined();
-    expect(result.current.status).toBe('idle');
+    const committed = store.getState().forecast.forecastCycle.days[1]?.data.categorical?.get('TSTM');
+    if (expectCommitted) {
+      expect(committed).toHaveLength(1);
+    } else {
+      expect(committed).toBeUndefined();
+      expect(result.current.status).toBe('idle');
+    }
+    expect(result.current.isPanelOpen).toBe(!expectPanelClosed);
     expect(result.current.previewFeatures).toHaveLength(0);
   });
 

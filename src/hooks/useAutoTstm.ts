@@ -1,19 +1,16 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Feature } from 'geojson';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  replaceTstmFeatures,
-  selectCurrentDay,
-  selectForecastCycle,
-} from '../store/forecastSlice';
+import { selectCurrentDay, selectForecastCycle } from '../store/forecastSlice';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
-import { buildTstmRequest } from '../utils/buildTstmRequest';
+import { canGenerateTstmForDay } from '../utils/tstmGeneration';
+import { useAutoTstmActions } from './useAutoTstmActions';
 import {
-  canGenerateTstmForDay,
-  isCurrentTstmRequest,
-} from '../utils/tstmGeneration';
-import { runAutoTstmPreviewFetch } from './autoTstmPreviewFetch';
-import { useAutoTstmLifecycle } from './useAutoTstmLifecycle';
+  useAutoTstmActiveRequestGuard,
+  useAutoTstmCleanupEffect,
+  useAutoTstmPanelFetchEffect,
+  useAutoTstmPreviewGuard,
+} from './useAutoTstmEffects';
 
 export type AutoTstmStatus = 'idle' | 'loading' | 'preview' | 'error';
 
@@ -23,9 +20,6 @@ type PreviewState = {
 };
 
 const EMPTY_FEATURES: Feature[] = [];
-
-const STALE_APPLY_MESSAGE =
-  'This guidance is stale because the forecast day or cycle changed. Fetch again before applying.';
 
 /** Orchestrates cached Auto-TSTM preview, apply, cancel, and stale-result protection. */
 export const useAutoTstm = () => {
@@ -59,62 +53,46 @@ export const useAutoTstm = () => {
     clearPreview();
   }, [clearPreview]);
 
-  const openPanel = useCallback(() => {
-    if (isDaySupported) {
-      setIsPanelOpen(true);
-    }
-  }, [isDaySupported]);
-
-  const fetchPreview = useCallback(async () => {
-    await runAutoTstmPreviewFetch({
-      isDaySupported,
-      forecastCycle,
-      currentDay,
-      clearInFlightRequest,
-      abortRef,
-      activeRequestRef,
-      setStatus,
-      setErrorMessage,
-      setPreview,
-    });
-  }, [clearInFlightRequest, currentDay, forecastCycle, isDaySupported]);
+  const { openPanel, fetchPreview, applyPreview, cancelPreview } = useAutoTstmActions({
+    dispatch,
+    forecastCycle,
+    currentDay,
+    isDaySupported,
+    preview,
+    abortRef,
+    activeRequestRef,
+    clearInFlightRequest,
+    clearPreview,
+    closePanel,
+    setIsPanelOpen,
+    setStatus,
+    setErrorMessage,
+    setPreview,
+  });
 
   fetchPreviewRef.current = fetchPreview;
 
-  const applyPreview = useCallback(() => {
-    if (!preview) {
-      return;
-    }
-
-    const activeRequest = buildTstmRequest(forecastCycle, currentDay);
-    if (!isCurrentTstmRequest(preview.request, activeRequest)) {
-      clearPreview();
-      setErrorMessage(STALE_APPLY_MESSAGE);
-      setStatus('error');
-      return;
-    }
-
-    dispatch(replaceTstmFeatures({ features: preview.response.features }));
-    closePanel();
-  }, [clearPreview, closePanel, currentDay, dispatch, forecastCycle, preview]);
-
-  const cancelPreview = useCallback(() => {
-    clearPreview();
-  }, [clearPreview]);
-
-  useAutoTstmLifecycle({
+  useAutoTstmPanelFetchEffect(isPanelOpen, fetchPreviewRef);
+  useAutoTstmActiveRequestGuard({
     isPanelOpen,
-    preview,
     forecastCycle,
     currentDay,
     activeRequestRef,
-    fetchPreviewRef,
     clearInFlightRequest,
-    clearPreview,
     setPreview,
     setStatus,
     setErrorMessage,
   });
+  useAutoTstmPreviewGuard({
+    isPanelOpen,
+    preview,
+    forecastCycle,
+    currentDay,
+    clearPreview,
+    setStatus,
+    setErrorMessage,
+  });
+  useAutoTstmCleanupEffect(clearInFlightRequest);
 
   return {
     status,
