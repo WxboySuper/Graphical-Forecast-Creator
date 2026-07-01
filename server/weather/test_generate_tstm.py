@@ -191,11 +191,22 @@ class GenerateTstmTests(unittest.TestCase):
         if missing_assert is not None:
             missing_assert(completeness["missingHours"])
 
+    def test_completeness_checked_hours_full_uses_loaded_frames(self):
+        self.assertEqual(
+            generate_tstm.completeness_checked_hours("full", 30, [7]),
+            [7],
+        )
+        self.assertEqual(
+            generate_tstm.completeness_checked_hours("4hr", 30, [27, 30]),
+            [27, 30],
+        )
+
     def test_build_completeness_outcomes(self):
         window = self._build_day1_window()
         end_hour = window.forecast_hours[-1]
-        checked_hours = generate_tstm.spc_period_hours(end_hour, "full")
-        spc_window = generate_tstm.replace(window, forecast_hours=checked_hours)
+        full_checked = generate_tstm.spc_period_hours(end_hour, "full")
+        four_hr_checked = generate_tstm.spc_period_hours(end_hour, "4hr")
+        four_hr_window = generate_tstm.replace(window, forecast_hours=four_hr_checked)
 
         cases = [
             (
@@ -213,16 +224,23 @@ class GenerateTstmTests(unittest.TestCase):
                 lambda missing: self.assertEqual(missing, []),
             ),
             (
-                "partial spc period",
-                spc_window,
+                "full period single loaded hour",
+                generate_tstm.replace(window, forecast_hours=[full_checked[0]]),
+                [full_checked[0]],
+                True,
+                lambda missing: self.assertEqual(missing, []),
+            ),
+            (
+                "partial 4hr period",
+                four_hr_window,
                 [end_hour],
                 False,
                 lambda missing: self.assertNotEqual(missing, []),
             ),
             (
-                "full spc period",
-                spc_window,
-                checked_hours,
+                "full 4hr period",
+                four_hr_window,
+                four_hr_checked,
                 True,
                 lambda missing: self.assertEqual(missing, []),
             ),
@@ -244,11 +262,11 @@ class GenerateTstmTests(unittest.TestCase):
             href_run=datetime(2026, 6, 13, 0, tzinfo=timezone.utc),
             forecast_hours=[24],
         )
-        checked_hours = generate_tstm.spc_period_hours(fallback.forecast_hours[-1], "full")
-        completeness_window = generate_tstm.replace(fallback, forecast_hours=checked_hours)
+        loaded_hour = generate_tstm.spc_period_hours(fallback.forecast_hours[-1], "full")[0]
+        completeness_window = generate_tstm.replace(fallback, forecast_hours=[loaded_hour])
         self._assert_completeness(
             completeness_window,
-            checked_hours,
+            [loaded_hour],
             expect_complete=True,
             missing_assert=lambda missing: self.assertEqual(missing, []),
         )

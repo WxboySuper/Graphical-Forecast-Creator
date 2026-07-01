@@ -351,6 +351,18 @@ def spc_period_hours(end_hour: int, period: str) -> list[int]:
     return [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
 
 
+def completeness_checked_hours(period: str, end_hour: int, matched_hours: list[int]) -> list[int]:
+    """Forecast hours that must match for ingestion completeness.
+
+    The ``full`` product is a single 24h accumulation GRIB, and the loader stops
+    after the first successful frame.  Shorter periods may require every candidate
+    frame listed by :func:`spc_period_hours`.
+    """
+    if period == "full":
+        return matched_hours
+    return spc_period_hours(end_hour, period)
+
+
 def combine_spc_arrays(arrays: list[np.ndarray]) -> np.ndarray:
     stacked = np.stack(arrays)
     if np.all(np.isnan(stacked)):
@@ -714,7 +726,12 @@ def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dic
     response = response_payload(response_window, features, warnings, sources)
     completeness_window = window
     if calibrated_thunder is not None:
-        checked_hours = spc_period_hours(response_window.forecast_hours[-1], calibrated_thunder.period)
+        end_hour = response_window.forecast_hours[-1]
+        checked_hours = completeness_checked_hours(
+            calibrated_thunder.period,
+            end_hour,
+            matched_hours,
+        )
         completeness_window = replace(response_window, forecast_hours=checked_hours)
     completeness = _build_completeness(
         ingestion_mode, completeness_window, features,
