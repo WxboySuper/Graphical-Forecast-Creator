@@ -270,6 +270,27 @@ describe('GET /api/tstm/latest', () => {
     });
   });
 
+  it('returns cached source metadata when present', async () => {
+    const sources = {
+      calibratedThunder: {
+        product: 'spc_hrefct_full',
+        run: '2026-06-13T12:00:00Z',
+        period: 'full',
+      },
+    };
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
+      cache: { ...SAMPLE_CACHED_ROUTE, sources },
+      routePath: '/api/tstm/latest',
+      query: '?day=1&period=full',
+    }, async (res) => {
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.deepEqual(body.sources, sources);
+    });
+  });
+
   it('returns 404 when no cache exists', async () => {
     await withTstmRouteResponse({
       tmpDir,
