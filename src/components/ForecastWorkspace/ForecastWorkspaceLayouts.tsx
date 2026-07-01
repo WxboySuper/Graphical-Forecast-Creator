@@ -14,7 +14,7 @@ export const ForecastTabbedToolbarLayout: React.FC<ForecastWorkspaceLayoutProps>
   <TooltipProvider>
     <div className="forecast-workspace-layout flex h-full min-h-0 flex-col bg-gradient-to-b from-background via-background to-muted/10">
       <div className="forecast-workspace-layout__map relative min-h-0 flex-1">
-        <ForecastMap ref={mapRef} />
+        <ForecastMap ref={mapRef} tstmPreviewFeatures={controller.tstmPreviewFeatures} />
       </div>
       <TabbedIntegratedToolbar controller={controller} />
     </div>

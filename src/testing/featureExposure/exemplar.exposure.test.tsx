@@ -54,6 +54,7 @@ describe('feature exposure exemplar contract', () => {
     test.each(BUILD_TARGETS)(
       'does not run gated effects on %s while registry exposure is off',
       (target) => {
+        const exposureSpy = mockFeatureExposure('autoTstm', ALL_TARGETS_OFF);
         const { spy, Probe } = createSideEffectProbe('autoTstm');
 
         runWithBuildTarget(target, () => {

@@ -4,6 +4,13 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #649
+
+- Integrate Auto-TSTM preview, apply, cancel, and stale-result protection in the forecast editor (TSTM-05, #476).
+- Fetch cached guidance via `requestLatestTstmData`, render ephemeral map preview with run/source/validity metadata, and apply through one undoable `replaceTstmFeatures` replacement.
+- Reject late cycle/day responses using `isCurrentTstmRequest`; preserve existing polygons on failure or cancel.
+- Enable `autoTstm` on beta behind `ServerBackedFeatureBoundary` when server capability is available.
+
 ### PR #648
 
 - Harden cached Auto-TSTM API: public read policy, rate limits on `GET /api/tstm/latest` and `GET /api/tstm/status`, structured stale/unavailable/corrupt error reasons, and operational cache health (TSTM-04, #475).

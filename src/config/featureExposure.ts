@@ -104,7 +104,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 440,
   },
   autoTstm: {
-    exposure: { ...ALL_TARGETS_OFF },
+    exposure: { ...ALL_TARGETS_OFF, beta: true },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
     temporary: true,

@@ -944,6 +944,7 @@ const TabbedToolbarToolsTab: React.FC<{ controller: ForecastWorkspaceController 
       <TabbedToolbarStripSection label="Cloud & Context" className="tabbed-integrated-toolbar__section--cloud-context w-[260px]">
         <div className="flex flex-wrap items-center gap-2">
           <TabbedToolbarStatPill label="State" value={controller.isSaved ? 'Saved' : 'Unsaved'} />
+          {controller.autoTstmTools}
           {controller.cloudTools ?? (
             <span className="text-xs font-medium text-muted-foreground">Local session only</span>
           )}

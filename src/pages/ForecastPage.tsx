@@ -39,6 +39,8 @@ import {
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useCycleHistoryPersistence } from '../utils/cycleHistoryPersistence';
 import useAutoCategorical from '../hooks/useAutoCategorical';
+import { useAutoTstm } from '../hooks/useAutoTstm';
+import AutoTstmWorkspaceTools from '../components/AutoTstm/AutoTstmWorkspaceTools';
 import type { AddToastFn } from '../components/Layout';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
@@ -1147,6 +1149,7 @@ const useForecastPageWorkspace = ({
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
 
   useAutoCategorical();
+  const autoTstm = useAutoTstm();
   useAutoSave();
   useCycleHistoryPersistence();
   useOutlookExposureSync(dispatch);
@@ -1207,6 +1210,8 @@ const useForecastPageWorkspace = ({
       onSaveToCloud: handleSaveToCloud,
       onOpenCloudLibrary: () => navigate('/cloud'),
     }),
+    autoTstmTools: <AutoTstmWorkspaceTools autoTstm={autoTstm} />,
+    tstmPreviewFeatures: autoTstm.previewFeatures,
   });
 
   return {
