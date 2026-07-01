@@ -18,6 +18,15 @@ jest.mock('uuid', () => ({
   v4: () => mockUuid(),
 }));
 
+jest.mock('@turf/turf', () => {
+  const actual = jest.requireActual<typeof import('@turf/turf')>('@turf/turf');
+  return {
+    ...actual,
+    featureCollection: jest.fn((...args: Parameters<typeof actual.featureCollection>) =>
+      actual.featureCollection(...args)),
+  };
+});
+
 const makeFeature = (id: string): Feature<Polygon> => ({
   type: 'Feature',
   id,
@@ -232,12 +241,12 @@ describe('processOutlooksToCategorical', () => {
       categorical: new Map(),
     };
 
-    const featureCollectionSpy = jest.spyOn(turf, 'featureCollection');
+    const featureCollectionMock = turf.featureCollection as jest.MockedFunction<typeof turf.featureCollection>;
+    featureCollectionMock.mockClear();
     processDay12OutlooksToCategorical(outlooks);
 
     // Hatching unions may still allocate collections; intersect/difference should not per CIG iteration.
-    expect(featureCollectionSpy.mock.calls.length).toBeLessThanOrEqual(3);
-    featureCollectionSpy.mockRestore();
+    expect(featureCollectionMock.mock.calls.length).toBeLessThanOrEqual(3);
   });
 
   test('applies day 3 hatching and cumulative risk generation', () => {
