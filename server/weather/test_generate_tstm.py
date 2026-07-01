@@ -173,59 +173,85 @@ class GenerateTstmTests(unittest.TestCase):
         finally:
             sys.argv = original
 
-    def test_build_completeness_partial_run_marks_incomplete(self):
-        """Partial runs with missing forecast hours should be marked incomplete."""
-        window = generate_tstm.build_effective_window(
-            {"day": 1, "cycleDate": "2026-06-13"}
-        )
+    def _assert_completeness(
+        self,
+        completeness_window,
+        matched_hours: list[int],
+        *,
+        expect_complete: bool,
+        missing_assert=None,
+    ) -> None:
         completeness = generate_tstm._build_completeness(
-            True, window, [{"type": "Feature"}],
-            {"matched_hours": [6, 9], "warnings": []},
+            True,
+            completeness_window,
+            [{"type": "Feature"}],
+            {"matched_hours": matched_hours, "warnings": []},
         )
-        self.assertFalse(completeness["complete"])
-        self.assertIn(12, completeness["missingHours"])
+        self.assertEqual(completeness["complete"], expect_complete)
+        if missing_assert is not None:
+            missing_assert(completeness["missingHours"])
 
-    def test_build_completeness_full_run_marks_complete(self):
-        """When all checked hours are matched, complete is True."""
-        window = generate_tstm.build_effective_window(
-            {"day": 1, "cycleDate": "2026-06-13"}
-        )
-        completeness = generate_tstm._build_completeness(
-            True, window, [{"type": "Feature"}],
-            {"matched_hours": list(window.forecast_hours), "warnings": []},
-        )
-        self.assertTrue(completeness["complete"])
-        self.assertEqual(completeness["missingHours"], [])
-
-    def test_build_completeness_spc_period_partial_marks_incomplete(self):
-        """Only loading the end-hour frame should not satisfy the full SPC period."""
-        window = generate_tstm.build_effective_window(
-            {"day": 1, "cycleDate": "2026-06-13"}
-        )
+    def test_build_completeness_outcomes(self):
+        window = self._build_day1_window()
         end_hour = window.forecast_hours[-1]
         checked_hours = generate_tstm.spc_period_hours(end_hour, "full")
-        completeness_window = generate_tstm.replace(window, forecast_hours=checked_hours)
-        completeness = generate_tstm._build_completeness(
-            True, completeness_window, [{"type": "Feature"}],
-            {"matched_hours": [end_hour], "warnings": []},
-        )
-        self.assertFalse(completeness["complete"])
-        self.assertNotEqual(completeness["missingHours"], [])
+        spc_window = generate_tstm.replace(window, forecast_hours=checked_hours)
 
-    def test_build_completeness_spc_period_full_marks_complete(self):
-        """When every SPC period frame loads, completeness should pass."""
-        window = generate_tstm.build_effective_window(
-            {"day": 1, "cycleDate": "2026-06-13"}
+        cases = [
+            (
+                "partial href hours",
+                window,
+                [6, 9],
+                False,
+                lambda missing: self.assertIn(12, missing),
+            ),
+            (
+                "full href hours",
+                window,
+                list(window.forecast_hours),
+                True,
+                lambda missing: self.assertEqual(missing, []),
+            ),
+            (
+                "partial spc period",
+                spc_window,
+                [end_hour],
+                False,
+                lambda missing: self.assertNotEqual(missing, []),
+            ),
+            (
+                "full spc period",
+                spc_window,
+                checked_hours,
+                True,
+                lambda missing: self.assertEqual(missing, []),
+            ),
+        ]
+        for label, completeness_window, matched_hours, expect_complete, missing_assert in cases:
+            with self.subTest(label=label):
+                self._assert_completeness(
+                    completeness_window,
+                    matched_hours,
+                    expect_complete=expect_complete,
+                    missing_assert=missing_assert,
+                )
+
+    def test_build_completeness_uses_loaded_run_hours_for_fallback(self):
+        """Fallback SPC runs should compare against the loaded run's period hours."""
+        requested = self._build_day1_window(cycleRun="2026-06-13T12:00:00Z")
+        fallback = generate_tstm.replace(
+            requested,
+            href_run=datetime(2026, 6, 13, 0, tzinfo=timezone.utc),
+            forecast_hours=[24],
         )
-        end_hour = window.forecast_hours[-1]
-        checked_hours = generate_tstm.spc_period_hours(end_hour, "full")
-        completeness_window = generate_tstm.replace(window, forecast_hours=checked_hours)
-        completeness = generate_tstm._build_completeness(
-            True, completeness_window, [{"type": "Feature"}],
-            {"matched_hours": checked_hours, "warnings": []},
+        checked_hours = generate_tstm.spc_period_hours(fallback.forecast_hours[-1], "full")
+        completeness_window = generate_tstm.replace(fallback, forecast_hours=checked_hours)
+        self._assert_completeness(
+            completeness_window,
+            checked_hours,
+            expect_complete=True,
+            missing_assert=lambda missing: self.assertEqual(missing, []),
         )
-        self.assertTrue(completeness["complete"])
-        self.assertEqual(completeness["missingHours"], [])
 
     def test_cycle_run_override(self):
         """When cycleRun is provided, it overrides the derived href_run."""

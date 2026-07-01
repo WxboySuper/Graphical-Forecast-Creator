@@ -134,9 +134,9 @@ def day1_window_bounds(
     cycle_start: datetime,
     issue_date: datetime | None,
     valid_date: datetime | None,
-    issue_hour: int,
-    issue_minute: int,
+    issuance: tuple[int, int],
 ) -> tuple[datetime, datetime]:
+    issue_hour, issue_minute = issuance
     start = valid_date or issue_date or cycle_start.replace(hour=issue_hour, minute=issue_minute)
     end = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
     return start, end
@@ -161,7 +161,7 @@ def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
     override_run = parse_cycle_run_override(payload)
 
     if day == 1:
-        start, end = day1_window_bounds(cycle_start, issue_date, valid_date, issue_hour, issue_minute)
+        start, end = day1_window_bounds(cycle_start, issue_date, valid_date, (issue_hour, issue_minute))
         href_run = override_run or previous_spc_cycle(start)
     else:
         start, end = day2_window_bounds(cycle_start)
@@ -714,8 +714,8 @@ def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dic
     response = response_payload(response_window, features, warnings, sources)
     completeness_window = window
     if calibrated_thunder is not None:
-        checked_hours = spc_period_hours(window.forecast_hours[-1], calibrated_thunder.period)
-        completeness_window = replace(window, forecast_hours=checked_hours)
+        checked_hours = spc_period_hours(response_window.forecast_hours[-1], calibrated_thunder.period)
+        completeness_window = replace(response_window, forecast_hours=checked_hours)
     completeness = _build_completeness(
         ingestion_mode, completeness_window, features,
         {"matched_hours": matched_hours, "warnings": warnings},

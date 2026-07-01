@@ -66,8 +66,7 @@ const isCacheExpired = (data, now = Date.now(), expirationHours = DEFAULT_EXPIRA
 const isRunComplete = (result) => {
   if (!result || typeof result !== 'object') return false;
   if (!Array.isArray(result.features) || result.features.length === 0) return false;
-  if (result.completeness && result.completeness.complete === false) return false;
-  return true;
+  return !(result.completeness && result.completeness.complete === false);
 };
 
 /**
@@ -175,8 +174,7 @@ const startIngestionLoop = (options = {}) => {
   let timer = null;
   let running = false;
 
-  /** Runs one ingestion cycle, skipping when a previous tick is still in flight. */
-  const tick = async () => {
+  async function tick() {
     if (running) return;
     running = true;
     try {
@@ -184,7 +182,7 @@ const startIngestionLoop = (options = {}) => {
     } finally {
       running = false;
     }
-  };
+  }
 
   tick();
   timer = setInterval(tick, intervalMs);
