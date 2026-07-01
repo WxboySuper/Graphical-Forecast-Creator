@@ -594,7 +594,7 @@ const syncTstmPreviewSource = (
       featureProjection: "EPSG:3857",
     });
 
-    const applyPreviewProps = (item: OLFeature<Geometry>) => {
+    const applyPreviewProps = function applyPreviewProps(item: OLFeature<Geometry>) {
       item.setStyle(previewStyle);
       item.set("featureId", String(feature.id ?? "tstm-preview"));
       item.set("outlookType", "categorical");

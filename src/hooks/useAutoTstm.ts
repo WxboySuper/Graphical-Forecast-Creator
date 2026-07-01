@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Feature } from 'geojson';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -8,12 +8,13 @@ import {
 } from '../store/forecastSlice';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
 import { buildTstmRequest } from '../utils/buildTstmRequest';
-import { resolveTstmFetchOutcome } from './autoTstmFetch';
 import {
   canGenerateTstmForDay,
   isCurrentTstmRequest,
   requestLatestTstmData,
 } from '../utils/tstmGeneration';
+import { resolveTstmFetchOutcome } from './autoTstmFetch';
+import { useAutoTstmLifecycle } from './useAutoTstmLifecycle';
 
 export type AutoTstmStatus = 'idle' | 'loading' | 'preview' | 'error';
 
@@ -24,11 +25,39 @@ type PreviewState = {
 
 const EMPTY_FEATURES: Feature[] = [];
 
-/** Returns a user-facing message when cached guidance is unavailable. */
-const describeUnavailableGuidance = (): string =>
+const UNAVAILABLE_MESSAGE =
   'No cached Auto-TSTM guidance is available for this day yet. Try again after the next ingestion cycle.';
 
-/** Orchestrates cached Auto-TSTM preview, apply, cancel, and stale-response protection. */
+const STALE_APPLY_MESSAGE =
+  'This guidance is stale because the forecast day or cycle changed. Fetch again before applying.';
+
+/** Applies a fetch resolution to preview UI state when it is actionable. */
+const applyFetchOutcome = (
+  outcome: ReturnType<typeof resolveTstmFetchOutcome>,
+  setPreview: (value: PreviewState | null) => void,
+  setStatus: (value: AutoTstmStatus) => void,
+  setErrorMessage: (value: string | null) => void
+): void => {
+  if (outcome.kind === 'aborted' || outcome.kind === 'stale') {
+    return;
+  }
+  if (outcome.kind === 'unavailable') {
+    setPreview(null);
+    setStatus('error');
+    setErrorMessage(UNAVAILABLE_MESSAGE);
+    return;
+  }
+  if (outcome.kind === 'error') {
+    setPreview(null);
+    setStatus('error');
+    setErrorMessage(outcome.message);
+    return;
+  }
+  setPreview({ request: outcome.request, response: outcome.response });
+  setStatus('preview');
+};
+
+/** Orchestrates cached Auto-TSTM preview, apply, cancel, and stale-result protection. */
 export const useAutoTstm = () => {
   const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
@@ -40,7 +69,6 @@ export const useAutoTstm = () => {
   const abortRef = useRef<AbortController | null>(null);
   const activeRequestRef = useRef<TstmGenerationRequest | null>(null);
   const fetchPreviewRef = useRef<(() => Promise<void>) | null>(null);
-
   const isDaySupported = canGenerateTstmForDay(currentDay);
 
   const clearInFlightRequest = useCallback(() => {
@@ -62,10 +90,9 @@ export const useAutoTstm = () => {
   }, [clearPreview]);
 
   const openPanel = useCallback(() => {
-    if (!isDaySupported) {
-      return;
+    if (isDaySupported) {
+      setIsPanelOpen(true);
     }
-    setIsPanelOpen(true);
   }, [isDaySupported]);
 
   const fetchPreview = useCallback(async () => {
@@ -84,46 +111,31 @@ export const useAutoTstm = () => {
 
     try {
       const response = await requestLatestTstmData(currentDay, 'full', controller.signal);
-      const outcome = resolveTstmFetchOutcome(
-        request,
-        activeRequestRef.current,
-        response,
-        controller.signal.aborted,
-        null
+      applyFetchOutcome(
+        resolveTstmFetchOutcome({
+          request,
+          activeRequest: activeRequestRef.current,
+          response,
+          aborted: controller.signal.aborted,
+          error: null,
+        }),
+        setPreview,
+        setStatus,
+        setErrorMessage
       );
-
-      if (outcome.kind === 'aborted' || outcome.kind === 'stale') {
-        return;
-      }
-      if (outcome.kind === 'unavailable') {
-        setPreview(null);
-        setStatus('error');
-        setErrorMessage(describeUnavailableGuidance());
-        return;
-      }
-      if (outcome.kind === 'error') {
-        setPreview(null);
-        setStatus('error');
-        setErrorMessage(outcome.message);
-        return;
-      }
-
-      setPreview({ request: outcome.request, response: outcome.response });
-      setStatus('preview');
     } catch (error) {
-      const outcome = resolveTstmFetchOutcome(
-        request,
-        activeRequestRef.current,
-        null,
-        controller.signal.aborted,
-        error
+      applyFetchOutcome(
+        resolveTstmFetchOutcome({
+          request,
+          activeRequest: activeRequestRef.current,
+          response: null,
+          aborted: controller.signal.aborted,
+          error,
+        }),
+        setPreview,
+        setStatus,
+        setErrorMessage
       );
-      if (outcome.kind === 'aborted' || outcome.kind === 'stale') {
-        return;
-      }
-      setPreview(null);
-      setStatus('error');
-      setErrorMessage(outcome.kind === 'error' ? outcome.message : describeUnavailableGuidance());
     } finally {
       if (abortRef.current === controller) {
         abortRef.current = null;
@@ -141,7 +153,7 @@ export const useAutoTstm = () => {
     const activeRequest = buildTstmRequest(forecastCycle, currentDay);
     if (!isCurrentTstmRequest(preview.request, activeRequest)) {
       clearPreview();
-      setErrorMessage('This guidance is stale because the forecast day or cycle changed. Fetch again before applying.');
+      setErrorMessage(STALE_APPLY_MESSAGE);
       setStatus('error');
       return;
     }
@@ -154,43 +166,19 @@ export const useAutoTstm = () => {
     clearPreview();
   }, [clearPreview]);
 
-  useEffect(() => {
-    if (!isPanelOpen) {
-      return;
-    }
-    fetchPreviewRef.current?.().catch(() => undefined);
-  }, [isPanelOpen]);
-
-  useEffect(() => {
-    if (!isPanelOpen) {
-      return;
-    }
-
-    const activeRequest = buildTstmRequest(forecastCycle, currentDay);
-    if (activeRequestRef.current && !isCurrentTstmRequest(activeRequestRef.current, activeRequest)) {
-      clearInFlightRequest();
-      setPreview(null);
-      setStatus('error');
-      setErrorMessage('Forecast context changed. Fetch guidance again for the current day and cycle.');
-    }
-  }, [clearInFlightRequest, currentDay, forecastCycle, isPanelOpen]);
-
-  useEffect(() => {
-    if (!preview) {
-      return;
-    }
-
-    const activeRequest = buildTstmRequest(forecastCycle, currentDay);
-    if (!isCurrentTstmRequest(preview.request, activeRequest)) {
-      clearPreview();
-      if (isPanelOpen) {
-        setErrorMessage('Forecast context changed. Fetch guidance again for the current day and cycle.');
-        setStatus('error');
-      }
-    }
-  }, [clearPreview, currentDay, forecastCycle, isPanelOpen, preview]);
-
-  useEffect(() => () => clearInFlightRequest(), [clearInFlightRequest]);
+  useAutoTstmLifecycle({
+    isPanelOpen,
+    preview,
+    forecastCycle,
+    currentDay,
+    activeRequestRef,
+    fetchPreviewRef,
+    clearInFlightRequest,
+    clearPreview,
+    setPreview,
+    setStatus,
+    setErrorMessage,
+  });
 
   return {
     status,

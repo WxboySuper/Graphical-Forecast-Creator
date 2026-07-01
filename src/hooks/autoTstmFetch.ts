@@ -8,14 +8,22 @@ export type TstmFetchResolution =
   | { kind: 'error'; message: string }
   | { kind: 'preview'; request: TstmGenerationRequest; response: TstmGenerationResponse };
 
+type ResolveTstmFetchOutcomeInput = {
+  request: TstmGenerationRequest;
+  activeRequest: TstmGenerationRequest | null;
+  response: TstmGenerationResponse | null;
+  aborted: boolean;
+  error: unknown;
+};
+
 /** Resolves a cached Auto-TSTM fetch into a preview-safe outcome. */
-export const resolveTstmFetchOutcome = (
-  request: TstmGenerationRequest,
-  activeRequest: TstmGenerationRequest | null,
-  response: TstmGenerationResponse | null,
-  aborted: boolean,
-  error: unknown
-): TstmFetchResolution => {
+export const resolveTstmFetchOutcome = ({
+  request,
+  activeRequest,
+  response,
+  aborted,
+  error,
+}: ResolveTstmFetchOutcomeInput): TstmFetchResolution => {
   if (aborted) {
     return { kind: 'aborted' };
   }

@@ -16,18 +16,6 @@ jest.mock('../../utils/tstmGeneration', () => {
 
 const mockedRequestLatest = requestLatestTstmData as jest.MockedFunction<typeof requestLatestTstmData>;
 
-const createStore = () => configureStore({
-  reducer: { forecast: forecastReducer },
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware({
-    serializableCheck: false,
-    immutableCheck: false,
-  }),
-});
-
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <Provider store={createStore()}>{children}</Provider>
-);
-
 const cachedResponse = {
   features: [{
     type: 'Feature' as const,
@@ -51,19 +39,36 @@ const cachedResponse = {
   generatedAt: '2026-06-13T12:00:00Z',
 };
 
+const createStore = () => configureStore({
+  reducer: { forecast: forecastReducer },
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware({
+    serializableCheck: false,
+    immutableCheck: false,
+  }),
+});
+
+const renderAutoTstm = () => {
+  const store = createStore();
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <Provider store={store}>{children}</Provider>
+  );
+  const hook = renderHook(() => useAutoTstm(), { wrapper });
+  return { store, ...hook };
+};
+
 describe('useAutoTstm', () => {
   beforeEach(() => {
     mockedRequestLatest.mockReset();
   });
 
   test('does not fetch when the panel is closed', () => {
-    renderHook(() => useAutoTstm(), { wrapper });
+    renderAutoTstm();
     expect(mockedRequestLatest).not.toHaveBeenCalled();
   });
 
   test('fetches cached guidance when the panel opens and exposes preview metadata', async () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
-    const { result } = renderHook(() => useAutoTstm(), { wrapper });
+    const { result } = renderAutoTstm();
 
     await act(async () => {
       result.current.openPanel();
@@ -80,11 +85,7 @@ describe('useAutoTstm', () => {
 
   test('keeps committed polygons unchanged when guidance is unavailable', async () => {
     mockedRequestLatest.mockResolvedValue(null);
-    const store = createStore();
-    const localWrapper = ({ children }: { children: React.ReactNode }) => (
-      <Provider store={store}>{children}</Provider>
-    );
-    const { result } = renderHook(() => useAutoTstm(), { wrapper: localWrapper });
+    const { store, result } = renderAutoTstm();
 
     await act(async () => {
       result.current.openPanel();
@@ -99,11 +100,7 @@ describe('useAutoTstm', () => {
 
   test('apply dispatches one undoable replacement and closes the panel', async () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
-    const store = createStore();
-    const localWrapper = ({ children }: { children: React.ReactNode }) => (
-      <Provider store={store}>{children}</Provider>
-    );
-    const { result } = renderHook(() => useAutoTstm(), { wrapper: localWrapper });
+    const { store, result } = renderAutoTstm();
 
     await act(async () => {
       result.current.openPanel();
@@ -124,11 +121,7 @@ describe('useAutoTstm', () => {
 
   test('cancel clears preview without mutating forecast state', async () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
-    const store = createStore();
-    const localWrapper = ({ children }: { children: React.ReactNode }) => (
-      <Provider store={store}>{children}</Provider>
-    );
-    const { result } = renderHook(() => useAutoTstm(), { wrapper: localWrapper });
+    const { store, result } = renderAutoTstm();
 
     await act(async () => {
       result.current.openPanel();
@@ -155,11 +148,7 @@ describe('useAutoTstm', () => {
       })
     );
 
-    const store = createStore();
-    const localWrapper = ({ children }: { children: React.ReactNode }) => (
-      <Provider store={store}>{children}</Provider>
-    );
-    const { result } = renderHook(() => useAutoTstm(), { wrapper: localWrapper });
+    const { store, result } = renderAutoTstm();
 
     await act(async () => {
       result.current.openPanel();
@@ -181,11 +170,7 @@ describe('useAutoTstm', () => {
 
   test('blocks stale apply after the day changes', async () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
-    const store = createStore();
-    const localWrapper = ({ children }: { children: React.ReactNode }) => (
-      <Provider store={store}>{children}</Provider>
-    );
-    const { result } = renderHook(() => useAutoTstm(), { wrapper: localWrapper });
+    const { store, result } = renderAutoTstm();
 
     await act(async () => {
       result.current.openPanel();
