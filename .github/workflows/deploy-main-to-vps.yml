@@ -246,6 +246,7 @@ jobs:
           SENTRY_ENVIRONMENT=production
           SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.sentry_release }}
           EOF
+          node scripts/write-deployment-env.mjs deploy/production-deployment-config.json >> prod-server.env
           cat > staging-server.env <<EOF
           PORT=3008
           LOG_DIR=/opt/gfc-staging-analytics/logs
@@ -271,6 +272,7 @@ jobs:
           SENTRY_ENVIRONMENT=staging
           SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.sentry_release }}
           EOF
+          node scripts/write-deployment-env.mjs deploy/beta-deployment-config.json >> staging-server.env
 
       - name: Deploy live release (full)
         if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live'
