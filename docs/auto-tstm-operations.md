@@ -72,6 +72,18 @@ Use this endpoint (or server logs prefixed with `[tstm-ingest]`) to confirm inge
 - Returns `null` for expected `cache_miss`, `cache_stale`, and disabled responses (no thrown errors, no Sentry noise)
 - Marks the server capability unavailable when the standard disabled gate message is returned
 
+### Preview / apply flow (TSTM-05)
+
+On beta builds with `autoTstm` exposure enabled:
+
+1. Forecast editor **Tools** tab exposes **Auto-TSTM** behind `ServerBackedFeatureBoundary`.
+2. Opening the panel fetches `GET /api/tstm/latest` for the active Day 1/2 context.
+3. Guidance renders on a separate map preview layer until the forecaster applies or cancels.
+4. **Apply** dispatches one undoable `replaceTstmFeatures` replacement; **Cancel** clears the preview and closes the panel without applying.
+5. Late cycle/day responses are ignored via `isCurrentTstmRequest` before preview or apply can mutate forecast state.
+
+Controls stay absent when registry exposure or the server capability gate is off.
+
 ## Related docs
 
 - [feature-exposure-workstreams.md](./feature-exposure-workstreams.md) — Auto-TSTM registry and beta enablement criteria

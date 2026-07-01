@@ -136,6 +136,7 @@ const buildCacheData = (result, day, period) => ({
   forecastHours: Array.isArray(result.forecastHours) ? result.forecastHours : [],
   warnings: Array.isArray(result.warnings) ? result.warnings : [],
   thresholds: result.thresholds,
+  sources: result.sources && typeof result.sources === 'object' ? result.sources : {},
   generatedAt: result.generatedAt,
   ingestedAt: new Date().toISOString(),
   complete: true,

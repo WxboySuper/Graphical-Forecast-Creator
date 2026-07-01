@@ -29,14 +29,22 @@ describe('server capability gates', () => {
 
   it('requires registry exposure and deployment env to both be enabled', () => {
     const env = { TSTM_GENERATION_ENABLED: 'true', SERVER_TARGET: 'beta' };
-    assert.equal(isServerCapabilityEnabled('TSTM_GENERATION_ENABLED', { env }), false);
+    assert.equal(isServerCapabilityEnabled('TSTM_GENERATION_ENABLED', { env }), true);
+
+    assert.equal(
+      isServerCapabilityEnabled('TSTM_GENERATION_ENABLED', {
+        env: { SERVER_TARGET: 'beta' },
+        exposureOverride: { beta: true },
+      }),
+      false
+    );
 
     assert.equal(
       isServerCapabilityEnabled('TSTM_GENERATION_ENABLED', {
         env,
-        exposureOverride: { beta: true },
+        exposureOverride: { beta: false },
       }),
-      true
+      false
     );
   });
 

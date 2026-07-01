@@ -405,6 +405,26 @@ export const toOlStyle = (
   });
 };
 
+/** Creates a dashed preview style for uncommitted Auto-TSTM guidance. */
+export const toTstmPreviewOlStyle = () => {
+  const style = getFeatureStyle("categorical", "TSTM");
+  const strokeColor = String(style.color || "#1f7a1f");
+
+  return new Style({
+    fill: createOutlookFill({
+      probability: "TSTM",
+      fillColor: String(style.fillColor || "#C1E9C1"),
+      fillOpacity: 0.18,
+    }),
+    stroke: new Stroke({
+      color: toRgbaColor({ color: strokeColor, alpha: 0.95 }),
+      width: 3,
+      lineDash: [10, 6],
+    }),
+    zIndex: computeZIndex("categorical", "TSTM") + 650,
+  });
+};
+
 /** Creates a faded style variant for non-active outlooks shown as ghost overlays. */
 export const toGhostOlStyle = ({
   outlookType,
@@ -559,9 +579,53 @@ export const hideOverlay = (overlay: Overlay): void => {
   overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 
+/** Applies preview styling and metadata before adding one OL feature to the preview source. */
+const addTstmPreviewOlFeature = (
+  item: OLFeature<Geometry>,
+  previewSource: VectorSource,
+  previewStyle: ReturnType<typeof toTstmPreviewOlStyle>,
+  featureId: string,
+): void => {
+  item.setStyle(previewStyle);
+  item.set("featureId", featureId);
+  item.set("outlookType", "categorical");
+  item.set("probability", "TSTM");
+  previewSource.addFeature(item);
+};
+
+/** Replaces Auto-TSTM preview features on a dedicated map source. */
+const syncTstmPreviewSource = (
+  previewSource: VectorSource,
+  tstmPreviewFeatures: GeoJsonFeature[],
+) => {
+  previewSource.clear();
+  const format = new GeoJSON();
+  const previewStyle = toTstmPreviewOlStyle();
+
+  tstmPreviewFeatures.forEach((feature) => {
+    const olFeature = format.readFeature(feature, {
+      dataProjection: "EPSG:4326",
+      featureProjection: "EPSG:3857",
+    });
+    const featureId = String(feature.id ?? "tstm-preview");
+
+    if (Array.isArray(olFeature)) {
+      olFeature.forEach((item: FeatureLike) =>
+        addTstmPreviewOlFeature(item as OLFeature<Geometry>, previewSource, previewStyle, featureId),
+      );
+    } else {
+      addTstmPreviewOlFeature(olFeature as OLFeature<Geometry>, previewSource, previewStyle, featureId);
+    }
+  });
+};
+
+type OpenLayersForecastMapProps = {
+  tstmPreviewFeatures?: GeoJsonFeature[];
+};
+
 // Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
-const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
-  (_, ref) => {
+const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLayersForecastMapProps>(
+  ({ tstmPreviewFeatures = [] }, ref) => {
     const dispatch = useDispatch();
     const [interactionMode, setInteractionMode] = useState<
       "pan" | "draw" | "delete"
@@ -618,8 +682,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
     const vectorSourceRef = useRef<VectorSource>(new VectorSource());
     const catSourceRef = useRef<VectorSource>(new VectorSource());
     const ghostSourceRef = useRef<VectorSource>(new VectorSource());
+    const tstmPreviewSourceRef = useRef<VectorSource>(new VectorSource());
     const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const tstmPreviewLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const drawRef = useRef<Draw | null>(null);
     const modifyRef = useRef<Modify | null>(null);
@@ -734,6 +800,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
         zIndex: GHOST_REFERENCE_LAYER_Z_INDEX,
       });
       ghostLayerRef.current = ghostLayer;
+      const tstmPreviewLayer = new VectorLayer({
+        source: tstmPreviewSourceRef.current,
+        zIndex: TOP_OUTLINE_LAYER_Z_INDEX + 5,
+      });
+      tstmPreviewLayerRef.current = tstmPreviewLayer;
       // Probabilistic/other features layer: separate source, normal per-feature opacity
       const vectorLayer = new VectorLayer({
         source: vectorSourceRef.current,
@@ -762,6 +833,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
           landLayer,
           ghostLayer,
           catLayer,
+          tstmPreviewLayer,
           vectorLayer,
           landOutlineLayer,
           vectorReferenceGroup,
@@ -1466,6 +1538,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null>(
       drawingState.activeOutlookType,
       ghostOutlooks,
     ]);
+
+    useEffect(() => {
+      syncTstmPreviewSource(tstmPreviewSourceRef.current, tstmPreviewFeatures);
+    }, [tstmPreviewFeatures]);
 
     // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
     const handleSetModePan = () => {

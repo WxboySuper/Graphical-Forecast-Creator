@@ -39,6 +39,8 @@ import {
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useCycleHistoryPersistence } from '../utils/cycleHistoryPersistence';
 import useAutoCategorical from '../hooks/useAutoCategorical';
+import { useAutoTstm } from '../hooks/useAutoTstm';
+import AutoTstmWorkspaceTools from '../components/AutoTstm/AutoTstmWorkspaceTools';
 import type { AddToastFn } from '../components/Layout';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
@@ -70,6 +72,8 @@ const renderForecastWorkspaceLayout = (
   props: {
     mapRef: React.RefObject<ForecastMapHandle | null>;
     controller: ReturnType<typeof useForecastWorkspaceController>;
+    autoTstmTools?: React.ReactNode;
+    tstmPreviewFeatures?: ReturnType<typeof useAutoTstm>['previewFeatures'];
   }
 ) => {
   // Only the Tabbed Toolbar variant is supported now.
@@ -1147,6 +1151,7 @@ const useForecastPageWorkspace = ({
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
 
   useAutoCategorical();
+  const autoTstm = useAutoTstm();
   useAutoSave();
   useCycleHistoryPersistence();
   useOutlookExposureSync(dispatch);
@@ -1213,6 +1218,8 @@ const useForecastPageWorkspace = ({
     emergencyMode,
     dayRolloverPrompt,
     workspaceController,
+    autoTstmTools: <AutoTstmWorkspaceTools autoTstm={autoTstm} />,
+    tstmPreviewFeatures: autoTstm.previewFeatures,
   };
 };
 
@@ -1229,6 +1236,8 @@ export const ForecastPage: React.FC = () => {
     emergencyMode,
     dayRolloverPrompt,
     workspaceController,
+    autoTstmTools,
+    tstmPreviewFeatures,
   } = useForecastPageWorkspace({
     dispatch,
     addToast,
@@ -1252,6 +1261,8 @@ export const ForecastPage: React.FC = () => {
       {renderForecastWorkspaceLayout(forecastUiVariant, {
         mapRef,
         controller: workspaceController,
+        autoTstmTools,
+        tstmPreviewFeatures,
       })}
       <ForecastWorkspaceModals controller={workspaceController} />
       <DayRolloverDialog

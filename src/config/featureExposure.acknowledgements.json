@@ -1,7 +1,8 @@
 {
   "autoTstm": {
     "reason": "Disabled-side-effect coverage in src/testing/featureExposure/exemplar.exposure.test.tsx and server/testing/autoTstm.exposure.test.js",
-    "trackingIssue": 529
+    "trackingIssue": 529,
+    "betaEnablementApproved": true
   },
   "tropicalWorkspace": {
     "reason": "Route and navigation gating covered by src/testing/featureExposure/exemplar.exposure.test.tsx and src/routing/buildFeatureGatedRoutes.test.tsx",

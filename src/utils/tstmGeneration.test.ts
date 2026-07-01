@@ -115,6 +115,20 @@ describe('tstmGeneration utilities', () => {
     });
     expect(response.features[0].properties).toMatchObject({ probability: 'TSTM' });
     expect(response.domain).toBe('conus');
+    const withSources = parseTstmGenerationResponse({
+      ...response,
+      sources: {
+        calibratedThunder: {
+          product: 'spc_hrefct_full',
+          run: '2026-06-13T12:00:00Z',
+          period: 'full',
+        },
+      },
+    });
+    expect(withSources.sources.calibratedThunder).toMatchObject({
+      product: 'spc_hrefct_full',
+      period: 'full',
+    });
     const malformedThresholds = parseTstmGenerationResponse({
       ...response,
       thresholds: {} as never,

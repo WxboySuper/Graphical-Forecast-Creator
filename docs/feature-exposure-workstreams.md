@@ -32,7 +32,7 @@ Initial exposure matrix for every row above: `local`, `beta`, `staging`, and `pr
 - **Gates:** `FEATURE_SIDE_EFFECT_MODULES.autoTstm`, `ServerBackedFeatureBoundary`, `server/tstm.js` capability gate
 - **Tests:** `src/testing/featureExposure/exemplar.exposure.test.tsx`, `server/testing/autoTstm.exposure.test.js`
 - **Ops:** [auto-tstm-operations.md](./auto-tstm-operations.md)
-- **Beta enablement:** tracker #427; first enable PR: TBD (flip `exposure.beta` after TSTM-03+ surfaces ship and disabled-side-effect tests pass)
+- **Beta enablement:** tracker #427; `exposure.beta` enabled with TSTM-05 editor integration (#476)
 
 ### Forecast workflow v2 (`forecastWorkflowV2`, #429)
 

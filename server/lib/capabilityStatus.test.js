@@ -18,9 +18,18 @@ describe('capability status', () => {
   it('returns registry_disabled when the target matrix keeps the feature off', () => {
     const status = resolveCapabilityAvailability('TSTM_GENERATION_ENABLED', {
       env: { SERVER_TARGET: 'beta' },
+      exposureOverride: { beta: false },
     });
     assert.equal(status.available, false);
     assert.equal(status.reason, CAPABILITY_REASON.REGISTRY_DISABLED);
+  });
+
+  it('returns deployment_disabled when beta exposure is on but deployment env is off', () => {
+    const status = resolveCapabilityAvailability('TSTM_GENERATION_ENABLED', {
+      env: { SERVER_TARGET: 'beta' },
+    });
+    assert.equal(status.available, false);
+    assert.equal(status.reason, CAPABILITY_REASON.DEPLOYMENT_DISABLED);
   });
 
   it('returns emergency_disabled when the override env is set', () => {

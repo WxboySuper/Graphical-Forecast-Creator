@@ -108,13 +108,13 @@ describe('autoTstm exposure contract', () => {
 
   it('rejects generate requests when only deployment env is enabled', async () => {
     await assertGenerateRouteRejectsWithoutWork({
-      env: { TSTM_GENERATION_ENABLED: 'true' },
+      env: { TSTM_GENERATION_ENABLED: 'true', SERVER_TARGET: 'local' },
     });
   });
 
   it('rejects latest requests when only deployment env is enabled', async () => {
     await assertLatestRouteRejectsWithoutWork({
-      env: { TSTM_GENERATION_ENABLED: 'true' },
+      env: { TSTM_GENERATION_ENABLED: 'true', SERVER_TARGET: 'local' },
     });
   });
 

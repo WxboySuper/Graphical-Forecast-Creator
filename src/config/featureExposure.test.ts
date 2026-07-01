@@ -114,7 +114,6 @@ describe('featureExposure registry', () => {
 
   test('keeps v1.7 workstream keys disabled on every target until adoption', () => {
     const workstreamKeys = [
-      'autoTstm',
       'forecastWorkflowV2',
       'verificationRelaunch',
       'customProducts',
@@ -127,6 +126,11 @@ describe('featureExposure registry', () => {
         expect(isFeatureExposedOnTarget(feature, target)).toBe(false);
       }
     }
+
+    for (const target of ['local', 'staging', 'production'] as const) {
+      expect(isFeatureExposedOnTarget('autoTstm', target)).toBe(false);
+    }
+    expect(isFeatureExposedOnTarget('autoTstm', 'beta')).toBe(true);
   });
 
   test('only autoTstm is server-backed in the initial registry', () => {

@@ -311,6 +311,44 @@ describe('tstm-ingestion', () => {
       assert.deepEqual(cached.forecastHours, [12, 24]);
       assert.deepEqual(cached.warnings, ['sample warning']);
     });
+
+    it('persists source metadata for preview display', () => {
+      const sources = {
+        calibratedThunder: {
+          product: 'spc_hrefct_full',
+          run: '2026-06-13T12:00:00Z',
+          period: 'full',
+        },
+      };
+      const cached = buildCacheData({
+        run: '2026-06-13T12:00:00Z',
+        features: SAMPLE_CACHE_DATA.features,
+        effectiveStart: '2026-06-13T06:00:00Z',
+        effectiveEnd: '2026-06-14T12:00:00Z',
+        forecastHours: [24],
+        warnings: [],
+        thresholds: SAMPLE_CACHE_DATA.thresholds,
+        generatedAt: '2026-06-13T14:05:00Z',
+        sources,
+      }, 1, 'full');
+
+      assert.deepEqual(cached.sources, sources);
+    });
+
+    it('defaults sources to an empty object when generator output omits them', () => {
+      const cached = buildCacheData({
+        run: '2026-06-13T12:00:00Z',
+        features: SAMPLE_CACHE_DATA.features,
+        effectiveStart: '2026-06-13T06:00:00Z',
+        effectiveEnd: '2026-06-14T12:00:00Z',
+        forecastHours: [24],
+        warnings: [],
+        thresholds: SAMPLE_CACHE_DATA.thresholds,
+        generatedAt: '2026-06-13T14:05:00Z',
+      }, 1, 'full');
+
+      assert.deepEqual(cached.sources, {});
+    });
   });
 
   describe('getTstmCacheHealth', () => {
