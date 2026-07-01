@@ -691,7 +691,7 @@ def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dic
 
     response = response_payload(response_window, features, warnings, sources)
     completeness = _build_completeness(
-        ingestion_mode, window, features,
+        ingestion_mode, response_window, features,
         {"matched_hours": matched_hours, "warnings": warnings},
     )
     if completeness is not None:
