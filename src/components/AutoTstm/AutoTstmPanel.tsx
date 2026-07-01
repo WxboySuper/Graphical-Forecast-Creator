@@ -62,8 +62,8 @@ export const AutoTstmPanel: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent>
+        <DialogHeader className="pr-8 sm:pr-10">
           <DialogTitle>Auto-TSTM Preview</DialogTitle>
           <DialogDescription>
             Review cached SPC calibrated thunder guidance before replacing the current TSTM outlook.
@@ -87,11 +87,11 @@ export const AutoTstmPanel: React.FC<{
           <dl className="grid gap-3 text-sm">
             <div>
               <dt className="font-medium text-foreground">Run</dt>
-              <dd className="text-muted-foreground">{formatTimestamp(previewResponse.run)}</dd>
+              <dd className="break-words leading-snug text-muted-foreground">{formatTimestamp(previewResponse.run)}</dd>
             </div>
             <div>
               <dt className="font-medium text-foreground">Valid</dt>
-              <dd className="text-muted-foreground">
+              <dd className="break-words leading-snug text-muted-foreground">
                 {formatTimestamp(previewResponse.effectiveStart)}
                 {' '}
                 –
@@ -101,7 +101,7 @@ export const AutoTstmPanel: React.FC<{
             </div>
             <div>
               <dt className="font-medium text-foreground">Source</dt>
-              <dd className="text-muted-foreground">{formatSourceSummary(previewResponse)}</dd>
+              <dd className="break-words leading-snug text-muted-foreground">{formatSourceSummary(previewResponse)}</dd>
             </div>
             <div>
               <dt className="font-medium text-foreground">Polygons</dt>
@@ -110,7 +110,7 @@ export const AutoTstmPanel: React.FC<{
             {previewResponse.warnings.length > 0 && (
               <div>
                 <dt className="font-medium text-foreground">Warnings</dt>
-                <dd className="text-muted-foreground">{previewResponse.warnings.join(' ')}</dd>
+                <dd className="break-words leading-snug text-muted-foreground">{previewResponse.warnings.join(' ')}</dd>
               </div>
             )}
           </dl>
