@@ -86,5 +86,6 @@ Controls stay absent when registry exposure or the server capability gate is off
 
 ## Related docs
 
+- [auto-tstm-beta-test-plans.md](./auto-tstm-beta-test-plans.md) — beta tester smoke and workflow plans
 - [feature-exposure-workstreams.md](./feature-exposure-workstreams.md) — Auto-TSTM registry and beta enablement criteria
 - [emergency-feature-disable.md](./emergency-feature-disable.md) — incident disable runbook
