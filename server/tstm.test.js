@@ -1,13 +1,17 @@
 'use strict';
 
-const { describe, it } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const express = require('express');
 const {
   createGenerationPayload,
   isTstmGenerationEnabled,
+  registerTstmIngestion,
   registerTstmRoutes,
   runTstmGenerator,
   validatePayload,
@@ -169,5 +173,147 @@ describe('Auto-TSTM server foundation', () => {
       /TSTM_GENERATION_TIMEOUT/
     );
     assert.equal(killed, true);
+  });
+
+  it('passes --ingestion-mode flag when ingestionMode is set', async () => {
+    const child = createFakeChild();
+    let spawnedArgs;
+    runTstmGenerator(
+      { day: 1, cycleDate: '2026-06-13' },
+      {
+        spawnProcess: (_cmd, args) => {
+          spawnedArgs = args;
+          return child;
+        },
+        ingestionMode: true,
+      }
+    );
+    child.stdout.end('{}');
+    child.emit('close', 0);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.ok(spawnedArgs.includes('--ingestion-mode'));
+  });
+});
+
+describe('GET /api/tstm/latest', () => {
+  let tmpDir;
+  beforeEach(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tstm-latest-test-')); });
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true   });
+});
+
+describe('registerTstmIngestion', () => {
+  it('returns null when capability is not enabled', () => {
+    const result = registerTstmIngestion({}, express, {
+      env: { TSTM_INGESTION_ENABLED: 'true' },
+    });
+    assert.equal(result, null);
+  });
+
+  it('returns null when TSTM_INGESTION_ENABLED is not set', () => {
+    const result = registerTstmIngestion({}, express, {
+      env: { TSTM_GENERATION_ENABLED: 'true' },
+    });
+    assert.equal(result, null);
+  });
+});
+
+  const SAMPLE_CACHED = {
+    run: '2026-06-13T12:00:00Z',
+    day: 1,
+    period: 'full',
+    features: [{ type: 'Feature', id: 't-0', geometry: { type: 'Polygon', coordinates: [[[-100, 30], [-99, 30], [-99, 31], [-100, 31], [-100, 30]]] }, properties: {} }],
+    effectiveStart: '2026-06-13T06:00:00Z',
+    effectiveEnd: '2099-01-01T00:00:00Z',
+    complete: true,
+  };
+
+  const startLatestServer = (env, routeOptions = {}) => {
+    const app = express();
+    registerTstmRoutes(app, express, { env, runGenerator: async () => ({}), ...routeOptions });
+    return new Promise((resolve, reject) => {
+      const server = app.listen(0, '127.0.0.1', () => resolve(server));
+      server.on('error', reject);
+    });
+  };
+
+  const getLatestUrl = (server, query = '') => {
+    const { port } = server.address();
+    return `http://127.0.0.1:${port}/api/tstm/latest${query}`;
+  };
+
+  it('returns cached data when available', async () => {
+    const cacheDir = path.join(tmpDir, 'local', 'day1');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
+
+    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
+    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
+    try {
+      const res = await fetch(getLatestUrl(server, '?day=1&period=full'));
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.run, '2026-06-13T12:00:00Z');
+      assert.equal(body.features.length, 1);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('returns 404 when no cache exists', async () => {
+    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
+    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
+    try {
+      const res = await fetch(getLatestUrl(server, '?day=1'));
+      assert.equal(res.status, 404);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('returns 400 for invalid day parameter', async () => {
+    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
+    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
+    try {
+      const res = await fetch(getLatestUrl(server, '?day=3'));
+      assert.equal(res.status, 400);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('returns 404 when capability is disabled', async () => {
+    const cacheDir = path.join(tmpDir, 'local', 'day1');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
+
+    const env = { TSTM_CACHE_DIR: tmpDir };
+    const server = await startLatestServer(env);
+    try {
+      const res = await fetch(getLatestUrl(server, '?day=1'));
+      assert.equal(res.status, 404);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('returns 404 when cached data has expired', async () => {
+    const expired = {
+      ...SAMPLE_CACHED,
+      effectiveEnd: '2026-06-13T12:00:00Z',
+    };
+    const cacheDir = path.join(tmpDir, 'local', 'day1');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(expired));
+
+    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
+    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
+    try {
+      const res = await fetch(getLatestUrl(server, '?day=1'));
+      assert.equal(res.status, 404);
+      const body = await res.json();
+      assert.ok(body.error.includes('expired'));
+    } finally {
+      server.close();
+    }
   });
 });

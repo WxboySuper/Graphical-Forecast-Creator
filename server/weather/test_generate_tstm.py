@@ -126,6 +126,158 @@ class GenerateTstmTests(unittest.TestCase):
         response = generate_tstm.response_payload(window, [], [], {})
         self.assertEqual(response["thresholds"], generate_tstm.DEFAULT_THRESHOLDS)
 
+    def test_ingestion_mode_off_by_default(self):
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13"}
+        )
+        response = generate_tstm.build_response(
+            {"day": 1, "cycleDate": "2026-06-13"}, ingestion_mode=False
+        )
+        self.assertNotIn("completeness", response)
+
+    def test_ingestion_mode_adds_completeness_when_no_forecast_hours(self):
+        """When ingestion_mode=True and no SPC data is found, completeness.complete is False."""
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13"}
+        )
+        # Simulate a response with no features (data unavailable)
+        response = generate_tstm.response_payload(window, [], ["No SPC data"], {})
+        response["completeness"] = {
+            "complete": False,
+            "checkedHours": window.forecast_hours,
+            "matchedHours": [],
+            "missingHours": window.forecast_hours,
+            "warnings": ["No SPC data"],
+        }
+        self.assertFalse(response["completeness"]["complete"])
+        self.assertEqual(response["completeness"]["missingHours"], window.forecast_hours)
+        self.assertEqual(len(response["features"]), 0)
+
+    def test_ingestion_mode_parse_args_flag(self):
+        import sys
+        original = sys.argv
+        try:
+            sys.argv = ["generate_tstm.py", "--ingestion-mode"]
+            payload, mode = generate_tstm.parse_args()
+            self.assertTrue(mode)
+        finally:
+            sys.argv = original
+
+    def test_ingestion_mode_parse_args_default(self):
+        import sys
+        original = sys.argv
+        try:
+            sys.argv = ["generate_tstm.py"]
+            payload, mode = generate_tstm.parse_args()
+            self.assertFalse(mode)
+        finally:
+            sys.argv = original
+
+    def _assert_completeness(
+        self,
+        completeness_window,
+        matched_hours: list[int],
+        *,
+        expect_complete: bool,
+        missing_assert=None,
+    ) -> None:
+        completeness = generate_tstm._build_completeness(
+            True,
+            completeness_window,
+            [{"type": "Feature"}],
+            {"matched_hours": matched_hours, "warnings": []},
+        )
+        self.assertEqual(completeness["complete"], expect_complete)
+        if missing_assert is not None:
+            missing_assert(completeness["missingHours"])
+
+    def test_completeness_checked_hours_full_uses_loaded_frames(self):
+        self.assertEqual(
+            generate_tstm.completeness_checked_hours("full", 30, [7]),
+            [7],
+        )
+        self.assertEqual(
+            generate_tstm.completeness_checked_hours("4hr", 30, [27, 30]),
+            [27, 30],
+        )
+
+    def test_build_completeness_outcomes(self):
+        window = self._build_day1_window()
+        end_hour = window.forecast_hours[-1]
+        full_checked = generate_tstm.spc_period_hours(end_hour, "full")
+        four_hr_checked = generate_tstm.spc_period_hours(end_hour, "4hr")
+        four_hr_window = generate_tstm.replace(window, forecast_hours=four_hr_checked)
+
+        cases = [
+            (
+                "partial href hours",
+                window,
+                [6, 9],
+                False,
+                lambda missing: self.assertIn(12, missing),
+            ),
+            (
+                "full href hours",
+                window,
+                list(window.forecast_hours),
+                True,
+                lambda missing: self.assertEqual(missing, []),
+            ),
+            (
+                "full period single loaded hour",
+                generate_tstm.replace(window, forecast_hours=[full_checked[0]]),
+                [full_checked[0]],
+                True,
+                lambda missing: self.assertEqual(missing, []),
+            ),
+            (
+                "partial 4hr period",
+                four_hr_window,
+                [end_hour],
+                False,
+                lambda missing: self.assertNotEqual(missing, []),
+            ),
+            (
+                "full 4hr period",
+                four_hr_window,
+                four_hr_checked,
+                True,
+                lambda missing: self.assertEqual(missing, []),
+            ),
+        ]
+        for label, completeness_window, matched_hours, expect_complete, missing_assert in cases:
+            with self.subTest(label=label):
+                self._assert_completeness(
+                    completeness_window,
+                    matched_hours,
+                    expect_complete=expect_complete,
+                    missing_assert=missing_assert,
+                )
+
+    def test_build_completeness_uses_loaded_run_hours_for_fallback(self):
+        """Fallback SPC runs should compare against the loaded run's period hours."""
+        requested = self._build_day1_window(cycleRun="2026-06-13T12:00:00Z")
+        fallback = generate_tstm.replace(
+            requested,
+            href_run=datetime(2026, 6, 13, 0, tzinfo=timezone.utc),
+            forecast_hours=[24],
+        )
+        loaded_hour = generate_tstm.spc_period_hours(fallback.forecast_hours[-1], "full")[0]
+        completeness_window = generate_tstm.replace(fallback, forecast_hours=[loaded_hour])
+        self._assert_completeness(
+            completeness_window,
+            [loaded_hour],
+            expect_complete=True,
+            missing_assert=lambda missing: self.assertEqual(missing, []),
+        )
+
+    def test_cycle_run_override(self):
+        """When cycleRun is provided, it overrides the derived href_run."""
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-15", "cycleRun": "2026-06-15T12:00:00Z"}
+        )
+        self.assertEqual(window.href_run.hour, 12)
+
 
 if __name__ == "__main__":
     unittest.main()

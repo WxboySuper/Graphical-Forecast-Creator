@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 
 const { createServerCapabilityGate, isServerCapabilityEnabled } = require('./lib/featureCapabilities');
+const { isCacheExpired, isValidPeriod, readCache, startIngestionLoop } = require('./tstm-ingestion');
 
 const DEFAULT_TIMEOUT_MS = 480000;
 const MAX_STDERR_LENGTH = 2000;
@@ -54,7 +55,11 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
   const spawnProcess = options.spawnProcess || spawn;
   const timeoutMs = Number(env.TSTM_GENERATION_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
   const script = path.join(__dirname, 'weather', 'generate_tstm.py');
-  const child = spawnProcess(getPythonCommand(env), [script], {
+  const args = [script];
+  if (options.ingestionMode) {
+    args.push('--ingestion-mode');
+  }
+  const child = spawnProcess(getPythonCommand(env), args, {
     cwd: __dirname,
     env: {
       ...env,
@@ -117,6 +122,30 @@ const validatePayload = (payload) => {
   return null;
 };
 
+/** Handles GET /api/tstm/latest — serves pre-cached ingestion data. */
+const handleLatestRequest = (env, target) => (req, res) => {
+  const day = Number(req.query.day);
+  if (!isSupportedDay(day)) {
+    res.status(400).json({ error: 'day must be 1 or 2.' });
+    return;
+  }
+  const period = typeof req.query.period === 'string' ? req.query.period : 'full';
+  if (!isValidPeriod(period)) {
+    res.status(400).json({ error: 'period must be full, 4hr, or 1hr.' });
+    return;
+  }
+  const cached = readCache(target, day, period, env);
+  if (!cached) {
+    res.status(404).json({ error: 'No cached TSTM data available.' });
+    return;
+  }
+  if (isCacheExpired(cached)) {
+    res.status(404).json({ error: 'Cached TSTM data has expired.' });
+    return;
+  }
+  res.json(cached);
+};
+
 /** Registers the preserved endpoint in a fail-closed, default-off state. */
 const registerTstmRoutes = (app, express, options = {}) => {
   const env = options.env || process.env;
@@ -152,12 +181,35 @@ const registerTstmRoutes = (app, express, options = {}) => {
       }
     },
   );
+
+  const { getServerTarget: getTarget } = require('./lib/serverTarget');
+  const target = options.target || getTarget(env);
+  app.get(
+    '/api/tstm/latest',
+    createServerCapabilityGate(TSTM_CAPABILITY_KEY, capabilityOptions),
+    handleLatestRequest(env, target),
+  );
+};
+
+/**
+ * Starts the scheduled TSTM ingestion loop.  Only runs when
+ * TSTM_INGESTION_ENABLED=true and the capability gate allows it.
+ */
+const registerTstmIngestion = (app, express, options = {}) => {
+  const env = options.env || process.env;
+  if (env.TSTM_INGESTION_ENABLED !== 'true') return null;
+  if (!isTstmGenerationEnabled(env, options)) return null;
+
+  const runGenerator = options.runGenerator || runTstmGenerator;
+  const log = options.log || console;
+  return startIngestionLoop({ env, runGenerator, log });
 };
 
 module.exports = {
   createGenerationPayload,
   isSupportedDay,
   isTstmGenerationEnabled,
+  registerTstmIngestion,
   registerTstmRoutes,
   runTstmGenerator,
   validatePayload,

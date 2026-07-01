@@ -62,6 +62,7 @@ class SpcThunderSignal:
     run: datetime
     period: str
     forecast_hours: list[int]
+    loaded_hours: list[int]
     urls: list[str]
 
 
@@ -122,6 +123,31 @@ def build_forecast_hours(start: datetime, end: datetime, run: datetime) -> list[
     return forecast_hours
 
 
+def parse_cycle_run_override(payload: dict[str, Any]) -> datetime | None:
+    cycle_run_raw = payload.get("cycleRun")
+    if not isinstance(cycle_run_raw, str) or not cycle_run_raw:
+        return None
+    return parse_iso_datetime(cycle_run_raw)
+
+
+def day1_window_bounds(
+    cycle_start: datetime,
+    issue_date: datetime | None,
+    valid_date: datetime | None,
+    issuance: tuple[int, int],
+) -> tuple[datetime, datetime]:
+    issue_hour, issue_minute = issuance
+    start = valid_date or issue_date or cycle_start.replace(hour=issue_hour, minute=issue_minute)
+    end = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
+    return start, end
+
+
+def day2_window_bounds(cycle_start: datetime) -> tuple[datetime, datetime]:
+    start = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
+    end = (cycle_start + timedelta(days=2)).replace(hour=12, minute=0)
+    return start, end
+
+
 def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
     """Compute valid-time window and HREF run for Day 1 (→12Z) or Day 2 (12Z→12Z)."""
     day = int(payload.get("day", 0))
@@ -132,15 +158,14 @@ def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
     issue_date = parse_iso_datetime(payload.get("issueDate"))
     valid_date = parse_iso_datetime(payload.get("validDate"))
     issue_hour, issue_minute = parse_issuance_time(payload.get("issuanceTime"))
+    override_run = parse_cycle_run_override(payload)
 
     if day == 1:
-        start = valid_date or issue_date or cycle_start.replace(hour=issue_hour, minute=issue_minute)
-        end = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
-        href_run = previous_spc_cycle(start)
+        start, end = day1_window_bounds(cycle_start, issue_date, valid_date, (issue_hour, issue_minute))
+        href_run = override_run or previous_spc_cycle(start)
     else:
-        start = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
-        end = (cycle_start + timedelta(days=2)).replace(hour=12, minute=0)
-        href_run = cycle_start.replace(hour=12, minute=0)
+        start, end = day2_window_bounds(cycle_start)
+        href_run = override_run or cycle_start.replace(hour=12, minute=0)
 
     forecast_hours = build_forecast_hours(start, end, href_run)
 
@@ -314,6 +339,7 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
             run=window.href_run,
             period=period,
             forecast_hours=[end_hour],
+            loaded_hours=matched_hours,
             urls=urls,
         )
     return None
@@ -323,6 +349,18 @@ def spc_period_hours(end_hour: int, period: str) -> list[int]:
     """Candidate forecast hours: "full"=2 frames/24h, "4hr"=2 frames/4h, else=[end]."""
     offset = {"full": 23, "4hr": 3}.get(period)
     return [end_hour] if offset is None else sorted({max(1, end_hour - offset), end_hour})
+
+
+def completeness_checked_hours(period: str, end_hour: int, matched_hours: list[int]) -> list[int]:
+    """Forecast hours that must match for ingestion completeness.
+
+    The ``full`` product is a single 24h accumulation GRIB, and the loader stops
+    after the first successful frame.  Shorter periods may require every candidate
+    frame listed by :func:`spc_period_hours`.
+    """
+    if period == "full":
+        return matched_hours
+    return spc_period_hours(end_hour, period)
 
 
 def combine_spc_arrays(arrays: list[np.ndarray]) -> np.ndarray:
@@ -617,38 +655,64 @@ def mask_to_features(mask: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> list
     return features
 
 
-def build_response(payload: dict[str, Any]) -> dict[str, Any]:
+def _build_completeness(
+    ingestion_mode: bool,
+    window: EffectiveWindow,
+    features: list[dict[str, Any]],
+    ctx: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Build completeness metadata for ingestion mode, or None.
+
+    *ctx* may contain ``matched_hours`` (list[int]) and ``warnings`` (list[str]).
+    """
+    if not ingestion_mode:
+        return None
+    ctx = ctx or {}
+    checked = window.forecast_hours
+    matched = ctx.get("matched_hours", [])
+    missing = sorted(set(checked) - set(matched))
+    return {
+        "complete": len(features) > 0 and not missing,
+        "checkedHours": checked,
+        "matchedHours": matched,
+        "missingHours": missing,
+        "warnings": ctx.get("warnings", []),
+    }
+
+
+def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dict[str, Any]:
     window = build_effective_window(payload)
     warnings: list[str] = []
+    features: list[dict[str, Any]] = []
+    matched_hours: list[int] = []
+    sources: dict[str, dict[str, Any] | None] = {}
+    response_window = window
+    calibrated_thunder: SpcThunderSignal | None = None
 
     if not window.forecast_hours:
         warnings.append("The effective outlook window does not overlap HREF forecast hours 0-48.")
-        return response_payload(window, [], warnings, {})
-
-    print(
-        f"effective window {window.start.isoformat()} to {window.end.isoformat()} "
-        f"from HREF run {window.href_run.isoformat()} using hours {window.forecast_hours}",
-        file=sys.stderr,
-        flush=True,
-    )
-
-    calibrated_thunder, spc_warnings = fetch_spc_calibrated_thunder(window)
-    warnings.extend(spc_warnings)
-    if calibrated_thunder is not None:
-        lat, lon = get_lat_lon(calibrated_thunder.template)
-        probability = as_probability(calibrated_thunder.values)
-        final_mask = calibrated_thunder_mask(probability, grid_near_land_mask(lat, lon), lat, lon)
-        features = mask_to_features(final_mask, lat, lon)
-        response_window = replace(
-            window,
-            href_run=calibrated_thunder.run,
-            forecast_hours=calibrated_thunder.forecast_hours,
+    else:
+        print(
+            f"effective window {window.start.isoformat()} to {window.end.isoformat()} "
+            f"from HREF run {window.href_run.isoformat()} using hours {window.forecast_hours}",
+            file=sys.stderr,
+            flush=True,
         )
-        return response_payload(
-            response_window,
-            features,
-            warnings,
-            {
+
+        calibrated_thunder, spc_warnings = fetch_spc_calibrated_thunder(window)
+        warnings.extend(spc_warnings)
+        if calibrated_thunder is not None:
+            lat, lon = get_lat_lon(calibrated_thunder.template)
+            probability = as_probability(calibrated_thunder.values)
+            final_mask = calibrated_thunder_mask(probability, grid_near_land_mask(lat, lon), lat, lon)
+            features = mask_to_features(final_mask, lat, lon)
+            matched_hours = calibrated_thunder.loaded_hours
+            response_window = replace(
+                window,
+                href_run=calibrated_thunder.run,
+                forecast_hours=calibrated_thunder.forecast_hours,
+            )
+            sources = {
                 "calibratedThunder": {
                     "product": f"spc_hrefct_{calibrated_thunder.period}",
                     "search": "tstm",
@@ -657,10 +721,25 @@ def build_response(payload: dict[str, Any]) -> dict[str, Any]:
                     "forecastHours": ",".join(str(hour) for hour in calibrated_thunder.forecast_hours),
                     "url": calibrated_thunder.urls[0],
                 },
-            },
-        )
+            }
 
-    return response_payload(window, [], warnings, {})
+    response = response_payload(response_window, features, warnings, sources)
+    completeness_window = window
+    if calibrated_thunder is not None:
+        end_hour = response_window.forecast_hours[-1]
+        checked_hours = completeness_checked_hours(
+            calibrated_thunder.period,
+            end_hour,
+            matched_hours,
+        )
+        completeness_window = replace(response_window, forecast_hours=checked_hours)
+    completeness = _build_completeness(
+        ingestion_mode, completeness_window, features,
+        {"matched_hours": matched_hours, "warnings": warnings},
+    )
+    if completeness is not None:
+        response["completeness"] = completeness
+    return response
 
 
 def response_payload(
@@ -683,10 +762,21 @@ def response_payload(
     }
 
 
+def parse_args() -> tuple[dict[str, Any], bool]:
+    """Parse CLI arguments and stdin payload.
+
+    Returns (payload, ingestion_mode).  ``--ingestion-mode`` enables the
+    extended completeness metadata in the JSON output.
+    """
+    ingestion_mode = "--ingestion-mode" in sys.argv
+    payload = read_payload()
+    return payload, ingestion_mode
+
+
 def main() -> int:
     try:
-        payload = read_payload()
-        print(json.dumps(build_response(payload)))
+        payload, ingestion_mode = parse_args()
+        print(json.dumps(build_response(payload, ingestion_mode=ingestion_mode)))
         return 0
     except Exception as exc:
         print(str(exc), file=sys.stderr)
