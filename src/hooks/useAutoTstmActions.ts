@@ -1,11 +1,9 @@
 import { useCallback } from 'react';
 import type { MutableRefObject } from 'react';
 import type { Dispatch } from '@reduxjs/toolkit';
-import { replaceTstmFeatures } from '../store/forecastSlice';
 import type { DayType, ForecastCycle } from '../types/outlooks';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
-import { buildTstmRequest } from '../utils/buildTstmRequest';
-import { isCurrentTstmRequest } from '../utils/tstmGeneration';
+import { commitAutoTstmPreview } from './autoTstmApply';
 import { runAutoTstmPreviewFetch } from './autoTstmPreviewFetch';
 import type { AutoTstmStatus } from './useAutoTstmState';
 
@@ -13,9 +11,6 @@ type PreviewState = {
   request: TstmGenerationRequest;
   response: TstmGenerationResponse;
 };
-
-const STALE_APPLY_MESSAGE =
-  'This guidance is stale because the forecast day or cycle changed. Fetch again before applying.';
 
 type UseAutoTstmActionsArgs = {
   dispatch: Dispatch;
@@ -86,20 +81,16 @@ export const useAutoTstmActions = ({
       return;
     }
 
-    const activeRequest = buildTstmRequest(forecastCycle, currentDay);
-    if (!isCurrentTstmRequest(preview.request, activeRequest)) {
-      clearPreview();
-      setErrorMessage(STALE_APPLY_MESSAGE);
-      setStatus('error');
-      return;
-    }
-
-    if (preview.response.features.length === 0) {
-      return;
-    }
-
-    dispatch(replaceTstmFeatures({ features: preview.response.features }));
-    closePanel();
+    commitAutoTstmPreview({
+      preview,
+      forecastCycle,
+      currentDay,
+      dispatch,
+      clearPreview,
+      closePanel,
+      setErrorMessage,
+      setStatus,
+    });
   }, [clearPreview, closePanel, currentDay, dispatch, forecastCycle, preview, setErrorMessage, setStatus]);
 
   const cancelPreview = useCallback(() => {

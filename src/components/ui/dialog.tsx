@@ -28,6 +28,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DIALOG_FOOTER_DISPLAY_NAME = 'DialogFooter';
 
+/** Returns true when a dialog child is the shared footer shell. */
 const isDialogFooter = (child: React.ReactNode): boolean => (
   React.isValidElement(child)
   && (child.type as { displayName?: string }).displayName === DIALOG_FOOTER_DISPLAY_NAME
