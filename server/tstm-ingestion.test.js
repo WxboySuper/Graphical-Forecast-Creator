@@ -138,7 +138,7 @@ describe('tstm-ingestion', () => {
 
     it('writes and reads a cache file', () => {
       const env = { TSTM_CACHE_DIR: dir };
-      writeCache('beta', 1, 'full', SAMPLE_CACHE_DATA, env);
+      writeCache({ target: 'beta', day: 1, period: 'full', data: SAMPLE_CACHE_DATA, env });
       const data = readCache('beta', 1, 'full', env);
       assert.deepEqual(data, SAMPLE_CACHE_DATA);
     });
@@ -150,7 +150,7 @@ describe('tstm-ingestion', () => {
 
     it('deletes a cache file', () => {
       const env = { TSTM_CACHE_DIR: dir };
-      writeCache('beta', 1, 'full', SAMPLE_CACHE_DATA, env);
+      writeCache({ target: 'beta', day: 1, period: 'full', data: SAMPLE_CACHE_DATA, env });
       deleteCache('beta', 1, 'full', env);
       assert.equal(readCache('beta', 1, 'full', env), null);
     });
@@ -162,9 +162,9 @@ describe('tstm-ingestion', () => {
 
     it('keeps beta and production cache independent', () => {
       const env = { TSTM_CACHE_DIR: dir };
-      writeCache('beta', 1, 'full', SAMPLE_CACHE_DATA, env);
+      writeCache({ target: 'beta', day: 1, period: 'full', data: SAMPLE_CACHE_DATA, env });
       const prodData = { ...SAMPLE_CACHE_DATA, run: '2026-06-14T00:00:00Z' };
-      writeCache('production', 1, 'full', prodData, env);
+      writeCache({ target: 'production', day: 1, period: 'full', data: prodData, env });
       assert.equal(readCache('beta', 1, 'full', env).run, '2026-06-13T12:00:00Z');
       assert.equal(readCache('production', 1, 'full', env).run, '2026-06-14T00:00:00Z');
     });
@@ -197,8 +197,7 @@ describe('tstm-ingestion', () => {
 
     it('retains existing cache when data is not ready', async () => {
       const env = { TSTM_CACHE_DIR: dir, TSTM_INGESTION_INTERVAL_MS: '60000' };
-      // Pre-populate cache
-      writeCache('beta', 1, 'full', SAMPLE_CACHE_DATA, env);
+      writeCache({ target: 'beta', day: 1, period: 'full', data: SAMPLE_CACHE_DATA, env });
 
       const runGenerator = async () => ({
         features: [],
@@ -220,7 +219,7 @@ describe('tstm-ingestion', () => {
 
     it('retains existing cache when generator throws', async () => {
       const env = { TSTM_CACHE_DIR: dir, TSTM_INGESTION_INTERVAL_MS: '60000' };
-      writeCache('beta', 1, 'full', SAMPLE_CACHE_DATA, env);
+      writeCache({ target: 'beta', day: 1, period: 'full', data: SAMPLE_CACHE_DATA, env });
 
       const runGenerator = async () => {
         throw new Error('SPC data unavailable');

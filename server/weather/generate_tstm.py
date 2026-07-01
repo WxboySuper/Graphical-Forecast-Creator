@@ -621,21 +621,24 @@ def _build_completeness(
     ingestion_mode: bool,
     window: EffectiveWindow,
     features: list[dict[str, Any]],
-    matched_hours: list[int] | None = None,
-    warnings: list[str] | None = None,
+    ctx: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Build completeness metadata for ingestion mode, or None."""
+    """Build completeness metadata for ingestion mode, or None.
+
+    *ctx* may contain ``matched_hours`` (list[int]) and ``warnings`` (list[str]).
+    """
     if not ingestion_mode:
         return None
+    ctx = ctx or {}
     checked = window.forecast_hours
-    matched = matched_hours if matched_hours is not None else []
+    matched = ctx.get("matched_hours", [])
     missing = sorted(set(checked) - set(matched))
     return {
         "complete": len(features) > 0,
         "checkedHours": checked,
         "matchedHours": matched,
         "missingHours": missing,
-        "warnings": warnings or [],
+        "warnings": ctx.get("warnings", []),
     }
 
 
@@ -683,7 +686,8 @@ def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dic
 
     response = response_payload(response_window, features, warnings, sources)
     completeness = _build_completeness(
-        ingestion_mode, window, features, matched_hours, warnings
+        ingestion_mode, window, features,
+        {"matched_hours": matched_hours, "warnings": warnings},
     )
     if completeness is not None:
         response["completeness"] = completeness
