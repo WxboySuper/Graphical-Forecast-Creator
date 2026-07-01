@@ -174,6 +174,7 @@ const startIngestionLoop = (options = {}) => {
   let timer = null;
   let running = false;
 
+  /** Runs one ingestion cycle, skipping when a previous tick is still in flight. */
   async function tick() {
     if (running) return;
     running = true;
