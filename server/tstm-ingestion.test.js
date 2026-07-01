@@ -15,6 +15,7 @@ const {
   isCacheExpired,
   isRunComplete,
   readCache,
+  readCacheState,
   runIngestionCycle,
   startIngestionLoop,
   writeCache,
@@ -345,7 +346,40 @@ describe('tstm-ingestion', () => {
       assert.equal(health.ingestionEnabled, true);
       assert.equal(health.cache.day1.full.available, true);
       assert.equal(health.cache.day2.full.reason, 'cache_stale');
+      assert.equal(health.cache.day2.full.effectiveEnd, '2020-01-01T00:00:00Z');
       assert.equal(health.cache.day1['4hr'].reason, 'cache_miss');
+    });
+
+    it('reports corrupt cache separately from a true miss', () => {
+      const env = { TSTM_CACHE_DIR: dir };
+      const corruptPath = cacheFilePath('beta', 1, 'full', env);
+      fs.mkdirSync(path.dirname(corruptPath), { recursive: true });
+      fs.writeFileSync(corruptPath, '{not-json', 'utf8');
+
+      const health = getTstmCacheHealth('beta', env);
+      assert.equal(health.cache.day1.full.reason, 'cache_corrupt');
+      assert.equal(health.cache.day2.full.reason, 'cache_miss');
+    });
+  });
+
+  describe('readCacheState', () => {
+    let dir;
+    beforeEach(() => { dir = tmpDir(); });
+    afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+    it('distinguishes miss, corrupt, and hit states', () => {
+      const env = { TSTM_CACHE_DIR: dir };
+      assert.deepEqual(readCacheState('beta', 1, 'full', env), { state: 'miss' });
+
+      const corruptPath = cacheFilePath('beta', 1, 'full', env);
+      fs.mkdirSync(path.dirname(corruptPath), { recursive: true });
+      fs.writeFileSync(corruptPath, 'not-json', 'utf8');
+      assert.deepEqual(readCacheState('beta', 1, 'full', env), { state: 'corrupt' });
+
+      writeCache({ target: 'beta', day: 1, period: 'full', data: SAMPLE_CACHE_DATA, env });
+      const hit = readCacheState('beta', 1, 'full', env);
+      assert.equal(hit.state, 'hit');
+      assert.equal(hit.data.run, SAMPLE_CACHE_DATA.run);
     });
   });
 });

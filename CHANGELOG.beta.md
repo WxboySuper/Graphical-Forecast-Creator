@@ -6,7 +6,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ### PR #648
 
-- Harden cached Auto-TSTM API: public read policy, rate limits on `GET /api/tstm/latest` and `GET /api/tstm/status`, structured stale/unavailable error reasons, and operational cache health (TSTM-04, #475).
+- Harden cached Auto-TSTM API: public read policy, rate limits on `GET /api/tstm/latest` and `GET /api/tstm/status`, structured stale/unavailable/corrupt error reasons, and operational cache health (TSTM-04, #475).
 - Align ingestion cache schema with client response validation (`forecastHours`, `warnings`).
 - Extend Auto-TSTM server/client tests and exposure contracts for the latest and status routes.
 - Document Auto-TSTM operational behavior in `docs/auto-tstm-operations.md`.

@@ -36,6 +36,7 @@ Cached read failures return sanitized JSON with a machine-readable `reason`:
 | --- | --- | --- |
 | `cache_miss` | No cached entry for the requested day/period | `404` |
 | `cache_stale` | Cache exists but is past its valid window | `404` |
+| `cache_corrupt` | Cache file exists but is unreadable or invalid | `404` |
 | `unavailable` | Generator or upstream guidance is temporarily down | `503` |
 
 Capability-disabled responses use the standard gate body and **do not** include internal `reason` codes.
@@ -47,7 +48,7 @@ Responses never include filesystem paths, Python stderr, stack traces, or other 
 `GET /api/tstm/status` returns a public-safe summary:
 
 - `ingestionEnabled` — whether `TSTM_INGESTION_ENABLED=true` on this process
-- `cache.day1` / `cache.day2` — per-period availability with `available`, `stale`, `reason`, `run`, and `ingestedAt` when known
+- `cache.day1` / `cache.day2` — per-period availability with `available`, `stale`, `reason`, `run`, `ingestedAt`, and `effectiveEnd` when known
 
 Use this endpoint (or server logs prefixed with `[tstm-ingest]`) to confirm ingestion health. Expected ingestion skips log at **info** level and do not report to Sentry.
 

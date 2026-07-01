@@ -22,14 +22,31 @@ const cacheDir = (target, env = process.env) =>
 const cacheFilePath = (target, day, period, env = process.env) =>
   path.join(cacheDir(target, env), `day${day}`, `${period}.json`);
 
+/** Reads cache and reports miss, corrupt, or hit without exposing internal paths. */
+const readCacheState = (target, day, period, env = process.env) => {
+  if (!isValidPeriod(period)) {
+    return { state: 'miss' };
+  }
+
+  const filePath = cacheFilePath(target, day, period, env);
+  if (!fs.existsSync(filePath)) {
+    return { state: 'miss' };
+  }
+
+  try {
+    return {
+      state: 'hit',
+      data: JSON.parse(fs.readFileSync(filePath, 'utf8')),
+    };
+  } catch {
+    return { state: 'corrupt' };
+  }
+};
+
 /** Reads cached TSTM data for a target/day/period. Returns null on any error. */
 const readCache = (target, day, period, env = process.env) => {
-  if (!isValidPeriod(period)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(cacheFilePath(target, day, period, env), 'utf8'));
-  } catch {
-    return null;
-  }
+  const entry = readCacheState(target, day, period, env);
+  return entry.state === 'hit' ? entry.data : null;
 };
 
 /** Atomically writes TSTM data to the cache (write-to-temp, then rename). */
@@ -134,8 +151,8 @@ const getTstmCacheHealth = (target, env = process.env, now = Date.now()) => {
     cache[dayKey] = {};
 
     for (const period of VALID_PERIODS) {
-      const cached = readCache(target, day, period, env);
-      if (!cached) {
+      const entry = readCacheState(target, day, period, env);
+      if (entry.state === 'miss') {
         cache[dayKey][period] = {
           available: false,
           reason: 'cache_miss',
@@ -143,6 +160,15 @@ const getTstmCacheHealth = (target, env = process.env, now = Date.now()) => {
         continue;
       }
 
+      if (entry.state === 'corrupt') {
+        cache[dayKey][period] = {
+          available: false,
+          reason: 'cache_corrupt',
+        };
+        continue;
+      }
+
+      const cached = entry.data;
       if (isCacheExpired(cached, now)) {
         cache[dayKey][period] = {
           available: false,
@@ -150,6 +176,7 @@ const getTstmCacheHealth = (target, env = process.env, now = Date.now()) => {
           reason: 'cache_stale',
           run: cached.run,
           ingestedAt: cached.ingestedAt,
+          effectiveEnd: cached.effectiveEnd,
         };
         continue;
       }
@@ -257,6 +284,7 @@ module.exports = {
   isValidPeriod,
   isRunComplete,
   readCache,
+  readCacheState,
   runIngestionCycle,
   startIngestionLoop,
   SUPPORTED_DAYS,

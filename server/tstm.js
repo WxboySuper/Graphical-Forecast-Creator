@@ -11,7 +11,7 @@ const {
   getTstmCacheHealth,
   isCacheExpired,
   isValidPeriod,
-  readCache,
+  readCacheState,
   startIngestionLoop,
 } = require('./tstm-ingestion');
 
@@ -150,8 +150,8 @@ const handleLatestRequest = (env, target) => (req, res) => {
     res.status(400).json({ error: 'period must be full, 4hr, or 1hr.' });
     return;
   }
-  const cached = readCache(target, day, period, env);
-  if (!cached) {
+  const entry = readCacheState(target, day, period, env);
+  if (entry.state === 'miss') {
     sendTstmApiError(
       res,
       404,
@@ -160,6 +160,16 @@ const handleLatestRequest = (env, target) => (req, res) => {
     );
     return;
   }
+  if (entry.state === 'corrupt') {
+    sendTstmApiError(
+      res,
+      404,
+      'Cached TSTM data is unavailable.',
+      TSTM_ERROR_REASON.CACHE_CORRUPT,
+    );
+    return;
+  }
+  const cached = entry.data;
   if (isCacheExpired(cached)) {
     sendTstmApiError(
       res,

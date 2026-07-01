@@ -285,6 +285,25 @@ describe('GET /api/tstm/latest', () => {
     });
   });
 
+  it('returns 404 when cache file is corrupt', async () => {
+    const corruptPath = path.join(tmpDir, 'local', 'day1', 'full.json');
+    fs.mkdirSync(path.dirname(corruptPath), { recursive: true });
+    fs.writeFileSync(corruptPath, '{not-json', 'utf8');
+
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
+      routePath: '/api/tstm/latest',
+      query: '?day=1&period=full',
+    }, async (res) => {
+      assert.equal(res.status, 404);
+      assert.deepEqual(await res.json(), {
+        error: 'Cached TSTM data is unavailable.',
+        reason: 'cache_corrupt',
+      });
+    });
+  });
+
   it('returns 400 for invalid day parameter', async () => {
     await withTstmRouteResponse({
       tmpDir,

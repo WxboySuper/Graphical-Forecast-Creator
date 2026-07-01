@@ -169,6 +169,7 @@ describe('tstmGeneration utilities', () => {
   test('reads structured latest failure reasons from API payloads', () => {
     expect(readTstmLatestFailureReason({ reason: 'cache_miss' })).toBe('cache_miss');
     expect(readTstmLatestFailureReason({ reason: 'cache_stale' })).toBe('cache_stale');
+    expect(readTstmLatestFailureReason({ reason: 'cache_corrupt' })).toBe('cache_corrupt');
     expect(readTstmLatestFailureReason({ reason: 'unavailable' })).toBe('unavailable');
     expect(readTstmLatestFailureReason({ reason: 'internal_path' })).toBeNull();
   });

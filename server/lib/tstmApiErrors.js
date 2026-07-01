@@ -4,6 +4,7 @@
 const TSTM_ERROR_REASON = {
   CACHE_MISS: 'cache_miss',
   CACHE_STALE: 'cache_stale',
+  CACHE_CORRUPT: 'cache_corrupt',
   UNAVAILABLE: 'unavailable',
 };
 

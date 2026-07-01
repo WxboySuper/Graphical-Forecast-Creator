@@ -1,8 +1,9 @@
-export type TstmLatestFailureReason = 'cache_miss' | 'cache_stale' | 'unavailable';
+export type TstmLatestFailureReason = 'cache_miss' | 'cache_stale' | 'cache_corrupt' | 'unavailable';
 
 const VALID_LATEST_FAILURE_REASONS: readonly TstmLatestFailureReason[] = [
   'cache_miss',
   'cache_stale',
+  'cache_corrupt',
   'unavailable',
 ];
 
