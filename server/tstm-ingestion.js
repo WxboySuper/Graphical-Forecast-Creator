@@ -63,12 +63,12 @@ const isCacheExpired = (data, now = Date.now(), expirationHours = DEFAULT_EXPIRA
 };
 
 /** Returns true when a generator response indicates the run data is complete and usable. */
-const isRunComplete = (result) =>
-  result
-  && typeof result === 'object'
-  && Array.isArray(result.features)
-  && result.features.length > 0
-  && !(result.completeness && result.completeness.complete === false);
+const isRunComplete = (result) => {
+  if (!result || typeof result !== 'object') return false;
+  if (!Array.isArray(result.features) || result.features.length === 0) return false;
+  if (result.completeness && result.completeness.complete === false) return false;
+  return true;
+};
 
 /**
  * Resolves the HREF run timestamps to check for Day 1 and Day 2 based on
@@ -175,6 +175,7 @@ const startIngestionLoop = (options = {}) => {
   let timer = null;
   let running = false;
 
+  /** Runs one ingestion cycle, skipping when a previous tick is still in flight. */
   const tick = async () => {
     if (running) return;
     running = true;

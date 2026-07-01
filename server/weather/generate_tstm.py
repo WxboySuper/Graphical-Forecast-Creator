@@ -62,6 +62,7 @@ class SpcThunderSignal:
     run: datetime
     period: str
     forecast_hours: list[int]
+    loaded_hours: list[int]
     urls: list[str]
 
 
@@ -122,6 +123,31 @@ def build_forecast_hours(start: datetime, end: datetime, run: datetime) -> list[
     return forecast_hours
 
 
+def parse_cycle_run_override(payload: dict[str, Any]) -> datetime | None:
+    cycle_run_raw = payload.get("cycleRun")
+    if not isinstance(cycle_run_raw, str) or not cycle_run_raw:
+        return None
+    return parse_iso_datetime(cycle_run_raw)
+
+
+def day1_window_bounds(
+    cycle_start: datetime,
+    issue_date: datetime | None,
+    valid_date: datetime | None,
+    issue_hour: int,
+    issue_minute: int,
+) -> tuple[datetime, datetime]:
+    start = valid_date or issue_date or cycle_start.replace(hour=issue_hour, minute=issue_minute)
+    end = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
+    return start, end
+
+
+def day2_window_bounds(cycle_start: datetime) -> tuple[datetime, datetime]:
+    start = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
+    end = (cycle_start + timedelta(days=2)).replace(hour=12, minute=0)
+    return start, end
+
+
 def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
     """Compute valid-time window and HREF run for Day 1 (→12Z) or Day 2 (12Z→12Z)."""
     day = int(payload.get("day", 0))
@@ -132,19 +158,13 @@ def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
     issue_date = parse_iso_datetime(payload.get("issueDate"))
     valid_date = parse_iso_datetime(payload.get("validDate"))
     issue_hour, issue_minute = parse_issuance_time(payload.get("issuanceTime"))
-
-    cycle_run_raw = payload.get("cycleRun")
-    override_run = (
-        parse_iso_datetime(cycle_run_raw) if isinstance(cycle_run_raw, str) and cycle_run_raw else None
-    )
+    override_run = parse_cycle_run_override(payload)
 
     if day == 1:
-        start = valid_date or issue_date or cycle_start.replace(hour=issue_hour, minute=issue_minute)
-        end = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
+        start, end = day1_window_bounds(cycle_start, issue_date, valid_date, issue_hour, issue_minute)
         href_run = override_run or previous_spc_cycle(start)
     else:
-        start = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
-        end = (cycle_start + timedelta(days=2)).replace(hour=12, minute=0)
+        start, end = day2_window_bounds(cycle_start)
         href_run = override_run or cycle_start.replace(hour=12, minute=0)
 
     forecast_hours = build_forecast_hours(start, end, href_run)
@@ -319,6 +339,7 @@ def fetch_spc_period_for_window(window: EffectiveWindow, period: str) -> SpcThun
             run=window.href_run,
             period=period,
             forecast_hours=[end_hour],
+            loaded_hours=matched_hours,
             urls=urls,
         )
     return None
@@ -654,6 +675,7 @@ def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dic
     matched_hours: list[int] = []
     sources: dict[str, dict[str, Any] | None] = {}
     response_window = window
+    calibrated_thunder: SpcThunderSignal | None = None
 
     if not window.forecast_hours:
         warnings.append("The effective outlook window does not overlap HREF forecast hours 0-48.")
@@ -672,7 +694,7 @@ def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dic
             probability = as_probability(calibrated_thunder.values)
             final_mask = calibrated_thunder_mask(probability, grid_near_land_mask(lat, lon), lat, lon)
             features = mask_to_features(final_mask, lat, lon)
-            matched_hours = calibrated_thunder.forecast_hours
+            matched_hours = calibrated_thunder.loaded_hours
             response_window = replace(
                 window,
                 href_run=calibrated_thunder.run,
@@ -690,8 +712,12 @@ def build_response(payload: dict[str, Any], ingestion_mode: bool = False) -> dic
             }
 
     response = response_payload(response_window, features, warnings, sources)
+    completeness_window = window
+    if calibrated_thunder is not None:
+        checked_hours = spc_period_hours(window.forecast_hours[-1], calibrated_thunder.period)
+        completeness_window = replace(window, forecast_hours=checked_hours)
     completeness = _build_completeness(
-        ingestion_mode, response_window, features,
+        ingestion_mode, completeness_window, features,
         {"matched_hours": matched_hours, "warnings": warnings},
     )
     if completeness is not None:
