@@ -33,6 +33,8 @@ No frontend rebuild or redeploy is required.
 
 Use this when the incident is caused by the background ingestion loop itself, such as upstream rate limiting, disk growth, runaway polling, or repeated cache writes. Route disable alone prevents user-triggered generation but does not keep a running ingestion loop from polling after restart.
 
+The beta deploy workflow preserves an active `TSTM_INGESTION_ENABLED=false` value and any existing `EMERGENCY_DISABLED_CAPABILITIES` value from `/opt/gfc-beta-analytics/.env` when it writes a fresh env file. This keeps an in-flight emergency stop from being silently undone by a hotfix deployment. After the incident is resolved, complete the rollback steps below so future deployments resume normal ingestion.
+
 1. SSH to the beta analytics host.
 2. Edit `/opt/gfc-beta-analytics/.env`.
 3. Set:
@@ -99,6 +101,7 @@ Already-open beta sessions should stop showing server-backed controls after the 
 3. Restart `gfc-beta-analytics` with pm2.
 4. Re-run the verification commands and confirm `"available": true` when registry exposure and `TSTM_GENERATION_ENABLED=true` are both in effect.
 5. Confirm `GET /api/tstm/status` reports `"ingestionEnabled": true` when ingestion should be running.
+6. If a hotfix deployed during the incident, confirm `/opt/gfc-beta-analytics/.env` no longer carries the preserved emergency values.
 
 ## Ownership and audit
 
