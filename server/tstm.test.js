@@ -138,6 +138,7 @@ describe('Auto-TSTM server foundation', () => {
       assert.equal(response.status, 503);
       assert.deepEqual(await response.json(), {
         error: 'Auto-TSTM guidance is temporarily unavailable.',
+        reason: 'unavailable',
       });
     } finally {
       server.close();
@@ -198,24 +199,7 @@ describe('Auto-TSTM server foundation', () => {
 describe('GET /api/tstm/latest', () => {
   let tmpDir;
   beforeEach(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tstm-latest-test-')); });
-  afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true   });
-});
-
-describe('registerTstmIngestion', () => {
-  it('returns null when capability is not enabled', () => {
-    const result = registerTstmIngestion({}, express, {
-      env: { TSTM_INGESTION_ENABLED: 'true' },
-    });
-    assert.equal(result, null);
-  });
-
-  it('returns null when TSTM_INGESTION_ENABLED is not set', () => {
-    const result = registerTstmIngestion({}, express, {
-      env: { TSTM_GENERATION_ENABLED: 'true' },
-    });
-    assert.equal(result, null);
-  });
-});
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
 
   const SAMPLE_CACHED = {
     run: '2026-06-13T12:00:00Z',
@@ -265,6 +249,10 @@ describe('registerTstmIngestion', () => {
     try {
       const res = await fetch(getLatestUrl(server, '?day=1'));
       assert.equal(res.status, 404);
+      assert.deepEqual(await res.json(), {
+        error: 'No cached TSTM data available.',
+        reason: 'cache_miss',
+      });
     } finally {
       server.close();
     }
@@ -311,7 +299,123 @@ describe('registerTstmIngestion', () => {
       const res = await fetch(getLatestUrl(server, '?day=1'));
       assert.equal(res.status, 404);
       const body = await res.json();
+      assert.equal(body.reason, 'cache_stale');
       assert.ok(body.error.includes('expired'));
+    } finally {
+      server.close();
+    }
+  });
+
+  it('rate limits repeated latest requests', async () => {
+    const cacheDir = path.join(tmpDir, 'local', 'day1');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
+
+    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
+    const rateLimit = require('express-rate-limit');
+    const server = await startLatestServer(env, {
+      ...allTargetsEnabledRouteOptions(),
+      readRateLimit: rateLimit({
+        windowMs: 60 * 1000,
+        limit: 1,
+        standardHeaders: true,
+        legacyHeaders: false,
+      }),
+    });
+    try {
+      const url = getLatestUrl(server, '?day=1&period=full');
+      const first = await fetch(url);
+      const second = await fetch(url);
+      assert.equal(first.status, 200);
+      assert.equal(second.status, 429);
+    } finally {
+      server.close();
+    }
+  });
+});
+
+describe('registerTstmIngestion', () => {
+  it('returns null when capability is not enabled', () => {
+    const result = registerTstmIngestion({}, express, {
+      env: { TSTM_INGESTION_ENABLED: 'true' },
+    });
+    assert.equal(result, null);
+  });
+
+  it('returns null when TSTM_INGESTION_ENABLED is not set', () => {
+    const result = registerTstmIngestion({}, express, {
+      env: { TSTM_GENERATION_ENABLED: 'true' },
+    });
+    assert.equal(result, null);
+  });
+});
+
+describe('GET /api/tstm/status', () => {
+  let tmpDir;
+  beforeEach(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tstm-status-test-')); });
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
+
+  const SAMPLE_CACHED = {
+    run: '2026-06-13T12:00:00Z',
+    day: 1,
+    period: 'full',
+    features: [{ type: 'Feature', id: 't-0', geometry: { type: 'Polygon', coordinates: [[[-100, 30], [-99, 30], [-99, 31], [-100, 31], [-100, 30]]] }, properties: {} }],
+    effectiveStart: '2026-06-13T06:00:00Z',
+    effectiveEnd: '2099-01-01T00:00:00Z',
+    forecastHours: [24],
+    warnings: [],
+    ingestedAt: '2026-06-13T14:05:12Z',
+    complete: true,
+  };
+
+  const startStatusServer = (env, routeOptions = {}) => {
+    const app = express();
+    registerTstmRoutes(app, express, { env, runGenerator: async () => ({}), ...routeOptions });
+    return new Promise((resolve, reject) => {
+      const server = app.listen(0, '127.0.0.1', () => resolve(server));
+      server.on('error', reject);
+    });
+  };
+
+  const getStatusUrl = (server) => {
+    const { port } = server.address();
+    return `http://127.0.0.1:${port}/api/tstm/status`;
+  };
+
+  it('reports cache miss and available entries without leaking internals', async () => {
+    const cacheDir = path.join(tmpDir, 'local', 'day1');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
+
+    const env = {
+      TSTM_GENERATION_ENABLED: 'true',
+      TSTM_CACHE_DIR: tmpDir,
+      TSTM_INGESTION_ENABLED: 'true',
+    };
+    const server = await startStatusServer(env, allTargetsEnabledRouteOptions());
+    try {
+      const res = await fetch(getStatusUrl(server));
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.ingestionEnabled, true);
+      assert.equal(body.cache.day1.full.available, true);
+      assert.equal(body.cache.day2.full.reason, 'cache_miss');
+      assert.equal(JSON.stringify(body).includes(tmpDir), false);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('returns 404 when capability is disabled without reading cache', async () => {
+    const cacheDir = path.join(tmpDir, 'local', 'day1');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
+
+    const env = { TSTM_CACHE_DIR: tmpDir };
+    const server = await startStatusServer(env);
+    try {
+      const res = await fetch(getStatusUrl(server));
+      assert.equal(res.status, 404);
     } finally {
       server.close();
     }

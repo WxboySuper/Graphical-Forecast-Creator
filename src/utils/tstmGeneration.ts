@@ -169,6 +169,22 @@ export const requestTstmGeneration = async (
 
 const TSTM_LATEST_ENDPOINT = '/api/tstm/latest';
 
+export type TstmLatestFailureReason = 'cache_miss' | 'cache_stale' | 'unavailable';
+
+/** Reads a machine-readable reason from a cached Auto-TSTM API error payload. */
+export const readTstmLatestFailureReason = (payload: unknown): TstmLatestFailureReason | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const reason = (payload as { reason?: unknown }).reason;
+  if (reason === 'cache_miss' || reason === 'cache_stale' || reason === 'unavailable') {
+    return reason;
+  }
+
+  return null;
+};
+
 /** Requests the latest pre-cached TSTM data for a given day and period. */
 export const requestLatestTstmData = async (
   day: DayType,
@@ -177,8 +193,14 @@ export const requestLatestTstmData = async (
 ): Promise<TstmGenerationResponse | null> => {
   if (!canGenerateTstmForDay(day)) return null;
   const response = await fetch(`${TSTM_LATEST_ENDPOINT}?day=${day}&period=${period}`, { signal });
-  if (!response.ok) return null;
   const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = readTstmGenerationErrorMessage(payload);
+    if (error) {
+      handleDisabledTstmCapability(response, error);
+    }
+    return null;
+  }
   if (!payload) return null;
   try {
     return parseTstmGenerationResponse(payload);

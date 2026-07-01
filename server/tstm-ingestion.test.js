@@ -7,9 +7,11 @@ const os = require('os');
 const path = require('path');
 
 const {
+  buildCacheData,
   cacheFilePath,
   computeCandidateRuns,
   deleteCache,
+  getTstmCacheHealth,
   isCacheExpired,
   isRunComplete,
   readCache,
@@ -289,6 +291,61 @@ describe('tstm-ingestion', () => {
       assert.ok(callCount >= 1);
 
       stop();
+    });
+  });
+
+  describe('buildCacheData', () => {
+    it('persists forecastHours and warnings for client parsing', () => {
+      const cached = buildCacheData({
+        run: '2026-06-13T12:00:00Z',
+        features: SAMPLE_CACHE_DATA.features,
+        effectiveStart: '2026-06-13T06:00:00Z',
+        effectiveEnd: '2026-06-14T12:00:00Z',
+        forecastHours: [12, 24],
+        warnings: ['sample warning'],
+        thresholds: SAMPLE_CACHE_DATA.thresholds,
+        generatedAt: '2026-06-13T14:05:00Z',
+      }, 1, 'full');
+
+      assert.deepEqual(cached.forecastHours, [12, 24]);
+      assert.deepEqual(cached.warnings, ['sample warning']);
+    });
+  });
+
+  describe('getTstmCacheHealth', () => {
+    let dir;
+    beforeEach(() => { dir = tmpDir(); });
+    afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+    it('distinguishes available, stale, and missing cache entries', () => {
+      const env = { TSTM_CACHE_DIR: dir, TSTM_INGESTION_ENABLED: 'true' };
+      writeCache({
+        target: 'beta',
+        day: 1,
+        period: 'full',
+        data: {
+          ...SAMPLE_CACHE_DATA,
+          effectiveEnd: '2099-01-01T00:00:00Z',
+        },
+        env,
+      });
+      writeCache({
+        target: 'beta',
+        day: 2,
+        period: 'full',
+        data: {
+          ...SAMPLE_CACHE_DATA,
+          day: 2,
+          effectiveEnd: '2020-01-01T00:00:00Z',
+        },
+        env,
+      });
+
+      const health = getTstmCacheHealth('beta', env);
+      assert.equal(health.ingestionEnabled, true);
+      assert.equal(health.cache.day1.full.available, true);
+      assert.equal(health.cache.day2.full.reason, 'cache_stale');
+      assert.equal(health.cache.day1['4hr'].reason, 'cache_miss');
     });
   });
 });

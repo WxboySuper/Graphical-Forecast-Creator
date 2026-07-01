@@ -116,12 +116,59 @@ const buildCacheData = (result, day, period) => ({
   features: result.features,
   effectiveStart: result.effectiveStart,
   effectiveEnd: result.effectiveEnd,
+  forecastHours: Array.isArray(result.forecastHours) ? result.forecastHours : [],
+  warnings: Array.isArray(result.warnings) ? result.warnings : [],
   thresholds: result.thresholds,
   generatedAt: result.generatedAt,
   ingestedAt: new Date().toISOString(),
   complete: true,
   domain: result.domain || 'conus',
 });
+
+/** Summarizes cache availability for each supported day and period. */
+const getTstmCacheHealth = (target, env = process.env, now = Date.now()) => {
+  const cache = {};
+
+  for (const day of SUPPORTED_DAYS) {
+    const dayKey = `day${day}`;
+    cache[dayKey] = {};
+
+    for (const period of VALID_PERIODS) {
+      const cached = readCache(target, day, period, env);
+      if (!cached) {
+        cache[dayKey][period] = {
+          available: false,
+          reason: 'cache_miss',
+        };
+        continue;
+      }
+
+      if (isCacheExpired(cached, now)) {
+        cache[dayKey][period] = {
+          available: false,
+          stale: true,
+          reason: 'cache_stale',
+          run: cached.run,
+          ingestedAt: cached.ingestedAt,
+        };
+        continue;
+      }
+
+      cache[dayKey][period] = {
+        available: true,
+        stale: false,
+        run: cached.run,
+        ingestedAt: cached.ingestedAt,
+        effectiveEnd: cached.effectiveEnd,
+      };
+    }
+  }
+
+  return {
+    ingestionEnabled: env.TSTM_INGESTION_ENABLED === 'true',
+    cache,
+  };
+};
 
 /**
  * Runs a single ingestion cycle: checks each candidate run, spawns the
@@ -151,7 +198,7 @@ const runIngestionCycle = async (options = {}) => {
       writeCache({ target, day, period, data: buildCacheData(result, day, period), env });
       log.info?.(`[tstm-ingest] run ${run} day ${day} cached (${result.features.length} features)`);
     } catch (err) {
-      log.error?.(`[tstm-ingest] run ${run} day ${day} failed: ${err.message}`);
+      log.info?.(`[tstm-ingest] run ${run} day ${day} skipped: ${err.message}`);
     }
   }
 };
@@ -197,6 +244,7 @@ const startIngestionLoop = (options = {}) => {
 };
 
 module.exports = {
+  buildCacheData,
   cacheDir,
   cacheFilePath,
   computeCandidateRuns,
@@ -204,6 +252,7 @@ module.exports = {
   DEFAULT_BUFFER_HOURS,
   DEFAULT_EXPIRATION_HOURS,
   DEFAULT_INGESTION_INTERVAL_MS,
+  getTstmCacheHealth,
   isCacheExpired,
   isValidPeriod,
   isRunComplete,
