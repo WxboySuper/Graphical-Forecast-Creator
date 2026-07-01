@@ -12,7 +12,6 @@ All notable changes to this project will be documented in this file.
 - **Production deploy supply chain:** Use `pnpm install --frozen-lockfile` in the production deploy workflow so builds cannot silently resolve new dependency versions at deploy time.
 
 ### Changed
-- **Deploy feature config:** Move server-backed feature switches into `deploy/beta-deployment-config.json` and `deploy/production-deployment-config.json`, with deploy workflows appending the target config into analytics env files.
 - **Deploy env:** Add explicit `SERVER_TARGET` values to beta, staging, and production analytics server deploy env files.
 - **Deploy triggers:** Run **Deploy Beta** on beta prerelease publish and **Deploy Production** on stable release publish (one deploy per version bump; merge pushes no longer trigger VPS deploys).
 
