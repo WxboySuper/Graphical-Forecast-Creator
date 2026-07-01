@@ -126,6 +126,53 @@ class GenerateTstmTests(unittest.TestCase):
         response = generate_tstm.response_payload(window, [], [], {})
         self.assertEqual(response["thresholds"], generate_tstm.DEFAULT_THRESHOLDS)
 
+    def test_ingestion_mode_off_by_default(self):
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13"}
+        )
+        response = generate_tstm.build_response(
+            {"day": 1, "cycleDate": "2026-06-13"}, ingestion_mode=False
+        )
+        self.assertNotIn("completeness", response)
+
+    def test_ingestion_mode_adds_completeness_when_no_forecast_hours(self):
+        """When ingestion_mode=True and no SPC data is found, completeness.complete is False."""
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13"}
+        )
+        # Simulate a response with no features (data unavailable)
+        response = generate_tstm.response_payload(window, [], ["No SPC data"], {})
+        response["completeness"] = {
+            "complete": False,
+            "checkedHours": window.forecast_hours,
+            "matchedHours": [],
+            "missingHours": window.forecast_hours,
+            "warnings": ["No SPC data"],
+        }
+        self.assertFalse(response["completeness"]["complete"])
+        self.assertEqual(response["completeness"]["missingHours"], window.forecast_hours)
+        self.assertEqual(len(response["features"]), 0)
+
+    def test_ingestion_mode_parse_args_flag(self):
+        import sys
+        original = sys.argv
+        try:
+            sys.argv = ["generate_tstm.py", "--ingestion-mode"]
+            payload, mode = generate_tstm.parse_args()
+            self.assertTrue(mode)
+        finally:
+            sys.argv = original
+
+    def test_ingestion_mode_parse_args_default(self):
+        import sys
+        original = sys.argv
+        try:
+            sys.argv = ["generate_tstm.py"]
+            payload, mode = generate_tstm.parse_args()
+            self.assertFalse(mode)
+        finally:
+            sys.argv = original
+
 
 if __name__ == "__main__":
     unittest.main()

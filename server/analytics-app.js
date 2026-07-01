@@ -34,7 +34,7 @@ function configureApp(app, express, fs, LOG_FILE) {
   const { registerCapabilityRoutes } = require('./capabilities');
   const { registerMetricsRoutes } = require('./metrics');
   const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
-  const { registerTstmRoutes } = require('./tstm');
+  const { registerTstmIngestion, registerTstmRoutes } = require('./tstm');
 
   app.set('trust proxy', 'loopback');
 
@@ -51,6 +51,7 @@ function configureApp(app, express, fs, LOG_FILE) {
   registerBetaRoutes(app, express);
   registerCapabilityRoutes(app);
   registerTstmRoutes(app, express);
+  registerTstmIngestion(app, express);
 
   app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, createCollectHandler(fs, LOG_FILE));
 

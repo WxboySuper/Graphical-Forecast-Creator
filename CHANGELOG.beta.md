@@ -4,6 +4,13 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #646
+
+- Add scheduled TSTM ingestion: periodic server-side discovery of new HREF runs with golden-copy caching that only replaces confirmed data (TSTM-03, #474).
+- Add `GET /api/tstm/latest` endpoint for pre-cached TSTM data.
+- Add `--ingestion-mode` flag to Python generator for completeness metadata.
+- Add `requestLatestTstmData()` client utility.
+
 ### PR #645
 
 - Fix Sentry GFC-WEB-G by portaling the Forecast Cycle History modal to `document.body`, unifying its overlay/dialog shell with `notranslate`, deferring parent close after nested confirm actions, and stacking confirm overlays above the history dialog.

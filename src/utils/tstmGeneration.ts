@@ -166,3 +166,23 @@ export const requestTstmGeneration = async (
   }
   return parseTstmGenerationResponse(payload);
 };
+
+const TSTM_LATEST_ENDPOINT = '/api/tstm/latest';
+
+/** Requests the latest pre-cached TSTM data for a given day and period. */
+export const requestLatestTstmData = async (
+  day: DayType,
+  period = 'full',
+  signal?: AbortSignal
+): Promise<TstmGenerationResponse | null> => {
+  if (!canGenerateTstmForDay(day)) return null;
+  const response = await fetch(`${TSTM_LATEST_ENDPOINT}?day=${day}&period=${period}`, { signal });
+  if (!response.ok) return null;
+  const payload = await response.json().catch(() => null);
+  if (!payload) return null;
+  try {
+    return parseTstmGenerationResponse(payload);
+  } catch {
+    return null;
+  }
+};
