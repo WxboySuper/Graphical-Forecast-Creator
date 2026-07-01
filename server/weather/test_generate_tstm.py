@@ -173,6 +173,37 @@ class GenerateTstmTests(unittest.TestCase):
         finally:
             sys.argv = original
 
+    def test_build_completeness_partial_run_marks_incomplete(self):
+        """Partial runs with missing forecast hours should be marked incomplete."""
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13"}
+        )
+        completeness = generate_tstm._build_completeness(
+            True, window, [{"type": "Feature"}],
+            {"matched_hours": [6, 9], "warnings": []},
+        )
+        self.assertFalse(completeness["complete"])
+        self.assertIn(12, completeness["missingHours"])
+
+    def test_build_completeness_full_run_marks_complete(self):
+        """When all checked hours are matched, complete is True."""
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-13"}
+        )
+        completeness = generate_tstm._build_completeness(
+            True, window, [{"type": "Feature"}],
+            {"matched_hours": list(window.forecast_hours), "warnings": []},
+        )
+        self.assertTrue(completeness["complete"])
+        self.assertEqual(completeness["missingHours"], [])
+
+    def test_cycle_run_override(self):
+        """When cycleRun is provided, it overrides the derived href_run."""
+        window = generate_tstm.build_effective_window(
+            {"day": 1, "cycleDate": "2026-06-15", "cycleRun": "2026-06-15T12:00:00Z"}
+        )
+        self.assertEqual(window.href_run.hour, 12)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -133,14 +133,19 @@ def build_effective_window(payload: dict[str, Any]) -> EffectiveWindow:
     valid_date = parse_iso_datetime(payload.get("validDate"))
     issue_hour, issue_minute = parse_issuance_time(payload.get("issuanceTime"))
 
+    cycle_run_raw = payload.get("cycleRun")
+    override_run = (
+        parse_iso_datetime(cycle_run_raw) if isinstance(cycle_run_raw, str) and cycle_run_raw else None
+    )
+
     if day == 1:
         start = valid_date or issue_date or cycle_start.replace(hour=issue_hour, minute=issue_minute)
         end = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
-        href_run = previous_spc_cycle(start)
+        href_run = override_run or previous_spc_cycle(start)
     else:
         start = (cycle_start + timedelta(days=1)).replace(hour=12, minute=0)
         end = (cycle_start + timedelta(days=2)).replace(hour=12, minute=0)
-        href_run = cycle_start.replace(hour=12, minute=0)
+        href_run = override_run or cycle_start.replace(hour=12, minute=0)
 
     forecast_hours = build_forecast_hours(start, end, href_run)
 
@@ -634,7 +639,7 @@ def _build_completeness(
     matched = ctx.get("matched_hours", [])
     missing = sorted(set(checked) - set(matched))
     return {
-        "complete": len(features) > 0,
+        "complete": len(features) > 0 and not missing,
         "checkedHours": checked,
         "matchedHours": matched,
         "missingHours": missing,

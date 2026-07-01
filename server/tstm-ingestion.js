@@ -140,7 +140,7 @@ const runIngestionCycle = async (options = {}) => {
 
   for (const { day, period, run } of candidates) {
     try {
-      const result = await runGenerator({ day, cycleDate: run.slice(0, 10) }, { ingestionMode: true });
+      const result = await runGenerator({ day, cycleDate: run.slice(0, 10), cycleRun: run }, { ingestionMode: true });
 
       if (!isRunComplete(result)) {
         log.info?.(`[tstm-ingest] run ${run} day ${day} not ready, retaining cache`);

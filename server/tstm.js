@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 
 const { createServerCapabilityGate, isServerCapabilityEnabled } = require('./lib/featureCapabilities');
-const { isValidPeriod, readCache, startIngestionLoop } = require('./tstm-ingestion');
+const { isCacheExpired, isValidPeriod, readCache, startIngestionLoop } = require('./tstm-ingestion');
 
 const DEFAULT_TIMEOUT_MS = 480000;
 const MAX_STDERR_LENGTH = 2000;
@@ -139,6 +139,10 @@ const handleLatestRequest = (env, target) => (req, res) => {
     res.status(404).json({ error: 'No cached TSTM data available.' });
     return;
   }
+  if (isCacheExpired(cached)) {
+    res.status(404).json({ error: 'Cached TSTM data has expired.' });
+    return;
+  }
   res.json(cached);
 };
 
@@ -194,6 +198,7 @@ const registerTstmRoutes = (app, express, options = {}) => {
 const registerTstmIngestion = (app, express, options = {}) => {
   const env = options.env || process.env;
   if (env.TSTM_INGESTION_ENABLED !== 'true') return null;
+  if (!isTstmGenerationEnabled(env, options)) return null;
 
   const runGenerator = options.runGenerator || runTstmGenerator;
   const log = options.log || console;

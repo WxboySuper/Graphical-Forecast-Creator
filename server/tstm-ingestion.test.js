@@ -195,6 +195,26 @@ describe('tstm-ingestion', () => {
       assert.equal(cached.features.length, 1);
     });
 
+    it('passes full run timestamp as cycleRun to generator', async () => {
+      const env = { TSTM_CACHE_DIR: dir, TSTM_INGESTION_INTERVAL_MS: '60000' };
+      let receivedPayload;
+      const runGenerator = async (payload) => {
+        receivedPayload = payload;
+        return { ...SAMPLE_CACHE_DATA, completeness: { complete: true, checkedHours: [1, 24], matchedHours: [1, 24], missingHours: [] } };
+      };
+
+      await runIngestionCycle({
+        env,
+        target: 'beta',
+        runGenerator,
+        now: new Date('2026-06-15T15:00:00Z').getTime(),
+      });
+
+      assert.ok(receivedPayload);
+      assert.equal(receivedPayload.cycleRun, '2026-06-15T12:00:00Z');
+      assert.equal(receivedPayload.cycleDate, '2026-06-15');
+    });
+
     it('retains existing cache when data is not ready', async () => {
       const env = { TSTM_CACHE_DIR: dir, TSTM_INGESTION_INTERVAL_MS: '60000' };
       writeCache({ target: 'beta', day: 1, period: 'full', data: SAMPLE_CACHE_DATA, env });
