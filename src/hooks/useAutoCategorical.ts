@@ -226,6 +226,28 @@ export function processOutlooksToCategorical(outlooks: OutlookData, day: number 
   return [];
 }
 
+type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
+
+/** Reusable two-feature collection for Turf v7 intersect/difference/union calls. */
+const createPairFeatureCollection = (): turf.FeatureCollection<Polygon | MultiPolygon> => ({
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [] }, properties: {} },
+    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [] }, properties: {} },
+  ],
+});
+
+const setPairFeatures = (
+  collection: turf.FeatureCollection<Polygon | MultiPolygon>,
+  first: PolygonOutlookFeature,
+  second: PolygonOutlookFeature,
+): void => {
+  collection.features[0] = first;
+  collection.features[1] = second;
+};
+
+const pairFeatureCollection = createPairFeatureCollection();
+
 // Helper to safely union a list of polygons
 const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon | MultiPolygon> | null => {
   if (features.length === 0) return null;
@@ -233,7 +255,13 @@ const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon
   
   try {
     // Turf v7: union takes a FeatureCollection
-    const fc = turf.featureCollection(features);
+    let fc: turf.FeatureCollection<Polygon | MultiPolygon>;
+    if (features.length === 2) {
+      setPairFeatures(pairFeatureCollection, features[0], features[1]);
+      fc = pairFeatureCollection;
+    } else {
+      fc = turf.featureCollection(features);
+    }
     const result = turf.union(fc);
     return result as Feature<Polygon | MultiPolygon>;
   } catch {
@@ -297,8 +325,6 @@ const buildCumulativeCategoricalFeatures = (
   return generatedFeatures;
 };
 
-type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
-
 /** Narrows GeoJSON features to polygon geometries used in categorical generation. */
 const isPolygonOutlookFeature = (feature: GeoJSON.Feature): feature is PolygonOutlookFeature =>
   feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon';
@@ -354,6 +380,7 @@ const applyProbabilityFeaturesWithHatching = (
   probabilityFeatures.forEach((features, probStr) => {
     features.forEach((poly) => {
       let remainingPoly: PolygonOutlookFeature | null = poly;
+      const pairCollection = createPairFeatureCollection();
 
       cigLevels.forEach((cig) => {
         if (!remainingPoly) {
@@ -366,12 +393,12 @@ const applyProbabilityFeaturesWithHatching = (
         }
 
         try {
-          const intersection = turf.intersect(turf.featureCollection([remainingPoly, hatchRegion]));
+          setPairFeatures(pairCollection, remainingPoly, hatchRegion);
+          const intersection = turf.intersect(pairCollection);
           if (intersection) {
             onPiece(probStr, cig, intersection as PolygonOutlookFeature);
-            remainingPoly = turf.difference(
-              turf.featureCollection([remainingPoly, intersection as PolygonOutlookFeature]),
-            ) as PolygonOutlookFeature | null;
+            setPairFeatures(pairCollection, remainingPoly, intersection as PolygonOutlookFeature);
+            remainingPoly = turf.difference(pairCollection) as PolygonOutlookFeature | null;
           }
         } catch {
           // Ignore topology errors
