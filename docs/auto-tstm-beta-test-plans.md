@@ -31,7 +31,7 @@ Ask testers to include:
 - Steps to reproduce anything unexpected
 - Whether the issue blocks normal forecast creation
 
-## Plan 1: 15-minute beta smoke test
+## Plan 1: Short beta test
 
 Goal: prove the feature can be found, previewed, cancelled, applied, and used on common devices without breaking the forecast workflow.
 
@@ -82,7 +82,7 @@ Recommended coverage:
 - The mobile layout hides the map or makes Tools unreachable.
 - Any crash, blank map, or repeated loading state.
 
-## Plan 2: 45-minute workflow and quality pass
+## Plan 2: Full forecast test
 
 Goal: test Auto-TSTM as part of realistic forecast creation and compare the generated guidance against forecaster judgment.
 
@@ -174,7 +174,7 @@ This section is for maintainers, not general beta testers.
 
 Use the public beta API to confirm cached guidance health before sending testers into the feature:
 
-```powershell
+```sh
 curl https://beta-gfc.weatherboysuper.com/api/capabilities/status
 curl "https://beta-gfc.weatherboysuper.com/api/tstm/status"
 curl "https://beta-gfc.weatherboysuper.com/api/tstm/latest?day=1&period=full"

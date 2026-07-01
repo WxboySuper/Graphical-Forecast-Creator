@@ -9,6 +9,11 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 - Port deployment feature-switch config from #651: add per-target config files under `deploy/` and wire beta, staging, and production analytics env generation through the checked-out deploy ref.
 - Harden deployment config validation for newline injection, path traversal, and readable CLI errors.
 
+### PR #650
+
+- Add Auto-TSTM beta tester plans, including a short step-by-step test, a full forecast test, and copy-ready report templates.
+- Document that beta deployment enables Auto-TSTM generation and ingestion through `deploy/beta-deployment-config.json`.
+
 ### PR #649
 
 - Integrate Auto-TSTM preview, apply, cancel, and stale-result protection in the forecast editor (TSTM-05, #476).
