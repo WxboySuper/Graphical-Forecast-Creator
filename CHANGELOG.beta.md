@@ -4,6 +4,11 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #647
+
+- Reduce redundant Turf feature collection allocation in Auto-Categorical hatching and cumulative risk generation (PERF-04, #589).
+- Extend Auto-Categorical tests for hatching splits, cumulative risk rings, and allocation regression coverage.
+
 ### PR #646
 
 - Add scheduled TSTM ingestion: periodic server-side discovery of new HREF runs with golden-copy caching that only replaces confirmed data (TSTM-03, #474).
