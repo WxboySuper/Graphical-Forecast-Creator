@@ -60,6 +60,15 @@ bash /opt/gfc-analytics/current/release/promote-release.sh
 3. Smoke **staging-gfc** (beta access guard, same as beta-gfc).
 4. At `rolloutAt`, cron promotes; live banner switches via `write-live-alert-banner.mjs`.
 
+## Deployment feature config
+
+Server-backed capability switches are reviewed in target deployment config files, not hard-coded in workflow env blocks:
+
+- `deploy/beta-deployment-config.json` controls beta deploys and staging preview analytics.
+- `deploy/production-deployment-config.json` controls production analytics.
+
+The workflow definitions live on `main`, but each deploy checks out the release ref before reading these config files. To enable or disable a server-backed feature, update the config file on the branch/tag that will be deployed.
+
 ## Hotfix / emergency
 
 Set `"action": "live"` in `deploy/production-release.json` for immediate full deploy (no staging).

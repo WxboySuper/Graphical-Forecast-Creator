@@ -170,6 +170,7 @@ jobs:
           SENTRY_ENVIRONMENT=beta
           SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.value }}
           EOF
+          node scripts/write-deployment-env.mjs deploy/beta-deployment-config.json >> beta-server.env
           rsync -avz beta-server.env root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/.env
 
       - name: Install analytics dependencies and restart
