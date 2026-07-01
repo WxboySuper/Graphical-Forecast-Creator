@@ -6,7 +6,7 @@ import {
   openPanelAndWaitForError,
   openPanelAndWaitForPreview,
   renderAutoTstm,
-} from './useAutoTstm.testHelpers';
+} from '../testing/autoTstmTestHarness';
 
 describe('useAutoTstm', () => {
   beforeEach(() => {

@@ -4,7 +4,7 @@ import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tst
 import { buildTstmRequest } from '../utils/buildTstmRequest';
 import { requestLatestTstmData } from '../utils/tstmGeneration';
 import { resolveTstmFetchOutcome } from './autoTstmFetch';
-import type { AutoTstmStatus } from './useAutoTstm';
+import type { AutoTstmStatus } from './useAutoTstmState';
 
 type PreviewState = {
   request: TstmGenerationRequest;

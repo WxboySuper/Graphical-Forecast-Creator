@@ -7,7 +7,7 @@ import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tst
 import { buildTstmRequest } from '../utils/buildTstmRequest';
 import { isCurrentTstmRequest } from '../utils/tstmGeneration';
 import { runAutoTstmPreviewFetch } from './autoTstmPreviewFetch';
-import type { AutoTstmStatus } from './useAutoTstm';
+import type { AutoTstmStatus } from './useAutoTstmState';
 
 type PreviewState = {
   request: TstmGenerationRequest;

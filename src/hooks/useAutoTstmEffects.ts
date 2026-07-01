@@ -7,7 +7,7 @@ import {
   isStaleActiveTstmRequest,
   isStaleTstmContext,
 } from './autoTstmContextGuards';
-import type { AutoTstmStatus } from './useAutoTstm';
+import type { AutoTstmStatus } from './useAutoTstmState';
 
 type PreviewState = {
   request: TstmGenerationRequest;

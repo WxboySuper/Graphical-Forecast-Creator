@@ -1,9 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
 import type { Feature } from 'geojson';
-import { useDispatch, useSelector } from 'react-redux';
-import { selectCurrentDay, selectForecastCycle } from '../store/forecastSlice';
-import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
-import { canGenerateTstmForDay } from '../utils/tstmGeneration';
+import { useDispatch } from 'react-redux';
 import { useAutoTstmActions } from './useAutoTstmActions';
 import {
   useAutoTstmActiveRequestGuard,
@@ -11,98 +7,66 @@ import {
   useAutoTstmPanelFetchEffect,
   useAutoTstmPreviewGuard,
 } from './useAutoTstmEffects';
+import { useAutoTstmState } from './useAutoTstmState';
 
-export type AutoTstmStatus = 'idle' | 'loading' | 'preview' | 'error';
-
-type PreviewState = {
-  request: TstmGenerationRequest;
-  response: TstmGenerationResponse;
-};
+export type { AutoTstmStatus } from './useAutoTstmState';
 
 const EMPTY_FEATURES: Feature[] = [];
 
 /** Orchestrates cached Auto-TSTM preview, apply, cancel, and stale-result protection. */
 export const useAutoTstm = () => {
   const dispatch = useDispatch();
-  const forecastCycle = useSelector(selectForecastCycle);
-  const currentDay = useSelector(selectCurrentDay);
-  const [status, setStatus] = useState<AutoTstmStatus>('idle');
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [preview, setPreview] = useState<PreviewState | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const activeRequestRef = useRef<TstmGenerationRequest | null>(null);
-  const fetchPreviewRef = useRef<(() => Promise<void>) | null>(null);
-  const isDaySupported = canGenerateTstmForDay(currentDay);
-
-  const clearInFlightRequest = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    activeRequestRef.current = null;
-  }, []);
-
-  const clearPreview = useCallback(() => {
-    clearInFlightRequest();
-    setPreview(null);
-    setErrorMessage(null);
-    setStatus('idle');
-  }, [clearInFlightRequest]);
-
-  const closePanel = useCallback(() => {
-    setIsPanelOpen(false);
-    clearPreview();
-  }, [clearPreview]);
-
+  const state = useAutoTstmState();
   const { openPanel, fetchPreview, applyPreview, cancelPreview } = useAutoTstmActions({
     dispatch,
-    forecastCycle,
-    currentDay,
-    isDaySupported,
-    preview,
-    abortRef,
-    activeRequestRef,
-    clearInFlightRequest,
-    clearPreview,
-    closePanel,
-    setIsPanelOpen,
-    setStatus,
-    setErrorMessage,
-    setPreview,
+    forecastCycle: state.forecastCycle,
+    currentDay: state.currentDay,
+    isDaySupported: state.isDaySupported,
+    preview: state.preview,
+    abortRef: state.abortRef,
+    activeRequestRef: state.activeRequestRef,
+    clearInFlightRequest: state.clearInFlightRequest,
+    clearPreview: state.clearPreview,
+    closePanel: state.closePanel,
+    setIsPanelOpen: state.setIsPanelOpen,
+    setStatus: state.setStatus,
+    setErrorMessage: state.setErrorMessage,
+    setPreview: state.setPreview,
   });
 
-  fetchPreviewRef.current = fetchPreview;
+  state.fetchPreviewRef.current = fetchPreview;
 
-  useAutoTstmPanelFetchEffect(isPanelOpen, fetchPreviewRef);
+  useAutoTstmPanelFetchEffect(state.isPanelOpen, state.fetchPreviewRef);
   useAutoTstmActiveRequestGuard({
-    isPanelOpen,
-    forecastCycle,
-    currentDay,
-    activeRequestRef,
-    clearInFlightRequest,
-    setPreview,
-    setStatus,
-    setErrorMessage,
+    isPanelOpen: state.isPanelOpen,
+    forecastCycle: state.forecastCycle,
+    currentDay: state.currentDay,
+    activeRequestRef: state.activeRequestRef,
+    clearInFlightRequest: state.clearInFlightRequest,
+    setPreview: state.setPreview,
+    setStatus: state.setStatus,
+    setErrorMessage: state.setErrorMessage,
   });
   useAutoTstmPreviewGuard({
-    isPanelOpen,
-    preview,
-    forecastCycle,
-    currentDay,
-    clearPreview,
-    setStatus,
-    setErrorMessage,
+    isPanelOpen: state.isPanelOpen,
+    preview: state.preview,
+    forecastCycle: state.forecastCycle,
+    currentDay: state.currentDay,
+    clearPreview: state.clearPreview,
+    setStatus: state.setStatus,
+    setErrorMessage: state.setErrorMessage,
   });
-  useAutoTstmCleanupEffect(clearInFlightRequest);
+  useAutoTstmCleanupEffect(state.clearInFlightRequest);
 
   return {
-    status,
-    isPanelOpen,
-    isDaySupported,
-    previewFeatures: preview?.response.features ?? EMPTY_FEATURES,
-    previewResponse: preview?.response ?? null,
-    errorMessage,
+    status: state.status,
+    isPanelOpen: state.isPanelOpen,
+    isDaySupported: state.isDaySupported,
+    previewFeatures: state.preview?.response.features ?? EMPTY_FEATURES,
+    previewResponse: state.preview?.response ?? null,
+    errorMessage: state.errorMessage,
     openPanel,
-    closePanel,
+    closePanel: state.closePanel,
     fetchPreview,
     applyPreview,
     cancelPreview,
