@@ -5,6 +5,8 @@ import {
   isCurrentTstmRequest,
   normalizeGeneratedTstmFeatures,
   parseTstmGenerationResponse,
+  readTstmLatestFailureReason,
+  requestLatestTstmData,
   requestTstmGeneration,
 } from './tstmGeneration';
 import {
@@ -148,6 +150,69 @@ describe('tstmGeneration utilities', () => {
         .resolves.toMatchObject({ features: [] });
       await expect(requestTstmGeneration({ day: 1, cycleDate: '2026-06-13' }))
         .rejects.toThrow(/not enabled/);
+      expect(
+        isServerCapabilityAvailable('TSTM_GENERATION_ENABLED', {
+          loaded: true,
+          capabilities: {
+            TSTM_GENERATION_ENABLED: {
+              available: true,
+              reason: 'available',
+            },
+          },
+        })
+      ).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('reads structured latest failure reasons from API payloads', () => {
+    expect(readTstmLatestFailureReason({ reason: 'cache_miss' })).toBe('cache_miss');
+    expect(readTstmLatestFailureReason({ reason: 'cache_stale' })).toBe('cache_stale');
+    expect(readTstmLatestFailureReason({ reason: 'cache_corrupt' })).toBe('cache_corrupt');
+    expect(readTstmLatestFailureReason({ reason: 'unavailable' })).toBe('unavailable');
+    expect(readTstmLatestFailureReason({ reason: 'internal_path' })).toBeNull();
+  });
+
+  test('returns cached guidance and handles expected latest outages without throwing', async () => {
+    const originalFetch = global.fetch;
+    const cachedPayload = {
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        properties: {},
+      }],
+      run: '2026-06-13T12:00:00Z',
+      forecastHours: [24],
+      effectiveStart: '2026-06-13T12:00:00Z',
+      effectiveEnd: '2026-06-14T12:00:00Z',
+      warnings: [],
+    };
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => cachedPayload,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: 'No cached TSTM data available.', reason: 'cache_miss' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: 'Cached TSTM data has expired.', reason: 'cache_stale' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: 'Auto-TSTM is not enabled on this deployment.' }),
+      }) as jest.Mock;
+    try {
+      await expect(requestLatestTstmData(1)).resolves.toMatchObject({ run: '2026-06-13T12:00:00Z' });
+      await expect(requestLatestTstmData(1)).resolves.toBeNull();
+      await expect(requestLatestTstmData(1)).resolves.toBeNull();
+      await expect(requestLatestTstmData(1)).resolves.toBeNull();
       expect(
         isServerCapabilityAvailable('TSTM_GENERATION_ENABLED', {
           loaded: true,

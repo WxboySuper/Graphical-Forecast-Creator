@@ -6,12 +6,28 @@ const os = require('os');
 const path = require('path');
 
 const { createServerCapabilityGate, isServerCapabilityEnabled } = require('./lib/featureCapabilities');
-const { isCacheExpired, isValidPeriod, readCache, startIngestionLoop } = require('./tstm-ingestion');
+const { sendTstmApiError, TSTM_ERROR_REASON } = require('./lib/tstmApiErrors');
+const {
+  getTstmCacheHealth,
+  isCacheExpired,
+  isValidPeriod,
+  readCacheState,
+  startIngestionLoop,
+} = require('./tstm-ingestion');
 
 const DEFAULT_TIMEOUT_MS = 480000;
 const MAX_STDERR_LENGTH = 2000;
 const MAX_STDOUT_LENGTH = 4 * 1024 * 1024;
 const TSTM_CAPABILITY_KEY = 'TSTM_GENERATION_ENABLED';
+const TSTM_READ_RATE_LIMIT_MAX = 120;
+
+/** Creates the shared read rate limiter for cached Auto-TSTM GET routes. */
+const createTstmReadRateLimit = (rateLimit, options = {}) => rateLimit({
+  windowMs: 60 * 1000,
+  max: options.max ?? TSTM_READ_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /** Returns true when Auto-TSTM is exposed on this deployment target and capability env. */
 const isTstmGenerationEnabled = (env = process.env, options = {}) =>
@@ -134,16 +150,41 @@ const handleLatestRequest = (env, target) => (req, res) => {
     res.status(400).json({ error: 'period must be full, 4hr, or 1hr.' });
     return;
   }
-  const cached = readCache(target, day, period, env);
-  if (!cached) {
-    res.status(404).json({ error: 'No cached TSTM data available.' });
+  const entry = readCacheState(target, day, period, env);
+  if (entry.state === 'miss') {
+    sendTstmApiError(
+      res,
+      404,
+      'No cached TSTM data available.',
+      TSTM_ERROR_REASON.CACHE_MISS,
+    );
     return;
   }
+  if (entry.state === 'corrupt') {
+    sendTstmApiError(
+      res,
+      404,
+      'Cached TSTM data is unavailable.',
+      TSTM_ERROR_REASON.CACHE_CORRUPT,
+    );
+    return;
+  }
+  const cached = entry.data;
   if (isCacheExpired(cached)) {
-    res.status(404).json({ error: 'Cached TSTM data has expired.' });
+    sendTstmApiError(
+      res,
+      404,
+      'Cached TSTM data has expired.',
+      TSTM_ERROR_REASON.CACHE_STALE,
+    );
     return;
   }
   res.json(cached);
+};
+
+/** Handles GET /api/tstm/status — public operational cache health. */
+const handleStatusRequest = (env, target) => (_req, res) => {
+  res.json(getTstmCacheHealth(target, env));
 };
 
 /** Registers the preserved endpoint in a fail-closed, default-off state. */
@@ -157,6 +198,7 @@ const registerTstmRoutes = (app, express, options = {}) => {
     standardHeaders: true,
     legacyHeaders: false,
   });
+  const readLimiter = options.readRateLimit || createTstmReadRateLimit(rateLimit, options.readRateLimitOptions);
   const capabilityOptions = {
     env,
     exposureOverride: options.exposureOverride,
@@ -177,7 +219,12 @@ const registerTstmRoutes = (app, express, options = {}) => {
       try {
         res.json(await runGenerator(payload));
       } catch {
-        res.status(503).json({ error: 'Auto-TSTM guidance is temporarily unavailable.' });
+        sendTstmApiError(
+          res,
+          503,
+          'Auto-TSTM guidance is temporarily unavailable.',
+          TSTM_ERROR_REASON.UNAVAILABLE,
+        );
       }
     },
   );
@@ -187,7 +234,14 @@ const registerTstmRoutes = (app, express, options = {}) => {
   app.get(
     '/api/tstm/latest',
     createServerCapabilityGate(TSTM_CAPABILITY_KEY, capabilityOptions),
+    readLimiter,
     handleLatestRequest(env, target),
+  );
+  app.get(
+    '/api/tstm/status',
+    createServerCapabilityGate(TSTM_CAPABILITY_KEY, capabilityOptions),
+    readLimiter,
+    handleStatusRequest(env, target),
   );
 };
 
@@ -207,10 +261,14 @@ const registerTstmIngestion = (app, express, options = {}) => {
 
 module.exports = {
   createGenerationPayload,
+  createTstmReadRateLimit,
+  handleLatestRequest,
+  handleStatusRequest,
   isSupportedDay,
   isTstmGenerationEnabled,
   registerTstmIngestion,
   registerTstmRoutes,
   runTstmGenerator,
+  TSTM_READ_RATE_LIMIT_MAX,
   validatePayload,
 };

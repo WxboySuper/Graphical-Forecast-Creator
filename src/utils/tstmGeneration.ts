@@ -169,6 +169,29 @@ export const requestTstmGeneration = async (
 
 const TSTM_LATEST_ENDPOINT = '/api/tstm/latest';
 
+/** Resolves a latest-route response into guidance or an expected null result. */
+const finishLatestTstmRequest = (
+  response: Response,
+  payload: unknown
+): TstmGenerationResponse | null => {
+  if (!response.ok) {
+    const error = readTstmGenerationErrorMessage(payload);
+    if (error) {
+      handleDisabledTstmCapability(response, error);
+    }
+    return null;
+  }
+  if (!payload) return null;
+  try {
+    return parseTstmGenerationResponse(payload);
+  } catch {
+    return null;
+  }
+};
+
+export type { TstmLatestFailureReason } from './tstmLatestErrors';
+export { readTstmLatestFailureReason } from './tstmLatestErrors';
+
 /** Requests the latest pre-cached TSTM data for a given day and period. */
 export const requestLatestTstmData = async (
   day: DayType,
@@ -177,12 +200,6 @@ export const requestLatestTstmData = async (
 ): Promise<TstmGenerationResponse | null> => {
   if (!canGenerateTstmForDay(day)) return null;
   const response = await fetch(`${TSTM_LATEST_ENDPOINT}?day=${day}&period=${period}`, { signal });
-  if (!response.ok) return null;
   const payload = await response.json().catch(() => null);
-  if (!payload) return null;
-  try {
-    return parseTstmGenerationResponse(payload);
-  } catch {
-    return null;
-  }
+  return finishLatestTstmRequest(response, payload);
 };
