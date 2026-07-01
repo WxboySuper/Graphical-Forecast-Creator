@@ -1,5 +1,5 @@
 import { act, waitFor } from '@testing-library/react';
-import { setForecastDay } from '../../store/forecastSlice';
+import { replaceTstmFeatures, setForecastDay } from '../../store/forecastSlice';
 import {
   cachedResponse,
   mockedRequestLatest,
@@ -120,5 +120,24 @@ describe('useAutoTstm', () => {
 
     expect(store.getState().forecast.forecastCycle.days[2]?.data.categorical?.get('TSTM')).toBeUndefined();
     expect(result.current.status).toBe('error');
+  });
+
+  test('does not wipe committed TSTM when apply is called with zero preview features', async () => {
+    mockedRequestLatest.mockResolvedValue({ ...cachedResponse, features: [] });
+    const { store, result } = renderAutoTstm();
+
+    await act(async () => {
+      store.dispatch(replaceTstmFeatures({ features: cachedResponse.features }));
+    });
+
+    await openPanelAndWaitForPreview(result);
+
+    await act(async () => {
+      result.current.applyPreview();
+    });
+
+    const committed = store.getState().forecast.forecastCycle.days[1]?.data.categorical?.get('TSTM');
+    expect(committed).toHaveLength(1);
+    expect(result.current.isPanelOpen).toBe(true);
   });
 });

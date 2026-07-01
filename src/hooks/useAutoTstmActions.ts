@@ -94,6 +94,10 @@ export const useAutoTstmActions = ({
       return;
     }
 
+    if (preview.response.features.length === 0) {
+      return;
+    }
+
     dispatch(replaceTstmFeatures({ features: preview.response.features }));
     closePanel();
   }, [clearPreview, closePanel, currentDay, dispatch, forecastCycle, preview, setErrorMessage, setStatus]);
