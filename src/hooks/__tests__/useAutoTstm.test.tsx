@@ -49,7 +49,7 @@ describe('useAutoTstm', () => {
     label: 'cancel',
     action: (result: ReturnType<typeof renderAutoTstm>['result']) => result.current.cancelPreview(),
     expectCommitted: false,
-    expectPanelClosed: false,
+    expectPanelClosed: true,
   },
 ] as const)('$label preview updates state without unintended forecast mutation', async ({
   action,

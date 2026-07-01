@@ -84,10 +84,6 @@ test.describe('Auto-TSTM workspace tools', () => {
     await expect(page.getByText(/Polygons/i)).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('dialog', { name: /Auto-TSTM Preview/i }).getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('button', { name: 'Apply TSTM' })).toBeDisabled();
-    await expect(page.getByText(/^Polygons$/i)).not.toBeVisible({ timeout: 5000 });
-
-    await page.keyboard.press('Escape');
     await expect(page.getByRole('heading', { name: 'Auto-TSTM Preview' })).not.toBeVisible({ timeout: 5000 });
     await expect(page.locator('.map-container')).toBeVisible();
   });

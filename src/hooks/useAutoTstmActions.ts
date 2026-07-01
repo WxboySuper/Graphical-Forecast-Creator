@@ -94,8 +94,8 @@ export const useAutoTstmActions = ({
   }, [clearPreview, closePanel, currentDay, dispatch, forecastCycle, preview, setErrorMessage, setStatus]);
 
   const cancelPreview = useCallback(() => {
-    clearPreview();
-  }, [clearPreview]);
+    closePanel();
+  }, [closePanel]);
 
   return {
     openPanel,
