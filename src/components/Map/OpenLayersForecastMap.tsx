@@ -579,6 +579,20 @@ export const hideOverlay = (overlay: Overlay): void => {
   overlay.setPosition(OVERLAY_HIDDEN_POSITION);
 };
 
+/** Applies preview styling and metadata before adding one OL feature to the preview source. */
+const addTstmPreviewOlFeature = (
+  item: OLFeature<Geometry>,
+  previewSource: VectorSource,
+  previewStyle: ReturnType<typeof toTstmPreviewOlStyle>,
+  featureId: string,
+): void => {
+  item.setStyle(previewStyle);
+  item.set("featureId", featureId);
+  item.set("outlookType", "categorical");
+  item.set("probability", "TSTM");
+  previewSource.addFeature(item);
+};
+
 /** Replaces Auto-TSTM preview features on a dedicated map source. */
 const syncTstmPreviewSource = (
   previewSource: VectorSource,
@@ -593,21 +607,14 @@ const syncTstmPreviewSource = (
       dataProjection: "EPSG:4326",
       featureProjection: "EPSG:3857",
     });
-
-    const applyPreviewProps = function applyPreviewProps(item: OLFeature<Geometry>) {
-      item.setStyle(previewStyle);
-      item.set("featureId", String(feature.id ?? "tstm-preview"));
-      item.set("outlookType", "categorical");
-      item.set("probability", "TSTM");
-      previewSource.addFeature(item);
-    };
+    const featureId = String(feature.id ?? "tstm-preview");
 
     if (Array.isArray(olFeature)) {
       olFeature.forEach((item: FeatureLike) =>
-        applyPreviewProps(item as OLFeature<Geometry>),
+        addTstmPreviewOlFeature(item as OLFeature<Geometry>, previewSource, previewStyle, featureId),
       );
     } else {
-      applyPreviewProps(olFeature as OLFeature<Geometry>);
+      addTstmPreviewOlFeature(olFeature as OLFeature<Geometry>, previewSource, previewStyle, featureId);
     }
   });
 };

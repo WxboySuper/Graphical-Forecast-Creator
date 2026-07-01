@@ -16,7 +16,7 @@ jest.mock('../../utils/tstmGeneration', () => {
 
 const mockedRequestLatest = requestLatestTstmData as jest.MockedFunction<typeof requestLatestTstmData>;
 
-const cachedResponse = {
+export const cachedResponse = {
   features: [{
     type: 'Feature' as const,
     geometry: {
@@ -56,6 +56,17 @@ const renderAutoTstm = () => {
   return { store, ...hook };
 };
 
+const openPanelAndWaitForPreview = async (
+  result: ReturnType<typeof renderAutoTstm>['result'],
+) => {
+  await act(async () => {
+    result.current.openPanel();
+  });
+  await waitFor(() => {
+    expect(result.current.status).toBe('preview');
+  });
+};
+
 describe('useAutoTstm', () => {
   beforeEach(() => {
     mockedRequestLatest.mockReset();
@@ -70,13 +81,7 @@ describe('useAutoTstm', () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
     const { result } = renderAutoTstm();
 
-    await act(async () => {
-      result.current.openPanel();
-    });
-
-    await waitFor(() => {
-      expect(result.current.status).toBe('preview');
-    });
+    await openPanelAndWaitForPreview(result);
 
     expect(mockedRequestLatest).toHaveBeenCalledWith(1, 'full', expect.any(AbortSignal));
     expect(result.current.previewResponse?.run).toBe('2026-06-13T12:00:00Z');
@@ -102,13 +107,7 @@ describe('useAutoTstm', () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
     const { store, result } = renderAutoTstm();
 
-    await act(async () => {
-      result.current.openPanel();
-    });
-
-    await waitFor(() => {
-      expect(result.current.status).toBe('preview');
-    });
+    await openPanelAndWaitForPreview(result);
 
     await act(async () => {
       result.current.applyPreview();
@@ -123,13 +122,7 @@ describe('useAutoTstm', () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
     const { store, result } = renderAutoTstm();
 
-    await act(async () => {
-      result.current.openPanel();
-    });
-
-    await waitFor(() => {
-      expect(result.current.status).toBe('preview');
-    });
+    await openPanelAndWaitForPreview(result);
 
     await act(async () => {
       result.current.cancelPreview();
@@ -145,7 +138,7 @@ describe('useAutoTstm', () => {
     mockedRequestLatest.mockImplementation(
       () => new Promise((resolve) => {
         resolveRequest = resolve;
-      })
+      }),
     );
 
     const { store, result } = renderAutoTstm();
@@ -172,13 +165,7 @@ describe('useAutoTstm', () => {
     mockedRequestLatest.mockResolvedValue(cachedResponse);
     const { store, result } = renderAutoTstm();
 
-    await act(async () => {
-      result.current.openPanel();
-    });
-
-    await waitFor(() => {
-      expect(result.current.status).toBe('preview');
-    });
+    await openPanelAndWaitForPreview(result);
 
     await act(async () => {
       store.dispatch(setForecastDay(2));

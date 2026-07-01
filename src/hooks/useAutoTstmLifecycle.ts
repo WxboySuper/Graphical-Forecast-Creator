@@ -1,13 +1,13 @@
 import type { MutableRefObject } from 'react';
 import { useEffect } from 'react';
-import type { ForecastCycle } from '../types/outlooks';
-import type { DayType } from '../types/outlooks';
-import type { TstmGenerationRequest } from '../types/tstmGeneration';
-import { buildTstmRequest } from '../utils/buildTstmRequest';
-import { isCurrentTstmRequest } from '../utils/tstmGeneration';
+import type { DayType, ForecastCycle } from '../types/outlooks';
+import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
+import {
+  CONTEXT_CHANGED_MESSAGE,
+  isStaleActiveTstmRequest,
+  isStaleTstmContext,
+} from './autoTstmContextGuards';
 import type { AutoTstmStatus } from './useAutoTstm';
-
-import type { TstmGenerationResponse } from '../types/tstmGeneration';
 
 type PreviewState = {
   request: TstmGenerationRequest;
@@ -27,9 +27,6 @@ type AutoTstmLifecycleArgs = {
   setStatus: (value: AutoTstmStatus) => void;
   setErrorMessage: (value: string | null) => void;
 };
-
-const CONTEXT_CHANGED_MESSAGE =
-  'Forecast context changed. Fetch guidance again for the current day and cycle.';
 
 /** Wires preview fetch, stale-response guards, and cleanup for Auto-TSTM. */
 export const useAutoTstmLifecycle = ({
@@ -53,17 +50,13 @@ export const useAutoTstmLifecycle = ({
   }, [fetchPreviewRef, isPanelOpen]);
 
   useEffect(() => {
-    if (!isPanelOpen) {
+    if (!isPanelOpen || !isStaleActiveTstmRequest(activeRequestRef.current, forecastCycle, currentDay)) {
       return;
     }
-
-    const activeRequest = buildTstmRequest(forecastCycle, currentDay);
-    if (activeRequestRef.current && !isCurrentTstmRequest(activeRequestRef.current, activeRequest)) {
-      clearInFlightRequest();
-      setPreview(null);
-      setStatus('error');
-      setErrorMessage(CONTEXT_CHANGED_MESSAGE);
-    }
+    clearInFlightRequest();
+    setPreview(null);
+    setStatus('error');
+    setErrorMessage(CONTEXT_CHANGED_MESSAGE);
   }, [
     activeRequestRef,
     clearInFlightRequest,
@@ -76,17 +69,13 @@ export const useAutoTstmLifecycle = ({
   ]);
 
   useEffect(() => {
-    if (!preview) {
+    if (!preview || !isStaleTstmContext(preview.request, forecastCycle, currentDay)) {
       return;
     }
-
-    const activeRequest = buildTstmRequest(forecastCycle, currentDay);
-    if (!isCurrentTstmRequest(preview.request, activeRequest)) {
-      clearPreview();
-      if (isPanelOpen) {
-        setErrorMessage(CONTEXT_CHANGED_MESSAGE);
-        setStatus('error');
-      }
+    clearPreview();
+    if (isPanelOpen) {
+      setErrorMessage(CONTEXT_CHANGED_MESSAGE);
+      setStatus('error');
     }
   }, [clearPreview, currentDay, forecastCycle, isPanelOpen, preview, setErrorMessage, setStatus]);
 

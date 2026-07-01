@@ -12,7 +12,6 @@ import { useExportMap } from '../DrawingTools/useExportMap';
 
 import { DayType, OutlookType } from '../../types/outlooks';
 import { getOutlookColor } from '../../utils/outlookUtils';
-import type { Feature } from 'geojson';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 
@@ -113,8 +112,6 @@ export interface ForecastWorkspaceController {
   currentColor: string;
   isLowProb: boolean;
   cloudTools: React.ReactNode;
-  autoTstmTools: React.ReactNode;
-  tstmPreviewFeatures: Feature[];
   baseMapStyle: BaseMapStyle;
   onBaseMapStyleSelect: (style: BaseMapStyle) => void;
 }
@@ -126,8 +123,6 @@ interface UseForecastWorkspaceControllerOptions {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   addToast: AddToastFn;
   cloudTools?: React.ReactNode;
-  autoTstmTools?: React.ReactNode;
-  tstmPreviewFeatures?: Feature[];
 }
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
@@ -136,8 +131,6 @@ interface UseForecastWorkspaceControllerOptions {
 interface BuildForecastWorkspaceControllerArgs {
   onSave: () => void;
   cloudTools: React.ReactNode;
-  autoTstmTools: React.ReactNode;
-  tstmPreviewFeatures: Feature[];
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   isSaved: boolean;
   canUndo: boolean;
@@ -182,8 +175,6 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
   const {
     onSave,
     cloudTools,
-    autoTstmTools,
-    tstmPreviewFeatures,
     fileInputRef,
     isSaved,
     canUndo,
@@ -227,8 +218,6 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
   return {
     onSave,
     cloudTools,
-    autoTstmTools,
-    tstmPreviewFeatures,
     fileInputRef,
     isSaved,
     canUndo,
@@ -285,8 +274,6 @@ export const useForecastWorkspaceController = ({
   fileInputRef,
   addToast,
   cloudTools = null,
-  autoTstmTools = null,
-  tstmPreviewFeatures = [],
 }: UseForecastWorkspaceControllerOptions): ForecastWorkspaceController => {
   const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
@@ -365,8 +352,6 @@ export const useForecastWorkspaceController = ({
   return buildForecastWorkspaceController({
     onSave,
     cloudTools,
-    autoTstmTools,
-    tstmPreviewFeatures,
     fileInputRef,
     isSaved,
     canUndo,

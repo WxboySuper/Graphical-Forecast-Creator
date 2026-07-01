@@ -11,9 +11,8 @@ import { buildTstmRequest } from '../utils/buildTstmRequest';
 import {
   canGenerateTstmForDay,
   isCurrentTstmRequest,
-  requestLatestTstmData,
 } from '../utils/tstmGeneration';
-import { resolveTstmFetchOutcome } from './autoTstmFetch';
+import { runAutoTstmPreviewFetch } from './autoTstmPreviewFetch';
 import { useAutoTstmLifecycle } from './useAutoTstmLifecycle';
 
 export type AutoTstmStatus = 'idle' | 'loading' | 'preview' | 'error';
@@ -25,37 +24,8 @@ type PreviewState = {
 
 const EMPTY_FEATURES: Feature[] = [];
 
-const UNAVAILABLE_MESSAGE =
-  'No cached Auto-TSTM guidance is available for this day yet. Try again after the next ingestion cycle.';
-
 const STALE_APPLY_MESSAGE =
   'This guidance is stale because the forecast day or cycle changed. Fetch again before applying.';
-
-/** Applies a fetch resolution to preview UI state when it is actionable. */
-const applyFetchOutcome = (
-  outcome: ReturnType<typeof resolveTstmFetchOutcome>,
-  setPreview: (value: PreviewState | null) => void,
-  setStatus: (value: AutoTstmStatus) => void,
-  setErrorMessage: (value: string | null) => void
-): void => {
-  if (outcome.kind === 'aborted' || outcome.kind === 'stale') {
-    return;
-  }
-  if (outcome.kind === 'unavailable') {
-    setPreview(null);
-    setStatus('error');
-    setErrorMessage(UNAVAILABLE_MESSAGE);
-    return;
-  }
-  if (outcome.kind === 'error') {
-    setPreview(null);
-    setStatus('error');
-    setErrorMessage(outcome.message);
-    return;
-  }
-  setPreview({ request: outcome.request, response: outcome.response });
-  setStatus('preview');
-};
 
 /** Orchestrates cached Auto-TSTM preview, apply, cancel, and stale-result protection. */
 export const useAutoTstm = () => {
@@ -96,51 +66,17 @@ export const useAutoTstm = () => {
   }, [isDaySupported]);
 
   const fetchPreview = useCallback(async () => {
-    if (!isDaySupported) {
-      return;
-    }
-
-    const request = buildTstmRequest(forecastCycle, currentDay);
-    clearInFlightRequest();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    activeRequestRef.current = request;
-    setStatus('loading');
-    setErrorMessage(null);
-    setPreview(null);
-
-    try {
-      const response = await requestLatestTstmData(currentDay, 'full', controller.signal);
-      applyFetchOutcome(
-        resolveTstmFetchOutcome({
-          request,
-          activeRequest: activeRequestRef.current,
-          response,
-          aborted: controller.signal.aborted,
-          error: null,
-        }),
-        setPreview,
-        setStatus,
-        setErrorMessage
-      );
-    } catch (error) {
-      applyFetchOutcome(
-        resolveTstmFetchOutcome({
-          request,
-          activeRequest: activeRequestRef.current,
-          response: null,
-          aborted: controller.signal.aborted,
-          error,
-        }),
-        setPreview,
-        setStatus,
-        setErrorMessage
-      );
-    } finally {
-      if (abortRef.current === controller) {
-        abortRef.current = null;
-      }
-    }
+    await runAutoTstmPreviewFetch({
+      isDaySupported,
+      forecastCycle,
+      currentDay,
+      clearInFlightRequest,
+      abortRef,
+      activeRequestRef,
+      setStatus,
+      setErrorMessage,
+      setPreview,
+    });
   }, [clearInFlightRequest, currentDay, forecastCycle, isDaySupported]);
 
   fetchPreviewRef.current = fetchPreview;

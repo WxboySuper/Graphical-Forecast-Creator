@@ -44,6 +44,7 @@ import './IntegratedToolbar.css';
 
 interface IntegratedToolbarProps {
   controller: ForecastWorkspaceController;
+  autoTstmTools?: React.ReactNode;
 }
 
 /** Compact icon button wrapped in a Tooltip for use in the integrated toolbar. */
@@ -913,7 +914,10 @@ const TabbedToolbarActionTile: React.FC<{ item: TabbedToolbarActionItem }> = ({ 
 );
 
 /** Tools tab exposing workspace actions, file actions, and cloud context. */
-const TabbedToolbarToolsTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
+const TabbedToolbarToolsTab: React.FC<{
+  controller: ForecastWorkspaceController;
+  autoTstmTools?: React.ReactNode;
+}> = ({ controller, autoTstmTools = null }) => {
   const actionItems = getTabbedToolbarActionItems(controller);
   const historyItems = actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key));
   const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package'].includes(item.key));
@@ -944,7 +948,7 @@ const TabbedToolbarToolsTab: React.FC<{ controller: ForecastWorkspaceController 
       <TabbedToolbarStripSection label="Cloud & Context" className="tabbed-integrated-toolbar__section--cloud-context w-[260px]">
         <div className="flex flex-wrap items-center gap-2">
           <TabbedToolbarStatPill label="State" value={controller.isSaved ? 'Saved' : 'Unsaved'} />
-          {controller.autoTstmTools}
+          {autoTstmTools}
           {controller.cloudTools ?? (
             <span className="text-xs font-medium text-muted-foreground">Local session only</span>
           )}
@@ -1012,7 +1016,7 @@ const TabbedIntegratedToolbarHeader: React.FC<{ controller: ForecastWorkspaceCon
 );
 
 /** Tray area containing the tab panels. */
-const TabbedIntegratedToolbarTray: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+const TabbedIntegratedToolbarTray: React.FC<IntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
   <div className="tabbed-integrated-toolbar__tray min-h-0 flex-1 overflow-hidden border-t border-border/70 bg-background px-3 py-2 lg:px-4">
     <TabsContent value="draw" className="tabbed-integrated-toolbar__panel mt-0 h-full">
       <TabbedToolbarDrawTab controller={controller} />
@@ -1027,17 +1031,17 @@ const TabbedIntegratedToolbarTray: React.FC<{ controller: ForecastWorkspaceContr
     </TabsContent>
 
     <TabsContent value="tools" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-      <TabbedToolbarToolsTab controller={controller} />
+      <TabbedToolbarToolsTab controller={controller} autoTstmTools={autoTstmTools} />
     </TabsContent>
   </div>
 );
 
 /** Toolbar variant that keeps the original integrated-bar footprint but moves secondary controls behind tabs. */
-const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ controller }) => (
+const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
   <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[168px] overflow-hidden backdrop-blur">
     <Tabs defaultValue="draw" className="flex h-full flex-col">
       <TabbedIntegratedToolbarHeader controller={controller} />
-      <TabbedIntegratedToolbarTray controller={controller} />
+      <TabbedIntegratedToolbarTray controller={controller} autoTstmTools={autoTstmTools} />
     </Tabs>
   </div>
 );
@@ -1045,9 +1049,9 @@ const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ control
 /**
  * Tabbed variant of the integrated toolbar — keeps primary footprint and moves secondary controls behind tabs.
  */
-export const TabbedIntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller }) => (
+export const TabbedIntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
   <TooltipProvider>
-    <TabbedIntegratedToolbarBody controller={controller} />
+    <TabbedIntegratedToolbarBody controller={controller} autoTstmTools={autoTstmTools} />
   </TooltipProvider>
 );
 

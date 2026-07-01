@@ -72,6 +72,8 @@ const renderForecastWorkspaceLayout = (
   props: {
     mapRef: React.RefObject<ForecastMapHandle | null>;
     controller: ReturnType<typeof useForecastWorkspaceController>;
+    autoTstmTools?: React.ReactNode;
+    tstmPreviewFeatures?: ReturnType<typeof useAutoTstm>['previewFeatures'];
   }
 ) => {
   // Only the Tabbed Toolbar variant is supported now.
@@ -1210,14 +1212,14 @@ const useForecastPageWorkspace = ({
       onSaveToCloud: handleSaveToCloud,
       onOpenCloudLibrary: () => navigate('/cloud'),
     }),
-    autoTstmTools: <AutoTstmWorkspaceTools autoTstm={autoTstm} />,
-    tstmPreviewFeatures: autoTstm.previewFeatures,
   });
 
   return {
     emergencyMode,
     dayRolloverPrompt,
     workspaceController,
+    autoTstmTools: <AutoTstmWorkspaceTools autoTstm={autoTstm} />,
+    tstmPreviewFeatures: autoTstm.previewFeatures,
   };
 };
 
@@ -1234,6 +1236,8 @@ export const ForecastPage: React.FC = () => {
     emergencyMode,
     dayRolloverPrompt,
     workspaceController,
+    autoTstmTools,
+    tstmPreviewFeatures,
   } = useForecastPageWorkspace({
     dispatch,
     addToast,
@@ -1257,6 +1261,8 @@ export const ForecastPage: React.FC = () => {
       {renderForecastWorkspaceLayout(forecastUiVariant, {
         mapRef,
         controller: workspaceController,
+        autoTstmTools,
+        tstmPreviewFeatures,
       })}
       <ForecastWorkspaceModals controller={workspaceController} />
       <DayRolloverDialog
