@@ -169,31 +169,11 @@ export const requestTstmGeneration = async (
 
 const TSTM_LATEST_ENDPOINT = '/api/tstm/latest';
 
-export type TstmLatestFailureReason = 'cache_miss' | 'cache_stale' | 'unavailable';
-
-/** Reads a machine-readable reason from a cached Auto-TSTM API error payload. */
-export const readTstmLatestFailureReason = (payload: unknown): TstmLatestFailureReason | null => {
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
-
-  const reason = (payload as { reason?: unknown }).reason;
-  if (reason === 'cache_miss' || reason === 'cache_stale' || reason === 'unavailable') {
-    return reason;
-  }
-
-  return null;
-};
-
-/** Requests the latest pre-cached TSTM data for a given day and period. */
-export const requestLatestTstmData = async (
-  day: DayType,
-  period = 'full',
-  signal?: AbortSignal
-): Promise<TstmGenerationResponse | null> => {
-  if (!canGenerateTstmForDay(day)) return null;
-  const response = await fetch(`${TSTM_LATEST_ENDPOINT}?day=${day}&period=${period}`, { signal });
-  const payload = await response.json().catch(() => null);
+/** Resolves a latest-route response into guidance or an expected null result. */
+const finishLatestTstmRequest = (
+  response: Response,
+  payload: unknown
+): TstmGenerationResponse | null => {
   if (!response.ok) {
     const error = readTstmGenerationErrorMessage(payload);
     if (error) {
@@ -207,4 +187,19 @@ export const requestLatestTstmData = async (
   } catch {
     return null;
   }
+};
+
+export type { TstmLatestFailureReason } from './tstmLatestErrors';
+export { readTstmLatestFailureReason } from './tstmLatestErrors';
+
+/** Requests the latest pre-cached TSTM data for a given day and period. */
+export const requestLatestTstmData = async (
+  day: DayType,
+  period = 'full',
+  signal?: AbortSignal
+): Promise<TstmGenerationResponse | null> => {
+  if (!canGenerateTstmForDay(day)) return null;
+  const response = await fetch(`${TSTM_LATEST_ENDPOINT}?day=${day}&period=${period}`, { signal });
+  const payload = await response.json().catch(() => null);
+  return finishLatestTstmRequest(response, payload);
 };

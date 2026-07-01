@@ -48,6 +48,60 @@ const postGenerateRequest = (server) =>
     body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
   });
 
+const SAMPLE_CACHED_ROUTE = {
+  run: '2026-06-13T12:00:00Z',
+  day: 1,
+  period: 'full',
+  features: [{ type: 'Feature', id: 't-0', geometry: { type: 'Polygon', coordinates: [[[-100, 30], [-99, 30], [-99, 31], [-100, 31], [-100, 30]]] }, properties: {} }],
+  effectiveStart: '2026-06-13T06:00:00Z',
+  effectiveEnd: '2099-01-01T00:00:00Z',
+  forecastHours: [24],
+  warnings: [],
+  ingestedAt: '2026-06-13T14:05:12Z',
+  complete: true,
+};
+
+const writeDay1FullCache = (tmpDir, data = SAMPLE_CACHED_ROUTE) => {
+  const cacheDir = path.join(tmpDir, 'local', 'day1');
+  fs.mkdirSync(cacheDir, { recursive: true });
+  fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(data));
+};
+
+const startTstmRoutesServer = (env, routeOptions = {}) => {
+  const app = express();
+  registerTstmRoutes(app, express, { env, runGenerator: async () => ({}), ...routeOptions });
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, '127.0.0.1', () => resolve(server));
+    server.on('error', reject);
+  });
+};
+
+const getTstmRouteUrl = (server, routePath, query = '') => {
+  const { port } = server.address();
+  return `http://127.0.0.1:${port}${routePath}${query}`;
+};
+
+/** Fetches a TSTM route and always closes the ephemeral test server. */
+const withTstmRouteResponse = async ({
+  tmpDir,
+  env,
+  routeOptions = allTargetsEnabledRouteOptions(),
+  cache,
+  routePath,
+  query = '',
+}, runAssertion) => {
+  if (cache !== undefined) {
+    writeDay1FullCache(tmpDir, cache);
+  }
+  const server = await startTstmRoutesServer(env, routeOptions);
+  try {
+    const response = await fetch(getTstmRouteUrl(server, routePath, query));
+    await runAssertion(response);
+  } finally {
+    server.close();
+  }
+};
+
 /** Asserts a disabled generate route returns 404 without invoking the generator. */
 const assertGenerateRouteRejectsWithoutWork = async ({ env, routeOptions = {}, expectedBody }) => {
   let calls = 0;
@@ -201,129 +255,95 @@ describe('GET /api/tstm/latest', () => {
   beforeEach(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tstm-latest-test-')); });
   afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
 
-  const SAMPLE_CACHED = {
-    run: '2026-06-13T12:00:00Z',
-    day: 1,
-    period: 'full',
-    features: [{ type: 'Feature', id: 't-0', geometry: { type: 'Polygon', coordinates: [[[-100, 30], [-99, 30], [-99, 31], [-100, 31], [-100, 30]]] }, properties: {} }],
-    effectiveStart: '2026-06-13T06:00:00Z',
-    effectiveEnd: '2099-01-01T00:00:00Z',
-    complete: true,
-  };
-
-  const startLatestServer = (env, routeOptions = {}) => {
-    const app = express();
-    registerTstmRoutes(app, express, { env, runGenerator: async () => ({}), ...routeOptions });
-    return new Promise((resolve, reject) => {
-      const server = app.listen(0, '127.0.0.1', () => resolve(server));
-      server.on('error', reject);
-    });
-  };
-
-  const getLatestUrl = (server, query = '') => {
-    const { port } = server.address();
-    return `http://127.0.0.1:${port}/api/tstm/latest${query}`;
-  };
-
   it('returns cached data when available', async () => {
-    const cacheDir = path.join(tmpDir, 'local', 'day1');
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
-
-    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
-    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
-    try {
-      const res = await fetch(getLatestUrl(server, '?day=1&period=full'));
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
+      cache: SAMPLE_CACHED_ROUTE,
+      routePath: '/api/tstm/latest',
+      query: '?day=1&period=full',
+    }, async (res) => {
       assert.equal(res.status, 200);
       const body = await res.json();
       assert.equal(body.run, '2026-06-13T12:00:00Z');
       assert.equal(body.features.length, 1);
-    } finally {
-      server.close();
-    }
+    });
   });
 
   it('returns 404 when no cache exists', async () => {
-    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
-    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
-    try {
-      const res = await fetch(getLatestUrl(server, '?day=1'));
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
+      routePath: '/api/tstm/latest',
+      query: '?day=1',
+    }, async (res) => {
       assert.equal(res.status, 404);
       assert.deepEqual(await res.json(), {
         error: 'No cached TSTM data available.',
         reason: 'cache_miss',
       });
-    } finally {
-      server.close();
-    }
+    });
   });
 
   it('returns 400 for invalid day parameter', async () => {
-    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
-    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
-    try {
-      const res = await fetch(getLatestUrl(server, '?day=3'));
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
+      routePath: '/api/tstm/latest',
+      query: '?day=3',
+    }, async (res) => {
       assert.equal(res.status, 400);
-    } finally {
-      server.close();
-    }
+    });
   });
 
   it('returns 404 when capability is disabled', async () => {
-    const cacheDir = path.join(tmpDir, 'local', 'day1');
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
-
-    const env = { TSTM_CACHE_DIR: tmpDir };
-    const server = await startLatestServer(env);
-    try {
-      const res = await fetch(getLatestUrl(server, '?day=1'));
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_CACHE_DIR: tmpDir },
+      cache: SAMPLE_CACHED_ROUTE,
+      routeOptions: {},
+      routePath: '/api/tstm/latest',
+      query: '?day=1',
+    }, async (res) => {
       assert.equal(res.status, 404);
-    } finally {
-      server.close();
-    }
+    });
   });
 
   it('returns 404 when cached data has expired', async () => {
-    const expired = {
-      ...SAMPLE_CACHED,
-      effectiveEnd: '2026-06-13T12:00:00Z',
-    };
-    const cacheDir = path.join(tmpDir, 'local', 'day1');
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(expired));
-
-    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
-    const server = await startLatestServer(env, allTargetsEnabledRouteOptions());
-    try {
-      const res = await fetch(getLatestUrl(server, '?day=1'));
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
+      cache: {
+        ...SAMPLE_CACHED_ROUTE,
+        effectiveEnd: '2026-06-13T12:00:00Z',
+      },
+      routePath: '/api/tstm/latest',
+      query: '?day=1',
+    }, async (res) => {
       assert.equal(res.status, 404);
       const body = await res.json();
       assert.equal(body.reason, 'cache_stale');
       assert.ok(body.error.includes('expired'));
-    } finally {
-      server.close();
-    }
+    });
   });
 
   it('rate limits repeated latest requests', async () => {
-    const cacheDir = path.join(tmpDir, 'local', 'day1');
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
-
-    const env = { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir };
     const rateLimit = require('express-rate-limit');
-    const server = await startLatestServer(env, {
-      ...allTargetsEnabledRouteOptions(),
-      readRateLimit: rateLimit({
-        windowMs: 60 * 1000,
-        limit: 1,
-        standardHeaders: true,
-        legacyHeaders: false,
-      }),
-    });
+    writeDay1FullCache(tmpDir, SAMPLE_CACHED_ROUTE);
+    const server = await startTstmRoutesServer(
+      { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
+      {
+        ...allTargetsEnabledRouteOptions(),
+        readRateLimit: rateLimit({
+          windowMs: 60 * 1000,
+          limit: 1,
+          standardHeaders: true,
+          legacyHeaders: false,
+        }),
+      },
+    );
     try {
-      const url = getLatestUrl(server, '?day=1&period=full');
+      const url = getTstmRouteUrl(server, '/api/tstm/latest', '?day=1&period=full');
       const first = await fetch(url);
       const second = await fetch(url);
       assert.equal(first.status, 200);
@@ -355,69 +375,35 @@ describe('GET /api/tstm/status', () => {
   beforeEach(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tstm-status-test-')); });
   afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
 
-  const SAMPLE_CACHED = {
-    run: '2026-06-13T12:00:00Z',
-    day: 1,
-    period: 'full',
-    features: [{ type: 'Feature', id: 't-0', geometry: { type: 'Polygon', coordinates: [[[-100, 30], [-99, 30], [-99, 31], [-100, 31], [-100, 30]]] }, properties: {} }],
-    effectiveStart: '2026-06-13T06:00:00Z',
-    effectiveEnd: '2099-01-01T00:00:00Z',
-    forecastHours: [24],
-    warnings: [],
-    ingestedAt: '2026-06-13T14:05:12Z',
-    complete: true,
-  };
-
-  const startStatusServer = (env, routeOptions = {}) => {
-    const app = express();
-    registerTstmRoutes(app, express, { env, runGenerator: async () => ({}), ...routeOptions });
-    return new Promise((resolve, reject) => {
-      const server = app.listen(0, '127.0.0.1', () => resolve(server));
-      server.on('error', reject);
-    });
-  };
-
-  const getStatusUrl = (server) => {
-    const { port } = server.address();
-    return `http://127.0.0.1:${port}/api/tstm/status`;
-  };
-
   it('reports cache miss and available entries without leaking internals', async () => {
-    const cacheDir = path.join(tmpDir, 'local', 'day1');
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
-
-    const env = {
-      TSTM_GENERATION_ENABLED: 'true',
-      TSTM_CACHE_DIR: tmpDir,
-      TSTM_INGESTION_ENABLED: 'true',
-    };
-    const server = await startStatusServer(env, allTargetsEnabledRouteOptions());
-    try {
-      const res = await fetch(getStatusUrl(server));
+    await withTstmRouteResponse({
+      tmpDir,
+      env: {
+        TSTM_GENERATION_ENABLED: 'true',
+        TSTM_CACHE_DIR: tmpDir,
+        TSTM_INGESTION_ENABLED: 'true',
+      },
+      cache: SAMPLE_CACHED_ROUTE,
+      routePath: '/api/tstm/status',
+    }, async (res) => {
       assert.equal(res.status, 200);
       const body = await res.json();
       assert.equal(body.ingestionEnabled, true);
       assert.equal(body.cache.day1.full.available, true);
       assert.equal(body.cache.day2.full.reason, 'cache_miss');
       assert.equal(JSON.stringify(body).includes(tmpDir), false);
-    } finally {
-      server.close();
-    }
+    });
   });
 
   it('returns 404 when capability is disabled without reading cache', async () => {
-    const cacheDir = path.join(tmpDir, 'local', 'day1');
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(path.join(cacheDir, 'full.json'), JSON.stringify(SAMPLE_CACHED));
-
-    const env = { TSTM_CACHE_DIR: tmpDir };
-    const server = await startStatusServer(env);
-    try {
-      const res = await fetch(getStatusUrl(server));
+    await withTstmRouteResponse({
+      tmpDir,
+      env: { TSTM_CACHE_DIR: tmpDir },
+      cache: SAMPLE_CACHED_ROUTE,
+      routeOptions: {},
+      routePath: '/api/tstm/status',
+    }, async (res) => {
       assert.equal(res.status, 404);
-    } finally {
-      server.close();
-    }
+    });
   });
 });
