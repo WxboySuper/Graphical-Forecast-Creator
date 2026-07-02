@@ -74,7 +74,7 @@ Use this endpoint (or server logs prefixed with `[tstm-ingest]`) to confirm inge
 
 ### Preview / apply flow (TSTM-05)
 
-On beta builds with `autoTstm` exposure enabled and the beta analytics deployment setting `TSTM_GENERATION_ENABLED=true`:
+On beta builds with `autoTstm` exposure enabled and `TSTM_GENERATION_ENABLED=true` supplied by `deploy/beta-deployment-config.json`:
 
 1. Forecast editor **Tools** tab exposes **Auto-TSTM** behind `ServerBackedFeatureBoundary`.
 2. Opening the panel fetches `GET /api/tstm/latest` for the active Day 1/2 context.
