@@ -12,7 +12,7 @@ import type {
   Package,
 } from './workflow';
 
-import { WORKFLOW_SCHEMA_VERSION } from './workflow';
+import { WORKFLOW_SCHEMA_VERSION, createCustomGrouping } from './workflow';
 
 describe('WORKFLOW_SCHEMA_VERSION', () => {
   it('is a valid semver string', () => {
@@ -129,7 +129,11 @@ describe('Grouping', () => {
   });
 
   it('accepts custom groupings', () => {
-    const groupings: Grouping[] = ['day1', 'fire-weather', 'marine'];
+    const groupings: Grouping[] = [
+      'day1',
+      createCustomGrouping('fire-weather'),
+      createCustomGrouping('marine'),
+    ];
     expect(groupings).toContain('fire-weather');
     expect(groupings).toContain('marine');
   });

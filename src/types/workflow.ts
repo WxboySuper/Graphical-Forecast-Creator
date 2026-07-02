@@ -94,6 +94,11 @@ export type StandardGrouping = 'day1' | 'day2' | 'day3' | 'day4-8';
 /** User-defined grouping label. Branded to distinguish from standard groupings at the type level. */
 export type CustomGrouping = string & { readonly _brand: 'custom' };
 
+/** Helper to construct a branded CustomGrouping from a plain string. */
+export function createCustomGrouping(value: string): CustomGrouping {
+  return value as CustomGrouping;
+}
+
 /** Union of standard and custom groupings. */
 export type Grouping = StandardGrouping | CustomGrouping;
 
