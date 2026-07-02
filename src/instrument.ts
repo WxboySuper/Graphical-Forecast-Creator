@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react';
+import type { Event, EventHint } from '@sentry/react';
 import React from 'react';
 import {
   useLocation,
@@ -11,8 +12,6 @@ declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
 declare const __GFC_APP_VERSION__: string;
 
-<<<<<<< HEAD
-=======
 type SentryExceptionValue = NonNullable<NonNullable<Event['exception']>['values']>[number];
 
 const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]\.canvas'\)$/i;
@@ -23,7 +22,6 @@ const REQUEST_LIFECYCLE_MESSAGES = [
   /^(AbortError: )?The user aborted a request\.?$/i,
 ];
 
->>>>>>> 2b13234 (fix: filter OpenLayers render-frame noise)
 /** Returns the Sentry DSN baked in at build time, or an empty string when monitoring is off. */
 function getSentryDsn(): string {
   return typeof __GFC_SENTRY_DSN__ !== 'undefined' ? __GFC_SENTRY_DSN__ : '';
@@ -47,8 +45,6 @@ function getEnvironment(): string {
   return configured.trim() || 'production';
 }
 
-<<<<<<< HEAD
-=======
 /** True when Sentry captured stack frames for an exception value. */
 function hasStackFrames(value: SentryExceptionValue): boolean {
   return (value.stacktrace?.frames?.length ?? 0) > 0;
@@ -75,7 +71,6 @@ export function beforeSend(event: Event, _hint: EventHint): Event | null {
     : event;
 }
 
->>>>>>> 2b13234 (fix: filter OpenLayers render-frame noise)
 /** Initializes Sentry when a DSN is present. No-op in local dev without a DSN. */
 export function initSentry(): void {
   if (!isSentryEnabled()) {
@@ -90,6 +85,7 @@ export function initSentry(): void {
     sendDefaultPii: false,
     enableLogs: true,
     normalizeDepth: 10,
+    beforeSend,
     integrations: [
       Sentry.reactRouterV7BrowserTracingIntegration({
         useEffect: React.useEffect,

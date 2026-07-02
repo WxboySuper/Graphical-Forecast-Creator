@@ -45,6 +45,7 @@ describe('instrument', () => {
           sendDefaultPii: false,
           enableLogs: true,
           normalizeDepth: 10,
+          beforeSend: expect.any(Function),
           tracesSampleRate: 0.1,
           tracePropagationTargets: expect.arrayContaining([
             'localhost',
@@ -58,8 +59,6 @@ describe('instrument', () => {
       expect(initCall.integrations).toHaveLength(1);
     });
   });
-<<<<<<< HEAD
-=======
 
   const createOpenLayersCanvasEvent = (
     value: string,
@@ -148,6 +147,17 @@ describe('instrument', () => {
     });
   });
 
+  it('drops matching request lifecycle noise from message-only events', () => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+      const event = { message: 'A network error occurred.' };
+
+      expect(beforeSend(event, {})).toBeNull();
+    });
+  });
+
   it('keeps unrelated application errors', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
@@ -158,5 +168,4 @@ describe('instrument', () => {
       expect(beforeSend(event, {})).toBe(event);
     });
   });
->>>>>>> 2b13234 (fix: filter OpenLayers render-frame noise)
 });
