@@ -12,7 +12,12 @@ declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
 declare const __GFC_APP_VERSION__: string;
 
-const IGNORED_ERROR_MESSAGES = [
+type SentryExceptionValue = NonNullable<NonNullable<Event['exception']>['values']>[number];
+
+const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]\.canvas'\)$/i;
+const REQUEST_ANIMATION_FRAME_MECHANISM = 'auto.browser.browserapierrors.requestAnimationFrame';
+
+const REQUEST_LIFECYCLE_MESSAGES = [
   /^(NetworkError: )?A network error occurred\.?$/i,
   /^(AbortError: )?The user aborted a request\.?$/i,
 ];
@@ -40,14 +45,30 @@ function getEnvironment(): string {
   return configured.trim() || 'production';
 }
 
+/** True when Sentry captured stack frames for an exception value. */
+function hasStackFrames(value: SentryExceptionValue): boolean {
+  return (value.stacktrace?.frames?.length ?? 0) > 0;
+}
+
+/** True for the OpenLayers Safari canvas renderer noise from requestAnimationFrame. */
+function isOpenLayersCanvasNoise(value: SentryExceptionValue): boolean {
+  return (
+    OPENLAYERS_CANVAS_MESSAGE.test(value.value ?? '') &&
+    value.mechanism?.type === REQUEST_ANIMATION_FRAME_MECHANISM &&
+    value.mechanism.handled === false
+  );
+}
+
 /** Drops no-stack request lifecycle noise while preserving actionable stacked errors. */
 export function beforeSend(event: Event, _hint: EventHint): Event | null {
   const values = event.exception?.values ?? [];
   const message = values[0]?.value ?? event.message ?? '';
-  const hasStackFrames = values.some((value) => (value.stacktrace?.frames?.length ?? 0) > 0);
-  const isIgnoredRequestNoise = IGNORED_ERROR_MESSAGES.some((pattern) => pattern.test(message));
+  const hasAnyStackFrames = values.some(hasStackFrames);
+  const isIgnoredRequestNoise = REQUEST_LIFECYCLE_MESSAGES.some((pattern) => pattern.test(message));
 
-  return isIgnoredRequestNoise && !hasStackFrames ? null : event;
+  return (isIgnoredRequestNoise && !hasAnyStackFrames) || values.some(isOpenLayersCanvasNoise)
+    ? null
+    : event;
 }
 
 /** Initializes Sentry when a DSN is present. No-op in local dev without a DSN. */

@@ -60,6 +60,54 @@ describe('instrument', () => {
     });
   });
 
+  const createOpenLayersCanvasEvent = (
+    value: string,
+    mechanismType = 'auto.browser.browserapierrors.requestAnimationFrame'
+  ) => ({
+    exception: {
+      values: [
+        {
+          value,
+          mechanism: {
+            type: mechanismType,
+            handled: false,
+          },
+          stacktrace: {
+            frames: [{ filename: 'assets/index-BmG6v9Rh.js', function: 'n' }],
+          },
+        },
+      ],
+    },
+  });
+
+  it.each([
+    ["Safari/WebKit observed shape", "null is not an object (evaluating 'a.canvas')"],
+    ["Safari/WebKit alternate minified name", "null is not an object (evaluating 'b.canvas')"],
+  ])('drops OpenLayers canvas render-frame noise: %s', (_label, message) => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+      const event = createOpenLayersCanvasEvent(message);
+
+      expect(beforeSend(event, {})).toBeNull();
+    });
+  });
+
+  it('keeps matching canvas TypeErrors when they come from application frames', () => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+      const event = createOpenLayersCanvasEvent(
+        "null is not an object (evaluating 'a.canvas')",
+        'auto.browser.global_handlers.onerror'
+      );
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
+  });
+
   const createRequestLifecycleEvent = (value: string, withStack = false) => ({
     exception: {
       values: [
