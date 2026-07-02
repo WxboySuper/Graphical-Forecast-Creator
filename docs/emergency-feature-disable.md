@@ -10,7 +10,7 @@ Use this when a server-backed beta capability must be turned off immediately wit
 
 Normal rollout still comes from the checked-in registry in `src/config/featureExposure.ts` plus deployment env switches such as `TSTM_GENERATION_ENABLED=true`.
 
-## Activation (beta)
+## Disable Auto-TSTM routes (beta)
 
 1. SSH to the beta analytics host.
 2. Edit `/opt/gfc-beta-analytics/.env`.
@@ -26,6 +26,48 @@ EMERGENCY_DISABLED_CAPABILITIES=TSTM_GENERATION_ENABLED
 cd /opt/gfc-beta-analytics
 pm2 restart gfc-beta-analytics
 ```
+
+No frontend rebuild or redeploy is required.
+
+## Stop Auto-TSTM ingestion (beta)
+
+Use this when the incident is caused by the background ingestion loop itself, such as upstream rate limiting, disk growth, runaway polling, or repeated cache writes. Route disable alone prevents user-triggered generation but does not keep a running ingestion loop from polling after restart.
+
+The beta deploy workflow preserves an active `TSTM_INGESTION_ENABLED=false` value and any existing `EMERGENCY_DISABLED_CAPABILITIES` value from `/opt/gfc-beta-analytics/.env` when it writes a fresh env file. This keeps an in-flight emergency stop from being silently undone by a hotfix deployment. After the incident is resolved, complete the rollback steps below so future deployments resume normal ingestion.
+
+1. SSH to the beta analytics host.
+2. Edit `/opt/gfc-beta-analytics/.env`.
+3. Set:
+
+```bash
+TSTM_INGESTION_ENABLED=false
+```
+
+4. If user-facing Auto-TSTM should also be hidden while ingestion is stopped, add or keep:
+
+```bash
+EMERGENCY_DISABLED_CAPABILITIES=TSTM_GENERATION_ENABLED
+```
+
+5. Restart the analytics process so the scheduled loop is not registered:
+
+```bash
+cd /opt/gfc-beta-analytics
+pm2 restart gfc-beta-analytics
+```
+
+6. Confirm the process restarted cleanly:
+
+```bash
+pm2 status gfc-beta-analytics
+pm2 logs gfc-beta-analytics --lines 100
+```
+
+Expected results:
+
+- No new `[tstm-ingest]` polling or cache-write log lines appear after restart.
+- `GET /api/tstm/status` reports `"ingestionEnabled": false`.
+- If `EMERGENCY_DISABLED_CAPABILITIES=TSTM_GENERATION_ENABLED` is also set, `/api/capabilities/status` reports `"available": false` with `"reason": "emergency_disabled"`.
 
 No frontend rebuild or redeploy is required.
 
@@ -55,8 +97,11 @@ Already-open beta sessions should stop showing server-backed controls after the 
 ## Rollback
 
 1. Remove `EMERGENCY_DISABLED_CAPABILITIES` from `/opt/gfc-beta-analytics/.env`, or set it to an empty value.
-2. Restart `gfc-beta-analytics` with pm2.
-3. Re-run the verification commands and confirm `"available": true` when registry exposure and `TSTM_GENERATION_ENABLED=true` are both in effect.
+2. If ingestion was stopped, restore `TSTM_INGESTION_ENABLED=true`.
+3. Restart `gfc-beta-analytics` with pm2.
+4. Re-run the verification commands and confirm `"available": true` when registry exposure and `TSTM_GENERATION_ENABLED=true` are both in effect.
+5. Confirm `GET /api/tstm/status` reports `"ingestionEnabled": true` when ingestion should be running.
+6. If a hotfix deployed during the incident, confirm `/opt/gfc-beta-analytics/.env` no longer carries the preserved emergency values.
 
 ## Ownership and audit
 
@@ -82,6 +127,7 @@ Manual server drill (requires registry exposure on the target):
 ```powershell
 $env:SERVER_TARGET='beta'
 $env:TSTM_GENERATION_ENABLED='true'
+$env:TSTM_INGESTION_ENABLED='false'
 $env:EMERGENCY_DISABLED_CAPABILITIES='TSTM_GENERATION_ENABLED'
 node server/analytics.js
 ```
@@ -95,8 +141,8 @@ curl -X POST http://127.0.0.1:3006/api/tstm/generate `
   -d '{"day":1,"cycleDate":"2026-06-13"}'
 ```
 
-4. Confirm the status payload includes `TSTM_GENERATION_ENABLED` with reason `emergency_disabled`, the generate route returns `404`, and no Python worker starts.
-5. Remove the env var, restart the server, and confirm normal disabled/enabled behavior resumes according to the registry matrix.
+4. Confirm the status payload includes `TSTM_GENERATION_ENABLED` with reason `emergency_disabled`, `/api/tstm/status` reports `"ingestionEnabled": false`, the generate route returns `404`, and no Python worker starts.
+5. Remove the emergency env var, restore `TSTM_INGESTION_ENABLED=true` if needed, restart the server, and confirm normal disabled/enabled behavior resumes according to the registry matrix.
 
 ## Public status endpoint security
 

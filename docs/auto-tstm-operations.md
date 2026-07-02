@@ -74,7 +74,7 @@ Use this endpoint (or server logs prefixed with `[tstm-ingest]`) to confirm inge
 
 ### Preview / apply flow (TSTM-05)
 
-On beta builds with `autoTstm` exposure enabled:
+On beta builds with `autoTstm` exposure enabled and `TSTM_GENERATION_ENABLED=true` supplied by `deploy/beta-deployment-config.json`:
 
 1. Forecast editor **Tools** tab exposes **Auto-TSTM** behind `ServerBackedFeatureBoundary`.
 2. Opening the panel fetches `GET /api/tstm/latest` for the active Day 1/2 context.
@@ -86,5 +86,7 @@ Controls stay absent when registry exposure or the server capability gate is off
 
 ## Related docs
 
+- [auto-tstm-beta-test-plans.md](./auto-tstm-beta-test-plans.md) — beta tester smoke and workflow plans
+- [auto-tstm-beta-tester-post.md](./auto-tstm-beta-tester-post.md) — concise copy-ready tester instructions
 - [feature-exposure-workstreams.md](./feature-exposure-workstreams.md) — Auto-TSTM registry and beta enablement criteria
 - [emergency-feature-disable.md](./emergency-feature-disable.md) — incident disable runbook

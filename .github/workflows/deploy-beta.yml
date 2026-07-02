@@ -145,6 +145,15 @@ jobs:
 
       - name: Write beta analytics env file
         run: |
+          current_emergency_disabled_capabilities="$(
+            ssh -o StrictHostKeyChecking=yes root@${{ secrets.BETA_SSH_HOST }} \
+              "grep -E '^EMERGENCY_DISABLED_CAPABILITIES=' /opt/gfc-beta-analytics/.env 2>/dev/null | tail -n 1 | cut -d= -f2-"
+          )"
+          current_tstm_ingestion_enabled="$(
+            ssh -o StrictHostKeyChecking=yes root@${{ secrets.BETA_SSH_HOST }} \
+              "grep -E '^TSTM_INGESTION_ENABLED=' /opt/gfc-beta-analytics/.env 2>/dev/null | tail -n 1 | cut -d= -f2-"
+          )"
+
           cat > beta-server.env <<EOF
           PORT=3007
           LOG_DIR=/opt/gfc-beta-analytics/logs
@@ -170,6 +179,14 @@ jobs:
           SENTRY_ENVIRONMENT=beta
           SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.value }}
           EOF
+          if [ -n "$current_emergency_disabled_capabilities" ]; then
+            echo "Preserving active EMERGENCY_DISABLED_CAPABILITIES from beta analytics .env"
+            echo "EMERGENCY_DISABLED_CAPABILITIES=${current_emergency_disabled_capabilities}" >> beta-server.env
+          fi
+          if [ "$current_tstm_ingestion_enabled" = "false" ]; then
+            echo "Preserving emergency TSTM_INGESTION_ENABLED=false from beta analytics .env"
+            echo "TSTM_INGESTION_ENABLED=false" >> beta-server.env
+          fi
           node scripts/write-deployment-env.mjs deploy/beta-deployment-config.json >> beta-server.env
           rsync -avz beta-server.env root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/.env
 
