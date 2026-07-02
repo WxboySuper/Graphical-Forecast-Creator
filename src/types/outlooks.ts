@@ -219,3 +219,24 @@ export interface GFCForecastSaveData {
     cycleDate: string;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Workflow v2 re-exports (issue #451 / WF-01)
+// ---------------------------------------------------------------------------
+
+export type {
+  WorkflowId,
+  CycleId,
+  CycleStatus,
+  OutlookStatus,
+  OutlookVersion,
+  StandardGrouping,
+  CustomGrouping,
+  Grouping,
+  WorkflowMetadata,
+  CycleMetadata,
+  WorkflowPackageMetadata,
+  Package,
+} from './workflow';
+
+export { WORKFLOW_SCHEMA_VERSION, createCustomGrouping } from './workflow';

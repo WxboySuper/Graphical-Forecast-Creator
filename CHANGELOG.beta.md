@@ -4,6 +4,12 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #660
+
+- Define workflow v2 schema types: stable cycle/workflow IDs, cycle and outlook status enums, outlook versioning with derivation tracking, standard and custom groupings, workflow/cycle/package metadata, and schema version constant (WF-01, #451).
+- Add 27 focused unit tests covering all type definitions and acceptance criteria.
+- Re-export new types from `outlooks.ts` for backward compatibility.
+
 ### PR #655
 
 - Move Monitor UI and map components under `src/monitor/components` so Monitor domain logic and implementation components share one feature-owned area.
