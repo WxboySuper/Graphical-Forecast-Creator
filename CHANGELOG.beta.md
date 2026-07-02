@@ -4,6 +4,11 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #653
+
+- Port deployment feature-switch config from #651: add per-target config files under `deploy/` and wire beta, staging, and production analytics env generation through the checked-out deploy ref.
+- Harden deployment config validation for newline injection, path traversal, and readable CLI errors.
+
 ### PR #649
 
 - Integrate Auto-TSTM preview, apply, cancel, and stale-result protection in the forecast editor (TSTM-05, #476).
