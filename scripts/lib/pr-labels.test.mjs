@@ -72,7 +72,7 @@ describe('pr descriptive labels', () => {
   it('tags docs-only PRs as Documentation', () => {
     const labels = descriptiveLabels({
       head: 'chore/docs',
-      changedFiles: ['docs/release-workflow.md', 'CHANGELOG.md'],
+      changedFiles: ['docs/operations/release-workflow.md', 'CHANGELOG.md'],
     });
     assert.equal(labels.has('javascript'), false);
     assert.ok(labels.has('Documentation'));

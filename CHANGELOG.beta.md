@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #654
+
+- Add the #445 codebase inventory and reorganize docs into architecture, operations, product, releases, and review-removal archive areas.
+
 ### PR #653
 
 - Port deployment feature-switch config from #651: add per-target config files under `deploy/` and wire beta, staging, and production analytics env generation through the checked-out deploy ref.

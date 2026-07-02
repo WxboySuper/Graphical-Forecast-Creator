@@ -31,13 +31,13 @@ If both tried to port the same merge into `beta`, you would get a port PR and a 
 
 ### Conflicts
 
-Automation auto-resolves version-policy file conflicts on beta ports (`package.json`, lockfiles, `CHANGELOG.md`, `deploy/production-release.json`). Remaining code conflicts open a **draft** `[Port][Conflicts]` PR — no tracking issue. See [`AGENTS.md`](../AGENTS.md) for manual port steps.
+Automation auto-resolves version-policy file conflicts on beta ports (`package.json`, lockfiles, `CHANGELOG.md`, `deploy/production-release.json`). Remaining code conflicts open a **draft** `[Port][Conflicts]` PR — no tracking issue. See [`AGENTS.md`](../../AGENTS.md) for manual port steps.
 
 ### Port branch cleanup (security)
 
-When a port PR closes, [`cleanup-port-branches.yml`](../.github/workflows/cleanup-port-branches.yml) deletes the remote head branch. This is intentional hygiene for temporary `port/<pr>-to-<target>` branches created by [`port-changes.sh`](../.github/scripts/port-changes.sh).
+When a port PR closes, [`cleanup-port-branches.yml`](../../.github/workflows/cleanup-port-branches.yml) deletes the remote head branch. This is intentional hygiene for temporary `port/<pr>-to-<target>` branches created by [`port-changes.sh`](../../.github/scripts/port-changes.sh).
 
-**Do not loosen the workflow guards.** The job only runs for same-repo PRs whose head ref starts with `port/`, and the cleanup script enforces the stricter allowlist in [`scripts/lib/port-pr-policy.mjs`](../scripts/lib/port-pr-policy.mjs) (`^port\/(\d+)-to-(.+)$`). Those checks prevent arbitrary ref deletion. Port branch naming must stay aligned across `port-changes.sh`, `port-pr-policy.mjs`, and this workflow.
+**Do not loosen the workflow guards.** The job only runs for same-repo PRs whose head ref starts with `port/`, and the cleanup script enforces the stricter allowlist in [`scripts/lib/port-pr-policy.mjs`](../../scripts/lib/port-pr-policy.mjs) (`^port\/(\d+)-to-(.+)$`). Those checks prevent arbitrary ref deletion. Port branch naming must stay aligned across `port-changes.sh`, `port-pr-policy.mjs`, and this workflow.
 
 ## What happens when you merge
 
@@ -173,7 +173,7 @@ Maintainers get a weekly **informational** report of drifting work branches. Thi
 | Tracked prefixes | `feature/*`, `fix/*`, `research/*` |
 | Grace period | **14 days** since the branch tip commit |
 | Compared against | `beta` (`behind beta` commit count) |
-| Schedule | Mondays 14:00 UTC via [`stale-branch-report.yml`](../.github/workflows/stale-branch-report.yml) |
+| Schedule | Mondays 14:00 UTC via [`stale-branch-report.yml`](../../.github/workflows/stale-branch-report.yml) |
 | Reporting surface | One auto-maintained GitHub issue (upserted each run) plus the workflow step summary |
 
 Branches with an open PR are listed separately from **orphaned** branches (no open PR). Protected integration branches (`main`, `beta`) and automation-managed prefixes (`port/*`, `dependabot/*`, `release/*`, `hotfix/*`, `feature/release-*`) are excluded.
@@ -184,7 +184,7 @@ Manual runs:
 2. Optional **dry run** uses checked-in fixture data (no issue upsert side effects beyond the workflow log/summary)
 3. Local dry run: `pnpm branches:report` (uses checked-in fixture data by default)
 
-This is separate from [`cleanup-port-branches.yml`](../.github/workflows/cleanup-port-branches.yml), which deletes merged temporary `port/*` branches after their PR closes.
+This is separate from [`cleanup-port-branches.yml`](../../.github/workflows/cleanup-port-branches.yml), which deletes merged temporary `port/*` branches after their PR closes.
 
 ## Local scripts
 

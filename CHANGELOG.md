@@ -91,7 +91,7 @@ All notable changes to this project will be documented in this file.
 - **Release automation:** Post-merge beta bump after `main` releases no longer resets an in-progress beta line when `main` is still on an older stable (e.g. `1.5.3` infra merge while beta stays on `1.6.0-beta.N`). New `X.Y.0-beta.1` only after a real promotion of that line.
 - **Alert banner tests:** Repair corrupted `AlertBanner.test.tsx` from release sync (syntax error and broken dismissible test).
 - **Analytics server:** Land Express 5 and Stripe Node 22 on beta (`server/analytics.js` / `configureApp`) and shared smoke-test app wiring for CodeQL rate-limit coverage on `/collect`.
-- **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/alert-banner.md`.
+- **Alert banner:** Optional `linkUrl` / `linkLabel`, `startsAt` / `expiresAt` scheduling, and `id` on `public/alert-banner.json`; client normalizes config in `alertBannerConfig.ts`. See `docs/operations/alert-banner.md`.
 
 
 ### Fixed
@@ -140,7 +140,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **PR governance labels:** Content labels are diff-applied (no strip/re-add churn); `ci:*` labels aggregate all check runs on the PR head and only change when the overall state changes.
 - **Post-merge beta version:** `computeBetaVersionAfterMainRelease` preserves in-progress beta prereleases when `main` is on an older stable line; bump script accepts pre-merge beta version and restores `package.json` after `main` merge; skips duplicate beta GitHub releases when unchanged.
-- **Timed production rollout:** `deploy/production-release.json` drives stage-vs-live deploys; staged builds land under `releases/<version>/` until `rolloutAt`, then VPS cron runs `promote-release.sh`. Staging preview at `staging-gfc.weatherboysuper.com` (beta access gate). See `docs/hosted-rollout.md`.
+- **Timed production rollout:** `deploy/production-release.json` drives stage-vs-live deploys; staged builds land under `releases/<version>/` until `rolloutAt`, then VPS cron runs `promote-release.sh`. Staging preview at `staging-gfc.weatherboysuper.com` (beta access gate). See `docs/operations/hosted-rollout.md`.
 - **Dependabot grouping:** Root and `server/` npm version updates are combined into one multi-ecosystem Dependabot PR targeting `beta` instead of one PR per package; `target-branch` is set on the `npm-beta` group (required by Dependabot when using multi-ecosystem groups).
 - **Post-merge `release/*` → main:** Automation now merges `main` into `beta` after every `release/*` merge (same as `feature/release-*`), not only when `package.json` changes — prevents beta from drifting behind main.
 - **Porting vs post-merge:** PR porting no longer opens `port/* → beta` when post-merge automation already syncs `main` into `beta` (beta promotion, `release/*`, and `feature/release-*` merges). CI fails redundant `port/* → beta` PRs so duplicate port work cannot merge.
