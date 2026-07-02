@@ -1,7 +1,7 @@
 import React from 'react';
 import { Satellite } from 'lucide-react';
-import { SATELLITE_PRODUCTS } from '../../monitor/wms';
-import type { MonitorSettings } from '../../monitor/types';
+import { SATELLITE_PRODUCTS } from '../wms';
+import type { MonitorSettings } from '../types';
 import MonitorControlsSection from './MonitorControlsSection';
 import { formatLayerTime } from './monitorControlsUtils';
 
@@ -12,6 +12,7 @@ interface MonitorSatelliteSectionProps {
   onSatelliteOpacityChange: (opacity: number) => void;
 }
 
+/** Renders satellite product and opacity controls for the monitor map. */
 const MonitorSatelliteSection: React.FC<MonitorSatelliteSectionProps> = ({
   settings,
   satelliteLatestTime,

@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
-import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
-import type { MonitorMapView } from '../../monitor/types';
+import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { MonitorMapView } from '../types';
 import { createStateOutlineStyle } from './monitorMapLayerUtils';
 import {
   syncAlertFeatures,
@@ -25,6 +25,7 @@ interface UseMonitorMapOverlaySyncArgs {
   onClearSelectedAlert: () => void;
 }
 
+/** Synchronizes non-WMS monitor map overlays and external map view state. */
 export const useMonitorMapOverlaySync = ({
   mapView,
   darkMode,

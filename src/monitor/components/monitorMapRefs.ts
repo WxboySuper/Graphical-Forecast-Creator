@@ -7,6 +7,7 @@ import VectorSource from 'ol/source/Vector';
 import TileWMS from 'ol/source/TileWMS';
 import Overlay from 'ol/Overlay';
 
+/** Creates stable OpenLayers refs used by the monitor map lifecycle hooks. */
 export const useMonitorMapRefs = () => ({
   overlayRef: useRef<Overlay | null>(null),
   popupElRef: useRef<HTMLDivElement | null>(null),

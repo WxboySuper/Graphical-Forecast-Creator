@@ -1,11 +1,11 @@
 import React, { useMemo, useRef } from 'react';
 import 'ol/ol.css';
 import type { StormReport } from '../../types/stormReports';
-import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
+import type { NwsAlertFeatureCollection } from '../nwsAlerts';
 import type { OutlookData } from '../../types/outlooks';
-import type { MonitorMapView, MonitorOutlookLayerType } from '../../monitor/types';
-import { flattenMonitorOutlookFeatures } from '../../monitor/outlookLayers';
-import type { WmsLayerConfig } from '../../monitor/wms';
+import type { MonitorMapView, MonitorOutlookLayerType } from '../types';
+import { flattenMonitorOutlookFeatures } from '../outlookLayers';
+import type { WmsLayerConfig } from '../wms';
 import { useMonitorOlMap } from './useMonitorOlMap';
 
 interface MonitorMapProps {

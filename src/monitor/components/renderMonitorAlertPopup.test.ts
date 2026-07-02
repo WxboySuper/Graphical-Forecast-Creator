@@ -1,5 +1,5 @@
 import { renderMonitorAlertPopup, clearMonitorAlertPopup } from './renderMonitorAlertPopup';
-import type { NwsAlertDetails } from '../../monitor/nwsAlertDetails';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
 
 const sampleDetails: NwsAlertDetails = {
   event: 'Tornado Warning',

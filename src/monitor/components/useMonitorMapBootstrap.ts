@@ -8,15 +8,15 @@ import VectorLayer from 'ol/layer/Vector';
 import TileWMS from 'ol/source/TileWMS';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { apply } from 'ol-mapbox-style';
-import { buildNwsAlertStyle } from '../../monitor/nwsAlerts';
-import { parseNwsAlertFromOlProperties } from '../../monitor/nwsAlertDetails';
-import type { NwsAlertDetails } from '../../monitor/nwsAlertDetails';
-import { hideOverlay } from '../Map/OpenLayersForecastMap';
+import { buildNwsAlertStyle } from '../nwsAlerts';
+import { parseNwsAlertFromOlProperties } from '../nwsAlertDetails';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
+import { hideOverlay } from '../../components/Map/OpenLayersForecastMap';
 import { clearMonitorAlertPopup } from './renderMonitorAlertPopup';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../store';
 import { setMonitorMapView } from '../../store/monitorSlice';
-import type { MonitorMapView } from '../../monitor/types';
+import type { MonitorMapView } from '../types';
 import { getOpenFreeMapStyleSet } from '../../lib/openFreeMap';
 import {
   ALERTS_LAYER_Z_INDEX,
@@ -46,6 +46,7 @@ interface UseMonitorMapBootstrapArgs {
   onSelectAlert: (details: NwsAlertDetails | null) => void;
 }
 
+/** Initializes the monitor OpenLayers map, base layers, overlays, and map events. */
 export const useMonitorMapBootstrap = ({
   mapView,
   darkMode,

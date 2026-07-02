@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapPin } from 'lucide-react';
-import type { MonitorSettings } from '../../monitor/types';
+import type { MonitorSettings } from '../types';
 import MonitorControlsSection from './MonitorControlsSection';
 import { formatStormReportsStatusLine } from './monitorControlsUtils';
 
@@ -27,6 +27,7 @@ const STORM_REPORT_FILTERS = [
   { key: 'hail', label: 'Hail', settingKey: 'stormReportsFilterHail' },
 ] as const;
 
+/** Renders SPC storm report visibility and filtering controls. */
 const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
   settings,
   stormReportsMeta,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
-import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
-import type { MonitorSettings } from '../../monitor/types';
+import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { MonitorSettings } from '../types';
 import MonitorControlsSection from './MonitorControlsSection';
 import { formatAlertsStatusLine } from './monitorControlsUtils';
 
@@ -21,6 +21,7 @@ interface MonitorAlertCategoryCheckboxProps {
   onChange: (enabled: boolean) => void;
 }
 
+/** Toggles one NWS alert category within the monitor controls. */
 const MonitorAlertCategoryCheckbox: React.FC<MonitorAlertCategoryCheckboxProps> = ({
   label,
   checked,
@@ -48,6 +49,7 @@ interface MonitorAlertsSectionProps {
   onAlertsShowAdvisoriesChange: (enabled: boolean) => void;
 }
 
+/** Groups NWS watch, warning, and advisory controls for the monitor map. */
 const MonitorAlertsSection: React.FC<MonitorAlertsSectionProps> = ({
   settings,
   alertsMeta,

@@ -8,6 +8,7 @@ export interface MonitorControlsSectionProps {
   children: React.ReactNode;
 }
 
+/** Provides a collapsible section shell for monitor control groups. */
 const MonitorControlsSection: React.FC<MonitorControlsSectionProps> = ({
   id,
   title,

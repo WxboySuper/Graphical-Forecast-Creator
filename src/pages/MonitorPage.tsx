@@ -28,7 +28,7 @@ import { selectForecastCycle, selectSavedCycles } from '../store/forecastSlice';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import type { AddToastFn } from '../components/Layout';
-import { MonitorControls, MonitorMap } from '../components/Monitor';
+import { MonitorControls, MonitorMap } from '../monitor/components';
 import { buildMonitorOutlookOptions, resolveSelectedOutlookOption } from '../monitor/outlookSources';
 import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
 import type { MonitorSettings } from '../monitor/types';

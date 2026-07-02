@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #655
+
+- Move Monitor UI and map components under `src/monitor/components` so Monitor domain logic and implementation components share one feature-owned area.
+
 ### PR #654
 
 - Add the #445 codebase inventory and reorganize docs into architecture, operations, product, releases, and review-removal archive areas.

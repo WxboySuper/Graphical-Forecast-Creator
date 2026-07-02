@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { useSelector } from 'react-redux';
 import type { StormReport } from '../../types/stormReports';
-import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
-import type { NwsAlertDetails } from '../../monitor/nwsAlertDetails';
-import { hideOverlay } from '../Map/OpenLayersForecastMap';
+import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
+import { hideOverlay } from '../../components/Map/OpenLayersForecastMap';
 import type { RootState } from '../../store';
-import type { MonitorMapView } from '../../monitor/types';
-import type { WmsLayerConfig } from '../../monitor/wms';
+import type { MonitorMapView } from '../types';
+import type { WmsLayerConfig } from '../wms';
 import type { SerializedMonitorOutlookFeature } from './monitorMapFeatureSync';
 import { useMonitorMapBootstrap } from './useMonitorMapBootstrap';
 import { useMonitorMapLayerSync } from './useMonitorMapLayerSync';
