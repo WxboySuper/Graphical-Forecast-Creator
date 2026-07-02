@@ -284,7 +284,7 @@ describe('tstm-ingestion', () => {
         return SAMPLE_CACHE_DATA;
       };
 
-      const stop = startIngestionLoop({ env, runGenerator, intervalMs: 50 });
+      const stop = startIngestionLoop({ env, runGenerator, bufferHours: -24, intervalMs: 50 });
       assert.equal(typeof stop, 'function');
 
       // Wait for at least one cycle

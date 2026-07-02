@@ -239,6 +239,7 @@ const startIngestionLoop = (options = {}) => {
     env = process.env,
     intervalMs = Number(env.TSTM_INGESTION_INTERVAL_MS) || DEFAULT_INGESTION_INTERVAL_MS,
     runGenerator,
+    bufferHours = DEFAULT_BUFFER_HOURS,
     log = console,
   } = options;
 
@@ -254,7 +255,7 @@ const startIngestionLoop = (options = {}) => {
     if (running) return;
     running = true;
     try {
-      await runIngestionCycle({ env, runGenerator, log });
+      await runIngestionCycle({ env, runGenerator, bufferHours, log });
     } finally {
       running = false;
     }
@@ -262,6 +263,7 @@ const startIngestionLoop = (options = {}) => {
 
   tick();
   timer = setInterval(tick, intervalMs);
+  timer.unref?.();
 
   return () => {
     if (timer) {
