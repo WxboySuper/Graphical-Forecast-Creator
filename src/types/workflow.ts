@@ -64,6 +64,11 @@ export type OutlookStatus = 'in-progress' | 'completed' | 'skipped' | 'omitted';
  * When a forecaster issues an update (e.g. Day 1 1300Z → 1600Z), a new
  * `OutlookVersion` is appended. The `derivedFrom` field links the update
  * back to its parent, making lineage explicit.
+ *
+ * @note This type is grouping-agnostic — it does not indicate which
+ * grouping (day) a version belongs to. WF-02+ will attach grouping
+ * information via the cycle's workflow groupings. Consumers should not
+ * assume a 1:1 mapping between outlook versions and groupings.
  */
 export interface OutlookVersion {
   /** 1-based version number within the cycle. */
@@ -86,8 +91,8 @@ export interface OutlookVersion {
  */
 export type StandardGrouping = 'day1' | 'day2' | 'day3' | 'day4-8';
 
-/** User-defined grouping label. */
-export type CustomGrouping = string;
+/** User-defined grouping label. Branded to distinguish from standard groupings at the type level. */
+export type CustomGrouping = string & { readonly _brand: 'custom' };
 
 /** Union of standard and custom groupings. */
 export type Grouping = StandardGrouping | CustomGrouping;

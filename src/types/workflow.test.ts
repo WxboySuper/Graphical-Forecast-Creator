@@ -294,7 +294,7 @@ describe('Acceptance criteria validation', () => {
       status: 'completed-with-omissions',
       outlookVersions: [
         { version: 1, status: 'completed', createdAt: '2026-06-14T12:00:00Z' },
-        { version: 1, status: 'omitted', createdAt: '2026-06-14T12:00:00Z' },
+        { version: 2, status: 'omitted', createdAt: '2026-06-14T12:00:00Z' },
       ],
       createdAt: '2026-06-14T12:00:00Z',
       updatedAt: '2026-06-14T18:00:00Z',
