@@ -1,6 +1,7 @@
-import type { MonitorOutlookSourceSelection } from '../../monitor/types';
+import type { MonitorOutlookSourceSelection } from '../types';
 
-export const formatLayerTime = (time?: string): string => {
+/** Formats monitor layer timestamps for compact control-panel status text. */
+export function formatLayerTime(time?: string): string {
   if (!time) {
     return 'Latest time unavailable';
   }
@@ -11,8 +12,9 @@ export const formatLayerTime = (time?: string): string => {
   }
 
   return parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-};
+}
 
+/** Serializes an outlook source selection for select input values. */
 export const sourceValue = (source: MonitorOutlookSourceSelection): string => `${source.kind}:${source.id}`;
 
 const OUTLOOK_SOURCE_KINDS = new Set<MonitorOutlookSourceSelection['kind']>([
@@ -21,6 +23,7 @@ const OUTLOOK_SOURCE_KINDS = new Set<MonitorOutlookSourceSelection['kind']>([
   'cloud-cycle',
 ]);
 
+/** Parses a monitor outlook source selection from a select input value. */
 export const parseSourceValue = (value: string): MonitorOutlookSourceSelection => {
   const [kind, ...idParts] = value.split(':');
   const id = idParts.join(':') || 'current';
@@ -31,6 +34,7 @@ export const parseSourceValue = (value: string): MonitorOutlookSourceSelection =
   return { kind: 'current', id: 'current' };
 };
 
+/** Formats the NWS alert layer count and animation frame status. */
 export const formatAlertsStatusLine = (
   polygonCount: number,
   frameCount: number,
@@ -44,6 +48,7 @@ export const formatAlertsStatusLine = (
   return `${polygonLabel} · frame ${frameIndex + 1}/${frameCount}`;
 };
 
+/** Formats the visible and total SPC storm report counts. */
 export const formatStormReportsStatusLine = (
   shownCount: number,
   totalCount: number,

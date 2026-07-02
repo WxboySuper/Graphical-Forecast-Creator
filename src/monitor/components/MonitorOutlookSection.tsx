@@ -1,11 +1,11 @@
 import React from 'react';
 import { Shapes } from 'lucide-react';
-import type { MonitorOutlookSourceOption } from '../../monitor/outlookSources';
+import type { MonitorOutlookSourceOption } from '../outlookSources';
 import {
   MONITOR_OUTLOOK_LAYER_LABELS,
   MONITOR_OUTLOOK_LAYER_TYPES,
-} from '../../monitor/outlookLayers';
-import type { MonitorOutlookLayerType, MonitorOutlookSourceSelection, MonitorSettings } from '../../monitor/types';
+} from '../outlookLayers';
+import type { MonitorOutlookLayerType, MonitorOutlookSourceSelection, MonitorSettings } from '../types';
 import MonitorControlsSection from './MonitorControlsSection';
 import { parseSourceValue, sourceValue } from './monitorControlsUtils';
 
@@ -17,6 +17,7 @@ interface MonitorOutlookSectionProps {
   onOutlookTypeChange: (type: MonitorOutlookLayerType) => void;
 }
 
+/** Renders monitor outlook source and hazard layer selectors. */
 const MonitorOutlookSection: React.FC<MonitorOutlookSectionProps> = ({
   settings,
   outlookOptions,

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import MonitorControls from './MonitorControls';
-import { DEFAULT_MONITOR_SETTINGS } from '../../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS } from '../types';
 
 const baseProps = {
   settings: DEFAULT_MONITOR_SETTINGS,

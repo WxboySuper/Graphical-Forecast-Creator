@@ -1,4 +1,4 @@
-import type { WmsLayerConfig } from '../../monitor/wms';
+import type { WmsLayerConfig } from '../wms';
 import type { useMonitorMapRefs } from './monitorMapRefs';
 import { useMonitorRadarWmsSync } from './useMonitorRadarWmsSync';
 import { useMonitorSatelliteWmsSync } from './useMonitorSatelliteWmsSync';
@@ -14,6 +14,7 @@ interface UseMonitorMapWmsSyncArgs {
   refs: MonitorMapRefs;
 }
 
+/** Synchronizes all monitor WMS layers for the current map settings. */
 export const useMonitorMapWmsSync = ({
   darkMode,
   radarLayer,

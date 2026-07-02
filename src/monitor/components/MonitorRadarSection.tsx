@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Radar } from 'lucide-react';
-import type { RadarSiteOption } from '../../monitor/radarSites';
-import { getRadarProductsForMode } from '../../monitor/wms';
-import type { MonitorSettings } from '../../monitor/types';
+import type { RadarSiteOption } from '../radarSites';
+import { getRadarProductsForMode } from '../wms';
+import type { MonitorSettings } from '../types';
 import MonitorControlsSection from './MonitorControlsSection';
 import { formatLayerTime } from './monitorControlsUtils';
 
@@ -15,6 +15,7 @@ interface MonitorRadarSiteFieldProps {
   onRadarSiteChange: (site: string) => void;
 }
 
+/** Renders the radar site search field and selected-site status text. */
 const MonitorRadarSiteField: React.FC<MonitorRadarSiteFieldProps> = ({
   radarSite,
   radarSiteOptions,
@@ -61,6 +62,7 @@ interface MonitorRadarSectionProps {
   onRadarOpacityChange: (opacity: number) => void;
 }
 
+/** Renders radar source, product, site, and opacity controls. */
 const MonitorRadarSection: React.FC<MonitorRadarSectionProps> = ({
   settings,
   radarSiteOptions,

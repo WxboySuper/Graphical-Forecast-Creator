@@ -1,13 +1,14 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import type { NwsAlertDetails } from '../../monitor/nwsAlertDetails';
-import { formatNwsAlertTime } from '../../monitor/nwsAlertDetails';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
+import { formatNwsAlertTime } from '../nwsAlertDetails';
 
 interface MonitorAlertPopupProps {
   details: NwsAlertDetails;
   onClose: () => void;
 }
 
+/** Renders one metadata field in the alert details popup when data exists. */
 const MetaRow: React.FC<{ label: string; value: string | null }> = ({ label, value }) => {
   if (!value) {
     return null;
@@ -21,6 +22,7 @@ const MetaRow: React.FC<{ label: string; value: string | null }> = ({ label, val
   );
 };
 
+/** Displays the selected NWS alert details inside the monitor map overlay. */
 const MonitorAlertPopup: React.FC<MonitorAlertPopupProps> = ({ details, onClose }) => {
   const effective = formatNwsAlertTime(details.effective);
   const expires = formatNwsAlertTime(details.expires);

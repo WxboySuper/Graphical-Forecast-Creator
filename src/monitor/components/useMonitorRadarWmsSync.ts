@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import type { WmsLayerConfig } from '../../monitor/wms';
+import type { WmsLayerConfig } from '../wms';
 import { applyWmsLayer, buildWmsParams } from './monitorMapLayerUtils';
 import type { useMonitorMapRefs } from './monitorMapRefs';
 
 type MonitorMapRefs = ReturnType<typeof useMonitorMapRefs>;
 
+/** Applies radar WMS layer source, opacity, and time updates. */
 export const useMonitorRadarWmsSync = (
   radarLayer: WmsLayerConfig | null,
   radarOpacity: number,

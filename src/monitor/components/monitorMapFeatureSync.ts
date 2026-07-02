@@ -5,9 +5,9 @@ import type { FeatureLike } from 'ol/Feature';
 import VectorSource from 'ol/source/Vector';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
-import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
-import { buildStormReportStyle } from '../../monitor/stormReportMapStyle';
-import { toOlStyle } from '../Map/OpenLayersForecastMap';
+import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import { buildStormReportStyle } from '../stormReportMapStyle';
+import { toOlStyle } from '../../components/Map/OpenLayersForecastMap';
 import { MONITOR_OUTLOOK_TRANSPARENCY_SCALE } from './monitorMapLayerUtils';
 
 export interface SerializedMonitorOutlookFeature {
@@ -16,6 +16,7 @@ export interface SerializedMonitorOutlookFeature {
   feature: object;
 }
 
+/** Replaces the monitor outlook vector source with serialized outlook features. */
 export const syncOutlookFeatures = (
   source: VectorSource,
   serializedFeatures: SerializedMonitorOutlookFeature[],
@@ -29,6 +30,7 @@ export const syncOutlookFeatures = (
       featureProjection: 'EPSG:3857',
     });
 
+    // Applies monitor outlook styling before adding a feature to the source.
     const applyStyle = (item: FeatureLike) => {
       if ('setStyle' in item && typeof item.setStyle === 'function') {
         item.setStyle(toOlStyle(
@@ -47,6 +49,7 @@ export const syncOutlookFeatures = (
   });
 };
 
+/** Replaces the monitor alert vector source with NWS alert polygons. */
 export const syncAlertFeatures = (
   source: VectorSource,
   alertsCollection: NwsAlertFeatureCollection,
@@ -77,6 +80,7 @@ export const syncAlertFeatures = (
   });
 };
 
+/** Replaces the monitor storm report source with point features. */
 export const syncStormReportFeatures = (source: VectorSource, stormReports: StormReport[]) => {
   source.clear();
 

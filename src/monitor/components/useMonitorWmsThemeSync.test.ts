@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react';
-import type { WmsLayerConfig } from '../../monitor/wms';
+import type { WmsLayerConfig } from '../wms';
 import * as monitorMapLayerUtils from './monitorMapLayerUtils';
 import type { useMonitorMapRefs } from './monitorMapRefs';
 import { useMonitorRadarWmsSync } from './useMonitorRadarWmsSync';

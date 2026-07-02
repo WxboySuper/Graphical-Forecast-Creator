@@ -1,10 +1,10 @@
 import React from 'react';
 import { RefreshCcw } from 'lucide-react';
-import type { NwsAlertFeatureCollection } from '../../monitor/nwsAlerts';
-import { Button } from '../ui/button';
-import type { MonitorOutlookSourceOption } from '../../monitor/outlookSources';
-import type { RadarSiteOption } from '../../monitor/radarSites';
-import type { MonitorOutlookLayerType, MonitorOutlookSourceSelection, MonitorSettings } from '../../monitor/types';
+import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import { Button } from '../../components/ui/button';
+import type { MonitorOutlookSourceOption } from '../outlookSources';
+import type { RadarSiteOption } from '../radarSites';
+import type { MonitorOutlookLayerType, MonitorOutlookSourceSelection, MonitorSettings } from '../types';
 import MonitorAlertsSection from './MonitorAlertsSection';
 import MonitorOutlookSection from './MonitorOutlookSection';
 import MonitorPlaybackSection from './MonitorPlaybackSection';
@@ -66,6 +66,7 @@ interface MonitorControlsProps {
   onRefresh: () => void;
 }
 
+/** Composes all monitor layer, source, and playback controls. */
 const MonitorControls: React.FC<MonitorControlsProps> = ({
   settings,
   outlookOptions,

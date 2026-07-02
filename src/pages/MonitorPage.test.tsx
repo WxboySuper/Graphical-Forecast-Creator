@@ -63,7 +63,7 @@ jest.mock('../monitor/useRadarSiteOptions', () => ({
   }),
 }));
 
-jest.mock('../components/Monitor/MonitorMap', () => () => <div data-testid="monitor-map-stub" />);
+jest.mock('../monitor/components/MonitorMap', () => () => <div data-testid="monitor-map-stub" />);
 
 const renderMonitorPage = () => {
   const store = configureStore({

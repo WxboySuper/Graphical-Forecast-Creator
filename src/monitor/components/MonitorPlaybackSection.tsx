@@ -1,7 +1,7 @@
 import React from 'react';
 import { CloudSun, Pause, Play } from 'lucide-react';
-import type { MonitorSettings } from '../../monitor/types';
-import { Button } from '../ui/button';
+import type { MonitorSettings } from '../types';
+import { Button } from '../../components/ui/button';
 import MonitorControlsSection from './MonitorControlsSection';
 
 interface MonitorPlaybackSectionProps {
@@ -11,6 +11,7 @@ interface MonitorPlaybackSectionProps {
   onAnimationSpeedChange: (speed: number) => void;
 }
 
+/** Renders monitor animation playback controls. */
 const MonitorPlaybackSection: React.FC<MonitorPlaybackSectionProps> = ({
   settings,
   syncLabel,

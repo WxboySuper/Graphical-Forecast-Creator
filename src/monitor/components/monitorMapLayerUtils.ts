@@ -6,7 +6,7 @@ import TileWMS from 'ol/source/TileWMS';
 import XYZ from 'ol/source/XYZ';
 import GeoJSON from 'ol/format/GeoJSON';
 import { Fill, Stroke, Style } from 'ol/style';
-import type { WmsLayerConfig } from '../../monitor/wms';
+import type { WmsLayerConfig } from '../wms';
 
 export const BASE_LAYER_Z_INDEX = 0;
 export const SATELLITE_LAYER_Z_INDEX = 15;
@@ -23,6 +23,7 @@ const US_STATES_GEOJSON_URL =
 
 let cachedUsStatesGeoJSON: object | null = null;
 
+/** Creates the monitor basemap tile source for the active theme. */
 export const createBaseSource = (darkMode: boolean) => new XYZ({
   url: darkMode
     ? 'https://{a-d}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png'
@@ -32,6 +33,7 @@ export const createBaseSource = (darkMode: boolean) => new XYZ({
   maxZoom: 19,
 });
 
+/** Replaces a layer group's children while preserving the target group instance. */
 export const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
   const targetLayers = target.getLayers();
   targetLayers.clear();
@@ -40,6 +42,7 @@ export const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) 
   });
 };
 
+/** Builds the theme-aware style for state outline reference features. */
 export const createStateOutlineStyle = (darkMode: boolean) => new Style({
   fill: new Fill({ color: 'rgba(0, 0, 0, 0)' }),
   stroke: new Stroke({
@@ -48,6 +51,7 @@ export const createStateOutlineStyle = (darkMode: boolean) => new Style({
   }),
 });
 
+/** Creates a WMS tile source for the provided monitor layer config. */
 const createWmsSource = (config: WmsLayerConfig): TileWMS => new TileWMS({
   url: config.url,
   params: {
@@ -59,14 +63,17 @@ const createWmsSource = (config: WmsLayerConfig): TileWMS => new TileWMS({
   crossOrigin: 'anonymous',
 });
 
+/** Builds WMS request params for the current layer and optional latest time. */
 export const buildWmsParams = (config: WmsLayerConfig) => ({
   LAYERS: config.layer,
   TILED: true,
   ...(config.latestTime ? { TIME: config.latestTime } : {}),
 });
 
+/** Builds the stable source identity key for a monitor WMS layer. */
 export const buildWmsLayerKey = (config: WmsLayerConfig): string => `${config.url}::${config.layer}`;
 
+/** Applies source, opacity, and visibility updates to a monitor WMS layer. */
 export const applyWmsLayer = (
   layer: TileLayer<TileWMS>,
   config: WmsLayerConfig | null,
@@ -93,6 +100,7 @@ export const applyWmsLayer = (
   layer.setVisible(true);
 };
 
+/** Loads and styles US state outlines into the monitor reference source. */
 export const loadUsStateOutlines = async (source: VectorSource, darkMode: boolean) => {
   if (source.getFeatures().length > 0) {
     return;
