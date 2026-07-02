@@ -83,6 +83,7 @@ describe('instrument', () => {
   it.each([
     ["Safari/WebKit observed shape", "null is not an object (evaluating 'a.canvas')"],
     ["Safari/WebKit alternate minified name", "null is not an object (evaluating 'b.canvas')"],
+    ["Safari/WebKit two-character minified name", "null is not an object (evaluating 'ab.canvas')"],
   ])('drops OpenLayers canvas render-frame noise: %s', (_label, message) => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
