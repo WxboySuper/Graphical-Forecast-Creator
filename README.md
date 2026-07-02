@@ -124,16 +124,16 @@ Server capability gates live in:
 
 Experimental APIs register `createServerCapabilityGate(serverCapabilityKey)` before auth and handlers. A capability is enabled only when the registry exposes it for the server target and the deployment env key is `true`. Disabled routes return `404` with `{ error: "<label> is not enabled on this deployment." }`.
 
-Emergency incident disable is server-authoritative via `EMERGENCY_DISABLED_CAPABILITIES` on the analytics server. That override is disable-only, overrides registry and deployment env for server-backed capabilities, and does not require a frontend rebuild. See [docs/emergency-feature-disable.md](docs/emergency-feature-disable.md) for activation, verification, rollback, and a local drill.
+Emergency incident disable is server-authoritative via `EMERGENCY_DISABLED_CAPABILITIES` on the analytics server. That override is disable-only, overrides registry and deployment env for server-backed capabilities, and does not require a frontend rebuild. See [docs/operations/emergency-feature-disable.md](docs/operations/emergency-feature-disable.md) for activation, verification, rollback, and a local drill.
 
 Client runtime fallback for server-backed features lives in:
 
 - `src/config/serverCapabilityStatus.ts` — fetches `/api/capabilities/status` and tracks locally unavailable capabilities
 - `src/features/ServerBackedFeatureBoundary.tsx` — hides already-mounted server-backed UI when the server disables a capability after page load
 
-Disabled-side-effect test fixtures and the minimum per-feature contract are documented in [docs/feature-exposure-testing.md](docs/feature-exposure-testing.md). Run `pnpm test:exposure` locally or adopt `src/testing/featureExposure/harness.tsx` in a new `*.exposure.test.ts` file.
+Disabled-side-effect test fixtures and the minimum per-feature contract are documented in [docs/operations/feature-exposure-testing.md](docs/operations/feature-exposure-testing.md). Run `pnpm test:exposure` locally or adopt `src/testing/featureExposure/harness.tsx` in a new `*.exposure.test.ts` file.
 
-v1.7 workstream adoption (registry keys, gates, beta-enablement records) is documented in [docs/feature-exposure-workstreams.md](docs/feature-exposure-workstreams.md).
+v1.7 workstream adoption (registry keys, gates, beta-enablement records) is documented in [docs/operations/feature-exposure-workstreams.md](docs/operations/feature-exposure-workstreams.md).
 
 ### Local Beta Mode (developer)
 
@@ -238,7 +238,9 @@ src/
 
 ## Documentation
 
-- [Outlook Information](docs/Outlook_Info.md) - risk levels, probability values, categorical conversion rules
+- [Documentation index](docs/README.md) - architecture, operations, product, release, and archive docs
+- [Codebase inventory](docs/architecture/codebase-inventory.md) - folder ownership, entry points, import risks, and move batches
+- [Outlook Information](docs/product/outlook-info.md) - risk levels, probability values, categorical conversion rules
 - [Roadmap](ROADMAP.md) - versioning plan and feature milestones
 - [Changelog](CHANGELOG.md) - release history
 

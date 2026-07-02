@@ -202,7 +202,7 @@ Only if splitting workflows helps readability; otherwise one workflow with branc
 - **Option A:** `staging.gfc.weatherboysuper.com` → nginx `root` `releases/<staged>/` (read `production-release.json` for version).
 - **Option B:** SSH + `curl` only for v1.6.
 
-Document DNS + nginx in `docs/hosted-rollout.md` (short ops appendix).
+Document DNS + nginx in `docs/operations/hosted-rollout.md` (short ops appendix).
 
 ---
 
@@ -229,9 +229,9 @@ Estimated **one focused day** if VPS/nginx access is available.
 |-------|------|---------------|-------|
 | 1 | `scripts/lib/production-release.mjs` + `validate-production-release.mjs` + unit tests | `feature/timed-production-rollout` → **beta** | 1.5h |
 | 2 | `alertBannerConfig` **phases[]** + hook/tests | same PR | 1h |
-| 3 | Example `deploy/production-release.json` (disabled/`action:none` on beta) + `docs/alert-banner.md` update | same PR | 30m |
+| 3 | Example `deploy/production-release.json` (disabled/`action:none` on beta) + `docs/operations/alert-banner.md` update | same PR | 30m |
 | 4 | `deploy-main-to-vps.yml` stage path + validator gate | `feature/release-timed-deploy` → **main** or `feature/release-*` | 1.5h |
-| 5 | VPS scripts + `setup-vps.sh` + `docs/hosted-rollout.md` | same as 4 or ops PR | 1h |
+| 5 | VPS scripts + `setup-vps.sh` + `docs/operations/hosted-rollout.md` | same as 4 or ops PR | 1h |
 | 6 | Nginx `current` symlink (manual VPS) | ops | 30m |
 | 7 | PR template + `beta_to_main.md` checklist | beta | 15m |
 | 8 | Promote cron dry-run on beta VPS optional | ops | 30m |
@@ -269,8 +269,8 @@ Later: `allowlistUids`, client `release-control.json`, or second nginx upstream 
 | `server/scripts/check-rollout.mjs` | Cron entry |
 | `server/scripts/promote-release.sh` | Promote |
 | `scripts/setup-vps.sh` | Cron + dirs |
-| `docs/hosted-rollout.md` | Ops runbook |
-| `docs/alert-banner.md` | Phases + link to this doc |
+| `docs/operations/hosted-rollout.md` | Ops runbook |
+| `docs/operations/alert-banner.md` | Phases + link to this doc |
 | `.github/PULL_REQUEST_TEMPLATE/beta_to_main.md` | Checklist §7 |
 
 ---

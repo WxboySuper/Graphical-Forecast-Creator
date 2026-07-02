@@ -9,7 +9,7 @@ For **beta → main** promotions with timed rollout, author banner copy in `depl
 - **Stage deploy:** pre-rollout phase written to the **live** site (users still on the previous version).
 - **Promote at `rolloutAt`:** post-rollout phase written to the new live build.
 
-See [hosted-rollout.md](./hosted-rollout.md) and [production-release.example-v1.6-stage.json](../deploy/production-release.example-v1.6-stage.json).
+See [hosted-rollout.md](./hosted-rollout.md) and [production-release.example-v1.6-stage.json](../../deploy/production-release.example-v1.6-stage.json).
 
 ## Flat file fields (emergencies / hotfix)
 

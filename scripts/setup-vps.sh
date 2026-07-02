@@ -75,5 +75,5 @@ echo "  4. GitHub Actions secrets: PROD_SSH_KEY, PROD_SSH_HOST, BETA_INVITE_PATH
 echo ""
 echo "  5. Merge release automation PR, then run Deploy Production to VPS (action=live once to migrate layout)."
 echo ""
-echo "  See docs/hosted-rollout.md for timed beta→main promotion flow."
+echo "  See docs/operations/hosted-rollout.md for timed beta→main promotion flow."
 echo ""
