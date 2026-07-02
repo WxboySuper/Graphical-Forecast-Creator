@@ -239,4 +239,4 @@ export type {
   Package,
 } from './workflow';
 
-export { WORKFLOW_SCHEMA_VERSION } from './workflow';
+export { WORKFLOW_SCHEMA_VERSION, createCustomGrouping } from './workflow';
