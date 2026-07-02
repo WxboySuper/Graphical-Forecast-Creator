@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react';
+import type { Event, EventHint } from '@sentry/react';
 import React from 'react';
 import {
   useLocation,
@@ -10,6 +11,16 @@ import {
 declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
 declare const __GFC_APP_VERSION__: string;
+
+type SentryExceptionValue = NonNullable<NonNullable<Event['exception']>['values']>[number];
+
+const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]{1,2}\.canvas'\)$/i;
+const REQUEST_ANIMATION_FRAME_MECHANISM = 'auto.browser.browserapierrors.requestAnimationFrame';
+
+const REQUEST_LIFECYCLE_MESSAGES = [
+  /^(NetworkError: )?A network error occurred\.?$/i,
+  /^(AbortError: )?The user aborted a request\.?$/i,
+];
 
 /** Returns the Sentry DSN baked in at build time, or an empty string when monitoring is off. */
 function getSentryDsn(): string {
@@ -34,6 +45,32 @@ function getEnvironment(): string {
   return configured.trim() || 'production';
 }
 
+/** True when Sentry captured stack frames for an exception value. */
+function hasStackFrames(value: SentryExceptionValue): boolean {
+  return (value.stacktrace?.frames?.length ?? 0) > 0;
+}
+
+/** True for the OpenLayers Safari canvas renderer noise from requestAnimationFrame. */
+function isOpenLayersCanvasNoise(value: SentryExceptionValue): boolean {
+  return (
+    OPENLAYERS_CANVAS_MESSAGE.test(value.value ?? '') &&
+    value.mechanism?.type === REQUEST_ANIMATION_FRAME_MECHANISM &&
+    value.mechanism.handled === false
+  );
+}
+
+/** Drops no-stack request lifecycle noise while preserving actionable stacked errors. */
+export function beforeSend(event: Event, _hint: EventHint): Event | null {
+  const values = event.exception?.values ?? [];
+  const message = values[0]?.value ?? event.message ?? '';
+  const hasAnyStackFrames = values.some(hasStackFrames);
+  const isIgnoredRequestNoise = REQUEST_LIFECYCLE_MESSAGES.some((pattern) => pattern.test(message));
+
+  return (isIgnoredRequestNoise && !hasAnyStackFrames) || values.some(isOpenLayersCanvasNoise)
+    ? null
+    : event;
+}
+
 /** Initializes Sentry when a DSN is present. No-op in local dev without a DSN. */
 export function initSentry(): void {
   if (!isSentryEnabled()) {
@@ -48,6 +85,7 @@ export function initSentry(): void {
     sendDefaultPii: false,
     enableLogs: true,
     normalizeDepth: 10,
+    beforeSend,
     integrations: [
       Sentry.reactRouterV7BrowserTracingIntegration({
         useEffect: React.useEffect,
