@@ -10,7 +10,7 @@
 *   **Feature Branches**: `feature/[name-of-feature]` (e.g., `feature/discussion-editor-v2`).
 *   **Bugfix Branches**: `fix/[bug-description]` (e.g., `fix/map-flicker`).
 *   **Hotfix Branches**: `hotfix/[critical-fix]` (targeted at `main`).
-*   **Automated Porting**: After a merge into `main`, automation may open a single port PR into `beta` (for example hotfix merges). Use the `porting/manual` label or an open manual beta PR to skip automation. See `AGENTS.md` and `docs/release-workflow.md`.
+*   **Automated Porting**: After a merge into `main`, automation may open a single port PR into `beta` (for example hotfix merges). Use the `porting/manual` label or an open manual beta PR to skip automation. See `AGENTS.md` and `docs/operations/release-workflow.md`.
 
 ## 📝 Commit Message Conventions
 Use [Conventional Commits](https://www.conventionalcommits.org/):

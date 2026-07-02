@@ -8,6 +8,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Move Monitor UI and map components under `src/monitor/components` so Monitor domain logic and implementation components share one feature-owned area.
 
+### PR #654
+
+- Add the #445 codebase inventory and reorganize docs into architecture, operations, product, releases, and review-removal archive areas.
+
 ### PR #653
 
 - Port deployment feature-switch config from #651: add per-target config files under `deploy/` and wire beta, staging, and production analytics env generation through the checked-out deploy ref.

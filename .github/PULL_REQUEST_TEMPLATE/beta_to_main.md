@@ -41,6 +41,6 @@ This PR promotes **beta** to **production** (`main`).
 - GitHub Release created from CHANGELOG
 - Beta bumped to the next development prerelease
 - **Deploy Production to VPS** runs (`stage` stages release; live site unchanged until `rolloutAt`)
-- VPS cron promotes at `rolloutAt` (see [docs/hosted-rollout.md](../docs/hosted-rollout.md))
+- VPS cron promotes at `rolloutAt` (see [docs/operations/hosted-rollout.md](../docs/operations/hosted-rollout.md))
 
 You only need to click **Merge** — no manual Actions steps unless promoting early (`bash /opt/gfc-analytics/current/release/promote-release.sh --force` on VPS).
