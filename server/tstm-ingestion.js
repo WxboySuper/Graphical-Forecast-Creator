@@ -262,7 +262,6 @@ const startIngestionLoop = (options = {}) => {
 
   tick();
   timer = setInterval(tick, intervalMs);
-  timer.unref?.();
 
   return () => {
     if (timer) {

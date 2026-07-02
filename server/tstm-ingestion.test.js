@@ -283,7 +283,7 @@ describe('tstm-ingestion', () => {
       const stop = startIngestionLoop({ env, runGenerator, intervalMs: 50 });
       assert.equal(typeof stop, 'function');
 
-      // Give the loop a chance to tick, then verify stopping does not leave a ref'd timer open.
+      // Give the loop a chance to tick, then verify stop returns without throwing.
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       stop();
