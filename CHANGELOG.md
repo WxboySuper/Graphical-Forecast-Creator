@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Deploy reliability:** Harden beta and production VPS deploy workflows against flaky `ssh-keyscan` host-key discovery with pinned known-host secrets, retries, deploy concurrency, and explicit `StrictHostKeyChecking` on SSH/rsync.
+- **GFC-WEB-K/F/E Sentry noise:** Filter no-stack browser `NetworkError`/`AbortError` promise-rejection noise before it reaches Sentry while preserving actionable exceptions.
 
 ### Added
 - **Explicit build targets:** Define and validate local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
