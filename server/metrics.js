@@ -69,10 +69,13 @@ let premiumSubscriptionsCache = {
   value: null,
   expiresAt: 0,
 };
+let pendingPremiumCount = null;
 
+/** Returns true when the premium subscriptions cache has a fresh value. */
 const hasFreshPremiumCache = () =>
   premiumSubscriptionsCache.value !== null && Date.now() < premiumSubscriptionsCache.expiresAt;
 
+/** Stores a premium subscription count in the cache with a TTL. */
 const cachePremiumSubscriptions = (value) => {
   premiumSubscriptionsCache = {
     value,
@@ -313,14 +316,26 @@ const countPremiumSubscriptions = async () => {
     return premiumSubscriptionsCache.value;
   }
 
-  const snapshot = await db
+  if (pendingPremiumCount) {
+    return pendingPremiumCount;
+  }
+
+  pendingPremiumCount = db
     .collection('userEntitlements')
     .where('billingStatus', 'in', ['active', 'trialing'])
-    .get();
+    .get()
+    .then((snapshot) => {
+      const count = snapshot.size;
+      cachePremiumSubscriptions(count);
+      pendingPremiumCount = null;
+      return count;
+    })
+    .catch((err) => {
+      pendingPremiumCount = null;
+      throw err;
+    });
 
-  const count = snapshot.size;
-  cachePremiumSubscriptions(count);
-  return count;
+  return pendingPremiumCount;
 };
 
 /** Returns the current total number of hosted accounts that have profile docs in Firestore. */
@@ -659,6 +674,15 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
   };
 };
 
+/** Returns true when the event requires authentication but the token is missing, sending a 401 if so. */
+const requireAuthForExpensiveEvents = (eventType, decodedToken, res) => {
+  if (eventType === 'cloud_cycle_saved' && !decodedToken) {
+    res.status(401).json({ error: 'Authentication required for cloud save metrics.' });
+    return true;
+  }
+  return false;
+};
+
 /** Handles client product-metric events while gracefully no-oping when hosted metrics are unavailable. */
 const handleMetricEvent = async (req, res) => {
   if (!hasFirebaseAdminConfig()) {
@@ -675,10 +699,7 @@ const handleMetricEvent = async (req, res) => {
   const installationId = readInstallationId(req.body?.installationId);
   const decodedToken = await verifyRequestUser(req);
 
-  if (eventType === 'cloud_cycle_saved' && !decodedToken) {
-    res.status(401).json({ error: 'Authentication required for cloud save metrics.' });
-    return;
-  }
+  if (requireAuthForExpensiveEvents(eventType, decodedToken, res)) return;
 
   await recordMetricEvent({
     eventType,
