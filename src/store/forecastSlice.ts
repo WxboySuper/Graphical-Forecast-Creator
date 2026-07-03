@@ -896,7 +896,6 @@ export const forecastSlice = createSlice({
     completeWithOmissions: (state) => {
       state.completionValidation.showCompletionModal = false;
       state.completionValidation.lastResult = null;
-      state.isSaved = false;
     },
 
     clearOmittedDays: (state) => {
