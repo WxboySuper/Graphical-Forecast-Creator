@@ -302,6 +302,39 @@ describe('workflowSerialization', () => {
       );
       expect(serialized.cycles[0].groupingData['day4-8-v1']?.data['day4-8']).toEqual([['15%', []]]);
     });
+
+    test('keeps first day4-8 entry when multiple legacy days map to day4-8', () => {
+      const legacy = makeLegacySaveData();
+      if (legacy.forecastCycle) {
+        legacy.forecastCycle.days[4] = {
+          day: 4,
+          data: { 'day4-8': [['15%', []]] },
+          metadata: {
+            issueDate: '2026-04-21',
+            validDate: '2026-04-24',
+            issuanceTime: '0600',
+            lowProbabilityOutlooks: [],
+          },
+        };
+        legacy.forecastCycle.days[5] = {
+          day: 5,
+          data: { 'day4-8': [['30%', []]] },
+          metadata: {
+            issueDate: '2026-04-21',
+            validDate: '2026-04-25',
+            issuanceTime: '0600',
+            lowProbabilityOutlooks: [],
+          },
+        };
+      }
+
+      const serialized = migrateLegacyForecastToSerializedPackage(legacy);
+      const day48Grouping = serialized.cycles[0].groupings.find(({ grouping }) => grouping === 'day4-8');
+
+      expect(day48Grouping?.day).toBe(4);
+      expect(serialized.cycles[0].groupingData['day4-8-v1']?.day).toBe(4);
+      expect(serialized.cycles[0].groupingData['day4-8-v1']?.data['day4-8']).toEqual([['15%', []]]);
+    });
   });
 
   // ---------------------------------------------------------------------------

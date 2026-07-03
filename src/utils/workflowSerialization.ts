@@ -35,6 +35,7 @@ const dayToGrouping = (day: DayType): Grouping => {
 const makeCycleId = (workflowId: WorkflowId, cycleDate: string): CycleId =>
   `WF-${workflowId}-${cycleDate}`;
 
+/** Returns populated legacy day entries in stable iteration order. */
 const getLegacyDayEntries = (
   legacyData: GFCForecastSaveData,
 ): Array<{ day: DayType; savedDay: NonNullable<NonNullable<GFCForecastSaveData['forecastCycle']>['days']>[DayType] }> => {
@@ -47,6 +48,7 @@ const getLegacyDayEntries = (
     .map((savedDay) => ({ day: savedDay.day, savedDay }));
 };
 
+/** Maps a serialized cycle into runtime cycle metadata. */
 const toCycleMetadata = (serializedCycle: SerializedCycle): CycleMetadata => ({
   id: serializedCycle.id,
   workflowId: serializedCycle.workflowId,
@@ -57,6 +59,7 @@ const toCycleMetadata = (serializedCycle: SerializedCycle): CycleMetadata => ({
   updatedAt: serializedCycle.updatedAt,
 });
 
+/** Builds one completed outlook version per legacy day entry. */
 const buildOutlookVersions = (
   legacyData: GFCForecastSaveData,
   createdAt: string,
@@ -64,7 +67,7 @@ const buildOutlookVersions = (
   const outlookVersions: OutlookVersion[] = [];
   let versionCounter = 1;
 
-  getLegacyDayEntries(legacyData).forEach(({ day }) => {
+  getLegacyDayEntries(legacyData).forEach(() => {
     outlookVersions.push({
       version: versionCounter++,
       status: 'completed',
@@ -83,6 +86,7 @@ const buildOutlookVersions = (
   return outlookVersions;
 };
 
+/** Builds grouping payloads keyed by grouping version, keeping the first day per grouping. */
 const buildGroupingData = (
   legacyData: GFCForecastSaveData,
 ): Record<string, SerializedOutlookVersionData> => {
@@ -90,7 +94,12 @@ const buildGroupingData = (
 
   getLegacyDayEntries(legacyData).forEach(({ day, savedDay }) => {
     const grouping = dayToGrouping(day);
-    groupingData[`${grouping}-v1`] = {
+    const groupingKey = `${grouping}-v1`;
+    if (groupingData[groupingKey]) {
+      return;
+    }
+
+    groupingData[groupingKey] = {
       day,
       data: savedDay.data,
       metadata: {
@@ -106,6 +115,7 @@ const buildGroupingData = (
   return groupingData;
 };
 
+/** Builds unique grouping entries, keeping the first day per grouping. */
 const buildGroupings = (legacyData: GFCForecastSaveData): { grouping: Grouping; day: DayType }[] => {
   const seenGroupings = new Set<string>();
   const groupings: { grouping: Grouping; day: DayType }[] = [];
@@ -123,6 +133,7 @@ const buildGroupings = (legacyData: GFCForecastSaveData): { grouping: Grouping; 
   return groupings;
 };
 
+/** Type guard for serialized workflow package metadata. */
 const isWorkflowPackageMetadata = (value: unknown): value is WorkflowPackageMetadata => {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -132,6 +143,7 @@ const isWorkflowPackageMetadata = (value: unknown): value is WorkflowPackageMeta
   return typeof metadata.workflowId === 'string' && typeof metadata.cycleId === 'string';
 };
 
+/** Type guard for serialized cycle payloads. */
 const isSerializedCycle = (value: unknown): value is SerializedCycle => {
   if (typeof value !== 'object' || value === null) {
     return false;
