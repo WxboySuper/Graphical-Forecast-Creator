@@ -62,31 +62,13 @@ const expectedOutlookTypesForDay = (day: DayType): OutlookType[] => {
 };
 
 /** Returns true when an outlook map has at least one non-TSTM polygon drawn. */
-const hasPolygonData = (map: Map<string, unknown[]> | undefined): boolean => {
+const hasNonTstmPolygonData = (map: Map<string, unknown[]> | undefined): boolean => {
   if (!map) return false;
   for (const [key, features] of map.entries()) {
     if (key !== 'TSTM' && features.length > 0) return true;
   }
   return false;
 };
-
-/** Returns true when the categorical map has non-TSTM data or risk levels above TSTM. */
-const hasCategoricalData = (map: Map<string, unknown[]> | undefined): boolean => {
-  if (!map) return false;
-  for (const [key, features] of map.entries()) {
-    if (key !== 'TSTM' && features.length > 0) return true;
-  }
-  return false;
-};
-
-const hasOutlookData = (
-  outlookType: OutlookType,
-  map: Map<string, unknown[]> | undefined,
-): boolean => (
-  outlookType === 'categorical'
-    ? hasCategoricalData(map)
-    : hasPolygonData(map)
-);
 
 const hasGuidedDiscussionContent = (
   guided: NonNullable<DiscussionData['guidedContent']>,
@@ -151,7 +133,7 @@ const validateOutlookPolygons = (ctx: DayValidationContext): void => {
     }
 
     const outlookMap = dayData.data[outlookType as keyof typeof dayData.data];
-    if (hasOutlookData(outlookType, outlookMap as Map<string, unknown[]> | undefined)) {
+    if (hasNonTstmPolygonData(outlookMap as Map<string, unknown[]> | undefined)) {
       continue;
     }
 
@@ -188,7 +170,7 @@ const shouldReportNoTstmForecast = (ctx: DayValidationContext): boolean => {
     return false;
   }
 
-  return !hasCategoricalData(categoricalMap);
+  return !hasNonTstmPolygonData(categoricalMap);
 };
 
 const validateNoTstmForecast = (ctx: DayValidationContext): void => {
@@ -220,13 +202,21 @@ const dayHasDrawnPolygons = (ctx: DayValidationContext): boolean => {
     }
 
     const map = dayData.data[outlookType as keyof typeof dayData.data];
-    return hasOutlookData(outlookType, map as Map<string, unknown[]> | undefined);
+    return hasNonTstmPolygonData(map as Map<string, unknown[]> | undefined);
   });
 };
 
 const validateDiscussion = (ctx: DayValidationContext): void => {
   const dayData = ctx.dayData;
-  if (!dayData || !dayHasDrawnPolygons(ctx) || hasDiscussionContent(dayData.discussion)) {
+  if (!dayData) {
+    return;
+  }
+
+  if (!dayHasDrawnPolygons(ctx)) {
+    return;
+  }
+
+  if (hasDiscussionContent(dayData.discussion)) {
     return;
   }
 

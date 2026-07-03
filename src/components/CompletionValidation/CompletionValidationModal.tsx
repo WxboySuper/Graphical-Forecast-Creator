@@ -16,6 +16,7 @@ interface CompletionValidationModalProps {
   onNavigateToIssue?: (day: DayType) => void;
 }
 
+/** Maps a validation grouping key to its primary forecast day number. */
 const getGroupingDay = (grouping: string): DayType | null => {
   switch (grouping) {
     case 'day1': return 1;
