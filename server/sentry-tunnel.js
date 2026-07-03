@@ -86,7 +86,7 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
   app.post(
     '/api/sentry-tunnel',
     tunnelRateLimit,
-    express.raw({ type: () => true, limit: '150kb' }),
+    express.raw({ type: () => true, limit: '100kb' }),
     async (req, res) => {
       try {
         const envelopeBody = req.body;
