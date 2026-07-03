@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType, CycleMetadata } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
+import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
 
 const CURRENT_VERSION = '1.0.0';
 
@@ -69,19 +70,7 @@ const createEmptyOutlook = (day: DayType): OutlookDay => {
   };
 };
 
-type CompletionMetadata = Pick<ForecastCycle, 'completionAcknowledgedAt' | 'omittedDayReasons'>;
-
-const completionMetadataFromForecastCycle = (
-  forecastCycle: CompletionMetadata,
-): CompletionMetadata => ({
-  ...(forecastCycle.completionAcknowledgedAt
-    ? { completionAcknowledgedAt: forecastCycle.completionAcknowledgedAt }
-    : {}),
-  ...(forecastCycle.omittedDayReasons
-    ? { omittedDayReasons: forecastCycle.omittedDayReasons }
-    : {}),
-});
-
+/** Rehydrates one saved outlook day from serialized forecast JSON. */
 const deserializeSavedOutlookDay = (
   savedDay: SerializedDay,
 ): OutlookDay => {
@@ -118,6 +107,7 @@ const deserializeSavedOutlookDay = (
   };
 };
 
+/** Rehydrates all saved outlook days from serialized forecast JSON. */
 const deserializeForecastCycleDays = (
   cycle: NonNullable<GFCForecastSaveData['forecastCycle']>,
 ): Partial<Record<DayType, OutlookDay>> => {
