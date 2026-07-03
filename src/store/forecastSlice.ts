@@ -10,7 +10,7 @@ import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
-import type { CycleValidationResult, StandardGrouping } from '../types/workflow';
+import type { CycleValidationResult } from '../types/workflow';
 
 export interface SavedCycleStats {
   forecastDays: number;

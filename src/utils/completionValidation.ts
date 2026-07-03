@@ -102,7 +102,7 @@ export const hasDiscussionContent = (discussion: DiscussionData | undefined): bo
   }
 
   const guided = discussion.guidedContent;
-  return guided ? hasGuidedDiscussionContent(guided) : false;
+  return Boolean(guided && hasGuidedDiscussionContent(guided));
 };
 
 const collectDaysToValidate = (expectedGroupings?: StandardGrouping[]): DayType[] => {
@@ -138,7 +138,11 @@ const addMissingDayIssues = (ctx: DayValidationContext): void => {
 };
 
 const validateOutlookPolygons = (ctx: DayValidationContext): void => {
-  const dayData = ctx.dayData!;
+  const dayData = ctx.dayData;
+  if (!dayData) {
+    return;
+  }
+
   const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
 
   for (const outlookType of ctx.expectedTypes) {
@@ -164,7 +168,11 @@ const validateOutlookPolygons = (ctx: DayValidationContext): void => {
 };
 
 const shouldReportNoTstmForecast = (ctx: DayValidationContext): boolean => {
-  const dayData = ctx.dayData!;
+  const dayData = ctx.dayData;
+  if (!dayData) {
+    return false;
+  }
+
   const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
   const categoricalMap = dayData.data.categorical;
 
@@ -199,7 +207,11 @@ const validateNoTstmForecast = (ctx: DayValidationContext): void => {
 };
 
 const dayHasDrawnPolygons = (ctx: DayValidationContext): boolean => {
-  const dayData = ctx.dayData!;
+  const dayData = ctx.dayData;
+  if (!dayData) {
+    return false;
+  }
+
   const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
 
   return ctx.expectedTypes.some((outlookType) => {
@@ -213,8 +225,8 @@ const dayHasDrawnPolygons = (ctx: DayValidationContext): boolean => {
 };
 
 const validateDiscussion = (ctx: DayValidationContext): void => {
-  const dayData = ctx.dayData!;
-  if (!dayHasDrawnPolygons(ctx) || hasDiscussionContent(dayData.discussion)) {
+  const dayData = ctx.dayData;
+  if (!dayData || !dayHasDrawnPolygons(ctx) || hasDiscussionContent(dayData.discussion)) {
     return;
   }
 

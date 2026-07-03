@@ -12,10 +12,9 @@ import { useExportMap } from '../DrawingTools/useExportMap';
 
 import { DayType, OutlookType } from '../../types/outlooks';
 import { getOutlookColor } from '../../utils/outlookUtils';
+import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
-
-import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 
 /** Helper to create ghost outlook handlers outside the hook to reduce hook length. */
 function createGhostOutlookHandlers(

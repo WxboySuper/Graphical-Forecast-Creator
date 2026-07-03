@@ -21,9 +21,9 @@ export const MissingItemsList: React.FC<MissingItemsListProps> = ({ issues, onNa
 
   return (
     <div className="completion-issues-list">
-      {issues.map((issue, index) => (
+      {issues.map((issue) => (
         <div
-          key={`${issue.day}-${issue.outlookType}-${issue.type}-${index}`}
+          key={`${issue.day}-${issue.outlookType}-${issue.type}-${issue.message}`}
           className={`completion-issue-item completion-issue-item--${issue.severity}`}
         >
           <div className="completion-issue-info">
