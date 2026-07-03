@@ -64,6 +64,21 @@ let storageBytesCache = {
   value: null,
   expiresAt: 0,
 };
+const PREMIUM_CACHE_TTL_MS = 5 * 60 * 1000;
+let premiumSubscriptionsCache = {
+  value: null,
+  expiresAt: 0,
+};
+
+const hasFreshPremiumCache = () =>
+  premiumSubscriptionsCache.value !== null && Date.now() < premiumSubscriptionsCache.expiresAt;
+
+const cachePremiumSubscriptions = (value) => {
+  premiumSubscriptionsCache = {
+    value,
+    expiresAt: Date.now() + PREMIUM_CACHE_TTL_MS,
+  };
+};
 
 /** True when the storage-footprint cache is still valid for reuse. */
 const hasFreshStorageCache = () =>
@@ -294,12 +309,18 @@ const countPremiumSubscriptions = async () => {
     return 0;
   }
 
+  if (hasFreshPremiumCache()) {
+    return premiumSubscriptionsCache.value;
+  }
+
   const snapshot = await db
     .collection('userEntitlements')
     .where('billingStatus', 'in', ['active', 'trialing'])
     .get();
 
-  return snapshot.size;
+  const count = snapshot.size;
+  cachePremiumSubscriptions(count);
+  return count;
 };
 
 /** Returns the current total number of hosted accounts that have profile docs in Firestore. */
@@ -653,6 +674,11 @@ const handleMetricEvent = async (req, res) => {
 
   const installationId = readInstallationId(req.body?.installationId);
   const decodedToken = await verifyRequestUser(req);
+
+  if (eventType === 'cloud_cycle_saved' && !decodedToken) {
+    res.status(401).json({ error: 'Authentication required for cloud save metrics.' });
+    return;
+  }
 
   await recordMetricEvent({
     eventType,
