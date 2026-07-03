@@ -677,6 +677,7 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
 /** Returns true when the event requires authentication but the token is missing, sending a 401 if so. */
 const requireAuthForExpensiveEvents = (eventType, decodedToken, res) => {
   if (eventType === 'cloud_cycle_saved' && !decodedToken) {
+    console.warn('[metrics] cloud_cycle_saved:unauthenticated');
     res.status(401).json({ error: 'Authentication required for cloud save metrics.' });
     return true;
   }
