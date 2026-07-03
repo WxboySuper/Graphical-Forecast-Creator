@@ -112,7 +112,13 @@ export const serializeForecast = (
     forecastCycle: {
       days: serializedDays,
       currentDay: forecastCycle.currentDay,
-      cycleDate: forecastCycle.cycleDate
+      cycleDate: forecastCycle.cycleDate,
+      ...(forecastCycle.completionAcknowledgedAt
+        ? { completionAcknowledgedAt: forecastCycle.completionAcknowledgedAt }
+        : {}),
+      ...(forecastCycle.omittedDayReasons
+        ? { omittedDayReasons: forecastCycle.omittedDayReasons }
+        : {}),
     },
     mapView
   };
@@ -177,7 +183,13 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
     return {
       days,
       currentDay: cycle.currentDay,
-      cycleDate: cycle.cycleDate
+      cycleDate: cycle.cycleDate,
+      ...(cycle.completionAcknowledgedAt
+        ? { completionAcknowledgedAt: cycle.completionAcknowledgedAt }
+        : {}),
+      ...(cycle.omittedDayReasons
+        ? { omittedDayReasons: cycle.omittedDayReasons }
+        : {}),
     };
   }
 

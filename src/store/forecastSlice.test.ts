@@ -17,6 +17,7 @@ import reducer, {
   removeFeature,
   completeWithOmissions,
   markAsSaved,
+  omitDay,
   validateCompletion,
 } from './forecastSlice';
 
@@ -519,9 +520,10 @@ describe('forecastSlice undo/redo', () => {
     expect(nextState.forecastCycle.days[4]?.data['day4-8']?.size ?? 0).toBe(0);
   });
 
-  it('completeWithOmissions closes the modal without marking the forecast unsaved', () => {
+  it('completeWithOmissions persists acknowledgement metadata and marks the forecast unsaved', () => {
     let state = reducer(undefined, markAsSaved());
     state = reducer(state, validateCompletion());
+    state = reducer(state, omitDay({ day: 3, reason: 'No severe weather expected' }));
 
     expect(state.completionValidation.showCompletionModal).toBe(true);
 
@@ -529,6 +531,8 @@ describe('forecastSlice undo/redo', () => {
 
     expect(nextState.completionValidation.showCompletionModal).toBe(false);
     expect(nextState.completionValidation.lastResult).toBeNull();
-    expect(nextState.isSaved).toBe(true);
+    expect(nextState.forecastCycle.completionAcknowledgedAt).toEqual(expect.any(String));
+    expect(nextState.forecastCycle.omittedDayReasons).toEqual({ 3: 'No severe weather expected' });
+    expect(nextState.isSaved).toBe(false);
   });
 });
