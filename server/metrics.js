@@ -306,7 +306,7 @@ const getAdminUidAllowlist = () =>
 const isAllowedAdminUid = (uid) => getAdminUidAllowlist().includes(uid);
 
 /** Returns the current number of Stripe-backed premium subscriptions derived from entitlement truth in Firestore. */
-const countPremiumSubscriptions = async () => {
+const countPremiumSubscriptions = () => {
   const db = getAdminDb();
   if (!db) {
     return 0;
