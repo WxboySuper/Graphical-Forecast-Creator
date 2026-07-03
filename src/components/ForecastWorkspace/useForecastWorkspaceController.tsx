@@ -393,15 +393,11 @@ function useCompletionValidationController(
   };
 }
 
-/** Shared controller for all Forecast workspace layouts. */
-function useForecastWorkspaceControllerArgs({
-  onSave,
-  onLoad,
-  mapRef,
-  fileInputRef,
-  addToast,
-  cloudTools = null,
-}: UseForecastWorkspaceControllerOptions): BuildForecastWorkspaceControllerArgs {
+/** Redux-derived forecast workspace state shared by the controller hook. */
+function useForecastWorkspaceCoreState(
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+  addToast: AddToastFn,
+) {
   const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days, cycleDate } = forecastCycle;
@@ -416,108 +412,112 @@ function useForecastWorkspaceControllerArgs({
   const outlooks = useSelector((state: RootState) =>
     state.forecast.forecastCycle.days[currentDay]?.data || {}
   );
-  const isExportDisabled = !isExportMapExposed();
   const panel = useOutlookPanelLogic();
-  const { isExporting, isModalOpen, initiateExport, confirmExport, cancelExport } = useExportMap({
+  const exportState = useExportMap({
     mapRef,
     outlooks,
-    isExportDisabled,
+    isExportDisabled: !isExportMapExposed(),
     addToast,
   });
-
-  const {
-    showHistoryModal,
-    showCopyModal,
-    showResetConfirm,
-    isPackageDownloading,
-    setIsPackageDownloading,
-    isEditingDate,
-    setIsEditingDate,
-    tempDate,
-    handleOpenHistoryModal,
-    handleOpenCopyModal,
-    handleOpenResetConfirm,
-    handleCloseHistoryModal,
-    handleCloseCopyModal,
-    handleCancelReset,
-    handleTempDateChange,
-    handleStartDateEdit,
-    handleBaseMapStyleSelect,
-  } = useForecastWorkspaceModalState(cycleDate, dispatch);
-
-  const {
-    showCompletionModal,
-    handleOpenCompletionModal,
-    handleCloseCompletionModal,
-    handleCompleteCycle,
-    handleCompleteWithOmissions,
-    handleNavigateToIssue,
-  } = useCompletionValidationController(dispatch, addToast);
-
   const availableTypes = OUTLOOK_TYPE_ORDER.filter((type) => panel.getOutlookTypeEnabled(type));
   const ghostTypes = availableTypes.filter((type) => type !== panel.activeOutlookType);
-  const ghostOutlookHandlers = useMemo(() => createGhostOutlookHandlers(dispatch, ghostOutlookState), [dispatch, ghostOutlookState]);
+  const ghostOutlookHandlers = useMemo(
+    () => createGhostOutlookHandlers(dispatch, ghostOutlookState),
+    [dispatch, ghostOutlookState],
+  );
 
-  const handlers = useForecastWorkspaceActionHandlers({
+  return {
     dispatch,
+    forecastCycle,
+    currentDay,
+    days,
+    cycleDate,
+    isSaved,
+    canUndo,
+    canRedo,
+    ghostOutlookState,
+    baseMapStyle,
+    lowProbabilityOutlooks,
+    panel,
+    availableTypes,
+    ghostTypes,
+    ghostOutlookHandlers,
+    ...exportState,
+  };
+}
+
+/** Shared controller for all Forecast workspace layouts. */
+function useForecastWorkspaceControllerArgs({
+  onSave,
+  onLoad,
+  mapRef,
+  fileInputRef,
+  addToast,
+  cloudTools = null,
+}: UseForecastWorkspaceControllerOptions): BuildForecastWorkspaceControllerArgs {
+  const core = useForecastWorkspaceCoreState(mapRef, addToast);
+  const modalState = useForecastWorkspaceModalState(core.cycleDate, core.dispatch);
+  const completionState = useCompletionValidationController(core.dispatch, addToast);
+  const handlers = useForecastWorkspaceActionHandlers({
+    dispatch: core.dispatch,
     onLoad,
     mapRef,
     addToast,
-    forecastCycle,
-    currentDay,
-    canUndo,
-    canRedo,
-    tempDate,
-    setIsEditingDate,
-    setIsPackageDownloading,
+    forecastCycle: core.forecastCycle,
+    currentDay: core.currentDay,
+    canUndo: core.canUndo,
+    canRedo: core.canRedo,
+    tempDate: modalState.tempDate,
+    setIsEditingDate: modalState.setIsEditingDate,
+    setIsPackageDownloading: modalState.setIsPackageDownloading,
     fileInputRef,
-    handleCancelReset,
+    handleCancelReset: modalState.handleCancelReset,
   });
 
   return {
     onSave,
     cloudTools,
     fileInputRef,
-    isSaved,
-    canUndo,
-    canRedo,
-    isExporting,
-    isModalOpen,
-    initiateExport,
-    confirmExport,
-    cancelExport,
-    isPackageDownloading,
-    showHistoryModal,
-    showCopyModal,
-    showResetConfirm,
-    isEditingDate,
-    tempDate,
-    cycleDate,
-    currentDay,
-    days,
-    availableTypes,
-    ghostTypes,
-    panel,
-    lowProbabilityOutlooks,
-    ghostOutlookState,
-    ghostOutlookHandlers,
-    baseMapStyle,
-    handleBaseMapStyleSelect,
-    handleOpenHistoryModal,
-    handleOpenCopyModal,
-    handleOpenResetConfirm,
-    handleCloseHistoryModal,
-    handleCloseCopyModal,
-    handleCancelReset,
-    handleTempDateChange,
-    handleStartDateEdit,
+    isSaved: core.isSaved,
+    canUndo: core.canUndo,
+    canRedo: core.canRedo,
+    isExporting: core.isExporting,
+    isModalOpen: core.isModalOpen,
+    initiateExport: core.initiateExport,
+    confirmExport: core.confirmExport,
+    cancelExport: core.cancelExport,
+    isPackageDownloading: modalState.isPackageDownloading,
+    showHistoryModal: modalState.showHistoryModal,
+    showCopyModal: modalState.showCopyModal,
+    showResetConfirm: modalState.showResetConfirm,
+    isEditingDate: modalState.isEditingDate,
+    tempDate: modalState.tempDate,
+    cycleDate: core.cycleDate,
+    currentDay: core.currentDay,
+    days: core.days,
+    availableTypes: core.availableTypes,
+    ghostTypes: core.ghostTypes,
+    panel: core.panel,
+    lowProbabilityOutlooks: core.lowProbabilityOutlooks,
+    ghostOutlookState: core.ghostOutlookState,
+    ghostOutlookHandlers: core.ghostOutlookHandlers,
+    baseMapStyle: core.baseMapStyle,
+    handleBaseMapStyleSelect: modalState.handleBaseMapStyleSelect,
+    handleOpenHistoryModal: modalState.handleOpenHistoryModal,
+    handleOpenCopyModal: modalState.handleOpenCopyModal,
+    handleOpenResetConfirm: modalState.handleOpenResetConfirm,
+    handleCloseHistoryModal: modalState.handleCloseHistoryModal,
+    handleCloseCopyModal: modalState.handleCloseCopyModal,
+    handleCancelReset: modalState.handleCancelReset,
+    handleTempDateChange: modalState.handleTempDateChange,
+    handleStartDateEdit: modalState.handleStartDateEdit,
     handlers,
-    showCompletionModal,
-    handleOpenCompletionModal,
-    handleCloseCompletionModal,
-    handleCompleteCycle,
-    handleCompleteWithOmissions,
-    handleNavigateToIssue,
+    showCompletionModal: completionState.showCompletionModal,
+    handleOpenCompletionModal: completionState.handleOpenCompletionModal,
+    handleCloseCompletionModal: completionState.handleCloseCompletionModal,
+    handleCompleteCycle: completionState.handleCompleteCycle,
+    handleCompleteWithOmissions: completionState.handleCompleteWithOmissions,
+    handleNavigateToIssue: completionState.handleNavigateToIssue,
   };
 }
 
