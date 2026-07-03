@@ -520,6 +520,7 @@ function useForecastWorkspaceControllerArgs({
   };
 }
 
+/** Composes forecast workspace state, handlers, and modal wiring for the editor shell. */
 export const useForecastWorkspaceController = (
   options: UseForecastWorkspaceControllerOptions,
 ): ForecastWorkspaceController => buildForecastWorkspaceController(useForecastWorkspaceControllerArgs(options));

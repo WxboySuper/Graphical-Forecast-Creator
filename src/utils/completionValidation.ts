@@ -70,6 +70,7 @@ const hasNonTstmPolygonData = (map: Map<string, unknown[]> | undefined): boolean
   return false;
 };
 
+/** Returns true when guided discussion fields contain non-empty text. */
 const hasGuidedDiscussionContent = (
   guided: NonNullable<DiscussionData['guidedContent']>,
 ): boolean => GUIDED_DISCUSSION_FIELDS.some(
@@ -87,11 +88,13 @@ export const hasDiscussionContent = (discussion: DiscussionData | undefined): bo
   return Boolean(guided && hasGuidedDiscussionContent(guided));
 };
 
+/** Collects the forecast days that should be validated for the requested groupings. */
 const collectDaysToValidate = (expectedGroupings?: StandardGrouping[]): DayType[] => {
   const groupings = expectedGroupings ?? DEFAULT_GROUPINGS;
   return groupings.flatMap((grouping) => GROUPING_DAY_NUMBERS[grouping]);
 };
 
+/** Builds per-day validation context from the active forecast cycle. */
 const createDayContext = (
   day: DayType,
   forecastCycle: ForecastCycle,
@@ -105,6 +108,7 @@ const createDayContext = (
   dayData: forecastCycle.days[day],
 });
 
+/** Adds critical issues when an expected day has no saved outlook data. */
 const addMissingDayIssues = (ctx: DayValidationContext): void => {
   for (const outlookType of ctx.expectedTypes) {
     ctx.issues.push({
@@ -119,6 +123,7 @@ const addMissingDayIssues = (ctx: DayValidationContext): void => {
   ctx.missingGroupings.add(ctx.grouping);
 };
 
+/** Validates that required outlook polygons exist for the current day. */
 const validateOutlookPolygons = (ctx: DayValidationContext): void => {
   const dayData = ctx.dayData;
   if (!dayData) {
@@ -149,6 +154,7 @@ const validateOutlookPolygons = (ctx: DayValidationContext): void => {
   }
 };
 
+/** Returns true when a categorical day has map entries but no non-TSTM polygons. */
 const shouldReportNoTstmForecast = (ctx: DayValidationContext): boolean => {
   const dayData = ctx.dayData;
   if (!dayData) {
@@ -173,6 +179,7 @@ const shouldReportNoTstmForecast = (ctx: DayValidationContext): boolean => {
   return !hasNonTstmPolygonData(categoricalMap);
 };
 
+/** Adds a warning when categorical data exists without a non-TSTM forecast. */
 const validateNoTstmForecast = (ctx: DayValidationContext): void => {
   if (!shouldReportNoTstmForecast(ctx)) {
     return;
@@ -188,6 +195,7 @@ const validateNoTstmForecast = (ctx: DayValidationContext): void => {
   });
 };
 
+/** Returns true when the day has at least one required non-TSTM polygon. */
 const dayHasDrawnPolygons = (ctx: DayValidationContext): boolean => {
   const dayData = ctx.dayData;
   if (!dayData) {
@@ -206,6 +214,7 @@ const dayHasDrawnPolygons = (ctx: DayValidationContext): boolean => {
   });
 };
 
+/** Adds a warning when polygons exist but the day discussion is missing. */
 const validateDiscussion = (ctx: DayValidationContext): void => {
   const dayData = ctx.dayData;
   if (!dayData) {
@@ -230,6 +239,7 @@ const validateDiscussion = (ctx: DayValidationContext): void => {
   });
 };
 
+/** Validates one forecast day and appends issues to the shared accumulator. */
 const validateDay = (
   day: DayType,
   forecastCycle: ForecastCycle,

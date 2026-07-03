@@ -1,7 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
-import type { CycleMetadata, WorkflowMetadata, Package } from '../types/workflow';
+import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
@@ -10,7 +10,6 @@ import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
-import type { CycleValidationResult } from '../types/workflow';
 
 export interface SavedCycleStats {
   forecastDays: number;

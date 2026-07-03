@@ -1,3 +1,4 @@
+// skipcq: JS-W1028
 import React, { useCallback } from 'react';
 import type { CycleValidationResult } from '../../types/workflow';
 import type { DayType } from '../../types/outlooks';

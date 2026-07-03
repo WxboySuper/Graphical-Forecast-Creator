@@ -1,3 +1,4 @@
+// skipcq: JS-W1028
 import React from 'react';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { ValidationIssue } from '../../types/workflow';

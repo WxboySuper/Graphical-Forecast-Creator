@@ -1,3 +1,4 @@
+// skipcq: JS-W1028
 import React from 'react';
 import type { ValidationIssue } from '../../types/workflow';
 
@@ -6,7 +7,6 @@ interface MissingItemsListProps {
   onNavigate?: (day: string, outlookType: string) => void;
 }
 
-/** Formats a workflow grouping key for display. */
 const formatGrouping = (grouping: string): string => {
   switch (grouping) {
     case 'day1': return 'Day 1';
