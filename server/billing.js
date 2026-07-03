@@ -256,7 +256,7 @@ const handleCheckout = async (req, res) => {
     return;
   }
 
-  const baseUrl = getBaseUrl(req);
+  const baseUrl = getBaseUrl();
   const metadata = createCheckoutMetadata(decodedToken.uid, plan);
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
@@ -296,7 +296,7 @@ const handleBillingPortal = async (req, res) => {
 
   const portal = await stripe.billingPortal.sessions.create({
     customer: entitlementData.stripeCustomerId,
-    return_url: `${getBaseUrl(req)}/account`,
+    return_url: `${getBaseUrl()}/account`,
   });
 
   res.json({ url: portal.url });
