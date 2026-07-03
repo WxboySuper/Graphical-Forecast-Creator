@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from './firebase';
 import { CloudCycleMetadata, CloudCycle, CloudOperationResult } from '../types/cloudCycles';
 import { GFCForecastSaveData } from '../types/outlooks';
-import type { CycleMetadata } from '../types/workflow';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
 
@@ -13,8 +12,6 @@ const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
 interface CloudCycleDocument extends CloudCycleMetadata {
   payloadJson: string;
   payloadBytes: number;
-  /** v2 workflow metadata serialized as JSON in the Firestore document. */
-  workflowMetadata?: CycleMetadata;
 }
 
 interface NormalizeMetadataParams {
@@ -211,15 +208,9 @@ const normalizeCloudCycleRecord = ({
     return null;
   }
 
-  // Extract v2 workflow metadata if present
-  const workflowMetadata = isPlainObject(rawRecord.workflowMetadata)
-    ? (rawRecord.workflowMetadata as CycleMetadata)
-    : undefined;
-
   return {
     ...metadata,
     payload,
-    workflowMetadata,
   };
 };
 
@@ -239,18 +230,17 @@ const normalizeCloudCycleMetadataRecord = ({
 
 /** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
-  const { payload, workflowMetadata, ...metadata } = cycle;
+  const { payload, ...metadata } = cycle;
   const payloadStats = createPayloadStorageStats(payload);
 
   return {
     ...metadata,
     ...payloadStats,
-    workflowMetadata,
   };
 };
 
 /** Strips the saved payload from a cloud cycle so library APIs can expose metadata-only objects. */
-const toCloudCycleMetadata = ({ payload: _payload, workflowMetadata: _wm, ...cycleMetadata }: CloudCycle): CloudCycleMetadata => cycleMetadata;
+const toCloudCycleMetadata = ({ payload: _payload, ...cycleMetadata }: CloudCycle): CloudCycleMetadata => cycleMetadata;
 
 /** Sorts cloud-cycle metadata from newest to oldest update time. */
 const sortCloudCycleMetadata = (cycles: CloudCycleMetadata[]): CloudCycleMetadata[] =>
