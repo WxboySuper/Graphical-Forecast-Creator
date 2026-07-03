@@ -189,7 +189,7 @@ const validateNoTstmForecast = (ctx: DayValidationContext): void => {
     day: ctx.grouping,
     outlookType: 'categorical',
     type: 'no-tstm-forecast',
-    message: `Day ${ctx.day} categorical: no TSTM forecast (no polygons drawn)`,
+    message: `Day ${ctx.day} categorical: only TSTM-level forecast drawn (no threat-level polygons)`,
     severity: 'warning',
     canNavigate: false,
   });

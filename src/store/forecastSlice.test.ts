@@ -15,6 +15,9 @@ import reducer, {
   undoLastEdit,
   updateFeature,
   removeFeature,
+  completeWithOmissions,
+  markAsSaved,
+  validateCompletion,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -514,5 +517,18 @@ describe('forecastSlice undo/redo', () => {
     );
 
     expect(nextState.forecastCycle.days[4]?.data['day4-8']?.size ?? 0).toBe(0);
+  });
+
+  it('completeWithOmissions closes the modal without marking the forecast unsaved', () => {
+    let state = reducer(undefined, markAsSaved());
+    state = reducer(state, validateCompletion());
+
+    expect(state.completionValidation.showCompletionModal).toBe(true);
+
+    const nextState = reducer(state, completeWithOmissions());
+
+    expect(nextState.completionValidation.showCompletionModal).toBe(false);
+    expect(nextState.completionValidation.lastResult).toBeNull();
+    expect(nextState.isSaved).toBe(true);
   });
 });
