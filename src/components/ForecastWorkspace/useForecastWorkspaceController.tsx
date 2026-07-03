@@ -321,6 +321,77 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
 }
 
 
+/** Local modal/date state for the forecast workspace controller. */
+function useForecastWorkspaceModalState(cycleDate: string, dispatch: ReturnType<typeof useDispatch>) {
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isPackageDownloading, setIsPackageDownloading] = useState(false);
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [tempDate, setTempDate] = useState('');
+
+  const {
+    handleOpenHistoryModal,
+    handleOpenCopyModal,
+    handleOpenResetConfirm,
+    handleCloseHistoryModal,
+    handleCloseCopyModal,
+    handleCancelReset,
+    handleTempDateChange,
+    handleStartDateEdit,
+    handleBaseMapStyleSelect,
+  } = useMemo(
+    () =>
+      createDateAndModalHandlers({
+        cycleDate,
+        setShowHistoryModal,
+        setShowCopyModal,
+        setShowResetConfirm,
+        setTempDate,
+        setIsEditingDate,
+        dispatch,
+      }),
+    [cycleDate, dispatch],
+  );
+
+  return {
+    showHistoryModal,
+    showCopyModal,
+    showResetConfirm,
+    isPackageDownloading,
+    setIsPackageDownloading,
+    isEditingDate,
+    tempDate,
+    handleOpenHistoryModal,
+    handleOpenCopyModal,
+    handleOpenResetConfirm,
+    handleCloseHistoryModal,
+    handleCloseCopyModal,
+    handleCancelReset,
+    handleTempDateChange,
+    handleStartDateEdit,
+    handleBaseMapStyleSelect,
+  };
+}
+
+/** Completion validation modal state and handlers. */
+function useCompletionValidationController(
+  dispatch: ReturnType<typeof useDispatch>,
+  addToast: AddToastFn,
+) {
+  const showCompletionModal = useSelector(
+    (state: RootState) => state.forecast.completionValidation.showCompletionModal,
+  );
+
+  return {
+    showCompletionModal,
+    ...useMemo(
+      () => createCompletionValidationHandlers({ dispatch, addToast }),
+      [dispatch, addToast],
+    ),
+  };
+}
+
 /** Shared controller for all Forecast workspace layouts. */
 export const useForecastWorkspaceController = ({
   onSave,
@@ -353,21 +424,14 @@ export const useForecastWorkspaceController = ({
     addToast,
   });
 
-  // Completion validation (WF-03)
-  const showCompletionModal = useSelector((state: RootState) => state.forecast.completionValidation.showCompletionModal);
-
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [showCopyModal, setShowCopyModal] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [isPackageDownloading, setIsPackageDownloading] = useState(false);
-  const [isEditingDate, setIsEditingDate] = useState(false);
-  const [tempDate, setTempDate] = useState('');
-
-  const availableTypes = OUTLOOK_TYPE_ORDER.filter((type) => panel.getOutlookTypeEnabled(type));
-  const ghostTypes = availableTypes.filter((type) => type !== panel.activeOutlookType);
-  const ghostOutlookHandlers = useMemo(() => createGhostOutlookHandlers(dispatch, ghostOutlookState), [dispatch, ghostOutlookState]);
-
   const {
+    showHistoryModal,
+    showCopyModal,
+    showResetConfirm,
+    isPackageDownloading,
+    setIsPackageDownloading,
+    isEditingDate,
+    tempDate,
     handleOpenHistoryModal,
     handleOpenCopyModal,
     handleOpenResetConfirm,
@@ -377,30 +441,20 @@ export const useForecastWorkspaceController = ({
     handleTempDateChange,
     handleStartDateEdit,
     handleBaseMapStyleSelect,
-  } = useMemo(
-    () =>
-      createDateAndModalHandlers({
-        cycleDate,
-        setShowHistoryModal,
-        setShowCopyModal,
-        setShowResetConfirm,
-        setTempDate,
-        setIsEditingDate,
-        dispatch,
-      }),
-    [cycleDate, dispatch]
-  );
+  } = useForecastWorkspaceModalState(cycleDate, dispatch);
 
   const {
+    showCompletionModal,
     handleOpenCompletionModal,
     handleCloseCompletionModal,
     handleCompleteCycle,
     handleCompleteWithOmissions,
     handleNavigateToIssue,
-  } = useMemo(
-    () => createCompletionValidationHandlers({ dispatch, addToast }),
-    [dispatch, addToast],
-  );
+  } = useCompletionValidationController(dispatch, addToast);
+
+  const availableTypes = OUTLOOK_TYPE_ORDER.filter((type) => panel.getOutlookTypeEnabled(type));
+  const ghostTypes = availableTypes.filter((type) => type !== panel.activeOutlookType);
+  const ghostOutlookHandlers = useMemo(() => createGhostOutlookHandlers(dispatch, ghostOutlookState), [dispatch, ghostOutlookState]);
 
   const handlers = useForecastWorkspaceActionHandlers({
     dispatch,
