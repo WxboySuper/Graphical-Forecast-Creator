@@ -1,7 +1,6 @@
 import type {
   Package,
   CycleMetadata,
-  WorkflowMetadata,
   WorkflowPackageMetadata,
   CycleId,
   WorkflowId,
@@ -13,12 +12,8 @@ import type {
   SerializedOutlookVersionData,
 } from '../types/workflow';
 import type {
-  ForecastCycle,
   GFCForecastSaveData,
   DayType,
-  OutlookDay,
-  OutlookType,
-  SerializedOutlookData,
   DiscussionData,
 } from '../types/outlooks';
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
