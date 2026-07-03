@@ -24,6 +24,12 @@ describe('branch policy', () => {
     assert.equal(result.ok, false);
   });
 
+  it('allows the opencode workflow branch to main', () => {
+    const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'add-opencode-workflow' });
+    assert.equal(result.ok, true);
+    assert.equal(result.kind, 'main-direct-fix');
+  });
+
   it('prioritizes feature to beta', () => {
     const result = evaluateBranchPolicy({ baseRef: 'beta', headRef: 'feature/foo' });
     assert.equal(result.ok, true);

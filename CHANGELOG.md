@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - **GFC-WEB-K/F/E Sentry noise:** Filter no-stack browser `NetworkError`/`AbortError` promise-rejection noise before it reaches Sentry while preserving actionable exceptions.
 
 ### Added
+- **OpenCode GitHub Actions workflow:** Trigger `/oc` or `/opencode` comments on issues and PR review threads to run the pinned OpenCode GitHub action with repository `GITHUB_TOKEN` auth.
 - **Explicit build targets:** Define and validate local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
 - **PR governance:** Add feature exposure labels (`exposure:production`, `exposure:server-backed`, `exposure:registry-change`) to automatically tag PRs that change feature exposure configuration.
 
