@@ -240,6 +240,10 @@ export type {
   SerializedOutlookVersionData,
   SerializedCycle,
   SerializedWorkflowPackage,
+  ValidationOutlookType,
+  ValidationSeverity,
+  ValidationIssue,
+  CycleValidationResult,
 } from './workflow';
 
 export { WORKFLOW_SCHEMA_VERSION, createCustomGrouping } from './workflow';

@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Archive,
   CalendarDays,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -876,6 +877,15 @@ const getTabbedToolbarActionItems = (
     accentClass: 'bg-teal-500/15 text-teal-700',
   },
   {
+    key: 'complete',
+    label: 'Complete',
+    description: 'Validate and complete cycle',
+    icon: <CheckCircle className="h-4 w-4" />,
+    onClick: controller.onOpenCompletionModal,
+    tone: 'primary',
+    accentClass: 'bg-emerald-500/15 text-emerald-700',
+  },
+  {
     key: 'reset',
     label: 'Reset All',
     description: 'Clear every polygon',
@@ -921,6 +931,7 @@ const TabbedToolbarToolsTab: React.FC<{
   const actionItems = getTabbedToolbarActionItems(controller);
   const historyItems = actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key));
   const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package'].includes(item.key));
+  const completionItems = actionItems.filter((item) => item.key === 'complete');
   const destructiveItems = actionItems.filter((item) => item.key === 'reset');
 
   return (
@@ -934,6 +945,11 @@ const TabbedToolbarToolsTab: React.FC<{
           </div>
           <div className="tabbed-integrated-toolbar__action-group flex flex-wrap items-center gap-2 border-r border-border/70 pr-3">
             {fileItems.map((item) => (
+              <TabbedToolbarActionTile key={item.key} item={item} />
+            ))}
+          </div>
+          <div className="tabbed-integrated-toolbar__action-group flex flex-wrap items-center gap-2 border-r border-border/70 pr-3">
+            {completionItems.map((item) => (
               <TabbedToolbarActionTile key={item.key} item={item} />
             ))}
           </div>

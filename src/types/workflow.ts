@@ -212,3 +212,50 @@ export interface SerializedWorkflowPackage {
   cycles: SerializedCycle[];
   styleSnapshots?: Record<string, unknown>;
 }
+
+// ---------------------------------------------------------------------------
+// Completion validation (WF-03)
+// ---------------------------------------------------------------------------
+
+/**
+ * Type of outlook that a validation issue applies to.
+ * Imported from outlooks.ts to avoid circular dependencies at the type level.
+ */
+export type ValidationOutlookType = 'tornado' | 'wind' | 'hail' | 'categorical' | 'totalSevere' | 'day4-8';
+
+/**
+ * Severity of a validation issue.
+ * - `critical` — missing polygon that is required for the day.
+ * - `warning` — optional or low-probability item.
+ */
+export type ValidationSeverity = 'critical' | 'warning';
+
+/**
+ * A single validation issue found during cycle completion check.
+ */
+export interface ValidationIssue {
+  /** Forecast day number. */
+  day: StandardGrouping;
+  /** Outlook type with the issue. */
+  outlookType: ValidationOutlookType;
+  /** Classification of the missing content. */
+  type: 'missing-polygon' | 'missing-discussion' | 'no-tstm-forecast';
+  /** Human-readable description of the issue. */
+  message: string;
+  /** Whether this issue blocks completion. */
+  severity: ValidationSeverity;
+  /** Whether the user can navigate to fix this issue. */
+  canNavigate: boolean;
+}
+
+/**
+ * Result of validating a forecast cycle for completion readiness.
+ */
+export interface CycleValidationResult {
+  /** Whether the cycle has all required content. */
+  isComplete: boolean;
+  /** List of individual issues found. */
+  issues: ValidationIssue[];
+  /** Groupings that have at least one missing item. */
+  missingGroupings: StandardGrouping[];
+}

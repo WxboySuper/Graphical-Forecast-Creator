@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { selectCanRedo, selectCanUndo, selectForecastCycle } from '../../store/forecastSlice';
@@ -114,6 +114,13 @@ export interface ForecastWorkspaceController {
   cloudTools: React.ReactNode;
   baseMapStyle: BaseMapStyle;
   onBaseMapStyleSelect: (style: BaseMapStyle) => void;
+  // Completion validation (WF-03)
+  showCompletionModal: boolean;
+  onOpenCompletionModal: () => void;
+  onCloseCompletionModal: () => void;
+  onCompleteCycle: () => void;
+  onCompleteWithOmissions: () => void;
+  onNavigateToIssue: (day: DayType) => void;
 }
 
 interface UseForecastWorkspaceControllerOptions {
@@ -166,6 +173,13 @@ interface BuildForecastWorkspaceControllerArgs {
   handleTempDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleStartDateEdit: () => void;
   handlers: ReturnType<typeof useForecastWorkspaceActionHandlers>;
+  // Completion validation (WF-03)
+  showCompletionModal: boolean;
+  handleOpenCompletionModal: () => void;
+  handleCloseCompletionModal: () => void;
+  handleCompleteCycle: () => void;
+  handleCompleteWithOmissions: () => void;
+  handleNavigateToIssue: (day: DayType) => void;
 }
 
 /** Build the controller object returned by useForecastWorkspaceController.
@@ -210,6 +224,12 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     handleTempDateChange,
     handleStartDateEdit,
     handlers,
+    showCompletionModal,
+    handleOpenCompletionModal,
+    handleCloseCompletionModal,
+    handleCompleteCycle,
+    handleCompleteWithOmissions,
+    handleNavigateToIssue,
   } = args;
 
   const currentColor = getOutlookColor(panel.activeOutlookType, panel.activeProbability);
@@ -261,6 +281,13 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     onCancelReset: handleCancelReset,
     onTempDateChange: handleTempDateChange,
     onStartDateEdit: handleStartDateEdit,
+    // Completion validation (WF-03)
+    showCompletionModal,
+    onOpenCompletionModal: handleOpenCompletionModal,
+    onCloseCompletionModal: handleCloseCompletionModal,
+    onCompleteCycle: handleCompleteCycle,
+    onCompleteWithOmissions: handleCompleteWithOmissions,
+    onNavigateToIssue: handleNavigateToIssue,
     ...handlers,
   };
 }
@@ -298,6 +325,9 @@ export const useForecastWorkspaceController = ({
     addToast,
   });
 
+  // Completion validation (WF-03)
+  const showCompletionModal = useSelector((state: RootState) => state.forecast.completionValidation.showCompletionModal);
+
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -332,6 +362,30 @@ export const useForecastWorkspaceController = ({
       }),
     [cycleDate, dispatch]
   );
+
+  // Completion validation handlers (WF-03)
+  const handleOpenCompletionModal = useCallback(() => {
+    dispatch({ type: 'forecast/validateCompletion' });
+  }, [dispatch]);
+
+  const handleCloseCompletionModal = useCallback(() => {
+    dispatch({ type: 'forecast/dismissCompletionModal' });
+  }, [dispatch]);
+
+  const handleCompleteCycle = useCallback(() => {
+    dispatch({ type: 'forecast/completeWithOmissions' });
+    addToast('Forecast cycle marked as complete', 'success');
+  }, [dispatch, addToast]);
+
+  const handleCompleteWithOmissions = useCallback(() => {
+    dispatch({ type: 'forecast/completeWithOmissions' });
+    addToast('Forecast cycle completed with omissions', 'info');
+  }, [dispatch, addToast]);
+
+  const handleNavigateToIssue = useCallback((day: DayType) => {
+    dispatch({ type: 'forecast/setForecastDay', payload: day });
+    dispatch({ type: 'forecast/dismissCompletionModal' });
+  }, [dispatch]);
 
   const handlers = useForecastWorkspaceActionHandlers({
     dispatch,
@@ -387,5 +441,11 @@ export const useForecastWorkspaceController = ({
     handleTempDateChange,
     handleStartDateEdit,
     handlers,
+    showCompletionModal,
+    handleOpenCompletionModal,
+    handleCloseCompletionModal,
+    handleCompleteCycle,
+    handleCompleteWithOmissions,
+    handleNavigateToIssue,
   });
 };
