@@ -74,6 +74,7 @@ const getBillingRuntimeConfig = () => {
 
   return {
     billingEnabled,
+    hasBaseUrl,
     checkoutEnabled: billingEnabled && hasFirebaseAdminConfig() && hasBaseUrl,
     annualPromoActive: annualPlan.annualPromoActive,
     monthlyDisplayPrice: MONTHLY_DISPLAY_PRICE,

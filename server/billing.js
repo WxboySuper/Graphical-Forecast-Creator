@@ -219,6 +219,8 @@ const verifyRequestUser = async (req, res) => {
 /** Creates the plan-specific Stripe checkout session for the verified user. */
 const isCheckoutAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.checkoutEnabled);
 
+const isPortalAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.hasBaseUrl);
+
 /** Resolves the Stripe price id for the selected billing plan. */
 const getCheckoutPriceId = (plan, billingConfig) => {
   if (plan === 'monthly') {
@@ -276,8 +278,9 @@ const handleCheckout = async (req, res) => {
 
 /** Opens the Stripe billing portal for a user who already has a customer record. */
 const handleBillingPortal = async (req, res) => {
+  const billingConfig = getBillingRuntimeConfig();
   const stripe = getStripeClient();
-  if (!stripe) {
+  if (!isPortalAvailable(stripe, billingConfig)) {
     res.status(503).json({ error: 'Billing is not available on this deployment yet.' });
     return;
   }

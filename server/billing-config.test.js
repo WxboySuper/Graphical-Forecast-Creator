@@ -23,7 +23,8 @@ describe('getBaseUrl', () => {
     assert.equal(getBaseUrl(), 'http://127.0.0.1:3000');
   });
 
-  it('does not accept request headers as a fallback', () => {
+  it('never derives the base URL from request headers because getBaseUrl is env-only', () => {
+    assert.equal(getBaseUrl.length, 0);
     assert.equal(getBaseUrl(), 'http://127.0.0.1:3000');
   });
 });
