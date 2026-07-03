@@ -13,6 +13,7 @@ interface CompletionValidationModalBodyProps {
   onNavigate: (grouping: string) => void;
 }
 
+/** Renders completion status, missing groupings, and issue lists. */
 export const CompletionValidationModalBody: React.FC<CompletionValidationModalBodyProps> = ({
   isComplete,
   issues,
@@ -70,6 +71,7 @@ interface CompletionValidationModalFooterProps {
   onCompleteWithOmissions: () => void;
 }
 
+/** Renders completion modal action buttons for cancel and finalize flows. */
 export const CompletionValidationModalFooter: React.FC<CompletionValidationModalFooterProps> = ({
   isComplete,
   onClose,

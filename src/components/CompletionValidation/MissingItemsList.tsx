@@ -7,6 +7,7 @@ interface MissingItemsListProps {
   onNavigate?: (day: string, outlookType: string) => void;
 }
 
+/** Formats a workflow grouping key for display in the issues list. */
 const formatGrouping = (grouping: string): string => {
   switch (grouping) {
     case 'day1': return 'Day 1';
@@ -17,6 +18,7 @@ const formatGrouping = (grouping: string): string => {
   }
 };
 
+/** Renders validation issues with optional navigation actions. */
 export const MissingItemsList: React.FC<MissingItemsListProps> = ({ issues, onNavigate }) => {
   if (issues.length === 0) return null;
 

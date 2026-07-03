@@ -28,6 +28,7 @@ const getGroupingDay = (grouping: string): DayType | null => {
   }
 };
 
+/** Renders the completion validation modal when cycle review is requested. */
 export const CompletionValidationModal: React.FC<CompletionValidationModalProps> = ({
   isOpen,
   validationResult,
