@@ -4,13 +4,15 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { getBaseUrl, getBillingRuntimeConfig } = require('./billing-config');
 
-describe('getBaseUrl', () => {
-  const originalEnv = process.env;
+const originalEnv = process.env;
 
-  beforeEach(() => {
-    process.env = { ...originalEnv };
-    delete process.env.APP_BASE_URL;
-  });
+function resetEnv(keys) {
+  process.env = { ...originalEnv };
+  for (const key of keys) delete process.env[key];
+}
+
+describe('getBaseUrl', () => {
+  beforeEach(() => resetEnv(['APP_BASE_URL']));
 
   it('returns APP_BASE_URL when set', () => {
     process.env.APP_BASE_URL = 'https://gfc.weatherboysuper.com';
@@ -27,19 +29,16 @@ describe('getBaseUrl', () => {
 });
 
 describe('getBillingRuntimeConfig', () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    process.env = { ...originalEnv };
-    delete process.env.STRIPE_SECRET_KEY;
-    delete process.env.STRIPE_PRICE_MONTHLY;
-    delete process.env.STRIPE_PRICE_ANNUAL_STANDARD;
-    delete process.env.STRIPE_PRICE_ANNUAL_PROMO;
-    delete process.env.APP_BASE_URL;
-    delete process.env.FIREBASE_ADMIN_PROJECT_ID;
-    delete process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-    delete process.env.FIREBASE_ADMIN_PRIVATE_KEY;
-  });
+  beforeEach(() => resetEnv([
+    'STRIPE_SECRET_KEY',
+    'STRIPE_PRICE_MONTHLY',
+    'STRIPE_PRICE_ANNUAL_STANDARD',
+    'STRIPE_PRICE_ANNUAL_PROMO',
+    'APP_BASE_URL',
+    'FIREBASE_ADMIN_PROJECT_ID',
+    'FIREBASE_ADMIN_CLIENT_EMAIL',
+    'FIREBASE_ADMIN_PRIVATE_KEY',
+  ]));
 
   it('checkoutEnabled is false when APP_BASE_URL is missing', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
