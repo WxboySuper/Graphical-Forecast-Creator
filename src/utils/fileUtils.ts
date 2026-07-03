@@ -69,6 +69,70 @@ const createEmptyOutlook = (day: DayType): OutlookDay => {
   };
 };
 
+type CompletionMetadata = Pick<ForecastCycle, 'completionAcknowledgedAt' | 'omittedDayReasons'>;
+
+const completionMetadataFromForecastCycle = (
+  forecastCycle: CompletionMetadata,
+): CompletionMetadata => ({
+  ...(forecastCycle.completionAcknowledgedAt
+    ? { completionAcknowledgedAt: forecastCycle.completionAcknowledgedAt }
+    : {}),
+  ...(forecastCycle.omittedDayReasons
+    ? { omittedDayReasons: forecastCycle.omittedDayReasons }
+    : {}),
+});
+
+const deserializeSavedOutlookDay = (
+  savedDay: SerializedDay,
+): OutlookDay => {
+  const outlookData: OutlookData = {};
+
+  if (savedDay.data.tornado) outlookData.tornado = deserializeOutlookMap(savedDay.data.tornado);
+  if (savedDay.data.wind) outlookData.wind = deserializeOutlookMap(savedDay.data.wind);
+  if (savedDay.data.hail) outlookData.hail = deserializeOutlookMap(savedDay.data.hail);
+  if (savedDay.data.totalSevere) outlookData.totalSevere = deserializeOutlookMap(savedDay.data.totalSevere);
+  if (savedDay.data['day4-8']) outlookData['day4-8'] = deserializeOutlookMap(savedDay.data['day4-8']);
+  if (savedDay.data.categorical) outlookData.categorical = deserializeOutlookMap(savedDay.data.categorical);
+
+  const meta = savedDay.metadata as Partial<{
+    issueDate?: string;
+    validDate?: string;
+    issuanceTime?: string;
+    lowProbabilityOutlooks?: OutlookDay['metadata']['lowProbabilityOutlooks'];
+    createdAt?: string;
+    lastModified?: string;
+  }>;
+
+  return {
+    day: savedDay.day,
+    metadata: {
+      issueDate: meta.issueDate ?? savedDay.metadata.issueDate,
+      validDate: meta.validDate ?? savedDay.metadata.validDate,
+      issuanceTime: meta.issuanceTime ?? savedDay.metadata.issuanceTime,
+      lowProbabilityOutlooks: meta.lowProbabilityOutlooks ?? savedDay.metadata.lowProbabilityOutlooks ?? [],
+      createdAt: meta.createdAt ?? new Date().toISOString(),
+      lastModified: meta.lastModified ?? new Date().toISOString(),
+    },
+    data: outlookData,
+    discussion: (savedDay as Partial<{ discussion?: DiscussionData }>).discussion,
+  };
+};
+
+const deserializeForecastCycleDays = (
+  cycle: NonNullable<GFCForecastSaveData['forecastCycle']>,
+): Partial<Record<DayType, OutlookDay>> => {
+  const days: Partial<Record<DayType, OutlookDay>> = {};
+
+  (Object.keys(cycle.days) as unknown as DayType[]).forEach((day) => {
+    const savedDay = cycle.days[day];
+    if (savedDay) {
+      days[day] = deserializeSavedOutlookDay(savedDay);
+    }
+  });
+
+  return days;
+};
+
 /**
  * Serializes the current ForecastCycle into a JSON-compatible format.
  * When `cycleMetadata` is provided, the output is tagged with v2 workflow metadata.
@@ -113,12 +177,7 @@ export const serializeForecast = (
       days: serializedDays,
       currentDay: forecastCycle.currentDay,
       cycleDate: forecastCycle.cycleDate,
-      ...(forecastCycle.completionAcknowledgedAt
-        ? { completionAcknowledgedAt: forecastCycle.completionAcknowledgedAt }
-        : {}),
-      ...(forecastCycle.omittedDayReasons
-        ? { omittedDayReasons: forecastCycle.omittedDayReasons }
-        : {}),
+      ...completionMetadataFromForecastCycle(forecastCycle),
     },
     mapView
   };
@@ -136,60 +195,14 @@ export const serializeForecast = (
  * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
 export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
-  // Check for v0.5.0+ format
   if (data.forecastCycle) {
-    const days: Partial<Record<DayType, OutlookDay>> = {};
     const cycle = data.forecastCycle;
-    
-    (Object.keys(cycle.days) as unknown as DayType[]).forEach(day => {
-      const savedDay = cycle.days[day];
-      if (savedDay) {
-        const outlookData: OutlookData = {};
-        
-        // Only deserialize outlook maps that exist in the saved data
-        if (savedDay.data.tornado) outlookData.tornado = deserializeOutlookMap(savedDay.data.tornado);
-        if (savedDay.data.wind) outlookData.wind = deserializeOutlookMap(savedDay.data.wind);
-        if (savedDay.data.hail) outlookData.hail = deserializeOutlookMap(savedDay.data.hail);
-        if (savedDay.data.totalSevere) outlookData.totalSevere = deserializeOutlookMap(savedDay.data.totalSevere);
-        if (savedDay.data['day4-8']) outlookData['day4-8'] = deserializeOutlookMap(savedDay.data['day4-8']);
-        if (savedDay.data.categorical) outlookData.categorical = deserializeOutlookMap(savedDay.data.categorical);
-        
-        days[day] = {
-          day: savedDay.day,
-          metadata: (() => {
-            const meta = savedDay.metadata as Partial<{
-              issueDate?: string;
-              validDate?: string;
-              issuanceTime?: string;
-              lowProbabilityOutlooks?: OutlookDay['metadata']['lowProbabilityOutlooks'];
-              createdAt?: string;
-              lastModified?: string;
-            }>;
-            return {
-              issueDate: meta.issueDate ?? savedDay.metadata.issueDate,
-              validDate: meta.validDate ?? savedDay.metadata.validDate,
-              issuanceTime: meta.issuanceTime ?? savedDay.metadata.issuanceTime,
-              lowProbabilityOutlooks: meta.lowProbabilityOutlooks ?? savedDay.metadata.lowProbabilityOutlooks ?? [],
-              createdAt: meta.createdAt ?? new Date().toISOString(),
-              lastModified: meta.lastModified ?? new Date().toISOString(),
-            };
-          })(),
-          data: outlookData,
-          discussion: (savedDay as Partial<{ discussion?: DiscussionData }>).discussion
-        };
-      }
-    });
 
     return {
-      days,
+      days: deserializeForecastCycleDays(cycle),
       currentDay: cycle.currentDay,
       cycleDate: cycle.cycleDate,
-      ...(cycle.completionAcknowledgedAt
-        ? { completionAcknowledgedAt: cycle.completionAcknowledgedAt }
-        : {}),
-      ...(cycle.omittedDayReasons
-        ? { omittedDayReasons: cycle.omittedDayReasons }
-        : {}),
+      ...completionMetadataFromForecastCycle(cycle),
     };
   }
 
