@@ -32,6 +32,20 @@ const GUIDED_DISCUSSION_FIELDS = [
   'additionalConsiderations',
 ] as const;
 
+interface DayValidationContext {
+  day: DayType;
+  grouping: StandardGrouping;
+  expectedTypes: OutlookType[];
+  issues: ValidationIssue[];
+  missingGroupings: Set<StandardGrouping>;
+  dayData?: OutlookDay;
+}
+
+interface ValidationAccumulator {
+  issues: ValidationIssue[];
+  missingGroupings: Set<StandardGrouping>;
+}
+
 /** Maps forecast day numbers to their grouping key. */
 const dayToGrouping = (day: DayType): StandardGrouping => {
   if (day === 1) return 'day1';
@@ -96,37 +110,38 @@ const collectDaysToValidate = (expectedGroupings?: StandardGrouping[]): DayType[
   return groupings.flatMap((grouping) => GROUPING_DAY_NUMBERS[grouping]);
 };
 
-const addMissingDayIssues = (
+const createDayContext = (
   day: DayType,
-  grouping: StandardGrouping,
-  expectedTypes: OutlookType[],
-  issues: ValidationIssue[],
-  missingGroupingsSet: Set<StandardGrouping>,
-): void => {
-  for (const outlookType of expectedTypes) {
-    issues.push({
-      day: grouping,
+  forecastCycle: ForecastCycle,
+  accumulator: ValidationAccumulator,
+): DayValidationContext => ({
+  day,
+  grouping: dayToGrouping(day),
+  expectedTypes: expectedOutlookTypesForDay(day),
+  issues: accumulator.issues,
+  missingGroupings: accumulator.missingGroupings,
+  dayData: forecastCycle.days[day],
+});
+
+const addMissingDayIssues = (ctx: DayValidationContext): void => {
+  for (const outlookType of ctx.expectedTypes) {
+    ctx.issues.push({
+      day: ctx.grouping,
       outlookType: outlookType as ValidationOutlookType,
       type: 'missing-polygon',
-      message: `Day ${day} ${outlookType} outlook: no data drawn`,
+      message: `Day ${ctx.day} ${outlookType} outlook: no data drawn`,
       severity: 'critical',
       canNavigate: true,
     });
   }
-  missingGroupingsSet.add(grouping);
+  ctx.missingGroupings.add(ctx.grouping);
 };
 
-const validateOutlookPolygons = (
-  day: DayType,
-  dayData: OutlookDay,
-  grouping: StandardGrouping,
-  expectedTypes: OutlookType[],
-  issues: ValidationIssue[],
-  missingGroupingsSet: Set<StandardGrouping>,
-): void => {
+const validateOutlookPolygons = (ctx: DayValidationContext): void => {
+  const dayData = ctx.dayData!;
   const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
 
-  for (const outlookType of expectedTypes) {
+  for (const outlookType of ctx.expectedTypes) {
     if (lowProbabilityOutlooks.includes(outlookType)) {
       continue;
     }
@@ -136,55 +151,49 @@ const validateOutlookPolygons = (
       continue;
     }
 
-    issues.push({
-      day: grouping,
+    ctx.issues.push({
+      day: ctx.grouping,
       outlookType: outlookType as ValidationOutlookType,
       type: 'missing-polygon',
-      message: `Day ${day} ${outlookType} outlook: no polygon drawn`,
+      message: `Day ${ctx.day} ${outlookType} outlook: no polygon drawn`,
       severity: 'critical',
       canNavigate: true,
     });
-    missingGroupingsSet.add(grouping);
+    ctx.missingGroupings.add(ctx.grouping);
   }
 };
 
-const validateNoTstmForecast = (
-  day: DayType,
-  dayData: OutlookDay,
-  grouping: StandardGrouping,
-  expectedTypes: OutlookType[],
-  issues: ValidationIssue[],
-): void => {
+const validateNoTstmForecast = (ctx: DayValidationContext): void => {
+  const dayData = ctx.dayData!;
   const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
-  if (
-    !expectedTypes.includes('categorical') ||
-    lowProbabilityOutlooks.includes('categorical')
-  ) {
-    return;
-  }
-
+  const categoricalIsRequired = ctx.expectedTypes.includes('categorical');
+  const categoricalIsLowProb = lowProbabilityOutlooks.includes('categorical');
   const categoricalMap = dayData.data.categorical;
-  if (!categoricalMap || categoricalMap.size === 0 || hasCategoricalData(categoricalMap)) {
+  const hasEmptyCategorical = Boolean(
+    categoricalMap &&
+    categoricalMap.size > 0 &&
+    !hasCategoricalData(categoricalMap),
+  );
+
+  if (!categoricalIsRequired || categoricalIsLowProb || !hasEmptyCategorical) {
     return;
   }
 
-  issues.push({
-    day: grouping,
+  ctx.issues.push({
+    day: ctx.grouping,
     outlookType: 'categorical',
     type: 'no-tstm-forecast',
-    message: `Day ${day} categorical: no TSTM forecast (no polygons drawn)`,
+    message: `Day ${ctx.day} categorical: no TSTM forecast (no polygons drawn)`,
     severity: 'warning',
     canNavigate: false,
   });
 };
 
-const dayHasDrawnPolygons = (
-  dayData: OutlookDay,
-  expectedTypes: OutlookType[],
-): boolean => {
+const dayHasDrawnPolygons = (ctx: DayValidationContext): boolean => {
+  const dayData = ctx.dayData!;
   const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
 
-  return expectedTypes.some((outlookType) => {
+  return ctx.expectedTypes.some((outlookType) => {
     if (lowProbabilityOutlooks.includes(outlookType)) {
       return false;
     }
@@ -194,22 +203,17 @@ const dayHasDrawnPolygons = (
   });
 };
 
-const validateDiscussion = (
-  day: DayType,
-  dayData: OutlookDay,
-  grouping: StandardGrouping,
-  expectedTypes: OutlookType[],
-  issues: ValidationIssue[],
-): void => {
-  if (!dayHasDrawnPolygons(dayData, expectedTypes) || hasDiscussionContent(dayData.discussion)) {
+const validateDiscussion = (ctx: DayValidationContext): void => {
+  const dayData = ctx.dayData!;
+  if (!dayHasDrawnPolygons(ctx) || hasDiscussionContent(dayData.discussion)) {
     return;
   }
 
-  issues.push({
-    day: grouping,
+  ctx.issues.push({
+    day: ctx.grouping,
     outlookType: 'categorical',
     type: 'missing-discussion',
-    message: `Day ${day}: discussion is missing or empty`,
+    message: `Day ${ctx.day}: discussion is missing or empty`,
     severity: 'warning',
     canNavigate: true,
   });
@@ -218,21 +222,18 @@ const validateDiscussion = (
 const validateDay = (
   day: DayType,
   forecastCycle: ForecastCycle,
-  issues: ValidationIssue[],
-  missingGroupingsSet: Set<StandardGrouping>,
+  accumulator: ValidationAccumulator,
 ): void => {
-  const grouping = dayToGrouping(day);
-  const expectedTypes = expectedOutlookTypesForDay(day);
-  const dayData = forecastCycle.days[day];
+  const ctx = createDayContext(day, forecastCycle, accumulator);
 
-  if (!dayData) {
-    addMissingDayIssues(day, grouping, expectedTypes, issues, missingGroupingsSet);
+  if (!ctx.dayData) {
+    addMissingDayIssues(ctx);
     return;
   }
 
-  validateOutlookPolygons(day, dayData, grouping, expectedTypes, issues, missingGroupingsSet);
-  validateNoTstmForecast(day, dayData, grouping, expectedTypes, issues);
-  validateDiscussion(day, dayData, grouping, expectedTypes, issues);
+  validateOutlookPolygons(ctx);
+  validateNoTstmForecast(ctx);
+  validateDiscussion(ctx);
 };
 
 // ---------------------------------------------------------------------------
@@ -246,19 +247,21 @@ export function validateCycleCompletion(
   forecastCycle: ForecastCycle,
   expectedGroupings?: StandardGrouping[],
 ): CycleValidationResult {
-  const issues: ValidationIssue[] = [];
-  const missingGroupingsSet = new Set<StandardGrouping>();
+  const accumulator: ValidationAccumulator = {
+    issues: [],
+    missingGroupings: new Set<StandardGrouping>(),
+  };
 
   for (const day of collectDaysToValidate(expectedGroupings)) {
-    validateDay(day, forecastCycle, issues, missingGroupingsSet);
+    validateDay(day, forecastCycle, accumulator);
   }
 
-  const missingGroupings = Array.from(missingGroupingsSet).sort();
-  const isComplete = issues.every((issue) => issue.severity !== 'critical');
+  const missingGroupings = Array.from(accumulator.missingGroupings).sort();
+  const isComplete = accumulator.issues.every((issue) => issue.severity !== 'critical');
 
   return {
     isComplete,
-    issues,
+    issues: accumulator.issues,
     missingGroupings,
   };
 }
