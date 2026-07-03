@@ -1,0 +1,115 @@
+# Agent PR Workflow CI
+
+This workflow validates and enforces the 8-step agentic development process defined in AGENTS.md.
+
+## Overview
+
+This CI workflow ensures that all agent-generated PRs follow the standardized 8-step agentic development workflow:
+
+1. **Investigation** - Tasks are investigated on the correct branch (main or beta based on task type)
+2. **Plan Creation** - A detailed implementation plan is created and approved
+3. **Branch Creation** - Implementation happens on a NEW branch
+4. **Draft PR** - Changes are committed and pushed with a draft PR opened
+5. **CI Validation** - CI runs (excluding Greptile) to validate the changes
+6. **Greptile Review** - Greptile runs and must pass before PR is ready for review
+7. **Manual Review** - Human review completes the process
+
+## Workflow Purpose
+
+This workflow provides:
+
+- Automated validation of agent PR compliance with AGENTS.md
+- Enforcement of the 8-step agentic development process
+- Prevention of manual override of the standardized workflow
+- Clear documentation of the process for future reference
+- Integration with existing GitHub PR workflows
+
+## Key Features
+
+### 1. PR Validation
+- Validates that PRs follow the 8-step agentic development process
+- Checks for required documentation and workflow compliance
+- Ensures PRs are properly labeled and formatted
+
+### 2. Automated Checks
+- Validates that PRs contain the correct agent-specific labels
+- Checks that PRs follow the agentic development workflow guidelines
+- Validates that PRs are created using the agent PR workflow
+
+### 3. Status Reporting
+- Provides clear status reporting for agent PRs
+- Documents the progress through the 8-step process
+- Enables tracking and monitoring of agent PR workflows
+
+## Usage
+
+This workflow is triggered automatically for all pull requests from agent branches.
+
+### For Manual Testing
+
+You can test this workflow by creating a pull request from a branch that contains the required agent-specific labels and documentation:
+
+```
+# Example agent branch with proper workflow compliance
+feat/agent/implementation
+agent/automation
+Agent-Generated
+```
+
+The workflow will validate that the PR follows the 8-step process and provide appropriate feedback.
+
+## Integration
+
+This workflow integrates with:
+
+- Existing GitHub PR workflows (`pr-governance.yml`)
+- PR labeling system (`pr-governance.yml`)
+- Agent PR workflow (`agent-pr-workflow.yml`)
+- Existing CI validation checks
+
+## Validation Criteria
+
+PRs must pass the following validation criteria to be merged:
+
+1. **Workflow Compliance** - PR follows the 8-step agentic development process
+2. **Documentation** - PR contains appropriate documentation and labels
+3. **Quality Gates** - All quality gates and validation checks pass
+4. **Review Process** - PR is properly reviewed and approved
+
+## Branch Policy
+
+- **main** - PRs to main must be validated and approved
+- **beta** - PRs to beta must follow the agentic development workflow
+- **Feature branches** - All PRs must validate against the 8-step process
+
+## Dependencies
+
+This workflow depends on:
+
+- GitHub Actions
+- Existing PR labeling system
+- GitHub PRs
+- Agent PR workflow
+
+## Future Enhancement
+
+Future enhancements may include:
+
+- Automated branch creation for agent tasks
+- Integration with agent task management systems
+- Enhanced validation of agent PR content
+- Automated quality gate enforcement
+
+## See Also
+
+- AGENTS.md - 8-step agentic development workflow
+- agent-pr-workflow.yml - Agent PR workflow
+- pr-governance.yml - Existing PR governance workflow
+- ci.yml - Main CI workflow
+
+## Notes
+
+- This workflow is designed to support and enforce the agentic development process
+- It is part of a larger effort to standardize agent-based development
+- The workflow is extensible for future enhancements
+- All PRs must validate against this workflow to be merged
