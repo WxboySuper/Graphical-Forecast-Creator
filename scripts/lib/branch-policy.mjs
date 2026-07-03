@@ -4,10 +4,7 @@
 
 const PORT_BRANCH_PATTERN = /^port\/\d+-to-/;
 const RELEASE_INFRA_BRANCH_PATTERN = /^feature\/release-/;
-<<<<<<< HEAD
-=======
 const MAIN_DIRECT_FIX_BRANCHES = new Set(['fix/deployment-config', 'add-opencode-workflow']);
->>>>>>> e2abb02 (fix: harden opencode workflow and satisfy PR governance for #665)
 
 /**
  * @param {string} headRef
