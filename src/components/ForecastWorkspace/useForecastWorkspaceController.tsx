@@ -394,14 +394,14 @@ function useCompletionValidationController(
 }
 
 /** Shared controller for all Forecast workspace layouts. */
-export const useForecastWorkspaceController = ({
+function useForecastWorkspaceControllerArgs({
   onSave,
   onLoad,
   mapRef,
   fileInputRef,
   addToast,
   cloudTools = null,
-}: UseForecastWorkspaceControllerOptions): ForecastWorkspaceController => {
+}: UseForecastWorkspaceControllerOptions): BuildForecastWorkspaceControllerArgs {
   const dispatch = useDispatch();
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days, cycleDate } = forecastCycle;
@@ -474,7 +474,7 @@ export const useForecastWorkspaceController = ({
     handleCancelReset,
   });
 
-  return buildForecastWorkspaceController({
+  return {
     onSave,
     cloudTools,
     fileInputRef,
@@ -518,5 +518,9 @@ export const useForecastWorkspaceController = ({
     handleCompleteCycle,
     handleCompleteWithOmissions,
     handleNavigateToIssue,
-  });
-};
+  };
+}
+
+export const useForecastWorkspaceController = (
+  options: UseForecastWorkspaceControllerOptions,
+): ForecastWorkspaceController => buildForecastWorkspaceController(useForecastWorkspaceControllerArgs(options));
