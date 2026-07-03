@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { selectCanRedo, selectCanUndo, selectForecastCycle } from '../../store/forecastSlice';
@@ -28,6 +28,34 @@ function createGhostOutlookHandlers(
     handlers[type] = () => dispatch(setGhostOutlookVisibility({ outlookType: type, visible: nextVisibility }));
   });
   return handlers;
+}
+
+/** Factory for completion validation handlers to keep the hook small and focused. */
+function createCompletionValidationHandlers(opts: {
+  dispatch: ReturnType<typeof useDispatch>;
+  addToast: AddToastFn;
+}) {
+  const { dispatch, addToast } = opts;
+  return {
+    handleOpenCompletionModal: () => {
+      dispatch({ type: 'forecast/validateCompletion' });
+    },
+    handleCloseCompletionModal: () => {
+      dispatch({ type: 'forecast/dismissCompletionModal' });
+    },
+    handleCompleteCycle: () => {
+      dispatch({ type: 'forecast/completeWithOmissions' });
+      addToast('Forecast cycle marked as complete', 'success');
+    },
+    handleCompleteWithOmissions: () => {
+      dispatch({ type: 'forecast/completeWithOmissions' });
+      addToast('Forecast cycle completed with omissions', 'info');
+    },
+    handleNavigateToIssue: (day: DayType) => {
+      dispatch({ type: 'forecast/setForecastDay', payload: day });
+      dispatch({ type: 'forecast/dismissCompletionModal' });
+    },
+  };
 }
 
 /** Factory for date and modal handlers to keep the hook small and focused. */
@@ -363,29 +391,16 @@ export const useForecastWorkspaceController = ({
     [cycleDate, dispatch]
   );
 
-  // Completion validation handlers (WF-03)
-  const handleOpenCompletionModal = useCallback(() => {
-    dispatch({ type: 'forecast/validateCompletion' });
-  }, [dispatch]);
-
-  const handleCloseCompletionModal = useCallback(() => {
-    dispatch({ type: 'forecast/dismissCompletionModal' });
-  }, [dispatch]);
-
-  const handleCompleteCycle = useCallback(() => {
-    dispatch({ type: 'forecast/completeWithOmissions' });
-    addToast('Forecast cycle marked as complete', 'success');
-  }, [dispatch, addToast]);
-
-  const handleCompleteWithOmissions = useCallback(() => {
-    dispatch({ type: 'forecast/completeWithOmissions' });
-    addToast('Forecast cycle completed with omissions', 'info');
-  }, [dispatch, addToast]);
-
-  const handleNavigateToIssue = useCallback((day: DayType) => {
-    dispatch({ type: 'forecast/setForecastDay', payload: day });
-    dispatch({ type: 'forecast/dismissCompletionModal' });
-  }, [dispatch]);
+  const {
+    handleOpenCompletionModal,
+    handleCloseCompletionModal,
+    handleCompleteCycle,
+    handleCompleteWithOmissions,
+    handleNavigateToIssue,
+  } = useMemo(
+    () => createCompletionValidationHandlers({ dispatch, addToast }),
+    [dispatch, addToast],
+  );
 
   const handlers = useForecastWorkspaceActionHandlers({
     dispatch,

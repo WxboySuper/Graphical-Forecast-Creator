@@ -163,19 +163,28 @@ const validateOutlookPolygons = (ctx: DayValidationContext): void => {
   }
 };
 
-const validateNoTstmForecast = (ctx: DayValidationContext): void => {
+const shouldReportNoTstmForecast = (ctx: DayValidationContext): boolean => {
   const dayData = ctx.dayData!;
   const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
-  const categoricalIsRequired = ctx.expectedTypes.includes('categorical');
-  const categoricalIsLowProb = lowProbabilityOutlooks.includes('categorical');
   const categoricalMap = dayData.data.categorical;
-  const hasEmptyCategorical = Boolean(
-    categoricalMap &&
-    categoricalMap.size > 0 &&
-    !hasCategoricalData(categoricalMap),
-  );
 
-  if (!categoricalIsRequired || categoricalIsLowProb || !hasEmptyCategorical) {
+  if (!ctx.expectedTypes.includes('categorical')) {
+    return false;
+  }
+
+  if (lowProbabilityOutlooks.includes('categorical')) {
+    return false;
+  }
+
+  if (!categoricalMap || categoricalMap.size === 0) {
+    return false;
+  }
+
+  return !hasCategoricalData(categoricalMap);
+};
+
+const validateNoTstmForecast = (ctx: DayValidationContext): void => {
+  if (!shouldReportNoTstmForecast(ctx)) {
     return;
   }
 

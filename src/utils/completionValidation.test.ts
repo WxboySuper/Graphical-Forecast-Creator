@@ -1,99 +1,98 @@
 import { validateCycleCompletion } from './completionValidation';
 import type { ForecastCycle, DayType, OutlookType } from '../types/outlooks';
-import type { StandardGrouping } from '../types/workflow';
 
-const createDayWithAllOutlooks = (day: DayType) => {
-  const outlookData: Record<string, Map<string, unknown[]>> = {};
+type DayFixtureMode = 'full' | 'lowProb' | 'empty' | 'withDiscussion' | 'emptyDiscussion';
 
+const expectedOutlookTypesForDay = (day: DayType): OutlookType[] => {
+  if (day === 1 || day === 2) return ['tornado', 'wind', 'hail', 'categorical'];
+  if (day === 3) return ['totalSevere', 'categorical'];
+  return ['day4-8'];
+};
+
+const buildOutlookData = (day: DayType): Record<string, Map<string, unknown[]>> => {
   if (day === 1 || day === 2) {
-    outlookData.tornado = new Map([['2%', [{ id: 't1' }]]]);
-    outlookData.wind = new Map([['5%', [{ id: 'w1' }]]]);
-    outlookData.hail = new Map([['5%', [{ id: 'h1' }]]]);
-    outlookData.categorical = new Map([['SLGT', [{ id: 'c1' }]]]);
-  } else if (day === 3) {
-    outlookData.totalSevere = new Map([['15%', [{ id: 'ts1' }]]]);
-    outlookData.categorical = new Map([['SLGT', [{ id: 'c1' }]]]);
-  } else {
-    outlookData['day4-8'] = new Map([['15%', [{ id: 'd1' }]]]);
+    return {
+      tornado: new Map([['2%', [{ id: 't1' }]]]),
+      wind: new Map([['5%', [{ id: 'w1' }]]]),
+      hail: new Map([['5%', [{ id: 'h1' }]]]),
+      categorical: new Map([['SLGT', [{ id: 'c1' }]]]),
+    };
+  }
+
+  if (day === 3) {
+    return {
+      totalSevere: new Map([['15%', [{ id: 'ts1' }]]]),
+      categorical: new Map([['SLGT', [{ id: 'c1' }]]]),
+    };
   }
 
   return {
-    day,
-    data: outlookData as any,
-    metadata: {
-      issueDate: new Date().toISOString(),
-      validDate: new Date().toISOString(),
-      issuanceTime: '0600',
-      createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString(),
-      lowProbabilityOutlooks: [] as OutlookType[],
-    },
-    discussion: undefined,
+    'day4-8': new Map([['15%', [{ id: 'd1' }]]]),
   };
 };
 
-const createDayAllLowProb = (day: DayType) => {
-  const allTypes: OutlookType[] =
-    day === 1 || day === 2
-      ? ['tornado', 'wind', 'hail', 'categorical']
-      : day === 3
-        ? ['totalSevere', 'categorical']
-        : ['day4-8'];
-
-  return {
-    day,
-    data: {} as any,
-    metadata: {
-      issueDate: new Date().toISOString(),
-      validDate: new Date().toISOString(),
-      issuanceTime: '0600',
-      createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString(),
-      lowProbabilityOutlooks: allTypes,
-    },
-    discussion: undefined,
-  };
-};
-
-const createDayWithDiscussion = (day: DayType) => {
-  const d = createDayWithAllOutlooks(day);
-  d.discussion = {
-    mode: 'diy',
-    validStart: new Date().toISOString(),
-    validEnd: new Date().toISOString(),
-    forecasterName: 'Test',
-    diyContent: 'This is a test discussion.',
-    lastModified: new Date().toISOString(),
-  };
-  return d;
-};
-
-const createDayWithEmptyDiscussion = (day: DayType) => {
-  const d = createDayWithAllOutlooks(day);
-  d.discussion = {
-    mode: 'diy',
-    validStart: new Date().toISOString(),
-    validEnd: new Date().toISOString(),
-    forecasterName: 'Test',
-    diyContent: '',
-    lastModified: new Date().toISOString(),
-  };
-  return d;
-};
-
-const createEmptyDay = (day: DayType) => ({
-  day,
-  data: {} as any,
-  metadata: {
+const createDayFixture = (day: DayType, mode: DayFixtureMode) => {
+  const baseMetadata = {
     issueDate: new Date().toISOString(),
     validDate: new Date().toISOString(),
     issuanceTime: '0600',
     createdAt: new Date().toISOString(),
     lastModified: new Date().toISOString(),
     lowProbabilityOutlooks: [] as OutlookType[],
-  },
-  discussion: undefined,
-});
+  };
+
+  if (mode === 'empty') {
+    return {
+      day,
+      data: {} as ForecastCycle['days'][DayType]['data'],
+      metadata: baseMetadata,
+      discussion: undefined,
+    };
+  }
+
+  if (mode === 'lowProb') {
+    return {
+      day,
+      data: {} as ForecastCycle['days'][DayType]['data'],
+      metadata: {
+        ...baseMetadata,
+        lowProbabilityOutlooks: expectedOutlookTypesForDay(day),
+      },
+      discussion: undefined,
+    };
+  }
+
+  const dayFixture = {
+    day,
+    data: buildOutlookData(day) as ForecastCycle['days'][DayType]['data'],
+    metadata: baseMetadata,
+    discussion: undefined as ForecastCycle['days'][DayType]['discussion'],
+  };
+
+  if (mode === 'withDiscussion') {
+    dayFixture.discussion = {
+      mode: 'diy',
+      validStart: new Date().toISOString(),
+      validEnd: new Date().toISOString(),
+      forecasterName: 'Test',
+      diyContent: 'This is a test discussion.',
+      lastModified: new Date().toISOString(),
+    };
+  }
+
+  if (mode === 'emptyDiscussion') {
+    dayFixture.discussion = {
+      mode: 'diy',
+      validStart: new Date().toISOString(),
+      validEnd: new Date().toISOString(),
+      forecasterName: 'Test',
+      diyContent: '',
+      lastModified: new Date().toISOString(),
+    };
+  }
+
+  return dayFixture;
+};
 
 const createForecastCycle = (
   days: ForecastCycle['days'],
@@ -113,7 +112,7 @@ describe('validateCycleCompletion', () => {
 
   it('returns complete when all day1 types are low probability', () => {
     const result = validateCycleCompletion(
-      createForecastCycle({ 1: createDayAllLowProb(1) }),
+      createForecastCycle({ 1: createDayFixture(1, 'lowProb') }),
       ['day1'],
     );
     expect(result.isComplete).toBe(true);
@@ -122,7 +121,7 @@ describe('validateCycleCompletion', () => {
 
   it('reports missing polygon for day1 with no data', () => {
     const result = validateCycleCompletion(
-      createForecastCycle({ 1: createEmptyDay(1) }),
+      createForecastCycle({ 1: createDayFixture(1, 'empty') }),
       ['day1'],
     );
     expect(result.isComplete).toBe(false);
@@ -132,7 +131,7 @@ describe('validateCycleCompletion', () => {
 
   it('reports missing discussion when polygons exist but discussion is empty', () => {
     const result = validateCycleCompletion(
-      createForecastCycle({ 1: createDayWithEmptyDiscussion(1) }),
+      createForecastCycle({ 1: createDayFixture(1, 'emptyDiscussion') }),
       ['day1'],
     );
     expect(result.isComplete).toBe(true);
@@ -141,7 +140,7 @@ describe('validateCycleCompletion', () => {
 
   it('is complete when day1 has all polygons and discussion', () => {
     const result = validateCycleCompletion(
-      createForecastCycle({ 1: createDayWithDiscussion(1) }),
+      createForecastCycle({ 1: createDayFixture(1, 'withDiscussion') }),
       ['day1'],
     );
     expect(result.isComplete).toBe(true);
@@ -150,7 +149,7 @@ describe('validateCycleCompletion', () => {
 
   it('validates day3 with totalSevere and categorical', () => {
     const result = validateCycleCompletion(
-      createForecastCycle({ 3: createDayWithAllOutlooks(3) }, 3),
+      createForecastCycle({ 3: createDayFixture(3, 'full') }, 3),
       ['day3'],
     );
     expect(result.isComplete).toBe(true);
@@ -158,7 +157,7 @@ describe('validateCycleCompletion', () => {
 
   it('validates day4 with day4-8 outlook', () => {
     const result = validateCycleCompletion(
-      createForecastCycle({ 4: createDayWithAllOutlooks(4) }, 4),
+      createForecastCycle({ 4: createDayFixture(4, 'full') }, 4),
       ['day4-8'],
     );
     expect(result.issues.some((i) => i.day === 'day4-8' && i.outlookType === 'day4-8' && i.type === 'missing-polygon')).toBe(true);
@@ -166,7 +165,7 @@ describe('validateCycleCompletion', () => {
   });
 
   it('reports no-tstm-forecast warning when categorical has only TSTM but is not low probability', () => {
-    const day = createEmptyDay(1);
+    const day = createDayFixture(1, 'empty');
     day.data.tornado = new Map([['2%', [{ id: 't1' }]]]);
     day.data.wind = new Map([['5%', [{ id: 'w1' }]]]);
     day.data.hail = new Map([['5%', [{ id: 'h1' }]]]);
@@ -178,14 +177,17 @@ describe('validateCycleCompletion', () => {
   });
 
   it.each([
-    ['critical', createEmptyDay(1), (issues: ReturnType<typeof validateCycleCompletion>['issues']) => {
+    ['critical', 'empty', (issues: ReturnType<typeof validateCycleCompletion>['issues']) => {
       expect(issues.filter((issue) => issue.severity === 'critical').length).toBeGreaterThan(0);
     }],
-    ['warning', createDayWithEmptyDiscussion(1), (issues: ReturnType<typeof validateCycleCompletion>['issues']) => {
+    ['warning', 'emptyDiscussion', (issues: ReturnType<typeof validateCycleCompletion>['issues']) => {
       expect(issues.filter((issue) => issue.severity === 'warning').length).toBeGreaterThan(0);
     }],
-  ])('returns %s issues with expected severity', (_label, day, assertSeverity) => {
-    const result = validateCycleCompletion(createForecastCycle({ 1: day }), ['day1']);
+  ] as const)('returns %s issues with expected severity', (_label, mode, assertSeverity) => {
+    const result = validateCycleCompletion(
+      createForecastCycle({ 1: createDayFixture(1, mode) }),
+      ['day1'],
+    );
     assertSeverity(result.issues);
   });
 });
