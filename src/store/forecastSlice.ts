@@ -1,6 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
+import type { CycleMetadata, WorkflowMetadata, Package } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
@@ -22,6 +23,8 @@ export interface SavedCycle {
   label?: string;
   forecastCycle: ForecastCycle;
   stats: SavedCycleStats;
+  /** v2 workflow metadata for the cycle (optional, present for workflow-imported cycles). */
+  workflowMetadata?: CycleMetadata;
 }
 
 export interface ForecastState {
@@ -35,6 +38,10 @@ export interface ForecastState {
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
   historyByDay: Partial<Record<DayType, ForecastHistoryStacks>>;
+  /** v2 workflow metadata for the active cycle (optional, present when loaded from a workflow package). */
+  workflowMetadata?: CycleMetadata;
+  /** v2 workflow template metadata (optional, present when the editor is in workflow mode). */
+  workflowTemplate?: WorkflowMetadata;
 }
 
 interface ForecastDaySnapshot {
@@ -831,6 +838,32 @@ export const forecastSlice = createSlice({
     redoLastEdit: (state) => {
       const dayHistory = getOrCreateDayHistory(state);
       restoreHistoryEntry(dayHistory.redoStack, dayHistory.undoStack, state);
+    },
+
+    // v2 workflow metadata reducers
+    setWorkflowMetadata: (state, action: PayloadAction<CycleMetadata>) => {
+      state.workflowMetadata = action.payload;
+    },
+
+    setWorkflowTemplate: (state, action: PayloadAction<WorkflowMetadata>) => {
+      state.workflowTemplate = action.payload;
+    },
+
+    importWorkflowPackage: (state, action: PayloadAction<Package>) => {
+      const pkg = action.payload;
+      // Import the first cycle's metadata (packages typically have one cycle)
+      if (pkg.cycles.length > 0) {
+        state.workflowMetadata = pkg.cycles[0];
+      }
+      if (pkg.metadata) {
+        state.workflowTemplate = {
+          id: pkg.metadata.workflowId,
+          label: pkg.metadata.workflowId,
+          groupings: [],
+        };
+      }
+      clearHistory(state);
+      state.isSaved = true;
     }
   }
 });
@@ -863,7 +896,10 @@ export const {
   setLowProbability,
   toggleLowProbability,
   undoLastEdit,
-  redoLastEdit
+  redoLastEdit,
+  setWorkflowMetadata,
+  setWorkflowTemplate,
+  importWorkflowPackage,
 } = forecastSlice.actions;
 
 /** Selects the full forecast slice. */

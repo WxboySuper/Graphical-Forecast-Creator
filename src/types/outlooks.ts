@@ -237,6 +237,9 @@ export type {
   CycleMetadata,
   WorkflowPackageMetadata,
   Package,
+  SerializedOutlookVersionData,
+  SerializedCycle,
+  SerializedWorkflowPackage,
 } from './workflow';
 
 export { WORKFLOW_SCHEMA_VERSION, createCustomGrouping } from './workflow';

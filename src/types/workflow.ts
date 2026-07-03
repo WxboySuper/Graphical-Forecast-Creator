@@ -173,3 +173,42 @@ export interface Package {
   metadata: WorkflowPackageMetadata;
   cycles: CycleMetadata[];
 }
+
+// ---------------------------------------------------------------------------
+// Serialized types for JSON storage
+// ---------------------------------------------------------------------------
+
+/** Serialized form of OutlookData for JSON storage. */
+export interface SerializedOutlookVersionData {
+  day: import('./outlooks').DayType;
+  data: import('./outlooks').SerializedOutlookData;
+  metadata: {
+    issueDate: string;
+    validDate: string;
+    issuanceTime: string;
+    lowProbabilityOutlooks?: import('./outlooks').OutlookType[];
+  };
+  discussion?: import('./outlooks').DiscussionData;
+}
+
+/** Serialized form of a single cycle within a workflow package. */
+export interface SerializedCycle {
+  id: CycleId;
+  workflowId: WorkflowId;
+  cycleDate: string;
+  status: CycleStatus;
+  outlookVersions: OutlookVersion[];
+  createdAt: string;
+  updatedAt: string;
+  groupings: { grouping: Grouping; day: import('./outlooks').DayType }[];
+  groupingData: Record<string, SerializedOutlookVersionData>;
+}
+
+/** Top-level serialized workflow package format. */
+export interface SerializedWorkflowPackage {
+  schemaVersion: string;
+  version: string;
+  metadata: WorkflowPackageMetadata;
+  cycles: SerializedCycle[];
+  styleSnapshots?: Record<string, unknown>;
+}

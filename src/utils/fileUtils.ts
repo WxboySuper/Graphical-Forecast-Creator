@@ -1,9 +1,9 @@
 import JSZip from 'jszip';
-import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType } from '../types/outlooks';
+import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType, CycleMetadata } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 
-const CURRENT_VERSION = '0.5.0';
+const CURRENT_VERSION = '1.0.0';
 
 // Helper to convert Map to Array for JSON serialization
 const mapToArray = <K, V>(m: Map<K, V>): [K, V][] =>
@@ -71,10 +71,12 @@ const createEmptyOutlook = (day: DayType): OutlookDay => {
 
 /**
  * Serializes the current ForecastCycle into a JSON-compatible format.
+ * When `cycleMetadata` is provided, the output is tagged with v2 workflow metadata.
  */
 export const serializeForecast = (
   forecastCycle: ForecastCycle,
-  mapView: { center: [number, number]; zoom: number }
+  mapView: { center: [number, number]; zoom: number },
+  cycleMetadata?: CycleMetadata
 ): GFCForecastSaveData => {
   const serializedDays: Partial<Record<DayType, SerializedDay>> = {};
   
@@ -103,7 +105,7 @@ export const serializeForecast = (
     }
   });
 
-  return {
+  const result: GFCForecastSaveData = {
     version: CURRENT_VERSION,
     type: 'forecast-cycle',
     timestamp: new Date().toISOString(),
@@ -114,11 +116,18 @@ export const serializeForecast = (
     },
     mapView
   };
+
+  // Embed v2 workflow metadata when provided
+  if (cycleMetadata) {
+    (result as GFCForecastSaveData & { cycleMetadata?: CycleMetadata }).cycleMetadata = cycleMetadata;
+  }
+
+  return result;
 };
 
 /**
  * Deserializes the saved JSON data back into ForecastCycle.
- * Handles migration from single-day format.
+ * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
 export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
   // Check for v0.5.0+ format

@@ -7,7 +7,7 @@ import type { SavedCycle, SavedCycleStats } from '../store/forecastSlice';
 import { deserializeForecast, serializeForecast } from './fileUtils';
 import { countForecastMetrics } from './forecastMetrics';
 import { normalizeForecastCycle } from './outlookMapCoercion';
-import type { ForecastCycle, GFCForecastSaveData } from '../types/outlooks';
+import type { ForecastCycle, GFCForecastSaveData, CycleMetadata } from '../types/outlooks';
 
 const CYCLE_HISTORY_KEY = 'gfc-cycle-history';
 const STORAGE_MAP_VIEW = { center: [0, 0] as [number, number], zoom: 0 };
@@ -19,6 +19,8 @@ interface PersistedSavedCycle {
   label?: string;
   forecastData: GFCForecastSaveData;
   stats?: SavedCycleStats;
+  /** v2 workflow metadata for the cycle (optional, present for workflow-imported cycles). */
+  workflowMetadata?: CycleMetadata;
 }
 
 /** Converts an in-memory saved cycle into a JSON-safe storage shape that preserves map data. */
@@ -27,8 +29,9 @@ const toPersistedSavedCycle = (cycle: SavedCycle): PersistedSavedCycle => ({
   timestamp: cycle.timestamp,
   cycleDate: cycle.cycleDate,
   label: cycle.label,
-  forecastData: serializeForecast(cycle.forecastCycle, STORAGE_MAP_VIEW),
+  forecastData: serializeForecast(cycle.forecastCycle, STORAGE_MAP_VIEW, cycle.workflowMetadata),
   stats: cycle.stats,
+  workflowMetadata: cycle.workflowMetadata,
 });
 
 /** Restores one saved cycle from storage, rehydrating its forecast maps and filling stats when missing. */
@@ -42,6 +45,7 @@ const fromPersistedSavedCycle = (cycle: PersistedSavedCycle): SavedCycle => {
     label: cycle.label,
     forecastCycle,
     stats: cycle.stats ?? countForecastMetrics(forecastCycle),
+    workflowMetadata: cycle.workflowMetadata,
   };
 };
 
