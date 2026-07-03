@@ -114,13 +114,9 @@ export const serializeForecast = (
       currentDay: forecastCycle.currentDay,
       cycleDate: forecastCycle.cycleDate
     },
-    mapView
+    mapView,
+    ...(cycleMetadata ? { cycleMetadata } : {}),
   };
-
-  // Embed v2 workflow metadata when provided
-  if (cycleMetadata) {
-    (result as GFCForecastSaveData & { cycleMetadata?: CycleMetadata }).cycleMetadata = cycleMetadata;
-  }
 
   return result;
 };

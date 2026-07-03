@@ -218,6 +218,9 @@ export interface GFCForecastSaveData {
     currentDay: DayType;
     cycleDate: string;
   };
+
+  /** Optional v2 workflow cycle metadata embedded in v1.0.0 saves. */
+  cycleMetadata?: import('./workflow').CycleMetadata;
 }
 
 // ---------------------------------------------------------------------------

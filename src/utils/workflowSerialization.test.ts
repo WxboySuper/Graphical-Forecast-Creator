@@ -2,6 +2,7 @@ import {
   serializeWorkflowPackage,
   deserializeWorkflowPackage,
   migrateLegacyForecastToWorkflowPackage,
+  migrateLegacyForecastToSerializedPackage,
   validateWorkflowPackage,
 } from './workflowSerialization';
 import type {
@@ -289,10 +290,17 @@ describe('workflowSerialization', () => {
           },
         };
       }
-      const pkg = migrateLegacyForecastToWorkflowPackage(legacy);
+      const serialized = migrateLegacyForecastToSerializedPackage(legacy);
 
-      // Should have 3 outlook versions (days 1, 2, 4)
-      expect(pkg.cycles[0].outlookVersions).toHaveLength(3);
+      expect(serialized.cycles[0].outlookVersions).toHaveLength(3);
+      expect(serialized.cycles[0].groupings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ grouping: 'day1', day: 1 }),
+          expect.objectContaining({ grouping: 'day2', day: 2 }),
+          expect.objectContaining({ grouping: 'day4-8', day: 4 }),
+        ]),
+      );
+      expect(serialized.cycles[0].groupingData['day4-8-v1']?.data['day4-8']).toEqual([['15%', []]]);
     });
   });
 
