@@ -40,6 +40,8 @@ const defaultHandlers = {
   onClose: jest.fn(),
   onComplete: jest.fn(),
   onCompleteWithOmissions: jest.fn(),
+  onOmitDay: jest.fn(),
+  omittedDays: {},
 };
 
 const renderModal = (
@@ -49,6 +51,7 @@ const renderModal = (
   <CompletionValidationModal
     isOpen={true}
     validationResult={validationResult}
+    omittedDays={{}}
     {...defaultHandlers}
     {...overrides}
   />,
@@ -101,9 +104,27 @@ describe('CompletionValidationModal', () => {
 
   it('calls onCompleteWithOmissions when "Complete with Omissions" is clicked', () => {
     const onCompleteWithOmissions = jest.fn();
-    renderModal(incompleteResult, { onCompleteWithOmissions });
+    renderModal(incompleteResult, {
+      onCompleteWithOmissions,
+      omittedDays: { 1: 'No severe weather expected' },
+    });
     fireEvent.click(screen.getByText('Complete with Omissions'));
     expect(onCompleteWithOmissions).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Complete with Omissions until all missing groupings have reasons', () => {
+    renderModal(incompleteResult);
+    expect(screen.getByText('Complete with Omissions')).toBeDisabled();
+  });
+
+  it('calls onOmitDay when an omission reason is entered', () => {
+    const onOmitDay = jest.fn();
+    renderModal(incompleteResult, { onOmitDay });
+    fireEvent.change(
+      screen.getByPlaceholderText('Why is Day 1 being omitted?'),
+      { target: { value: 'No severe weather expected' } },
+    );
+    expect(onOmitDay).toHaveBeenCalledWith(1, 'No severe weather expected');
   });
 
   it('calls onNavigateToIssue when Go button is clicked', () => {

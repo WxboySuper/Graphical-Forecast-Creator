@@ -66,9 +66,11 @@ export const ForecastWorkspaceModals: React.FC<{ controller: ForecastWorkspaceCo
       <CompletionValidationModal
         isOpen={controller.showCompletionModal}
         validationResult={completionValidationResult}
+        omittedDays={controller.omittedDays}
         onClose={controller.onCloseCompletionModal}
         onComplete={controller.onCompleteCycle}
         onCompleteWithOmissions={controller.onCompleteWithOmissions}
+        onOmitDay={controller.onOmitDay}
         onNavigateToIssue={controller.onNavigateToIssue}
       />
     </>

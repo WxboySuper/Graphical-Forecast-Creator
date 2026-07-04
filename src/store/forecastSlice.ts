@@ -881,6 +881,7 @@ export const forecastSlice = createSlice({
     validateCompletion: (state) => {
       const result = validateCycleCompletion(state.forecastCycle);
       state.completionValidation.lastResult = result;
+      state.completionValidation.omittedDays = {};
       state.completionValidation.showCompletionModal = true;
     },
 

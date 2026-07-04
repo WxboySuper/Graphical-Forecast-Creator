@@ -211,6 +211,38 @@
   margin: 4px 0;
 }
 
+.completion-omission-reasons {
+  margin-top: 16px;
+}
+
+.completion-omission-field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.completion-omission-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.completion-omission-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.completion-modal-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 /* Dark mode support */
 .dark-mode .completion-modal {
   background-color: #1e1f24;
@@ -286,4 +318,14 @@
 
 .dark-mode .completion-modal-empty {
   color: #9ca3af;
+}
+
+.dark-mode .completion-omission-label {
+  color: #9ca3af;
+}
+
+.dark-mode .completion-omission-input {
+  background-color: #2a2b30;
+  border-color: #4b5563;
+  color: #e2e8f0;
 }

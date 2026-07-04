@@ -5,15 +5,18 @@ import type { DayType } from '../../types/outlooks';
 import {
   CompletionValidationModalBody,
   CompletionValidationModalFooter,
+  hasAllOmissionReasons,
 } from './CompletionValidationModalSections';
 import './CompletionValidationModal.css';
 
 interface CompletionValidationModalProps {
   isOpen: boolean;
   validationResult: CycleValidationResult | null;
+  omittedDays: Partial<Record<DayType, string>>;
   onClose: () => void;
   onComplete: () => void;
   onCompleteWithOmissions: () => void;
+  onOmitDay: (day: DayType, reason: string) => void;
   onNavigateToIssue?: (day: DayType) => void;
 }
 
@@ -32,9 +35,11 @@ const getGroupingDay = (grouping: string): DayType | null => {
 export const CompletionValidationModal: React.FC<CompletionValidationModalProps> = ({
   isOpen,
   validationResult,
+  omittedDays,
   onClose,
   onComplete,
   onCompleteWithOmissions,
+  onOmitDay,
   onNavigateToIssue,
 }) => {
   const handleNavigate = useCallback(
@@ -53,6 +58,7 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
   const { isComplete, issues, missingGroupings } = validationResult;
   const criticalIssues = issues.filter((issue) => issue.severity === 'critical');
   const warningIssues = issues.filter((issue) => issue.severity === 'warning');
+  const canCompleteWithOmissions = hasAllOmissionReasons(missingGroupings, omittedDays);
 
   return (
     <div className="completion-modal-root">
@@ -76,11 +82,14 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
           criticalIssues={criticalIssues}
           warningIssues={warningIssues}
           missingGroupings={missingGroupings}
+          omittedDays={omittedDays}
           onNavigate={handleNavigate}
+          onOmitDay={onOmitDay}
         />
 
         <CompletionValidationModalFooter
           isComplete={isComplete}
+          canCompleteWithOmissions={canCompleteWithOmissions}
           onClose={onClose}
           onComplete={onComplete}
           onCompleteWithOmissions={onCompleteWithOmissions}

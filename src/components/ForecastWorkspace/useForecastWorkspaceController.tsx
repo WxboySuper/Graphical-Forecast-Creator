@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { selectCanRedo, selectCanUndo, selectForecastCycle } from '../../store/forecastSlice';
+import { selectCanRedo, selectCanUndo, selectForecastCycle, selectOmittedDays } from '../../store/forecastSlice';
 import { setBaseMapStyle, setGhostOutlookVisibility } from '../../store/overlaysSlice';
 import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
@@ -49,6 +49,9 @@ function createCompletionValidationHandlers(opts: {
     handleCompleteWithOmissions: () => {
       dispatch({ type: 'forecast/completeWithOmissions' });
       addToast('Forecast cycle completed with omissions', 'info');
+    },
+    handleOmitDay: (day: DayType, reason: string) => {
+      dispatch({ type: 'forecast/omitDay', payload: { day, reason } });
     },
     handleNavigateToIssue: (day: DayType) => {
       dispatch({ type: 'forecast/setForecastDay', payload: day });
@@ -147,6 +150,8 @@ export interface ForecastWorkspaceController {
   onCloseCompletionModal: () => void;
   onCompleteCycle: () => void;
   onCompleteWithOmissions: () => void;
+  onOmitDay: (day: DayType, reason: string) => void;
+  omittedDays: Partial<Record<DayType, string>>;
   onNavigateToIssue: (day: DayType) => void;
 }
 
@@ -206,6 +211,8 @@ interface BuildForecastWorkspaceControllerArgs {
   handleCloseCompletionModal: () => void;
   handleCompleteCycle: () => void;
   handleCompleteWithOmissions: () => void;
+  handleOmitDay: (day: DayType, reason: string) => void;
+  omittedDays: Partial<Record<DayType, string>>;
   handleNavigateToIssue: (day: DayType) => void;
 }
 
@@ -256,6 +263,8 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     handleCloseCompletionModal,
     handleCompleteCycle,
     handleCompleteWithOmissions,
+    handleOmitDay,
+    omittedDays,
     handleNavigateToIssue,
   } = args;
 
@@ -314,6 +323,8 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     onCloseCompletionModal: handleCloseCompletionModal,
     onCompleteCycle: handleCompleteCycle,
     onCompleteWithOmissions: handleCompleteWithOmissions,
+    onOmitDay: handleOmitDay,
+    omittedDays,
     onNavigateToIssue: handleNavigateToIssue,
     ...handlers,
   };
@@ -382,9 +393,11 @@ function useCompletionValidationController(
   const showCompletionModal = useSelector(
     (state: RootState) => state.forecast.completionValidation.showCompletionModal,
   );
+  const omittedDays = useSelector(selectOmittedDays);
 
   return {
     showCompletionModal,
+    omittedDays,
     ...useMemo(
       () => createCompletionValidationHandlers({ dispatch, addToast }),
       [dispatch, addToast],
@@ -512,10 +525,12 @@ function useForecastWorkspaceControllerArgs({
     handleStartDateEdit: modalState.handleStartDateEdit,
     handlers,
     showCompletionModal: completionState.showCompletionModal,
+    omittedDays: completionState.omittedDays,
     handleOpenCompletionModal: completionState.handleOpenCompletionModal,
     handleCloseCompletionModal: completionState.handleCloseCompletionModal,
     handleCompleteCycle: completionState.handleCompleteCycle,
     handleCompleteWithOmissions: completionState.handleCompleteWithOmissions,
+    handleOmitDay: completionState.handleOmitDay,
     handleNavigateToIssue: completionState.handleNavigateToIssue,
   };
 }
