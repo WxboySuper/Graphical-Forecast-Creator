@@ -19,10 +19,14 @@ describe('branch policy', () => {
     assert.equal(result.ok, true);
   });
 
-  it('allows the deployment config workflow fix to main', () => {
+  it('blocks fix/deployment-config to main', () => {
     const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/deployment-config' });
-    assert.equal(result.ok, true);
-    assert.equal(result.kind, 'main-direct-fix');
+    assert.equal(result.ok, false);
+  });
+
+  it('blocks arbitrary fix/* branches to main', () => {
+    const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/some-other-branch' });
+    assert.equal(result.ok, false);
   });
 
   it('prioritizes feature to beta', () => {
