@@ -893,11 +893,21 @@ export const forecastSlice = createSlice({
       state.completionValidation.omittedDays[day] = reason;
     },
 
+    completeCycle: (state) => {
+      state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
+      delete state.forecastCycle.omittedDayReasons;
+      state.completionValidation.showCompletionModal = false;
+      state.completionValidation.lastResult = null;
+      state.completionValidation.omittedDays = {};
+      state.isSaved = false;
+    },
+
     completeWithOmissions: (state) => {
       state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
       state.forecastCycle.omittedDayReasons = { ...state.completionValidation.omittedDays };
       state.completionValidation.showCompletionModal = false;
       state.completionValidation.lastResult = null;
+      state.completionValidation.omittedDays = {};
       state.isSaved = false;
     },
 
@@ -942,6 +952,7 @@ export const {
   validateCompletion,
   dismissCompletionModal,
   omitDay,
+  completeCycle,
   completeWithOmissions,
   clearOmittedDays,
 } = forecastSlice.actions;

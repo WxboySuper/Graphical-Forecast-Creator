@@ -43,7 +43,7 @@ function createCompletionValidationHandlers(opts: {
       dispatch({ type: 'forecast/dismissCompletionModal' });
     },
     handleCompleteCycle: () => {
-      dispatch({ type: 'forecast/completeWithOmissions' });
+      dispatch({ type: 'forecast/completeCycle' });
       addToast('Forecast cycle marked as complete', 'success');
     },
     handleCompleteWithOmissions: () => {
