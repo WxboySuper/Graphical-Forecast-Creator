@@ -4,6 +4,7 @@
 
 const PORT_BRANCH_PATTERN = /^port\/\d+-to-/;
 const RELEASE_INFRA_BRANCH_PATTERN = /^feature\/release-/;
+const MAIN_DIRECT_FIX_BRANCHES = new Set();
 
 /**
  * @param {string} headRef
@@ -41,6 +42,9 @@ const evaluateMainTarget = (headRef) => {
   }
   if (RELEASE_INFRA_BRANCH_PATTERN.test(headRef)) {
     return { ok: true, kind: 'release-infrastructure' };
+  }
+  if (MAIN_DIRECT_FIX_BRANCHES.has(headRef)) {
+    return { ok: true, kind: 'main-direct-fix' };
   }
   if (isFeatureBranch(headRef)) {
     return { ok: false, message: 'feature/* branches must merge into beta, not main.' };

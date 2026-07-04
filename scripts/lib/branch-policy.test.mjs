@@ -19,8 +19,13 @@ describe('branch policy', () => {
     assert.equal(result.ok, true);
   });
 
-  it('blocks fix branches to main', () => {
+  it('blocks fix/deployment-config to main', () => {
     const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/deployment-config' });
+    assert.equal(result.ok, false);
+  });
+
+  it('blocks arbitrary fix/* branches to main', () => {
+    const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/some-other-branch' });
     assert.equal(result.ok, false);
   });
 
