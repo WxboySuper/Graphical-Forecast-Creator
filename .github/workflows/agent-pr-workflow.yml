@@ -6,7 +6,10 @@ name: Agent PR Workflow
 on:
   pull_request:
     types: [opened]
-    branches: ['**']
+    branches:
+      - 'agent/**'
+      - 'hotfix/agent*'
+      - 'feat/agent*'
   workflow_dispatch:
     inputs:
       branch_name:
@@ -66,21 +69,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Filter for Agent-only Commits
-        if: github.event.inputs.agent_commits_only == 'true'
-        env:
-          FILTER_BRANCH: "${{ github.event.inputs.branch_name || '' }}"
-        run: |
-          # Filter commits to keep only those that look like agent work
-          # Agent commits typically don't have known human co-authored-by lines
-          # or have specific patterns that indicate agent assistance
-          echo "Filtering for agent-only commits..."
-          git config user.name "agentic-developer[bot]"
-          git config user.email "agentic-developer[bot]@opencode.ai"
-          git add .
-          git commit -m "agent: prepare PR from workspace state"
-          git push origin HEAD:${{ github.event.inputs.branch_name || 'agent-pr-temp' }}
 
       - name: Agent PR Labels and Description
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
@@ -166,7 +154,12 @@ Running tests and validation to ensure quality...
 
             // Sync check to ensure agent work is up-to-date
             try {
-              await github.request('GET ${github.repository}/branches/${{ github.event.inputs.target_branch || 'beta' }}');
+              const targetBranch = '${{ github.event.inputs.target_branch || 'beta' }}';
+              await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: targetBranch,
+              });
               console.log('Target branch is accessible');
             } catch (error) {
               console.error('Target branch error:', error.message);
@@ -259,14 +252,10 @@ Running tests and validation to ensure quality...
               pull_number: pr,
             });
 
-            const status = context.job === 'agent-quality-gates' ? 'agent-reviewed' : 'pending';
-            const updateData = {
-              labels: [...pullRequest.labels.map(label => label.name), 'agent:verified']
-            };
+            const status = 'agent-reviewed';
+            const updateData = {};
 
-            if (status === 'agent-reviewed') {
-              updateData.body = `${pullRequest.body || ''}\n\n---\n\n*Agent workflow verification completed - PR ready for human review*`;
-            }
+            updateData.body = `${pullRequest.body || ''}\n\n---\n\n*Agent workflow verification completed - PR ready for human review*`;
 
             await github.rest.issues.update({
               owner,
@@ -312,12 +301,12 @@ The agent has successfully completed the PR workflow following the agentic devel
 2. **Quality gates**: All automated quality gates have passed
 3. **Workflow compliance**: Agent followed the agentic development workflow guidelines
 
-*Created by the agent PR workflow at $(date)*`
+*Created by the agent PR workflow at ${new Date().toISOString()}*`
             });
 
       - name: Agent PR Notification
         if: needs.agent-quality-gates.result == 'success'
-        uses: actions/github-script@f28e40b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const owner = context.repo.owner;
@@ -367,7 +356,7 @@ The agent has successfully completed the PR workflow following the agentic devel
               issue_number: pr,
               body: `## 🚀 Agent PR Workflow Concluded
 
-**Workflow completed successfully at $(date)**
+**Workflow completed successfully at ${new Date().toISOString()}**
 
 ### Agentic Development Workflow Summary
 - **✅ Minimal changes made**: Focused on solving the reported problem
