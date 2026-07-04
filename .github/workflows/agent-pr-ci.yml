@@ -12,7 +12,7 @@ jobs:
   agent-compliance:
     runs-on: ubuntu-latest
     if: >-
-      contains(join(github.event.pull_request.labels.*.name, ','), 'agentic-work')
+      contains(github.event.pull_request.labels.*.name, 'agentic-work')
       || startsWith(github.head_ref, 'agent/')
       || startsWith(github.head_ref, 'hotfix/agent')
       || startsWith(github.head_ref, 'feat/agent')
