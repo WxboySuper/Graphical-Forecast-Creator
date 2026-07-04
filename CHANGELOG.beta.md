@@ -4,6 +4,12 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #673
+
+- Add 8-step agentic development workflow to AGENTS.md with structured investigate → plan → approve → branch → commit/push/draft PR → wait CI → ready for review/Greptile → human handoff process.
+- Add `agent-pr-workflow.yml` GitHub Actions workflow for agent PR lifecycle automation.
+- Add `agent-pr-ci.yml` CI validation workflow to enforce agent compliance with the 8-step process.
+
 ### PR #664
 
 - Added backward-compatible cycle and workflow serialization with v2 metadata support
