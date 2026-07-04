@@ -13,8 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       contains(join(github.event.pull_request.labels.*.name, ','), 'agentic-work')
-      || contains(github.head_ref, 'agent')
-      || contains(github.head_ref, 'hotfix/agent')
+      || startsWith(github.head_ref, 'agent/')
+      || startsWith(github.head_ref, 'hotfix/agent')
+      || startsWith(github.head_ref, 'feat/agent')
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
