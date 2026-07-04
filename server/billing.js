@@ -219,6 +219,7 @@ const verifyRequestUser = async (req, res) => {
 /** Creates the plan-specific Stripe checkout session for the verified user. */
 const isCheckoutAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.checkoutEnabled);
 
+/** Checks whether the Stripe customer portal is configured for this site. */
 const isPortalAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.hasBaseUrl);
 
 /** Resolves the Stripe price id for the selected billing plan. */
