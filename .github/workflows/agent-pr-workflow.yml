@@ -8,13 +8,6 @@ on:
     types: [opened]
   workflow_dispatch:
     inputs:
-      branch_name:
-        description: Branch name for the PR (optional, can be inferred from git status)
-        required: false
-      agent_commits_only:
-        description: If true, only commit agent-made changes (filter out human commits)
-        type: boolean
-        default: true
       target_branch:
         description: Target branch for the PR (default: beta)
         type: string
@@ -118,6 +111,9 @@ This PR was created by an autonomous agent following the agentic development wor
 
 ### Verification
 Running tests and validation to ensure quality...
+
+## Changelog
+- Agent-generated PR following the 8-step agentic workflow
 
 ---
 
@@ -289,11 +285,11 @@ The agent has successfully completed the PR workflow following the agentic devel
             console.log('PR is ready for human review and potential approval');
 
   agent-pr-cleanup:
-    needs: [agent-pr-success]
+    needs: [agent-pr-success, agent-quality-gates]
     runs-on: ubuntu-latest
     if: >-
       always()
-      && needs.agent-pr-success.result == 'success'
+      && needs.agent-quality-gates.result == 'success'
       && (
         github.event_name == 'workflow_dispatch'
         || startsWith(github.head_ref, 'agent/')
