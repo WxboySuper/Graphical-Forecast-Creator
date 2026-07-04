@@ -6,10 +6,6 @@ name: Agent PR Workflow
 on:
   pull_request:
     types: [opened]
-    branches:
-      - 'agent/**'
-      - 'hotfix/agent*'
-      - 'feat/agent*'
   workflow_dispatch:
     inputs:
       branch_name:
@@ -32,6 +28,10 @@ permissions:
 jobs:
   setup:
     runs-on: ubuntu-latest
+    if: >-
+      startsWith(github.head_ref, 'agent/')
+      || startsWith(github.head_ref, 'hotfix/agent')
+      || startsWith(github.head_ref, 'feat/agent')
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -323,7 +323,7 @@ The agent has successfully completed the PR workflow following the agentic devel
   agent-pr-cleanup:
     needs: [agent-pr-success]
     runs-on: ubuntu-latest
-    if: always()
+    if: always() && needs.agent-pr-success.result == 'success'
     steps:
       - name: Clean up Temporary Resources
         run: |
