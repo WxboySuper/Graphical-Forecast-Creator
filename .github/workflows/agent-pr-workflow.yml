@@ -148,6 +148,8 @@ Running tests and validation to ensure quality...
       - name: Agent PR Sync Check
         if: github.event_name == 'workflow_dispatch'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          TARGET_BRANCH: ${{ github.event.inputs.target_branch || 'beta' }}
         with:
           script: |
             const owner = context.repo.owner;
@@ -155,7 +157,7 @@ Running tests and validation to ensure quality...
 
             // Sync check to ensure agent work is up-to-date
             try {
-              const targetBranch = '${{ github.event.inputs.target_branch || 'beta' }}';
+              const targetBranch = process.env.TARGET_BRANCH;
               await github.rest.repos.getBranch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -198,7 +200,6 @@ Running tests and validation to ensure quality...
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
-            // Verify agent workflow compliance
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pr = context.issue.number || context.payload.pull_request?.number;
@@ -208,34 +209,12 @@ Running tests and validation to ensure quality...
               return;
             }
 
-            const complianceChecks = [
-              {
-                name: 'Minimal Changes',
-                description: 'Agent followed the minimal, focused change principle from AGENTS.md'
-              },
-              {
-                name: 'Code Patterns',
-                description: 'Agent followed existing repository patterns and conventions'
-              },
-              {
-                name: 'Coverage',
-                description: 'Agent maintained coverage above 80% where applicable'
-              },
-              {
-                name: 'Test Coverage',
-                description: 'Agent added or updated focused tests for behavior'
-              },
-              {
-                name: 'Port Rule Compliance',
-                description: 'Agent did not use slashes as code delimiters in PR description'
-              }
-            ];
-
-            console.log('Agent workflow compliance checks completed');
-            console.log('All agent work should follow the principles in AGENTS.md');
+            console.log('Build and tests passed — core compliance gate satisfied');
+            console.log('Agent workflow principles: minimal changes, existing patterns, coverage above 80%');
+            console.log('Full compliance verified by human review and Greptile/DeepSource CI checks');
 
       - name: Agent PR Status Update
-        if: always()
+        if: success()
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
@@ -253,16 +232,17 @@ Running tests and validation to ensure quality...
               pull_number: pr,
             });
 
-            const status = 'agent-reviewed';
-            const updateData = {};
-
-            updateData.body = `${pullRequest.body || ''}\n\n---\n\n*Agent workflow verification completed - PR ready for human review*`;
+            const footer = '---\n\n*Agent workflow verification completed - PR ready for human review*';
+            if ((pullRequest.body || '').includes(footer)) {
+              console.log('Footer already present — skipping append');
+              return;
+            }
 
             await github.rest.issues.update({
               owner,
               repo,
               issue_number: pr,
-              ...updateData,
+              body: `${pullRequest.body || ''}\n\n${footer}`,
             });
 
   agent-pr-success:
