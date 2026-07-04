@@ -174,6 +174,7 @@ describe('validateCycleCompletion', () => {
 
     const result = validateCycleCompletion(createForecastCycle({ 1: day }), ['day1']);
     expect(result.issues.some((i) => i.type === 'no-tstm-forecast')).toBe(true);
+    expect(result.issues.some((i) => i.outlookType === 'categorical' && i.type === 'missing-polygon')).toBe(false);
   });
 
   it.each([

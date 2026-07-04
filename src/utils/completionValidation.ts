@@ -123,6 +123,15 @@ const addMissingDayIssues = (ctx: DayValidationContext): void => {
   ctx.missingGroupings.add(ctx.grouping);
 };
 
+/** Returns true when an outlook map has TSTM polygons but no threat-level polygons. */
+const hasTstmOnlyCategoricalData = (map: Map<string, unknown[]> | undefined): boolean => {
+  if (!map || map.size === 0) {
+    return false;
+  }
+
+  return !hasNonTstmPolygonData(map);
+};
+
 /** Validates that required outlook polygons exist for the current day. */
 const validateOutlookPolygons = (ctx: DayValidationContext): void => {
   const dayData = ctx.dayData;
@@ -139,6 +148,13 @@ const validateOutlookPolygons = (ctx: DayValidationContext): void => {
 
     const outlookMap = dayData.data[outlookType as keyof typeof dayData.data];
     if (hasNonTstmPolygonData(outlookMap as Map<string, unknown[]> | undefined)) {
+      continue;
+    }
+
+    if (
+      outlookType === 'categorical'
+      && hasTstmOnlyCategoricalData(outlookMap as Map<string, unknown[]> | undefined)
+    ) {
       continue;
     }
 
