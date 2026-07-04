@@ -60,6 +60,7 @@ export const OmissionReasonsList: React.FC<OmissionReasonsListProps> = ({
     return null;
   }
 
+  /** Persists the same omission reason across every day in the grouping. */
   const handleReasonChange = (grouping: string, reason: string) => {
     getDaysForGrouping(grouping).forEach((day) => onOmitDay(day, reason));
   };
