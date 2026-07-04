@@ -169,7 +169,7 @@ Running tests and validation to ensure quality...
             }
 
   agent-quality-gates:
-    needs: [setup, agent-pr-review]
+    needs: [setup]
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     steps:
