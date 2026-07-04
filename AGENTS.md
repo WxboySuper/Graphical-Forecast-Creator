@@ -30,13 +30,44 @@ Agents should act like senior collaborators, not script runners. Prefer concrete
 
 ## Implementation Workflow
 
-1. Inspect the relevant files and existing tests.
-2. Identify the smallest change that solves the reported problem.
-3. Edit the implementation.
-4. Add or update focused tests for the behavior.
-5. Run targeted verification.
-6. Run broader checks when the change touches shared behavior, build configuration, or user-facing flows.
-7. Summarize what changed and what was verified.
+1. **Investigate the task/issue relative to the codebase on the correct branch relative to the issue or task**
+   - Understand the problem scope
+   - Explore relevant code and existing tests
+   - Determine the correct branch (main or beta based on task type)
+
+2. **Create a plan for implementation to resolve the issue or complete the task**
+   - Document the approach
+   - Define expected changes
+   - Outline testing strategy
+
+3. **Get approval for that plan**
+   - Share the plan with the human for review and approval
+   - Incorporate feedback
+
+4. **Implement that plan on a NEW branch from either main or beta depending on the issue/task**
+   - Create a dedicated branch for this task
+   - Use the approved plan as the implementation guide
+   - Follow coding standards and existing patterns
+
+5. **Commit and push the changes and open a Draft PR**
+   - Make focused, minimal commits
+   - Push to the new branch
+   - Create a draft PR for review
+
+6. **Wait on CI, make sure it is all green. All will run except Greptile**
+   - Wait for CI to complete
+   - Ensure all checks pass (except Greptile)
+   - Resolve any non-Greptile CI failures
+
+7. **Mark the PR Ready for Review and wait on Greptile to run and get it green and resolve all of its comments**
+   - Mark PR as "Ready for Review"
+   - Wait for Greptile to run
+   - Address all Greptile comments and ensure it passes
+
+8. **Once Greptile and CI are green stop and hand off to the human to manually review and handle the rest of the process**
+   - Final verification that both CI and Greptile pass
+   - Stop automated work
+   - Hand off to human for final review and any additional manual steps
 
 If a test fails, fix the product code or the test based on the intended behavior. Do not weaken coverage just to make CI pass.
 
@@ -167,22 +198,5 @@ Automation detects both and skips creating a duplicate `port/*` PR.
 - Open redundant `port/* → beta` PRs for merges post-merge already synced (CI blocks these via `scripts/lib/port-pr-policy.mjs`).
 - Push directly to `beta` for port work — always use a PR.
 
-Full release policy: [`docs/operations/release-workflow.md`](docs/operations/release-workflow.md). Key automation: [`.github/scripts/port-changes.sh`](.github/scripts/port-changes.sh), [`scripts/lib/port-targets.mjs`](scripts/lib/port-targets.mjs), [`scripts/lib/port-conflicts.mjs`](scripts/lib/port-conflicts.mjs).
-
-## Cursor Cloud specific instructions
-
-Dependencies are installed automatically by the startup update script (`pnpm install --frozen-lockfile` for the root frontend, `npm --prefix server install` for the backend). The two packages use **different package managers** — pnpm at the repo root, npm in `server/` — so they are installed separately and have separate lockfiles.
-
-Services (standard commands are in `README.md` / `package.json`):
-
-- **Frontend (the core product):** `pnpm run dev` → http://localhost:3000. This is sufficient on its own; forecast/verification/discussion data persists to browser `localStorage`, and no database is required.
-- **Analytics/billing backend (optional):** `cd server && npm start` → binds `127.0.0.1:3006`. Only needed for auth/billing/analytics/Sentry-tunnel flows. Vite proxies `/api` → `127.0.0.1:3006`, so start the backend if you exercise `/api`.
-
-Non-obvious notes:
-
-- **Lint:** there is no ESLint setup (no eslint dependency, no `lint` script). CI only runs build + tests. Do not expect a lint command; the closest static check is the Vite build plus `pnpm test`.
-- **`tsc --noEmit` does not work standalone** — it errors with `vite.config.ts is not under rootDir 'src'` because of the `tsconfig.json` layout. This is a config quirk, not a real type error; type safety is enforced via the build and `ts-jest` during `pnpm test`. Do not treat that `tsc` error as a regression.
-- **Checks that mirror CI:** `pnpm run build` (frontend), `pnpm test` (Jest), and `cd server && npm test` (`node --test`). Run `pnpm test` from the repo root — running it from `server/` invokes the backend's test script instead.
-- pnpm reports "Ignored build scripts" for `esbuild`/`@sentry/cli`/etc.; the dev server and build still work fine via prebuilt platform binaries, so this warning is safe to ignore.
-- Firebase, Stripe, and Sentry are all optional and degrade gracefully when their env vars are absent; the app and backend boot without any secrets.
+Full release policy: [`docs/release-workflow.md`](docs/release-workflow.md). Key automation: [`.github/scripts/port-changes.sh`](.github/scripts/port-changes.sh), [`scripts/lib/port-targets.mjs`](scripts/lib/port-targets.mjs), [`scripts/lib/port-conflicts.mjs`](scripts/lib/port-conflicts.mjs).
 
