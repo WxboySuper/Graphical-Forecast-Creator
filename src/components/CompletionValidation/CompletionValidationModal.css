@@ -1,0 +1,331 @@
+.completion-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.completion-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.completion-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 1;
+  width: 90%;
+  max-width: 560px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.completion-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.completion-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.completion-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.completion-modal-close:hover {
+  background-color: #f0f0f0;
+}
+
+.completion-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.completion-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.completion-status-badge--complete {
+  background-color: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.completion-status-badge--incomplete {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.completion-issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.completion-issue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #fafafa;
+  transition: background-color 0.15s;
+}
+
+.completion-issue-item:hover {
+  background-color: #f3f4f6;
+}
+
+.completion-issue-item--critical {
+  border-left: 3px solid #ef4444;
+}
+
+.completion-issue-item--warning {
+  border-left: 3px solid #f59e0b;
+}
+
+.completion-issue-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.completion-issue-day {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.completion-issue-message {
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.completion-issue-nav-btn {
+  margin-left: 12px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: white;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.completion-issue-nav-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.completion-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.completion-modal-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.completion-modal-btn--cancel {
+  background-color: #6b7280;
+  color: white;
+}
+
+.completion-modal-btn--cancel:hover {
+  background-color: #4b5563;
+}
+
+.completion-modal-btn--complete {
+  background-color: #2563eb;
+  color: white;
+}
+
+.completion-modal-btn--complete:hover {
+  background-color: #1d4ed8;
+}
+
+.completion-modal-btn--complete-anyway {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.completion-modal-btn--complete-anyway:hover {
+  background-color: #d97706;
+}
+
+.completion-modal-empty {
+  text-align: center;
+  padding: 24px 16px;
+  color: #6b7280;
+}
+
+.completion-modal-empty p {
+  margin: 4px 0;
+}
+
+.completion-omission-reasons {
+  margin-top: 16px;
+}
+
+.completion-omission-field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.completion-omission-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.completion-omission-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.completion-modal-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Dark mode support */
+.dark-mode .completion-modal {
+  background-color: #1e1f24;
+  color: #e2e8f0;
+}
+
+.dark-mode .completion-modal-header {
+  border-bottom-color: #374151;
+}
+
+.dark-mode .completion-modal-header h2 {
+  color: #f1f5f9;
+}
+
+.dark-mode .completion-modal-close {
+  color: #9ca3af;
+}
+
+.dark-mode .completion-modal-close:hover {
+  background-color: #374151;
+}
+
+.dark-mode .completion-status-badge--complete {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.dark-mode .completion-status-badge--incomplete {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.dark-mode .completion-issue-item {
+  background-color: #2a2b30;
+  border-color: #374151;
+}
+
+.dark-mode .completion-issue-item:hover {
+  background-color: #323338;
+}
+
+.dark-mode .completion-issue-day {
+  color: #9ca3af;
+}
+
+.dark-mode .completion-issue-message {
+  color: #e2e8f0;
+}
+
+.dark-mode .completion-issue-nav-btn {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e2e8f0;
+}
+
+.dark-mode .completion-issue-nav-btn:hover {
+  background-color: #4b5563;
+}
+
+.dark-mode .completion-modal-footer {
+  border-top-color: #374151;
+}
+
+.dark-mode .completion-modal-btn--cancel {
+  background-color: #4b5563;
+}
+
+.dark-mode .completion-modal-btn--cancel:hover {
+  background-color: #6b7280;
+}
+
+.dark-mode .completion-modal-empty {
+  color: #9ca3af;
+}
+
+.dark-mode .completion-omission-label {
+  color: #9ca3af;
+}
+
+.dark-mode .completion-omission-input {
+  background-color: #2a2b30;
+  border-color: #4b5563;
+  color: #e2e8f0;
+}

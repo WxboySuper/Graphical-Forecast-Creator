@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { IntegratedToolbar } from './IntegratedToolbar';
+import { IntegratedToolbar, TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, { addFeature } from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
@@ -66,7 +66,7 @@ const createFeature = () => ({
   },
 });
 
-const ToolbarHarness: React.FC = () => {
+const ToolbarTestHarness: React.FC<{ variant: 'legacy' | 'tabbed' }> = ({ variant }) => {
   const mapRef = useRef<ForecastMapHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const controller = useForecastWorkspaceController({
@@ -77,8 +77,16 @@ const ToolbarHarness: React.FC = () => {
     addToast: mockAddToast,
   });
 
-  return <IntegratedToolbar controller={controller} />;
+  return variant === 'tabbed'
+    ? <TabbedIntegratedToolbar controller={controller} />
+    : <IntegratedToolbar controller={controller} />;
 };
+
+const renderToolbar = (variant: 'legacy' | 'tabbed', store = createStore()) => render(
+  <Provider store={store}>
+    <ToolbarTestHarness variant={variant} />
+  </Provider>
+);
 
 describe('IntegratedToolbar undo/redo buttons', () => {
   beforeEach(() => {
@@ -86,13 +94,7 @@ describe('IntegratedToolbar undo/redo buttons', () => {
   });
 
   test('renders undo and redo buttons with disabled state from selectors', () => {
-    const store = createStore();
-
-    render(
-      <Provider store={store}>
-        <ToolbarHarness />
-      </Provider>
-    );
+    renderToolbar('legacy');
 
     expect(screen.getByLabelText('Undo')).toBeDisabled();
     expect(screen.getByLabelText('Redo')).toBeDisabled();
@@ -103,11 +105,7 @@ describe('IntegratedToolbar undo/redo buttons', () => {
     const store = createStore();
     store.dispatch(addFeature({ feature: createFeature() }));
 
-    render(
-      <Provider store={store}>
-        <ToolbarHarness />
-      </Provider>
-    );
+    renderToolbar('legacy', store);
 
     const undoButton = screen.getByLabelText('Undo');
     const redoButton = screen.getByLabelText('Redo');
@@ -122,4 +120,30 @@ describe('IntegratedToolbar undo/redo buttons', () => {
     await user.click(screen.getByLabelText('Redo'));
     expect(screen.getByLabelText('Undo')).toBeEnabled();
   });
+});
+
+describe('TabbedIntegratedToolbar completion validation exposure', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test.each([
+    [false, false],
+    [true, true],
+  ])(
+    'Complete action visibility follows forecastWorkflowV2 exposure (exposed=%s)',
+    async (exposed, visible) => {
+      jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(exposed);
+      const user = userEvent.setup();
+
+      renderToolbar('tabbed');
+      await user.click(screen.getByRole('tab', { name: /Tools/i }));
+
+      if (visible) {
+        expect(screen.getByText('Complete')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('Complete')).not.toBeInTheDocument();
+      }
+    }
+  );
 });

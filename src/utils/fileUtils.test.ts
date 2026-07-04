@@ -35,6 +35,37 @@ describe('fileUtils', () => {
     expect(des.days[1].data.categorical instanceof Map).toBe(true);
   });
 
+  test('serialize/deserialize preserves completion acknowledgement metadata', () => {
+    const cycle: ForecastCycle = {
+      days: {
+        1: {
+          day: 1,
+          metadata: {
+            issueDate: '2026-04-21',
+            validDate: '2026-04-21',
+            issuanceTime: '0600',
+            createdAt: '2026-04-21T12:00:00.000Z',
+            lastModified: '2026-04-21T12:00:00.000Z',
+            lowProbabilityOutlooks: [],
+          },
+          data: { categorical: new Map([['TSTM', []]]) },
+        },
+      },
+      currentDay: 1,
+      cycleDate: '2026-04-21',
+      completionAcknowledgedAt: '2026-04-21T15:00:00.000Z',
+      omittedDayReasons: { 3: 'No severe weather expected' },
+    };
+
+    const serialized = serializeForecast(cycle, { center: [0, 0], zoom: 0 });
+    expect(serialized.forecastCycle?.completionAcknowledgedAt).toBe('2026-04-21T15:00:00.000Z');
+    expect(serialized.forecastCycle?.omittedDayReasons).toEqual({ 3: 'No severe weather expected' });
+
+    const deserialized = deserializeForecast(serialized);
+    expect(deserialized.completionAcknowledgedAt).toBe('2026-04-21T15:00:00.000Z');
+    expect(deserialized.omittedDayReasons).toEqual({ 3: 'No severe weather expected' });
+  });
+
   test('serializeForecast handles non-Map data without throwing', () => {
     const corruptedCycle = {
       days: {

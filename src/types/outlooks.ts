@@ -188,6 +188,10 @@ export interface ForecastCycle {
   days: Partial<Record<DayType, OutlookDay>>;
   currentDay: DayType;
   cycleDate: string;
+  /** ISO timestamp when the forecaster acknowledged completion with omissions. */
+  completionAcknowledgedAt?: string;
+  /** User-provided reasons for omitted forecast days at completion time. */
+  omittedDayReasons?: Partial<Record<DayType, string>>;
 }
 
 // Updated Save Data Interface
@@ -217,6 +221,8 @@ export interface GFCForecastSaveData {
     }>>;
     currentDay: DayType;
     cycleDate: string;
+    completionAcknowledgedAt?: string;
+    omittedDayReasons?: Partial<Record<DayType, string>>;
   };
 
   /** Optional v2 workflow cycle metadata embedded in v1.0.0 saves. */
@@ -243,6 +249,10 @@ export type {
   SerializedOutlookVersionData,
   SerializedCycle,
   SerializedWorkflowPackage,
+  ValidationOutlookType,
+  ValidationSeverity,
+  ValidationIssue,
+  CycleValidationResult,
 } from './workflow';
 
 export { WORKFLOW_SCHEMA_VERSION, createCustomGrouping } from './workflow';
