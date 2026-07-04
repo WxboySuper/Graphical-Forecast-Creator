@@ -83,10 +83,7 @@ describe('instrument', () => {
   it.each([
     ["Safari/WebKit observed shape", "null is not an object (evaluating 'a.canvas')"],
     ["Safari/WebKit alternate minified name", "null is not an object (evaluating 'b.canvas')"],
-<<<<<<< HEAD
     ["Safari/WebKit two-character minified name", "null is not an object (evaluating 'ab.canvas')"],
-=======
->>>>>>> origin/pr/669
   ])('drops OpenLayers canvas render-frame noise: %s', (_label, message) => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
@@ -151,7 +148,6 @@ describe('instrument', () => {
     });
   });
 
-<<<<<<< HEAD
   it('drops matching request lifecycle noise from message-only events', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
@@ -163,8 +159,7 @@ describe('instrument', () => {
     });
   });
 
-=======
->>>>>>> origin/pr/669
+
   it('keeps unrelated application errors', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
