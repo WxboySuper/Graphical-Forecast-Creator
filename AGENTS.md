@@ -30,13 +30,44 @@ Agents should act like senior collaborators, not script runners. Prefer concrete
 
 ## Implementation Workflow
 
-1. Inspect the relevant files and existing tests.
-2. Identify the smallest change that solves the reported problem.
-3. Edit the implementation.
-4. Add or update focused tests for the behavior.
-5. Run targeted verification.
-6. Run broader checks when the change touches shared behavior, build configuration, or user-facing flows.
-7. Summarize what changed and what was verified.
+1. **Investigate the task/issue relative to the codebase on the correct branch relative to the issue or task**
+   - Understand the problem scope
+   - Explore relevant code and existing tests
+   - Determine the correct branch (main or beta based on task type)
+
+2. **Create a plan for implementation to resolve the issue or complete the task**
+   - Document the approach
+   - Define expected changes
+   - Outline testing strategy
+
+3. **Get approval for that plan**
+   - Share the plan with the human for review and approval
+   - Incorporate feedback
+
+4. **Implement that plan on a NEW branch from either main or beta depending on the issue/task**
+   - Create a dedicated branch for this task
+   - Use the approved plan as the implementation guide
+   - Follow coding standards and existing patterns
+
+5. **Commit and push the changes and open a Draft PR**
+   - Make focused, minimal commits
+   - Push to the new branch
+   - Create a draft PR for review
+
+6. **Wait on CI, make sure it is all green. All will run except Greptile**
+   - Wait for CI to complete
+   - Ensure all checks pass (except Greptile)
+   - Resolve any non-Greptile CI failures
+
+7. **Mark the PR Ready for Review and wait on Greptile to run and get it green and resolve all of its comments**
+   - Mark PR as "Ready for Review"
+   - Wait for Greptile to run
+   - Address all Greptile comments and ensure it passes
+
+8. **Once Greptile and CI are green stop and hand off to the human to manually review and handle the rest of the process**
+   - Final verification that both CI and Greptile pass
+   - Stop automated work
+   - Hand off to human for final review and any additional manual steps
 
 If a test fails, fix the product code or the test based on the intended behavior. Do not weaken coverage just to make CI pass.
 
