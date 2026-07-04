@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #676
+
+- Added 8-step agentic development workflow to AGENTS.md
+
 ### PR #664
 
 - Added backward-compatible cycle and workflow serialization with v2 metadata support
