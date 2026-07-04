@@ -131,6 +131,23 @@ $env:PLAYWRIGHT_SKIP_WEBSERVER='1'
 pnpm exec playwright test e2e/smoke.spec.ts
 ```
 
+## Cursor Cloud specific instructions
+
+Dependencies are installed automatically by the startup update script (`pnpm install --frozen-lockfile` for the root frontend, `npm --prefix server install` for the backend). The two packages use **different package managers** - pnpm at the repo root, npm in `server/` - so they are installed separately and have separate lockfiles.
+
+Services (standard commands are in `README.md` / `package.json`):
+
+- **Frontend (the core product):** `pnpm run dev` → http://localhost:3000. This is sufficient on its own; forecast/verification/discussion data persists to browser `localStorage`, and no database is required.
+- **Analytics/billing backend (optional):** `cd server && npm start` → binds `127.0.0.1:3006`. Only needed for auth/billing/analytics/Sentry-tunnel flows. Vite proxies `/api` → `127.0.0.1:3006`, so start the backend if you exercise `/api`.
+
+Non-obvious notes:
+
+- **Lint:** there is no ESLint setup (no eslint dependency, no `lint` script). CI only runs build + tests. Do not expect a lint command; the closest static check is the Vite build plus `pnpm test`.
+- **`tsc --noEmit` does not work standalone** - it errors with `vite.config.ts is not under rootDir 'src'` because of the `tsconfig.json` layout. This is a config quirk, not a real type error; type safety is enforced via the build and `ts-jest` during `pnpm test`. Do not treat that `tsc` error as a regression.
+- **Checks that mirror CI:** `pnpm run build` (frontend), `pnpm test` (Jest), and `cd server && npm test` (`node --test`). Run `pnpm test` from the repo root - running it from `server/` invokes the backend's test script instead.
+- pnpm reports "Ignored build scripts" for `esbuild`/`@sentry/cli`/etc.; the dev server and build still work fine via prebuilt platform binaries, so this warning is safe to ignore.
+- Firebase, Stripe, and Sentry are all optional and degrade gracefully when their env vars are absent; the app and backend boot without any secrets.
+
 ## Communication
 
 - Keep updates short and concrete while working.
