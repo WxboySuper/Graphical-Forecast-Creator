@@ -4,7 +4,7 @@
 
 const PORT_BRANCH_PATTERN = /^port\/\d+-to-/;
 const RELEASE_INFRA_BRANCH_PATTERN = /^feature\/release-/;
-const MAIN_DIRECT_FIX_BRANCHES = new Set(['fix/deployment-config']);
+const MAIN_DIRECT_FIX_BRANCHES = new Set();
 
 /**
  * @param {string} headRef
