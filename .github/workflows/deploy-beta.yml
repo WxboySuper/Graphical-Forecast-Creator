@@ -44,7 +44,11 @@ jobs:
           fi
 
       - name: Checkout
+<<<<<<< HEAD
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+=======
+        uses: actions/checkout@v4
+>>>>>>> origin/pr/669
         with:
           ref: ${{ steps.checkout_ref.outputs.ref }}
 
@@ -179,6 +183,7 @@ jobs:
           SENTRY_ENVIRONMENT=beta
           SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.value }}
           EOF
+<<<<<<< HEAD
           if [ -n "$current_emergency_disabled_capabilities" ]; then
             echo "Preserving active EMERGENCY_DISABLED_CAPABILITIES from beta analytics .env"
             echo "EMERGENCY_DISABLED_CAPABILITIES=${current_emergency_disabled_capabilities}" >> beta-server.env
@@ -187,6 +192,8 @@ jobs:
             echo "Preserving emergency TSTM_INGESTION_ENABLED=false from beta analytics .env"
             echo "TSTM_INGESTION_ENABLED=false" >> beta-server.env
           fi
+=======
+>>>>>>> origin/pr/669
           node scripts/write-deployment-env.mjs deploy/beta-deployment-config.json >> beta-server.env
           rsync -avz beta-server.env root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/.env
 

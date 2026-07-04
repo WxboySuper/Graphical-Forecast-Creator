@@ -64,6 +64,24 @@ let storageBytesCache = {
   value: null,
   expiresAt: 0,
 };
+const PREMIUM_CACHE_TTL_MS = 5 * 60 * 1000;
+let premiumSubscriptionsCache = {
+  value: null,
+  expiresAt: 0,
+};
+let pendingPremiumCount = null;
+
+/** Returns true when the premium subscriptions cache has a fresh value. */
+const hasFreshPremiumCache = () =>
+  premiumSubscriptionsCache.value !== null && Date.now() < premiumSubscriptionsCache.expiresAt;
+
+/** Stores a premium subscription count in the cache with a TTL. */
+const cachePremiumSubscriptions = (value) => {
+  premiumSubscriptionsCache = {
+    value,
+    expiresAt: Date.now() + PREMIUM_CACHE_TTL_MS,
+  };
+};
 
 /** True when the storage-footprint cache is still valid for reuse. */
 const hasFreshStorageCache = () =>
@@ -288,18 +306,36 @@ const getAdminUidAllowlist = () =>
 const isAllowedAdminUid = (uid) => getAdminUidAllowlist().includes(uid);
 
 /** Returns the current number of Stripe-backed premium subscriptions derived from entitlement truth in Firestore. */
-const countPremiumSubscriptions = async () => {
+const countPremiumSubscriptions = () => {
   const db = getAdminDb();
   if (!db) {
     return 0;
   }
 
-  const snapshot = await db
+  if (hasFreshPremiumCache()) {
+    return premiumSubscriptionsCache.value;
+  }
+
+  if (pendingPremiumCount) {
+    return pendingPremiumCount;
+  }
+
+  pendingPremiumCount = db
     .collection('userEntitlements')
     .where('billingStatus', 'in', ['active', 'trialing'])
-    .get();
+    .get()
+    .then((snapshot) => {
+      const count = snapshot.size;
+      cachePremiumSubscriptions(count);
+      pendingPremiumCount = null;
+      return count;
+    })
+    .catch((err) => {
+      pendingPremiumCount = null;
+      throw err;
+    });
 
-  return snapshot.size;
+  return pendingPremiumCount;
 };
 
 /** Returns the current total number of hosted accounts that have profile docs in Firestore. */
@@ -638,6 +674,16 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
   };
 };
 
+/** Returns true when the event requires authentication but the token is missing, sending a 401 if so. */
+const requireAuthForExpensiveEvents = (eventType, decodedToken, res) => {
+  if (eventType === 'cloud_cycle_saved' && !decodedToken) {
+    console.warn('[metrics] cloud_cycle_saved:unauthenticated');
+    res.status(401).json({ error: 'Authentication required for cloud save metrics.' });
+    return true;
+  }
+  return false;
+};
+
 /** Handles client product-metric events while gracefully no-oping when hosted metrics are unavailable. */
 const handleMetricEvent = async (req, res) => {
   if (!hasFirebaseAdminConfig()) {
@@ -653,6 +699,8 @@ const handleMetricEvent = async (req, res) => {
 
   const installationId = readInstallationId(req.body?.installationId);
   const decodedToken = await verifyRequestUser(req);
+
+  if (requireAuthForExpensiveEvents(eventType, decodedToken, res)) return;
 
   await recordMetricEvent({
     eventType,
