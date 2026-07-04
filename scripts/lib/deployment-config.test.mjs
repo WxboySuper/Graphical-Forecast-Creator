@@ -69,7 +69,6 @@ describe('deployment config', () => {
   });
 
   it('renders checked-in deployment config through the CLI', () => {
-<<<<<<< HEAD
     const output = execFileSync(process.execPath, [
       WRITE_DEPLOYMENT_ENV_SCRIPT,
       'deploy/production-deployment-config.json',
@@ -86,18 +85,6 @@ describe('deployment config', () => {
       ['TSTM_GENERATION_ENABLED', 'TSTM_INGESTION_ENABLED']
     );
     assert.ok(lines.every((line) => /^[A-Z][A-Z0-9_]*=.+$/.test(line)));
-=======
-    assert.equal(
-      execFileSync(process.execPath, [
-        WRITE_DEPLOYMENT_ENV_SCRIPT,
-        'deploy/production-deployment-config.json',
-      ], {
-        cwd: ROOT,
-        encoding: 'utf8',
-      }),
-      'TSTM_GENERATION_ENABLED=false\nTSTM_INGESTION_ENABLED=false\n'
-    );
->>>>>>> origin/pr/662
   });
 
   it('rejects config paths outside deploy', () => {

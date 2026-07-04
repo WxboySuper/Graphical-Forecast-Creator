@@ -19,16 +19,10 @@ describe('branch policy', () => {
     assert.equal(result.ok, true);
   });
 
-<<<<<<< HEAD
-  it('blocks fix branches to main', () => {
-    const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/deployment-config' });
-    assert.equal(result.ok, false);
-=======
   it('allows the deployment config workflow fix to main', () => {
     const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/deployment-config' });
     assert.equal(result.ok, true);
     assert.equal(result.kind, 'main-direct-fix');
->>>>>>> origin/pr/662
   });
 
   it('prioritizes feature to beta', () => {

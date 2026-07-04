@@ -76,10 +76,7 @@ Infrastructure fixes that land via `release/*` → `main` (not only `feature/rel
 - Automation bumps the **patch** on `main` after merge (e.g. `1.6.0` → `1.6.1`).
 - Creates a **GitHub Release** for the new patch version from `CHANGELOG.md`.
 - **Deploy Production to VPS** runs when that stable release is published.
-<<<<<<< HEAD:docs/operations/release-workflow.md
 - **PR porting** opens a reviewable port PR into `beta` (or skips when `porting/manual` is set or a manual beta PR already exists).
-=======
->>>>>>> origin/pr/662:docs/release-workflow.md
 
 ### `feature/release-*` → main (release infrastructure)
 
