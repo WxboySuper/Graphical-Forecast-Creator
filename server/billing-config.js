@@ -20,10 +20,8 @@ const parseDateEnv = (value) => {
 const getAnnualPromoPriceId = () => process.env.STRIPE_PRICE_ANNUAL_PROMO || '';
 
 /** Returns the public base URL used for Stripe return links. */
-const getBaseUrl = (req) =>
-  process.env.APP_BASE_URL ||
-  req.headers.origin ||
-  'http://127.0.0.1:3000';
+const getBaseUrl = () =>
+  process.env.APP_BASE_URL || 'http://127.0.0.1:3000';
 
 /** True when the annual intro pricing window is currently active. */
 const isAnnualPromoActive = () => {
@@ -72,10 +70,12 @@ const getBillingRuntimeConfig = () => {
       monthlyPriceId &&
       annualPlan.annualPriceId
   );
+  const hasBaseUrl = Boolean(process.env.APP_BASE_URL);
 
   return {
     billingEnabled,
-    checkoutEnabled: billingEnabled && hasFirebaseAdminConfig(),
+    hasBaseUrl,
+    checkoutEnabled: billingEnabled && hasFirebaseAdminConfig() && hasBaseUrl,
     annualPromoActive: annualPlan.annualPromoActive,
     monthlyDisplayPrice: MONTHLY_DISPLAY_PRICE,
     annualDisplayPrice: annualPlan.annualDisplayPrice,
