@@ -14,11 +14,7 @@ declare const __GFC_APP_VERSION__: string;
 
 type SentryExceptionValue = NonNullable<NonNullable<Event['exception']>['values']>[number];
 
-<<<<<<< HEAD
 const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]{1,2}\.canvas'\)$/i;
-=======
-const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]\.canvas'\)$/i;
->>>>>>> origin/pr/669
 const REQUEST_ANIMATION_FRAME_MECHANISM = 'auto.browser.browserapierrors.requestAnimationFrame';
 
 const REQUEST_LIFECYCLE_MESSAGES = [
