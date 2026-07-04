@@ -24,6 +24,7 @@ type SerializedDay = {
   discussion?: DiscussionData;
 };
 
+/** Converts serialized outlook map data back into a Map instance. */
 const deserializeOutlookMap = <K extends string, V>(
   value: [K, V][] | Record<string, V> | Map<K, V> | undefined,
 ): Map<K, V> | undefined => {
