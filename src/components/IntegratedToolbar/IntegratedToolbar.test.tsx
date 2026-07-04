@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { IntegratedToolbar } from './IntegratedToolbar';
+import { IntegratedToolbar, TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, { addFeature } from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
@@ -80,6 +80,20 @@ const ToolbarHarness: React.FC = () => {
   return <IntegratedToolbar controller={controller} />;
 };
 
+const TabbedToolbarHarness: React.FC = () => {
+  const mapRef = useRef<ForecastMapHandle | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const controller = useForecastWorkspaceController({
+    onSave: jest.fn(),
+    onLoad: jest.fn(),
+    mapRef,
+    fileInputRef,
+    addToast: mockAddToast,
+  });
+
+  return <TabbedIntegratedToolbar controller={controller} />;
+};
+
 describe('IntegratedToolbar undo/redo buttons', () => {
   beforeEach(() => {
     mockAddToast.mockReset();
@@ -121,5 +135,41 @@ describe('IntegratedToolbar undo/redo buttons', () => {
 
     await user.click(screen.getByLabelText('Redo'));
     expect(screen.getByLabelText('Undo')).toBeEnabled();
+  });
+});
+
+describe('TabbedIntegratedToolbar completion validation exposure', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('hides Complete action when forecastWorkflowV2 is not exposed', async () => {
+    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    const user = userEvent.setup();
+    const store = createStore();
+
+    render(
+      <Provider store={store}>
+        <TabbedToolbarHarness />
+      </Provider>
+    );
+
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.queryByText('Complete')).not.toBeInTheDocument();
+  });
+
+  test('shows Complete action when forecastWorkflowV2 is exposed', async () => {
+    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    const user = userEvent.setup();
+    const store = createStore();
+
+    render(
+      <Provider store={store}>
+        <TabbedToolbarHarness />
+      </Provider>
+    );
+
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.getByText('Complete')).toBeInTheDocument();
   });
 });
