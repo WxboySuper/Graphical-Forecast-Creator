@@ -96,6 +96,31 @@ const ALL_OUTLOOK_TYPES: OutlookType[] = [
   'day4-8',
 ];
 const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical'];
+
+/** Resolves the workflow ID from template or cycle metadata, falling back to 'default'. */
+const resolveWorkflowId = (
+  template?: WorkflowMetadata,
+  cycleMetadata?: CycleMetadata,
+): string => template?.id || cycleMetadata?.workflowId || 'default';
+
+/** Creates initial CycleMetadata for a new cycle. */
+const createInitialCycleMetadata = (
+  workflowId: string,
+  cycleDate: string,
+  now: string,
+): CycleMetadata => ({
+  id: `WF-${workflowId}-${cycleDate}`,
+  workflowId,
+  cycleDate,
+  status: 'in-progress',
+  outlookVersions: [{
+    version: 1,
+    status: 'in-progress',
+    createdAt: now,
+  }],
+  createdAt: now,
+  updatedAt: now,
+});
 const COPY_FEATURE_RULES: Record<DayBucket, Record<DayBucket, CopyFeatureRule[]>> = {
   day12: {
     day12: DIRECT_DAY12_COPY_TYPES.map((type) => ({ sourceType: type, targetType: type })),
@@ -1112,26 +1137,11 @@ export const forecastSlice = createSlice({
       state.outlookVersionSnapshots = [];
       
       // Set workflow metadata with derivedFromCycleId
-      const workflowId = workflowTemplate?.id || sourceCycle.workflowMetadata?.workflowId || 'default';
-      state.workflowMetadata = {
-        id: `WF-${workflowId}-${targetDate}`,
-        workflowId,
-        cycleDate: targetDate,
-        status: 'in-progress',
-        outlookVersions: [{
-          version: 1,
-          status: 'in-progress',
-          createdAt: now,
-        }],
-        createdAt: now,
-        updatedAt: now,
-      };
+      const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
+      state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
       
-      if (workflowTemplate) {
-        state.workflowTemplate = workflowTemplate;
-      } else if (state.workflowTemplate) {
-        // Keep existing template if not provided
-      }
+      // Restore or set workflow template
+      state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
     },
   }
 });
