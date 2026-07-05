@@ -1013,6 +1013,13 @@ export const forecastSlice = createSlice({
       // Restore or clear workflow metadata
       if (savedCycle.workflowMetadata) {
         state.workflowMetadata = savedCycle.workflowMetadata;
+        // Restore the workflow template from the workflowId
+        // Create a minimal template if the full template isn't available
+        state.workflowTemplate = {
+          id: savedCycle.workflowMetadata.workflowId,
+          label: savedCycle.workflowMetadata.workflowId,
+          groupings: [],
+        };
       } else {
         state.workflowMetadata = undefined;
         state.workflowTemplate = undefined;
