@@ -635,7 +635,7 @@ describe('forecastSlice undo/redo', () => {
         expect(state.workflowMetadata?.outlookVersions[0].version).toBe(1);
         
         // Create an update
-        state = reducer(state, createOutlookUpdate({}));
+        state = reducer(state, createOutlookUpdate());
         
         expect(state.workflowMetadata?.outlookVersions).toHaveLength(2);
         expect(state.workflowMetadata?.outlookVersions[0].status).toBe('completed');
@@ -650,9 +650,9 @@ describe('forecastSlice undo/redo', () => {
           workflowTemplate: testWorkflowTemplate,
         }));
         
-        state = reducer(state, createOutlookUpdate({}));
-        state = reducer(state, createOutlookUpdate({}));
-        state = reducer(state, createOutlookUpdate({}));
+        state = reducer(state, createOutlookUpdate());
+        state = reducer(state, createOutlookUpdate());
+        state = reducer(state, createOutlookUpdate());
         
         expect(state.workflowMetadata?.outlookVersions).toHaveLength(4);
         expect(state.workflowMetadata?.outlookVersions[3].version).toBe(4);

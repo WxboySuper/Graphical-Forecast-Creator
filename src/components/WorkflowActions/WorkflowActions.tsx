@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   Workflow,
   Play,
-  RotateCcw,
   RefreshCw,
   GitBranch,
   Calendar,
@@ -157,7 +156,7 @@ export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
   /** Handle creating a new outlook version within the current cycle. */
   const handleCreateUpdate = () => {
     if (isInProgress && hasOutlookData) {
-      dispatch(createOutlookUpdate({}));
+      dispatch(createOutlookUpdate());
     }
   };
   
@@ -206,14 +205,6 @@ export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
             <div>
               <div className="font-medium">Start Blank</div>
               <div className="text-xs text-muted-foreground">Begin a new empty cycle</div>
-            </div>
-          </DropdownMenuItem>
-          
-          <DropdownMenuItem onClick={() => {}}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            <div>
-              <div className="font-medium">Continue Incomplete</div>
-              <div className="text-xs text-muted-foreground">Resume a saved cycle</div>
             </div>
           </DropdownMenuItem>
           

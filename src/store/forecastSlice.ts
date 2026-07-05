@@ -1000,7 +1000,7 @@ export const forecastSlice = createSlice({
     },
 
     /** Create a new outlook version within the current cycle (same-cycle update). */
-    createOutlookUpdate: (state, action: PayloadAction<{ versionLabel?: string }>) => {
+    createOutlookUpdate: (state) => {
       const now = new Date().toISOString();
       
       // Determine the next version number
