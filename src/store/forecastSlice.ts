@@ -992,6 +992,10 @@ export const forecastSlice = createSlice({
           createdAt: now,
           updatedAt: now,
         };
+      } else {
+        // Clear stale workflow state when starting without a template
+        state.workflowTemplate = undefined;
+        state.workflowMetadata = undefined;
       }
     },
 
