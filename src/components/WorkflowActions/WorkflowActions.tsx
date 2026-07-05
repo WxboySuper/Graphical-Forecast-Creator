@@ -129,7 +129,7 @@ const WorkflowActionsTrigger: React.FC = () => (
 /** Renders the workflow dropdown menu body. */
 const WorkflowMenuContent: React.FC<{
   isInProgress: boolean;
-  hasVersionHistory: boolean;
+  canCreateUpdate: boolean;
   currentVersionNumber: number;
   workflowTemplate: WorkflowMetadata | null | undefined;
   workflowMetadata: { status: string } | undefined;
@@ -138,7 +138,7 @@ const WorkflowMenuContent: React.FC<{
   onStartFromPrevious: () => void;
 }> = ({
   isInProgress,
-  hasVersionHistory,
+  canCreateUpdate,
   currentVersionNumber,
   workflowTemplate,
   workflowMetadata,
@@ -159,7 +159,7 @@ const WorkflowMenuContent: React.FC<{
     
     <DropdownMenuItem 
       onClick={onCreateUpdate}
-      disabled={!isInProgress || !hasVersionHistory}
+      disabled={!canCreateUpdate}
     >
       <RefreshCw className="h-4 w-4 mr-2" />
       <span className="font-medium">Create Update (v{currentVersionNumber + 1})</span>
@@ -193,7 +193,7 @@ export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
       
       <WorkflowMenuContent
         isInProgress={actions.isInProgress}
-        hasVersionHistory={actions.hasVersionHistory}
+        canCreateUpdate={actions.canCreateUpdate}
         currentVersionNumber={actions.currentVersionNumber}
         workflowTemplate={actions.workflowTemplate}
         workflowMetadata={actions.workflowMetadata}

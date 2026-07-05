@@ -950,7 +950,11 @@ export const forecastSlice = createSlice({
     }>) => {
       const { workflowTemplate, cycleDate } = action.payload;
       clearHistory(state);
-      localStorage.removeItem('forecastData');
+      try {
+        localStorage.removeItem('forecastData');
+      } catch {
+        // Ignore localStorage errors
+      }
       const today = cycleDate || getLocalCalendarDate();
       const newCycle: ForecastCycle = {
         days: { 1: createEmptyOutlook(1) },
@@ -988,14 +992,16 @@ export const forecastSlice = createSlice({
       if (!savedCycle) return;
 
       clearHistory(state);
-      // Deep clone the forecast cycle to avoid shared references
-      state.forecastCycle = JSON.parse(JSON.stringify(savedCycle.forecastCycle));
+      state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
       state.isSaved = true;
       state.outlookVersionSnapshots = [];
       
-      // Restore workflow metadata if present
+      // Restore or clear workflow metadata
       if (savedCycle.workflowMetadata) {
         state.workflowMetadata = savedCycle.workflowMetadata;
+      } else {
+        state.workflowMetadata = undefined;
+        state.workflowTemplate = undefined;
       }
     },
 
@@ -1061,7 +1067,7 @@ export const forecastSlice = createSlice({
       
       // Create a new cycle derived from the source
       clearHistory(state);
-      state.forecastCycle = JSON.parse(JSON.stringify(sourceCycle.forecastCycle));
+      state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(sourceCycle.forecastCycle));
       state.forecastCycle.cycleDate = targetDate;
       state.forecastCycle.currentDay = 1;
       state.isSaved = false;

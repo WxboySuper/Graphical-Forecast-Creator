@@ -26,6 +26,9 @@ export function useWorkflowActions() {
   const isWorkflowMode = isFeatureExposed('forecastWorkflowV2');
   const isInProgress = workflowMetadata?.status === 'in-progress';
   const hasVersionHistory = outlookVersionSnapshots.length > 0 || currentVersionNumber > 1;
+  // Allow creating an update when in workflow mode and either version history exists
+  // or the current version is in-progress (user has started working)
+  const canCreateUpdate = isInProgress && (hasVersionHistory || workflowMetadata?.outlookVersions.some(v => v.status === 'in-progress'));
 
   /** Handle starting a blank cycle with optional workflow template. */
   const handleStartBlank = (template?: WorkflowMetadata) => {
@@ -38,7 +41,7 @@ export function useWorkflowActions() {
 
   /** Handle creating a new outlook version within the current cycle. */
   const handleCreateUpdate = () => {
-    if (isInProgress && hasVersionHistory) {
+    if (canCreateUpdate) {
       dispatch(createOutlookUpdate());
     }
   };
@@ -55,7 +58,7 @@ export function useWorkflowActions() {
   return {
     isWorkflowMode,
     isInProgress,
-    hasVersionHistory,
+    canCreateUpdate,
     currentVersionNumber,
     workflowMetadata,
     workflowTemplate,
