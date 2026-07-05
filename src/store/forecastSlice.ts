@@ -10,6 +10,7 @@ import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
+import { getWorkflowTemplateById } from '../components/WorkflowActions/workflowTemplates';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -732,6 +733,9 @@ export const forecastSlice = createSlice({
       clearHistory(state);
       state.isSaved = true;
       state.outlookVersionSnapshots = [];
+      // Clear workflow state when importing a plain forecast cycle
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
     },
 
     // Legacy import support (Single day) -> Import into CURRENT day
@@ -812,7 +816,7 @@ export const forecastSlice = createSlice({
         if (savedCycle.workflowMetadata) {
           state.workflowMetadata = savedCycle.workflowMetadata;
           // Restore the workflow template from the workflowId
-          state.workflowTemplate = {
+          state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
             id: savedCycle.workflowMetadata.workflowId,
             label: savedCycle.workflowMetadata.workflowId,
             groupings: [],
@@ -1023,8 +1027,7 @@ export const forecastSlice = createSlice({
       if (savedCycle.workflowMetadata) {
         state.workflowMetadata = savedCycle.workflowMetadata;
         // Restore the workflow template from the workflowId
-        // Create a minimal template if the full template isn't available
-        state.workflowTemplate = {
+        state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
           id: savedCycle.workflowMetadata.workflowId,
           label: savedCycle.workflowMetadata.workflowId,
           groupings: [],
