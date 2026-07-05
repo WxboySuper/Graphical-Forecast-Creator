@@ -808,9 +808,18 @@ export const forecastSlice = createSlice({
         state.isSaved = true;
         state.outlookVersionSnapshots = [];
         
-        // Restore workflow metadata if present
+        // Restore or clear workflow metadata
         if (savedCycle.workflowMetadata) {
           state.workflowMetadata = savedCycle.workflowMetadata;
+          // Restore the workflow template from the workflowId
+          state.workflowTemplate = {
+            id: savedCycle.workflowMetadata.workflowId,
+            label: savedCycle.workflowMetadata.workflowId,
+            groupings: [],
+          };
+        } else {
+          state.workflowMetadata = undefined;
+          state.workflowTemplate = undefined;
         }
       }
     },
