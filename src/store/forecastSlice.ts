@@ -914,7 +914,7 @@ export const forecastSlice = createSlice({
         state.workflowMetadata = pkg.cycles[0];
       }
       if (pkg.metadata) {
-        state.workflowTemplate = {
+        state.workflowTemplate = getWorkflowTemplateById(pkg.metadata.workflowId) || {
           id: pkg.metadata.workflowId,
           label: pkg.metadata.workflowId,
           groupings: [],
