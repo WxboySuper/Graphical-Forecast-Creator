@@ -2,6 +2,8 @@ import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType, CycleMetadata } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
+import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
+import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 
 const CURRENT_VERSION = '1.0.0';
 
@@ -112,15 +114,12 @@ export const serializeForecast = (
     forecastCycle: {
       days: serializedDays,
       currentDay: forecastCycle.currentDay,
-      cycleDate: forecastCycle.cycleDate
+      cycleDate: forecastCycle.cycleDate,
+      ...completionMetadataFromForecastCycle(forecastCycle),
     },
-    mapView
+    mapView,
+    ...(cycleMetadata ? { cycleMetadata } : {}),
   };
-
-  // Embed v2 workflow metadata when provided
-  if (cycleMetadata) {
-    (result as GFCForecastSaveData & { cycleMetadata?: CycleMetadata }).cycleMetadata = cycleMetadata;
-  }
 
   return result;
 };
@@ -130,54 +129,14 @@ export const serializeForecast = (
  * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
 export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
-  // Check for v0.5.0+ format
   if (data.forecastCycle) {
-    const days: Partial<Record<DayType, OutlookDay>> = {};
     const cycle = data.forecastCycle;
-    
-    (Object.keys(cycle.days) as unknown as DayType[]).forEach(day => {
-      const savedDay = cycle.days[day];
-      if (savedDay) {
-        const outlookData: OutlookData = {};
-        
-        // Only deserialize outlook maps that exist in the saved data
-        if (savedDay.data.tornado) outlookData.tornado = deserializeOutlookMap(savedDay.data.tornado);
-        if (savedDay.data.wind) outlookData.wind = deserializeOutlookMap(savedDay.data.wind);
-        if (savedDay.data.hail) outlookData.hail = deserializeOutlookMap(savedDay.data.hail);
-        if (savedDay.data.totalSevere) outlookData.totalSevere = deserializeOutlookMap(savedDay.data.totalSevere);
-        if (savedDay.data['day4-8']) outlookData['day4-8'] = deserializeOutlookMap(savedDay.data['day4-8']);
-        if (savedDay.data.categorical) outlookData.categorical = deserializeOutlookMap(savedDay.data.categorical);
-        
-        days[day] = {
-          day: savedDay.day,
-          metadata: (() => {
-            const meta = savedDay.metadata as Partial<{
-              issueDate?: string;
-              validDate?: string;
-              issuanceTime?: string;
-              lowProbabilityOutlooks?: OutlookDay['metadata']['lowProbabilityOutlooks'];
-              createdAt?: string;
-              lastModified?: string;
-            }>;
-            return {
-              issueDate: meta.issueDate ?? savedDay.metadata.issueDate,
-              validDate: meta.validDate ?? savedDay.metadata.validDate,
-              issuanceTime: meta.issuanceTime ?? savedDay.metadata.issuanceTime,
-              lowProbabilityOutlooks: meta.lowProbabilityOutlooks ?? savedDay.metadata.lowProbabilityOutlooks ?? [],
-              createdAt: meta.createdAt ?? new Date().toISOString(),
-              lastModified: meta.lastModified ?? new Date().toISOString(),
-            };
-          })(),
-          data: outlookData,
-          discussion: (savedDay as Partial<{ discussion?: DiscussionData }>).discussion
-        };
-      }
-    });
 
     return {
-      days,
+      days: deserializeForecastCycleDays(cycle),
       currentDay: cycle.currentDay,
-      cycleDate: cycle.cycleDate
+      cycleDate: cycle.cycleDate,
+      ...completionMetadataFromForecastCycle(cycle),
     };
   }
 

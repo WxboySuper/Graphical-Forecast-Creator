@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #670
+
+- Address Greptile and CodeScene review feedback from prematurely merged #664: preserve legacy grouping data via `migrateLegacyForecastToSerializedPackage`, remove dead helpers, add typed `cycleMetadata` on `GFCForecastSaveData`, and reduce serialization complexity.
+
 ### PR #676
 
 - Added 8-step agentic development workflow to AGENTS.md
@@ -11,6 +15,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 ### PR #664
 
 - Added backward-compatible cycle and workflow serialization with v2 metadata support
+
+### PR #666
+
+- Added workflow completion validation with actionable missing item navigation and omission acknowledgement
 
 ### PR #660
 

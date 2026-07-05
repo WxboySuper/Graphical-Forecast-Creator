@@ -1,7 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
-import type { CycleMetadata, WorkflowMetadata, Package } from '../types/workflow';
+import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
@@ -9,6 +9,7 @@ import { cloneForecastCycle } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
+import { validateCycleCompletion } from '../utils/completionValidation';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -42,6 +43,11 @@ export interface ForecastState {
   workflowMetadata?: CycleMetadata;
   /** v2 workflow template metadata (optional, present when the editor is in workflow mode). */
   workflowTemplate?: WorkflowMetadata;
+  completionValidation: {
+    lastResult: CycleValidationResult | null;
+    showCompletionModal: boolean;
+    omittedDays: Partial<Record<DayType, string>>;
+  };
 }
 
 interface ForecastDaySnapshot {
@@ -170,7 +176,12 @@ const initialState: ForecastState = {
   isSaved: true,
   emergencyMode: false,
   savedCycles: [],
-  historyByDay: {}
+  historyByDay: {},
+  completionValidation: {
+    lastResult: null,
+    showCompletionModal: false,
+    omittedDays: {},
+  }
 };
 
 // Helpers to keep reducers small and testable
@@ -864,7 +875,46 @@ export const forecastSlice = createSlice({
       }
       clearHistory(state);
       state.isSaved = true;
-    }
+    },
+
+    // Completion validation (WF-03)
+    validateCompletion: (state) => {
+      const result = validateCycleCompletion(state.forecastCycle);
+      state.completionValidation.lastResult = result;
+      state.completionValidation.omittedDays = {};
+      state.completionValidation.showCompletionModal = true;
+    },
+
+    dismissCompletionModal: (state) => {
+      state.completionValidation.showCompletionModal = false;
+    },
+
+    omitDay: (state, action: PayloadAction<{ day: DayType; reason: string }>) => {
+      const { day, reason } = action.payload;
+      state.completionValidation.omittedDays[day] = reason;
+    },
+
+    completeCycle: (state) => {
+      state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
+      delete state.forecastCycle.omittedDayReasons;
+      state.completionValidation.showCompletionModal = false;
+      state.completionValidation.lastResult = null;
+      state.completionValidation.omittedDays = {};
+      state.isSaved = false;
+    },
+
+    completeWithOmissions: (state) => {
+      state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
+      state.forecastCycle.omittedDayReasons = { ...state.completionValidation.omittedDays };
+      state.completionValidation.showCompletionModal = false;
+      state.completionValidation.lastResult = null;
+      state.completionValidation.omittedDays = {};
+      state.isSaved = false;
+    },
+
+    clearOmittedDays: (state) => {
+      state.completionValidation.omittedDays = {};
+    },
   }
 });
 
@@ -900,6 +950,12 @@ export const {
   setWorkflowMetadata,
   setWorkflowTemplate,
   importWorkflowPackage,
+  validateCompletion,
+  dismissCompletionModal,
+  omitDay,
+  completeCycle,
+  completeWithOmissions,
+  clearOmittedDays,
 } = forecastSlice.actions;
 
 /** Selects the full forecast slice. */
@@ -938,5 +994,17 @@ export const selectIsLowProbability = (state: RootState) => {
   const activeType = state.forecast.drawingState.activeOutlookType;
   return day?.metadata?.lowProbabilityOutlooks?.includes(activeType) || false;
 };
+
+/** Selects the last completion validation result. */
+export const selectCompletionValidationResult = (state: RootState) =>
+  state.forecast.completionValidation.lastResult;
+
+/** Selects whether the completion modal is visible. */
+export const selectShowCompletionModal = (state: RootState) =>
+  state.forecast.completionValidation.showCompletionModal;
+
+/** Selects the omitted days map. */
+export const selectOmittedDays = (state: RootState) =>
+  state.forecast.completionValidation.omittedDays;
 
 export default forecastSlice.reducer;

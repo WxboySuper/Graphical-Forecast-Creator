@@ -15,6 +15,11 @@ import reducer, {
   undoLastEdit,
   updateFeature,
   removeFeature,
+  completeCycle,
+  completeWithOmissions,
+  markAsSaved,
+  omitDay,
+  validateCompletion,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -514,5 +519,33 @@ describe('forecastSlice undo/redo', () => {
     );
 
     expect(nextState.forecastCycle.days[4]?.data['day4-8']?.size ?? 0).toBe(0);
+  });
+
+  it('completeCycle persists acknowledgement metadata without omission reasons', () => {
+    let state = reducer(undefined, markAsSaved());
+    state = reducer(state, validateCompletion());
+
+    const nextState = reducer(state, completeCycle());
+
+    expect(nextState.forecastCycle.completionAcknowledgedAt).toEqual(expect.any(String));
+    expect(nextState.forecastCycle.omittedDayReasons).toBeUndefined();
+    expect(nextState.isSaved).toBe(false);
+  });
+
+  it('completeWithOmissions persists acknowledgement metadata and marks the forecast unsaved', () => {
+    let state = reducer(undefined, markAsSaved());
+    state = reducer(state, validateCompletion());
+    state = reducer(state, omitDay({ day: 3, reason: 'No severe weather expected' }));
+
+    expect(state.completionValidation.showCompletionModal).toBe(true);
+
+    const nextState = reducer(state, completeWithOmissions());
+
+    expect(nextState.completionValidation.showCompletionModal).toBe(false);
+    expect(nextState.completionValidation.lastResult).toBeNull();
+    expect(nextState.forecastCycle.completionAcknowledgedAt).toEqual(expect.any(String));
+    expect(nextState.forecastCycle.omittedDayReasons).toEqual({ 3: 'No severe weather expected' });
+    expect(nextState.isSaved).toBe(false);
+    expect(nextState.completionValidation.omittedDays).toEqual({});
   });
 });

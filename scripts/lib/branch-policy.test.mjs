@@ -19,7 +19,7 @@ describe('branch policy', () => {
     assert.equal(result.ok, true);
   });
 
-  it('blocks fix/deployment-config to main (no permanent allowlist entry)', () => {
+  it('blocks fix/deployment-config to main', () => {
     const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'fix/deployment-config' });
     assert.equal(result.ok, false);
   });
