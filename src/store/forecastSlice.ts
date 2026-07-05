@@ -1,7 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
-import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, OutlookVersion } from '../types/workflow';
+import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
@@ -1001,7 +1001,6 @@ export const forecastSlice = createSlice({
 
     /** Create a new outlook version within the current cycle (same-cycle update). */
     createOutlookUpdate: (state, action: PayloadAction<{ versionLabel?: string }>) => {
-      const { versionLabel } = action.payload;
       const now = new Date().toISOString();
       
       // Determine the next version number
