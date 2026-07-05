@@ -194,10 +194,7 @@ export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
         
         <DropdownMenuItem onClick={() => setShowStartNewModal(true)}>
           <Play className="h-4 w-4 mr-2" />
-          <div>
-            <div className="font-medium">Start Blank</div>
-            <div className="text-xs text-muted-foreground">Begin a new empty cycle</div>
-          </div>
+          <span className="font-medium">Start Blank</span>
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
@@ -207,20 +204,12 @@ export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
           disabled={!isInProgress || !hasOutlookData}
         >
           <RefreshCw className="h-4 w-4 mr-2" />
-          <div>
-            <div className="font-medium">Create Update</div>
-            <div className="text-xs text-muted-foreground">
-              New outlook version (v{currentVersionNumber + 1})
-            </div>
-          </div>
+          <span className="font-medium">Create Update (v{currentVersionNumber + 1})</span>
         </DropdownMenuItem>
         
         <DropdownMenuItem onClick={() => setShowStartFromPreviousModal(true)}>
           <GitBranch className="h-4 w-4 mr-2" />
-          <div>
-            <div className="font-medium">Start from Previous</div>
-            <div className="text-xs text-muted-foreground">Base on an existing cycle</div>
-          </div>
+          <span className="font-medium">Start from Previous</span>
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
