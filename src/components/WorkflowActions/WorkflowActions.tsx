@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
 import {
   Workflow,
   Play,
@@ -18,18 +17,9 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
-import { isFeatureExposed } from '../../config/featureExposure';
-import { 
-  startBlankCycle, 
-  createOutlookUpdate,
-  startFromPreviousCycle,
-  selectWorkflowMetadata,
-  selectWorkflowTemplate,
-  selectOutlookVersionSnapshots,
-  selectCurrentVersionNumber,
-} from '../../store/forecastSlice';
 import type { WorkflowMetadata } from '../../types/workflow';
 import { DEFAULT_WORKFLOW_TEMPLATES } from './workflowTemplates';
+import { useWorkflowActions } from './useWorkflowActions';
 
 interface WorkflowActionsProps {
   className?: string;
@@ -41,7 +31,7 @@ const StartNewWorkflowModal: React.FC<{
   onSelect: (template?: WorkflowMetadata) => void;
   onClose: () => void;
 }> = ({ templates, onSelect, onClose }) => {
-  const [selectedTemplate, setSelectedTemplate] = useState<WorkflowMetadata | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = React.useState<WorkflowMetadata | null>(null);
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -88,37 +78,33 @@ const StartNewWorkflowModal: React.FC<{
 const StartFromPreviousModal: React.FC<{
   onSelect: (sourceCycleId: string) => void;
   onClose: () => void;
-}> = ({ onClose }) => {
-  // This is a placeholder - in a real implementation, this would show
-  // a list of saved cycles from the cycle history
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-background rounded-lg shadow-lg p-6 w-96">
-        <h2 className="text-lg font-semibold mb-4">Start from Previous Cycle</h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          Select a previous cycle to use as a base for your new forecast.
+}> = ({ onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="bg-background rounded-lg shadow-lg p-6 w-96">
+      <h2 className="text-lg font-semibold mb-4">Start from Previous Cycle</h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Select a previous cycle to use as a base for your new forecast.
+      </p>
+      
+      <div className="text-center py-8 text-muted-foreground">
+        <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+        <p>Cycle history integration coming soon.</p>
+        <p className="text-xs mt-1">
+          Use the History action to load a previous cycle, then create an update.
         </p>
-        
-        <div className="text-center py-8 text-muted-foreground">
-          <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-          <p>Cycle history integration coming soon.</p>
-          <p className="text-xs mt-1">
-            Use the History action to load a previous cycle, then create an update.
-          </p>
-        </div>
-        
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button disabled>
-            Select Cycle
-          </Button>
-        </div>
+      </div>
+      
+      <div className="flex justify-end gap-2 mt-6">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button disabled>
+          Select Cycle
+        </Button>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 /** Trigger button for the workflow actions dropdown. */
 const WorkflowActionsTrigger: React.FC = () => (
@@ -140,100 +126,94 @@ const WorkflowActionsTrigger: React.FC = () => (
   </DropdownMenuTrigger>
 );
 
+/** Renders the workflow dropdown menu body. */
+const WorkflowMenuContent: React.FC<{
+  isInProgress: boolean;
+  hasVersionHistory: boolean;
+  currentVersionNumber: number;
+  workflowTemplate: WorkflowMetadata | null | undefined;
+  workflowMetadata: { status: string } | undefined;
+  onStartBlank: () => void;
+  onCreateUpdate: () => void;
+  onStartFromPrevious: () => void;
+}> = ({
+  isInProgress,
+  hasVersionHistory,
+  currentVersionNumber,
+  workflowTemplate,
+  workflowMetadata,
+  onStartBlank,
+  onCreateUpdate,
+  onStartFromPrevious,
+}) => (
+  <DropdownMenuContent align="end" className="w-56">
+    <DropdownMenuLabel>Workflow Actions</DropdownMenuLabel>
+    <DropdownMenuSeparator />
+    
+    <DropdownMenuItem onClick={onStartBlank}>
+      <Play className="h-4 w-4 mr-2" />
+      <span className="font-medium">Start Blank</span>
+    </DropdownMenuItem>
+    
+    <DropdownMenuSeparator />
+    
+    <DropdownMenuItem 
+      onClick={onCreateUpdate}
+      disabled={!isInProgress || !hasVersionHistory}
+    >
+      <RefreshCw className="h-4 w-4 mr-2" />
+      <span className="font-medium">Create Update (v{currentVersionNumber + 1})</span>
+    </DropdownMenuItem>
+    
+    <DropdownMenuItem onClick={onStartFromPrevious}>
+      <GitBranch className="h-4 w-4 mr-2" />
+      <span className="font-medium">Start from Previous</span>
+    </DropdownMenuItem>
+    
+    <DropdownMenuSeparator />
+    
+    <DropdownMenuLabel className="text-xs text-muted-foreground">
+      Current: {workflowTemplate?.label ?? 'No workflow'} 
+      {workflowMetadata != null && ` • v${currentVersionNumber}`}
+    </DropdownMenuLabel>
+  </DropdownMenuContent>
+);
+
 /** Workflow actions dropdown menu for the forecast editor toolbar. */
 export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
-  const dispatch = useDispatch();
-  const [showStartNewModal, setShowStartNewModal] = useState(false);
-  const [showStartFromPreviousModal, setShowStartFromPreviousModal] = useState(false);
-  
-  const workflowMetadata = useSelector(selectWorkflowMetadata);
-  const workflowTemplate = useSelector(selectWorkflowTemplate);
-  const outlookVersionSnapshots = useSelector(selectOutlookVersionSnapshots);
-  const currentVersionNumber = useSelector(selectCurrentVersionNumber);
-  
-  const isWorkflowMode = isFeatureExposed('forecastWorkflowV2');
-  const isInProgress = workflowMetadata?.status === 'in-progress';
-  const hasOutlookData = outlookVersionSnapshots.length > 0 || currentVersionNumber > 1;
-  
-  if (!isWorkflowMode) {
+  const actions = useWorkflowActions();
+
+  if (!actions.isWorkflowMode) {
     return null;
   }
-  
-  /** Handle starting a blank cycle with optional workflow template. */
-  const handleStartBlank = (template?: WorkflowMetadata) => {
-    dispatch(startBlankCycle({ 
-      workflowTemplate: template,
-      cycleDate: new Date().toISOString().split('T')[0],
-    }));
-    setShowStartNewModal(false);
-  };
-  
-  /** Handle creating a new outlook version within the current cycle. */
-  const handleCreateUpdate = () => {
-    if (isInProgress && hasOutlookData) {
-      dispatch(createOutlookUpdate());
-    }
-  };
-  
-  /** Handle starting a new cycle derived from a previous cycle. */
-  const handleStartFromPrevious = (sourceCycleId: string) => {
-    dispatch(startFromPreviousCycle({
-      sourceCycleId,
-      workflowTemplate: workflowTemplate || undefined,
-    }));
-    setShowStartFromPreviousModal(false);
-  };
-  
+
   return (
     <DropdownMenu>
       <WorkflowActionsTrigger />
       
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Workflow Actions</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem onClick={() => setShowStartNewModal(true)}>
-          <Play className="h-4 w-4 mr-2" />
-          <span className="font-medium">Start Blank</span>
-        </DropdownMenuItem>
-        
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
-          onClick={handleCreateUpdate}
-          disabled={!isInProgress || !hasOutlookData}
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          <span className="font-medium">Create Update (v{currentVersionNumber + 1})</span>
-        </DropdownMenuItem>
-        
-        <DropdownMenuItem onClick={() => setShowStartFromPreviousModal(true)}>
-          <GitBranch className="h-4 w-4 mr-2" />
-          <span className="font-medium">Start from Previous</span>
-        </DropdownMenuItem>
-        
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Current: {workflowTemplate?.label || 'No workflow'} 
-          {workflowMetadata && ` • v${currentVersionNumber}`}
-        </DropdownMenuLabel>
-      </DropdownMenuContent>
+      <WorkflowMenuContent
+        isInProgress={actions.isInProgress}
+        hasVersionHistory={actions.hasVersionHistory}
+        currentVersionNumber={actions.currentVersionNumber}
+        workflowTemplate={actions.workflowTemplate}
+        workflowMetadata={actions.workflowMetadata}
+        onStartBlank={() => actions.setShowStartNewModal(true)}
+        onCreateUpdate={actions.handleCreateUpdate}
+        onStartFromPrevious={() => actions.setShowStartFromPreviousModal(true)}
+      />
       
-      {/* Start New Modal */}
-      {showStartNewModal && (
+      {actions.showStartNewModal && (
         <StartNewWorkflowModal
           templates={DEFAULT_WORKFLOW_TEMPLATES}
-          onSelect={handleStartBlank}
-          onClose={() => setShowStartNewModal(false)}
+          onSelect={actions.handleStartBlank}
+          onClose={() => actions.setShowStartNewModal(false)}
         />
       )}
       
-      {/* Start from Previous Modal */}
-      {showStartFromPreviousModal && (
+      {actions.showStartFromPreviousModal && (
         <StartFromPreviousModal
-          onSelect={handleStartFromPrevious}
-          onClose={() => setShowStartFromPreviousModal(false)}
+          onSelect={actions.handleStartFromPrevious}
+          onClose={() => actions.setShowStartFromPreviousModal(false)}
         />
       )}
     </DropdownMenu>
