@@ -17,11 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '../ui/tooltip';
 import { cn } from '../../lib/utils';
 import { isFeatureExposed } from '../../config/featureExposure';
 import { 
@@ -125,6 +120,26 @@ const StartFromPreviousModal: React.FC<{
   );
 };
 
+/** Trigger button for the workflow actions dropdown. */
+const WorkflowActionsTrigger: React.FC = () => (
+  <DropdownMenuTrigger asChild>
+    <Button
+      variant="outline"
+      className={cn(
+        'tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs',
+        'bg-background',
+        'tabbed-integrated-toolbar__action-tile--primary'
+      )}
+    >
+      <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-violet-500/15 text-violet-700">
+        <Workflow className="h-4 w-4" />
+      </span>
+      <span className="font-semibold">Workflow</span>
+      <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+    </Button>
+  </DropdownMenuTrigger>
+);
+
 /** Workflow actions dropdown menu for the forecast editor toolbar. */
 export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
   const dispatch = useDispatch();
@@ -170,75 +185,51 @@ export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
   };
   
   return (
-    <>
-      <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  'tabbed-integrated-toolbar__action-tile h-10 shrink-0 justify-start rounded-xl px-2.5 text-left text-xs',
-                  'bg-background',
-                  'tabbed-integrated-toolbar__action-tile--primary'
-                )}
-              >
-                <span className="tabbed-integrated-toolbar__action-icon rounded-lg p-1.5 bg-violet-500/15 text-violet-700">
-                  <Workflow className="h-4 w-4" />
-                </span>
-                <span className="font-semibold">Workflow</span>
-                <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Workflow actions for cycle management</p>
-          </TooltipContent>
-        </Tooltip>
+    <DropdownMenu>
+      <WorkflowActionsTrigger />
+      
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Workflow Actions</DropdownMenuLabel>
+        <DropdownMenuSeparator />
         
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Workflow Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          
-          <DropdownMenuItem onClick={() => setShowStartNewModal(true)}>
-            <Play className="h-4 w-4 mr-2" />
-            <div>
-              <div className="font-medium">Start Blank</div>
-              <div className="text-xs text-muted-foreground">Begin a new empty cycle</div>
+        <DropdownMenuItem onClick={() => setShowStartNewModal(true)}>
+          <Play className="h-4 w-4 mr-2" />
+          <div>
+            <div className="font-medium">Start Blank</div>
+            <div className="text-xs text-muted-foreground">Begin a new empty cycle</div>
+          </div>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuItem 
+          onClick={handleCreateUpdate}
+          disabled={!isInProgress || !hasOutlookData}
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          <div>
+            <div className="font-medium">Create Update</div>
+            <div className="text-xs text-muted-foreground">
+              New outlook version (v{currentVersionNumber + 1})
             </div>
-          </DropdownMenuItem>
-          
-          <DropdownMenuSeparator />
-          
-          <DropdownMenuItem 
-            onClick={handleCreateUpdate}
-            disabled={!isInProgress || !hasOutlookData}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            <div>
-              <div className="font-medium">Create Update</div>
-              <div className="text-xs text-muted-foreground">
-                New outlook version (v{currentVersionNumber + 1})
-              </div>
-            </div>
-          </DropdownMenuItem>
-          
-          <DropdownMenuItem onClick={() => setShowStartFromPreviousModal(true)}>
-            <GitBranch className="h-4 w-4 mr-2" />
-            <div>
-              <div className="font-medium">Start from Previous</div>
-              <div className="text-xs text-muted-foreground">Base on an existing cycle</div>
-            </div>
-          </DropdownMenuItem>
-          
-          <DropdownMenuSeparator />
-          
-          <DropdownMenuLabel className="text-xs text-muted-foreground">
-            Current: {workflowTemplate?.label || 'No workflow'} 
-            {workflowMetadata && ` • v${currentVersionNumber}`}
-          </DropdownMenuLabel>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </div>
+        </DropdownMenuItem>
+        
+        <DropdownMenuItem onClick={() => setShowStartFromPreviousModal(true)}>
+          <GitBranch className="h-4 w-4 mr-2" />
+          <div>
+            <div className="font-medium">Start from Previous</div>
+            <div className="text-xs text-muted-foreground">Base on an existing cycle</div>
+          </div>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Current: {workflowTemplate?.label || 'No workflow'} 
+          {workflowMetadata && ` • v${currentVersionNumber}`}
+        </DropdownMenuLabel>
+      </DropdownMenuContent>
       
       {/* Start New Modal */}
       {showStartNewModal && (
@@ -256,7 +247,7 @@ export const WorkflowActions: React.FC<WorkflowActionsProps> = () => {
           onClose={() => setShowStartFromPreviousModal(false)}
         />
       )}
-    </>
+    </DropdownMenu>
   );
 };
 
