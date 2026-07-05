@@ -4,6 +4,15 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #680
+
+- Implement WF-04: cycle and workflow entry, resume, new outlook, and update actions
+- Add Redux actions: `startBlankCycle`, `resumeIncompleteCycle`, `createOutlookUpdate`, `startFromPreviousCycle`
+- Add `WorkflowActions` dropdown component with Start Blank, Create Update, and Start from Previous options
+- Add `outlookVersionSnapshots` state for tracking versioned outlook data within cycles
+- Add workflow template constants and `useWorkflowActions` hook
+- All new code gated behind `forecastWorkflowV2` feature flag (currently ALL_TARGETS_OFF)
+
 ### PR #670
 
 - Address Greptile and CodeScene review feedback from prematurely merged #664: preserve legacy grouping data via `migrateLegacyForecastToSerializedPackage`, remove dead helpers, add typed `cycleMetadata` on `GFCForecastSaveData`, and reduce serialization complexity.
