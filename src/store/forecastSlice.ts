@@ -1,7 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
-import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult } from '../types/workflow';
+import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, OutlookVersion } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
@@ -48,6 +48,8 @@ export interface ForecastState {
     showCompletionModal: boolean;
     omittedDays: Partial<Record<DayType, string>>;
   };
+  /** v2 outlook version snapshots for the active cycle (used for same-cycle updates). */
+  outlookVersionSnapshots: OutlookVersionSnapshot[];
 }
 
 interface ForecastDaySnapshot {
@@ -64,6 +66,16 @@ interface ForecastHistoryEntry {
 interface ForecastHistoryStacks {
   undoStack: ForecastHistoryEntry[];
   redoStack: ForecastHistoryEntry[];
+}
+
+/** Stores a snapshot of outlook data for a specific version within a cycle. */
+interface OutlookVersionSnapshot {
+  /** Version number within the cycle. */
+  version: number;
+  /** Snapshot of day data for this version. */
+  days: Partial<Record<DayType, OutlookDay>>;
+  /** ISO-8601 creation timestamp. */
+  createdAt: string;
 }
 
 type DayBucket = 'day12' | 'day3' | 'day48';
@@ -181,7 +193,8 @@ const initialState: ForecastState = {
     lastResult: null,
     showCompletionModal: false,
     omittedDays: {},
-  }
+  },
+  outlookVersionSnapshots: [],
 };
 
 // Helpers to keep reducers small and testable
@@ -694,6 +707,9 @@ export const forecastSlice = createSlice({
 
       state.forecastCycle = newCycle;
       state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
     },
 
     markAsSaved: (state) => {
@@ -705,6 +721,7 @@ export const forecastSlice = createSlice({
       state.forecastCycle = action.payload;
       clearHistory(state);
       state.isSaved = true;
+      state.outlookVersionSnapshots = [];
     },
 
     // Legacy import support (Single day) -> Import into CURRENT day
@@ -766,6 +783,7 @@ export const forecastSlice = createSlice({
         label: action.payload.label,
         forecastCycle: forecastCycleSnapshot,
         stats: countForecastMetrics(forecastCycleSnapshot),
+        workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
       state.isSaved = true;
@@ -778,6 +796,12 @@ export const forecastSlice = createSlice({
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
         clearHistory(state);
         state.isSaved = true;
+        state.outlookVersionSnapshots = [];
+        
+        // Restore workflow metadata if present
+        if (savedCycle.workflowMetadata) {
+          state.workflowMetadata = savedCycle.workflowMetadata;
+        }
       }
     },
 
@@ -875,6 +899,7 @@ export const forecastSlice = createSlice({
       }
       clearHistory(state);
       state.isSaved = true;
+      state.outlookVersionSnapshots = [];
     },
 
     // Completion validation (WF-03)
@@ -914,6 +939,156 @@ export const forecastSlice = createSlice({
 
     clearOmittedDays: (state) => {
       state.completionValidation.omittedDays = {};
+    },
+
+    // WF-04: Workflow entry, resume, update, and base-cycle actions
+
+    /** Start a new blank cycle with optional workflow metadata. */
+    startBlankCycle: (state, action: PayloadAction<{
+      workflowTemplate?: WorkflowMetadata;
+      cycleDate?: string;
+    }>) => {
+      const { workflowTemplate, cycleDate } = action.payload;
+      clearHistory(state);
+      localStorage.removeItem('forecastData');
+      const today = cycleDate || getLocalCalendarDate();
+      const newCycle: ForecastCycle = {
+        days: { 1: createEmptyOutlook(1) },
+        currentDay: 1,
+        cycleDate: today
+      };
+      state.forecastCycle = newCycle;
+      state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      
+      if (workflowTemplate) {
+        state.workflowTemplate = workflowTemplate;
+        // Create initial cycle metadata
+        const now = new Date().toISOString();
+        state.workflowMetadata = {
+          id: `WF-${workflowTemplate.id}-${today}`,
+          workflowId: workflowTemplate.id,
+          cycleDate: today,
+          status: 'in-progress',
+          outlookVersions: [{
+            version: 1,
+            status: 'in-progress',
+            createdAt: now,
+          }],
+          createdAt: now,
+          updatedAt: now,
+        };
+      }
+    },
+
+    /** Resume an incomplete cycle from a saved snapshot, restoring workflow metadata. */
+    resumeIncompleteCycle: (state, action: PayloadAction<{ cycleId: string }>) => {
+      const { cycleId } = action.payload;
+      const savedCycle = state.savedCycles.find((c) => c.id === cycleId);
+      if (!savedCycle) return;
+
+      clearHistory(state);
+      // Deep clone the forecast cycle to avoid shared references
+      state.forecastCycle = JSON.parse(JSON.stringify(savedCycle.forecastCycle));
+      state.isSaved = true;
+      state.outlookVersionSnapshots = [];
+      
+      // Restore workflow metadata if present
+      if (savedCycle.workflowMetadata) {
+        state.workflowMetadata = savedCycle.workflowMetadata;
+      }
+    },
+
+    /** Create a new outlook version within the current cycle (same-cycle update). */
+    createOutlookUpdate: (state, action: PayloadAction<{ versionLabel?: string }>) => {
+      const { versionLabel } = action.payload;
+      const now = new Date().toISOString();
+      
+      // Determine the next version number
+      const currentVersions = state.workflowMetadata?.outlookVersions || [];
+      const nextVersion = currentVersions.length > 0 
+        ? Math.max(...currentVersions.map(v => v.version)) + 1 
+        : 1;
+      
+      // Snapshot the current day data before creating the update
+      const currentDay = state.forecastCycle.currentDay;
+      const currentDayData = state.forecastCycle.days[currentDay];
+      
+      if (currentDayData) {
+        // Store a snapshot of the current version
+        state.outlookVersionSnapshots.push({
+          version: nextVersion - 1, // Snapshot the previous version
+          days: { [currentDay]: JSON.parse(JSON.stringify(currentDayData)) },
+          createdAt: now,
+        });
+      }
+      
+      // Mark previous versions as completed
+      if (state.workflowMetadata) {
+        state.workflowMetadata.outlookVersions.forEach(v => {
+          if (v.status === 'in-progress') {
+            v.status = 'completed';
+          }
+        });
+        
+        // Add new version
+        state.workflowMetadata.outlookVersions.push({
+          version: nextVersion,
+          status: 'in-progress',
+          derivedFrom: nextVersion - 1,
+          createdAt: now,
+        });
+        
+        state.workflowMetadata.updatedAt = now;
+      }
+      
+      state.isSaved = false;
+    },
+
+    /** Start a new cycle derived from a previous cycle. */
+    startFromPreviousCycle: (state, action: PayloadAction<{
+      sourceCycleId: string;
+      newCycleDate?: string;
+      workflowTemplate?: WorkflowMetadata;
+    }>) => {
+      const { sourceCycleId, newCycleDate, workflowTemplate } = action.payload;
+      
+      // Find the source cycle in saved cycles
+      const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
+      if (!sourceCycle) return;
+      
+      const now = new Date().toISOString();
+      const targetDate = newCycleDate || getLocalCalendarDate();
+      
+      // Create a new cycle derived from the source
+      clearHistory(state);
+      state.forecastCycle = JSON.parse(JSON.stringify(sourceCycle.forecastCycle));
+      state.forecastCycle.cycleDate = targetDate;
+      state.forecastCycle.currentDay = 1;
+      state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      
+      // Set workflow metadata with derivedFromCycleId
+      const workflowId = workflowTemplate?.id || sourceCycle.workflowMetadata?.workflowId || 'default';
+      state.workflowMetadata = {
+        id: `WF-${workflowId}-${targetDate}`,
+        workflowId,
+        cycleDate: targetDate,
+        status: 'in-progress',
+        outlookVersions: [{
+          version: 1,
+          status: 'in-progress',
+          createdAt: now,
+        }],
+        createdAt: now,
+        updatedAt: now,
+      };
+      
+      if (workflowTemplate) {
+        state.workflowTemplate = workflowTemplate;
+      } else if (state.workflowTemplate) {
+        // Keep existing template if not provided
+      }
     },
   }
 });
@@ -956,6 +1131,10 @@ export const {
   completeCycle,
   completeWithOmissions,
   clearOmittedDays,
+  startBlankCycle,
+  resumeIncompleteCycle,
+  createOutlookUpdate,
+  startFromPreviousCycle,
 } = forecastSlice.actions;
 
 /** Selects the full forecast slice. */
@@ -1006,5 +1185,24 @@ export const selectShowCompletionModal = (state: RootState) =>
 /** Selects the omitted days map. */
 export const selectOmittedDays = (state: RootState) =>
   state.forecast.completionValidation.omittedDays;
+
+/** Selects the workflow metadata for the active cycle. */
+export const selectWorkflowMetadata = (state: RootState) =>
+  state.forecast.workflowMetadata;
+
+/** Selects the workflow template metadata. */
+export const selectWorkflowTemplate = (state: RootState) =>
+  state.forecast.workflowTemplate;
+
+/** Selects the outlook version snapshots for the active cycle. */
+export const selectOutlookVersionSnapshots = (state: RootState) =>
+  state.forecast.outlookVersionSnapshots;
+
+/** Selects the current version number for the active cycle. */
+export const selectCurrentVersionNumber = (state: RootState) => {
+  const metadata = state.forecast.workflowMetadata;
+  if (!metadata || metadata.outlookVersions.length === 0) return 1;
+  return Math.max(...metadata.outlookVersions.map(v => v.version));
+};
 
 export default forecastSlice.reducer;

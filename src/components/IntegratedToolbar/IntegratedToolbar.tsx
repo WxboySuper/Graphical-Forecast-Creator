@@ -18,6 +18,7 @@ import {
   Upload,
   Wrench,
 } from 'lucide-react';
+import { WorkflowActions } from '../WorkflowActions/WorkflowActions';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import {
@@ -958,6 +959,9 @@ const TabbedToolbarToolsTab: React.FC<{
               ))}
             </div>
           ) : null}
+          <div className="tabbed-integrated-toolbar__action-group flex flex-wrap items-center gap-2 border-r border-border/70 pr-3">
+            <WorkflowActions />
+          </div>
           <div className="tabbed-integrated-toolbar__action-group flex flex-wrap items-center gap-2">
             {destructiveItems.map((item) => (
               <TabbedToolbarActionTile key={item.key} item={item} />
