@@ -27,6 +27,7 @@ export function useWorkflowActions() {
   const isInProgress = workflowMetadata?.status === 'in-progress';
   const hasVersionHistory = outlookVersionSnapshots.length > 0 || currentVersionNumber > 1;
 
+  /** Handle starting a blank cycle with optional workflow template. */
   const handleStartBlank = (template?: WorkflowMetadata) => {
     dispatch(startBlankCycle({ 
       workflowTemplate: template,
@@ -35,12 +36,14 @@ export function useWorkflowActions() {
     setShowStartNewModal(false);
   };
 
+  /** Handle creating a new outlook version within the current cycle. */
   const handleCreateUpdate = () => {
     if (isInProgress && hasVersionHistory) {
       dispatch(createOutlookUpdate());
     }
   };
 
+  /** Handle starting a new cycle derived from a previous cycle. */
   const handleStartFromPrevious = (sourceCycleId: string) => {
     dispatch(startFromPreviousCycle({
       sourceCycleId,
