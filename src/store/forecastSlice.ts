@@ -294,6 +294,16 @@ const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | un
   ]));
 };
 
+/** Deep-clones OutlookData preserving Map-backed outlook maps. */
+const cloneOutlookData = (data: OutlookData): OutlookData => ({
+  tornado: cloneEntries(data.tornado),
+  wind: cloneEntries(data.wind),
+  hail: cloneEntries(data.hail),
+  totalSevere: cloneEntries(data.totalSevere),
+  categorical: cloneEntries(data.categorical),
+  'day4-8': cloneEntries(data['day4-8']),
+});
+
 /** Copies only the outlook types allowed by the source/target day compatibility rules. */
 const copyCompatibleOutlooks = (
   sourceData: OutlookData,
@@ -1020,10 +1030,15 @@ export const forecastSlice = createSlice({
       const currentDayData = state.forecastCycle.days[currentDay];
       
       if (currentDayData) {
-        // Store a snapshot of the current version
+        // Store a snapshot of the current version, preserving Map-backed outlook data
         state.outlookVersionSnapshots.push({
           version: nextVersion - 1, // Snapshot the previous version
-          days: { [currentDay]: JSON.parse(JSON.stringify(currentDayData)) },
+          days: { 
+            [currentDay]: {
+              ...currentDayData,
+              data: cloneOutlookData(currentDayData.data),
+            } 
+          },
           createdAt: now,
         });
       }
