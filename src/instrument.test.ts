@@ -159,6 +159,7 @@ describe('instrument', () => {
     });
   });
 
+
   it('keeps unrelated application errors', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
