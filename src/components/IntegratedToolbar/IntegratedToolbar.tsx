@@ -1031,6 +1031,7 @@ const TabbedIntegratedToolbarTabsList: React.FC<{
       if (trigger) observer.observe(trigger);
     });
 
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanup() {
       observer.disconnect();
     };
