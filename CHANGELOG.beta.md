@@ -4,6 +4,20 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #681
+
+- Dependency: @radix-ui/react-dialog ^1.1.17 → ^1.1.18
+- Dependency: @radix-ui/react-dropdown-menu ^2.1.18 → ^2.1.19
+- Dependency: @radix-ui/react-popover ^1.1.17 → ^1.1.18
+- Dependency: @radix-ui/react-tabs ^1.1.15 → ^1.1.16
+- Dependency: @radix-ui/react-tooltip ^1.2.10 → ^1.2.11
+- Dependency: @sentry/react ^10.62.0 → ^10.63.0
+- Dependency: @types/node ^26.0.1 → ^26.1.0
+- Dependency: immer ^11.1.8 → ^11.1.11
+- Dependency: lucide-react ^1.22.0 → ^1.23.0
+- Dependency: react-router-dom ^7.18.0 → ^7.18.1
+- Dependency: vite ^8.1.0 → ^8.1.3
+- Dependency: @sentry/node ^10.62.0 → ^10.63.0 (`server`)
 ### PR #670
 
 - Address Greptile and CodeScene review feedback from prematurely merged #664: preserve legacy grouping data via `migrateLegacyForecastToSerializedPackage`, remove dead helpers, add typed `cycleMetadata` on `GFCForecastSaveData`, and reduce serialization complexity.
