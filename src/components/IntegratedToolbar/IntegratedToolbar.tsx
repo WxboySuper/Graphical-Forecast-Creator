@@ -1016,7 +1016,7 @@ const TabbedIntegratedToolbarTabsList: React.FC<{
       if (trigger) observer.observe(trigger);
     });
 
-    return () => {
+    return function cleanup() {
       observer.disconnect();
     };
   }, [activeTab]);
