@@ -501,6 +501,7 @@ const TabbedToolbarProbabilityButton: React.FC<{
 
 /** Row wrapper for tabbed toolbar sections. */
 const TabbedToolbarTabRow: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  /** Translate vertical trackpad wheel deltas into horizontal scroll on the toolbar row. */
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     const row = event.currentTarget;
     const canScroll = row.scrollWidth > row.clientWidth;
@@ -907,6 +908,7 @@ const TabbedToolbarActionTile: React.FC<{ item: TabbedToolbarActionItem }> = ({ 
   </Tooltip>
 );
 
+/** Group of action tiles sharing a label, used to cluster related Tools actions. */
 const TabbedToolbarActionGroup: React.FC<{
   label: string;
   items: TabbedToolbarActionItem[];
@@ -983,20 +985,37 @@ const TabbedIntegratedToolbarTabsList: React.FC<{
   const [indicatorStyle, setIndicatorStyle] = React.useState<React.CSSProperties>({});
 
   React.useLayoutEffect(() => {
-    const tabsList = tabsListRef.current;
-    const trigger = triggerRefs.current[activeTab];
+    const measure = () => {
+      const tabsList = tabsListRef.current;
+      const trigger = triggerRefs.current[activeTab];
 
-    if (!tabsList || !trigger) {
+      if (!tabsList || !trigger) {
+        return;
+      }
+
+      const tabsRect = tabsList.getBoundingClientRect();
+      const triggerRect = trigger.getBoundingClientRect();
+
+      setIndicatorStyle({
+        width: triggerRect.width,
+        transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
+      });
+    };
+
+    measure();
+
+    const tabsList = tabsListRef.current;
+    if (!tabsList || typeof ResizeObserver === 'undefined') {
       return;
     }
 
-    const tabsRect = tabsList.getBoundingClientRect();
-    const triggerRect = trigger.getBoundingClientRect();
-
-    setIndicatorStyle({
-      width: triggerRect.width,
-      transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(tabsList);
+    Object.values(triggerRefs.current).forEach((trigger) => {
+      if (trigger) observer.observe(trigger);
     });
+
+    return () => observer.disconnect();
   }, [activeTab]);
 
   return (
@@ -1005,7 +1024,11 @@ const TabbedIntegratedToolbarTabsList: React.FC<{
       className="tabbed-integrated-toolbar__tabs-list relative z-10 mb-[-1px] h-auto gap-1 bg-transparent p-0"
       aria-label="Forecast toolbar sections"
     >
-      <span className="tabbed-integrated-toolbar__tab-indicator" style={indicatorStyle} aria-hidden="true" />
+      <span
+        className="tabbed-integrated-toolbar__tab-indicator pointer-events-none absolute inset-y-0 left-0"
+        style={indicatorStyle}
+        aria-hidden="true"
+      />
       <TabsTrigger
         value="draw"
         ref={(node) => {
