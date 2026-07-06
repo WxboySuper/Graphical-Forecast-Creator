@@ -1,5 +1,5 @@
 import { exportForecastToJson, deserializeForecast, validateForecastData } from '../utils/fileUtils';
-import { markAsSaved, importForecastCycle } from '../store/forecastSlice';
+import { markAsSaved, importForecastCycle, setWorkflowMetadata } from '../store/forecastSlice';
 import type { AddToastFn } from '../components/Layout';
 import type { Dispatch } from 'redux';
 import type { ForecastCycle } from '../types/outlooks';
@@ -31,6 +31,9 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle }: {
 
       const deserializedCycle = deserializeForecast(data);
       dispatch(importForecastCycle(deserializedCycle));
+      if (data.cycleMetadata) {
+        dispatch(setWorkflowMetadata(data.cycleMetadata));
+      }
       addToast('Forecast loaded successfully!', 'success');
     } catch {
       addToast('Error reading file.', 'error');

@@ -1,5 +1,6 @@
 import type { Feature, Polygon } from 'geojson';
 import type { DayType } from '../types/outlooks';
+import type { WorkflowMetadata } from '../types/workflow';
 import reducer, {
   addFeature,
   applyAutoCategoricalSync,
@@ -20,6 +21,12 @@ import reducer, {
   markAsSaved,
   omitDay,
   validateCompletion,
+  startBlankCycle,
+  resumeIncompleteCycle,
+  createOutlookUpdate,
+  startFromPreviousCycle,
+  saveCurrentCycle,
+  updateDiscussion,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -547,5 +554,272 @@ describe('forecastSlice undo/redo', () => {
     expect(nextState.forecastCycle.omittedDayReasons).toEqual({ 3: 'No severe weather expected' });
     expect(nextState.isSaved).toBe(false);
     expect(nextState.completionValidation.omittedDays).toEqual({});
+  });
+
+  it('invalidates completed package acknowledgement when an outlook is edited', () => {
+    let state = reducer(undefined, startBlankCycle({
+      workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
+      cycleDate: '2026-07-04',
+    }));
+    state = reducer(state, addFeature({ feature: createBaseFeature('tor-1', 0, { outlookType: 'tornado', probability: '2%' }) }));
+    state = reducer(state, addFeature({ feature: createBaseFeature('wind-1', 2, { outlookType: 'wind', probability: '5%' }) }));
+    state = reducer(state, addFeature({ feature: createBaseFeature('hail-1', 4, { outlookType: 'hail', probability: '5%' }) }));
+    state = reducer(state, addFeature({ feature: createBaseFeature('cat-1', 6, { outlookType: 'categorical', probability: 'SLGT' }) }));
+    state = reducer(state, updateDiscussion({
+      day: 1,
+      discussion: {
+        mode: 'diy',
+        validStart: '2026-07-04T12:00',
+        validEnd: '2026-07-05T12:00',
+        forecasterName: 'Test',
+        diyContent: 'Severe storms possible.',
+        lastModified: '2026-07-04T12:00:00.000Z',
+      },
+    }));
+    state = reducer(state, validateCompletion());
+    state = reducer(state, completeCycle());
+
+    expect(state.forecastCycle.completionAcknowledgedAt).toEqual(expect.any(String));
+
+    state = reducer(state, removeFeature({
+      outlookType: 'tornado',
+      probability: '2%',
+      featureId: 'tor-1',
+    }));
+
+    expect(state.forecastCycle.completionAcknowledgedAt).toBeUndefined();
+
+    state = reducer(state, validateCompletion());
+
+    expect(state.completionValidation.lastResult?.isComplete).toBe(false);
+    expect(state.completionValidation.lastResult?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          day: 'day1',
+          outlookType: 'tornado',
+          type: 'missing-polygon',
+          severity: 'critical',
+        }),
+      ]),
+    );
+  });
+
+  describe('WF-04: Workflow entry, resume, update, and base-cycle actions', () => {
+    const testWorkflowTemplate: WorkflowMetadata = {
+      id: 'severe-day1',
+      label: 'Severe Convective Day 1',
+      groupings: ['day1'],
+    };
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    describe('startBlankCycle', () => {
+      it('starts a blank cycle without workflow metadata', () => {
+        const state = reducer(undefined, startBlankCycle({}));
+        
+        expect(state.forecastCycle.days[1]).toBeDefined();
+        expect(state.forecastCycle.currentDay).toBe(1);
+        expect(state.isSaved).toBe(false);
+        expect(state.outlookVersionSnapshots).toEqual([]);
+        expect(state.workflowMetadata).toBeUndefined();
+        expect(state.workflowTemplate).toBeUndefined();
+      });
+
+      it('starts a blank cycle with workflow metadata', () => {
+        const state = reducer(undefined, startBlankCycle({ 
+          workflowTemplate: testWorkflowTemplate,
+          cycleDate: '2026-07-04',
+        }));
+        
+        expect(state.forecastCycle.cycleDate).toBe('2026-07-04');
+        expect(state.workflowTemplate).toEqual(testWorkflowTemplate);
+        expect(state.workflowMetadata).toBeDefined();
+        expect(state.workflowMetadata?.workflowId).toBe('severe-day1');
+        expect(state.workflowMetadata?.cycleDate).toBe('2026-07-04');
+        expect(state.workflowMetadata?.status).toBe('in-progress');
+        expect(state.workflowMetadata?.outlookVersions).toHaveLength(1);
+        expect(state.workflowMetadata?.outlookVersions[0].version).toBe(1);
+        expect(state.workflowMetadata?.outlookVersions[0].status).toBe('in-progress');
+        expect(state.isWorkflowActive).toBe(true);
+        expect(localStorage.getItem('gfc-active-forecast-workflow')).toBe('true');
+      });
+
+      it('starts workflow templates on their matching forecast day', () => {
+        const day2State = reducer(undefined, startBlankCycle({
+          workflowTemplate: { id: 'severe-day2', label: 'Severe Convective Day 2', groupings: ['day2'] },
+          cycleDate: '2026-07-04',
+        }));
+        const day48State = reducer(undefined, startBlankCycle({
+          workflowTemplate: { id: 'severe-day4-8', label: 'Severe Convective Days 4-8', groupings: ['day4-8'] },
+          cycleDate: '2026-07-04',
+        }));
+
+        expect(day2State.forecastCycle.currentDay).toBe(2);
+        expect(day2State.forecastCycle.days[2]).toBeDefined();
+        expect(day48State.forecastCycle.currentDay).toBe(4);
+        expect(day48State.forecastCycle.days[4]).toBeDefined();
+      });
+    });
+
+    it('validates completion against the active workflow groupings only', () => {
+      let state = reducer(undefined, startBlankCycle({
+        workflowTemplate: testWorkflowTemplate,
+        cycleDate: '2026-07-04',
+      }));
+
+      state = reducer(state, validateCompletion());
+
+      expect(state.completionValidation.lastResult?.missingGroupings).toEqual(['day1']);
+      expect(state.completionValidation.lastResult?.issues.every((issue) => issue.day === 'day1')).toBe(true);
+    });
+
+    describe('resumeIncompleteCycle', () => {
+      it('resumes a saved cycle and restores workflow metadata', () => {
+        // First create a saved cycle with workflow metadata
+        let state = reducer(undefined, startBlankCycle({ 
+          workflowTemplate: testWorkflowTemplate,
+        }));
+        state = reducer(state, markAsSaved());
+        state = reducer(state, saveCurrentCycle({ label: 'Test Cycle' }));
+        
+        const savedCycleId = state.savedCycles[0].id;
+        
+        // Reset to a new cycle
+        state = reducer(state, resetForecasts());
+        expect(state.workflowMetadata).toBeUndefined();
+        
+        // Resume the saved cycle
+        state = reducer(state, resumeIncompleteCycle({ cycleId: savedCycleId }));
+        
+        expect(state.workflowMetadata).toBeDefined();
+        expect(state.workflowMetadata?.workflowId).toBe('severe-day1');
+        expect(state.isSaved).toBe(true);
+        expect(state.outlookVersionSnapshots).toEqual([]);
+      });
+
+      it('does nothing if cycle ID is not found', () => {
+        const initialState = reducer(undefined, startBlankCycle({}));
+        const state = reducer(initialState, resumeIncompleteCycle({ cycleId: 'nonexistent' }));
+        
+        expect(state).toEqual(initialState);
+      });
+    });
+
+    describe('createOutlookUpdate', () => {
+      it('creates a new outlook version within the current cycle', () => {
+        // Start a workflow cycle
+        let state = reducer(undefined, startBlankCycle({ 
+          workflowTemplate: testWorkflowTemplate,
+        }));
+        
+        expect(state.workflowMetadata?.outlookVersions).toHaveLength(1);
+        expect(state.workflowMetadata?.outlookVersions[0].version).toBe(1);
+        
+        // Create an update
+        state = reducer(state, createOutlookUpdate());
+        
+        expect(state.workflowMetadata?.outlookVersions).toHaveLength(2);
+        expect(state.workflowMetadata?.outlookVersions[0].status).toBe('completed');
+        expect(state.workflowMetadata?.outlookVersions[1].version).toBe(2);
+        expect(state.workflowMetadata?.outlookVersions[1].status).toBe('in-progress');
+        expect(state.workflowMetadata?.outlookVersions[1].derivedFrom).toBe(1);
+        expect(state.forecastCycle.updateInProgressVersion).toBe(2);
+        expect(state.isSaved).toBe(false);
+      });
+
+      it('clears reviewed package state when creating a same-day update', () => {
+        let state = reducer(undefined, startBlankCycle({
+          workflowTemplate: testWorkflowTemplate,
+        }));
+        state = reducer(state, completeCycle());
+
+        expect(state.forecastCycle.completionAcknowledgedAt).toEqual(expect.any(String));
+
+        state = reducer(state, createOutlookUpdate());
+
+        expect(state.forecastCycle.completionAcknowledgedAt).toBeUndefined();
+        expect(state.forecastCycle.updateInProgressVersion).toBe(2);
+        expect(state.workflowMetadata?.status).toBe('in-progress');
+
+        state = reducer(state, completeCycle());
+
+        expect(state.forecastCycle.updateInProgressVersion).toBeUndefined();
+      });
+
+      it('creates multiple updates incrementing version numbers', () => {
+        let state = reducer(undefined, startBlankCycle({ 
+          workflowTemplate: testWorkflowTemplate,
+        }));
+        
+        state = reducer(state, createOutlookUpdate());
+        state = reducer(state, createOutlookUpdate());
+        state = reducer(state, createOutlookUpdate());
+        
+        expect(state.workflowMetadata?.outlookVersions).toHaveLength(4);
+        expect(state.workflowMetadata?.outlookVersions[3].version).toBe(4);
+        expect(state.workflowMetadata?.outlookVersions[3].derivedFrom).toBe(3);
+      });
+    });
+
+    describe('startFromPreviousCycle', () => {
+      it('creates a new cycle derived from a previous cycle', () => {
+        // Create and save a cycle with workflow metadata
+        let state = reducer(undefined, startBlankCycle({ 
+          workflowTemplate: testWorkflowTemplate,
+        }));
+        state = reducer(state, addFeature({ feature: createFeature('previous-day-1', 0) }));
+        state = reducer(state, markAsSaved());
+        state = reducer(state, saveCurrentCycle({ label: 'Previous Cycle' }));
+        
+        const previousCycleId = state.savedCycles[0].id;
+        
+        // Start a new cycle from the previous one
+        state = reducer(state, startFromPreviousCycle({
+          sourceCycleId: previousCycleId,
+          newCycleDate: '2026-07-05',
+          workflowTemplate: testWorkflowTemplate,
+        }));
+        
+        expect(state.forecastCycle.cycleDate).toBe('2026-07-05');
+        expect(state.forecastCycle.currentDay).toBe(1);
+        expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('previous-day-1');
+        expect(state.forecastCycle.days[2]).toBeUndefined();
+        expect(state.workflowMetadata).toBeDefined();
+        expect(state.workflowMetadata?.workflowId).toBe('severe-day1');
+        expect(state.workflowMetadata?.cycleDate).toBe('2026-07-05');
+        expect(state.workflowMetadata?.status).toBe('in-progress');
+        expect(state.isSaved).toBe(false);
+        expect(state.outlookVersionSnapshots).toEqual([]);
+      });
+
+      it('copies the requested previous day into the requested target day', () => {
+        let state = reducer(undefined, setForecastDay(2));
+        state = reducer(state, addFeature({ feature: createFeature('previous-day-2', 0) }));
+        state = reducer(state, saveCurrentCycle({ label: 'Yesterday Day 2' }));
+
+        state = reducer(state, startFromPreviousCycle({
+          sourceCycleId: state.savedCycles[0].id,
+          sourceDay: 2,
+          targetDay: 1,
+          newCycleDate: '2026-07-05',
+        }));
+
+        expect(state.forecastCycle.cycleDate).toBe('2026-07-05');
+        expect(state.forecastCycle.currentDay).toBe(1);
+        expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('previous-day-2');
+        expect(state.forecastCycle.days[2]).toBeUndefined();
+      });
+
+      it('does nothing if source cycle ID is not found', () => {
+        const initialState = reducer(undefined, startBlankCycle({}));
+        const state = reducer(initialState, startFromPreviousCycle({
+          sourceCycleId: 'nonexistent',
+        }));
+        
+        expect(state).toEqual(initialState);
+      });
+    });
   });
 });

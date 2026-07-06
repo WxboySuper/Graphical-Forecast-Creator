@@ -1,7 +1,7 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
-import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult } from '../types/workflow';
+import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import { RootState } from './index'; // Need RootState for selectors
@@ -10,6 +10,7 @@ import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
+import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -43,11 +44,15 @@ export interface ForecastState {
   workflowMetadata?: CycleMetadata;
   /** v2 workflow template metadata (optional, present when the editor is in workflow mode). */
   workflowTemplate?: WorkflowMetadata;
+  /** Whether the forecast workflow shell should be active across routes. */
+  isWorkflowActive: boolean;
   completionValidation: {
     lastResult: CycleValidationResult | null;
     showCompletionModal: boolean;
     omittedDays: Partial<Record<DayType, string>>;
   };
+  /** v2 outlook version snapshots for the active cycle (used for same-cycle updates). */
+  outlookVersionSnapshots: OutlookVersionSnapshot[];
 }
 
 interface ForecastDaySnapshot {
@@ -66,6 +71,16 @@ interface ForecastHistoryStacks {
   redoStack: ForecastHistoryEntry[];
 }
 
+/** Stores a snapshot of outlook data for a specific version within a cycle. */
+interface OutlookVersionSnapshot {
+  /** Version number within the cycle. */
+  version: number;
+  /** Snapshot of day data for this version. */
+  days: Partial<Record<DayType, OutlookDay>>;
+  /** ISO-8601 creation timestamp. */
+  createdAt: string;
+}
+
 type DayBucket = 'day12' | 'day3' | 'day48';
 
 interface CopyFeatureRule {
@@ -74,6 +89,7 @@ interface CopyFeatureRule {
 }
 
 const HISTORY_LIMIT = 50;
+const WORKFLOW_ACTIVE_STORAGE_KEY = 'gfc-active-forecast-workflow';
 const ALL_OUTLOOK_TYPES: OutlookType[] = [
   'tornado',
   'wind',
@@ -83,6 +99,67 @@ const ALL_OUTLOOK_TYPES: OutlookType[] = [
   'day4-8',
 ];
 const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical'];
+
+const readStoredWorkflowActive = (): boolean => {
+  try {
+    return localStorage.getItem(WORKFLOW_ACTIVE_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const writeStoredWorkflowActive = (isActive: boolean) => {
+  try {
+    if (isActive) {
+      localStorage.setItem(WORKFLOW_ACTIVE_STORAGE_KEY, 'true');
+      return;
+    }
+    localStorage.removeItem(WORKFLOW_ACTIVE_STORAGE_KEY);
+  } catch {
+    // Keep workflow state usable when storage is blocked.
+  }
+};
+
+const getWorkflowStartDay = (template?: WorkflowMetadata): DayType => {
+  const firstGrouping = template?.groupings[0];
+  if (firstGrouping === 'day2') return 2;
+  if (firstGrouping === 'day3') return 3;
+  if (firstGrouping === 'day4-8') return 4;
+  return 1;
+};
+
+const getWorkflowValidationGroupings = (template?: WorkflowMetadata): StandardGrouping[] | undefined => {
+  const standardGroupings = (template?.groupings ?? []).filter(
+    (grouping): grouping is StandardGrouping =>
+      grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
+  );
+  return standardGroupings.length > 0 ? standardGroupings : undefined;
+};
+
+/** Resolves the workflow ID from template or cycle metadata, falling back to 'default'. */
+const resolveWorkflowId = (
+  template?: WorkflowMetadata,
+  cycleMetadata?: CycleMetadata,
+): string => template?.id || cycleMetadata?.workflowId || 'default';
+
+/** Creates initial CycleMetadata for a new cycle. */
+const createInitialCycleMetadata = (
+  workflowId: string,
+  cycleDate: string,
+  now: string,
+): CycleMetadata => ({
+  id: `WF-${workflowId}-${cycleDate}`,
+  workflowId,
+  cycleDate,
+  status: 'in-progress',
+  outlookVersions: [{
+    version: 1,
+    status: 'in-progress',
+    createdAt: now,
+  }],
+  createdAt: now,
+  updatedAt: now,
+});
 const COPY_FEATURE_RULES: Record<DayBucket, Record<DayBucket, CopyFeatureRule[]>> = {
   day12: {
     day12: DIRECT_DAY12_COPY_TYPES.map((type) => ({ sourceType: type, targetType: type })),
@@ -181,7 +258,9 @@ const initialState: ForecastState = {
     lastResult: null,
     showCompletionModal: false,
     omittedDays: {},
-  }
+  },
+  isWorkflowActive: readStoredWorkflowActive(),
+  outlookVersionSnapshots: [],
 };
 
 // Helpers to keep reducers small and testable
@@ -367,6 +446,15 @@ const clearHistory = (state: ForecastState) => {
   state.historyByDay = {};
 };
 
+/** Clears stale package completion when forecast package content changes. */
+const invalidateCompletionAcknowledgement = (state: ForecastState) => {
+  if (state.forecastCycle.completionAcknowledgedAt || state.forecastCycle.omittedDayReasons) {
+    delete state.forecastCycle.completionAcknowledgedAt;
+    delete state.forecastCycle.omittedDayReasons;
+  }
+  state.completionValidation.lastResult = null;
+};
+
 /** Ensures low-probability metadata exists before mutating it in reducers. */
 const ensureLowProbabilityOutlooks = (dayData: OutlookDay): OutlookType[] => {
   if (!dayData.metadata.lowProbabilityOutlooks) {
@@ -410,6 +498,7 @@ const applyLowProbabilityState = (
     dayData.metadata.lowProbabilityOutlooks = lowProbabilityOutlooks.filter((type) => type !== outlookType);
   }
 
+  invalidateCompletionAcknowledgement(state);
   state.isSaved = false;
 };
 
@@ -520,6 +609,7 @@ export const forecastSlice = createSlice({
       );
 
       outlookMap.set(probability, [...existingFeatures, featureWithProps]);
+      invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
 
@@ -549,6 +639,7 @@ export const forecastSlice = createSlice({
               ...feature.properties
             }
           };
+          invalidateCompletionAcknowledgement(state);
           state.isSaved = false;
         }
       }
@@ -586,6 +677,7 @@ export const forecastSlice = createSlice({
           outlookMap.delete(probability);
         }
 
+        invalidateCompletionAcknowledgement(state);
         state.isSaved = false;
       }
     },
@@ -606,6 +698,7 @@ export const forecastSlice = createSlice({
       if (tstmFeatures.length > 0) {
         outlooks.categorical.set('TSTM', tstmFeatures);
       }
+      invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
 
@@ -627,6 +720,7 @@ export const forecastSlice = createSlice({
         pushUndoSnapshot(state);
         // @ts-ignore - Dynamic property assignment
         outlookData[outlookType] = map;
+        invalidateCompletionAcknowledgement(state);
         state.isSaved = false;
       }
     },
@@ -638,6 +732,7 @@ export const forecastSlice = createSlice({
       }
 
       outlookData.categorical = action.payload.map;
+      invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
 
@@ -664,6 +759,7 @@ export const forecastSlice = createSlice({
         outlookData.categorical.delete('TSTM');
       }
 
+      invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
 
@@ -694,6 +790,11 @@ export const forecastSlice = createSlice({
 
       state.forecastCycle = newCycle;
       state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
+      state.isWorkflowActive = false;
+      writeStoredWorkflowActive(false);
     },
 
     markAsSaved: (state) => {
@@ -705,6 +806,12 @@ export const forecastSlice = createSlice({
       state.forecastCycle = action.payload;
       clearHistory(state);
       state.isSaved = true;
+      state.outlookVersionSnapshots = [];
+      // Clear workflow state when importing a plain forecast cycle
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
+      state.isWorkflowActive = false;
+      writeStoredWorkflowActive(false);
     },
 
     // Legacy import support (Single day) -> Import into CURRENT day
@@ -752,6 +859,7 @@ export const forecastSlice = createSlice({
       if (dayData) {
         dayData.discussion = discussion;
         dayData.metadata.lastModified = new Date().toISOString();
+        invalidateCompletionAcknowledgement(state);
         state.isSaved = false;
       }
     },
@@ -766,6 +874,7 @@ export const forecastSlice = createSlice({
         label: action.payload.label,
         forecastCycle: forecastCycleSnapshot,
         stats: countForecastMetrics(forecastCycleSnapshot),
+        workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
       state.isSaved = true;
@@ -778,6 +887,25 @@ export const forecastSlice = createSlice({
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
         clearHistory(state);
         state.isSaved = true;
+        state.outlookVersionSnapshots = [];
+        
+        // Restore or clear workflow metadata
+        if (savedCycle.workflowMetadata) {
+          state.workflowMetadata = savedCycle.workflowMetadata;
+          // Restore the workflow template from the workflowId
+          state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
+            id: savedCycle.workflowMetadata.workflowId,
+            label: savedCycle.workflowMetadata.workflowId,
+            groupings: [],
+          };
+          state.isWorkflowActive = true;
+          writeStoredWorkflowActive(true);
+        } else {
+          state.workflowMetadata = undefined;
+          state.workflowTemplate = undefined;
+          state.isWorkflowActive = false;
+          writeStoredWorkflowActive(false);
+        }
       }
     },
 
@@ -854,6 +982,9 @@ export const forecastSlice = createSlice({
     // v2 workflow metadata reducers
     setWorkflowMetadata: (state, action: PayloadAction<CycleMetadata>) => {
       state.workflowMetadata = action.payload;
+      state.workflowTemplate = getWorkflowTemplateById(action.payload.workflowId) || state.workflowTemplate;
+      state.isWorkflowActive = true;
+      writeStoredWorkflowActive(true);
     },
 
     setWorkflowTemplate: (state, action: PayloadAction<WorkflowMetadata>) => {
@@ -865,9 +996,11 @@ export const forecastSlice = createSlice({
       // Import the first cycle's metadata (packages typically have one cycle)
       if (pkg.cycles.length > 0) {
         state.workflowMetadata = pkg.cycles[0];
+        state.isWorkflowActive = true;
+        writeStoredWorkflowActive(true);
       }
       if (pkg.metadata) {
-        state.workflowTemplate = {
+        state.workflowTemplate = getWorkflowTemplateById(pkg.metadata.workflowId) || {
           id: pkg.metadata.workflowId,
           label: pkg.metadata.workflowId,
           groupings: [],
@@ -875,11 +1008,15 @@ export const forecastSlice = createSlice({
       }
       clearHistory(state);
       state.isSaved = true;
+      state.outlookVersionSnapshots = [];
     },
 
     // Completion validation (WF-03)
     validateCompletion: (state) => {
-      const result = validateCycleCompletion(state.forecastCycle);
+      const result = validateCycleCompletion(
+        state.forecastCycle,
+        getWorkflowValidationGroupings(state.workflowTemplate),
+      );
       state.completionValidation.lastResult = result;
       state.completionValidation.omittedDays = {};
       state.completionValidation.showCompletionModal = true;
@@ -897,6 +1034,7 @@ export const forecastSlice = createSlice({
     completeCycle: (state) => {
       state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
       delete state.forecastCycle.omittedDayReasons;
+      delete state.forecastCycle.updateInProgressVersion;
       state.completionValidation.showCompletionModal = false;
       state.completionValidation.lastResult = null;
       state.completionValidation.omittedDays = {};
@@ -906,6 +1044,7 @@ export const forecastSlice = createSlice({
     completeWithOmissions: (state) => {
       state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
       state.forecastCycle.omittedDayReasons = { ...state.completionValidation.omittedDays };
+      delete state.forecastCycle.updateInProgressVersion;
       state.completionValidation.showCompletionModal = false;
       state.completionValidation.lastResult = null;
       state.completionValidation.omittedDays = {};
@@ -914,6 +1053,190 @@ export const forecastSlice = createSlice({
 
     clearOmittedDays: (state) => {
       state.completionValidation.omittedDays = {};
+    },
+
+    // WF-04: Workflow entry, resume, update, and base-cycle actions
+
+    /** Start a new blank cycle with optional workflow metadata. */
+    startBlankCycle: (state, action: PayloadAction<{
+      workflowTemplate?: WorkflowMetadata;
+      cycleDate?: string;
+    }>) => {
+      const { workflowTemplate, cycleDate } = action.payload;
+      clearHistory(state);
+      try {
+        localStorage.removeItem('forecastData');
+      } catch {
+        // Ignore localStorage errors
+      }
+      const today = cycleDate || getLocalCalendarDate();
+      const startDay = getWorkflowStartDay(workflowTemplate);
+      const newCycle: ForecastCycle = {
+        days: { [startDay]: createEmptyOutlook(startDay) },
+        currentDay: startDay,
+        cycleDate: today
+      };
+      state.forecastCycle = newCycle;
+      state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      
+      if (workflowTemplate) {
+        state.workflowTemplate = workflowTemplate;
+        // Create initial cycle metadata
+        const now = new Date().toISOString();
+        state.workflowMetadata = {
+          id: `WF-${workflowTemplate.id}-${today}`,
+          workflowId: workflowTemplate.id,
+          cycleDate: today,
+          status: 'in-progress',
+          outlookVersions: [{
+            version: 1,
+            status: 'in-progress',
+            createdAt: now,
+          }],
+          createdAt: now,
+          updatedAt: now,
+        };
+        state.isWorkflowActive = true;
+        writeStoredWorkflowActive(true);
+      } else {
+        // Clear stale workflow state when starting without a template
+        state.workflowTemplate = undefined;
+        state.workflowMetadata = undefined;
+        state.isWorkflowActive = false;
+        writeStoredWorkflowActive(false);
+      }
+    },
+
+    /** Resume an incomplete cycle from a saved snapshot, restoring workflow metadata. */
+    resumeIncompleteCycle: (state, action: PayloadAction<{ cycleId: string }>) => {
+      const { cycleId } = action.payload;
+      const savedCycle = state.savedCycles.find((c) => c.id === cycleId);
+      if (!savedCycle) return;
+
+      clearHistory(state);
+      state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
+      state.isSaved = true;
+      state.outlookVersionSnapshots = [];
+      
+      // Restore or clear workflow metadata
+      if (savedCycle.workflowMetadata) {
+        state.workflowMetadata = savedCycle.workflowMetadata;
+        // Restore the workflow template from the workflowId
+        state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
+          id: savedCycle.workflowMetadata.workflowId,
+          label: savedCycle.workflowMetadata.workflowId,
+          groupings: [],
+        };
+        state.isWorkflowActive = true;
+        writeStoredWorkflowActive(true);
+      } else {
+        state.workflowMetadata = undefined;
+        state.workflowTemplate = undefined;
+        state.isWorkflowActive = false;
+        writeStoredWorkflowActive(false);
+      }
+    },
+
+    /** Create a new outlook version within the current cycle (same-cycle update). */
+    createOutlookUpdate: (state) => {
+      const now = new Date().toISOString();
+      
+      // Determine the next version number
+      const currentVersions = state.workflowMetadata?.outlookVersions || [];
+      const nextVersion = currentVersions.length > 0 
+        ? Math.max(...currentVersions.map(v => v.version)) + 1 
+        : 1;
+      
+      // Snapshot the current day data before creating the update
+      const currentDay = state.forecastCycle.currentDay;
+      const currentDayData = state.forecastCycle.days[currentDay];
+      
+      if (currentDayData) {
+        // Store a snapshot of the current version, preserving Map-backed outlook data
+        state.outlookVersionSnapshots.push({
+          version: nextVersion - 1, // Snapshot the previous version
+          days: { 
+            [currentDay]: {
+              ...currentDayData,
+              data: cloneOutlookData(currentDayData.data),
+            } 
+          },
+          createdAt: now,
+        });
+      }
+      
+      // Mark previous versions as completed
+      if (state.workflowMetadata) {
+        state.workflowMetadata.outlookVersions.forEach(v => {
+          if (v.status === 'in-progress') {
+            v.status = 'completed';
+          }
+        });
+        
+        // Add new version
+        state.workflowMetadata.outlookVersions.push({
+          version: nextVersion,
+          status: 'in-progress',
+          derivedFrom: nextVersion - 1,
+          createdAt: now,
+        });
+        
+        state.workflowMetadata.status = 'in-progress';
+        state.workflowMetadata.updatedAt = now;
+      }
+      
+      state.forecastCycle.updateInProgressVersion = nextVersion;
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
+    /** Start a new cycle derived from a previous cycle. */
+    startFromPreviousCycle: (state, action: PayloadAction<{
+      sourceCycleId: string;
+      newCycleDate?: string;
+      sourceDay?: DayType;
+      targetDay?: DayType;
+      workflowTemplate?: WorkflowMetadata;
+    }>) => {
+      const { sourceCycleId, newCycleDate, sourceDay, targetDay = 1, workflowTemplate } = action.payload;
+      
+      // Find the source cycle in saved cycles
+      const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
+      if (!sourceCycle) return;
+      
+      const now = new Date().toISOString();
+      const targetDate = newCycleDate || getLocalCalendarDate();
+      
+      const sourceForecastCycle = normalizeForecastCycle(sourceCycle.forecastCycle);
+      const sourceDayNumber = sourceDay ?? sourceForecastCycle.currentDay;
+      const sourceDayData = sourceForecastCycle.days[sourceDayNumber];
+      if (!sourceDayData) return;
+
+      // Create a fresh cycle and copy only the requested, compatible outlook data
+      // so "start from previous" is a new package, not an import of the old one.
+      clearHistory(state);
+      const newCycle: ForecastCycle = {
+        days: { [targetDay]: createEmptyOutlook(targetDay) },
+        currentDay: targetDay,
+        cycleDate: targetDate,
+      };
+      const targetDayData = newCycle.days[targetDay];
+      if (targetDayData) {
+        copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDayNumber, targetDay);
+      }
+      state.forecastCycle = newCycle;
+      state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      
+      // Set workflow metadata with derivedFromCycleId
+      const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
+      state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
+      state.isWorkflowActive = true;
+      writeStoredWorkflowActive(true);
+      
+      // Restore or set workflow template
+      state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
     },
   }
 });
@@ -956,6 +1279,10 @@ export const {
   completeCycle,
   completeWithOmissions,
   clearOmittedDays,
+  startBlankCycle,
+  resumeIncompleteCycle,
+  createOutlookUpdate,
+  startFromPreviousCycle,
 } = forecastSlice.actions;
 
 /** Selects the full forecast slice. */
@@ -1006,5 +1333,32 @@ export const selectShowCompletionModal = (state: RootState) =>
 /** Selects the omitted days map. */
 export const selectOmittedDays = (state: RootState) =>
   state.forecast.completionValidation.omittedDays;
+
+/** Selects the workflow metadata for the active cycle. */
+export const selectWorkflowMetadata = (state: RootState) =>
+  state.forecast.workflowMetadata;
+
+/** Selects whether a forecast workflow is active across app routes. */
+export const selectIsWorkflowActive = (state: RootState) =>
+  state.forecast.isWorkflowActive;
+
+/** Selects whether the current route should render workflow-specific UI. */
+export const selectHasActiveWorkflow = (state: RootState) =>
+  state.forecast.isWorkflowActive && Boolean(state.forecast.workflowMetadata);
+
+/** Selects the workflow template metadata. */
+export const selectWorkflowTemplate = (state: RootState) =>
+  state.forecast.workflowTemplate;
+
+/** Selects the outlook version snapshots for the active cycle. */
+export const selectOutlookVersionSnapshots = (state: RootState) =>
+  state.forecast.outlookVersionSnapshots;
+
+/** Selects the current version number for the active cycle. */
+export const selectCurrentVersionNumber = (state: RootState) => {
+  const metadata = state.forecast.workflowMetadata;
+  if (!metadata || metadata.outlookVersions.length === 0) return 1;
+  return Math.max(...metadata.outlookVersions.map(v => v.version));
+};
 
 export default forecastSlice.reducer;

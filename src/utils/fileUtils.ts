@@ -209,12 +209,13 @@ export const exportForecastToJson = (
  */
 export const downloadGfcPackage = async (
   forecastCycle: ForecastCycle,
-  mapView: { center: [number, number]; zoom: number }
+  mapView: { center: [number, number]; zoom: number },
+  cycleMetadata?: CycleMetadata,
 ): Promise<void> => {
   const zip = new JSZip();
 
   // 1. Forecast JSON
-  const data = serializeForecast(forecastCycle, mapView);
+  const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
   zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
 
   // 2. Discussion text for each day that has content

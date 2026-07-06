@@ -699,8 +699,14 @@ const restoreCloudSession = (
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
 const restoreLocalSession = (
   dispatch: ShortcutDispatch,
-  addToast: AddToastFn
+  addToast: AddToastFn,
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  isSaved: boolean
 ): void => {
+  if (!isSaved || hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle)) {
+    return;
+  }
+
   const data = parseStoredForecastPayload(localStorage.getItem('forecastData'));
   if (!data) {
     return;
@@ -714,6 +720,8 @@ const restoreLocalSession = (
 const restoreAvailableSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  isSaved: boolean,
   onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
 ) => {
   const restoredCloudSession = restoreCloudSession(dispatch, addToast, onCloudCycleLoaded);
@@ -721,13 +729,15 @@ const restoreAvailableSession = (
     return;
   }
 
-  restoreLocalSession(dispatch, addToast);
+  restoreLocalSession(dispatch, addToast, forecastCycle, isSaved);
 };
 
 /** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
 const useSessionRestore = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  isSaved: boolean,
   onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
 ) => {
   const onCloudCycleLoadedRef = useRef(onCloudCycleLoaded);
@@ -739,13 +749,13 @@ const useSessionRestore = (
 
   useEffect(() => {
     try {
-      restoreAvailableSession(dispatch, addToast, onCloudCycleLoadedRef.current);
+      restoreAvailableSession(dispatch, addToast, forecastCycle, isSaved, onCloudCycleLoadedRef.current);
     } catch {
       // Silently skip auto-load errors to avoid disrupting initial render
     } finally {
       setRestoreComplete(true);
     }
-  }, [dispatch, addToast]);
+  }, [dispatch, addToast, forecastCycle, isSaved]);
 
   return restoreComplete;
 };
@@ -1166,7 +1176,7 @@ const useForecastPageWorkspace = ({
     userId: user?.uid,
   });
 
-  const restoreComplete = useSessionRestore(dispatch, addToast, handleCloudCycleLoaded);
+  const restoreComplete = useSessionRestore(dispatch, addToast, forecastCycle, isSaved, handleCloudCycleLoaded);
   useUnsavedChangesWarning(isSaved);
 
   const { handleSave, handleLoad } = useForecastFileActions(

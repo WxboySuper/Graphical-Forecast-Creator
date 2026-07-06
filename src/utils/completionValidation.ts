@@ -120,6 +120,14 @@ const addMissingDayIssues = (ctx: DayValidationContext): void => {
       canNavigate: true,
     });
   }
+  ctx.issues.push({
+    day: ctx.grouping,
+    outlookType: 'categorical',
+    type: 'missing-discussion',
+    message: `Day ${ctx.day}: discussion is missing or empty`,
+    severity: 'warning',
+    canNavigate: true,
+  });
   ctx.missingGroupings.add(ctx.grouping);
 };
 
@@ -211,33 +219,10 @@ const validateNoTstmForecast = (ctx: DayValidationContext): void => {
   });
 };
 
-/** Returns true when the day has at least one required non-TSTM polygon. */
-const dayHasDrawnPolygons = (ctx: DayValidationContext): boolean => {
-  const dayData = ctx.dayData;
-  if (!dayData) {
-    return false;
-  }
-
-  const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
-
-  return ctx.expectedTypes.some((outlookType) => {
-    if (lowProbabilityOutlooks.includes(outlookType)) {
-      return false;
-    }
-
-    const map = dayData.data[outlookType as keyof typeof dayData.data];
-    return hasNonTstmPolygonData(map as Map<string, unknown[]> | undefined);
-  });
-};
-
-/** Adds a warning when polygons exist but the day discussion is missing. */
+/** Adds a warning when the expected day discussion is missing. */
 const validateDiscussion = (ctx: DayValidationContext): void => {
   const dayData = ctx.dayData;
   if (!dayData) {
-    return;
-  }
-
-  if (!dayHasDrawnPolygons(ctx)) {
     return;
   }
 

@@ -26,12 +26,14 @@ import ForecastPage, {
   writeStoredDayValue,
 } from './ForecastPage';
 import forecastReducer from '../store/forecastSlice';
+import { addFeature } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
 import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
+import { serializeForecast } from '../utils/fileUtils';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -153,6 +155,32 @@ describe('ForecastPage layout selection', () => {
     const third = renderForecastPage(store);
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
     third.unmount();
+  });
+
+  test('does not overwrite active in-memory outlooks with an older local autosave on remount', () => {
+    const store = createStore();
+    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
+    localStorage.setItem('forecastData', JSON.stringify(stalePayload));
+
+    store.dispatch(addFeature({
+      feature: {
+        type: 'Feature',
+        id: 'live-outlook',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]],
+        },
+        properties: {
+          outlookType: 'tornado',
+          probability: '2%',
+          isSignificant: false,
+        },
+      },
+    }));
+
+    renderForecastPage(store);
+
+    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('live-outlook');
   });
 });
 

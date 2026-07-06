@@ -192,6 +192,8 @@ export interface ForecastCycle {
   completionAcknowledgedAt?: string;
   /** User-provided reasons for omitted forecast days at completion time. */
   omittedDayReasons?: Partial<Record<DayType, string>>;
+  /** Active same-day workflow update version that has not been reviewed yet. */
+  updateInProgressVersion?: number;
 }
 
 // Updated Save Data Interface
@@ -223,6 +225,7 @@ export interface GFCForecastSaveData {
     cycleDate: string;
     completionAcknowledgedAt?: string;
     omittedDayReasons?: Partial<Record<DayType, string>>;
+    updateInProgressVersion?: number;
   };
 
   /** Optional v2 workflow cycle metadata embedded in v1.0.0 saves. */
