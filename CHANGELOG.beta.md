@@ -4,6 +4,13 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #688
+
+- Add the sliding active-tab background indicator and a touch of top breathing room around toolbar tabs.
+- Slow and smooth the tab, panel, and button motion for a calmer feel.
+- Make horizontal toolbar scrolling easier to use and styles Days as a segmented control.
+- Separate Tools groups with compact tags.
+
 ### PR #687
 
 - Replace the repeated header selection/status pill with compact context text and tighten the Days tab width.
