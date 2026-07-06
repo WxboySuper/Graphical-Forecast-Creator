@@ -1004,13 +1004,28 @@ const TabbedIntegratedToolbarTabsList: React.FC<{
     };
 
     measure();
+  }, [activeTab]);
 
+  React.useEffect(function setupTabIndicatorObserver() {
     const tabsList = tabsListRef.current;
     if (!tabsList || typeof ResizeObserver === 'undefined') {
       return;
     }
 
-    const observer = new ResizeObserver(() => measure());
+    const observer = new ResizeObserver(() => {
+      const trigger = triggerRefs.current[activeTab];
+      if (!tabsList.isConnected || !trigger) {
+        return;
+      }
+
+      const tabsRect = tabsList.getBoundingClientRect();
+      const triggerRect = trigger.getBoundingClientRect();
+
+      setIndicatorStyle({
+        width: triggerRect.width,
+        transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
+      });
+    });
     observer.observe(tabsList);
     Object.values(triggerRefs.current).forEach((trigger) => {
       if (trigger) observer.observe(trigger);
