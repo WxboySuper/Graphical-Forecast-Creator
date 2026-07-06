@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import { MemoryRouter } from 'react-router-dom';
 import { DiscussionPage } from './DiscussionPage';
 import forecastReducer from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
@@ -51,9 +52,11 @@ describe('DiscussionPage', () => {
     });
 
     render(
-      <Provider store={createStore()}>
-        <DiscussionPage />
-      </Provider>
+      <MemoryRouter>
+        <Provider store={createStore()}>
+          <DiscussionPage />
+        </Provider>
+      </MemoryRouter>
     );
 
     expect(screen.getByDisplayValue('WeatherboySuper')).toBeInTheDocument();

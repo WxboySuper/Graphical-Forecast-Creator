@@ -20,6 +20,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { queueProductMetric } from '../utils/productMetrics';
 import DIYDiscussionEditor from '../components/DiscussionEditor/DIYDiscussionEditor';
 import GuidedDiscussionEditor from '../components/DiscussionEditor/GuidedDiscussionEditor';
+import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
@@ -543,6 +544,7 @@ export const DiscussionPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-background">
+      <ForecastWorkflowPanel context="discussion" />
       <DiscussionHeaderBar
         currentDay={currentDay}
         hasUnsavedChanges={editorState.hasUnsavedChanges}

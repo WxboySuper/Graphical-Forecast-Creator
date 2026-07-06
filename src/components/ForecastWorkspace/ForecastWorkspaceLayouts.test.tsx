@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
@@ -63,9 +64,11 @@ describe('Tabbed toolbar layout', () => {
     const store = createStore();
 
     render(
-      <Provider store={store}>
-        <LayoutHarness />
-      </Provider>
+      <MemoryRouter>
+        <Provider store={store}>
+          <LayoutHarness />
+        </Provider>
+      </MemoryRouter>
     );
 
     await user.click(screen.getByRole('tab', { name: /days/i }));

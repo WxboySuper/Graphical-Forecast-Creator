@@ -4,6 +4,7 @@ import ForecastMap, { ForecastMapHandle } from '../Map/ForecastMap';
 import { TabbedIntegratedToolbar } from '../IntegratedToolbar/IntegratedToolbar';
 import { TooltipProvider } from '../ui/tooltip';
 import type { ForecastWorkspaceController } from './useForecastWorkspaceController';
+import ForecastWorkflowPanel from '../ForecastWorkflow/ForecastWorkflowPanel';
 
 export interface ForecastWorkspaceLayoutProps {
   controller: ForecastWorkspaceController;
@@ -21,6 +22,7 @@ export const ForecastTabbedToolbarLayout: React.FC<ForecastWorkspaceLayoutProps>
 }) => (
   <TooltipProvider>
     <div className="forecast-workspace-layout flex h-full min-h-0 flex-col bg-gradient-to-b from-background via-background to-muted/10">
+      <ForecastWorkflowPanel controller={controller} />
       <div className="forecast-workspace-layout__map relative min-h-0 flex-1">
         <ForecastMap ref={mapRef} tstmPreviewFeatures={tstmPreviewFeatures} />
       </div>
