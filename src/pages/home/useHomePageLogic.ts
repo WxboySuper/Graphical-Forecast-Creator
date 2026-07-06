@@ -3,8 +3,18 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { AddToastFn } from '../../components/Layout';
 import { RootState } from '../../store';
-import { selectForecastCycle, setForecastDay, resetForecasts, importForecastCycle } from '../../store/forecastSlice';
+import {
+  selectForecastCycle,
+  setForecastDay,
+  resetForecasts,
+  importForecastCycle,
+  selectWorkflowMetadata,
+  selectHasActiveWorkflow,
+  startBlankCycle,
+  createOutlookUpdate,
+} from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
+import type { WorkflowMetadata } from '../../types/workflow';
 import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
@@ -20,6 +30,8 @@ const useHomePageLogic = () => {
   const { addToast } = useOutletContext<{ addToast: AddToastFn }>();
   const { hostedAuthEnabled, status } = useAuth();
   const forecastCycle = useSelector(selectForecastCycle);
+  const workflowMetadata = useSelector(selectWorkflowMetadata);
+  const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const savedCycles = useSelector((state: RootState) => state.forecast.savedCycles);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
 
@@ -49,6 +61,23 @@ const useHomePageLogic = () => {
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
     dispatch(setForecastDay(day));
+    navigate('/forecast');
+  };
+
+  /** Start a workflow package from the selected scope. */
+  const handleStartWorkflow = (workflowTemplate: WorkflowMetadata) => {
+    dispatch(startBlankCycle({
+      workflowTemplate,
+      cycleDate: forecastCycle.cycleDate,
+    }));
+    addToast(`Started ${workflowTemplate.label} workflow`, 'success');
+    navigate('/forecast');
+  };
+
+  /** Start a same-day update for the active workflow. */
+  const handleCreateWorkflowUpdate = () => {
+    dispatch(createOutlookUpdate());
+    addToast('Started same-day workflow update', 'success');
     navigate('/forecast');
   };
 
@@ -127,7 +156,11 @@ const useHomePageLogic = () => {
     handleNewCycle,
     savedCycles,
     forecastCycle,
+    workflowMetadata,
+    hasActiveWorkflow,
     isSaved,
+    handleStartWorkflow,
+    handleCreateWorkflowUpdate,
   } as const;
 };
 
