@@ -320,16 +320,6 @@ const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | un
   ]));
 };
 
-/** Deep-clones OutlookData preserving Map-backed outlook maps. */
-const cloneOutlookData = (data: OutlookData): OutlookData => ({
-  tornado: cloneEntries(data.tornado),
-  wind: cloneEntries(data.wind),
-  hail: cloneEntries(data.hail),
-  totalSevere: cloneEntries(data.totalSevere),
-  categorical: cloneEntries(data.categorical),
-  'day4-8': cloneEntries(data['day4-8']),
-});
-
 /** Copies only the outlook types allowed by the source/target day compatibility rules. */
 const copyCompatibleOutlooks = (
   sourceData: OutlookData,
