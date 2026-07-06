@@ -579,7 +579,7 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
       </div>
     </TabbedToolbarStripSection>
 
-    <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection w-[334px]">
+    <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection w-[342px]">
       <TabbedToolbarSelectionStrip controller={controller} showShortcuts={false} />
     </TabbedToolbarStripSection>
   </TabbedToolbarTabRow>
