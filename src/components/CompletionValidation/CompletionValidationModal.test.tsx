@@ -5,6 +5,7 @@ import type { CycleValidationResult } from '../../types/workflow';
 jest.mock('lucide-react', () => ({
   CheckCircle2: (props: React.SVGProps<SVGSVGElement>) => <svg {...props} />,
   AlertTriangle: (props: React.SVGProps<SVGSVGElement>) => <svg {...props} />,
+  X: (props: React.SVGProps<SVGSVGElement>) => <svg {...props} />,
 }));
 
 const completeResult: CycleValidationResult = {
@@ -75,7 +76,7 @@ describe('CompletionValidationModal', () => {
 
   it('renders complete status badge', () => {
     renderModal(completeResult);
-    expect(screen.getByText('Forecast cycle is complete')).toBeInTheDocument();
+    expect(screen.getByText('Ready for export')).toBeInTheDocument();
   });
 
   it('renders incomplete status badge with issue count', () => {
@@ -93,8 +94,17 @@ describe('CompletionValidationModal', () => {
   it('calls onComplete when Complete is clicked', () => {
     const onComplete = jest.fn();
     renderModal(completeResult, { onComplete });
-    fireEvent.click(screen.getByText('Complete'));
+    fireEvent.click(screen.getByText('Mark Reviewed'));
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onComplete and onExport when Mark Reviewed & Export is clicked', () => {
+    const onComplete = jest.fn();
+    const onExport = jest.fn();
+    renderModal(completeResult, { onComplete, onExport });
+    fireEvent.click(screen.getByText('Mark Reviewed & Export'));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onExport).toHaveBeenCalledTimes(1);
   });
 
   it('shows "Complete Anyway" for incomplete cycle', () => {

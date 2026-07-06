@@ -1,5 +1,13 @@
 import React from 'react';
-import './ExportModal.css'; // Reuse modal styles
+import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -23,35 +31,28 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   cancelLabel = "Cancel",
   overlayClassName,
 }) => {
-  if (!isOpen) return null;
-
-  const overlayClass = overlayClassName
-    ? `export-modal-overlay ${overlayClassName}`
-    : 'export-modal-overlay';
-
   return (
-    <div className={overlayClass}>
-      <div className="export-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
-        <h3 id="confirm-title">{title}</h3>
-        <p id="confirm-desc">{message}</p>
-        <div className="export-modal-actions">
-          <button
-            type="button"
-            className="export-modal-btn export-modal-cancel"
-            onClick={onCancel}
-          >
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onCancel();
+    }}>
+      <DialogContent
+        className={overlayClassName ? `confirmation-dialog ${overlayClassName}` : 'confirmation-dialog'}
+        aria-describedby="confirm-desc"
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription id="confirm-desc">{message}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onCancel}>
             {cancelLabel}
-          </button>
-          <button
-            type="button"
-            className="export-modal-btn export-modal-confirm"
-            onClick={onConfirm}
-          >
+          </Button>
+          <Button type="button" onClick={onConfirm}>
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

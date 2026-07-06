@@ -3,6 +3,13 @@ import React, { useCallback } from 'react';
 import type { CycleValidationResult } from '../../types/workflow';
 import type { DayType } from '../../types/outlooks';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import {
   CompletionValidationModalBody,
   CompletionValidationModalFooter,
   hasAllOmissionReasons,
@@ -18,6 +25,7 @@ interface CompletionValidationModalProps {
   onCompleteWithOmissions: () => void;
   onOmitDay: (day: DayType, reason: string) => void;
   onNavigateToIssue?: (day: DayType) => void;
+  onExport?: () => void;
 }
 
 /** Maps a validation grouping key to its primary forecast day number. */
@@ -41,6 +49,7 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
   onCompleteWithOmissions,
   onOmitDay,
   onNavigateToIssue,
+  onExport,
 }) => {
   const handleNavigate = useCallback(
     (grouping: string) => {
@@ -60,22 +69,20 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
   const warningIssues = issues.filter((issue) => issue.severity === 'warning');
   const canCompleteWithOmissions = hasAllOmissionReasons(missingGroupings, omittedDays);
 
-  return (
-    <div className="completion-modal-root">
-      <div className="completion-modal-overlay" onClick={onClose} />
-      <div className="completion-modal" role="dialog" aria-modal="true" aria-labelledby="completion-title">
-        <div className="completion-modal-header">
-          <h2 id="completion-title">Complete Forecast Cycle</h2>
-          <button
-            type="button"
-            className="completion-modal-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
+  const handleCompleteAndExport = () => {
+    onComplete();
+    onExport?.();
+  };
 
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="completion-modal" aria-describedby="completion-summary">
+        <DialogHeader className="completion-modal-header">
+          <DialogTitle id="completion-title">Review Package</DialogTitle>
+          <DialogDescription>
+            Confirm the outlook map and discussion before exporting the workflow bundle.
+          </DialogDescription>
+        </DialogHeader>
         <CompletionValidationModalBody
           isComplete={isComplete}
           issues={issues}
@@ -93,9 +100,10 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
           onClose={onClose}
           onComplete={onComplete}
           onCompleteWithOmissions={onCompleteWithOmissions}
+          onCompleteAndExport={onExport ? handleCompleteAndExport : undefined}
         />
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
