@@ -744,22 +744,24 @@ const restoreAvailableSession = (
 const useSessionRestore = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  forecastCycle: ReturnType<typeof selectForecastCycle>,
-  isSaved: boolean,
-  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+  currentSession: {
+    forecastCycle: ReturnType<typeof selectForecastCycle>;
+    isSaved: boolean;
+    onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
+  }
 ) => {
-  const onCloudCycleLoadedRef = useRef(onCloudCycleLoaded);
+  const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
   const [restoreComplete, setRestoreComplete] = useState(false);
 
   useEffect(() => {
-    onCloudCycleLoadedRef.current = onCloudCycleLoaded;
-  }, [onCloudCycleLoaded]);
+    onCloudCycleLoadedRef.current = currentSession.onCloudCycleLoaded;
+  }, [currentSession.onCloudCycleLoaded]);
 
   useEffect(() => {
     try {
       restoreAvailableSession(dispatch, addToast, {
-        forecastCycle,
-        isSaved,
+        forecastCycle: currentSession.forecastCycle,
+        isSaved: currentSession.isSaved,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
       });
     } catch {
@@ -767,7 +769,7 @@ const useSessionRestore = (
     } finally {
       setRestoreComplete(true);
     }
-  }, [dispatch, addToast, forecastCycle, isSaved]);
+  }, [dispatch, addToast, currentSession.forecastCycle, currentSession.isSaved]);
 
   return restoreComplete;
 };
@@ -1188,7 +1190,11 @@ const useForecastPageWorkspace = ({
     userId: user?.uid,
   });
 
-  const restoreComplete = useSessionRestore(dispatch, addToast, forecastCycle, isSaved, handleCloudCycleLoaded);
+  const restoreComplete = useSessionRestore(dispatch, addToast, {
+    forecastCycle,
+    isSaved,
+    onCloudCycleLoaded: handleCloudCycleLoaded,
+  });
   useUnsavedChangesWarning(isSaved);
 
   const { handleSave, handleLoad } = useForecastFileActions(
