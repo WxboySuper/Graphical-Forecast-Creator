@@ -696,14 +696,20 @@ const restoreCloudSession = (
   return true;
 };
 
+/** Returns true when the current cycle should skip local auto-save restore (already saved, rolled over, or has discussion content). */
+const shouldSkipLocalRestore = (
+  isSaved: boolean,
+  forecastCycle: ReturnType<typeof selectForecastCycle>
+): boolean =>
+  !isSaved || hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
+
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
 const restoreLocalSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  forecastCycle: ReturnType<typeof selectForecastCycle>,
-  isSaved: boolean
+  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; isSaved: boolean }
 ): void => {
-  if (!isSaved || hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle)) {
+  if (shouldSkipLocalRestore(currentSession.isSaved, currentSession.forecastCycle)) {
     return;
   }
 
@@ -729,7 +735,7 @@ const restoreAvailableSession = (
     return;
   }
 
-  restoreLocalSession(dispatch, addToast, forecastCycle, isSaved);
+  restoreLocalSession(dispatch, addToast, { forecastCycle, isSaved });
 };
 
 /** Attempts to restore the last auto-saved forecast session from localStorage on mount. */

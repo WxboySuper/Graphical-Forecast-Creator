@@ -4,6 +4,14 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #682
+
+- Add reusable workflow templates for Day 1, Day 2, Day 3, Days 4-8, and Full Outlook workflows with persistent activation in localStorage.
+- Start workflow templates on the correct forecast day and support same-cycle updates plus start-from-previous-cycle behavior.
+- Preserve workflow metadata when loading workflow-ready `forecast_cycle.json` files.
+- Fix completion validation to respect the active workflow groupings and invalidate stale package completion when map or discussion content changes.
+- Prevent local session restore from overwriting in-progress unsaved forecast or discussion state.
+
 ### PR #681
 
 - Dependency: @radix-ui/react-dialog ^1.1.17 → ^1.1.18

@@ -100,6 +100,7 @@ const ALL_OUTLOOK_TYPES: OutlookType[] = [
 ];
 const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical'];
 
+/** Reads the persisted workflow-active flag from localStorage, returning false when storage is blocked or unset. */
 const readStoredWorkflowActive = (): boolean => {
   try {
     return localStorage.getItem(WORKFLOW_ACTIVE_STORAGE_KEY) === 'true';
@@ -108,6 +109,7 @@ const readStoredWorkflowActive = (): boolean => {
   }
 };
 
+/** Persists or clears the workflow-active flag in localStorage, swallowing storage errors to keep the workflow usable. */
 const writeStoredWorkflowActive = (isActive: boolean) => {
   try {
     if (isActive) {
@@ -120,6 +122,7 @@ const writeStoredWorkflowActive = (isActive: boolean) => {
   }
 };
 
+/** Resolves the starting forecast day implied by a workflow template's first grouping, defaulting to day 1. */
 const getWorkflowStartDay = (template?: WorkflowMetadata): DayType => {
   const firstGrouping = template?.groupings[0];
   if (firstGrouping === 'day2') return 2;
@@ -128,6 +131,7 @@ const getWorkflowStartDay = (template?: WorkflowMetadata): DayType => {
   return 1;
 };
 
+/** Filters a template's groupings to the standard set used by completion validation, returning undefined when none qualify. */
 const getWorkflowValidationGroupings = (template?: WorkflowMetadata): StandardGrouping[] | undefined => {
   const standardGroupings = (template?.groupings ?? []).filter(
     (grouping): grouping is StandardGrouping =>
