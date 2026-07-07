@@ -326,18 +326,19 @@ const useForecastSaveAction = (
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   mapRef: React.RefObject<ForecastMapHandle | null>,
-  user: ReturnType<typeof useAuth>['user']
+  user: ReturnType<typeof useAuth>['user'],
+  workflowMetadata?: import('../types/workflow').CycleMetadata
 ) => {
   return useCallback(() => {
     try {
-      exportForecastToJson(forecastCycle, buildMapView(mapRef));
+      exportForecastToJson(forecastCycle, buildMapView(mapRef), workflowMetadata);
       dispatch(markAsSaved());
       queueProductMetric({ event: 'cycle_saved', user });
       addToast('Forecast exported to JSON!', 'success');
     } catch {
       addToast('Error exporting forecast.', 'error');
     }
-  }, [forecastCycle, dispatch, addToast, mapRef, user]);
+  }, [forecastCycle, dispatch, addToast, mapRef, user, workflowMetadata]);
 };
 
 /** Returns a memoized async callback that parses and imports a forecast JSON file into Redux. */
@@ -1013,9 +1014,10 @@ const useForecastFileActions = (
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   mapRef: React.RefObject<ForecastMapHandle | null>,
-  user: ReturnType<typeof useAuth>['user']
+  user: ReturnType<typeof useAuth>['user'],
+  workflowMetadata?: import('../types/workflow').CycleMetadata
 ) => {
-  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user);
+  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user, workflowMetadata);
   const handleLoad = useForecastLoadAction(dispatch, addToast, mapRef);
 
   return { handleSave, handleLoad };
@@ -1173,6 +1175,7 @@ const useForecastPageWorkspace = ({
   const canRedo = useSelector(selectCanRedo);
   const emergencyMode = useSelector((state: RootState) => state.forecast.emergencyMode);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+  const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const { user } = useAuth();
   const { premiumActive, effectiveSource } = useEntitlement();
   const cloudCycles = useCloudCycles();
@@ -1208,7 +1211,8 @@ const useForecastPageWorkspace = ({
     addToast,
     forecastCycle,
     mapRef,
-    user
+    user,
+    workflowMetadata
   );
 
   useKeyboardShortcuts({
