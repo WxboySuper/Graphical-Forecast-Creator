@@ -12,6 +12,23 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 - Fix completion validation to respect the active workflow groupings and invalidate stale package completion when map or discussion content changes.
 - Prevent local session restore from overwriting in-progress unsaved forecast or discussion state.
 
+### PR #688
+
+- Add the sliding active-tab background indicator and a touch of top breathing room around toolbar tabs.
+- Slow and smooth the tab, panel, and button motion for a calmer feel.
+- Make horizontal toolbar scrolling easier to use and styles Days as a segmented control.
+- Separate Tools groups with compact tags.
+
+### PR #687
+
+- Replace the repeated header selection/status pill with compact context text and tighten the Days tab width.
+- Add structure for grouped Tools actions and breathing room between ghost-layer icons and labels.
+
+### PR #686
+
+- Add horizontal breathing room to the forecast toolbar selection swatch (wider min width, larger padding and gap) and switch the probability digits to tabular-nums so the chip stays balanced with longer outlook names.
+- Widen the Current Selection toolbar section to 360px so the swatch and toggle fit without crowding.
+
 ### PR #681
 
 - Dependency: @radix-ui/react-dialog ^1.1.17 → ^1.1.18
