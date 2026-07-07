@@ -1145,27 +1145,33 @@ export const forecastSlice = createSlice({
     /** Create a new outlook version within the current cycle (same-cycle update). */
     createOutlookUpdate: (state) => {
       const now = new Date().toISOString();
-      
+
       // Determine the next version number
       const currentVersions = state.workflowMetadata?.outlookVersions || [];
-      const nextVersion = currentVersions.length > 0 
-        ? Math.max(...currentVersions.map(v => v.version)) + 1 
+      const nextVersion = currentVersions.length > 0
+        ? Math.max(...currentVersions.map(v => v.version)) + 1
         : 1;
-      
-      // Snapshot the current day data before creating the update
-      const currentDay = state.forecastCycle.currentDay;
-      const currentDayData = state.forecastCycle.days[currentDay];
-      
-      if (currentDayData) {
-        // Store a snapshot of the current version, preserving Map-backed outlook data
+
+      // Snapshot every day that has data so full-outlook workflows keep
+      // the whole version side-by-side with the next iteration, not just
+      // the currently selected day.
+      const snapshotDays: typeof state.forecastCycle.days = {};
+      let hasSnapshot = false;
+      (Object.entries(state.forecastCycle.days) as [DayType, typeof state.forecastCycle.days[DayType]][]).forEach(
+        ([day, dayData]) => {
+          if (!dayData) return;
+          snapshotDays[day] = {
+            ...dayData,
+            data: cloneOutlookData(dayData.data),
+          };
+          hasSnapshot = true;
+        },
+      );
+
+      if (hasSnapshot) {
         state.outlookVersionSnapshots.push({
           version: nextVersion - 1, // Snapshot the previous version
-          days: { 
-            [currentDay]: {
-              ...currentDayData,
-              data: cloneOutlookData(currentDayData.data),
-            } 
-          },
+          days: snapshotDays,
           createdAt: now,
         });
       }
@@ -1232,15 +1238,23 @@ export const forecastSlice = createSlice({
       state.forecastCycle = newCycle;
       state.isSaved = false;
       state.outlookVersionSnapshots = [];
-      
-      // Set workflow metadata with derivedFromCycleId
-      const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
-      state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
-      state.isWorkflowActive = true;
-      writeStoredWorkflowActive(true);
-      
-      // Restore or set workflow template
-      state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
+
+      // Only attach workflow metadata when the caller opted in via a template
+      // or the source cycle was already a workflow cycle. Plain "start from
+      // previous" should not synthesize a workflow for non-workflow forecasts.
+      const sourceHadWorkflow = Boolean(sourceCycle.workflowMetadata);
+      if (workflowTemplate || sourceHadWorkflow) {
+        const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
+        state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
+        state.isWorkflowActive = true;
+        writeStoredWorkflowActive(true);
+        state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
+      } else {
+        state.workflowMetadata = undefined;
+        state.isWorkflowActive = false;
+        writeStoredWorkflowActive(false);
+        state.workflowTemplate = undefined;
+      }
     },
   }
 });

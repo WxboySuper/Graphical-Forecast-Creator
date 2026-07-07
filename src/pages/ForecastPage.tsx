@@ -696,20 +696,19 @@ const restoreCloudSession = (
   return true;
 };
 
-/** Returns true when the current cycle should skip local auto-save restore (already saved, rolled over, or has discussion content). */
+/** Returns true when the current cycle already holds content (rolled over or discussion) that should not be clobbered by a local autosave restore. */
 const shouldSkipLocalRestore = (
-  isSaved: boolean,
   forecastCycle: ReturnType<typeof selectForecastCycle>
 ): boolean =>
-  !isSaved || hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
+  hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
 
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
 const restoreLocalSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; isSaved: boolean }
+  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle> }
 ): void => {
-  if (shouldSkipLocalRestore(currentSession.isSaved, currentSession.forecastCycle)) {
+  if (shouldSkipLocalRestore(currentSession.forecastCycle)) {
     return;
   }
 
@@ -728,7 +727,6 @@ const restoreAvailableSession = (
   addToast: AddToastFn,
   currentSession: {
     forecastCycle: ReturnType<typeof selectForecastCycle>;
-    isSaved: boolean;
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
   }
 ) => {
@@ -746,11 +744,11 @@ const useSessionRestore = (
   addToast: AddToastFn,
   currentSession: {
     forecastCycle: ReturnType<typeof selectForecastCycle>;
-    isSaved: boolean;
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
   }
 ) => {
   const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
+  const initialCycleRef = useRef(currentSession.forecastCycle);
   const [restoreComplete, setRestoreComplete] = useState(false);
 
   useEffect(() => {
@@ -760,8 +758,7 @@ const useSessionRestore = (
   useEffect(() => {
     try {
       restoreAvailableSession(dispatch, addToast, {
-        forecastCycle: currentSession.forecastCycle,
-        isSaved: currentSession.isSaved,
+        forecastCycle: initialCycleRef.current,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
       });
     } catch {
@@ -769,7 +766,7 @@ const useSessionRestore = (
     } finally {
       setRestoreComplete(true);
     }
-  }, [dispatch, addToast, currentSession.forecastCycle, currentSession.isSaved]);
+  }, [dispatch, addToast]);
 
   return restoreComplete;
 };
@@ -1192,7 +1189,6 @@ const useForecastPageWorkspace = ({
 
   const restoreComplete = useSessionRestore(dispatch, addToast, {
     forecastCycle,
-    isSaved,
     onCloudCycleLoaded: handleCloudCycleLoaded,
   });
   useUnsavedChangesWarning(isSaved);

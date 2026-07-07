@@ -817,8 +817,47 @@ describe('forecastSlice undo/redo', () => {
         const state = reducer(initialState, startFromPreviousCycle({
           sourceCycleId: 'nonexistent',
         }));
-        
+
         expect(state).toEqual(initialState);
+      });
+
+      it('leaves workflow inactive when the source is a plain (non-workflow) cycle and no template is passed', () => {
+        let state = reducer(undefined, setForecastDay(1));
+        state = reducer(state, addFeature({ feature: createFeature('plain-day-1', 0) }));
+        state = reducer(state, markAsSaved());
+        state = reducer(state, saveCurrentCycle({ label: 'Plain Previous Cycle' }));
+
+        const plainSourceId = state.savedCycles[0].id;
+
+        state = reducer(state, startFromPreviousCycle({
+          sourceCycleId: plainSourceId,
+          newCycleDate: '2026-07-05',
+        }));
+
+        expect(state.workflowMetadata).toBeUndefined();
+        expect(state.isWorkflowActive).toBe(false);
+        expect(state.workflowTemplate).toBeUndefined();
+        expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('plain-day-1');
+      });
+    });
+
+    describe('createOutlookUpdate snapshot scope', () => {
+      it('snapshots every populated day, not only the current one', () => {
+        let state = reducer(undefined, startBlankCycle({
+          workflowTemplate: testWorkflowTemplate,
+        }));
+        state = reducer(state, setForecastDay(1));
+        state = reducer(state, addFeature({ feature: createFeature('day-1-feature', 0) }));
+        state = reducer(state, setForecastDay(2));
+        state = reducer(state, addFeature({ feature: createFeature('day-2-feature', 0) }));
+        state = reducer(state, setForecastDay(2));
+
+        state = reducer(state, createOutlookUpdate());
+
+        const snapshot = state.outlookVersionSnapshots[0];
+        expect(snapshot).toBeDefined();
+        expect(snapshot.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('day-1-feature');
+        expect(snapshot.days[2]?.data.tornado?.get('2%')?.[0].id).toBe('day-2-feature');
       });
     });
   });

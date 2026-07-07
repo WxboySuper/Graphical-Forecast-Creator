@@ -11,6 +11,7 @@ import {
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 import type { AddToastFn } from '../Layout';
 import type { DayType, ForecastCycle } from '../../types/outlooks';
+import type { CycleMetadata } from '../../types/workflow';
 import { useDispatch } from 'react-redux';
 
 export interface ForecastWorkspaceActionParams {
@@ -19,6 +20,7 @@ export interface ForecastWorkspaceActionParams {
   mapRef: React.RefObject<ForecastMapHandle | null>;
   addToast: AddToastFn;
   forecastCycle: ForecastCycle;
+  cycleMetadata?: CycleMetadata;
   currentDay: DayType;
   canUndo: boolean;
   canRedo: boolean;
@@ -65,6 +67,7 @@ export const useForecastWorkspaceActionHandlers = ({
   mapRef,
   addToast,
   forecastCycle,
+  cycleMetadata,
   currentDay,
   canUndo,
   canRedo,
@@ -78,14 +81,14 @@ export const useForecastWorkspaceActionHandlers = ({
     setIsPackageDownloading(true);
     try {
       const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
-      await downloadGfcPackage(forecastCycle, mapView);
+      await downloadGfcPackage(forecastCycle, mapView, cycleMetadata);
       addToast('Package downloaded!', 'success');
     } catch {
       addToast('Failed to create package.', 'error');
     } finally {
       setIsPackageDownloading(false);
     }
-  }, [mapRef, forecastCycle, addToast, setIsPackageDownloading]);
+  }, [mapRef, forecastCycle, cycleMetadata, addToast, setIsPackageDownloading]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = getSelectedFile(e);
