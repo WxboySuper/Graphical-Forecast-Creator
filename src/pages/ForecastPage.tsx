@@ -1083,6 +1083,7 @@ const useCloudForecastActions = ({
   markCurrentStateSynced,
   saveCycle,
   userId,
+  workflowMetadata,
 }: {
   addToast: AddToastFn;
   currentMapView: RootState['forecast']['currentMapView'];
@@ -1091,6 +1092,7 @@ const useCloudForecastActions = ({
   markCurrentStateSynced: () => void;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
+  workflowMetadata?: import('../types/workflow').CycleMetadata;
 }) => {
   const handleCloudCycleLoaded = useCallback(
     (cloudCycle: { id: string; label: string }) => {
@@ -1106,7 +1108,7 @@ const useCloudForecastActions = ({
         throw new Error('Sign in to save forecasts to the cloud.');
       }
 
-      const payload = serializeForecast(forecastCycle, currentMapView);
+      const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
       const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload);
 
@@ -1117,7 +1119,7 @@ const useCloudForecastActions = ({
       markCurrentStateSynced();
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId]
+    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
   );
 
   return {
@@ -1198,6 +1200,7 @@ const useForecastPageWorkspace = ({
     markCurrentStateSynced,
     saveCycle,
     userId: user?.uid,
+    workflowMetadata,
   });
 
   const restoreComplete = useSessionRestore(dispatch, addToast, {
