@@ -13,9 +13,9 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { RootState } from '../store';
-import { 
-  importForecastCycle, 
-  markAsSaved, 
+import {
+  importForecastCycle,
+  markAsSaved,
   resetForecasts,
   saveCurrentCycle,
   setMapView,
@@ -29,6 +29,7 @@ import {
   setForecastDay,
   redoLastEdit,
   undoLastEdit,
+  setWorkflowMetadata,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
@@ -242,7 +243,10 @@ export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => 
 };
 
 interface LoadedForecastPayload {
-  rawData: { mapView?: { center: [number, number]; zoom: number } };
+  rawData: {
+    mapView?: { center: [number, number]; zoom: number };
+    cycleMetadata?: import('../types/workflow').CycleMetadata;
+  };
   deserializedCycle: ReturnType<typeof deserializeForecast>;
 }
 
@@ -295,6 +299,9 @@ const applyLoadedForecast = (
   mapRef: React.RefObject<ForecastMapHandle | null>
 ) => {
   dispatch(importForecastCycle(payload.deserializedCycle));
+  if (payload.rawData.cycleMetadata) {
+    dispatch(setWorkflowMetadata(payload.rawData.cycleMetadata));
+  }
 
   if (payload.rawData.mapView) {
     dispatch(setMapView(payload.rawData.mapView));
@@ -632,6 +639,9 @@ const restoreStoredForecastPayload = (
 ) => {
   const deserializedCycle = deserializeForecast(data);
   dispatch(importForecastCycle(deserializedCycle));
+  if (data.cycleMetadata) {
+    dispatch(setWorkflowMetadata(data.cycleMetadata));
+  }
 
   const rawData = data as LoadedForecastPayload['rawData'];
   if (rawData.mapView) {
