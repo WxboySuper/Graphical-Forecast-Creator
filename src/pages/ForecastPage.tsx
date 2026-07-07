@@ -726,16 +726,18 @@ const restoreLocalSession = (
 const restoreAvailableSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  forecastCycle: ReturnType<typeof selectForecastCycle>,
-  isSaved: boolean,
-  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+  currentSession: {
+    forecastCycle: ReturnType<typeof selectForecastCycle>;
+    isSaved: boolean;
+    onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
+  }
 ) => {
-  const restoredCloudSession = restoreCloudSession(dispatch, addToast, onCloudCycleLoaded);
+  const restoredCloudSession = restoreCloudSession(dispatch, addToast, currentSession.onCloudCycleLoaded);
   if (restoredCloudSession) {
     return;
   }
 
-  restoreLocalSession(dispatch, addToast, { forecastCycle, isSaved });
+  restoreLocalSession(dispatch, addToast, currentSession);
 };
 
 /** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
@@ -755,7 +757,11 @@ const useSessionRestore = (
 
   useEffect(() => {
     try {
-      restoreAvailableSession(dispatch, addToast, forecastCycle, isSaved, onCloudCycleLoadedRef.current);
+      restoreAvailableSession(dispatch, addToast, {
+        forecastCycle,
+        isSaved,
+        onCloudCycleLoaded: onCloudCycleLoadedRef.current,
+      });
     } catch {
       // Silently skip auto-load errors to avoid disrupting initial render
     } finally {
