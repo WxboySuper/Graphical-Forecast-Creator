@@ -236,6 +236,67 @@ const createEmptyOutlook = (day: DayType): OutlookDay => {
   };
 };
 
+interface ApplyRolloverArgs {
+  sourceCycle: ForecastState['savedCycles'][number];
+  sourceDayData: ReturnType<typeof normalizeForecastCycle>['days'][DayType];
+  sourceDayNumber: DayType;
+  targetDay: DayType;
+  targetDate: string;
+  workflowTemplate?: WorkflowMetadata;
+}
+
+/** Builds the fresh rollover cycle and copies the requested day into it. */
+const buildRolloverCycle = ({
+  sourceDayData,
+  sourceDayNumber,
+  targetDay,
+  targetDate,
+}: Omit<ApplyRolloverArgs, 'sourceCycle' | 'workflowTemplate'>): ForecastCycle => {
+  const newCycle: ForecastCycle = {
+    days: { [targetDay]: createEmptyOutlook(targetDay) },
+    currentDay: targetDay,
+    cycleDate: targetDate,
+  };
+  const targetDayData = newCycle.days[targetDay];
+  if (targetDayData) {
+    copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDayNumber, targetDay);
+  }
+  return newCycle;
+};
+
+/**
+ * Attaches workflow metadata to the rollover only when a template was passed
+ * or the source cycle was already a workflow cycle. Plain rollovers stay plain.
+ */
+const applyRolloverWorkflowState = (
+  state: ForecastState,
+  { sourceCycle, targetDate, workflowTemplate }: Pick<ApplyRolloverArgs, 'sourceCycle' | 'targetDate' | 'workflowTemplate'>,
+  now: string
+) => {
+  const sourceHadWorkflow = Boolean(sourceCycle.workflowMetadata);
+  if (workflowTemplate || sourceHadWorkflow) {
+    const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
+    state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
+    state.isWorkflowActive = true;
+    writeStoredWorkflowActive(true);
+    state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
+    return;
+  }
+  state.workflowMetadata = undefined;
+  state.isWorkflowActive = false;
+  writeStoredWorkflowActive(false);
+  state.workflowTemplate = undefined;
+};
+
+/** Resets the in-memory cycle to a fresh rollover derived from the requested source. */
+const applyRolloverFromPreviousCycle = (state: ForecastState, args: ApplyRolloverArgs) => {
+  clearHistory(state);
+  state.forecastCycle = buildRolloverCycle(args);
+  state.isSaved = false;
+  state.outlookVersionSnapshots = [];
+  applyRolloverWorkflowState(state, args, new Date().toISOString());
+};
+
 const initialState: ForecastState = {
   forecastCycle: {
     days: {
@@ -1210,51 +1271,23 @@ export const forecastSlice = createSlice({
       workflowTemplate?: WorkflowMetadata;
     }>) => {
       const { sourceCycleId, newCycleDate, sourceDay, targetDay = 1, workflowTemplate } = action.payload;
-      
-      // Find the source cycle in saved cycles
+
       const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
       if (!sourceCycle) return;
-      
-      const now = new Date().toISOString();
-      const targetDate = newCycleDate || getLocalCalendarDate();
-      
+
       const sourceForecastCycle = normalizeForecastCycle(sourceCycle.forecastCycle);
       const sourceDayNumber = sourceDay ?? sourceForecastCycle.currentDay;
       const sourceDayData = sourceForecastCycle.days[sourceDayNumber];
       if (!sourceDayData) return;
 
-      // Create a fresh cycle and copy only the requested, compatible outlook data
-      // so "start from previous" is a new package, not an import of the old one.
-      clearHistory(state);
-      const newCycle: ForecastCycle = {
-        days: { [targetDay]: createEmptyOutlook(targetDay) },
-        currentDay: targetDay,
-        cycleDate: targetDate,
-      };
-      const targetDayData = newCycle.days[targetDay];
-      if (targetDayData) {
-        copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDayNumber, targetDay);
-      }
-      state.forecastCycle = newCycle;
-      state.isSaved = false;
-      state.outlookVersionSnapshots = [];
-
-      // Only attach workflow metadata when the caller opted in via a template
-      // or the source cycle was already a workflow cycle. Plain "start from
-      // previous" should not synthesize a workflow for non-workflow forecasts.
-      const sourceHadWorkflow = Boolean(sourceCycle.workflowMetadata);
-      if (workflowTemplate || sourceHadWorkflow) {
-        const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
-        state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
-        state.isWorkflowActive = true;
-        writeStoredWorkflowActive(true);
-        state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
-      } else {
-        state.workflowMetadata = undefined;
-        state.isWorkflowActive = false;
-        writeStoredWorkflowActive(false);
-        state.workflowTemplate = undefined;
-      }
+      applyRolloverFromPreviousCycle(state, {
+        sourceCycle,
+        sourceDayData,
+        sourceDayNumber,
+        targetDay,
+        targetDate: newCycleDate || getLocalCalendarDate(),
+        workflowTemplate,
+      });
     },
   }
 });
