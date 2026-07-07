@@ -31,6 +31,7 @@ const setup = (overrides: Partial<Parameters<typeof useForecastWorkspaceActionHa
     mapRef: { current: { getView: jest.fn(() => ({ center: [1, 2], zoom: 7 })) } },
     addToast,
     forecastCycle,
+    cycleMetadata: undefined,
     currentDay: 3,
     canUndo: true,
     canRedo: false,
@@ -95,7 +96,7 @@ describe('useForecastWorkspaceActionHandlers', () => {
       await Promise.resolve();
     });
 
-    expect(downloadGfcPackage).toHaveBeenCalledWith(forecastCycle, { center: [1, 2], zoom: 7 });
+    expect(downloadGfcPackage).toHaveBeenCalledWith(forecastCycle, { center: [1, 2], zoom: 7 }, undefined);
     expect(first.addToast).toHaveBeenCalledWith('Package downloaded!', 'success');
     expect(first.setIsPackageDownloading).toHaveBeenLastCalledWith(false);
 
@@ -107,7 +108,7 @@ describe('useForecastWorkspaceActionHandlers', () => {
       await Promise.resolve();
     });
 
-    expect(downloadGfcPackage).toHaveBeenLastCalledWith(forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
+    expect(downloadGfcPackage).toHaveBeenLastCalledWith(forecastCycle, { center: [39.8283, -98.5795], zoom: 4 }, undefined);
     expect(second.addToast).toHaveBeenCalledWith('Failed to create package.', 'error');
   });
 });

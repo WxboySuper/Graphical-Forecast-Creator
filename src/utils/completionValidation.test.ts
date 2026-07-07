@@ -110,13 +110,14 @@ describe('validateCycleCompletion', () => {
     expect(result.issues.length).toBeGreaterThan(0);
   });
 
-  it('returns complete when all day1 types are low probability', () => {
+  it('returns complete with a warning when all day1 types are low probability but discussion is missing', () => {
     const result = validateCycleCompletion(
       createForecastCycle({ 1: createDayFixture(1, 'lowProb') }),
       ['day1'],
     );
     expect(result.isComplete).toBe(true);
-    expect(result.issues).toHaveLength(0);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0].type).toBe('missing-discussion');
   });
 
   it('reports missing polygon for day1 with no data', () => {

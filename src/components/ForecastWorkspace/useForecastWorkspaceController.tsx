@@ -414,6 +414,7 @@ function useForecastWorkspaceCoreState(
   const forecastCycle = useSelector(selectForecastCycle);
   const { currentDay, days, cycleDate } = forecastCycle;
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const cycleMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const canUndo = useSelector(selectCanUndo);
   const canRedo = useSelector(selectCanRedo);
   const ghostOutlookState = useSelector((state: RootState) => state.overlays.ghostOutlooks);
@@ -441,6 +442,7 @@ function useForecastWorkspaceCoreState(
   return {
     dispatch,
     forecastCycle,
+    cycleMetadata,
     currentDay,
     days,
     cycleDate,
@@ -476,6 +478,7 @@ function useForecastWorkspaceControllerArgs({
     mapRef,
     addToast,
     forecastCycle: core.forecastCycle,
+    cycleMetadata: core.cycleMetadata,
     currentDay: core.currentDay,
     canUndo: core.canUndo,
     canRedo: core.canRedo,

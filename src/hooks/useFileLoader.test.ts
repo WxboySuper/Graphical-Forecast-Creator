@@ -89,7 +89,7 @@ describe('createFileHandlers', () => {
     expect(mockExportForecastToJson).toHaveBeenCalledWith(forecastCycle, {
       center: [39.8283, -98.5795],
       zoom: 4,
-    });
+    }, undefined);
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/markAsSaved' }));
     expect(addToast).toHaveBeenCalledWith('Forecast exported to JSON!', 'success');
 

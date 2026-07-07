@@ -1,6 +1,6 @@
 import type { ForecastCycle } from '../types/outlooks';
 
-export type CompletionMetadata = Pick<ForecastCycle, 'completionAcknowledgedAt' | 'omittedDayReasons'>;
+export type CompletionMetadata = Pick<ForecastCycle, 'completionAcknowledgedAt' | 'omittedDayReasons' | 'updateInProgressVersion'>;
 
 /** Copies optional completion acknowledgement fields when present. */
 export const completionMetadataFromForecastCycle = (
@@ -11,5 +11,8 @@ export const completionMetadataFromForecastCycle = (
     : {}),
   ...(forecastCycle.omittedDayReasons
     ? { omittedDayReasons: forecastCycle.omittedDayReasons }
+    : {}),
+  ...(typeof forecastCycle.updateInProgressVersion === 'number'
+    ? { updateInProgressVersion: forecastCycle.updateInProgressVersion }
     : {}),
 });

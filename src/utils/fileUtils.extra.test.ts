@@ -69,14 +69,18 @@ describe('fileUtils extra', () => {
     spy.mockRestore();
   });
 
-  test('downloadGfcPackage zips and triggers download with discussions', async () => {
+  test('downloadGfcPackage zips one workflow-ready forecast JSON with discussions', async () => {
     jest.resetModules();
+    let generatedFiles: Record<string, string> = {};
 
     jest.doMock('jszip', () => {
       return class MockJSZip {
         files: Record<string, string> = {};
         file(name: string, content: string) { this.files[name] = content; }
-        generateAsync(_opts: unknown) { return Promise.resolve(new Blob([JSON.stringify(this.files)])); }
+        generateAsync(_opts: unknown) {
+          generatedFiles = this.files;
+          return Promise.resolve(new Blob([JSON.stringify(this.files)]));
+        }
       };
     });
 
@@ -102,6 +106,9 @@ describe('fileUtils extra', () => {
 
     expect(clickMock).toHaveBeenCalled();
     expect(urlHelpers.createObjectURL).toHaveBeenCalled();
+    expect(Object.keys(generatedFiles).sort()).toEqual(['discussion_day1.txt', 'forecast_cycle.json']);
+    expect(generatedFiles.workflow_package_json).toBeUndefined();
+    expect(generatedFiles['workflow_package.json']).toBeUndefined();
     spy.mockRestore();
   });
 });

@@ -13,9 +13,9 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { RootState } from '../store';
-import { 
-  importForecastCycle, 
-  markAsSaved, 
+import {
+  importForecastCycle,
+  markAsSaved,
   resetForecasts,
   saveCurrentCycle,
   setMapView,
@@ -29,6 +29,7 @@ import {
   setForecastDay,
   redoLastEdit,
   undoLastEdit,
+  setWorkflowMetadata,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
@@ -242,7 +243,10 @@ export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => 
 };
 
 interface LoadedForecastPayload {
-  rawData: { mapView?: { center: [number, number]; zoom: number } };
+  rawData: {
+    mapView?: { center: [number, number]; zoom: number };
+    cycleMetadata?: import('../types/workflow').CycleMetadata;
+  };
   deserializedCycle: ReturnType<typeof deserializeForecast>;
 }
 
@@ -295,6 +299,9 @@ const applyLoadedForecast = (
   mapRef: React.RefObject<ForecastMapHandle | null>
 ) => {
   dispatch(importForecastCycle(payload.deserializedCycle));
+  if (payload.rawData.cycleMetadata) {
+    dispatch(setWorkflowMetadata(payload.rawData.cycleMetadata));
+  }
 
   if (payload.rawData.mapView) {
     dispatch(setMapView(payload.rawData.mapView));
@@ -319,18 +326,19 @@ const useForecastSaveAction = (
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   mapRef: React.RefObject<ForecastMapHandle | null>,
-  user: ReturnType<typeof useAuth>['user']
+  user: ReturnType<typeof useAuth>['user'],
+  workflowMetadata?: import('../types/workflow').CycleMetadata
 ) => {
   return useCallback(() => {
     try {
-      exportForecastToJson(forecastCycle, buildMapView(mapRef));
+      exportForecastToJson(forecastCycle, buildMapView(mapRef), workflowMetadata);
       dispatch(markAsSaved());
       queueProductMetric({ event: 'cycle_saved', user });
       addToast('Forecast exported to JSON!', 'success');
     } catch {
       addToast('Error exporting forecast.', 'error');
     }
-  }, [forecastCycle, dispatch, addToast, mapRef, user]);
+  }, [forecastCycle, dispatch, addToast, mapRef, user, workflowMetadata]);
 };
 
 /** Returns a memoized async callback that parses and imports a forecast JSON file into Redux. */
@@ -632,6 +640,9 @@ const restoreStoredForecastPayload = (
 ) => {
   const deserializedCycle = deserializeForecast(data);
   dispatch(importForecastCycle(deserializedCycle));
+  if (data.cycleMetadata) {
+    dispatch(setWorkflowMetadata(data.cycleMetadata));
+  }
 
   const rawData = data as LoadedForecastPayload['rawData'];
   if (rawData.mapView) {
@@ -696,11 +707,22 @@ const restoreCloudSession = (
   return true;
 };
 
+/** Returns true when the current cycle already holds content (rolled over or discussion) that should not be clobbered by a local autosave restore. */
+const shouldSkipLocalRestore = (
+  forecastCycle: ReturnType<typeof selectForecastCycle>
+): boolean =>
+  hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
+
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
 const restoreLocalSession = (
   dispatch: ShortcutDispatch,
-  addToast: AddToastFn
+  addToast: AddToastFn,
+  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle> }
 ): void => {
+  if (shouldSkipLocalRestore(currentSession.forecastCycle)) {
+    return;
+  }
+
   const data = parseStoredForecastPayload(localStorage.getItem('forecastData'));
   if (!data) {
     return;
@@ -714,32 +736,42 @@ const restoreLocalSession = (
 const restoreAvailableSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+  currentSession: {
+    forecastCycle: ReturnType<typeof selectForecastCycle>;
+    onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
+  }
 ) => {
-  const restoredCloudSession = restoreCloudSession(dispatch, addToast, onCloudCycleLoaded);
+  const restoredCloudSession = restoreCloudSession(dispatch, addToast, currentSession.onCloudCycleLoaded);
   if (restoredCloudSession) {
     return;
   }
 
-  restoreLocalSession(dispatch, addToast);
+  restoreLocalSession(dispatch, addToast, currentSession);
 };
 
 /** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
 const useSessionRestore = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+  currentSession: {
+    forecastCycle: ReturnType<typeof selectForecastCycle>;
+    onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
+  }
 ) => {
-  const onCloudCycleLoadedRef = useRef(onCloudCycleLoaded);
+  const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
+  const initialCycleRef = useRef(currentSession.forecastCycle);
   const [restoreComplete, setRestoreComplete] = useState(false);
 
   useEffect(() => {
-    onCloudCycleLoadedRef.current = onCloudCycleLoaded;
-  }, [onCloudCycleLoaded]);
+    onCloudCycleLoadedRef.current = currentSession.onCloudCycleLoaded;
+  }, [currentSession.onCloudCycleLoaded]);
 
   useEffect(() => {
     try {
-      restoreAvailableSession(dispatch, addToast, onCloudCycleLoadedRef.current);
+      restoreAvailableSession(dispatch, addToast, {
+        forecastCycle: initialCycleRef.current,
+        onCloudCycleLoaded: onCloudCycleLoadedRef.current,
+      });
     } catch {
       // Silently skip auto-load errors to avoid disrupting initial render
     } finally {
@@ -982,9 +1014,10 @@ const useForecastFileActions = (
   addToast: AddToastFn,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   mapRef: React.RefObject<ForecastMapHandle | null>,
-  user: ReturnType<typeof useAuth>['user']
+  user: ReturnType<typeof useAuth>['user'],
+  workflowMetadata?: import('../types/workflow').CycleMetadata
 ) => {
-  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user);
+  const handleSave = useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user, workflowMetadata);
   const handleLoad = useForecastLoadAction(dispatch, addToast, mapRef);
 
   return { handleSave, handleLoad };
@@ -1050,6 +1083,7 @@ const useCloudForecastActions = ({
   markCurrentStateSynced,
   saveCycle,
   userId,
+  workflowMetadata,
 }: {
   addToast: AddToastFn;
   currentMapView: RootState['forecast']['currentMapView'];
@@ -1058,6 +1092,7 @@ const useCloudForecastActions = ({
   markCurrentStateSynced: () => void;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
+  workflowMetadata?: import('../types/workflow').CycleMetadata;
 }) => {
   const handleCloudCycleLoaded = useCallback(
     (cloudCycle: { id: string; label: string }) => {
@@ -1073,7 +1108,7 @@ const useCloudForecastActions = ({
         throw new Error('Sign in to save forecasts to the cloud.');
       }
 
-      const payload = serializeForecast(forecastCycle, currentMapView);
+      const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
       const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload);
 
@@ -1084,7 +1119,7 @@ const useCloudForecastActions = ({
       markCurrentStateSynced();
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId]
+    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
   );
 
   return {
@@ -1142,6 +1177,7 @@ const useForecastPageWorkspace = ({
   const canRedo = useSelector(selectCanRedo);
   const emergencyMode = useSelector((state: RootState) => state.forecast.emergencyMode);
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
+  const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const { user } = useAuth();
   const { premiumActive, effectiveSource } = useEntitlement();
   const cloudCycles = useCloudCycles();
@@ -1164,9 +1200,13 @@ const useForecastPageWorkspace = ({
     markCurrentStateSynced,
     saveCycle,
     userId: user?.uid,
+    workflowMetadata,
   });
 
-  const restoreComplete = useSessionRestore(dispatch, addToast, handleCloudCycleLoaded);
+  const restoreComplete = useSessionRestore(dispatch, addToast, {
+    forecastCycle,
+    onCloudCycleLoaded: handleCloudCycleLoaded,
+  });
   useUnsavedChangesWarning(isSaved);
 
   const { handleSave, handleLoad } = useForecastFileActions(
@@ -1174,7 +1214,8 @@ const useForecastPageWorkspace = ({
     addToast,
     forecastCycle,
     mapRef,
-    user
+    user,
+    workflowMetadata
   );
 
   useKeyboardShortcuts({

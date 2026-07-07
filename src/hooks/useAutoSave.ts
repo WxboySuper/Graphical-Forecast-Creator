@@ -10,6 +10,7 @@ const LOCAL_STORAGE_KEY = 'forecastData';
 export const useAutoSave = () => {
   const forecastCycle = useSelector(selectForecastCycle);
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
+  const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isFirstRender = useRef(true);
 
@@ -25,7 +26,7 @@ export const useAutoSave = () => {
 
     timerRef.current = setTimeout(() => {
       try {
-        const data = serializeForecast(forecastCycle, mapView);
+        const data = serializeForecast(forecastCycle, mapView, workflowMetadata);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
       } catch {
         // Auto-save silently fails to avoid disrupting the user
@@ -37,5 +38,5 @@ export const useAutoSave = () => {
         clearTimeout(timerRef.current);
       }
     };
-  }, [forecastCycle, mapView]);
+  }, [forecastCycle, mapView, workflowMetadata]);
 };
