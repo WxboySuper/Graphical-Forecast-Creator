@@ -69,7 +69,8 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
   const warningIssues = issues.filter((issue) => issue.severity === 'warning');
   const canCompleteWithOmissions = hasAllOmissionReasons(missingGroupings, omittedDays);
 
-  const handleCompleteAndExport = () => {
+/** Completes the forecast review and starts the optional export flow. */
+const handleCompleteAndExport = () => {
     onComplete();
     onExport?.();
   };

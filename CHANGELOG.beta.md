@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #683
+
+- Modernize the package review and completion dialogs with shared dialog primitives and review/export actions.
+
 ### PR #681
 
 - Dependency: @radix-ui/react-dialog ^1.1.17 → ^1.1.18
