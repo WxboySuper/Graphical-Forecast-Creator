@@ -36,7 +36,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       if (!open) onCancel();
     }}>
       <DialogContent
-        className={overlayClassName ? `confirmation-dialog ${overlayClassName}` : 'confirmation-dialog'}
+        className="confirmation-dialog"
+        overlayClassName={overlayClassName}
         aria-describedby="confirm-desc"
       >
         <DialogHeader>

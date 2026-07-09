@@ -50,15 +50,19 @@ const partitionDialogChildren = (children: React.ReactNode) => {
   return { body, footers };
 };
 
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  overlayClassName?: string;
+};
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => {
+  DialogContentProps
+>(({ className, children, overlayClassName, ...props }, ref) => {
   const { body, footers } = partitionDialogChildren(children);
 
   return (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
