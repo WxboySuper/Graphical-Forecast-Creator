@@ -18,6 +18,7 @@ import type { WorkflowMetadata } from '../../types/workflow';
 import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
+import { isFeatureExposed } from '../../config/featureExposure';
 
 /**
  * Encapsulates the state and handlers used by the HomePage component so the page
@@ -34,9 +35,11 @@ const useHomePageLogic = () => {
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const savedCycles = useSelector((state: RootState) => state.forecast.savedCycles);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [confirmNewCycle, setConfirmNewCycle] = useState(false);
+  const [pendingWorkflow, setPendingWorkflow] = useState<WorkflowMetadata | null>(null);
 
   const { fileInputRef, handleFileSelect, handleOpenFilePicker, handleSave: doSave } = createFileHandlers({
     addToast,
@@ -66,9 +69,15 @@ const useHomePageLogic = () => {
 
   /** Start a workflow package from the selected scope. */
   const handleStartWorkflow = (workflowTemplate: WorkflowMetadata) => {
+    if (!workflowEnabled) return;
+    if (!isSaved) {
+      setPendingWorkflow(workflowTemplate);
+      setConfirmNewCycle(true);
+      return;
+    }
     dispatch(startBlankCycle({
       workflowTemplate,
-      cycleDate: forecastCycle.cycleDate,
+      cycleDate: new Date().toISOString().slice(0, 10),
     }));
     addToast(`Started ${workflowTemplate.label} workflow`, 'success');
     navigate('/forecast');
@@ -76,6 +85,7 @@ const useHomePageLogic = () => {
 
   /** Start a same-day update for the active workflow. */
   const handleCreateWorkflowUpdate = () => {
+    if (!workflowEnabled) return;
     dispatch(createOutlookUpdate());
     addToast('Started same-day workflow update', 'success');
     navigate('/forecast');
@@ -125,13 +135,27 @@ const useHomePageLogic = () => {
 
   /** Confirm starting a new cycle (discard changes). */
   const handleConfirmNewCycle = () => {
+    if (pendingWorkflow) {
+      dispatch(startBlankCycle({
+        workflowTemplate: pendingWorkflow,
+        cycleDate: new Date().toISOString().slice(0, 10),
+      }));
+      setPendingWorkflow(null);
+      setConfirmNewCycle(false);
+      addToast(`Started ${pendingWorkflow.label} workflow`, 'success');
+      navigate('/forecast');
+      return;
+    }
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
     setConfirmNewCycle(false);
   };
 
   /** Cancel the 'start new cycle' confirmation. */
-  const handleCancelNewCycle = () => setConfirmNewCycle(false);
+  const handleCancelNewCycle = () => {
+    setPendingWorkflow(null);
+    setConfirmNewCycle(false);
+  };
 
   return {
     variant,
@@ -159,6 +183,7 @@ const useHomePageLogic = () => {
     workflowMetadata,
     hasActiveWorkflow,
     isSaved,
+    workflowEnabled,
     handleStartWorkflow,
     handleCreateWorkflowUpdate,
   } as const;
