@@ -20,6 +20,13 @@ import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
 
+const getLocalCalendarDate = () => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+};
+
 /**
  * Encapsulates the state and handlers used by the HomePage component so the page
  * component remains a focused presentational layer. This reduces HomePage's
@@ -77,7 +84,7 @@ const useHomePageLogic = () => {
     }
     dispatch(startBlankCycle({
       workflowTemplate,
-      cycleDate: new Date().toISOString().slice(0, 10),
+      cycleDate: getLocalCalendarDate(),
     }));
     addToast(`Started ${workflowTemplate.label} workflow`, 'success');
     navigate('/forecast');
@@ -138,7 +145,7 @@ const useHomePageLogic = () => {
     if (pendingWorkflow) {
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,
-        cycleDate: new Date().toISOString().slice(0, 10),
+        cycleDate: getLocalCalendarDate(),
       }));
       setPendingWorkflow(null);
       setConfirmNewCycle(false);
