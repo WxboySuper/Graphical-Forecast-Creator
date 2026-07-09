@@ -1,4 +1,5 @@
 import React from 'react';
+import './ConfirmationModal.css';
 import { Button } from '../ui/button';
 import {
   Dialog,
