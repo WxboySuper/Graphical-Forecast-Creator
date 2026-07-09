@@ -33,6 +33,7 @@ interface HomeConceptPageProps {
   savedCycles: SavedCycle[];
   forecastCycle: ForecastCycle;
   workflowMetadata?: CycleMetadata;
+  workflowEnabled: boolean;
   hasActiveWorkflow: boolean;
   isSaved: boolean;
   onResumeForecast: () => void;
@@ -281,7 +282,8 @@ const SignedInCycleBar: React.FC<{
 /** Main signed-in hero panel with resume, history, and new-cycle actions. */
 const SignedInContinuePanel: React.FC<{
   forecastCycle: ForecastCycle;
-  workflowMetadata?: CycleMetadata;
+    workflowMetadata?: CycleMetadata;
+    workflowEnabled: boolean;
   hasActiveWorkflow: boolean;
   onResumeForecast: () => void;
   onWriteDiscussion: () => void;
@@ -290,7 +292,8 @@ const SignedInContinuePanel: React.FC<{
   onCreateWorkflowUpdate: () => void;
 }> = ({
   forecastCycle,
-  workflowMetadata,
+    workflowMetadata,
+    workflowEnabled,
   hasActiveWorkflow,
   onResumeForecast,
   onWriteDiscussion,
@@ -320,7 +323,8 @@ const SignedInContinuePanel: React.FC<{
               type="button"
               key={template.id}
               className="home-concept-workflow-start"
-              onClick={() => onStartWorkflow(template)}
+                onClick={() => onStartWorkflow(template)}
+                disabled={!workflowEnabled}
             >
               {workflowStartLabels[template.id] ?? template.label}
             </button>
@@ -356,7 +360,7 @@ const SignedInContinuePanel: React.FC<{
           <NextActionIcon className="h-4 w-4" />
           {nextAction.label}
         </button>
-        <button type="button" onClick={onCreateWorkflowUpdate}>
+          <button type="button" onClick={onCreateWorkflowUpdate} disabled={!workflowEnabled}>
           <RefreshCw className="h-4 w-4" />
           Create update
         </button>
@@ -370,7 +374,8 @@ const SignedInContinuePanel: React.FC<{
           <button
             type="button"
             key={template.id}
-            onClick={() => onStartWorkflow(template)}
+              onClick={() => onStartWorkflow(template)}
+              disabled={!workflowEnabled}
           >
             {workflowStartLabels[template.id] ?? template.label}
           </button>
@@ -386,6 +391,7 @@ const SignedInConcept: React.FC<HomeConceptPageProps> = ({
   savedCycles,
   forecastCycle,
   workflowMetadata,
+  workflowEnabled,
   hasActiveWorkflow,
   isSaved,
   onResumeForecast,
@@ -409,6 +415,7 @@ const SignedInConcept: React.FC<HomeConceptPageProps> = ({
       <SignedInContinuePanel
         forecastCycle={forecastCycle}
         workflowMetadata={workflowMetadata}
+        workflowEnabled={workflowEnabled}
         hasActiveWorkflow={hasActiveWorkflow}
         onResumeForecast={onResumeForecast}
         onWriteDiscussion={onWriteDiscussion}
