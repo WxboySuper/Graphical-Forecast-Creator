@@ -68,6 +68,7 @@ const DialogContent = React.forwardRef<
       className={cn(
         'fixed left-[50%] top-[50%] z-modal flex w-[calc(100%-1.5rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-hidden rounded-lg border border-border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-scale-in sm:p-6',
         'max-h-[min(90dvh,calc(100%-1.5rem))]',
+        overlayClassName && 'z-[10001]',
         className
       )}
       {...props}
