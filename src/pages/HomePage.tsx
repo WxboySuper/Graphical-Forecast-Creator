@@ -311,7 +311,7 @@ const HomePage: React.FC = () => {
         savedCycles={savedCycles}
         forecastCycle={forecastCycle}
         workflowMetadata={workflowMetadata}
-        workflowEnabled={logic.workflowEnabled}
+        workflowEnabled={logic.workflowEnabled ?? true}
         hasActiveWorkflow={hasActiveWorkflow}
         isSaved={isSaved}
         onResumeForecast={handleNavigateForecast}
