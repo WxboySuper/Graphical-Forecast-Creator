@@ -140,9 +140,9 @@ describe('TabbedIntegratedToolbar completion validation exposure', () => {
       await user.click(screen.getByRole('tab', { name: /Tools/i }));
 
       if (visible) {
-        expect(screen.getByText('Complete')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Complete' })).toBeInTheDocument();
       } else {
-        expect(screen.queryByText('Complete')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Complete' })).not.toBeInTheDocument();
       }
     }
   );

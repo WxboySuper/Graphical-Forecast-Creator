@@ -34,6 +34,7 @@ import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
 import { serializeForecast } from '../utils/fileUtils';
+import type { Feature } from 'geojson';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -181,6 +182,30 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('live-outlook');
+  });
+
+  test('restores the local autosave when the current cycle is empty', () => {
+    const store = createStore();
+    const cycleWithOutlook = { ...store.getState().forecast.forecastCycle };
+    const features = new Map<string, Feature[]>();
+    features.set('10%', [{
+      type: 'Feature',
+      id: 'autosave-outlook',
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
+    } as Feature]);
+    cycleWithOutlook.days = {
+      1: {
+        data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
+        metadata: { lowProbabilityOutlooks: [] },
+      },
+    } as typeof cycleWithOutlook.days;
+    const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
+    localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
+
+    renderForecastPage(store);
+
+    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('autosave-outlook');
   });
 });
 

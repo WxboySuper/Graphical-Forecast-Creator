@@ -90,14 +90,15 @@ export const useCloudSync = (
   const updateSyncState = cloud.updateSyncState;
   const forecastCycle = useSelector((state: RootState) => state.forecast.forecastCycle);
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
-  
+  const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
+
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncStateRef = useRef<string | null>(null);
 
   const canSync = Boolean(currentCloud) && premiumActive;
   const serializedPayload = useMemo(
-    () => serializeForecast(forecastCycle, mapView),
-    [forecastCycle, mapView]
+    () => serializeForecast(forecastCycle, mapView, workflowMetadata),
+    [forecastCycle, mapView, workflowMetadata]
   );
   const currentHash = useMemo(
     () => buildCloudSyncHash(serializedPayload),

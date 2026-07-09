@@ -100,6 +100,7 @@ const ALL_OUTLOOK_TYPES: OutlookType[] = [
 ];
 const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical'];
 
+/** Reads the persisted workflow-active flag from localStorage, returning false when storage is blocked or unset. */
 const readStoredWorkflowActive = (): boolean => {
   try {
     return localStorage.getItem(WORKFLOW_ACTIVE_STORAGE_KEY) === 'true';
@@ -108,6 +109,7 @@ const readStoredWorkflowActive = (): boolean => {
   }
 };
 
+/** Persists or clears the workflow-active flag in localStorage, swallowing storage errors to keep the workflow usable. */
 const writeStoredWorkflowActive = (isActive: boolean) => {
   try {
     if (isActive) {
@@ -120,6 +122,7 @@ const writeStoredWorkflowActive = (isActive: boolean) => {
   }
 };
 
+/** Resolves the starting forecast day implied by a workflow template's first grouping, defaulting to day 1. */
 const getWorkflowStartDay = (template?: WorkflowMetadata): DayType => {
   const firstGrouping = template?.groupings[0];
   if (firstGrouping === 'day2') return 2;
@@ -128,6 +131,7 @@ const getWorkflowStartDay = (template?: WorkflowMetadata): DayType => {
   return 1;
 };
 
+/** Filters a template's groupings to the standard set used by completion validation, returning undefined when none qualify. */
 const getWorkflowValidationGroupings = (template?: WorkflowMetadata): StandardGrouping[] | undefined => {
   const standardGroupings = (template?.groupings ?? []).filter(
     (grouping): grouping is StandardGrouping =>
@@ -453,6 +457,67 @@ const invalidateCompletionAcknowledgement = (state: ForecastState) => {
     delete state.forecastCycle.omittedDayReasons;
   }
   state.completionValidation.lastResult = null;
+};
+
+interface ApplyRolloverArgs {
+  sourceCycle: ForecastState['savedCycles'][number];
+  sourceDayData: ReturnType<typeof normalizeForecastCycle>['days'][DayType];
+  sourceDayNumber: DayType;
+  targetDay: DayType;
+  targetDate: string;
+  workflowTemplate?: WorkflowMetadata;
+}
+
+/** Builds the fresh rollover cycle and copies the requested day into it. */
+const buildRolloverCycle = ({
+  sourceDayData,
+  sourceDayNumber,
+  targetDay,
+  targetDate,
+}: Omit<ApplyRolloverArgs, 'sourceCycle' | 'workflowTemplate'>): ForecastCycle => {
+  const newCycle: ForecastCycle = {
+    days: { [targetDay]: createEmptyOutlook(targetDay) },
+    currentDay: targetDay,
+    cycleDate: targetDate,
+  };
+  const targetDayData = newCycle.days[targetDay];
+  if (targetDayData) {
+    copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDayNumber, targetDay);
+  }
+  return newCycle;
+};
+
+/**
+ * Attaches workflow metadata to the rollover only when a template was passed
+ * or the source cycle was already a workflow cycle. Plain rollovers stay plain.
+ */
+const applyRolloverWorkflowState = (
+  state: ForecastState,
+  { sourceCycle, targetDate, workflowTemplate }: Pick<ApplyRolloverArgs, 'sourceCycle' | 'targetDate' | 'workflowTemplate'>,
+  now: string
+) => {
+  const sourceHadWorkflow = Boolean(sourceCycle.workflowMetadata);
+  if (workflowTemplate || sourceHadWorkflow) {
+    const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
+    state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
+    state.isWorkflowActive = true;
+    writeStoredWorkflowActive(true);
+    state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
+    return;
+  }
+  state.workflowMetadata = undefined;
+  state.isWorkflowActive = false;
+  writeStoredWorkflowActive(false);
+  state.workflowTemplate = undefined;
+};
+
+/** Resets the in-memory cycle to a fresh rollover derived from the requested source. */
+const applyRolloverFromPreviousCycle = (state: ForecastState, args: ApplyRolloverArgs) => {
+  clearHistory(state);
+  state.forecastCycle = buildRolloverCycle(args);
+  state.isSaved = false;
+  state.outlookVersionSnapshots = [];
+  applyRolloverWorkflowState(state, args, new Date().toISOString());
 };
 
 /** Ensures low-probability metadata exists before mutating it in reducers. */
@@ -1141,27 +1206,33 @@ export const forecastSlice = createSlice({
     /** Create a new outlook version within the current cycle (same-cycle update). */
     createOutlookUpdate: (state) => {
       const now = new Date().toISOString();
-      
+
       // Determine the next version number
       const currentVersions = state.workflowMetadata?.outlookVersions || [];
-      const nextVersion = currentVersions.length > 0 
-        ? Math.max(...currentVersions.map(v => v.version)) + 1 
+      const nextVersion = currentVersions.length > 0
+        ? Math.max(...currentVersions.map(v => v.version)) + 1
         : 1;
-      
-      // Snapshot the current day data before creating the update
-      const currentDay = state.forecastCycle.currentDay;
-      const currentDayData = state.forecastCycle.days[currentDay];
-      
-      if (currentDayData) {
-        // Store a snapshot of the current version, preserving Map-backed outlook data
+
+      // Snapshot every day that has data so full-outlook workflows keep
+      // the whole version side-by-side with the next iteration, not just
+      // the currently selected day.
+      const snapshotDays: typeof state.forecastCycle.days = {};
+      let hasSnapshot = false;
+      (Object.entries(state.forecastCycle.days) as [DayType, typeof state.forecastCycle.days[DayType]][]).forEach(
+        ([day, dayData]) => {
+          if (!dayData) return;
+          snapshotDays[day] = {
+            ...dayData,
+            data: cloneOutlookData(dayData.data),
+          };
+          hasSnapshot = true;
+        },
+      );
+
+      if (hasSnapshot) {
         state.outlookVersionSnapshots.push({
           version: nextVersion - 1, // Snapshot the previous version
-          days: { 
-            [currentDay]: {
-              ...currentDayData,
-              data: cloneOutlookData(currentDayData.data),
-            } 
-          },
+          days: snapshotDays,
           createdAt: now,
         });
       }
@@ -1200,43 +1271,23 @@ export const forecastSlice = createSlice({
       workflowTemplate?: WorkflowMetadata;
     }>) => {
       const { sourceCycleId, newCycleDate, sourceDay, targetDay = 1, workflowTemplate } = action.payload;
-      
-      // Find the source cycle in saved cycles
+
       const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
       if (!sourceCycle) return;
-      
-      const now = new Date().toISOString();
-      const targetDate = newCycleDate || getLocalCalendarDate();
-      
+
       const sourceForecastCycle = normalizeForecastCycle(sourceCycle.forecastCycle);
       const sourceDayNumber = sourceDay ?? sourceForecastCycle.currentDay;
       const sourceDayData = sourceForecastCycle.days[sourceDayNumber];
       if (!sourceDayData) return;
 
-      // Create a fresh cycle and copy only the requested, compatible outlook data
-      // so "start from previous" is a new package, not an import of the old one.
-      clearHistory(state);
-      const newCycle: ForecastCycle = {
-        days: { [targetDay]: createEmptyOutlook(targetDay) },
-        currentDay: targetDay,
-        cycleDate: targetDate,
-      };
-      const targetDayData = newCycle.days[targetDay];
-      if (targetDayData) {
-        copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDayNumber, targetDay);
-      }
-      state.forecastCycle = newCycle;
-      state.isSaved = false;
-      state.outlookVersionSnapshots = [];
-      
-      // Set workflow metadata with derivedFromCycleId
-      const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
-      state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
-      state.isWorkflowActive = true;
-      writeStoredWorkflowActive(true);
-      
-      // Restore or set workflow template
-      state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
+      applyRolloverFromPreviousCycle(state, {
+        sourceCycle,
+        sourceDayData,
+        sourceDayNumber,
+        targetDay,
+        targetDate: newCycleDate || getLocalCalendarDate(),
+        workflowTemplate,
+      });
     },
   }
 });
