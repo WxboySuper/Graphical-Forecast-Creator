@@ -70,10 +70,10 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
   const canCompleteWithOmissions = hasAllOmissionReasons(missingGroupings, omittedDays);
 
 /** Completes the forecast review and starts the optional export flow. */
-const handleCompleteAndExport = () => {
-    onComplete();
-    onExport?.();
-  };
+function handleCompleteAndExport(): void {
+  onComplete();
+  onExport?.();
+}
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
