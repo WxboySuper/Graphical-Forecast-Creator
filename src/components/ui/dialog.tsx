@@ -87,6 +87,7 @@ const DialogContent = React.forwardRef<
 });
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+/** Renders the title and supporting content area for a dialog. */
 const DialogHeader = ({
   className,
   ...props
@@ -101,6 +102,7 @@ const DialogHeader = ({
 );
 DialogHeader.displayName = 'DialogHeader';
 
+/** Renders the action area for a dialog. */
 const DialogFooter = ({
   className,
   ...props

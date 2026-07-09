@@ -21,6 +21,7 @@ interface ConfirmationModalProps {
   overlayClassName?: string;
 }
 
+/** Renders a confirmation dialog, optionally stacked above another modal. */
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isOpen,
   title,
