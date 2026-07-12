@@ -70,25 +70,42 @@ function isOpaqueGlobalError(value: SentryExceptionValue): boolean {
   );
 }
 
-/** Drops known no-stack browser noise while preserving actionable stacked errors. */
-export function beforeSend(event: Event, _hint: EventHint): Event | null {
+/** True when an exception value matches known request-lifecycle browser noise. */
+function isRequestLifecycleNoise(values: SentryExceptionValue[], message: string): boolean {
+  return (
+    values.length > 0 &&
+    REQUEST_LIFECYCLE_MESSAGES.some((pattern) => pattern.test(message))
+  );
+}
+
+/** True when the event contains any stack or breadcrumb context worth retaining. */
+function hasActionableContext(event: Event, values: SentryExceptionValue[]): boolean {
+  return values.some(hasStackFrames) || Boolean(event.breadcrumbs?.length);
+}
+
+/** True when the event is known browser noise that is safe to drop. */
+function isKnownBrowserNoise(event: Event): boolean {
   const values = event.exception?.values ?? [];
   const message = values[0]?.value ?? event.message ?? '';
   const normalizedMessage = message.replace(/\s+/g, ' ').trim();
-  const hasAnyStackFrames = values.some(hasStackFrames);
-  const isIgnoredRequestNoise =
-    values.length > 0 &&
-    REQUEST_LIFECYCLE_MESSAGES.some((pattern) => pattern.test(normalizedMessage));
-  const isIgnoredOpaqueGlobalError =
-    values.some(isOpaqueGlobalError) && !event.breadcrumbs?.length;
+
+  if (values.some(isOpenLayersCanvasNoise)) {
+    return true;
+  }
+
+  if (hasActionableContext(event, values)) {
+    return false;
+  }
 
   return (
-    (isIgnoredRequestNoise && !hasAnyStackFrames) ||
-    (isIgnoredOpaqueGlobalError && !hasAnyStackFrames) ||
-    values.some(isOpenLayersCanvasNoise)
-  )
-    ? null
-    : event;
+    isRequestLifecycleNoise(values, normalizedMessage) ||
+    values.some(isOpaqueGlobalError)
+  );
+}
+
+/** Drops known no-stack browser noise while preserving actionable stacked errors. */
+export function beforeSend(event: Event, _hint: EventHint): Event | null {
+  return isKnownBrowserNoise(event) ? null : event;
 }
 
 /** Initializes Sentry when a DSN is present. No-op in local dev without a DSN. */
