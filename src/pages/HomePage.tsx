@@ -19,6 +19,8 @@ type HomeSectionProps = Pick<
   | 'formattedDate'
   | 'savedCycles'
   | 'forecastCycle'
+  | 'workflowMetadata'
+  | 'hasActiveWorkflow'
   | 'isSaved'
   | 'handleNavigateForecast'
   | 'handleNavigateDiscussion'
@@ -26,6 +28,8 @@ type HomeSectionProps = Pick<
   | 'handleOpenHistoryModal'
   | 'handleQuickStartClick'
   | 'handleNewCycle'
+  | 'handleStartWorkflow'
+  | 'handleCreateWorkflowUpdate'
   | 'handleSave'
   | 'openFilePicker'
   | 'handleLoadRecentCycleClick'
@@ -38,6 +42,8 @@ const HomeSignedInSection: React.FC<HomeSectionProps> = ({
   formattedDate,
   savedCycles,
   forecastCycle,
+  workflowMetadata,
+  hasActiveWorkflow,
   isSaved,
   handleNavigateForecast,
   handleNavigateDiscussion,
@@ -45,6 +51,8 @@ const HomeSignedInSection: React.FC<HomeSectionProps> = ({
   handleOpenHistoryModal,
   handleQuickStartClick,
   handleNewCycle,
+  handleStartWorkflow,
+  handleCreateWorkflowUpdate,
   handleSave,
   openFilePicker,
   handleLoadRecentCycleClick,
@@ -69,9 +77,13 @@ const HomeSignedInSection: React.FC<HomeSectionProps> = ({
           formattedDate={formattedDate}
           isSaved={isSaved}
           forecastCycle={forecastCycle}
+          workflowMetadata={workflowMetadata}
+          hasActiveWorkflow={hasActiveWorkflow}
           stats={stats}
           onQuickStartClick={handleQuickStartClick}
           onNewCycle={handleNewCycle}
+          onStartWorkflow={handleStartWorkflow}
+          onCreateWorkflowUpdate={handleCreateWorkflowUpdate}
           onSave={handleSave}
           onOpenFile={openFilePicker}
           onOpenHistory={handleOpenHistoryModal}
@@ -104,6 +116,8 @@ const HomeSignedOutSection: React.FC<HomeSectionProps> = ({
   formattedDate,
   savedCycles,
   forecastCycle,
+  workflowMetadata,
+  hasActiveWorkflow,
   isSaved,
   handleNavigateForecast,
   handleNavigateDiscussion,
@@ -111,6 +125,8 @@ const HomeSignedOutSection: React.FC<HomeSectionProps> = ({
   handleOpenHistoryModal,
   handleQuickStartClick,
   handleNewCycle,
+  handleStartWorkflow,
+  handleCreateWorkflowUpdate,
   handleSave,
   openFilePicker,
   handleLoadRecentCycleClick,
@@ -134,9 +150,13 @@ const HomeSignedOutSection: React.FC<HomeSectionProps> = ({
           formattedDate={formattedDate}
           isSaved={isSaved}
           forecastCycle={forecastCycle}
+          workflowMetadata={workflowMetadata}
+          hasActiveWorkflow={hasActiveWorkflow}
           stats={stats}
           onQuickStartClick={handleQuickStartClick}
           onNewCycle={handleNewCycle}
+          onStartWorkflow={handleStartWorkflow}
+          onCreateWorkflowUpdate={handleCreateWorkflowUpdate}
           onSave={handleSave}
           onOpenFile={openFilePicker}
           onOpenHistory={handleOpenHistoryModal}
@@ -179,6 +199,8 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
     handleNewCycle,
     savedCycles,
     forecastCycle,
+    workflowMetadata,
+    hasActiveWorkflow,
     isSaved,
   } = logic;
 
@@ -192,6 +214,8 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
             formattedDate={formattedDate}
             savedCycles={savedCycles}
             forecastCycle={forecastCycle}
+            workflowMetadata={workflowMetadata}
+            hasActiveWorkflow={hasActiveWorkflow}
             isSaved={isSaved}
             handleNavigateForecast={handleNavigateForecast}
             handleNavigateDiscussion={handleNavigateDiscussion}
@@ -199,6 +223,8 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
             handleOpenHistoryModal={handleOpenHistoryModal}
             handleQuickStartClick={handleQuickStartClick}
             handleNewCycle={handleNewCycle}
+            handleStartWorkflow={logic.handleStartWorkflow}
+            handleCreateWorkflowUpdate={logic.handleCreateWorkflowUpdate}
             handleSave={handleSave}
             openFilePicker={openFilePicker}
             handleLoadRecentCycleClick={handleLoadRecentCycleClick}
@@ -210,6 +236,8 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
             formattedDate={formattedDate}
             savedCycles={savedCycles}
             forecastCycle={forecastCycle}
+            workflowMetadata={workflowMetadata}
+            hasActiveWorkflow={hasActiveWorkflow}
             isSaved={isSaved}
             handleNavigateForecast={handleNavigateForecast}
             handleNavigateDiscussion={handleNavigateDiscussion}
@@ -217,6 +245,8 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
             handleOpenHistoryModal={handleOpenHistoryModal}
             handleQuickStartClick={handleQuickStartClick}
             handleNewCycle={handleNewCycle}
+            handleStartWorkflow={logic.handleStartWorkflow}
+            handleCreateWorkflowUpdate={logic.handleCreateWorkflowUpdate}
             handleSave={handleSave}
             openFilePicker={openFilePicker}
             handleLoadRecentCycleClick={handleLoadRecentCycleClick}
@@ -231,11 +261,11 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
       <ConfirmationModal
         isOpen={confirmNewCycle}
-        title="Start New Cycle"
-        message="You have unsaved changes. Start a new cycle anyway?"
+        title="Start Blank Cycle"
+        message="You have unsaved changes. Start a blank forecast cycle without workflow steps?"
         onConfirm={handleConfirmNewCycle}
         onCancel={handleCancelNewCycle}
-        confirmLabel="Start New Cycle"
+        confirmLabel="Start Blank Cycle"
       />
     </div>
   );
@@ -261,6 +291,8 @@ const HomePage: React.FC = () => {
     handleNewCycle,
     savedCycles,
     forecastCycle,
+    workflowMetadata,
+    hasActiveWorkflow,
     isSaved,
   } = logic;
 
@@ -278,11 +310,17 @@ const HomePage: React.FC = () => {
         formattedDate={formattedDate}
         savedCycles={savedCycles}
         forecastCycle={forecastCycle}
+        workflowMetadata={workflowMetadata}
+        workflowEnabled={logic.workflowEnabled ?? true}
+        hasActiveWorkflow={hasActiveWorkflow}
         isSaved={isSaved}
         onResumeForecast={handleNavigateForecast}
+        onWriteDiscussion={logic.handleNavigateDiscussion}
         onOpenHistory={logic.handleOpenHistoryModal}
         onOpenFile={openFilePicker}
         onNewCycle={handleNewCycle}
+        onStartWorkflow={logic.handleStartWorkflow}
+        onCreateWorkflowUpdate={logic.handleCreateWorkflowUpdate}
         onLoadRecentCycle={handleLoadRecentCycleClick}
         onNavigateAccount={handleNavigateAccount}
       />
@@ -290,11 +328,11 @@ const HomePage: React.FC = () => {
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
       <ConfirmationModal
         isOpen={confirmNewCycle}
-        title="Start New Cycle"
-        message="You have unsaved changes. Start a new cycle anyway?"
+        title="Start Blank Cycle"
+        message="You have unsaved changes. Start a blank forecast cycle without workflow steps?"
         onConfirm={handleConfirmNewCycle}
         onCancel={handleCancelNewCycle}
-        confirmLabel="Start New Cycle"
+        confirmLabel="Start Blank Cycle"
       />
     </div>
   );
