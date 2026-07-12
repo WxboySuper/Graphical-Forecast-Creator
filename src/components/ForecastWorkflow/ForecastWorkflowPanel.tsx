@@ -169,7 +169,9 @@ const WorkflowPanelExportAction: React.FC<WorkflowPanelActionsProps> = ({ canExp
 
 /** Adds the optional review action for controller-backed forecast workspaces. */
 const WorkflowPanelReviewAction: React.FC<WorkflowPanelActionsProps> = ({ canReviewPackage, hasController, isReviewed, isUpdating, onOpenReview }) => {
-  if (!hasController || isUpdating || (canReviewPackage && !isReviewed)) return null;
+  if (!hasController) return null;
+  if (isUpdating) return null;
+  if (canReviewPackage && !isReviewed) return null;
   return (
     <Button size="sm" variant="outline" onClick={onOpenReview}>
       <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -200,6 +202,7 @@ const WorkflowPanelPreviousAction: React.FC<WorkflowPanelActionsProps> = ({ prev
   );
 };
 
+/** Renders the optional secondary workflow actions. */
 const WorkflowPanelExtras: React.FC<WorkflowPanelActionsProps> = (props) => (
   <>
     <WorkflowPanelExportAction {...props} />
@@ -217,7 +220,6 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
   isUpdating,
   mapIsComplete,
   isPackageDownloading,
-  activeUpdateVersion,
   onExport,
   onOpenReview,
   onNavigate,
@@ -377,6 +379,35 @@ const getCurrentWorkflowVersion = (versions: { version: number }[]): number => {
   return Math.max(...versions.map((version) => version.version));
 };
 
+/** Determines whether the banner has enough state to render. */
+const shouldHideWorkflowPanel = (
+  isExposed: boolean,
+  hasActiveWorkflow: boolean,
+  workflowMetadata: ReturnType<typeof selectWorkflowMetadata>,
+): boolean => !isExposed || !hasActiveWorkflow || !workflowMetadata;
+
+/** Determines whether the current package can enter review. */
+const canReviewWorkflowPackage = (
+  mapIsComplete: boolean,
+  discussionIsComplete: boolean,
+  isUpdating: boolean,
+  hasController: boolean,
+  context: 'forecast' | 'discussion',
+): boolean => mapIsComplete && discussionIsComplete && !isUpdating && (hasController || context === 'discussion');
+
+/** Determines whether the current package has anything available to export. */
+const canExportWorkflowPackage = (
+  hasMapStarted: boolean,
+  hasDiscussion: boolean,
+  outlookVersionCount: number,
+): boolean => hasMapStarted || hasDiscussion || outlookVersionCount > 0;
+
+/** Determines whether the current package can start a same-day update. */
+const hasSameDayWorkflowWork = (
+  cycleDate: string,
+  currentDay: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
+): boolean => cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
+
 /** Persistent package workflow prompt for the forecast editor. */
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
@@ -390,7 +421,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const omittedDays = useSelector(selectOmittedDays);
   const previousSuggestion = usePreviousOutlookSuggestion();
 
-  if (!isFeatureExposed('forecastWorkflowV2') || !hasActiveWorkflow || !workflowMetadata) {
+  if (shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
     return null;
   }
 
@@ -402,10 +433,10 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const discussionIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-discussion');
   const activeUpdateVersion = forecastCycle.updateInProgressVersion;
   const isUpdating = typeof activeUpdateVersion === 'number';
-  const canReviewPackage = mapIsComplete && discussionIsComplete && !isUpdating && (Boolean(controller) || context === 'discussion');
-  const canExportPackage = hasMapStarted || hasDiscussion || workflowMetadata.outlookVersions.length > 0;
+  const canReviewPackage = canReviewWorkflowPackage(mapIsComplete, discussionIsComplete, isUpdating, Boolean(controller), context);
+  const canExportPackage = canExportWorkflowPackage(hasMapStarted, hasDiscussion, workflowMetadata.outlookVersions.length);
   const isReviewed = Boolean(forecastCycle.completionAcknowledgedAt);
-  const hasSameDayWork = forecastCycle.cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
+  const hasSameDayWork = hasSameDayWorkflowWork(forecastCycle.cycleDate, currentDay);
   const currentVersion = getCurrentWorkflowVersion(workflowMetadata.outlookVersions);
 
   const statusLabel = getWorkflowStatusLabel(
