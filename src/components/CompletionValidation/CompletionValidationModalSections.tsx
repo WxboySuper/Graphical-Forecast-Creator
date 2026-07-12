@@ -4,6 +4,8 @@ import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { ValidationIssue } from '../../types/workflow';
 import type { DayType } from '../../types/outlooks';
 import { MissingItemsList } from './MissingItemsList';
+import { Button } from '../ui/button';
+import { DialogFooter } from '../ui/dialog';
 
 /** Formats a workflow grouping key for display in the modal. */
 const formatGrouping = (grouping: string): string => {
@@ -111,12 +113,12 @@ export const CompletionValidationModalBody: React.FC<CompletionValidationModalBo
 }) => (
   <div className="completion-modal-body">
     {isComplete ? (
-      <div className="completion-status-badge completion-status-badge--complete">
+      <div className="completion-status-badge completion-status-badge--complete" id="completion-summary">
         <CheckCircle2 className="h-4 w-4" />
-        <span>Forecast cycle is complete</span>
+        <span>Ready for export</span>
       </div>
     ) : (
-      <div className="completion-status-badge completion-status-badge--incomplete">
+      <div className="completion-status-badge completion-status-badge--incomplete" id="completion-summary">
         <AlertTriangle className="h-4 w-4" />
         <span>{criticalIssues.length} item{criticalIssues.length !== 1 ? 's' : ''} missing for completion</span>
       </div>
@@ -165,6 +167,7 @@ interface CompletionValidationModalFooterProps {
   onClose: () => void;
   onComplete: () => void;
   onCompleteWithOmissions: () => void;
+  onCompleteAndExport?: () => void;
 }
 
 /** Renders completion modal action buttons for cancel and finalize flows. */
@@ -174,31 +177,29 @@ export const CompletionValidationModalFooter: React.FC<CompletionValidationModal
   onClose,
   onComplete,
   onCompleteWithOmissions,
+  onCompleteAndExport,
 }) => (
-  <div className="completion-modal-footer">
-    <button
-      type="button"
-      className="completion-modal-btn completion-modal-btn--cancel"
-      onClick={onClose}
-    >
+  <DialogFooter className="completion-modal-footer">
+    <Button type="button" variant="outline" onClick={onClose}>
       Cancel
-    </button>
+    </Button>
     {!isComplete && (
-      <button
+      <Button
         type="button"
-        className="completion-modal-btn completion-modal-btn--complete-anyway"
+        variant="warning"
         onClick={onCompleteWithOmissions}
         disabled={!canCompleteWithOmissions}
       >
         Complete with Omissions
-      </button>
+      </Button>
     )}
-    <button
-      type="button"
-      className="completion-modal-btn completion-modal-btn--complete"
-      onClick={onComplete}
-    >
-      {isComplete ? 'Complete' : 'Complete Anyway'}
-    </button>
-  </div>
+    {isComplete && onCompleteAndExport ? (
+      <Button type="button" onClick={onCompleteAndExport}>
+        Mark Reviewed & Export
+      </Button>
+    ) : null}
+    <Button type="button" variant={isComplete ? 'default' : 'warning'} onClick={onComplete}>
+      {isComplete ? 'Mark Reviewed' : 'Complete Anyway'}
+    </Button>
+  </DialogFooter>
 );

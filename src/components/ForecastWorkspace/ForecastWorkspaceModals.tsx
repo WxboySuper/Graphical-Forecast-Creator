@@ -72,6 +72,7 @@ export const ForecastWorkspaceModals: React.FC<{ controller: ForecastWorkspaceCo
         onCompleteWithOmissions={controller.onCompleteWithOmissions}
         onOmitDay={controller.onOmitDay}
         onNavigateToIssue={controller.onNavigateToIssue}
+        onExport={controller.onInitiateExport}
       />
     </>
   );

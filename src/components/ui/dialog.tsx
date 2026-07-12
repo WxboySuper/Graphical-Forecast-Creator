@@ -50,20 +50,25 @@ const partitionDialogChildren = (children: React.ReactNode) => {
   return { body, footers };
 };
 
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  overlayClassName?: string;
+};
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => {
+  DialogContentProps
+>(({ className, children, overlayClassName, ...props }, ref) => {
   const { body, footers } = partitionDialogChildren(children);
 
   return (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
         'fixed left-[50%] top-[50%] z-modal flex w-[calc(100%-1.5rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-hidden rounded-lg border border-border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-scale-in sm:p-6',
         'max-h-[min(90dvh,calc(100%-1.5rem))]',
+        overlayClassName && 'z-[10001]',
         className
       )}
       {...props}
@@ -82,6 +87,7 @@ const DialogContent = React.forwardRef<
 });
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+/** Renders the title and supporting content area for a dialog. */
 const DialogHeader = ({
   className,
   ...props
@@ -96,6 +102,7 @@ const DialogHeader = ({
 );
 DialogHeader.displayName = 'DialogHeader';
 
+/** Renders the action area for a dialog. */
 const DialogFooter = ({
   className,
   ...props
