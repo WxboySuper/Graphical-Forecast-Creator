@@ -16,6 +16,8 @@ type SentryExceptionValue = NonNullable<NonNullable<Event['exception']>['values'
 
 const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]{1,2}\.canvas'\)$/i;
 const REQUEST_ANIMATION_FRAME_MECHANISM = 'auto.browser.browserapierrors.requestAnimationFrame';
+const OPAQUE_GLOBAL_ERROR_MESSAGE = /^uncaught exception: undefined$/i;
+const GLOBAL_ERROR_MECHANISM = 'auto.browser.global_handlers.onerror';
 
 const REQUEST_LIFECYCLE_MESSAGES = [
   /^(NetworkError: )?A network error occurred\.?$/i,
@@ -59,14 +61,31 @@ function isOpenLayersCanvasNoise(value: SentryExceptionValue): boolean {
   );
 }
 
-/** Drops no-stack request lifecycle noise while preserving actionable stacked errors. */
+/** True for the opaque Firefox global error with no exception value or stack. */
+function isOpaqueGlobalError(value: SentryExceptionValue): boolean {
+  return (
+    OPAQUE_GLOBAL_ERROR_MESSAGE.test(value.value ?? '') &&
+    value.mechanism?.type === GLOBAL_ERROR_MECHANISM &&
+    value.mechanism.handled === false
+  );
+}
+
+/** Drops known no-stack browser noise while preserving actionable stacked errors. */
 export function beforeSend(event: Event, _hint: EventHint): Event | null {
   const values = event.exception?.values ?? [];
   const message = values[0]?.value ?? event.message ?? '';
+  const normalizedMessage = message.replace(/\s+/g, ' ').trim();
   const hasAnyStackFrames = values.some(hasStackFrames);
-  const isIgnoredRequestNoise = REQUEST_LIFECYCLE_MESSAGES.some((pattern) => pattern.test(message));
+  const isIgnoredRequestNoise = REQUEST_LIFECYCLE_MESSAGES.some((pattern) =>
+    pattern.test(normalizedMessage)
+  );
+  const isIgnoredOpaqueGlobalError = values.some(isOpaqueGlobalError);
 
-  return (isIgnoredRequestNoise && !hasAnyStackFrames) || values.some(isOpenLayersCanvasNoise)
+  return (
+    (isIgnoredRequestNoise && !hasAnyStackFrames) ||
+    (isIgnoredOpaqueGlobalError && !hasAnyStackFrames) ||
+    values.some(isOpenLayersCanvasNoise)
+  )
     ? null
     : event;
 }

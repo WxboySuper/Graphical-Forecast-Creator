@@ -122,6 +122,23 @@ describe('instrument', () => {
     },
   });
 
+  const createOpaqueGlobalError = (value = 'uncaught exception: undefined', withStack = false) => ({
+    exception: {
+      values: [
+        {
+          value,
+          mechanism: {
+            type: 'auto.browser.global_handlers.onerror',
+            handled: false,
+          },
+          stacktrace: withStack
+            ? { frames: [{ filename: 'src/App.tsx', function: 'renderForecast' }] }
+            : undefined,
+        },
+      ],
+    },
+  });
+
   it.each([
     ['GFC-WEB-K NetworkError', 'A network error occurred.'],
     ['GFC-WEB-F wrapped NetworkError', 'NetworkError: A network error occurred.'],
@@ -143,6 +160,52 @@ describe('instrument', () => {
       // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
       const { beforeSend } = require('./instrument');
       const event = createRequestLifecycleEvent('A network error occurred.', true);
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
+  });
+
+  it.each([
+    ['double-space NetworkError', 'NetworkError:  A network error occurred.'],
+    ['leading/trailing whitespace', '  AbortError:   The user aborted a request.  '],
+  ])('drops whitespace variants of request lifecycle noise: %s', (_label, message) => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+
+      expect(beforeSend(createRequestLifecycleEvent(message), {})).toBeNull();
+    });
+  });
+
+  it('drops no-stack opaque global error noise from Firefox', () => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+
+      expect(beforeSend(createOpaqueGlobalError(), {})).toBeNull();
+    });
+  });
+
+  it('keeps opaque global errors when they have application stack frames', () => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+      const event = createOpaqueGlobalError(undefined, true);
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
+  });
+
+  it('keeps the opaque message when it comes from another mechanism', () => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+      const event = createOpaqueGlobalError();
+      event.exception.values[0].mechanism.type = 'auto.browser.global_handlers.onunhandledrejection';
 
       expect(beforeSend(event, {})).toBe(event);
     });
