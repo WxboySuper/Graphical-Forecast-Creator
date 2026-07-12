@@ -4,6 +4,11 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #684
+
+- Add a persistent workflow banner across the Forecast and Discussion routes with map, discussion, review, update, and export actions.
+- Keep the workflow feature gated by the existing exposure policy until rollout adoption is updated.
+
 ### PR #682
 
 - Add reusable workflow templates for Day 1, Day 2, Day 3, Days 4-8, and Full Outlook workflows with persistent activation in localStorage.

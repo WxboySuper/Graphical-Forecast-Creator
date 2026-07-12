@@ -78,6 +78,7 @@ const getPreviousSourceDay = (targetDay: DayType): DayType | null => {
   return null;
 };
 
+/** Formats a cycle date for the compact workflow banner label. */
 const formatCycleDate = (cycleDate: string): string => {
   const parsed = new Date(`${cycleDate}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return cycleDate;
@@ -124,6 +125,7 @@ const usePreviousOutlookSuggestion = (): PreviousOutlookSuggestion | null => {
   }, [forecastCycle.currentDay, savedCycles]);
 };
 
+/** Displays one map, discussion, or review step in the workflow banner. */
 const WorkflowStep: React.FC<{
   icon: React.ReactNode;
   label: string;
@@ -154,45 +156,56 @@ interface WorkflowPanelActionsProps {
   onNavigate: (path: string) => void;
 }
 
-const WorkflowPanelExtras: React.FC<WorkflowPanelActionsProps> = ({
-  canExportPackage,
-  hasController,
-  hasSameDayWork,
-  isPackageDownloading,
-  isReviewed,
-  isUpdating,
-  previousSuggestion,
-  onCreateUpdate,
-  onExport,
-  onNavigate,
-  onOpenReview,
-  onStartFromPrevious,
-}) => (
+/** Adds the optional workflow export action. */
+const WorkflowPanelExportAction: React.FC<WorkflowPanelActionsProps> = ({ canExportPackage, isPackageDownloading, isReviewed, onExport }) => {
+  if (!canExportPackage || isReviewed) return null;
+  return (
+    <Button size="sm" variant="outline" onClick={onExport} disabled={isPackageDownloading}>
+      <Archive className="h-4 w-4 mr-2" />
+      Export
+    </Button>
+  );
+};
+
+/** Adds the optional review action for controller-backed forecast workspaces. */
+const WorkflowPanelReviewAction: React.FC<WorkflowPanelActionsProps> = ({ canReviewPackage, hasController, isReviewed, isUpdating, onOpenReview }) => {
+  if (!hasController || isUpdating || (canReviewPackage && !isReviewed)) return null;
+  return (
+    <Button size="sm" variant="outline" onClick={onOpenReview}>
+      <CheckCircle2 className="h-4 w-4 mr-2" />
+      Review
+    </Button>
+  );
+};
+
+/** Adds the optional same-day update action. */
+const WorkflowPanelUpdateAction: React.FC<WorkflowPanelActionsProps> = ({ hasSameDayWork, isUpdating, onCreateUpdate }) => {
+  if (isUpdating || !hasSameDayWork) return null;
+  return (
+    <Button size="sm" variant="outline" onClick={onCreateUpdate}>
+      <RefreshCw className="h-4 w-4 mr-2" />
+      Update
+    </Button>
+  );
+};
+
+/** Adds the optional previous-cycle workflow action. */
+const WorkflowPanelPreviousAction: React.FC<WorkflowPanelActionsProps> = ({ previousSuggestion, onStartFromPrevious }) => {
+  if (!previousSuggestion) return null;
+  return (
+    <Button size="sm" variant="outline" onClick={onStartFromPrevious}>
+      <GitBranch className="h-4 w-4 mr-2" />
+      Use {previousSuggestion.label}
+    </Button>
+  );
+};
+
+const WorkflowPanelExtras: React.FC<WorkflowPanelActionsProps> = (props) => (
   <>
-    {canExportPackage && !isReviewed ? (
-      <Button size="sm" variant="outline" onClick={onExport} disabled={isPackageDownloading}>
-        <Archive className="h-4 w-4 mr-2" />
-        Export
-      </Button>
-    ) : null}
-    {hasController && !isUpdating && (!canReviewPackage || isReviewed) ? (
-      <Button size="sm" variant="outline" onClick={onOpenReview}>
-        <CheckCircle2 className="h-4 w-4 mr-2" />
-        Review
-      </Button>
-    ) : null}
-    {!isUpdating && hasSameDayWork ? (
-      <Button size="sm" variant="outline" onClick={onCreateUpdate}>
-        <RefreshCw className="h-4 w-4 mr-2" />
-        Update
-      </Button>
-    ) : null}
-    {previousSuggestion ? (
-      <Button size="sm" variant="outline" onClick={onStartFromPrevious}>
-        <GitBranch className="h-4 w-4 mr-2" />
-        Use {previousSuggestion.label}
-      </Button>
-    ) : null}
+    <WorkflowPanelExportAction {...props} />
+    <WorkflowPanelReviewAction {...props} />
+    <WorkflowPanelUpdateAction {...props} />
+    <WorkflowPanelPreviousAction {...props} />
   </>
 );
 
@@ -286,6 +299,84 @@ const getWorkflowStatusLabel = (
   return isReviewed ? 'Ready to export' : 'Ready for review';
 };
 
+/** Displays the workflow progress steps without mixing them into the panel orchestration. */
+const WorkflowPanelSteps: React.FC<{
+  mapIsComplete: boolean;
+  hasMapStarted: boolean;
+  discussionIsComplete: boolean;
+  isReviewed: boolean;
+  canReviewPackage: boolean;
+  isUpdating: boolean;
+  activeUpdateVersion: number | undefined;
+}> = ({
+  mapIsComplete,
+  hasMapStarted,
+  discussionIsComplete,
+  isReviewed,
+  canReviewPackage,
+  isUpdating,
+  activeUpdateVersion,
+}) => (
+  <div className="forecast-workflow-panel__steps">
+    <WorkflowStep icon={<Map className="h-4 w-4" />} label="Outlook map" status={mapIsComplete ? 'complete' : hasMapStarted ? 'active' : 'pending'} />
+    <WorkflowStep icon={<FileText className="h-4 w-4" />} label="Discussion" status={discussionIsComplete ? 'complete' : mapIsComplete ? 'active' : 'pending'} />
+    <WorkflowStep icon={<CheckCircle2 className="h-4 w-4" />} label={isUpdating ? `Update v${activeUpdateVersion}` : 'Review'} status={isReviewed ? 'complete' : (canReviewPackage || isUpdating) ? 'active' : 'pending'} />
+  </div>
+);
+
+/** Displays the stale-date notice and route-local completion modal. */
+const WorkflowPanelFooter: React.FC<{
+  cycleDate: string;
+  validationResult: ReturnType<typeof selectCompletionValidationResult>;
+  omittedDays: ReturnType<typeof selectOmittedDays>;
+  hasController: boolean;
+  onClose: () => void;
+  onComplete: () => void;
+  onCompleteWithOmissions: () => void;
+  onOmitDay: (day: DayType, reason: string) => void;
+  onNavigateToIssue: () => void;
+  onExport: () => void;
+}> = ({
+  cycleDate,
+  validationResult,
+  omittedDays,
+  hasController,
+  onClose,
+  onComplete,
+  onCompleteWithOmissions,
+  onOmitDay,
+  onNavigateToIssue,
+  onExport,
+}) => (
+  <>
+    {cycleDate !== getLocalCalendarDate() ? (
+      <div className="forecast-workflow-panel__notice">
+        <Clock3 className="h-4 w-4" />
+        This forecast was created before today and may now be out of date.
+      </div>
+    ) : null}
+    {!hasController ? (
+      <CompletionValidationModal
+        isOpen={Boolean(validationResult)}
+        validationResult={validationResult}
+        omittedDays={omittedDays}
+        onClose={onClose}
+        onComplete={onComplete}
+        onCompleteWithOmissions={onCompleteWithOmissions}
+        onOmitDay={onOmitDay}
+        onNavigateToIssue={onNavigateToIssue}
+        onExport={onExport}
+      />
+    ) : null}
+  </>
+);
+
+/** Returns the highest workflow package version, defaulting to the initial package. */
+const getCurrentWorkflowVersion = (versions: { version: number }[]): number => {
+  if (versions.length === 0) return 1;
+  return Math.max(...versions.map((version) => version.version));
+};
+
 /** Persistent package workflow prompt for the forecast editor. */
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
@@ -304,7 +395,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   }
 
   const currentDay = forecastCycle.days[forecastCycle.currentDay];
-  const hasMapStarted = currentDay ? dayHasMapWork(currentDay) : false;
+  const hasMapStarted = Boolean(currentDay && dayHasMapWork(currentDay));
   const hasDiscussion = hasDiscussionContent(currentDay?.discussion);
   const currentValidation = validateCycleCompletion(forecastCycle, getWorkflowValidationGroupings(workflowTemplate));
   const mapIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-polygon');
@@ -315,9 +406,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const canExportPackage = hasMapStarted || hasDiscussion || workflowMetadata.outlookVersions.length > 0;
   const isReviewed = Boolean(forecastCycle.completionAcknowledgedAt);
   const hasSameDayWork = forecastCycle.cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
-  const currentVersion = workflowMetadata.outlookVersions.length > 0
-    ? Math.max(...workflowMetadata.outlookVersions.map((version) => version.version))
-    : 1;
+  const currentVersion = getCurrentWorkflowVersion(workflowMetadata.outlookVersions);
 
   const statusLabel = getWorkflowStatusLabel(
     hasMapStarted,
@@ -328,9 +417,11 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     isReviewed,
   );
 
+  /** Starts a same-day workflow update from the current package. */
   const handleCreateUpdate = () => {
     dispatch(createOutlookUpdate());
   };
+  /** Opens the completion review in the active workspace or validates it locally. */
   const handleOpenReview = () => {
     if (controller) {
       controller.onOpenCompletionModal();
@@ -338,10 +429,15 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     }
     dispatch(validateCompletion());
   };
+  /** Closes the local completion review modal. */
   const handleCloseReview = () => dispatch(dismissCompletionModal());
+  /** Marks the current workflow package complete. */
   const handleCompleteReview = () => dispatch(completeCycle());
+  /** Completes the workflow package while retaining explicitly omitted days. */
   const handleCompleteWithOmissions = () => dispatch(completeWithOmissions());
+  /** Records why a workflow day was intentionally omitted. */
   const handleOmitDay = (day: DayType, reason: string) => dispatch(omitDay({ day, reason }));
+  /** Exports the current workflow package and restores the button state afterward. */
   const handleWorkflowExport = async () => {
     setIsPackageDownloading(true);
     try {
@@ -384,11 +480,15 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           ) : null}
         </div>
 
-        <div className="forecast-workflow-panel__steps">
-          <WorkflowStep icon={<Map className="h-4 w-4" />} label="Outlook map" status={mapIsComplete ? 'complete' : hasMapStarted ? 'active' : 'pending'} />
-          <WorkflowStep icon={<FileText className="h-4 w-4" />} label="Discussion" status={discussionIsComplete ? 'complete' : mapIsComplete ? 'active' : 'pending'} />
-          <WorkflowStep icon={<CheckCircle2 className="h-4 w-4" />} label={isUpdating ? `Update v${activeUpdateVersion}` : 'Review'} status={isReviewed ? 'complete' : (canReviewPackage || isUpdating) ? 'active' : 'pending'} />
-        </div>
+        <WorkflowPanelSteps
+          mapIsComplete={mapIsComplete}
+          hasMapStarted={hasMapStarted}
+          discussionIsComplete={discussionIsComplete}
+          isReviewed={isReviewed}
+          canReviewPackage={canReviewPackage}
+          isUpdating={isUpdating}
+          activeUpdateVersion={activeUpdateVersion}
+        />
         <WorkflowPanelActions
           context={context}
           isReviewed={isReviewed}
@@ -409,25 +509,18 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         />
       </div>
 
-      {forecastCycle.cycleDate !== getLocalCalendarDate() ? (
-        <div className="forecast-workflow-panel__notice">
-          <Clock3 className="h-4 w-4" />
-          This forecast was created before today and may now be out of date.
-        </div>
-      ) : null}
-      {!controller ? (
-        <CompletionValidationModal
-          isOpen={Boolean(validationResult)}
-          validationResult={validationResult}
-          omittedDays={omittedDays}
-          onClose={handleCloseReview}
-          onComplete={handleCompleteReview}
-          onCompleteWithOmissions={handleCompleteWithOmissions}
-          onOmitDay={handleOmitDay}
-          onNavigateToIssue={() => navigate('/forecast')}
-          onExport={() => { handleWorkflowExport().catch(() => undefined); }}
-        />
-      ) : null}
+      <WorkflowPanelFooter
+        cycleDate={forecastCycle.cycleDate}
+        validationResult={validationResult}
+        omittedDays={omittedDays}
+        hasController={Boolean(controller)}
+        onClose={handleCloseReview}
+        onComplete={handleCompleteReview}
+        onCompleteWithOmissions={handleCompleteWithOmissions}
+        onOmitDay={handleOmitDay}
+        onNavigateToIssue={() => navigate('/forecast')}
+        onExport={() => { handleWorkflowExport().catch(() => undefined); }}
+      />
     </section>
   );
 };
