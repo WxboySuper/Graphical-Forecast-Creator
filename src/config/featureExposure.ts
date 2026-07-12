@@ -115,7 +115,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 427,
   },
   forecastWorkflowV2: {
-    exposure: { ...ALL_TARGETS_OFF },
+      exposure: { ...ALL_TARGETS_OFF },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
     temporary: true,
