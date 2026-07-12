@@ -76,10 +76,11 @@ export function beforeSend(event: Event, _hint: EventHint): Event | null {
   const message = values[0]?.value ?? event.message ?? '';
   const normalizedMessage = message.replace(/\s+/g, ' ').trim();
   const hasAnyStackFrames = values.some(hasStackFrames);
-  const isIgnoredRequestNoise = REQUEST_LIFECYCLE_MESSAGES.some((pattern) =>
-    pattern.test(normalizedMessage)
-  );
-  const isIgnoredOpaqueGlobalError = values.some(isOpaqueGlobalError);
+  const isIgnoredRequestNoise =
+    values.length > 0 &&
+    REQUEST_LIFECYCLE_MESSAGES.some((pattern) => pattern.test(normalizedMessage));
+  const isIgnoredOpaqueGlobalError =
+    values.some(isOpaqueGlobalError) && !event.breadcrumbs?.length;
 
   return (
     (isIgnoredRequestNoise && !hasAnyStackFrames) ||

@@ -199,6 +199,16 @@ describe('instrument', () => {
     });
   });
 
+  it('keeps opaque global errors when breadcrumbs provide context', () => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = createOpaqueGlobalError();
+      event.breadcrumbs = [{ message: 'forecast route loaded' }];
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
+  });
+
   it('keeps the opaque message when it comes from another mechanism', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
@@ -211,14 +221,14 @@ describe('instrument', () => {
     });
   });
 
-  it('drops matching request lifecycle noise from message-only events', () => {
+  it('keeps matching request lifecycle messages without exception values', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
       // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
       const { beforeSend } = require('./instrument');
       const event = { message: 'A network error occurred.' };
 
-      expect(beforeSend(event, {})).toBeNull();
+      expect(beforeSend(event, {})).toBe(event);
     });
   });
 
