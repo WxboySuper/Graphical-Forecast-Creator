@@ -139,6 +139,12 @@ describe('instrument', () => {
     },
   });
 
+  const loadBeforeSend = () => {
+    globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+    // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+    return require('./instrument').beforeSend;
+  };
+
   it.each([
     ['GFC-WEB-K NetworkError', 'A network error occurred.'],
     ['GFC-WEB-F wrapped NetworkError', 'NetworkError: A network error occurred.'],
