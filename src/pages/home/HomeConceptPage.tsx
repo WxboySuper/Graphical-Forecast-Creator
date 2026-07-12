@@ -64,23 +64,27 @@ const featureItems = [
   },
 ];
 
-const dayHasMapWork = (day?: OutlookDay): boolean => {
+/** Returns whether a forecast day contains any map work. */
+function dayHasMapWork(day?: OutlookDay): boolean {
   if (!day) return false;
   const hasOutlookFeatures = Object.values(day.data).some((outlookMap) => (outlookMap?.size ?? 0) > 0);
   return hasOutlookFeatures || (day.metadata.lowProbabilityOutlooks?.length ?? 0) > 0;
-};
+}
 
-const dayHasDiscussion = (day?: OutlookDay): boolean => {
+/** Returns whether a forecast day contains any discussion content. */
+function dayHasDiscussion(day?: OutlookDay): boolean {
   const discussion = day?.discussion;
   if (!discussion) return false;
   if (discussion.mode === 'diy') return Boolean(discussion.diyContent?.trim());
   return Boolean(discussion.guidedContent && Object.values(discussion.guidedContent).some((value) => value.trim()));
-};
+}
 
-const getWorkflowLabel = (workflowMetadata?: CycleMetadata, currentDay?: number): string =>
-  DEFAULT_WORKFLOW_TEMPLATES.find((template) => template.id === workflowMetadata?.workflowId)?.label
-  ?? workflowMetadata?.workflowId
-  ?? `Day ${currentDay ?? 1} workflow`;
+/** Returns the readable label for the active workflow template. */
+function getWorkflowLabel(workflowMetadata?: CycleMetadata, currentDay?: number): string {
+  return DEFAULT_WORKFLOW_TEMPLATES.find((template) => template.id === workflowMetadata?.workflowId)?.label
+    ?? workflowMetadata?.workflowId
+    ?? `Day ${currentDay ?? 1} workflow`;
+}
 
 const workflowStartLabels: Record<string, string> = {
   'severe-day1': 'Day 1',
@@ -279,22 +283,51 @@ const SignedInCycleBar: React.FC<{
   </section>
 );
 
-/** Main signed-in hero panel with resume, history, and new-cycle actions. */
-const SignedInContinuePanel: React.FC<{
+interface SignedInWorkflowPanelProps {
   forecastCycle: ForecastCycle;
-    workflowMetadata?: CycleMetadata;
-    workflowEnabled: boolean;
+  workflowMetadata?: CycleMetadata;
+  workflowEnabled: boolean;
   hasActiveWorkflow: boolean;
   onResumeForecast: () => void;
   onWriteDiscussion: () => void;
   onOpenFile: () => void;
   onStartWorkflow: (workflowTemplate: WorkflowMetadata) => void;
   onCreateWorkflowUpdate: () => void;
-}> = ({
+}
+
+/** Renders workflow scope buttons when no workflow is active. */
+const SignedInWorkflowStartPanel: React.FC<Pick<SignedInWorkflowPanelProps, 'workflowEnabled' | 'onOpenFile' | 'onStartWorkflow'>> = ({
+  workflowEnabled,
+  onOpenFile,
+  onStartWorkflow,
+}) => (
+  <section className="home-concept-continue">
+    <h2>
+      <span>Continue your</span>
+      <span className="home-concept-heading-line">forecast <Zap className="h-10 w-10" /></span>
+    </h2>
+    <p>Start a forecast workflow by scope, or upload a workflow package from your device.</p>
+    <div className="home-concept-workflow-start-grid" aria-label="Start workflow">
+      {DEFAULT_WORKFLOW_TEMPLATES.map((template) => (
+        <button type="button" key={template.id} className="home-concept-workflow-start" onClick={() => onStartWorkflow(template)} disabled={!workflowEnabled}>
+          {workflowStartLabels[template.id] ?? template.label}
+        </button>
+      ))}
+    </div>
+    <div className="home-concept-workflow-inline-actions">
+      <button type="button" onClick={onOpenFile}>
+        <Upload className="h-4 w-4" />
+        Upload workflow
+      </button>
+    </div>
+  </section>
+);
+
+/** Renders status and actions when a workflow is active. */
+const SignedInWorkflowActivePanel: React.FC<SignedInWorkflowPanelProps> = ({
   forecastCycle,
-    workflowMetadata,
-    workflowEnabled,
-  hasActiveWorkflow,
+  workflowMetadata,
+  workflowEnabled,
   onResumeForecast,
   onWriteDiscussion,
   onOpenFile,
@@ -308,37 +341,6 @@ const SignedInContinuePanel: React.FC<{
     ? { icon: MessageSquare, label: 'Write Discussion', onClick: onWriteDiscussion }
     : { icon: PlayCircle, label: 'Continue Map', onClick: onResumeForecast };
   const NextActionIcon = nextAction.icon;
-
-  if (!hasActiveWorkflow) {
-    return (
-      <section className="home-concept-continue">
-        <h2>
-          <span>Continue your</span>
-          <span className="home-concept-heading-line">forecast <Zap className="h-10 w-10" /></span>
-        </h2>
-        <p>Start a forecast workflow by scope, or upload a workflow package from your device.</p>
-        <div className="home-concept-workflow-start-grid" aria-label="Start workflow">
-          {DEFAULT_WORKFLOW_TEMPLATES.map((template) => (
-            <button
-              type="button"
-              key={template.id}
-              className="home-concept-workflow-start"
-                onClick={() => onStartWorkflow(template)}
-                disabled={!workflowEnabled}
-            >
-              {workflowStartLabels[template.id] ?? template.label}
-            </button>
-          ))}
-        </div>
-        <div className="home-concept-workflow-inline-actions">
-          <button type="button" onClick={onOpenFile}>
-            <Upload className="h-4 w-4" />
-            Upload workflow
-          </button>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section className="home-concept-continue">
@@ -360,7 +362,7 @@ const SignedInContinuePanel: React.FC<{
           <NextActionIcon className="h-4 w-4" />
           {nextAction.label}
         </button>
-          <button type="button" onClick={onCreateWorkflowUpdate} disabled={!workflowEnabled}>
+        <button type="button" onClick={onCreateWorkflowUpdate} disabled={!workflowEnabled}>
           <RefreshCw className="h-4 w-4" />
           Create update
         </button>
@@ -371,18 +373,21 @@ const SignedInContinuePanel: React.FC<{
       </div>
       <div className="home-concept-workflow-new-row" aria-label="Start new workflow">
         {DEFAULT_WORKFLOW_TEMPLATES.map((template) => (
-          <button
-            type="button"
-            key={template.id}
-              onClick={() => onStartWorkflow(template)}
-              disabled={!workflowEnabled}
-          >
+          <button type="button" key={template.id} onClick={() => onStartWorkflow(template)} disabled={!workflowEnabled}>
             {workflowStartLabels[template.id] ?? template.label}
           </button>
         ))}
       </div>
     </section>
   );
+};
+
+/** Main signed-in hero panel with resume, history, and new-cycle actions. */
+const SignedInContinuePanel: React.FC<SignedInWorkflowPanelProps> = (props) => {
+  if (!props.hasActiveWorkflow) {
+    return <SignedInWorkflowStartPanel {...props} />;
+  }
+  return <SignedInWorkflowActivePanel {...props} />;
 };
 
 /** Signed-in concept home screen. */

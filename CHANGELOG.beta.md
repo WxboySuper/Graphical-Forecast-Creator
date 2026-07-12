@@ -4,6 +4,11 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #685
+
+- Add Home workflow entry points for starting, resuming, updating, and uploading workflow packages.
+- Protect workflow starts from disabled exposure targets and unsaved-cycle loss.
+
 ### PR #684
 
 - Add a persistent workflow banner across the Forecast and Discussion routes with map, discussion, review, update, and export actions.

@@ -20,12 +20,13 @@ import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
 
-const getLocalCalendarDate = () => {
+/** Returns today's local calendar date as YYYY-MM-DD without UTC conversion. */
+function getLocalCalendarDate(): string {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${now.getFullYear()}-${month}-${day}`;
-};
+}
 
 /**
  * Encapsulates the state and handlers used by the HomePage component so the page
