@@ -41,8 +41,6 @@ interface PreviousOutlookSuggestion {
   targetDay: DayType;
 }
 
-const dayValues = [1, 2, 3, 4, 5, 6, 7, 8] as const;
-
 /** True when one forecast day has any drawn outlook or low-probability marker. */
 const dayHasMapWork = (day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]>): boolean => {
   const hasMapData = Object.values(day.data).some((outlookMap) => (outlookMap?.size ?? 0) > 0);
@@ -137,6 +135,157 @@ const WorkflowStep: React.FC<{
   </div>
 );
 
+interface WorkflowPanelActionsProps {
+  context: 'forecast' | 'discussion';
+  isReviewed: boolean;
+  canReviewPackage: boolean;
+  isUpdating: boolean;
+  mapIsComplete: boolean;
+  canExportPackage: boolean;
+  hasController: boolean;
+  hasSameDayWork: boolean;
+  isPackageDownloading: boolean;
+  previousSuggestion: PreviousOutlookSuggestion | null;
+  activeUpdateVersion: number | undefined;
+  onExport: () => void;
+  onOpenReview: () => void;
+  onCreateUpdate: () => void;
+  onStartFromPrevious: () => void;
+  onNavigate: (path: string) => void;
+}
+
+const WorkflowPanelExtras: React.FC<WorkflowPanelActionsProps> = ({
+  canExportPackage,
+  hasController,
+  hasSameDayWork,
+  isPackageDownloading,
+  isReviewed,
+  isUpdating,
+  previousSuggestion,
+  onCreateUpdate,
+  onExport,
+  onNavigate,
+  onOpenReview,
+  onStartFromPrevious,
+}) => (
+  <>
+    {canExportPackage && !isReviewed ? (
+      <Button size="sm" variant="outline" onClick={onExport} disabled={isPackageDownloading}>
+        <Archive className="h-4 w-4 mr-2" />
+        Export
+      </Button>
+    ) : null}
+    {hasController && !isUpdating && (!canReviewPackage || isReviewed) ? (
+      <Button size="sm" variant="outline" onClick={onOpenReview}>
+        <CheckCircle2 className="h-4 w-4 mr-2" />
+        Review
+      </Button>
+    ) : null}
+    {!isUpdating && hasSameDayWork ? (
+      <Button size="sm" variant="outline" onClick={onCreateUpdate}>
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Update
+      </Button>
+    ) : null}
+    {previousSuggestion ? (
+      <Button size="sm" variant="outline" onClick={onStartFromPrevious}>
+        <GitBranch className="h-4 w-4 mr-2" />
+        Use {previousSuggestion.label}
+      </Button>
+    ) : null}
+  </>
+);
+
+/** Renders the primary action for the current workflow state. */
+const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
+  context,
+  isReviewed,
+  canReviewPackage,
+  isUpdating,
+  mapIsComplete,
+  isPackageDownloading,
+  activeUpdateVersion,
+  onExport,
+  onOpenReview,
+  onNavigate,
+}) => {
+  if (isReviewed) {
+    return (
+      <Button size="sm" onClick={onExport} disabled={isPackageDownloading}>
+        <Archive className="h-4 w-4 mr-2" />
+        {isPackageDownloading ? 'Exporting...' : 'Export Workflow'}
+      </Button>
+    );
+  }
+  if (canReviewPackage) {
+    return (
+      <Button size="sm" onClick={onOpenReview}>
+        <CheckCircle2 className="h-4 w-4 mr-2" />
+        Review Package
+      </Button>
+    );
+  }
+  if (isUpdating) {
+    return (
+      <>
+        {context === 'forecast' ? (
+          <Button size="sm" onClick={() => onNavigate('/discussion')} disabled={!mapIsComplete}>
+            <FileText className="h-4 w-4 mr-2" />
+            Update Discussion
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => onNavigate('/forecast')}>
+            <Map className="h-4 w-4 mr-2" />
+            Update Map
+          </Button>
+        )}
+        <Button size="sm" variant="outline" onClick={onOpenReview}>
+          <CheckCircle2 className="h-4 w-4 mr-2" />
+          Mark Ready
+        </Button>
+      </>
+    );
+  }
+  if (context === 'discussion') {
+    return (
+      <Button size="sm" onClick={() => onNavigate('/forecast')}>
+        <Map className="h-4 w-4 mr-2" />
+        {mapIsComplete ? 'Finish Map' : 'Continue Map'}
+      </Button>
+    );
+  }
+  return (
+    <Button size="sm" onClick={() => onNavigate('/discussion')} disabled={!mapIsComplete}>
+      <FileText className="h-4 w-4 mr-2" />
+      Write Discussion
+    </Button>
+  );
+};
+
+/** Renders navigation and export controls beside the primary workflow action. */
+const WorkflowPanelActions: React.FC<WorkflowPanelActionsProps> = (props) => (
+  <div className="forecast-workflow-panel__actions">
+    <WorkflowPanelPrimaryAction {...props} />
+    <WorkflowPanelExtras {...props} />
+  </div>
+);
+
+/** Returns the concise status shown in the workflow banner. */
+const getWorkflowStatusLabel = (
+  hasMapStarted: boolean,
+  isUpdating: boolean,
+  activeUpdateVersion: number | undefined,
+  mapIsComplete: boolean,
+  discussionIsComplete: boolean,
+  isReviewed: boolean,
+): string => {
+  if (!hasMapStarted) return 'Map not started';
+  if (isUpdating) return `Update v${activeUpdateVersion} in progress`;
+  if (!mapIsComplete) return 'Map in progress';
+  if (!discussionIsComplete) return 'Discussion needed';
+  return isReviewed ? 'Ready to export' : 'Ready for review';
+};
+
 /** Persistent package workflow prompt for the forecast editor. */
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
@@ -170,17 +319,14 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     ? Math.max(...workflowMetadata.outlookVersions.map((version) => version.version))
     : 1;
 
-  const statusLabel = !hasMapStarted
-    ? 'Map not started'
-    : isUpdating
-      ? `Update v${activeUpdateVersion} in progress`
-      : !mapIsComplete
-        ? 'Map in progress'
-        : !discussionIsComplete
-          ? 'Discussion needed'
-          : !forecastCycle.completionAcknowledgedAt
-            ? 'Ready for review'
-            : 'Ready to export';
+  const statusLabel = getWorkflowStatusLabel(
+    hasMapStarted,
+    isUpdating,
+    activeUpdateVersion,
+    mapIsComplete,
+    discussionIsComplete,
+    isReviewed,
+  );
 
   const handleCreateUpdate = () => {
     dispatch(createOutlookUpdate());
@@ -208,6 +354,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
       setIsPackageDownloading(false);
     }
   };
+  /** Starts today's workflow from the suggested previous-cycle outlook. */
   const handleStartFromPrevious = () => {
     if (!previousSuggestion) return;
     dispatch(startFromPreviousCycle({
@@ -242,76 +389,24 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           <WorkflowStep icon={<FileText className="h-4 w-4" />} label="Discussion" status={discussionIsComplete ? 'complete' : mapIsComplete ? 'active' : 'pending'} />
           <WorkflowStep icon={<CheckCircle2 className="h-4 w-4" />} label={isUpdating ? `Update v${activeUpdateVersion}` : 'Review'} status={isReviewed ? 'complete' : (canReviewPackage || isUpdating) ? 'active' : 'pending'} />
         </div>
-        <div className="forecast-workflow-panel__actions">
-          {isReviewed ? (
-            <Button size="sm" onClick={() => { handleWorkflowExport().catch(() => undefined); }} disabled={isPackageDownloading}>
-              <Archive className="h-4 w-4 mr-2" />
-              {isPackageDownloading ? 'Exporting...' : 'Export Workflow'}
-            </Button>
-          ) : canReviewPackage ? (
-            <Button size="sm" onClick={handleOpenReview}>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Review Package
-            </Button>
-          ) : isUpdating ? (
-            <>
-              {context === 'forecast' ? (
-                <Button size="sm" onClick={() => navigate('/discussion')} disabled={!mapIsComplete}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Update Discussion
-                </Button>
-              ) : (
-                <Button size="sm" onClick={() => navigate('/forecast')}>
-                  <Map className="h-4 w-4 mr-2" />
-                  Update Map
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={handleOpenReview}>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Mark Ready
-              </Button>
-            </>
-          ) : context === 'discussion' && !mapIsComplete ? (
-            <Button size="sm" onClick={() => navigate('/forecast')}>
-              <Map className="h-4 w-4 mr-2" />
-              Continue Map
-            </Button>
-          ) : context === 'discussion' ? (
-            <Button size="sm" onClick={() => navigate('/forecast')}>
-              <Map className="h-4 w-4 mr-2" />
-              Finish Map
-            </Button>
-          ) : (
-            <Button size="sm" onClick={() => navigate('/discussion')} disabled={!mapIsComplete}>
-              <FileText className="h-4 w-4 mr-2" />
-              Write Discussion
-            </Button>
-          )}
-          {canExportPackage && !isReviewed ? (
-            <Button size="sm" variant="outline" onClick={() => { handleWorkflowExport().catch(() => undefined); }} disabled={isPackageDownloading}>
-              <Archive className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          ) : null}
-          {controller && !isUpdating && (!canReviewPackage || forecastCycle.completionAcknowledgedAt) ? (
-            <Button size="sm" variant="outline" onClick={handleOpenReview}>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Review
-            </Button>
-          ) : null}
-          {!isUpdating && hasSameDayWork ? (
-            <Button size="sm" variant="outline" onClick={handleCreateUpdate}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Update
-            </Button>
-          ) : null}
-          {previousSuggestion ? (
-            <Button size="sm" variant="outline" onClick={handleStartFromPrevious}>
-              <GitBranch className="h-4 w-4 mr-2" />
-              Use {previousSuggestion.label}
-            </Button>
-          ) : null}
-        </div>
+        <WorkflowPanelActions
+          context={context}
+          isReviewed={isReviewed}
+          canReviewPackage={canReviewPackage}
+          isUpdating={isUpdating}
+          mapIsComplete={mapIsComplete}
+          canExportPackage={canExportPackage}
+          hasController={Boolean(controller)}
+          hasSameDayWork={hasSameDayWork}
+          isPackageDownloading={isPackageDownloading}
+          previousSuggestion={previousSuggestion}
+          activeUpdateVersion={activeUpdateVersion}
+          onExport={() => { handleWorkflowExport().catch(() => undefined); }}
+          onOpenReview={handleOpenReview}
+          onCreateUpdate={handleCreateUpdate}
+          onStartFromPrevious={handleStartFromPrevious}
+          onNavigate={navigate}
+        />
       </div>
 
       {forecastCycle.cycleDate !== getLocalCalendarDate() ? (
