@@ -295,6 +295,25 @@ interface SignedInWorkflowPanelProps {
   onCreateWorkflowUpdate: () => void;
 }
 
+interface WorkflowNextAction {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+}
+
+/** Chooses the next editor action for the active workflow state. */
+function getWorkflowNextAction(
+  mapStarted: boolean,
+  discussionStarted: boolean,
+  onWriteDiscussion: () => void,
+  onResumeForecast: () => void,
+): WorkflowNextAction {
+  if (mapStarted && !discussionStarted) {
+    return { icon: MessageSquare, label: 'Write Discussion', onClick: onWriteDiscussion };
+  }
+  return { icon: PlayCircle, label: 'Continue Map', onClick: onResumeForecast };
+}
+
 /** Renders workflow scope buttons when no workflow is active. */
 const SignedInWorkflowStartPanel: React.FC<Pick<SignedInWorkflowPanelProps, 'workflowEnabled' | 'onOpenFile' | 'onStartWorkflow'>> = ({
   workflowEnabled,
@@ -337,9 +356,7 @@ const SignedInWorkflowActivePanel: React.FC<SignedInWorkflowPanelProps> = ({
   const activeDay = forecastCycle.days[forecastCycle.currentDay];
   const mapStarted = dayHasMapWork(activeDay);
   const discussionStarted = dayHasDiscussion(activeDay);
-  const nextAction = mapStarted && !discussionStarted
-    ? { icon: MessageSquare, label: 'Write Discussion', onClick: onWriteDiscussion }
-    : { icon: PlayCircle, label: 'Continue Map', onClick: onResumeForecast };
+  const nextAction = getWorkflowNextAction(mapStarted, discussionStarted, onWriteDiscussion, onResumeForecast);
   const NextActionIcon = nextAction.icon;
 
   return (
