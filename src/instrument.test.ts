@@ -96,17 +96,12 @@ describe('instrument', () => {
   });
 
   it('keeps matching canvas TypeErrors when they come from application frames', () => {
-    jest.isolateModules(() => {
-      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
-      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
-      const { beforeSend } = require('./instrument');
-      const event = createOpenLayersCanvasEvent(
+    expectBeforeSendToKeep(() =>
+      createOpenLayersCanvasEvent(
         "null is not an object (evaluating 'a.canvas')",
         'auto.browser.global_handlers.onerror'
-      );
-
-      expect(beforeSend(event, {})).toBe(event);
-    });
+      )
+    );
   });
 
   const createRequestLifecycleEvent = (value: string, withStack = false) => ({
@@ -143,6 +138,15 @@ describe('instrument', () => {
     globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
     // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
     return require('./instrument').beforeSend;
+  };
+
+  const expectBeforeSendToKeep = (createEvent: () => any) => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = createEvent();
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
   };
 
   it.each([
@@ -216,14 +220,10 @@ describe('instrument', () => {
   });
 
   it('keeps the opaque message when it comes from another mechanism', () => {
-    jest.isolateModules(() => {
-      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
-      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
-      const { beforeSend } = require('./instrument');
+    expectBeforeSendToKeep(() => {
       const event = createOpaqueGlobalError();
       event.exception.values[0].mechanism.type = 'auto.browser.global_handlers.onunhandledrejection';
-
-      expect(beforeSend(event, {})).toBe(event);
+      return event;
     });
   });
 
