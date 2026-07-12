@@ -42,6 +42,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 ### PR #683
 
 - Modernize the package review and completion dialogs with shared dialog primitives and review/export actions.
+### PR #691
+
+- Filter known no-stack browser telemetry noise tracked by GFC-WEB-K and GFC-WEB-M while preserving actionable errors.
 
 ### PR #681
 
