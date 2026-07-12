@@ -96,7 +96,7 @@ interface CompletionValidationModalBodyProps {
   warningIssues: ValidationIssue[];
   missingGroupings: string[];
   omittedDays: Partial<Record<DayType, string>>;
-  onNavigate: (grouping: string) => void;
+  onNavigate: (grouping: string, outlookType: string) => void;
   onOmitDay: (day: DayType, reason: string) => void;
 }
 

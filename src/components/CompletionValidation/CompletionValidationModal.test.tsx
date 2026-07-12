@@ -141,7 +141,7 @@ describe('CompletionValidationModal', () => {
     const onNavigateToIssue = jest.fn();
     renderModal(incompleteResult, { onNavigateToIssue });
     fireEvent.click(screen.getAllByText('Go')[0]);
-    expect(onNavigateToIssue).toHaveBeenCalledWith(1);
+    expect(onNavigateToIssue).toHaveBeenCalledWith(1, 'tornado');
   });
 
   it('shows missing groupings summary', () => {

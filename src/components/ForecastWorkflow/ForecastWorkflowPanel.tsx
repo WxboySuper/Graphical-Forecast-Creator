@@ -19,11 +19,13 @@ import {
   completeWithOmissions,
   dismissCompletionModal,
   omitDay,
+  setActiveOutlookType,
+  setForecastDay,
 } from '../../store/forecastSlice';
 import { getLocalCalendarDate } from '../../utils/localDate';
 import { validateCycleCompletion } from '../../utils/completionValidation';
 import { downloadGfcPackage } from '../../utils/fileUtils';
-import type { DayType } from '../../types/outlooks';
+import type { DayType, OutlookType } from '../../types/outlooks';
 import type { StandardGrouping } from '../../types/workflow';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import CompletionValidationModal from '../CompletionValidation/CompletionValidationModal';
@@ -352,7 +354,7 @@ const WorkflowPanelFooter: React.FC<{
   onComplete: () => void;
   onCompleteWithOmissions: () => void;
   onOmitDay: (day: DayType, reason: string) => void;
-  onNavigateToIssue: () => void;
+  onNavigateToIssue: (day: DayType, outlookType: OutlookType) => void;
   onExport: () => void;
 }> = ({
   cycleDate,
@@ -565,7 +567,12 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         onComplete={handleCompleteReview}
         onCompleteWithOmissions={handleCompleteWithOmissions}
         onOmitDay={handleOmitDay}
-        onNavigateToIssue={() => navigate('/forecast')}
+        onNavigateToIssue={(day, outlookType) => {
+          dispatch(setForecastDay(day));
+          dispatch(setActiveOutlookType(outlookType));
+          dispatch(dismissCompletionModal());
+          navigate('/forecast');
+        }}
         onExport={() => { handleWorkflowExport().catch(() => undefined); }}
       />
     </section>

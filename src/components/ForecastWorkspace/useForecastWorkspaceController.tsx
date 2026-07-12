@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { selectCanRedo, selectCanUndo, selectForecastCycle, selectOmittedDays } from '../../store/forecastSlice';
+import { selectCanRedo, selectCanUndo, selectForecastCycle, selectOmittedDays, setActiveOutlookType, setForecastDay } from '../../store/forecastSlice';
 import { setBaseMapStyle, setGhostOutlookVisibility } from '../../store/overlaysSlice';
 import type { BaseMapStyle } from '../../store/overlaysSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
@@ -53,8 +53,9 @@ function createCompletionValidationHandlers(opts: {
     handleOmitDay: (day: DayType, reason: string) => {
       dispatch({ type: 'forecast/omitDay', payload: { day, reason } });
     },
-    handleNavigateToIssue: (day: DayType) => {
-      dispatch({ type: 'forecast/setForecastDay', payload: day });
+    handleNavigateToIssue: (day: DayType, outlookType: OutlookType) => {
+      dispatch(setForecastDay(day));
+      dispatch(setActiveOutlookType(outlookType));
       dispatch({ type: 'forecast/dismissCompletionModal' });
     },
   };
@@ -152,7 +153,7 @@ export interface ForecastWorkspaceController {
   onCompleteWithOmissions: () => void;
   onOmitDay: (day: DayType, reason: string) => void;
   omittedDays: Partial<Record<DayType, string>>;
-  onNavigateToIssue: (day: DayType) => void;
+  onNavigateToIssue: (day: DayType, outlookType: OutlookType) => void;
 }
 
 interface UseForecastWorkspaceControllerOptions {
@@ -213,7 +214,7 @@ interface BuildForecastWorkspaceControllerArgs {
   handleCompleteWithOmissions: () => void;
   handleOmitDay: (day: DayType, reason: string) => void;
   omittedDays: Partial<Record<DayType, string>>;
-  handleNavigateToIssue: (day: DayType) => void;
+  handleNavigateToIssue: (day: DayType, outlookType: OutlookType) => void;
 }
 
 /** Build the controller object returned by useForecastWorkspaceController.

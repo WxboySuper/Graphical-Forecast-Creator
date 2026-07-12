@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #692
+
+- Preserve the exact forecast day and outlook section when navigating from a workflow completion missing-item prompt.
+
 ### PR #685
 
 - Add Home workflow entry points for starting, resuming, updating, and uploading workflow packages.
