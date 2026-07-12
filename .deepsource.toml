@@ -46,7 +46,7 @@ enabled = true
   skip_doc_coverage = [
     "function-declaration",
     "function-expression",
-    "arrow-function",
+    "arrow-function-expression",
     "class-declaration",
     "class-expression",
     "method-definition",

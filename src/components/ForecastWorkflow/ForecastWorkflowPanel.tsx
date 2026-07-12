@@ -79,7 +79,7 @@ const getPreviousSourceDay = (targetDay: DayType): DayType | null => {
 };
 
 /** Formats a cycle date for the compact workflow banner label. */
-const formatCycleDate = (cycleDate: string): string => {
+function formatCycleDate(cycleDate: string): string {
   const parsed = new Date(`${cycleDate}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return cycleDate;
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -125,17 +125,21 @@ const usePreviousOutlookSuggestion = (): PreviousOutlookSuggestion | null => {
   }, [forecastCycle.currentDay, savedCycles]);
 };
 
-/** Displays one map, discussion, or review step in the workflow banner. */
-const WorkflowStep: React.FC<{
+interface WorkflowStepProps {
   icon: React.ReactNode;
   label: string;
   status: 'complete' | 'active' | 'pending';
-}> = ({ icon, label, status }) => (
-  <div className={`forecast-workflow-step forecast-workflow-step--${status}`}>
-    <span>{icon}</span>
-    <strong>{label}</strong>
-  </div>
-);
+}
+
+/** Displays one map, discussion, or review step in the workflow banner. */
+function WorkflowStep({ icon, label, status }: WorkflowStepProps): React.ReactElement {
+  return (
+    <div className={`forecast-workflow-step forecast-workflow-step--${status}`}>
+      <span>{icon}</span>
+      <strong>{label}</strong>
+    </div>
+  );
+}
 
 interface WorkflowPanelActionsProps {
   context: 'forecast' | 'discussion';
@@ -165,7 +169,7 @@ const WorkflowPanelExportAction: React.FC<WorkflowPanelActionsProps> = ({ canExp
       Export
     </Button>
   );
-};
+}
 
 /** Adds the optional review action for controller-backed forecast workspaces. */
 const WorkflowPanelReviewAction: React.FC<WorkflowPanelActionsProps> = ({ canReviewPackage, hasController, isReviewed, isUpdating, onOpenReview }) => {
@@ -203,14 +207,16 @@ const WorkflowPanelPreviousAction: React.FC<WorkflowPanelActionsProps> = ({ prev
 };
 
 /** Renders the optional secondary workflow actions. */
-const WorkflowPanelExtras: React.FC<WorkflowPanelActionsProps> = (props) => (
-  <>
-    <WorkflowPanelExportAction {...props} />
-    <WorkflowPanelReviewAction {...props} />
-    <WorkflowPanelUpdateAction {...props} />
-    <WorkflowPanelPreviousAction {...props} />
-  </>
-);
+function WorkflowPanelExtras(props: WorkflowPanelActionsProps): React.ReactElement {
+  return (
+    <>
+      <WorkflowPanelExportAction {...props} />
+      <WorkflowPanelReviewAction {...props} />
+      <WorkflowPanelUpdateAction {...props} />
+      <WorkflowPanelPreviousAction {...props} />
+    </>
+  );
+}
 
 /** Renders the primary action for the current workflow state. */
 const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
@@ -286,20 +292,30 @@ const WorkflowPanelActions: React.FC<WorkflowPanelActionsProps> = (props) => (
 );
 
 /** Returns the concise status shown in the workflow banner. */
-const getWorkflowStatusLabel = (
-  hasMapStarted: boolean,
-  isUpdating: boolean,
-  activeUpdateVersion: number | undefined,
-  mapIsComplete: boolean,
-  discussionIsComplete: boolean,
-  isReviewed: boolean,
-): string => {
+interface WorkflowStatusState {
+  hasMapStarted: boolean;
+  isUpdating: boolean;
+  activeUpdateVersion: number | undefined;
+  mapIsComplete: boolean;
+  discussionIsComplete: boolean;
+  isReviewed: boolean;
+}
+
+/** Returns the concise status shown in the workflow banner. */
+function getWorkflowStatusLabel({
+  hasMapStarted,
+  isUpdating,
+  activeUpdateVersion,
+  mapIsComplete,
+  discussionIsComplete,
+  isReviewed,
+}: WorkflowStatusState): string {
   if (!hasMapStarted) return 'Map not started';
   if (isUpdating) return `Update v${activeUpdateVersion} in progress`;
   if (!mapIsComplete) return 'Map in progress';
   if (!discussionIsComplete) return 'Discussion needed';
   return isReviewed ? 'Ready to export' : 'Ready for review';
-};
+}
 
 /** Displays the workflow progress steps without mixing them into the panel orchestration. */
 const WorkflowPanelSteps: React.FC<{
@@ -439,37 +455,37 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const hasSameDayWork = hasSameDayWorkflowWork(forecastCycle.cycleDate, currentDay);
   const currentVersion = getCurrentWorkflowVersion(workflowMetadata.outlookVersions);
 
-  const statusLabel = getWorkflowStatusLabel(
+  const statusLabel = getWorkflowStatusLabel({
     hasMapStarted,
     isUpdating,
     activeUpdateVersion,
     mapIsComplete,
     discussionIsComplete,
     isReviewed,
-  );
+  });
 
   /** Starts a same-day workflow update from the current package. */
-  const handleCreateUpdate = () => {
+  function handleCreateUpdate(): void {
     dispatch(createOutlookUpdate());
-  };
+  }
   /** Opens the completion review in the active workspace or validates it locally. */
-  const handleOpenReview = () => {
+  function handleOpenReview(): void {
     if (controller) {
       controller.onOpenCompletionModal();
       return;
     }
     dispatch(validateCompletion());
-  };
+  }
   /** Closes the local completion review modal. */
-  const handleCloseReview = () => dispatch(dismissCompletionModal());
+  function handleCloseReview(): void { dispatch(dismissCompletionModal()); }
   /** Marks the current workflow package complete. */
-  const handleCompleteReview = () => dispatch(completeCycle());
+  function handleCompleteReview(): void { dispatch(completeCycle()); }
   /** Completes the workflow package while retaining explicitly omitted days. */
-  const handleCompleteWithOmissions = () => dispatch(completeWithOmissions());
+  function handleCompleteWithOmissions(): void { dispatch(completeWithOmissions()); }
   /** Records why a workflow day was intentionally omitted. */
-  const handleOmitDay = (day: DayType, reason: string) => dispatch(omitDay({ day, reason }));
+  function handleOmitDay(day: DayType, reason: string): void { dispatch(omitDay({ day, reason })); }
   /** Exports the current workflow package and restores the button state afterward. */
-  const handleWorkflowExport = async () => {
+  async function handleWorkflowExport(): Promise<void> {
     setIsPackageDownloading(true);
     try {
       await downloadGfcPackage(
@@ -480,9 +496,9 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     } finally {
       setIsPackageDownloading(false);
     }
-  };
+  }
   /** Starts today's workflow from the suggested previous-cycle outlook. */
-  const handleStartFromPrevious = () => {
+  function handleStartFromPrevious(): void {
     if (!previousSuggestion) return;
     dispatch(startFromPreviousCycle({
       sourceCycleId: previousSuggestion.cycleId,
@@ -490,7 +506,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
       targetDay: previousSuggestion.targetDay,
       newCycleDate: getLocalCalendarDate(),
     }));
-  };
+  }
 
   return (
     <section
