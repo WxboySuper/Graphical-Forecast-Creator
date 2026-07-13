@@ -1,6 +1,6 @@
 import '../immerSetup';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, Probability } from '../types/outlooks';
+import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping, Probability } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
@@ -11,6 +11,7 @@ import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
+import { isValidDiscussionGroupings, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -40,6 +41,8 @@ export interface ForecastState {
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
   historyByDay: Partial<Record<DayType, ForecastHistoryStacks>>;
+  /** Unsaved discussion editor drafts, keyed by forecast day so route unmounts cannot lose them. */
+  discussionDraftsByDay: Partial<Record<DayType, DiscussionData>>;
   /** v2 workflow metadata for the active cycle (optional, present when loaded from a workflow package). */
   workflowMetadata?: CycleMetadata;
   /** v2 workflow template metadata (optional, present when the editor is in workflow mode). */
@@ -258,6 +261,7 @@ const initialState: ForecastState = {
   emergencyMode: false,
   savedCycles: [],
   historyByDay: {},
+  discussionDraftsByDay: {},
   completionValidation: {
     lastResult: null,
     showCompletionModal: false,
@@ -514,6 +518,7 @@ const applyRolloverWorkflowState = (
 /** Resets the in-memory cycle to a fresh rollover derived from the requested source. */
 const applyRolloverFromPreviousCycle = (state: ForecastState, args: ApplyRolloverArgs) => {
   clearHistory(state);
+  state.discussionDraftsByDay = {};
   state.forecastCycle = buildRolloverCycle(args);
   state.isSaved = false;
   state.outlookVersionSnapshots = [];
@@ -834,6 +839,7 @@ export const forecastSlice = createSlice({
 
     resetForecasts: (state) => {
       clearHistory(state);
+      state.discussionDraftsByDay = {};
       // Clear localStorage first
       try {
         localStorage.removeItem('forecastData');
@@ -866,9 +872,22 @@ export const forecastSlice = createSlice({
       state.isSaved = true;
     },
 
+    // Restores the local auto-save snapshot without discarding in-memory discussion drafts.
+    restoreForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
+      state.forecastCycle = action.payload;
+      clearHistory(state);
+      state.isSaved = true;
+      state.outlookVersionSnapshots = [];
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
+      state.isWorkflowActive = false;
+      writeStoredWorkflowActive(false);
+    },
+
     // Import forecast data: Now handles Cycle
     importForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
       state.forecastCycle = action.payload;
+      state.discussionDraftsByDay = {};
       clearHistory(state);
       state.isSaved = true;
       state.outlookVersionSnapshots = [];
@@ -917,6 +936,11 @@ export const forecastSlice = createSlice({
       state.isSaved = true;
     },
 
+    // Update an unsaved discussion draft without coupling it to the mounted page.
+    updateDiscussionDraft: (state, action: PayloadAction<{ day: DayType; draft: DiscussionData }>) => {
+      state.discussionDraftsByDay[action.payload.day] = action.payload.draft;
+    },
+
     // Update discussion for a specific day
     updateDiscussion: (state, action: PayloadAction<{ day: DayType; discussion: DiscussionData }>) => {
       const { day, discussion } = action.payload;
@@ -924,9 +948,20 @@ export const forecastSlice = createSlice({
       if (dayData) {
         dayData.discussion = discussion;
         dayData.metadata.lastModified = new Date().toISOString();
+        delete state.discussionDraftsByDay[day];
         invalidateCompletionAcknowledgement(state);
         state.isSaved = false;
       }
+    },
+
+    /** Persists discussion scopes without copying discussion content into each covered day. */
+    setDiscussionGroupings: (state, action: PayloadAction<DiscussionGrouping[] | undefined>) => {
+      if (action.payload !== undefined && !isValidDiscussionGroupings(action.payload)) return;
+      state.forecastCycle.discussionGroupings = action.payload === undefined
+        ? undefined
+        : normalizeDiscussionGroupings(action.payload);
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
     },
 
     // Cycle History Management
@@ -951,6 +986,7 @@ export const forecastSlice = createSlice({
       if (savedCycle) {
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
         clearHistory(state);
+        state.discussionDraftsByDay = {};
         state.isSaved = true;
         state.outlookVersionSnapshots = [];
         
@@ -1129,6 +1165,7 @@ export const forecastSlice = createSlice({
     }>) => {
       const { workflowTemplate, cycleDate } = action.payload;
       clearHistory(state);
+      state.discussionDraftsByDay = {};
       try {
         localStorage.removeItem('forecastData');
       } catch {
@@ -1180,6 +1217,7 @@ export const forecastSlice = createSlice({
       if (!savedCycle) return;
 
       clearHistory(state);
+      state.discussionDraftsByDay = {};
       state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
       state.isSaved = true;
       state.outlookVersionSnapshots = [];
@@ -1307,11 +1345,14 @@ export const {
   resetForecasts,
   markAsSaved,
   importForecasts,
+  restoreForecastCycle,
   importForecastCycle,
   setForecastDay,
   setCycleDate,
   setEmergencyMode,
+  updateDiscussionDraft,
   updateDiscussion,
+  setDiscussionGroupings,
   saveCurrentCycle,
   loadSavedCycle,
   deleteSavedCycle,
@@ -1342,6 +1383,8 @@ export const selectForecast = (state: RootState) => state.forecast;
 export const selectForecastCycle = (state: RootState) => state.forecast.forecastCycle;
 /** Selects the currently active forecast day number. */
 export const selectCurrentDay = (state: RootState) => state.forecast.forecastCycle.currentDay;
+/** Selects one day's unsaved discussion draft, if the editor has changed it. */
+export const selectDiscussionDraftForDay = (state: RootState, day: DayType) => state.forecast.discussionDraftsByDay[day];
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;

@@ -1,9 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import { DiscussionPage } from './DiscussionPage';
-import forecastReducer from '../store/forecastSlice';
+import forecastReducer, { setForecastDay } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -60,5 +60,44 @@ describe('DiscussionPage', () => {
     );
 
     expect(screen.getByDisplayValue('WeatherboySuper')).toBeInTheDocument();
+  });
+
+  test('keeps unsaved drafts across unmounts without mixing forecast days', () => {
+    mockUseAuth.mockReturnValue({
+      syncedSettings: { defaultForecasterName: '' },
+      user: { displayName: '' },
+    });
+
+    const store = createStore();
+    const renderPage = () => render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <DiscussionPage />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    const dayOnePage = renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/Write your forecast discussion here/i), {
+      target: { value: 'Day 1 draft' },
+    });
+    dayOnePage.unmount();
+
+    store.dispatch(setForecastDay(2));
+    const dayTwoPage = renderPage();
+    expect(screen.getByPlaceholderText(/Write your forecast discussion here/i)).toHaveValue('');
+    fireEvent.change(screen.getByPlaceholderText(/Write your forecast discussion here/i), {
+      target: { value: 'Day 2 draft' },
+    });
+    dayTwoPage.unmount();
+
+    store.dispatch(setForecastDay(1));
+    const restoredDayOnePage = renderPage();
+    expect(screen.getByPlaceholderText(/Write your forecast discussion here/i)).toHaveValue('Day 1 draft');
+    restoredDayOnePage.unmount();
+
+    store.dispatch(setForecastDay(2));
+    renderPage();
+    expect(screen.getByPlaceholderText(/Write your forecast discussion here/i)).toHaveValue('Day 2 draft');
   });
 });

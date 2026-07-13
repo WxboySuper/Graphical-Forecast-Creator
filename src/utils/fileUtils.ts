@@ -1,9 +1,18 @@
 import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType, CycleMetadata } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
+import {
+  getDiscussionForGrouping,
+  getDiscussionGroupings,
+  getDiscussionOwnerDay,
+  hasDiscussionContent,
+  isValidDiscussionGroupings,
+  normalizeDiscussionGroupings,
+} from './discussionGrouping';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
+import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 
 const CURRENT_VERSION = '1.0.0';
 
@@ -21,6 +30,28 @@ const deserializeOutlookMap = <K extends string, V>(
 
   const coerced = coerceOutlookProbabilityMap(value);
   return coerced ?? new Map<K, V>();
+};
+
+/** Creates a safe, deterministic, collision-free discussion filename for a ZIP archive. */
+export const createUniqueDiscussionEntryName = (
+  identifier: string,
+  usedNames: Set<string>,
+): string => {
+  const safeIdentifier = identifier
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^\.+/, '')
+    .replace(/^-+|-+$/g, '')
+    || 'discussion';
+  const baseName = `discussion_${safeIdentifier}`;
+  let name = `${baseName}.txt`;
+  let suffix = 2;
+  while (usedNames.has(name)) {
+    name = `${baseName}-${suffix}.txt`;
+    suffix += 1;
+  }
+  usedNames.add(name);
+  return name;
 };
 
 // Types for serialization helper
@@ -115,6 +146,9 @@ export const serializeForecast = (
       days: serializedDays,
       currentDay: forecastCycle.currentDay,
       cycleDate: forecastCycle.cycleDate,
+      ...(isValidDiscussionGroupings(forecastCycle.discussionGroupings)
+        ? { discussionGroupings: normalizeDiscussionGroupings(forecastCycle.discussionGroupings) }
+        : {}),
       ...completionMetadataFromForecastCycle(forecastCycle),
     },
     mapView,
@@ -136,6 +170,9 @@ export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle =>
       days: deserializeForecastCycleDays(cycle),
       currentDay: cycle.currentDay,
       cycleDate: cycle.cycleDate,
+      ...(isValidDiscussionGroupings(cycle.discussionGroupings)
+        ? { discussionGroupings: normalizeDiscussionGroupings(cycle.discussionGroupings) }
+        : {}),
       ...completionMetadataFromForecastCycle(cycle),
     };
   }
@@ -221,14 +258,36 @@ export const downloadGfcPackage = async (
   const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
   zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
 
-  // 2. Discussion text for each day that has content
-  (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach((day) => {
-    const outlookDay = forecastCycle.days[day];
-    if (outlookDay?.discussion) {
-      const text = compileDiscussionToText(outlookDay.discussion, day);
-      zip.file(`discussion_day${day}.txt`, text);
-    }
-  });
+  // 2. Discussion text for configured scopes, with every ungrouped legacy day retained.
+  const workflowTemplate = cycleMetadata ? getWorkflowTemplateById(cycleMetadata.workflowId) : undefined;
+  const hasStandardWorkflowGrouping = workflowTemplate?.groupings.some((grouping) =>
+    grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
+  );
+  const hasValidPersistedGrouping = isValidDiscussionGroupings(forecastCycle.discussionGroupings);
+  const exportedDays = new Set<DayType>();
+  const usedEntryNames = new Set<string>(['forecast_cycle.json']);
+
+  const addDiscussion = (discussion: DiscussionData | undefined, day: DayType, identifier: string): void => {
+    if (!discussion || !hasDiscussionContent(discussion)) return;
+    const entryName = createUniqueDiscussionEntryName(identifier, usedEntryNames);
+    zip.file(entryName, compileDiscussionToText(discussion, day));
+    exportedDays.add(day);
+  };
+
+  if (hasValidPersistedGrouping || hasStandardWorkflowGrouping) {
+    getDiscussionGroupings(forecastCycle, workflowTemplate).forEach((grouping) => {
+      const ownerDay = getDiscussionOwnerDay(forecastCycle, grouping);
+      addDiscussion(getDiscussionForGrouping(forecastCycle, grouping), ownerDay, grouping.id);
+    });
+  }
+
+  // A malformed grouping must never make its covered legacy discussions disappear.
+  (Object.keys(forecastCycle.days) as unknown as DayType[])
+    .sort((a, b) => a - b)
+    .forEach((day) => {
+      if (exportedDays.has(day)) return;
+      addDiscussion(forecastCycle.days[day]?.discussion, day, `day${day}`);
+    });
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);

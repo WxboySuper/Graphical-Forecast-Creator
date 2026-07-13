@@ -15,6 +15,7 @@ import {
 import { RootState } from '../store';
 import {
   importForecastCycle,
+  restoreForecastCycle,
   markAsSaved,
   resetForecasts,
   saveCurrentCycle,
@@ -636,10 +637,11 @@ export const parseStoredForecastPayload = (storedValue: string | null): GFCForec
 /** Applies one stored forecast payload into Redux and restores the saved map view when present. */
 const restoreStoredForecastPayload = (
   data: GFCForecastSaveData,
-  dispatch: ShortcutDispatch
+  dispatch: ShortcutDispatch,
+  preserveDiscussionDrafts = false,
 ) => {
   const deserializedCycle = deserializeForecast(data);
-  dispatch(importForecastCycle(deserializedCycle));
+  dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle) : importForecastCycle(deserializedCycle));
   if (data.cycleMetadata) {
     dispatch(setWorkflowMetadata(data.cycleMetadata));
   }
@@ -728,7 +730,7 @@ const restoreLocalSession = (
     return;
   }
 
-  restoreStoredForecastPayload(data, dispatch);
+  restoreStoredForecastPayload(data, dispatch, true);
   addToast('Session restored from auto-save.', 'success');
 };
 

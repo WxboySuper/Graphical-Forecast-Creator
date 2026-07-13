@@ -165,6 +165,16 @@ describe('validateCycleCompletion', () => {
     expect(result.missingGroupings).toContain('day4-8');
   });
 
+  it('uses one Days 4–8 discussion for every day in that grouping', () => {
+    const days = [4, 5, 6, 7, 8].reduce<ForecastCycle['days']>((result, day) => {
+      result[day as DayType] = createDayFixture(day as DayType, day === 4 ? 'withDiscussion' : 'full');
+      return result;
+    }, {});
+
+    const result = validateCycleCompletion(createForecastCycle(days, 4), ['day4-8']);
+    expect(result.issues.filter((issue) => issue.type === 'missing-discussion')).toHaveLength(0);
+  });
+
   it('reports no-tstm-forecast warning when categorical has only TSTM but is not low probability', () => {
     const day = createDayFixture(1, 'empty');
     day.data.tornado = new Map([['2%', [{ id: 't1' }]]]);

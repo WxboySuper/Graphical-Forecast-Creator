@@ -9,6 +9,7 @@ describe('fileUtils', () => {
     }>;
     currentDay: number;
     cycleDate: string;
+    discussionGroupings?: { id: string; label: string; days: number[]; discussionDay: number }[];
   };
 
   test('validateForecastData returns false for invalid input', () => {
@@ -33,6 +34,26 @@ describe('fileUtils', () => {
     expect(validateForecastData(ser)).toBe(true);
     const des = deserializeForecast(ser);
     expect(des.days[1].data.categorical instanceof Map).toBe(true);
+  });
+
+  test('serialize/deserialize preserves discussion scopes without changing day data', () => {
+    const grouping = { id: 'custom-all', label: 'All outlooks', days: [1, 2], discussionDay: 1 };
+    const cycle: ForecastCycle = {
+      days: {
+        1: {
+          day: 1,
+          metadata: { issueDate: 'x', validDate: 'y', issuanceTime: '0600', createdAt: '', lastModified: '', lowProbabilityOutlooks: [] },
+          data: { categorical: new Map() },
+        },
+      },
+      currentDay: 1,
+      cycleDate: '2026-04-21',
+      discussionGroupings: [grouping],
+    };
+
+    const restored = deserializeForecast(serializeForecast(cycle, { center: [0, 0], zoom: 0 }));
+    expect(restored.discussionGroupings).toEqual([grouping]);
+    expect(restored.days[1]?.discussion).toBeUndefined();
   });
 
   test('serialize/deserialize preserves completion acknowledgement metadata', () => {
