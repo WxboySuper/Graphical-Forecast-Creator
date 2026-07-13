@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #696
+
+- Preserve forecast sessions and cloud handoffs across day rollover choices.
+
 ### PR #693
 
 - Dependency: @radix-ui/react-dialog ^1.1.18 → ^1.1.19
