@@ -15,7 +15,6 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 - Dependency: @types/node ^26.1.0 → ^26.1.1
 - Dependency: firebase ^12.15.0 → ^12.16.0
 - Dependency: lucide-react ^1.23.0 → ^1.24.0
-- Dependency: typescript ^6.0.3 → ^7.0.2
 - Dependency: @sentry/vite-plugin ^5.3.0 → ^5.4.0
 - Dependency: vite ^8.1.3 → ^8.1.4
 - Dependency: @sentry/node ^10.63.0 → ^10.65.0 (`server`)
