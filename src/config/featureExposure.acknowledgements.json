@@ -13,8 +13,9 @@
     "trackingIssue": 529
   },
   "forecastWorkflowV2": {
-    "reason": "Registry-only until workflow v2 surfaces merge; adoption contract in src/config/v17WorkstreamAdoption.exposure.test.ts",
-    "trackingIssue": 530
+    "reason": "WF-05 workflow surfaces are enabled on local only for development; signed-in home interaction coverage is in src/pages/home/HomePage.test.tsx and the adoption contract is in src/config/v17WorkstreamAdoption.exposure.test.ts",
+    "trackingIssue": 530,
+    "localDevelopmentApproved": true
   },
   "verificationRelaunch": {
     "reason": "Registry-only until verification relaunch surfaces merge; core /verification is separate; adoption contract in src/config/v17WorkstreamAdoption.exposure.test.ts",

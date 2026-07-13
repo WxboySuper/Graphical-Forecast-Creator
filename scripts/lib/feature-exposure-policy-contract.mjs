@@ -62,6 +62,11 @@ function isV17BetaEnablementApproved(featureKey, acknowledgements) {
   return acknowledgements[featureKey]?.betaEnablementApproved === true;
 }
 
+/** Returns true when a workstream acknowledgement explicitly approves local-only development exposure. */
+function isV17LocalDevelopmentApproved(featureKey, acknowledgements) {
+  return acknowledgements[featureKey]?.localDevelopmentApproved === true;
+}
+
 /** Adds lifecycle violations for one v1.7 workstream registry entry. */
 function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors) {
   const { acknowledgements } = contract;
@@ -70,7 +75,13 @@ function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors
     errors.push(`v1.7 workstream "${featureKey}" must remain temporary until production promotion.`);
   }
 
-  for (const target of ['local', 'staging', 'production']) {
+  if (definition.exposure?.local === true && !isV17LocalDevelopmentApproved(featureKey, acknowledgements)) {
+    errors.push(
+      `v1.7 workstream "${featureKey}" cannot enable local development without localDevelopmentApproved in src/config/featureExposure.acknowledgements.json.`
+    );
+  }
+
+  for (const target of ['staging', 'production']) {
     if (definition.exposure?.[target] !== false) {
       errors.push(
         `v1.7 workstream "${featureKey}" must stay disabled on target "${target}" until adoption enables it.`

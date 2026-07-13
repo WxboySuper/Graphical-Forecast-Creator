@@ -483,4 +483,45 @@ describe('feature exposure policy', () => {
     });
     assert.equal(result.ok, true);
   });
+
+  it('passes when a v1.7 workstream enables local development with explicit approval', () => {
+    const registry = {
+      ...v17WorkstreamRegistry,
+      forecastWorkflowV2: {
+        ...v17WorkstreamRegistry.forecastWorkflowV2,
+        exposure: { ...ALL_OFF, local: true },
+      },
+    };
+    const acknowledgements = {
+      ...v17Acknowledgements,
+      forecastWorkflowV2: {
+        ...v17Acknowledgements.forecastWorkflowV2,
+        localDevelopmentApproved: true,
+      },
+    };
+    const result = evaluateFeatureExposurePolicy(registry, emptySurfaces, {
+      acknowledgements,
+      serverCapabilityKeys: ['TSTM_GENERATION_ENABLED'],
+      serverRegistry: {
+        autoTstm: {
+          serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
+          exposure: { ...ALL_OFF },
+        },
+      },
+    });
+    assert.equal(result.ok, true);
+  });
+
+  it('fails when a v1.7 workstream enables local development without explicit approval', () => {
+    const registry = {
+      ...v17WorkstreamRegistry,
+      forecastWorkflowV2: {
+        ...v17WorkstreamRegistry.forecastWorkflowV2,
+        exposure: { ...ALL_OFF, local: true },
+      },
+    };
+    assertPolicyErrors(registry, [/forecastWorkflowV2.*localDevelopmentApproved/], emptySurfaces, {
+      acknowledgements: v17Acknowledgements,
+    });
+  });
 });

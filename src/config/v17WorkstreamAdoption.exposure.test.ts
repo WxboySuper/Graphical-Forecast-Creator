@@ -19,14 +19,25 @@ export const V17_WORKSTREAM_KEYS = [
 type V17WorkstreamKey = (typeof V17_WORKSTREAM_KEYS)[number];
 
 describe('v1.7 workstream adoption contract', () => {
-  test.each(V17_WORKSTREAM_KEYS.filter((feature) => feature !== 'autoTstm'))(
-    '%s stays disabled on every build target',
-    (feature) => {
+  test('forecastWorkflowV2 is enabled only for local development', () => {
     for (const target of BUILD_TARGETS) {
-      expect(isFeatureExposedOnTarget(feature, target)).toBe(false);
-      expect(FEATURE_EXPOSURE_REGISTRY[feature].exposure[target]).toBe(false);
+      const expected = target === 'local';
+      expect(isFeatureExposedOnTarget('forecastWorkflowV2', target)).toBe(expected);
+      expect(FEATURE_EXPOSURE_REGISTRY.forecastWorkflowV2.exposure[target]).toBe(expected);
     }
   });
+
+  test.each(
+    V17_WORKSTREAM_KEYS.filter((feature) => !['autoTstm', 'forecastWorkflowV2'].includes(feature))
+  )(
+    '%s stays disabled on every build target',
+    (feature) => {
+      for (const target of BUILD_TARGETS) {
+        expect(isFeatureExposedOnTarget(feature, target)).toBe(false);
+        expect(FEATURE_EXPOSURE_REGISTRY[feature].exposure[target]).toBe(false);
+      }
+    }
+  );
 
   test('autoTstm is enabled only on beta', () => {
     for (const target of BUILD_TARGETS) {
