@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #694
+
+- Preserve discussions and drafts across workflow grouping, scope, and route changes.
+
 ### PR #692
 
 - Preserve the exact forecast day and outlook section when navigating from a workflow completion missing-item prompt.
