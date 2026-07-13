@@ -77,7 +77,7 @@ function validateV17LocalDevelopmentExposure(featureKey, definition, acknowledge
   );
 }
 
-/** Adds violations for workstream exposure outside local development and approved beta. */
+/** Adds violations outside the local-only development boundary and approved beta rollout. */
 function validateV17RestrictedTargets(featureKey, definition, errors) {
   for (const target of ['staging', 'production']) {
     if (definition.exposure?.[target] === false) continue;
