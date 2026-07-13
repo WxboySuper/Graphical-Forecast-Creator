@@ -872,9 +872,10 @@ export const forecastSlice = createSlice({
       state.isSaved = true;
     },
 
-    // Restores the local auto-save snapshot without discarding in-memory discussion drafts.
+    // Restores the local auto-save snapshot and discards drafts from the previous cycle.
     restoreForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
       state.forecastCycle = action.payload;
+      state.discussionDraftsByDay = {};
       clearHistory(state);
       state.isSaved = true;
       state.outlookVersionSnapshots = [];

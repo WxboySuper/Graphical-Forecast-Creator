@@ -6,6 +6,7 @@ import reducer, {
   applyAutoCategoricalSync,
   copyFeaturesFromPrevious,
   importForecastCycle,
+  restoreForecastCycle,
   redoLastEdit,
   replaceTstmFeatures,
   resetForecasts,
@@ -27,6 +28,7 @@ import reducer, {
   startFromPreviousCycle,
   saveCurrentCycle,
   updateDiscussion,
+  updateDiscussionDraft,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -418,6 +420,42 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, resetForecasts());
     expect(selectCanUndo({ forecast: state } as never)).toBe(false);
     expect(selectCanRedo({ forecast: state } as never)).toBe(false);
+  });
+
+  test('restoring a cycle clears drafts from the previous cycle', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Unsaved text',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
+    expect(state.discussionDraftsByDay[1]).toEqual(draft);
+
+    state = reducer(state, restoreForecastCycle(state.forecastCycle));
+
+    expect(state.discussionDraftsByDay).toEqual({});
+  });
+
+  test('saving a discussion draft does not publish it until updateDiscussion', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Unsaved text',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
+
+    expect(state.forecastCycle.days[1]?.discussion).toBeUndefined();
+    expect(state.discussionDraftsByDay[1]).toEqual(draft);
+
+    state = reducer(state, updateDiscussion({ day: 1, discussion: draft }));
+    expect(state.forecastCycle.days[1]?.discussion).toEqual(draft);
+    expect(state.discussionDraftsByDay[1]).toBeUndefined();
   });
 
   test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {

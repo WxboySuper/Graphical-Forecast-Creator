@@ -612,8 +612,8 @@ const useDiscussionEditorState = ({
   useEffect(() => {
     const previousScope = previousScopeRef.current;
     if (previousScope.discussionKey !== discussionKey && form.hasUnsavedChanges) {
-      // Persist the old scope before the form effect replaces its local fields for the new scope.
-      dispatch(updateDiscussion({ day: previousScope.currentDay, discussion: buildDiscussionData() }));
+      // Keep the old scope's unsaved text as a draft; changing scope must not publish it.
+      dispatch(updateDiscussionDraft({ day: previousScope.currentDay, draft: buildDiscussionData() }));
       form.setHasUnsavedChanges(false);
     }
     previousScopeRef.current = { discussionKey, currentDay };
