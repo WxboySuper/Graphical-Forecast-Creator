@@ -156,6 +156,7 @@ describe('HomePage', () => {
       forecastCycle: baseForecastCycle,
       workflowMetadata: undefined,
       hasActiveWorkflow: false,
+      workflowEnabled: true,
       isSaved: true,
       handleNavigateForecast: navigateForecast,
       handleNavigateDiscussion: jest.fn(),
@@ -186,7 +187,9 @@ describe('HomePage', () => {
     expect(screen.getByText(/Confirm start new cycle modal open/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /View full history/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Day 1/i }));
+    const dayOneButton = screen.getByRole('button', { name: /Day 1/i });
+    expect(dayOneButton).toBeEnabled();
+    fireEvent.click(dayOneButton);
     expect(startWorkflow).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: /2026-03-25/i }));

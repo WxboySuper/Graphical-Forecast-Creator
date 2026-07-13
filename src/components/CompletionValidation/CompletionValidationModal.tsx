@@ -1,7 +1,7 @@
 // skipcq: JS-W1028
 import React, { useCallback } from 'react';
 import type { CycleValidationResult } from '../../types/workflow';
-import type { DayType } from '../../types/outlooks';
+import type { DayType, OutlookType } from '../../types/outlooks';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,7 @@ interface CompletionValidationModalProps {
   onComplete: () => void;
   onCompleteWithOmissions: () => void;
   onOmitDay: (day: DayType, reason: string) => void;
-  onNavigateToIssue?: (day: DayType) => void;
+  onNavigateToIssue?: (day: DayType, outlookType: OutlookType) => void;
   onExport?: () => void;
 }
 
@@ -52,11 +52,11 @@ export const CompletionValidationModal: React.FC<CompletionValidationModalProps>
   onExport,
 }) => {
   const handleNavigate = useCallback(
-    (grouping: string) => {
+    (grouping: string, outlookType: string) => {
       if (!onNavigateToIssue) return;
       const day = getGroupingDay(grouping);
       if (day) {
-        onNavigateToIssue(day);
+        onNavigateToIssue(day, outlookType as OutlookType);
       }
     },
     [onNavigateToIssue],

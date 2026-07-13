@@ -6,7 +6,7 @@ Single adoption manifest for every unfinished v1.7 workstream registered in `src
 
 Every workstream must:
 
-1. Declare a registry key with an initial exposure matrix (all targets off until enablement criteria pass).
+1. Declare a registry key with an exposure matrix that reflects the current rollout stage (unreleased targets stay off until enablement criteria pass).
 2. Gate routes, navigation, boundaries, side-effect modules, and server capabilities **before** the first exposed slice merges.
 3. Ship disabled-side-effect tests or a documented acknowledgement (see [feature-exposure-testing.md](./feature-exposure-testing.md)).
 4. Record the tracker issue and the PR that may first flip `exposure.beta` (TBD until an implementation slice is ready).
@@ -16,13 +16,13 @@ Every workstream must:
 | Workstream | Registry key | Tracker | Surfaces today | Coverage |
 | --- | --- | --- | --- | --- |
 | Auto-TSTM | `autoTstm` | #427 | Side-effect module + server capability gate | Exemplar + server exposure tests |
-| Forecast workflow v2 | `forecastWorkflowV2` | #429 | Registry only (no product slice yet) | Acknowledgement + adoption test |
+| Forecast workflow v2 | `forecastWorkflowV2` | #429 | Home entry + forecast workspace workflow slice (local only) | Home interaction + adoption tests |
 | Verification relaunch | `verificationRelaunch` | #430 | Registry only; core `/verification` is separate | Acknowledgement + adoption test |
 | Custom products | `customProducts` | #431 | Registry only (no product slice yet) | Acknowledgement + adoption test |
 | Tropical workspace | `tropicalWorkspace` | #432 | Gated route `/tropical` + navbar | Exemplar + route/nav tests |
 | Collaboration room | `collaborationRoom` | #433 | Gated route `/collaborate` + navbar | Exemplar + route/nav tests |
 
-Initial exposure matrix for every row above: `local`, `beta`, `staging`, and `production` are all `false`.
+Initial exposure matrix for unreleased rows remains all `false`; forecast workflow v2 is enabled on `local` for development and remains off on `beta`, `staging`, and `production` until explicitly approved for beta rollout.
 
 ## Per-workstream detail
 
@@ -37,9 +37,9 @@ Initial exposure matrix for every row above: `local`, `beta`, `staging`, and `pr
 ### Forecast workflow v2 (`forecastWorkflowV2`, #429)
 
 - **Registry:** `temporary: true`, client-only
-- **Gates:** none yet — add route/boundary gates when WF-01+ implementation merges
-- **Tests:** acknowledgement in `featureExposure.acknowledgements.json`, `src/config/v17WorkstreamAdoption.exposure.test.ts`
-- **Beta enablement:** tracker #429; first enable PR: TBD
+- **Gates:** home workflow actions and forecast workspace workflow panel
+- **Tests:** signed-in home interaction coverage in `src/pages/home/HomePage.test.tsx`, adoption contract in `src/config/v17WorkstreamAdoption.exposure.test.ts`
+- **Beta enablement:** Not approved yet; keep beta, staging, and production disabled until the workflow is ready for beta rollout
 
 ### Verification relaunch (`verificationRelaunch`, #430)
 
