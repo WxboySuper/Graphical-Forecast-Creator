@@ -123,6 +123,21 @@ describe('cycleHistoryPersistence', () => {
     expect(loaded[0].stats).toEqual({});
   });
 
+  test('migrates legacy cycle history into a signed-in scope without overwriting account history', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'legacy' }]));
+
+    mod.migrateLegacyCycleHistory('user-1');
+
+    expect(localStorage.getItem('gfc-cycle-history')).toBeNull();
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'legacy' }]));
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'new-legacy' }]));
+    mod.migrateLegacyCycleHistory('user-1');
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'legacy' }]));
+  });
+
   test('loadCycleHistoryFromStorage returns empty on invalid stored data', async () => {
     localStorage.setItem('gfc-cycle-history', JSON.stringify({ not: 'an array' }));
     const mod = await import('./cycleHistoryPersistence');

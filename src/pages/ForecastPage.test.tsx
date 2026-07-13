@@ -60,6 +60,7 @@ jest.mock('../components/ForecastWorkspace/ForecastWorkspaceModals', () => () =>
 
 jest.mock('../hooks/useAutoSave', () => ({
   useAutoSave: jest.fn(),
+  migrateLegacyAutoSave: jest.fn(),
   getAutoSaveStorageKey: (userId?: string | null) => userId ? `forecastData:user-${userId}` : 'forecastData',
 }));
 

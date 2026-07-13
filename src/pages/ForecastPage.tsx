@@ -37,7 +37,7 @@ import {
   getFirstExposedOutlookType,
   shouldActivateEmergencyMode,
 } from '../config/productExposureSelectors';
-import { getAutoSaveStorageKey } from '../hooks/useAutoSave';
+import { getAutoSaveStorageKey, migrateLegacyAutoSave } from '../hooks/useAutoSave';
 import { getStorageScope, getScopedStorageKey } from '../utils/storageScope';
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import { useAutoTstm } from '../hooks/useAutoTstm';
@@ -821,7 +821,6 @@ const useSessionRestore = (
   userId?: string | null
 ) => {
   const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
-  const initialCycleRef = useRef(currentSession.forecastCycle);
   const [restoreComplete, setRestoreComplete] = useState(false);
   const [restoredSession, setRestoredSession] = useState(false);
   const [restoreAttempted, setRestoreAttempted] = useState(false);
@@ -832,8 +831,9 @@ const useSessionRestore = (
 
   useEffect(() => {
     try {
+      migrateLegacyAutoSave(userId);
       setRestoredSession(restoreAvailableSession(dispatch, addToast, {
-        forecastCycle: initialCycleRef.current,
+        forecastCycle: currentSession.forecastCycle,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
       }, userId));
     } catch {

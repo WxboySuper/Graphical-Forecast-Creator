@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView, setCycleDate } from '../store/forecastSlice';
-import { useAutoSave } from './useAutoSave';
+import { migrateLegacyAutoSave, useAutoSave } from './useAutoSave';
 import { serializeForecast } from '../utils/fileUtils';
 
 jest.mock('../utils/fileUtils', () => ({
@@ -31,6 +31,25 @@ describe('useAutoSave', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  test('migrates the legacy anonymous autosave into a signed-in scope', () => {
+    localStorage.setItem('forecastData', JSON.stringify({ legacy: true }));
+
+    migrateLegacyAutoSave('user/1');
+
+    expect(localStorage.getItem('forecastData')).toBeNull();
+    expect(localStorage.getItem('forecastData:user-user%2F1')).toBe(JSON.stringify({ legacy: true }));
+  });
+
+  test('does not overwrite an existing signed-in autosave during migration', () => {
+    localStorage.setItem('forecastData', JSON.stringify({ legacy: true }));
+    localStorage.setItem('forecastData:user-user-1', JSON.stringify({ account: true }));
+
+    migrateLegacyAutoSave('user-1');
+
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ legacy: true }));
+    expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ account: true }));
   });
 
   test('skips initial render, then debounces forecast saves to localStorage', async () => {

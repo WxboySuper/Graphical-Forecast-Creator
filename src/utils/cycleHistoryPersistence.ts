@@ -78,6 +78,24 @@ const fromLegacySavedCycle = (cycle: {
 export const getCycleHistoryStorageKey = (userId?: string | null): string =>
   userId ? getScopedStorageKey(CYCLE_HISTORY_KEY, getStorageScope(userId)) : CYCLE_HISTORY_KEY;
 
+/** Moves anonymous cycle history into the signed-in account scope once, without overwriting account data. */
+export const migrateLegacyCycleHistory = (userId?: string | null): void => {
+  if (!userId) return;
+
+  try {
+    const scopedKey = getCycleHistoryStorageKey(userId);
+    if (localStorage.getItem(scopedKey) === null) {
+      const legacyValue = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
+      if (legacyValue !== null) {
+        localStorage.setItem(scopedKey, legacyValue);
+        localStorage.removeItem(LEGACY_CYCLE_HISTORY_KEY);
+      }
+    }
+  } catch {
+    // Ignore storage failures so sign-in never disrupts editing.
+  }
+};
+
 export const saveCycleHistoryToStorage = (cycles: SavedCycle[], userId?: string | null): void => {
   try {
     const serialized = JSON.stringify(cycles.map(toPersistedSavedCycle));
@@ -144,6 +162,7 @@ export const useCycleHistoryPersistence = (userId?: string | null): void => {
   useEffect(() => {
     // Clear the previous account's history before hydrating the new scope.
     dispatch(loadCycleHistory([]));
+    migrateLegacyCycleHistory(userId);
     const savedCycles = loadCycleHistoryFromStorage(userId);
     if (savedCycles.length > 0) {
       dispatch(loadCycleHistory(savedCycles));

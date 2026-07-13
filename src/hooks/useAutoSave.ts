@@ -11,6 +11,24 @@ const LOCAL_STORAGE_KEY = 'forecastData';
 export const getAutoSaveStorageKey = (userId?: string | null): string =>
   userId ? getScopedStorageKey(LOCAL_STORAGE_KEY, getStorageScope(userId)) : LOCAL_STORAGE_KEY;
 
+/** Moves an anonymous autosave into the signed-in account scope once, without overwriting account data. */
+export const migrateLegacyAutoSave = (userId?: string | null): void => {
+  if (!userId) return;
+
+  try {
+    const scopedKey = getAutoSaveStorageKey(userId);
+    if (localStorage.getItem(scopedKey) === null) {
+      const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (legacyValue !== null) {
+        localStorage.setItem(scopedKey, legacyValue);
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+      }
+    }
+  } catch {
+    // Ignore storage failures so sign-in never disrupts editing.
+  }
+};
+
 export const useAutoSave = (userId?: string | null) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
