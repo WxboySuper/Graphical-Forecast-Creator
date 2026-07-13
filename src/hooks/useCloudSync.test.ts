@@ -88,6 +88,36 @@ describe('useCloudSync', () => {
     expect(updateSyncState).toHaveBeenCalledWith('saved');
   });
 
+  it('syncs metadata-only changes after the initial state is synced', async () => {
+    let currentWorkflowMetadata = workflowMetadata;
+    mockSerializeForecast.mockImplementation((_forecastCycle, _mapView, metadata) => ({
+      ...payload,
+      cycleMetadata: metadata,
+    } as never));
+    mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => selector({
+      forecast: {
+        forecastCycle,
+        currentMapView: mapView,
+        workflowMetadata: currentWorkflowMetadata,
+      },
+    } as RootState));
+
+    const { result, rerender } = renderHook(() => useCloudSync(cloud()));
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(saveCycle).toHaveBeenCalledTimes(1);
+
+    currentWorkflowMetadata = { ...workflowMetadata, status: 'completed' };
+    rerender();
+    await act(async () => {
+      await result.current.syncNow();
+    });
+
+    expect(saveCycle).toHaveBeenCalledTimes(2);
+    expect(saveCycle.mock.calls[1][4]).toEqual(currentWorkflowMetadata);
+  });
+
   it('syncs immediately, exposes synced state, and skips repeated identical state', async () => {
     const { result, rerender } = renderHook(() => useCloudSync(cloud()));
 

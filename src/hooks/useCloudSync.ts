@@ -18,11 +18,12 @@ const clearSyncTimeout = (syncTimeoutRef: MutableRefObject<ReturnType<typeof set
   syncTimeoutRef.current = null;
 };
 
-/** Builds the current sync hash from the serialized forecast payload without volatile timestamp fields. */
+/** Builds the current sync hash from all persisted forecast state, excluding volatile timestamp fields. */
 const buildCloudSyncHash = (serializedPayload: ReturnType<typeof serializeForecast>) =>
   JSON.stringify({
     forecastCycle: serializedPayload.forecastCycle,
     mapView: serializedPayload.mapView,
+    cycleMetadata: serializedPayload.cycleMetadata,
   });
 
 /** Runs one hosted cloud save for the active cloud cycle and updates sync state around the request. */

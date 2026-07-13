@@ -461,10 +461,9 @@ export const saveCloudCycle = async (
       payloadHash: computePayloadHash(payload),
     };
     const payloadStats = createPayloadStorageStats(payload);
-    const workflowMetadata = requestedWorkflowMetadata ?? existingCycle?.workflowMetadata;
-    const validWorkflowMetadata = isValidWorkflowMetadata(workflowMetadata) &&
-      workflowMetadata.cycleDate === cycleDate
-      ? workflowMetadata
+    const validWorkflowMetadata = isValidWorkflowMetadata(requestedWorkflowMetadata) &&
+      requestedWorkflowMetadata.cycleDate === cycleDate
+      ? requestedWorkflowMetadata
       : undefined;
 
     await setDoc(getCloudCycleDocRef(cycleId), {
