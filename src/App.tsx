@@ -15,8 +15,8 @@ import {
 
 import { useAutoSave } from './hooks/useAutoSave';
 import { useFirestoreSleepRecovery } from './hooks/useFirestoreSleepRecovery';
-import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
-import { AuthProvider } from './auth/AuthProvider';
+import { setupCycleHistoryListener, useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
@@ -67,18 +67,21 @@ function useLaunchGate(): boolean {
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
   const dispatch = useDispatch();
+  const { user } = useAuth();
+  const userId = user?.uid;
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
-  
-  // Enable Auto-Save
-  useAutoSave();
+
+  // Enable account-scoped Auto-Save
+  useAutoSave(userId);
 
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
 
-  // Load cycle history from localStorage
-  useCycleHistoryPersistence();
+  // Load and persist Cycle History for the active account only
+  useCycleHistoryPersistence(userId);
+  useEffect(() => setupCycleHistoryListener(store, userId), [userId]);
 
   // Derive emergency mode and the first exposed outlook from build-target exposure.
   useEffect(() => {

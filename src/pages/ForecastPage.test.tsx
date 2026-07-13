@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
@@ -10,6 +10,7 @@ import ForecastPage, {
   cycleHasDiscussionContent,
   dayHasAnyFeatures,
   formatRolloverDayLabel,
+  getDayRolloverPromptState,
   getProbabilityList,
   getUndoRedoAction,
   hasAnyModifierKey,
@@ -22,6 +23,8 @@ import ForecastPage, {
   parseStoredCloudMeta,
   parseStoredForecastPayload,
   processShortcutKeyDown,
+  runDayRolloverCloudSaveAction,
+  runDayRolloverDownloadAction,
   readStoredDayValue,
   writeStoredDayValue,
 } from './ForecastPage';
@@ -33,7 +36,9 @@ import appModeReducer from '../store/appModeSlice';
 import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
+import * as fileUtils from '../utils/fileUtils';
 import { serializeForecast } from '../utils/fileUtils';
+import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 
 const mockAddToast = jest.fn();
@@ -55,6 +60,7 @@ jest.mock('../components/ForecastWorkspace/ForecastWorkspaceModals', () => () =>
 
 jest.mock('../hooks/useAutoSave', () => ({
   useAutoSave: jest.fn(),
+  getAutoSaveStorageKey: (userId?: string | null) => userId ? `forecastData:user-${userId}` : 'forecastData',
 }));
 
 jest.mock('../hooks/useAutoCategorical', () => jest.fn());
@@ -72,6 +78,7 @@ jest.mock('../hooks/useCloudCycles', () => ({
     currentCloud: null,
     saveCycle: jest.fn(),
     markAsCurrent: jest.fn(),
+    clearCurrent: jest.fn(),
   }),
 }));
 jest.mock('../hooks/useCloudSync', () => ({
@@ -207,6 +214,31 @@ describe('ForecastPage layout selection', () => {
 
     expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('autosave-outlook');
   });
+
+  test('waits for restored session state before committing the local-day baseline', async () => {
+    const sourceStore = createStore();
+    sourceStore.dispatch(addFeature({
+      feature: {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: {},
+      },
+    }));
+    localStorage.setItem('forecastData', JSON.stringify(serializeForecast(
+      sourceStore.getState().forecast.forecastCycle,
+      sourceStore.getState().forecast.currentMapView,
+    )));
+    const today = getLocalCalendarDate();
+    const previousDay = getLocalCalendarDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    localStorage.setItem('gfc-last-active-local-day', previousDay);
+
+    renderForecastPage(createStore());
+
+    await waitFor(() => expect(screen.getByText('New day detected')).toBeInTheDocument());
+    expect(localStorage.getItem('gfc-last-active-local-day:anonymous')).toBe(today);
+    expect(screen.getByRole('button', { name: 'Download a copy & start new day' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace without saving' })).toBeInTheDocument();
+  });
 });
 
 describe('ForecastPage helpers', () => {
@@ -247,6 +279,51 @@ describe('ForecastPage helpers', () => {
     clearStoredCloudSession();
     expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
     expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
+  });
+
+  test('recovers a pending rollover prompt after session restore marks the cycle saved', () => {
+    const emptyCycle = createStore().getState().forecast.forecastCycle;
+    const pending = { previousDay: '2026-04-23', currentDay: '2026-04-24' };
+    expect(getDayRolloverPromptState({
+      restoreComplete: true,
+      lastActiveDay: '2026-04-24',
+      today: '2026-04-24',
+      alreadyPromptedToday: true,
+      pendingPrompt: pending,
+      promptOpen: false,
+      forecastCycle: emptyCycle,
+      isSaved: true,
+    })).toEqual(pending);
+  });
+
+  test('covers rollover download and cloud-save success and failure paths', async () => {
+    const forecastCycle = createStore().getState().forecast.forecastCycle;
+    const mapView = { center: [0, 0] as [number, number], zoom: 4 };
+    const dispatch = jest.fn();
+    const clearCurrent = jest.fn();
+    const exportSpy = jest.spyOn(fileUtils, 'exportForecastToJson').mockImplementation(() => undefined);
+
+    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(true);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    exportSpy.mockImplementationOnce(() => { throw new Error('download failed'); });
+    dispatch.mockClear();
+    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(false);
+    expect(dispatch).not.toHaveBeenCalled();
+
+    const saveCycle = jest.fn().mockResolvedValue(true);
+    dispatch.mockClear();
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(true);
+    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), { saveAsNew: true });
+    expect(clearCurrent).toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+
+    saveCycle.mockResolvedValueOnce(false);
+    clearCurrent.mockClear();
+    dispatch.mockClear();
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(false);
+    expect(clearCurrent).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+    exportSpy.mockRestore();
   });
 
   test('detects rollover candidates, map view fallbacks, keyboard targets, and undo/redo keys', () => {

@@ -37,8 +37,8 @@ import {
   getFirstExposedOutlookType,
   shouldActivateEmergencyMode,
 } from '../config/productExposureSelectors';
-import { useAutoSave } from '../hooks/useAutoSave';
-import { useCycleHistoryPersistence } from '../utils/cycleHistoryPersistence';
+import { getAutoSaveStorageKey } from '../hooks/useAutoSave';
+import { getStorageScope, getScopedStorageKey } from '../utils/storageScope';
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import { useAutoTstm } from '../hooks/useAutoTstm';
 import AutoTstmWorkspaceTools from '../components/AutoTstm/AutoTstmWorkspaceTools';
@@ -131,7 +131,39 @@ interface DayRolloverPromptState {
 
 const DAY_ROLLOVER_LAST_ACTIVE_KEY = 'gfc-last-active-local-day';
 const DAY_ROLLOVER_PROMPTED_KEY = 'gfc-day-rollover-prompt-day';
+const DAY_ROLLOVER_PENDING_KEY = 'gfc-day-rollover-pending';
 const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
+
+interface StoredRolloverPrompt extends DayRolloverPromptState {}
+
+const getRolloverStorageKey = (key: string, userId?: string | null): string =>
+  getScopedStorageKey(key, getStorageScope(userId));
+
+const readStoredRolloverPrompt = (userId?: string | null): StoredRolloverPrompt | null => {
+  const stored = readStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId));
+  if (!stored) return null;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<StoredRolloverPrompt>;
+    return typeof parsed.previousDay === 'string' && typeof parsed.currentDay === 'string'
+      ? { previousDay: parsed.previousDay, currentDay: parsed.currentDay }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredRolloverPrompt = (prompt: StoredRolloverPrompt, userId?: string | null): void => {
+  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId), JSON.stringify(prompt));
+};
+
+const clearStoredRolloverPrompt = (userId?: string | null): void => {
+  try {
+    localStorage.removeItem(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId));
+  } catch {
+    // Ignore storage failures.
+  }
+};
 
 /** Reads one stored day string from localStorage, returning null when storage is unavailable. */
 export const readStoredDayValue = (key: string): string | null => {
@@ -195,14 +227,24 @@ export const formatRolloverDayLabel = (value: string): string => {
 /** Modal prompt shown when the editor detects the local day rolled over while an older session still has work. */
 const DayRolloverDialog: React.FC<{
   promptState: DayRolloverPromptState | null;
+  canSaveToCloud: boolean;
+  isBusy: boolean;
+  error: string | null;
   onKeepCurrentSession: () => void;
-  onSaveAndStartNewDay: () => void;
+  onDownloadAndStartNewDay: () => void;
+  onSaveToCloudAndStartNewDay: () => void;
+  onReplaceWithoutSaving: () => void;
 }> = ({
   promptState,
+  canSaveToCloud,
+  isBusy,
+  error,
   onKeepCurrentSession,
-  onSaveAndStartNewDay,
+  onDownloadAndStartNewDay,
+  onSaveToCloudAndStartNewDay,
+  onReplaceWithoutSaving,
 }) => (
-  <Dialog open={Boolean(promptState)} onOpenChange={(isOpen) => { if (!isOpen) onKeepCurrentSession(); }}>
+  <Dialog open={Boolean(promptState)} onOpenChange={(isOpen) => { if (!isOpen && !isBusy) onKeepCurrentSession(); }}>
     <DialogContent>
       <DialogHeader>
         <DialogTitle>New day detected</DialogTitle>
@@ -210,21 +252,28 @@ const DayRolloverDialog: React.FC<{
           {promptState ? (
             <>
               It looks like your current Forecast session is from {formatRolloverDayLabel(promptState.previousDay)} and today is{' '}
-              {formatRolloverDayLabel(promptState.currentDay)}. Do you want to save that session to Cycle History and start a
-              fresh forecast for today?
+              {formatRolloverDayLabel(promptState.currentDay)}. Choose how to handle this session before starting today&apos;s forecast.
             </>
           ) : null}
         </DialogDescription>
       </DialogHeader>
 
-      <DialogFooter>
-        <Button variant="outline" onClick={onKeepCurrentSession}>
-          Keep Current Session
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+
+      <div className="grid gap-2">
+        <Button variant="outline" onClick={onDownloadAndStartNewDay} disabled={isBusy}>
+          Download a copy &amp; start new day
         </Button>
-        <Button onClick={onSaveAndStartNewDay}>
-          Save Session &amp; Start New Day
+        <Button onClick={onSaveToCloudAndStartNewDay} disabled={isBusy || !canSaveToCloud}>
+          {canSaveToCloud ? 'Save to premium cloud & start new day' : 'Premium cloud save unavailable'}
         </Button>
-      </DialogFooter>
+        <Button variant="secondary" onClick={onKeepCurrentSession} disabled={isBusy}>
+          Keep for now
+        </Button>
+        <Button variant="ghost" onClick={onReplaceWithoutSaving} disabled={isBusy}>
+          Replace without saving
+        </Button>
+      </div>
     </DialogContent>
   </Dialog>
 );
@@ -664,9 +713,13 @@ export const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMet
 };
 
 /** Clears the temporary session-storage keys used for handing a cloud cycle into the editor. */
-export const clearStoredCloudSession = () => {
-  sessionStorage.removeItem(CLOUD_CYCLE_PAYLOAD_KEY);
-  sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
+export const clearStoredCloudSession = (userId?: string | null) => {
+  sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId)));
+  sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId)));
+  if (!userId) {
+    sessionStorage.removeItem(CLOUD_CYCLE_PAYLOAD_KEY);
+    sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
+  }
 };
 
 /** Returns true when stored cloud metadata includes the id and label needed to restore selection context. */
@@ -690,19 +743,24 @@ const restoreCloudSelectionContext = (
 const restoreCloudSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void,
+  userId?: string | null
 ): boolean => {
-  const cloudPayloadStr = sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY);
+  const scopedPayloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId));
+  const cloudPayloadStr = sessionStorage.getItem(scopedPayloadKey)
+    ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null);
   const data = parseStoredForecastPayload(cloudPayloadStr);
   if (!data) {
     return false;
   }
 
-  const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(CLOUD_CYCLE_META_KEY));
+  const scopedMetaKey = getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId));
+  const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(scopedMetaKey)
+    ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_META_KEY) : null));
 
   restoreStoredForecastPayload(data, dispatch);
   restoreCloudSelectionContext(cloudMeta, onCloudCycleLoaded);
-  clearStoredCloudSession();
+  clearStoredCloudSession(userId);
   addToast('Cloud forecast loaded successfully.', 'success');
   return true;
 };
@@ -717,19 +775,21 @@ const shouldSkipLocalRestore = (
 const restoreLocalSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle> }
-): void => {
+  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle> },
+  userId?: string | null
+): boolean => {
   if (shouldSkipLocalRestore(currentSession.forecastCycle)) {
-    return;
+    return false;
   }
 
-  const data = parseStoredForecastPayload(localStorage.getItem('forecastData'));
+  const data = parseStoredForecastPayload(localStorage.getItem(getAutoSaveStorageKey(userId)));
   if (!data) {
-    return;
+    return false;
   }
 
   restoreStoredForecastPayload(data, dispatch);
   addToast('Session restored from auto-save.', 'success');
+  return true;
 };
 
 /** Restores a pending cloud session first, then falls back to the local auto-save snapshot. */
@@ -739,14 +799,15 @@ const restoreAvailableSession = (
   currentSession: {
     forecastCycle: ReturnType<typeof selectForecastCycle>;
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
-  }
-) => {
-  const restoredCloudSession = restoreCloudSession(dispatch, addToast, currentSession.onCloudCycleLoaded);
+  },
+  userId?: string | null
+): boolean => {
+  const restoredCloudSession = restoreCloudSession(dispatch, addToast, currentSession.onCloudCycleLoaded, userId);
   if (restoredCloudSession) {
-    return;
+    return true;
   }
 
-  restoreLocalSession(dispatch, addToast, currentSession);
+  return restoreLocalSession(dispatch, addToast, currentSession, userId);
 };
 
 /** Attempts to restore the last auto-saved forecast session from localStorage on mount. */
@@ -756,11 +817,14 @@ const useSessionRestore = (
   currentSession: {
     forecastCycle: ReturnType<typeof selectForecastCycle>;
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
-  }
+  },
+  userId?: string | null
 ) => {
   const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
   const initialCycleRef = useRef(currentSession.forecastCycle);
   const [restoreComplete, setRestoreComplete] = useState(false);
+  const [restoredSession, setRestoredSession] = useState(false);
+  const [restoreAttempted, setRestoreAttempted] = useState(false);
 
   useEffect(() => {
     onCloudCycleLoadedRef.current = currentSession.onCloudCycleLoaded;
@@ -768,18 +832,22 @@ const useSessionRestore = (
 
   useEffect(() => {
     try {
-      restoreAvailableSession(dispatch, addToast, {
+      setRestoredSession(restoreAvailableSession(dispatch, addToast, {
         forecastCycle: initialCycleRef.current,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
-      });
+      }, userId));
     } catch {
-      // Silently skip auto-load errors to avoid disrupting initial render
+      setRestoredSession(false);
     } finally {
-      setRestoreComplete(true);
+      setRestoreAttempted(true);
     }
-  }, [dispatch, addToast]);
+  }, [dispatch, addToast, userId]);
 
-  return restoreComplete;
+  useEffect(() => {
+    if (restoreAttempted) setRestoreComplete(true);
+  }, [restoreAttempted]);
+
+  return { restoreComplete, restoredSession };
 };
 
 /** Registers a beforeunload listener to warn the user when the forecast has unsaved changes. */
@@ -800,19 +868,30 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
   }, [isSaved]);
 };
 
-/** Returns the stored/derived day-rollover snapshot needed to decide whether a prompt should be shown. */
-const getDayRolloverSnapshot = () => {
+/** Reads the stored day-rollover snapshot without mutating the baseline used by the decision. */
+const getDayRolloverSnapshot = (userId?: string | null) => {
   const today = getLocalCalendarDate();
-  const lastActiveDay = readStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY);
-  const alreadyPromptedToday = readStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY) === today;
+  const scopedLastActiveKey = getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId);
+  const scopedPromptedKey = getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId);
+  const legacyLastActiveDay = !userId ? readStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY) : null;
+  const legacyPromptedDay = !userId ? readStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY) : null;
+  const scopedLastActiveDay = readStoredDayValue(scopedLastActiveKey);
+  const lastActiveDay = scopedLastActiveDay ?? legacyLastActiveDay;
+  const alreadyPromptedToday = (readStoredDayValue(scopedPromptedKey) ?? legacyPromptedDay) === today;
+  const existingPendingPrompt = readStoredRolloverPrompt(userId);
+  const pendingPrompt = existingPendingPrompt
+    ?? (legacyPromptedDay === today && legacyLastActiveDay && legacyLastActiveDay !== today
+      ? { previousDay: legacyLastActiveDay, currentDay: today }
+      : null);
 
-  writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, today);
+  if (!userId && legacyLastActiveDay && !scopedLastActiveDay) {
+    writeStoredDayValue(scopedLastActiveKey, legacyLastActiveDay);
+  }
+  if (pendingPrompt && !existingPendingPrompt) {
+    writeStoredRolloverPrompt(pendingPrompt, userId);
+  }
 
-  return {
-    today,
-    lastActiveDay,
-    alreadyPromptedToday,
-  };
+  return { today, lastActiveDay, alreadyPromptedToday, pendingPrompt };
 };
 
 /** Returns true when the day-rollover modal should not be shown for the current snapshot. */
@@ -855,6 +934,7 @@ export const getDayRolloverPromptState = ({
   promptOpen,
   forecastCycle,
   isSaved,
+  pendingPrompt,
 }: {
   restoreComplete: boolean;
   lastActiveDay: string | null;
@@ -863,8 +943,13 @@ export const getDayRolloverPromptState = ({
   promptOpen: boolean;
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   isSaved: boolean;
+  pendingPrompt?: DayRolloverPromptState | null;
 }): DayRolloverPromptState | null => {
   const hasUnsavedWork = hasUnsavedRolloverCandidateSession(forecastCycle, isSaved);
+
+  if (restoreComplete && pendingPrompt?.currentDay === today && !promptOpen) {
+    return pendingPrompt;
+  }
 
   if (shouldSkipDayRolloverPrompt({
     restoreComplete,
@@ -903,109 +988,113 @@ export const runDayRolloverSaveAction = ({
   return didSaveSession;
 };
 
+/** Downloads the rollover session and only resets the editor after the browser download succeeds. */
+export const runDayRolloverDownloadAction = ({ forecastCycle, mapView, dispatch, clearCurrent }: {
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  mapView: RootState['forecast']['currentMapView'];
+  dispatch: ShortcutDispatch;
+  clearCurrent?: UseCloudCyclesResult['clearCurrent'];
+}): boolean => {
+  try {
+    exportForecastToJson(forecastCycle, mapView);
+    clearCurrent?.();
+    dispatch(resetForecasts());
+    return true;
+  } catch { return false; }
+};
+
+/** Saves the rollover session as a new cloud cycle and resets only after a confirmed success. */
+export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch }: {
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  currentMapView: RootState['forecast']['currentMapView'];
+  saveCycle: UseCloudCyclesResult['saveCycle'];
+  clearCurrent: UseCloudCyclesResult['clearCurrent'];
+  dispatch: ShortcutDispatch;
+}): Promise<boolean> => {
+  try {
+    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), { saveAsNew: true });
+    if (!success) return false;
+    clearCurrent();
+    dispatch(resetForecasts());
+    return true;
+  } catch { return false; }
+};
+
 /** Watches for a local calendar-day rollover and offers to save the previous session before starting a new one. */
-const useDayRolloverPrompt = ({
-  restoreComplete,
-  dispatch,
-  addToast,
-  forecastCycle,
-  isSaved,
-}: {
+const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addToast, forecastCycle, currentMapView, isSaved, userId, canSaveToCloud, saveCycle, clearCurrent }: {
   restoreComplete: boolean;
+  restoredSession: boolean;
   dispatch: ShortcutDispatch;
   addToast: AddToastFn;
   forecastCycle: ReturnType<typeof selectForecastCycle>;
+  currentMapView: RootState['forecast']['currentMapView'];
   isSaved: boolean;
+  userId?: string;
+  canSaveToCloud: boolean;
+  saveCycle: UseCloudCyclesResult['saveCycle'];
+  clearCurrent: UseCloudCyclesResult['clearCurrent'];
 }) => {
   const [promptState, setPromptState] = useState<DayRolloverPromptState | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
   const forecastCycleRef = useRef(forecastCycle);
   const isSavedRef = useRef(isSaved);
+  const restoredSessionRef = useRef(restoredSession);
   const promptStateRef = useRef(promptState);
-
-  useEffect(() => {
-    forecastCycleRef.current = forecastCycle;
-  }, [forecastCycle]);
-
-  useEffect(() => {
-    isSavedRef.current = isSaved;
-  }, [isSaved]);
-
-  useEffect(() => {
-    promptStateRef.current = promptState;
-  }, [promptState]);
+  const previousUserIdRef = useRef(userId);
+  useEffect(() => { if (previousUserIdRef.current !== userId) { previousUserIdRef.current = userId; setPromptState(null); setActionError(null); } }, [userId]);
+  useEffect(() => { forecastCycleRef.current = forecastCycle; }, [forecastCycle]);
+  useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
+  useEffect(() => { restoredSessionRef.current = restoredSession; }, [restoredSession]);
+  useEffect(() => { promptStateRef.current = promptState; }, [promptState]);
 
   const detectDayRollover = useCallback(() => {
-    const { today, lastActiveDay, alreadyPromptedToday } = getDayRolloverSnapshot();
-    const nextPromptState = getDayRolloverPromptState({
-      restoreComplete,
-      lastActiveDay,
-      today,
-      alreadyPromptedToday,
-      promptOpen: Boolean(promptStateRef.current),
-      forecastCycle: forecastCycleRef.current,
-      isSaved: isSavedRef.current,
-    });
-
+    const { today, lastActiveDay, alreadyPromptedToday, pendingPrompt } = getDayRolloverSnapshot(userId);
+    const nextPromptState = getDayRolloverPromptState({ restoreComplete, lastActiveDay, today, alreadyPromptedToday, pendingPrompt, promptOpen: Boolean(promptStateRef.current), forecastCycle: forecastCycleRef.current, isSaved: isSavedRef.current && !restoredSessionRef.current });
     if (!nextPromptState) {
+      if (restoreComplete) writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
       return;
     }
-
-    writeStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY, today);
+    writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId), today);
+    writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
+    writeStoredRolloverPrompt(nextPromptState, userId);
+    setActionError(null);
     setPromptState(nextPromptState);
-  }, [restoreComplete]);
+  }, [restoreComplete, restoredSession, userId]);
 
   useEffect(() => {
     detectDayRollover();
-
-    /** Re-checks the local day when the tab regains focus so midnight rollovers are caught quickly. */
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        detectDayRollover();
-      }
-    };
-
+    const handleVisibilityChange = () => { if (!document.hidden) detectDayRollover(); };
     const intervalId = window.setInterval(detectDayRollover, DAY_ROLLOVER_CHECK_INTERVAL_MS);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    return () => { window.clearInterval(intervalId); document.removeEventListener('visibilitychange', handleVisibilityChange); };
   }, [detectDayRollover]);
 
-  useEffect(() => {
-    if (!restoreComplete) {
-      return;
-    }
-
-    writeStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, getLocalCalendarDate());
-  }, [restoreComplete]);
-
-  const handleKeepCurrentSession = useCallback(() => {
-    setPromptState(null);
-  }, []);
-
+  const completeRollover = useCallback(() => { clearStoredRolloverPrompt(userId); setPromptState(null); setActionError(null); }, [userId]);
+  const handleKeepCurrentSession = useCallback(() => completeRollover(), [completeRollover]);
   const handleSaveAndStartNewDay = useCallback(() => {
-    const didSaveSession = runDayRolloverSaveAction({
-      forecastCycle,
-      isSaved,
-      dispatch,
-    });
+    clearCurrent();
+    const didSaveSession = runDayRolloverSaveAction({ forecastCycle, isSaved: isSaved && !restoredSession, dispatch });
+    addToast(didSaveSession ? 'Saved the previous session to Cycle History and started a new forecast for today.' : 'Started a new forecast for today.', 'success');
+    completeRollover();
+  }, [addToast, clearCurrent, completeRollover, dispatch, forecastCycle, isSaved, restoredSession]);
+  const handleDownloadAndStartNewDay = useCallback(() => {
+    if (!runDayRolloverDownloadAction({ forecastCycle, mapView: currentMapView, dispatch, clearCurrent })) { setActionError('Unable to download this session. Your current forecast is still open.'); return; }
+    addToast('Forecast downloaded and a new day started.', 'success');
+    completeRollover();
+  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle]);
+  const handleSaveToCloudAndStartNewDay = useCallback(async () => {
+    setIsBusy(true); setActionError(null);
+    try {
+      const success = await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch });
+      if (!success) { setActionError('Unable to save this session to the cloud. Your current forecast is still open.'); return; }
+      addToast('Session saved to the cloud and a new day started.', 'success');
+      completeRollover();
+    } finally { setIsBusy(false); }
+  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle]);
+  const handleReplaceWithoutSaving = useCallback(() => { clearCurrent(); dispatch(resetForecasts()); addToast('Previous session replaced and a new forecast started.', 'success'); completeRollover(); }, [addToast, clearCurrent, completeRollover, dispatch]);
 
-    addToast(
-      didSaveSession
-        ? 'Saved the previous session to Cycle History and started a new forecast for today.'
-        : 'Started a new forecast for today.',
-      'success'
-    );
-    setPromptState(null);
-  }, [addToast, dispatch, forecastCycle, isSaved]);
-
-  return {
-    promptState,
-    handleKeepCurrentSession,
-    handleSaveAndStartNewDay,
-  };
+  return { promptState, canSaveToCloud, isBusy, error: actionError, handleKeepCurrentSession, handleDownloadAndStartNewDay, handleSaveToCloudAndStartNewDay, handleReplaceWithoutSaving };
 };
 
 /** Composes save, load, and file-input-change callbacks into a single hook return. */
@@ -1181,15 +1270,13 @@ const useForecastPageWorkspace = ({
   const { user } = useAuth();
   const { premiumActive, effectiveSource } = useEntitlement();
   const cloudCycles = useCloudCycles();
-  const { currentCloud, saveCycle, markAsCurrent } = cloudCycles;
+  const { currentCloud, saveCycle, markAsCurrent, clearCurrent } = cloudCycles;
   const cloudSync = useCloudSync(cloudCycles);
   const { markCurrentStateSynced } = cloudSync;
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
 
   useAutoCategorical();
   const autoTstm = useAutoTstm();
-  useAutoSave();
-  useCycleHistoryPersistence();
   useOutlookExposureSync(dispatch);
 
   const { handleCloudCycleLoaded, handleSaveToCloud } = useCloudForecastActions({
@@ -1203,10 +1290,10 @@ const useForecastPageWorkspace = ({
     workflowMetadata,
   });
 
-  const restoreComplete = useSessionRestore(dispatch, addToast, {
+  const { restoreComplete, restoredSession } = useSessionRestore(dispatch, addToast, {
     forecastCycle,
     onCloudCycleLoaded: handleCloudCycleLoaded,
-  });
+  }, user?.uid);
   useUnsavedChangesWarning(isSaved);
 
   const { handleSave, handleLoad } = useForecastFileActions(
@@ -1233,10 +1320,16 @@ const useForecastPageWorkspace = ({
 
   const dayRolloverPrompt = useDayRolloverPrompt({
     restoreComplete,
+    restoredSession,
     dispatch,
     addToast,
     forecastCycle,
+    currentMapView,
     isSaved,
+    userId: user?.uid,
+    canSaveToCloud: premiumActive,
+    saveCycle,
+    clearCurrent,
   });
 
   const workspaceController = useForecastWorkspaceController({
@@ -1308,8 +1401,13 @@ export const ForecastPage: React.FC = () => {
       <ForecastWorkspaceModals controller={workspaceController} />
       <DayRolloverDialog
         promptState={dayRolloverPrompt.promptState}
+        canSaveToCloud={dayRolloverPrompt.canSaveToCloud}
+        isBusy={dayRolloverPrompt.isBusy}
+        error={dayRolloverPrompt.error}
         onKeepCurrentSession={dayRolloverPrompt.handleKeepCurrentSession}
-        onSaveAndStartNewDay={dayRolloverPrompt.handleSaveAndStartNewDay}
+        onDownloadAndStartNewDay={dayRolloverPrompt.handleDownloadAndStartNewDay}
+        onSaveToCloudAndStartNewDay={dayRolloverPrompt.handleSaveToCloudAndStartNewDay}
+        onReplaceWithoutSaving={dayRolloverPrompt.handleReplaceWithoutSaving}
       />
     </div>
   );

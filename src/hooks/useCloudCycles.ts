@@ -19,7 +19,13 @@ export interface UseCloudCyclesResult {
   currentCloud: CloudCycleContext | null;
   loading: boolean;
   error: string | null;
-  saveCycle: (label: string, cycleDate: string, stats: SavedCycleStats, payload: GFCForecastSaveData) => Promise<boolean>;
+  saveCycle: (
+    label: string,
+    cycleDate: string,
+    stats: SavedCycleStats,
+    payload: GFCForecastSaveData,
+    options?: { saveAsNew?: boolean }
+  ) => Promise<boolean>;
   loadCycle: (cycleId: string) => Promise<GFCForecastSaveData | null>;
   deleteCycle: (cycleId: string) => Promise<boolean>;
   renameCycle: (cycleId: string, newLabel: string) => Promise<boolean>;
@@ -270,7 +276,8 @@ function useCloudSaveCycle({
       label: string,
       cycleDate: string,
       stats: SavedCycleStats,
-      payload: GFCForecastSaveData
+      payload: GFCForecastSaveData,
+      options?: { saveAsNew?: boolean }
     ): Promise<boolean> => {
       if (!userId || !canWrite) {
         setError(getCloudWriteBlockedMessage({ userId, canWrite }));
@@ -288,7 +295,7 @@ function useCloudSaveCycle({
         cycleDate,
         stats,
         payload,
-        existingId: currentCloudRef.current?.id,
+        existingId: options?.saveAsNew ? undefined : currentCloudRef.current?.id,
       });
 
       if (!result.success) {

@@ -10,11 +10,7 @@ import './darkMode.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { store } from './store';
-import { setupCycleHistoryListener } from './utils/cycleHistoryPersistence';
 import { trackPageView } from './utils/analyticsUtils';
-
-// Setup cycle history persistence
-setupCycleHistoryListener(store);
 
 const rootElement = document.getElementById('root') as HTMLElement;
 const root = ReactDOM.createRoot(

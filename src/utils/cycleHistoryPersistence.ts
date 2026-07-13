@@ -8,8 +8,10 @@ import { deserializeForecast, serializeForecast } from './fileUtils';
 import { countForecastMetrics } from './forecastMetrics';
 import { normalizeForecastCycle } from './outlookMapCoercion';
 import type { ForecastCycle, GFCForecastSaveData, CycleMetadata } from '../types/outlooks';
+import { getScopedStorageKey, getStorageScope } from './storageScope';
 
 const CYCLE_HISTORY_KEY = 'gfc-cycle-history';
+const LEGACY_CYCLE_HISTORY_KEY = CYCLE_HISTORY_KEY;
 const STORAGE_MAP_VIEW = { center: [0, 0] as [number, number], zoom: 0 };
 
 interface PersistedSavedCycle {
@@ -73,10 +75,13 @@ const fromLegacySavedCycle = (cycle: {
 /**
  * Save cycle history to localStorage
  */
-export const saveCycleHistoryToStorage = (cycles: SavedCycle[]): void => {
+export const getCycleHistoryStorageKey = (userId?: string | null): string =>
+  userId ? getScopedStorageKey(CYCLE_HISTORY_KEY, getStorageScope(userId)) : CYCLE_HISTORY_KEY;
+
+export const saveCycleHistoryToStorage = (cycles: SavedCycle[], userId?: string | null): void => {
   try {
     const serialized = JSON.stringify(cycles.map(toPersistedSavedCycle));
-    localStorage.setItem(CYCLE_HISTORY_KEY, serialized);
+    localStorage.setItem(getCycleHistoryStorageKey(userId), serialized);
   } catch {
     // Silently ignore localStorage write failures
   }
@@ -85,9 +90,18 @@ export const saveCycleHistoryToStorage = (cycles: SavedCycle[]): void => {
 /**
  * Load cycle history from localStorage
  */
-export const loadCycleHistoryFromStorage = (): SavedCycle[] => {
+export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[] => {
   try {
-    const serialized = localStorage.getItem(CYCLE_HISTORY_KEY);
+    const scopedKey = getCycleHistoryStorageKey(userId);
+    let serialized = localStorage.getItem(scopedKey);
+
+    if (!serialized && !userId) {
+      serialized = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
+      if (serialized) {
+        localStorage.setItem(scopedKey, serialized);
+      }
+    }
+
     if (!serialized) return [];
     
     const parsed = JSON.parse(serialized);
@@ -124,32 +138,36 @@ export const loadCycleHistoryFromStorage = (): SavedCycle[] => {
 /**
  * Hook to hydrate cycle history on app startup
  */
-export const useCycleHistoryPersistence = (): void => {
+export const useCycleHistoryPersistence = (userId?: string | null): void => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // Load cycle history from localStorage on mount
-    const savedCycles = loadCycleHistoryFromStorage();
+    // Clear the previous account's history before hydrating the new scope.
+    dispatch(loadCycleHistory([]));
+    const savedCycles = loadCycleHistoryFromStorage(userId);
     if (savedCycles.length > 0) {
       dispatch(loadCycleHistory(savedCycles));
     }
-  }, [dispatch]);
+  }, [dispatch, userId]);
 };
 
 /**
  * Subscribe to Redux store changes and persist cycle history
  * Call this from the root component after store initialization
  */
-export const setupCycleHistoryListener = (store: Store<RootState>): void => {
-  let previousCycles: SavedCycle[] = [];
+export const setupCycleHistoryListener = (store: Store<RootState>, userId?: string | null): (() => void) => {
+  let previousCycles: SavedCycle[] = store.getState().forecast.savedCycles;
 
-  store.subscribe(() => {
+  return store.subscribe(() => {
     const state = store.getState();
     const currentCycles = state.forecast.savedCycles;
 
-    // Only save if cycles array has changed
     if (currentCycles !== previousCycles) {
-      saveCycleHistoryToStorage(currentCycles);
+      if (userId) {
+        saveCycleHistoryToStorage(currentCycles, userId);
+      } else {
+        saveCycleHistoryToStorage(currentCycles);
+      }
       previousCycles = currentCycles;
     }
   });
