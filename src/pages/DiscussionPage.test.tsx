@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import { DiscussionPage } from './DiscussionPage';
-import forecastReducer, { setForecastDay } from '../store/forecastSlice';
+import forecastReducer, { setDiscussionGroupings, setForecastDay } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -60,6 +60,36 @@ describe('DiscussionPage', () => {
     );
 
     expect(screen.getByDisplayValue('WeatherboySuper')).toBeInTheDocument();
+  });
+
+  test('preserves unsaved scope text as a draft when changing grouping', () => {
+    mockUseAuth.mockReturnValue({
+      syncedSettings: { defaultForecasterName: '' },
+      user: { displayName: '' },
+    });
+
+    const store = createStore();
+    store.dispatch(setDiscussionGroupings([
+      { id: 'day-1', label: 'Day 1', days: [1], discussionDay: 1 },
+      { id: 'day-2', label: 'Day 2', days: [2], discussionDay: 2 },
+    ]));
+
+    render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <DiscussionPage />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/Write your forecast discussion here/i), {
+      target: { value: 'Unsaved scope text' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Discussion scope' }), { target: { value: 'day-2' } });
+
+    const state = store.getState().forecast;
+    expect(state.discussionDraftsByDay[1]?.diyContent).toBe('Unsaved scope text');
+    expect(state.forecastCycle.days[1].discussion).toBeUndefined();
   });
 
   test('keeps unsaved drafts across unmounts without mixing forecast days', () => {

@@ -604,7 +604,8 @@ const useDiscussionEditorState = ({
 
   const persistDraft = useCallback(() => {
     if (!form.hasUnsavedChanges) return;
-    dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+    // Scope changes preserve edits as drafts; only explicit save/autosave publishes them.
+    dispatch(updateDiscussionDraft({ day: currentDay, draft: buildDiscussionData() }));
     form.setHasUnsavedChanges(false);
   }, [buildDiscussionData, currentDay, dispatch, form.hasUnsavedChanges, form.setHasUnsavedChanges]);
 
