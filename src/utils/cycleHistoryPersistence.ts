@@ -78,18 +78,46 @@ const fromLegacySavedCycle = (cycle: {
 export const getCycleHistoryStorageKey = (userId?: string | null): string =>
   userId ? getScopedStorageKey(CYCLE_HISTORY_KEY, getStorageScope(userId)) : CYCLE_HISTORY_KEY;
 
-/** Moves anonymous cycle history into the signed-in account scope once, without overwriting account data. */
+/** Parses one stored history value, dropping malformed entries without throwing. */
+const parseStoredCycleHistory = (serialized: string | null): SavedCycle[] => {
+  if (!serialized) return [];
+
+  try {
+    const parsed = JSON.parse(serialized);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((cycle) => {
+        if (!cycle || typeof cycle !== 'object') return null;
+
+        try {
+          if ('forecastData' in cycle) return fromPersistedSavedCycle(cycle as PersistedSavedCycle);
+          if ('forecastCycle' in cycle) return fromLegacySavedCycle(cycle as SavedCycle);
+          return null;
+        } catch {
+          return null;
+        }
+      })
+      .filter((cycle): cycle is SavedCycle => cycle !== null);
+  } catch {
+    return [];
+  }
+};
+
+/** Moves usable anonymous cycle history into the signed-in account scope when its current scope is empty or unusable. */
 export const migrateLegacyCycleHistory = (userId?: string | null): void => {
   if (!userId) return;
 
   try {
     const scopedKey = getCycleHistoryStorageKey(userId);
-    if (localStorage.getItem(scopedKey) === null) {
-      const legacyValue = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
-      if (legacyValue !== null) {
-        localStorage.setItem(scopedKey, legacyValue);
-        localStorage.removeItem(LEGACY_CYCLE_HISTORY_KEY);
-      }
+    const scopedValue = localStorage.getItem(scopedKey);
+    const legacyValue = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
+    if (legacyValue === null) return;
+
+    const scopedCycles = parseStoredCycleHistory(scopedValue);
+    if (scopedValue === null || scopedCycles.length === 0) {
+      localStorage.setItem(scopedKey, legacyValue);
+      localStorage.removeItem(LEGACY_CYCLE_HISTORY_KEY);
     }
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.
@@ -120,34 +148,7 @@ export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[
       }
     }
 
-    if (!serialized) return [];
-    
-    const parsed = JSON.parse(serialized);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map((cycle) => {
-        if (!cycle || typeof cycle !== 'object') {
-          return null;
-        }
-
-        try {
-          if ('forecastData' in cycle) {
-            return fromPersistedSavedCycle(cycle as PersistedSavedCycle);
-          }
-
-          if ('forecastCycle' in cycle) {
-            return fromLegacySavedCycle(cycle as SavedCycle);
-          }
-
-          return null;
-        } catch {
-          return null;
-        }
-      })
-      .filter((cycle): cycle is SavedCycle => cycle !== null);
+    return parseStoredCycleHistory(serialized);
   } catch {
     return [];
   }

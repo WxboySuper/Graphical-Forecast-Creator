@@ -134,8 +134,24 @@ describe('cycleHistoryPersistence', () => {
 
     localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'new-legacy' }]));
     mod.migrateLegacyCycleHistory('user-1');
-    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
-    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'legacy' }]));
+    expect(localStorage.getItem('gfc-cycle-history')).toBeNull();
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
+  });
+
+  test('falls back to usable legacy history when signed-in scope is empty or unusable', async () => {
+    jest.doMock('./outlookMapCoercion', () => ({ normalizeForecastCycle: (cycle: unknown) => cycle }));
+    const mod = await import('./cycleHistoryPersistence');
+    const legacy = [{ id: 'legacy', timestamp: 't1', cycleDate: 'd1', forecastCycle: {} }];
+    localStorage.setItem('gfc-cycle-history:user-user-1', JSON.stringify({ invalid: true }));
+    localStorage.setItem('gfc-cycle-history', JSON.stringify(legacy));
+
+    mod.migrateLegacyCycleHistory('user-1');
+    const loaded = mod.loadCycleHistoryFromStorage('user-1');
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].id).toBe('legacy');
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify(legacy));
+    expect(localStorage.getItem('gfc-cycle-history')).toBeNull();
   });
 
   test('loadCycleHistoryFromStorage returns empty on invalid stored data', async () => {
