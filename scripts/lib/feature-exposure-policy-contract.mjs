@@ -67,6 +67,26 @@ function isV17LocalDevelopmentApproved(featureKey, acknowledgements) {
   return acknowledgements[featureKey]?.localDevelopmentApproved === true;
 }
 
+/** Adds a violation when local-only development exposure lacks explicit acknowledgement. */
+function validateV17LocalDevelopmentExposure(featureKey, definition, acknowledgements, errors) {
+  if (definition.exposure?.local !== true) return;
+  if (isV17LocalDevelopmentApproved(featureKey, acknowledgements)) return;
+
+  errors.push(
+    `v1.7 workstream "${featureKey}" cannot enable local development without localDevelopmentApproved in src/config/featureExposure.acknowledgements.json.`
+  );
+}
+
+/** Adds violations for workstream exposure outside local development and approved beta. */
+function validateV17RestrictedTargets(featureKey, definition, errors) {
+  for (const target of ['staging', 'production']) {
+    if (definition.exposure?.[target] === false) continue;
+    errors.push(
+      `v1.7 workstream "${featureKey}" must stay disabled on target "${target}" until adoption enables it.`
+    );
+  }
+}
+
 /** Adds lifecycle violations for one v1.7 workstream registry entry. */
 function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors) {
   const { acknowledgements } = contract;
@@ -75,19 +95,8 @@ function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors
     errors.push(`v1.7 workstream "${featureKey}" must remain temporary until production promotion.`);
   }
 
-  if (definition.exposure?.local === true && !isV17LocalDevelopmentApproved(featureKey, acknowledgements)) {
-    errors.push(
-      `v1.7 workstream "${featureKey}" cannot enable local development without localDevelopmentApproved in src/config/featureExposure.acknowledgements.json.`
-    );
-  }
-
-  for (const target of ['staging', 'production']) {
-    if (definition.exposure?.[target] !== false) {
-      errors.push(
-        `v1.7 workstream "${featureKey}" must stay disabled on target "${target}" until adoption enables it.`
-      );
-    }
-  }
+  validateV17LocalDevelopmentExposure(featureKey, definition, acknowledgements, errors);
+  validateV17RestrictedTargets(featureKey, definition, errors);
 
   if (definition.exposure?.beta === true && !isV17BetaEnablementApproved(featureKey, acknowledgements)) {
     errors.push(
