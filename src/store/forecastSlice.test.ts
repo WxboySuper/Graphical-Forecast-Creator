@@ -536,7 +536,20 @@ describe('forecastSlice undo/redo', () => {
 
     expect(nextState.forecastCycle.completionAcknowledgedAt).toEqual(expect.any(String));
     expect(nextState.forecastCycle.omittedDayReasons).toBeUndefined();
+    expect(nextState.workflowMetadata).toBeUndefined();
     expect(nextState.isSaved).toBe(false);
+  });
+
+  it('marks workflow metadata completed so awareness does not recommend it again', () => {
+    let state = reducer(undefined, startBlankCycle({
+      workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
+      cycleDate: '2026-07-13',
+    }));
+
+    const nextState = reducer(state, completeCycle());
+
+    expect(nextState.workflowMetadata?.status).toBe('completed');
+    expect(nextState.workflowMetadata?.outlookVersions[0].status).toBe('completed');
   });
 
   it('completeWithOmissions persists acknowledgement metadata and marks the forecast unsaved', () => {

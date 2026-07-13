@@ -9,6 +9,8 @@ import HomeConceptPage from './home/HomeConceptPage';
 import './HomePage.css';
 import useHomePageLogic from './home/useHomePageLogic';
 import AIDisclosure from './home/AIDisclosure';
+import { useWorkflowAwareness } from '../hooks/useWorkflowAwarenessSync';
+import type { WorkflowAwarenessRecommendation } from '../types/workflowAwareness';
 
 type HomeLogic = ReturnType<typeof useHomePageLogic>;
 
@@ -271,9 +273,51 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
   );
 };
 
+/** Shows metadata-only awareness recommendations only when a local cycle can restore them. */
+const AwarenessRecommendations: React.FC<{
+  recommendations: WorkflowAwarenessRecommendation[];
+  savedCycles: HomeLogic['savedCycles'];
+  activeWorkflowId?: string;
+  onRestore: (savedCycleId?: string) => void;
+}> = ({ recommendations, savedCycles, activeWorkflowId, onRestore }) => {
+  const visibleRecommendations = recommendations.filter((recommendation) =>
+    recommendation.cycleId === activeWorkflowId
+    || savedCycles.some((cycle) => cycle.workflowMetadata?.id === recommendation.cycleId),
+  );
+
+  if (visibleRecommendations.length === 0) return null;
+
+  return (
+    <section className="home-surface-card p-4" aria-labelledby="workflow-awareness-recommendations">
+      <h2 id="workflow-awareness-recommendations" className="text-lg font-semibold">Continue a workflow</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Metadata awareness found unfinished work. Nothing was downloaded from the cloud.</p>
+      <div className="mt-3 grid gap-2">
+        {visibleRecommendations.slice(0, 3).map((recommendation) => {
+          const localCycle = savedCycles.find((cycle) => cycle.workflowMetadata?.id === recommendation.cycleId);
+          return (
+            <button
+              type="button"
+              key={recommendation.cycleId}
+              className="flex items-center justify-between rounded-md border p-3 text-left hover:bg-muted/40"
+              onClick={() => onRestore(localCycle?.id)}
+            >
+              <span>
+                <strong>{recommendation.workflowId}</strong>
+                <small className="block text-muted-foreground">Cycle {recommendation.cycleDate}</small>
+              </span>
+              <span className="text-sm text-primary">{localCycle ? 'Restore local cycle' : 'Open editor'}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
 /** Home route that can render either the current concept or classic fallback. */
 const HomePage: React.FC = () => {
   const logic = useHomePageLogic();
+  const { recommendations } = useWorkflowAwareness();
   const {
     variant,
     formattedDate,
@@ -296,6 +340,20 @@ const HomePage: React.FC = () => {
     isSaved,
   } = logic;
 
+  const handleAwarenessRestore = (savedCycleId?: string) => {
+    if (savedCycleId) {
+      if (logic.handleRestoreSavedCycle) {
+        logic.handleRestoreSavedCycle(savedCycleId);
+        return;
+      }
+      logic.handleLoadRecentCycleClick({
+        currentTarget: { dataset: { cycleId: savedCycleId } },
+      } as unknown as React.MouseEvent<HTMLButtonElement>);
+      return;
+    }
+    logic.handleNavigateForecast();
+  };
+
   const isClassicHome = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('home') === 'classic';
 
@@ -305,6 +363,14 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="h-full overflow-auto bg-background">
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 pt-4">
+        <AwarenessRecommendations
+          recommendations={recommendations}
+          savedCycles={savedCycles}
+          activeWorkflowId={workflowMetadata?.id}
+          onRestore={handleAwarenessRestore}
+        />
+      </div>
       <HomeConceptPage
         variant={variant}
         formattedDate={formattedDate}

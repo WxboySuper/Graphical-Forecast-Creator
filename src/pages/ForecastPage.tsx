@@ -1110,7 +1110,7 @@ const useCloudForecastActions = ({
 
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload);
+      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');

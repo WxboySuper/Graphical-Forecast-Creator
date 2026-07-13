@@ -34,6 +34,7 @@ const syncCurrentCloudCycle = async ({
   payload,
   cycleDate,
   forecastCycle,
+  workflowMetadata,
   setLastSyncedHash,
   currentHash,
 }: {
@@ -44,6 +45,7 @@ const syncCurrentCloudCycle = async ({
   payload: ReturnType<typeof serializeForecast>;
   cycleDate: RootState['forecast']['forecastCycle']['cycleDate'];
   forecastCycle: RootState['forecast']['forecastCycle'];
+  workflowMetadata: RootState['forecast']['workflowMetadata'];
   setLastSyncedHash: (hash: string) => void;
   currentHash: string;
 }) => {
@@ -55,7 +57,7 @@ const syncCurrentCloudCycle = async ({
     updateSyncState('saving');
 
     const stats = countForecastMetrics(forecastCycle);
-    const success = await saveCycle(currentCloud.label, cycleDate, stats, payload);
+    const success = await saveCycle(currentCloud.label, cycleDate, stats, payload, workflowMetadata);
 
     if (!success) {
       updateSyncState('error', 'Failed to sync to cloud');
@@ -114,12 +116,13 @@ export const useCloudSync = (
       payload: serializedPayload,
       cycleDate: forecastCycle.cycleDate,
       forecastCycle,
+      workflowMetadata,
       setLastSyncedHash: (hash) => {
         lastSyncStateRef.current = hash;
       },
       currentHash,
     });
-  }, [canSync, currentCloud, currentHash, forecastCycle.cycleDate, saveCycle, serializedPayload, updateSyncState]);
+  }, [canSync, currentCloud, currentHash, forecastCycle.cycleDate, forecastCycle, saveCycle, serializedPayload, updateSyncState, workflowMetadata]);
 
   useEffect(() => {
     if (!canSync) {

@@ -11,6 +11,7 @@ import {
   subscribeToCloudCycles,
 } from '../lib/cloudCyclesService';
 import { GFCForecastSaveData } from '../types/outlooks';
+import type { CycleMetadata } from '../types/workflow';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
 
@@ -19,7 +20,13 @@ export interface UseCloudCyclesResult {
   currentCloud: CloudCycleContext | null;
   loading: boolean;
   error: string | null;
-  saveCycle: (label: string, cycleDate: string, stats: SavedCycleStats, payload: GFCForecastSaveData) => Promise<boolean>;
+  saveCycle: (
+    label: string,
+    cycleDate: string,
+    stats: SavedCycleStats,
+    payload: GFCForecastSaveData,
+    workflowMetadata?: CycleMetadata,
+  ) => Promise<boolean>;
   loadCycle: (cycleId: string) => Promise<GFCForecastSaveData | null>;
   deleteCycle: (cycleId: string) => Promise<boolean>;
   renameCycle: (cycleId: string, newLabel: string) => Promise<boolean>;
@@ -270,7 +277,8 @@ function useCloudSaveCycle({
       label: string,
       cycleDate: string,
       stats: SavedCycleStats,
-      payload: GFCForecastSaveData
+      payload: GFCForecastSaveData,
+      workflowMetadata?: CycleMetadata,
     ): Promise<boolean> => {
       if (!userId || !canWrite) {
         setError(getCloudWriteBlockedMessage({ userId, canWrite }));
@@ -288,6 +296,7 @@ function useCloudSaveCycle({
         cycleDate,
         stats,
         payload,
+        workflowMetadata,
         existingId: currentCloudRef.current?.id,
       });
 

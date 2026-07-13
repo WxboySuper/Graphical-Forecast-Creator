@@ -15,6 +15,7 @@ import {
 
 import { useAutoSave } from './hooks/useAutoSave';
 import { useFirestoreSleepRecovery } from './hooks/useFirestoreSleepRecovery';
+import { WorkflowAwarenessProvider } from './hooks/useWorkflowAwarenessSync';
 import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 import { AuthProvider } from './auth/AuthProvider';
 import { EntitlementProvider } from './billing/EntitlementProvider';
@@ -184,11 +185,13 @@ function App() {
     <Provider store={store}>
       <AuthProvider>
         <EntitlementProvider>
+          <WorkflowAwarenessProvider>
           <BrowserRouter>
             <GoogleAnalyticsRouteTracker />
             <AgreementGate showComingSoon={showComingSoon} />
             <AppRoutes showComingSoon={showComingSoon} />
           </BrowserRouter>
+          </WorkflowAwarenessProvider>
         </EntitlementProvider>
       </AuthProvider>
     </Provider>

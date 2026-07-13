@@ -37,6 +37,7 @@ interface HomeConceptPageProps {
   hasActiveWorkflow: boolean;
   isSaved: boolean;
   onResumeForecast: () => void;
+  onWriteDiscussion: () => void;
   onOpenHistory: () => void;
   onOpenFile: () => void;
   onNewCycle: () => void;

@@ -8,6 +8,7 @@ import {
   setForecastDay,
   resetForecasts,
   importForecastCycle,
+  loadSavedCycle,
   selectWorkflowMetadata,
   selectHasActiveWorkflow,
   startBlankCycle,
@@ -141,6 +142,14 @@ const useHomePageLogic = () => {
     addToast('Cycle loaded from history', 'success');
   };
 
+  /** Restores a recommended local cycle while preserving its workflow metadata. */
+  const handleRestoreSavedCycle = (cycleId: string) => {
+    const cycle = savedCycles.find((item) => item.id === cycleId);
+    if (!cycle) return;
+    dispatch(loadSavedCycle(cycleId));
+    addToast('Workflow restored from local history', 'success');
+  };
+
   /** Confirm starting a new cycle (discard changes). */
   const handleConfirmNewCycle = () => {
     if (pendingWorkflow) {
@@ -183,6 +192,7 @@ const useHomePageLogic = () => {
     handleCloseHistoryModal,
     handleQuickStartClick,
     handleLoadRecentCycleClick,
+    handleRestoreSavedCycle,
     handleConfirmNewCycle,
     handleCancelNewCycle,
     handleNewCycle,
