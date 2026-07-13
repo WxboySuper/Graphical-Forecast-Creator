@@ -96,17 +96,12 @@ describe('instrument', () => {
   });
 
   it('keeps matching canvas TypeErrors when they come from application frames', () => {
-    jest.isolateModules(() => {
-      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
-      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
-      const { beforeSend } = require('./instrument');
-      const event = createOpenLayersCanvasEvent(
+    expectBeforeSendToKeep(() =>
+      createOpenLayersCanvasEvent(
         "null is not an object (evaluating 'a.canvas')",
         'auto.browser.global_handlers.onerror'
-      );
-
-      expect(beforeSend(event, {})).toBe(event);
-    });
+      )
+    );
   });
 
   const createRequestLifecycleEvent = (value: string, withStack = false) => ({
@@ -121,6 +116,38 @@ describe('instrument', () => {
       ],
     },
   });
+
+  const createOpaqueGlobalError = (value = 'uncaught exception: undefined', withStack = false) => ({
+    exception: {
+      values: [
+        {
+          value,
+          mechanism: {
+            type: 'auto.browser.global_handlers.onerror',
+            handled: false,
+          },
+          stacktrace: withStack
+            ? { frames: [{ filename: 'src/App.tsx', function: 'renderForecast' }] }
+            : undefined,
+        },
+      ],
+    },
+  });
+
+  const loadBeforeSend = () => {
+    globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+    // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+    return require('./instrument').beforeSend;
+  };
+
+  const expectBeforeSendToKeep = (createEvent: () => any) => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = createEvent();
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
+  };
 
   it.each([
     ['GFC-WEB-K NetworkError', 'A network error occurred.'],
@@ -148,14 +175,66 @@ describe('instrument', () => {
     });
   });
 
-  it('drops matching request lifecycle noise from message-only events', () => {
+  it.each([
+    ['double-space NetworkError', 'NetworkError:  A network error occurred.'],
+    ['leading/trailing whitespace', '  AbortError:   The user aborted a request.  '],
+  ])('drops whitespace variants of request lifecycle noise: %s', (_label, message) => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+
+      expect(beforeSend(createRequestLifecycleEvent(message), {})).toBeNull();
+    });
+  });
+
+  it('drops no-stack opaque global error noise from Firefox', () => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+
+      expect(beforeSend(createOpaqueGlobalError(), {})).toBeNull();
+    });
+  });
+
+  it('keeps opaque global errors when they have application stack frames', () => {
+    jest.isolateModules(() => {
+      globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
+      // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
+      const { beforeSend } = require('./instrument');
+      const event = createOpaqueGlobalError(undefined, true);
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
+  });
+
+  it('keeps opaque global errors when breadcrumbs provide context', () => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = createOpaqueGlobalError();
+      event.breadcrumbs = [{ message: 'forecast route loaded' }];
+
+      expect(beforeSend(event, {})).toBe(event);
+    });
+  });
+
+  it('keeps the opaque message when it comes from another mechanism', () => {
+    expectBeforeSendToKeep(() => {
+      const event = createOpaqueGlobalError();
+      event.exception.values[0].mechanism.type = 'auto.browser.global_handlers.onunhandledrejection';
+      return event;
+    });
+  });
+
+  it('keeps matching request lifecycle messages without exception values', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
       // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
       const { beforeSend } = require('./instrument');
       const event = { message: 'A network error occurred.' };
 
-      expect(beforeSend(event, {})).toBeNull();
+      expect(beforeSend(event, {})).toBe(event);
     });
   });
 
