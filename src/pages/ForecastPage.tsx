@@ -30,6 +30,7 @@ import {
   redoLastEdit,
   undoLastEdit,
   setWorkflowMetadata,
+  clearWorkflowMetadata,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
@@ -317,6 +318,8 @@ const applyLoadedForecast = (
   dispatch(importForecastCycle(payload.deserializedCycle));
   if (payload.rawData.cycleMetadata) {
     dispatch(setWorkflowMetadata(payload.rawData.cycleMetadata));
+  } else if (payload.rawData.cycleMetadata === null) {
+    dispatch(clearWorkflowMetadata());
   }
 
   if (payload.rawData.mapView) {
@@ -659,8 +662,9 @@ const restoreStoredForecastPayload = (
   dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle, true) : importForecastCycle(deserializedCycle));
   if (data.cycleMetadata) {
     dispatch(setWorkflowMetadata(data.cycleMetadata));
+  } else if (data.cycleMetadata === null) {
+    dispatch(clearWorkflowMetadata());
   }
-
   const rawData = data as LoadedForecastPayload['rawData'];
   if (rawData.mapView) {
     dispatch(setMapView(rawData.mapView));
@@ -737,16 +741,29 @@ const restoreCloudSession = (
 const shouldSkipLocalRestore = (
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'],
-): boolean =>
-  hasRolloverForecastData(forecastCycle)
-  || cycleHasDiscussionContent(forecastCycle)
-  || hasUnpublishedDiscussionDrafts(discussionDraftsByScope);
+): boolean => {
+  if (hasRolloverForecastData(forecastCycle)) return true;
+  if (cycleHasDiscussionContent(forecastCycle)) return true;
+  if (hasUnpublishedDiscussionDrafts(discussionDraftsByScope)) return true;
+  return false;
+};
 
 /** Copies a legacy auto-save into the signed-in scope and removes the unscoped copy. */
 const copyLegacyAutoSaveToScopedStorage = (scopedKey: string, legacyValue: string | null): void => {
   if (legacyValue === null) return;
   localStorage.setItem(scopedKey, legacyValue);
   localStorage.removeItem('forecastData');
+};
+
+/** Returns true when a legacy autosave should be copied into the signed-in scope. */
+const shouldCopyLegacyAutoSaveToScoped = (
+  userId: string | null | undefined,
+  legacyValue: string | null,
+  storedValue: string | null,
+): boolean => {
+  if (!userId) return false;
+  if (legacyValue === null) return false;
+  return storedValue === legacyValue;
 };
 
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
@@ -768,7 +785,7 @@ const restoreLocalSession = (
   const data = parseStoredForecastPayload(storedValue);
   if (!data) return false;
 
-  if (userId && legacyValue !== null && storedValue === legacyValue) {
+  if (shouldCopyLegacyAutoSaveToScoped(userId, legacyValue, storedValue)) {
     copyLegacyAutoSaveToScopedStorage(scopedKey, legacyValue);
   }
   restoreStoredForecastPayload(data, dispatch, true);
@@ -1044,7 +1061,7 @@ export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapV
   dispatch: ShortcutDispatch;
 }): Promise<boolean> => {
   try {
-    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), { saveAsNew: true });
+    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true });
     if (!success) return false;
     clearCurrent();
     dispatch(resetForecasts());
@@ -1268,7 +1285,7 @@ const useCloudForecastActions = ({
 
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload);
+      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');

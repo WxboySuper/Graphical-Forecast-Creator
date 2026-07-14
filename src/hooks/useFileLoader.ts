@@ -1,5 +1,10 @@
 import { exportForecastToJson, deserializeForecast, validateForecastData } from '../utils/fileUtils';
-import { markAsSaved, importForecastCycle, setWorkflowMetadata } from '../store/forecastSlice';
+import {
+  markAsSaved,
+  importForecastCycle,
+  setWorkflowMetadata,
+  clearWorkflowMetadata,
+} from '../store/forecastSlice';
 import type { AddToastFn } from '../components/Layout';
 import type { Dispatch } from 'redux';
 import type { CycleMetadata, ForecastCycle } from '../types/outlooks';
@@ -34,6 +39,8 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
       dispatch(importForecastCycle(deserializedCycle));
       if (data.cycleMetadata) {
         dispatch(setWorkflowMetadata(data.cycleMetadata));
+      } else if (data.cycleMetadata === null) {
+        dispatch(clearWorkflowMetadata());
       }
       addToast('Forecast loaded successfully!', 'success');
     } catch {

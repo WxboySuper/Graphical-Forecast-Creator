@@ -11,6 +11,7 @@ import {
   subscribeToCloudCycles,
 } from '../lib/cloudCyclesService';
 import { GFCForecastSaveData } from '../types/outlooks';
+import type { CycleMetadata } from '../types/workflow';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
 
@@ -24,7 +25,8 @@ export interface UseCloudCyclesResult {
     cycleDate: string,
     stats: SavedCycleStats,
     payload: GFCForecastSaveData,
-    options?: { saveAsNew?: boolean }
+    workflowMetadata?: CycleMetadata,
+    options?: { saveAsNew?: boolean },
   ) => Promise<boolean>;
   loadCycle: (cycleId: string) => Promise<GFCForecastSaveData | null>;
   deleteCycle: (cycleId: string) => Promise<boolean>;
@@ -297,7 +299,8 @@ function useCloudSaveCycle({
       cycleDate: string,
       stats: SavedCycleStats,
       payload: GFCForecastSaveData,
-      options?: { saveAsNew?: boolean }
+      workflowMetadata?: CycleMetadata,
+      options?: { saveAsNew?: boolean },
     ): Promise<boolean> => {
       if (!canSaveCloudCycle({ userId, canWrite })) {
         setError(getCloudWriteBlockedMessage({ userId, canWrite }));
@@ -315,6 +318,7 @@ function useCloudSaveCycle({
         cycleDate,
         stats,
         payload,
+        workflowMetadata,
         existingId: options?.saveAsNew ? undefined : currentCloudRef.current?.id,
       });
 
@@ -332,6 +336,18 @@ function useCloudSaveCycle({
     [canWrite, currentCloudRef, setCurrentCloud, setError, updateSyncState, user, userId]
   );
 }
+
+/** Builds the forecast payload handed to the editor after a cloud load. */
+export const buildLoadedCloudForecastPayload = (
+  record: Pick<import('../types/cloudCycles').CloudCycle, 'payload' | 'workflowMetadata'>,
+): GFCForecastSaveData => {
+  if (record.workflowMetadata) {
+    return { ...record.payload, cycleMetadata: record.workflowMetadata };
+  }
+
+  const { cycleMetadata: _staleEmbedded, ...plainPayload } = record.payload;
+  return { ...plainPayload, cycleMetadata: null };
+};
 
 /** Returns the load callback for hosted cloud cycles. */
 function useCloudLoadCycle({
@@ -365,7 +381,7 @@ function useCloudLoadCycle({
       syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
       queueProductMetric({ event: 'cloud_cycle_loaded', user });
       updateSyncState('saved');
-      return result.data.payload;
+      return buildLoadedCloudForecastPayload(result.data);
     },
     [cycles, setCurrentCloud, setError, updateSyncState, user, userId]
   );
