@@ -949,6 +949,29 @@ export const forecastSlice = createSlice({
       state.discussionDraftsByScope[action.payload.scopeId] = action.payload.draft;
     },
 
+    /** Moves unpublished drafts when discussion scopes are combined or reset. */
+    migrateDiscussionDrafts: (state, action: PayloadAction<{ migrations: Record<string, string>; preferScopeId?: string }>) => {
+      const { migrations, preferScopeId } = action.payload;
+      const preferredDraft = preferScopeId ? state.discussionDraftsByScope[preferScopeId] : undefined;
+      const nextDrafts = { ...state.discussionDraftsByScope };
+
+      for (const [fromScopeId, toScopeId] of Object.entries(migrations)) {
+        const draft = nextDrafts[fromScopeId];
+        if (!draft || (nextDrafts[toScopeId] && fromScopeId !== preferScopeId)) continue;
+        nextDrafts[toScopeId] = draft;
+      }
+
+      if (preferredDraft && preferScopeId) {
+        const targetScopeId = migrations[preferScopeId];
+        if (targetScopeId) nextDrafts[targetScopeId] = preferredDraft;
+      }
+
+      const removedScopeIds = new Set(Object.keys(migrations));
+      state.discussionDraftsByScope = Object.fromEntries(
+        Object.entries(nextDrafts).filter(([scopeId]) => !removedScopeIds.has(scopeId)),
+      ) as Record<string, DiscussionData>;
+    },
+
     // Update discussion for a specific day
     updateDiscussion: (state, action: PayloadAction<{ day: DayType; discussion: DiscussionData; scopeId?: string }>) => {
       const { day, discussion, scopeId } = action.payload;
@@ -1368,6 +1391,7 @@ export const {
   setCycleDate,
   setEmergencyMode,
   updateDiscussionDraft,
+  migrateDiscussionDrafts,
   updateDiscussion,
   setDiscussionGroupings,
   resetDiscussionGroupings,

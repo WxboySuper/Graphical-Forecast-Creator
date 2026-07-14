@@ -504,13 +504,6 @@ export const DiscussionPage: React.FC = () => {
     setSearchParams,
   });
 
-  const { handleCombine: handleCombineGroupings, handleReset: handleResetGroupings } = useDiscussionGroupingActions({
-    forecastCycle,
-    groupings,
-    defaultGroupings,
-    currentDay,
-  });
-
   const editorState = useDiscussionEditorState({
     existingDiscussion,
     defaultForecasterName,
@@ -520,6 +513,15 @@ export const DiscussionPage: React.FC = () => {
     addToast,
     user,
     onSaved: () => navigate('/forecast'),
+  });
+
+  const { handleCombine: handleCombineGroupings, handleReset: handleResetGroupings } = useDiscussionGroupingActions({
+    forecastCycle,
+    groupings,
+    defaultGroupings,
+    currentDay,
+    selectedGroupingId: selectedGrouping.id,
+    persistDraft: editorState.persistDraft,
   });
 
   const handleSelectGrouping = useCallback((groupingId: string) => {

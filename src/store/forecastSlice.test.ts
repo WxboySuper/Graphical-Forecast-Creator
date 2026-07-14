@@ -30,6 +30,7 @@ import reducer, {
   saveCurrentCycle,
   updateDiscussion,
   updateDiscussionDraft,
+  migrateDiscussionDrafts,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -516,6 +517,31 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, updateDiscussionDraft({ scopeId: 'combined-b', draft: secondDraft }));
 
     expect(state.discussionDraftsByScope).toEqual({ 'combined-a': firstDraft, 'combined-b': secondDraft });
+  });
+
+  test('migrates combined scope drafts onto the new combined scope id', () => {
+    const dayOneDraft = { mode: 'diy' as const, diyContent: 'Day 1 draft' } as DiscussionData;
+    const dayTwoDraft = { mode: 'diy' as const, diyContent: 'Day 2 draft' } as DiscussionData;
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft: dayOneDraft }));
+    state = reducer(state, updateDiscussionDraft({ scopeId: 'day2', draft: dayTwoDraft }));
+
+    state = reducer(state, migrateDiscussionDrafts({
+      migrations: { day1: 'custom-combined', day2: 'custom-combined' },
+      preferScopeId: 'day1',
+    }));
+
+    expect(state.discussionDraftsByScope).toEqual({ 'custom-combined': dayOneDraft });
+  });
+
+  test('migrates custom scope drafts back to default scope ids on reset', () => {
+    const customDraft = { mode: 'diy' as const, diyContent: 'Custom scope draft' } as DiscussionData;
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'custom-1', draft: customDraft }));
+
+    state = reducer(state, migrateDiscussionDrafts({
+      migrations: { 'custom-1': 'day1' },
+    }));
+
+    expect(state.discussionDraftsByScope).toEqual({ day1: customDraft });
   });
 
   test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {
