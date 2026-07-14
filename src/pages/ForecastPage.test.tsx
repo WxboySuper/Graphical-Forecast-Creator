@@ -288,7 +288,7 @@ describe('ForecastPage layout selection', () => {
 
     await waitFor(() => {
       expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('anonymous-outlook');
-      expect(localStorage.getItem('forecastData')).toBeNull();
+      expect(localStorage.getItem('forecastData')).toBe(JSON.stringify(anonymousPayload));
       const scopedPayload = parseStoredForecastPayload(localStorage.getItem('forecastData:user-user-1'));
       expect(scopedPayload?.forecastCycle?.days?.[1]?.data?.tornado?.[0]?.[1]?.[0]?.id).toBe('anonymous-outlook');
     });

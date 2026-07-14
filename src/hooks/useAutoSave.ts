@@ -34,14 +34,15 @@ export const pickNewestAutoSaveValue = (...values: (string | null)[]): string | 
   ));
 };
 
-/** Picks the newest autosave snapshot when both scoped and legacy copies exist. */
+/** Picks the autosave snapshot for restore without crossing account boundaries. */
 export const selectPreferredAutoSaveValue = (
   scopedValue: string | null,
   legacyValue: string | null,
-): string | null => pickNewestAutoSaveValue(scopedValue, legacyValue);
+): string | null => scopedValue ?? legacyValue;
 
 /** Moves an anonymous autosave into the signed-in account scope once, without overwriting account data.
- * On sign-in, reconcile scoped, legacy, and live editor snapshots by timestamp so anonymous work is not dropped.
+ * On sign-in, reconcile live editor state with scoped storage, but never promote unscoped legacy over an
+ * existing account autosave on shared browsers.
  */
 export const migrateLegacyAutoSave = (userId?: string | null, liveSession?: unknown): void => {
   if (!userId) return;
@@ -52,12 +53,21 @@ export const migrateLegacyAutoSave = (userId?: string | null, liveSession?: unkn
     const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
 
     if (liveSession !== undefined) {
-      const preferred = pickNewestAutoSaveValue(scopedValue, legacyValue, JSON.stringify(liveSession));
+      const liveValue = JSON.stringify(liveSession);
+      if (scopedValue === null) {
+        const preferred = pickNewestAutoSaveValue(legacyValue, liveValue);
+        if (preferred) {
+          localStorage.setItem(scopedKey, preferred);
+        }
+        if (legacyValue !== null) {
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
+        }
+        return;
+      }
+
+      const preferred = pickNewestAutoSaveValue(scopedValue, liveValue);
       if (preferred) {
         localStorage.setItem(scopedKey, preferred);
-      }
-      if (legacyValue !== null) {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
       return;
     }
