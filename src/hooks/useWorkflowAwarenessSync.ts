@@ -151,6 +151,14 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
   const metadataRef = useRef(workflowMetadata);
   const previousConsentRef = useRef(consent);
   const disableRequestedRef = useRef(false);
+  const awarenessSyncKey = workflowMetadata
+    ? [
+      workflowMetadata.id,
+      workflowMetadata.status,
+      workflowMetadata.updatedAt,
+      ...workflowMetadata.outlookVersions.map((version) => `${version.version}:${version.status}:${version.createdAt}:${version.derivedFrom ?? ''}`),
+    ].join('|')
+    : null;
 
   useEffect(() => {
     consentRef.current = consent;
@@ -322,7 +330,7 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
         if (isActiveRequest(active, generation, currentUserId)) setSaving(false);
       });
     return undefined;
-  }, [workflowMetadata, userId, consent]);
+  }, [workflowMetadata, awarenessSyncKey, userId, consent]);
 
   const recommendations = useMemo(() => getAwarenessRecommendations(records), [records]);
 

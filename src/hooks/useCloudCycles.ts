@@ -349,7 +349,9 @@ function useCloudLoadCycle({
       syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
       queueProductMetric({ event: 'cloud_cycle_loaded', user });
       updateSyncState('saved');
-      return result.data.payload;
+      return result.data.workflowMetadata
+        ? { ...result.data.payload, cycleMetadata: result.data.workflowMetadata }
+        : result.data.payload;
     },
     [cycles, setCurrentCloud, setError, updateSyncState, user, userId]
   );
