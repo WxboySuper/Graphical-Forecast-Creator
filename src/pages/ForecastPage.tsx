@@ -783,11 +783,29 @@ const readLegacyAutoSave = (userId: string | null | undefined, scopedValue: stri
   return localStorage.getItem('forecastData');
 };
 
-/** Migrates a legacy auto-save into the signed-in scope after it is selected. */
-const migrateLegacyAutoSaveIfNeeded = (userId: string | null | undefined, scopedKey: string, scopedValue: string | null, legacyValue: string | null): void => {
-  if (!userId || scopedValue !== null || legacyValue === null) return;
+/** Returns true when a legacy auto-save should be copied into the signed-in scope. */
+const shouldMigrateLegacyAutoSave = (
+  userId: string | null | undefined,
+  scopedValue: string | null,
+  legacyValue: string | null,
+): boolean => Boolean(userId) && scopedValue === null && legacyValue !== null;
+
+/** Copies a legacy auto-save into the signed-in scope and removes the unscoped copy. */
+const copyLegacyAutoSaveToScopedStorage = (scopedKey: string, legacyValue: string | null): void => {
+  if (legacyValue === null) return;
   localStorage.setItem(scopedKey, legacyValue);
   localStorage.removeItem('forecastData');
+};
+
+/** Migrates a legacy auto-save into the signed-in scope after it is selected. */
+const migrateLegacyAutoSaveIfNeeded = (
+  userId: string | null | undefined,
+  scopedKey: string,
+  scopedValue: string | null,
+  legacyValue: string | null,
+): void => {
+  if (!shouldMigrateLegacyAutoSave(userId, scopedValue, legacyValue)) return;
+  copyLegacyAutoSaveToScopedStorage(scopedKey, legacyValue);
 };
 
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
@@ -1086,6 +1104,36 @@ const persistDetectedRolloverPrompt = (prompt: DayRolloverPromptState, today: st
   writeStoredRolloverPrompt(prompt, userId);
 };
 
+/** Applies one rollover detection result to storage and prompt state. */
+const applyDayRolloverDetection = ({
+  promptState,
+  today,
+  restoreComplete,
+  userId,
+  persistPrompt,
+  setPromptState,
+  setActionError,
+}: {
+  promptState: DayRolloverPromptState | null;
+  today: string;
+  restoreComplete: boolean;
+  userId?: string;
+  persistPrompt: (prompt: DayRolloverPromptState, today: string, userId?: string) => void;
+  setPromptState: React.Dispatch<React.SetStateAction<DayRolloverPromptState | null>>;
+  setActionError: React.Dispatch<React.SetStateAction<string | null>>;
+}): void => {
+  if (!promptState) {
+    if (restoreComplete) {
+      writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
+    }
+    return;
+  }
+
+  persistPrompt(promptState, today, userId);
+  setActionError(null);
+  setPromptState(promptState);
+};
+
 /** Watches for a local calendar-day rollover and offers to save the previous session before starting a new one. */
 const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addToast, forecastCycle, currentMapView, isSaved, userId, canSaveToCloud, saveCycle, clearCurrent }: {
   restoreComplete: boolean;
@@ -1117,21 +1165,28 @@ const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addT
   const detectDayRollover = useCallback(() => {
     const { today, lastActiveDay, alreadyPromptedToday, pendingPrompt } = getDayRolloverSnapshot(userId);
     const nextPromptState = getDayRolloverPromptState({ restoreComplete, lastActiveDay, today, alreadyPromptedToday, pendingPrompt, promptOpen: Boolean(promptStateRef.current), forecastCycle: forecastCycleRef.current, isSaved: isSavedRef.current && !restoredSessionRef.current });
-    if (!nextPromptState) {
-      if (restoreComplete) writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
-      return;
-    }
-    persistDetectedRolloverPrompt(nextPromptState, today, userId);
-    setActionError(null);
-    setPromptState(nextPromptState);
+    applyDayRolloverDetection({
+      promptState: nextPromptState,
+      today,
+      restoreComplete,
+      userId,
+      persistPrompt: persistDetectedRolloverPrompt,
+      setPromptState,
+      setActionError,
+    });
   }, [restoreComplete, restoredSession, userId]);
 
   useEffect(() => {
     detectDayRollover();
-    const handleVisibilityChange = () => { if (!document.hidden) detectDayRollover(); };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) detectDayRollover();
+    };
     const intervalId = window.setInterval(detectDayRollover, DAY_ROLLOVER_CHECK_INTERVAL_MS);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => { window.clearInterval(intervalId); document.removeEventListener('visibilitychange', handleVisibilityChange); };
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [detectDayRollover]);
 
   const completeRollover = useCallback(() => { clearStoredRolloverPrompt(userId); setPromptState(null); setActionError(null); }, [userId]);
