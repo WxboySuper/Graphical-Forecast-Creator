@@ -6,6 +6,7 @@ import {
   getValidationDiscussionGroupings,
   hasDiscussionContent,
   isValidDiscussionGroupings,
+  mergeDiscussionDrafts,
   normalizeDiscussionGroupings,
 } from './discussionGrouping';
 
@@ -64,5 +65,27 @@ describe('discussionGrouping', () => {
     expect(normalizeDiscussionGroupings([
       { id: 'bad', label: ' ', days: [1], discussionDay: 1 },
     ])).toEqual([]);
+  });
+
+  test('merges mixed DIY and guided drafts into one DIY draft', () => {
+    const diyDraft = { ...discussion, diyContent: 'DIY scope text' };
+    const guidedDraft = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 'Guided synopsis',
+        meteorologicalSetup: '',
+        severeWeatherExpectations: '',
+        timing: '',
+        regionalBreakdown: '',
+        additionalConsiderations: '',
+      },
+    };
+
+    const merged = mergeDiscussionDrafts([diyDraft, guidedDraft], diyDraft);
+
+    expect(merged?.mode).toBe('diy');
+    expect(merged?.diyContent).toBe('DIY scope text\n\nGuided synopsis');
   });
 });

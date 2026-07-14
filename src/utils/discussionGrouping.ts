@@ -1,4 +1,4 @@
-import type { DiscussionData, DiscussionGrouping, DayType, ForecastCycle } from '../types/outlooks';
+import type { DiscussionData, DiscussionGrouping, DayType, ForecastCycle, GuidedDiscussionData } from '../types/outlooks';
 import type { StandardGrouping, WorkflowMetadata } from '../types/workflow';
 
 export const STANDARD_DISCUSSION_GROUPINGS: readonly DiscussionGrouping[] = [
@@ -25,47 +25,76 @@ export const hasDiscussionContent = (discussion: DiscussionData | undefined): bo
   );
 };
 
+const EMPTY_GUIDED_CONTENT: GuidedDiscussionData = {
+  synopsis: '',
+  meteorologicalSetup: '',
+  severeWeatherExpectations: '',
+  timing: '',
+  regionalBreakdown: '',
+  additionalConsiderations: '',
+};
+
+/** Orders drafts so the preferred scope draft is merged first. */
+const orderDiscussionDrafts = (drafts: DiscussionData[], preferredDraft?: DiscussionData): DiscussionData[] => {
+  const filtered = drafts.filter(Boolean);
+  if (!preferredDraft) return filtered;
+  return [preferredDraft, ...filtered.filter((draft) => draft !== preferredDraft)];
+};
+
+/** Combines DIY drafts into one DIY draft. */
+const mergeDiyDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionData[]): DiscussionData => ({
+  ...primary,
+  mode: 'diy',
+  diyContent: drafts.map((draft) => draft.diyContent?.trim()).filter(Boolean).join('\n\n'),
+  guidedContent: undefined,
+  lastModified: new Date().toISOString(),
+});
+
+/** Combines guided drafts by filling the first empty field for each section. */
+const mergeGuidedDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionData[]): DiscussionData => {
+  const guidedContent = { ...EMPTY_GUIDED_CONTENT };
+  drafts.forEach((draft) => {
+    if (!draft.guidedContent) return;
+    (Object.keys(guidedContent) as Array<keyof GuidedDiscussionData>).forEach((key) => {
+      const value = draft.guidedContent?.[key]?.trim();
+      if (value && !guidedContent[key].trim()) guidedContent[key] = value;
+    });
+  });
+  return { ...primary, mode: 'guided', guidedContent, diyContent: undefined, lastModified: new Date().toISOString() };
+};
+
+/** Serializes guided sections into plain text for mixed-mode merges. */
+const serializeGuidedDraft = (draft: DiscussionData): string | undefined => {
+  if (draft.mode !== 'guided' || !draft.guidedContent) return undefined;
+  const text = Object.values(draft.guidedContent).map((value) => value.trim()).filter(Boolean).join('\n\n');
+  return text || undefined;
+};
+
+/** Preserves both DIY and guided draft text when scopes used different editor modes. */
+const mergeMixedDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionData[]): DiscussionData => {
+  const textParts = drafts.flatMap((draft) => {
+    if (draft.mode === 'diy') {
+      const diyContent = draft.diyContent?.trim();
+      return diyContent ? [diyContent] : [];
+    }
+    const guidedText = serializeGuidedDraft(draft);
+    return guidedText ? [guidedText] : [];
+  });
+  return mergeDiyDiscussionDrafts(primary, [{ ...primary, mode: 'diy', diyContent: textParts.join('\n\n') }]);
+};
+
 /** Merges multiple unpublished drafts into one combined-scope draft. */
 export const mergeDiscussionDrafts = (
   drafts: DiscussionData[],
   preferredDraft?: DiscussionData,
 ): DiscussionData | undefined => {
-  const ordered = preferredDraft
-    ? [preferredDraft, ...drafts.filter((draft) => draft !== preferredDraft)]
-    : drafts.filter(Boolean);
+  const ordered = orderDiscussionDrafts(drafts, preferredDraft);
   if (ordered.length === 0) return undefined;
 
   const primary = ordered[0];
-  const lastModified = new Date().toISOString();
-
-  if (ordered.every((draft) => draft.mode === 'diy')) {
-    const diyContent = ordered
-      .map((draft) => draft.diyContent?.trim())
-      .filter(Boolean)
-      .join('\n\n');
-    return { ...primary, mode: 'diy', diyContent, guidedContent: undefined, lastModified };
-  }
-
-  if (ordered.every((draft) => draft.mode === 'guided')) {
-    const guidedContent = {
-      synopsis: '',
-      meteorologicalSetup: '',
-      severeWeatherExpectations: '',
-      timing: '',
-      regionalBreakdown: '',
-      additionalConsiderations: '',
-    };
-    ordered.forEach((draft) => {
-      if (!draft.guidedContent) return;
-      (Object.keys(guidedContent) as Array<keyof typeof guidedContent>).forEach((key) => {
-        const value = draft.guidedContent?.[key]?.trim();
-        if (value && !guidedContent[key].trim()) guidedContent[key] = value;
-      });
-    });
-    return { ...primary, mode: 'guided', guidedContent, diyContent: undefined, lastModified };
-  }
-
-  return { ...primary, lastModified };
+  if (ordered.every((draft) => draft.mode === 'diy')) return mergeDiyDiscussionDrafts(primary, ordered);
+  if (ordered.every((draft) => draft.mode === 'guided')) return mergeGuidedDiscussionDrafts(primary, ordered);
+  return mergeMixedDiscussionDrafts(primary, ordered);
 };
 
 /** Returns the standard discussion grouping for one workflow grouping. */
