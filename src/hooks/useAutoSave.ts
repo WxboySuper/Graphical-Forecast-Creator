@@ -40,7 +40,7 @@ export const useAutoSave = (userId?: string | null) => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isFirstRender = useRef(true);
 
-  useEffect(() => {
+  useEffect(function autoSaveEffect() {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
@@ -59,7 +59,7 @@ export const useAutoSave = (userId?: string | null) => {
       }
     }, AUTOSAVE_DELAY);
 
-    return () => {
+    return function cleanupAutoSaveEffect() {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
