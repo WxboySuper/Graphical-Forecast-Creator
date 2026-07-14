@@ -102,11 +102,13 @@ export const isValidWorkflowAwarenessDocument = (value: unknown): value is Workf
     });
 };
 
+/** Checks the persisted document envelope and exact top-level key set. */
 function isValidWorkflowAwarenessDocumentShape(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     && sortedKeysEqual(value as Record<string, unknown>, RECORD_KEYS);
 }
 
+/** Checks document versions and the nested metadata object. */
 function isValidWorkflowAwarenessDocumentMetadata(value: Record<string, unknown>): boolean {
   return value.consentVersion === WORKFLOW_AWARENESS_CONSENT_VERSION
     && value.schemaVersion === WORKFLOW_AWARENESS_SCHEMA_VERSION
@@ -123,6 +125,7 @@ export const isValidWorkflowAwarenessMetadata = (value: unknown): value is Workf
   });
 };
 
+/** Checks the metadata subset and exact allowed key set. */
 function isValidWorkflowAwarenessMetadataShape(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     && sortedKeysEqual(value as Record<string, unknown>, METADATA_KEYS);

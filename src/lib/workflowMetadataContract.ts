@@ -47,11 +47,15 @@ export const isMetadataOnlyOutlookVersion = (value: unknown): value is OutlookVe
     && isValidDerivedFrom(value);
 };
 
-const isMetadataOnlyOutlookVersionShape = (value: unknown): value is Record<string, unknown> =>
-  isRecord(value) && hasExactKeys(value, ['version', 'status', 'createdAt'], ['derivedFrom']);
+/** Checks the allowed keys for one metadata-only outlook version. */
+function isMetadataOnlyOutlookVersionShape(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && hasExactKeys(value, ['version', 'status', 'createdAt'], ['derivedFrom']);
+}
 
-const isValidDerivedFrom = (value: Record<string, unknown>): boolean =>
-  !('derivedFrom' in value) || isValidVersionNumber(value.derivedFrom);
+/** Checks the optional source version reference. */
+function isValidDerivedFrom(value: Record<string, unknown>): boolean {
+  return !('derivedFrom' in value) || isValidVersionNumber(value.derivedFrom);
+}
 
 /** Validates the exact workflow metadata object persisted inside a cloud cycle. */
 export const isValidWorkflowMetadata = (value: unknown): value is CycleMetadata => {
@@ -61,21 +65,29 @@ export const isValidWorkflowMetadata = (value: unknown): value is CycleMetadata 
     && isWorkflowMetadataTimestamps(value);
 };
 
-const isWorkflowMetadataShape = (value: unknown): value is Record<string, unknown> =>
-  isRecord(value) && hasExactKeys(value, [
+/** Checks the required workflow metadata keys. */
+function isWorkflowMetadataShape(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && hasExactKeys(value, [
     'id', 'workflowId', 'cycleDate', 'status', 'outlookVersions', 'createdAt', 'updatedAt',
   ]);
+}
 
-const isWorkflowMetadataIdentity = (value: Record<string, unknown>): boolean =>
-  isNonEmptyText(value.id)
-  && isNonEmptyText(value.workflowId)
-  && isNonEmptyText(value.cycleDate)
-  && isSupportedStatus(value.status, CYCLE_STATUSES);
+/** Checks workflow identity and lifecycle status fields. */
+function isWorkflowMetadataIdentity(value: Record<string, unknown>): boolean {
+  return isNonEmptyText(value.id)
+    && isNonEmptyText(value.workflowId)
+    && isNonEmptyText(value.cycleDate)
+    && isSupportedStatus(value.status, CYCLE_STATUSES);
+}
 
-const isWorkflowMetadataOutlookVersions = (value: Record<string, unknown>): boolean =>
-  Array.isArray(value.outlookVersions)
-  && value.outlookVersions.length <= MAX_OUTLOOK_VERSIONS
-  && value.outlookVersions.every(isMetadataOnlyOutlookVersion);
+/** Checks the bounded list of nested outlook versions. */
+function isWorkflowMetadataOutlookVersions(value: Record<string, unknown>): boolean {
+  return Array.isArray(value.outlookVersions)
+    && value.outlookVersions.length <= MAX_OUTLOOK_VERSIONS
+    && value.outlookVersions.every(isMetadataOnlyOutlookVersion);
+}
 
-const isWorkflowMetadataTimestamps = (value: Record<string, unknown>): boolean =>
-  isNonEmptyText(value.createdAt) && isNonEmptyText(value.updatedAt);
+/** Checks workflow creation and update timestamps. */
+function isWorkflowMetadataTimestamps(value: Record<string, unknown>): boolean {
+  return isNonEmptyText(value.createdAt) && isNonEmptyText(value.updatedAt);
+}
