@@ -741,12 +741,10 @@ const restoreCloudSession = (
 const shouldSkipLocalRestore = (
   forecastCycle: ReturnType<typeof selectForecastCycle>,
   discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'],
-): boolean => {
-  if (hasRolloverForecastData(forecastCycle)) return true;
-  if (cycleHasDiscussionContent(forecastCycle)) return true;
-  if (hasUnpublishedDiscussionDrafts(discussionDraftsByScope)) return true;
-  return false;
-};
+): boolean =>
+  hasRolloverForecastData(forecastCycle)
+  || cycleHasDiscussionContent(forecastCycle)
+  || hasUnpublishedDiscussionDrafts(discussionDraftsByScope);
 
 /** Copies a legacy auto-save into the signed-in scope and removes the unscoped copy. */
 const copyLegacyAutoSaveToScopedStorage = (scopedKey: string, legacyValue: string | null): void => {
@@ -892,6 +890,7 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
 const isLegacyPromptForToday = (today: string, legacyPromptedDay: string | null): boolean => legacyPromptedDay === today;
 
 /** Returns true when a legacy active day exists and differs from today. */
+/** Returns true when a legacy last-active day exists and differs from today. */
 const hasPriorLegacyDay = (today: string, legacyLastActiveDay: string | null): legacyLastActiveDay is string => Boolean(legacyLastActiveDay) && legacyLastActiveDay !== today;
 
 /** Returns a pending prompt reconstructed from legacy rollover keys when needed. */
