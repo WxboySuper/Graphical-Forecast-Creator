@@ -72,9 +72,7 @@ const fromLegacySavedCycle = (cycle: {
   };
 };
 
-/**
- * Save cycle history to localStorage
- */
+/** Returns the storage key for anonymous or account-scoped cycle history. */
 export const getCycleHistoryStorageKey = (userId?: string | null): string =>
   userId ? getScopedStorageKey(CYCLE_HISTORY_KEY, getStorageScope(userId)) : CYCLE_HISTORY_KEY;
 
