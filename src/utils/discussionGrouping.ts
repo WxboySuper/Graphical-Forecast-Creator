@@ -10,6 +10,7 @@ export const STANDARD_DISCUSSION_GROUPINGS: readonly DiscussionGrouping[] = [
 
 const STANDARD_GROUPING_IDS = new Set(STANDARD_DISCUSSION_GROUPINGS.map(({ id }) => id));
 
+/** Returns true when a value is one of the supported forecast day numbers. */
 const isDayType = (value: unknown): value is DayType =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 8;
 

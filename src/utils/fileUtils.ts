@@ -267,6 +267,7 @@ export const downloadGfcPackage = async (
   const exportedDays = new Set<DayType>();
   const usedEntryNames = new Set<string>(['forecast_cycle.json']);
 
+  /** Adds a non-empty discussion to the package using a collision-free entry name. */
   const addDiscussion = (discussion: DiscussionData | undefined, day: DayType, identifier: string): void => {
     if (!discussion || !hasDiscussionContent(discussion)) return;
     const entryName = createUniqueDiscussionEntryName(identifier, usedEntryNames);

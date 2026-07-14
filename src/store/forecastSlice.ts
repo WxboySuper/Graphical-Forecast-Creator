@@ -956,11 +956,16 @@ export const forecastSlice = createSlice({
     },
 
     /** Persists discussion scopes without copying discussion content into each covered day. */
-    setDiscussionGroupings: (state, action: PayloadAction<DiscussionGrouping[] | undefined>) => {
-      if (action.payload !== undefined && !isValidDiscussionGroupings(action.payload)) return;
-      state.forecastCycle.discussionGroupings = action.payload === undefined
-        ? undefined
-        : normalizeDiscussionGroupings(action.payload);
+    setDiscussionGroupings: (state, action: PayloadAction<DiscussionGrouping[]>) => {
+      if (!isValidDiscussionGroupings(action.payload)) return;
+      state.forecastCycle.discussionGroupings = normalizeDiscussionGroupings(action.payload);
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
+    /** Clears custom discussion scopes and restores workflow or day defaults. */
+    resetDiscussionGroupings: (state) => {
+      state.forecastCycle.discussionGroupings = undefined;
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
@@ -1354,6 +1359,7 @@ export const {
   updateDiscussionDraft,
   updateDiscussion,
   setDiscussionGroupings,
+  resetDiscussionGroupings,
   saveCurrentCycle,
   loadSavedCycle,
   deleteSavedCycle,

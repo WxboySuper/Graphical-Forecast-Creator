@@ -22,12 +22,14 @@ const DiscussionScopeSection: React.FC<DiscussionScopeSectionProps> = ({
 
   if (groupings.length <= 1) return null;
 
+  /** Toggles whether a grouping participates in the combine operation. */
   const toggleGrouping = (id: string) => {
     setCombineIds((current) => current.includes(id)
       ? current.filter((value) => value !== id)
       : [...current, id]);
   };
 
+  /** Combines the selected discussion groupings and resets the local combine form. */
   const handleCombine = () => {
     const selected = groupings.filter((grouping) => combineIds.includes(grouping.id));
     if (selected.length < 2) return;

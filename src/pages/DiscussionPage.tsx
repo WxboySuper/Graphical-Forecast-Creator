@@ -17,6 +17,7 @@ import {
   selectForecastCycle,
   selectHasActiveWorkflow,
   selectWorkflowTemplate,
+  resetDiscussionGroupings,
   setDiscussionGroupings,
   setForecastDay,
   updateDiscussion,
@@ -728,7 +729,7 @@ export const DiscussionPage: React.FC = () => {
   }, [dispatch, forecastCycle, groupings, setSearchParams]);
 
   const handleResetGroupings = useCallback(() => {
-    dispatch(setDiscussionGroupings(undefined));
+    dispatch(resetDiscussionGroupings());
     const currentDefault = defaultGroupings.find((grouping) => grouping.days.includes(currentDay)) ?? defaultGroupings[0];
     setSearchParams({ group: currentDefault?.id ?? `day-${currentDay}` });
   }, [currentDay, defaultGroupings, dispatch, setSearchParams]);
