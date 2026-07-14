@@ -21,11 +21,13 @@ export interface DiscussionFormStateOptions {
   dispatch: ReturnType<typeof import('react-redux').useDispatch>;
 }
 
+/** Creates an empty guided-editor state for a new discussion. */
 const createDefaultGuidedContent = (): GuidedContentState => ({
   synopsis: '', meteorologicalSetup: '', severeWeatherExpectations: '', timing: '',
   regionalBreakdown: '', additionalConsiderations: '',
 });
 
+/** Returns the existing valid-end time or a default 24-hour discussion window. */
 const getInitialValidEnd = (existingDiscussion?: DiscussionData): string => {
   if (existingDiscussion?.validEnd) return existingDiscussion.validEnd;
   const end = new Date();
@@ -33,6 +35,7 @@ const getInitialValidEnd = (existingDiscussion?: DiscussionData): string => {
   return end.toISOString().slice(0, 16);
 };
 
+/** Builds initial form values from saved discussion data and editor defaults. */
 export const getDiscussionFormDefaults = (existingDiscussion?: DiscussionData): DiscussionFormDefaults => ({
   mode: existingDiscussion?.mode ?? 'diy',
   validStart: existingDiscussion?.validStart ?? new Date().toISOString().slice(0, 16),
@@ -42,6 +45,7 @@ export const getDiscussionFormDefaults = (existingDiscussion?: DiscussionData): 
   guidedContent: existingDiscussion?.guidedContent ?? createDefaultGuidedContent(),
 });
 
+/** Converts form fields into the persisted discussion shape for the active editor mode. */
 export const buildDiscussionDataFrom = (fields: DiscussionFormDefaults): DiscussionData => ({
   ...fields,
   diyContent: fields.mode === 'diy' ? fields.diyContent : undefined,
@@ -49,6 +53,7 @@ export const buildDiscussionDataFrom = (fields: DiscussionFormDefaults): Discuss
   lastModified: new Date().toISOString(),
 });
 
+/** Keeps unsaved discussion fields isolated while the user changes discussion scope. */
 const useDiscussionScopeDrafts = (options: {
   discussionKey: string;
   existingDiscussion?: DiscussionData;
@@ -90,10 +95,10 @@ const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, dis
   const [guidedContent, setGuidedContent] = useState<GuidedContentState>(initial.guidedContent);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const fields = { mode, validStart, validEnd, forecasterName, diyContent, guidedContent };
-  const applyFields = useCallback((next: DiscussionFormDefaults) => {
+  const applyFields = useCallback((next: DiscussionFormDefaults, hasChanges: boolean) => {
     setMode(next.mode); setValidStart(next.validStart); setValidEnd(next.validEnd);
     setForecasterName(next.forecasterName); setDiyContent(next.diyContent); setGuidedContent(next.guidedContent);
-    setHasUnsavedChanges(true);
+    setHasUnsavedChanges(hasChanges);
   }, []);
   useDiscussionScopeDrafts({ discussionKey, existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields });
 

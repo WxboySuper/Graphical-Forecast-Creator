@@ -271,6 +271,7 @@ const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledTex
 
 // Discussion form state lives in useDiscussionFormState to keep the page focused on composition.
 // Auto-save hook keeps the effect isolated and simple. Accepts a single options object
+/** Persists edited discussion data after the configured idle delay. */
 const useDiscussionAutoSave = (opts: {
   hasUnsavedChanges: boolean;
   buildDiscussionData: () => DiscussionData;
@@ -294,6 +295,7 @@ const useDiscussionAutoSave = (opts: {
 };
 
 // Computes derived values (compiled text and word count) in a focused hook.
+/** Derives the compiled preview text and active editor word count. */
 const useDiscussionComputed = (
   opts: {
     buildDiscussionData: () => DiscussionData;
@@ -449,6 +451,7 @@ const useDiscussionEditorState = ({
 };
 
 
+/** Synchronizes the selected discussion scope with the forecast day and URL query. */
 const useDiscussionScopeSync = (options: {
   currentDay: DayType;
   discussionDay: DayType;

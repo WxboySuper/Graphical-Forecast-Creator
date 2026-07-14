@@ -16,11 +16,11 @@ import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflow
 
 const CURRENT_VERSION = '1.0.0';
 
-// Helper to convert Map to Array for JSON serialization
+/** Converts a Map into JSON-friendly entry tuples. */
 const mapToArray = <K, V>(m: Map<K, V>): [K, V][] =>
   m instanceof Map ? Array.from(m.entries()) : [];
 
-// Helper to convert serializable Array back to Map
+/** Restores an outlook probability map from its supported serialized forms. */
 const deserializeOutlookMap = <K extends string, V>(
   value: [K, V][] | Record<string, V> | Map<K, V> | undefined,
 ): Map<K, V> | undefined => {
@@ -86,12 +86,14 @@ const serializeOutlookDay = (outlookDay: OutlookDay): SerializedDay => {
   };
 };
 
+/** Creates empty Map-backed outlook fields appropriate for a forecast day. */
 const createBaseOutlookData = (day: DayType): OutlookData => {
   if (day === 1 || day === 2) return { tornado: new Map(), wind: new Map(), hail: new Map(), categorical: new Map() };
   if (day === 3) return { totalSevere: new Map(), categorical: new Map() };
   return { 'day4-8': new Map() };
 };
 
+/** Creates a new empty outlook day with current metadata timestamps. */
 const createEmptyOutlook = (day: DayType): OutlookDay => {
   const baseData = createBaseOutlookData(day);
   return {
@@ -144,10 +146,7 @@ export const serializeForecast = (
   return result;
 };
 
-/**
- * Deserializes the saved JSON data back into ForecastCycle.
- * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
- */
+/** Migrates the legacy single-outlook save format into a day-one forecast cycle. */
 const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => {
   const day1 = createEmptyOutlook(1);
   const outlooks = data.outlooks;
@@ -161,6 +160,10 @@ const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => 
   return { days: { 1: day1 }, currentDay: 1, cycleDate: new Date().toISOString().split('T')[0] };
 };
 
+/**
+ * Deserializes the saved JSON data back into ForecastCycle.
+ * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
+ */
 export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
   if (!data.forecastCycle) return deserializeLegacyForecast(data);
   const cycle = data.forecastCycle;
