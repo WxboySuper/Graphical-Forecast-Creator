@@ -241,15 +241,15 @@ const normalizeCloudCycleMetadataRecord = ({
   return normalizeStoredMetadata({ cycleId, rawMetadata: metadataSource, fallbackUserId });
 };
 
+/** Keeps workflow metadata only when it belongs to the same cycle date. */
+const getCompatibleWorkflowMetadata = (workflowMetadata: unknown, cycleDate: string): CycleMetadata | undefined =>
+  isValidWorkflowMetadata(workflowMetadata) && workflowMetadata.cycleDate === cycleDate ? workflowMetadata : undefined;
+
 /** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   const { payload, workflowMetadata, ...metadata } = cycle;
   const payloadStats = createPayloadStorageStats(payload);
-
-  const validWorkflowMetadata = isValidWorkflowMetadata(workflowMetadata) &&
-    workflowMetadata.cycleDate === metadata.cycleDate
-    ? workflowMetadata
-    : undefined;
+  const validWorkflowMetadata = getCompatibleWorkflowMetadata(workflowMetadata, metadata.cycleDate);
 
   return {
     ...metadata,
@@ -461,10 +461,7 @@ export const saveCloudCycle = async (
       payloadHash: computePayloadHash(payload),
     };
     const payloadStats = createPayloadStorageStats(payload);
-    const validWorkflowMetadata = isValidWorkflowMetadata(requestedWorkflowMetadata) &&
-      requestedWorkflowMetadata.cycleDate === cycleDate
-      ? requestedWorkflowMetadata
-      : undefined;
+    const validWorkflowMetadata = getCompatibleWorkflowMetadata(requestedWorkflowMetadata, cycleDate);
 
     await setDoc(getCloudCycleDocRef(cycleId), {
       ...metadata,
@@ -482,9 +479,7 @@ export const saveCloudCycle = async (
   }
 };
 
-/**
- * Loads a specific cloud cycle
- */
+/** Loads a specific cloud cycle for the requested user. */
 export const loadCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult<CloudCycle>> => {
@@ -511,9 +506,7 @@ export const loadCloudCycle = async (
   }
 };
 
-/**
- * Deletes a cloud cycle
- */
+/** Deletes a cloud cycle only when it belongs to the requested user. */
 export const deleteCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult> => {
@@ -535,9 +528,7 @@ export const deleteCloudCycle = async (
   }
 };
 
-/**
- * Renames a cloud cycle
- */
+/** Renames a cloud cycle only when it belongs to the requested user. */
 export const renameCloudCycle = async (
   params: RenameCloudCycleParams
 ): Promise<CloudOperationResult> => {

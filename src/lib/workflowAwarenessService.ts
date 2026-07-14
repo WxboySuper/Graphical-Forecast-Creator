@@ -124,10 +124,11 @@ const readSnapshotRecords = (snapshot: AwarenessSnapshot): { valid: WorkflowAwar
   return { valid, malformedIds };
 };
 
-/** Serializes all writes for one user so a disable/delete cannot race a metadata save. */
+/** Serializes awareness writes so saves and deletes cannot overtake each other. */
 export class WorkflowAwarenessWriteQueue {
   private tail: Promise<void> = Promise.resolve();
 
+  /** Adds an async operation after all previously queued work. */
   enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.tail.then(operation);
     this.tail = result.then(() => undefined, () => undefined);
@@ -135,8 +136,10 @@ export class WorkflowAwarenessWriteQueue {
   }
 }
 
+/** Creates an isolated serialized write queue for one authenticated user. */
 export const createWorkflowAwarenessWriteQueue = (): WorkflowAwarenessWriteQueue => new WorkflowAwarenessWriteQueue();
 
+/** Saves one metadata-only awareness record when consent is current. */
 export const saveWorkflowAwareness = async ({
   userId,
   metadata,
