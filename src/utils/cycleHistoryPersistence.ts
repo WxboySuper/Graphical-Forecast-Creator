@@ -124,6 +124,7 @@ export const migrateLegacyCycleHistory = (userId?: string | null): void => {
   }
 };
 
+/** Persists saved cycles in the anonymous or account-scoped localStorage key. */
 export const saveCycleHistoryToStorage = (cycles: SavedCycle[], userId?: string | null): void => {
   try {
     const serialized = JSON.stringify(cycles.map(toPersistedSavedCycle));
@@ -139,16 +140,28 @@ export const saveCycleHistoryToStorage = (cycles: SavedCycle[], userId?: string 
 export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[] => {
   try {
     const scopedKey = getCycleHistoryStorageKey(userId);
-    let serialized = localStorage.getItem(scopedKey);
-
-    if (!serialized && !userId) {
-      serialized = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
-      if (serialized) {
-        localStorage.setItem(scopedKey, serialized);
+    const scopedSerialized = localStorage.getItem(scopedKey);
+    const scopedCycles = parseStoredCycleHistory(scopedSerialized);
+    if (scopedCycles.length > 0 || !userId) {
+      if (!userId && scopedSerialized === null) {
+        const legacySerialized = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
+        if (legacySerialized) {
+          localStorage.setItem(scopedKey, legacySerialized);
+          return parseStoredCycleHistory(legacySerialized);
+        }
       }
+      return scopedCycles;
     }
 
-    return parseStoredCycleHistory(serialized);
+    // During rollout, signed-in users may still have only the pre-scope history.
+    const legacySerialized = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
+    const legacyCycles = parseStoredCycleHistory(legacySerialized);
+    if (legacyCycles.length > 0) {
+      localStorage.setItem(scopedKey, legacySerialized as string);
+      localStorage.removeItem(LEGACY_CYCLE_HISTORY_KEY);
+      return legacyCycles;
+    }
+    return scopedCycles;
   } catch {
     return [];
   }

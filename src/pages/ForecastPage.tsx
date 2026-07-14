@@ -136,10 +136,13 @@ const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
 
 interface StoredRolloverPrompt extends DayRolloverPromptState {}
 
-const getRolloverStorageKey = (key: string, userId?: string | null): string =>
-  getScopedStorageKey(key, getStorageScope(userId));
+/** Returns the localStorage key for rollover state in the current workspace scope. */
+function getRolloverStorageKey(key: string, userId?: string | null): string {
+  return getScopedStorageKey(key, getStorageScope(userId));
+}
 
-const readStoredRolloverPrompt = (userId?: string | null): StoredRolloverPrompt | null => {
+/** Reads a pending rollover prompt, ignoring malformed or unavailable storage. */
+function readStoredRolloverPrompt(userId?: string | null): StoredRolloverPrompt | null {
   const stored = readStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId));
   if (!stored) return null;
 
@@ -166,22 +169,23 @@ const clearStoredRolloverPrompt = (userId?: string | null): void => {
 };
 
 /** Reads one stored day string from localStorage, returning null when storage is unavailable. */
-export const readStoredDayValue = (key: string): string | null => {
+/** Reads one stored day string from localStorage, returning null when storage is unavailable. */
+export function readStoredDayValue(key: string): string | null {
   try {
     return localStorage.getItem(key);
   } catch {
     return null;
   }
-};
+}
 
 /** Persists one day string into localStorage, ignoring storage errors. */
-export const writeStoredDayValue = (key: string, value: string) => {
+export function writeStoredDayValue(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch {
     // Ignore storage write failures so the editor keeps functioning.
   }
-};
+}
 
 /** Returns true when the forecast cycle contains any drawable outlook data or saved low-probability state. */
 export const hasRolloverForecastData = (
@@ -782,11 +786,18 @@ const restoreLocalSession = (
     return false;
   }
 
-  const data = parseStoredForecastPayload(localStorage.getItem(getAutoSaveStorageKey(userId)));
+  const scopedKey = getAutoSaveStorageKey(userId);
+  const scopedValue = localStorage.getItem(scopedKey);
+  const legacyValue = userId && scopedValue === null ? localStorage.getItem('forecastData') : null;
+  const data = parseStoredForecastPayload(scopedValue ?? legacyValue);
   if (!data) {
     return false;
   }
 
+  if (userId && scopedValue === null && legacyValue !== null) {
+    localStorage.setItem(scopedKey, legacyValue);
+    localStorage.removeItem('forecastData');
+  }
   restoreStoredForecastPayload(data, dispatch);
   addToast('Session restored from auto-save.', 'success');
   return true;
@@ -821,19 +832,21 @@ const useSessionRestore = (
   userId?: string | null
 ) => {
   const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
+  const forecastCycleRef = useRef(currentSession.forecastCycle);
   const [restoreComplete, setRestoreComplete] = useState(false);
   const [restoredSession, setRestoredSession] = useState(false);
   const [restoreAttempted, setRestoreAttempted] = useState(false);
 
   useEffect(() => {
     onCloudCycleLoadedRef.current = currentSession.onCloudCycleLoaded;
-  }, [currentSession.onCloudCycleLoaded]);
+    forecastCycleRef.current = currentSession.forecastCycle;
+  }, [currentSession.forecastCycle, currentSession.onCloudCycleLoaded]);
 
   useEffect(() => {
     try {
       migrateLegacyAutoSave(userId);
       setRestoredSession(restoreAvailableSession(dispatch, addToast, {
-        forecastCycle: currentSession.forecastCycle,
+        forecastCycle: forecastCycleRef.current,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
       }, userId));
     } catch {

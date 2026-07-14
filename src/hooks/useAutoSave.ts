@@ -8,6 +8,7 @@ import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
 const LOCAL_STORAGE_KEY = 'forecastData';
 
+/** Returns the autosave key for an account scope, or the legacy key anonymously. */
 export const getAutoSaveStorageKey = (userId?: string | null): string =>
   userId ? getScopedStorageKey(LOCAL_STORAGE_KEY, getStorageScope(userId)) : LOCAL_STORAGE_KEY;
 
@@ -29,6 +30,7 @@ export const migrateLegacyAutoSave = (userId?: string | null): void => {
   }
 };
 
+/** Debounces forecast edits into the current anonymous or account-scoped autosave. */
 export const useAutoSave = (userId?: string | null) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);

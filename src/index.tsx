@@ -9,7 +9,6 @@ import './index.css';
 import './darkMode.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { store } from './store';
 import { trackPageView } from './utils/analyticsUtils';
 
 const rootElement = document.getElementById('root') as HTMLElement;
