@@ -6,6 +6,7 @@ import type { RootState } from '../store';
 import {
   createWorkflowAwarenessWriteQueue,
   deleteWorkflowAwareness,
+  deleteOneWorkflowAwareness,
   listWorkflowAwareness,
   saveWorkflowAwareness,
   type WorkflowAwarenessWriteQueue,
@@ -134,10 +135,6 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
   }, [consent]);
 
   useEffect(() => {
-    metadataRef.current = workflowMetadata;
-  }, [workflowMetadata]);
-
-  useEffect(() => {
     const active = activeRef.current;
     active.generation += 1;
     active.userId = userId;
@@ -263,9 +260,26 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
     const metadata = metadataRef.current;
     const active = activeRef.current;
     const currentUserId = userId;
-    if (!currentUserId || !metadata || !isCurrentAwarenessConsent(currentConsent)) return undefined;
+    metadataRef.current = workflowMetadata;
+    if (!currentUserId || !isCurrentAwarenessConsent(currentConsent)) return undefined;
     const generation = active.generation;
-    const awarenessMetadata = createAwarenessMetadata(metadata);
+    if (!workflowMetadata) {
+      if (!metadata?.cycleId) return undefined;
+      const deletePromise = active.queue.enqueue(() => deleteOneWorkflowAwareness(currentUserId, metadata.cycleId));
+      deletePromise
+        .then(() => {
+          if (isActiveRequest(active, generation, currentUserId)) {
+            setRecords((previous) => previous.filter((entry) => entry.cycleId !== metadata.cycleId));
+          }
+        })
+        .catch((nextError: unknown) => {
+          if (isActiveRequest(active, generation, currentUserId)) {
+            setError(nextError instanceof Error ? nextError.message : 'Unable to clear workflow awareness.');
+          }
+        });
+      return undefined;
+    }
+    const awarenessMetadata = createAwarenessMetadata(workflowMetadata);
     setSaving(true);
     const savePromise = active.queue.enqueue(() => saveWorkflowAwareness({
       userId: currentUserId,

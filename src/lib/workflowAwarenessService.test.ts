@@ -10,6 +10,7 @@ jest.mock('./firebase', () => ({ db: { name: 'db' } }));
 
 import {
   createWorkflowAwarenessWriteQueue,
+  deleteOneWorkflowAwareness,
   getWorkflowAwarenessAllowlist,
   isValidWorkflowAwarenessRecord,
   listWorkflowAwareness,
@@ -97,4 +98,10 @@ test('serializes disable/delete behind an in-flight save', async () => {
   releaseSave();
   await Promise.all([save, remove]);
   expect(order).toEqual(['save-start', 'save-end', 'delete']);
+});
+
+test('deletes one cleared workflow awareness record', async () => {
+  await deleteOneWorkflowAwareness('user-a', metadata.cycleId);
+
+  expect(deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ parts: expect.arrayContaining([metadata.cycleId]) }));
 });
