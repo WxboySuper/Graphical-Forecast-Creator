@@ -155,7 +155,6 @@ export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[
     const legacyCycles = parseStoredCycleHistory(legacySerialized);
     if (legacyCycles.length > 0) {
       localStorage.setItem(scopedKey, legacySerialized as string);
-      localStorage.removeItem(LEGACY_CYCLE_HISTORY_KEY);
       return legacyCycles;
     }
     return scopedCycles;
