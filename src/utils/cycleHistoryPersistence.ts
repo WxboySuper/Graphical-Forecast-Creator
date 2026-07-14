@@ -115,7 +115,6 @@ export const migrateLegacyCycleHistory = (userId?: string | null): void => {
     const scopedCycles = parseStoredCycleHistory(scopedValue);
     if (scopedValue === null || scopedCycles.length === 0) {
       localStorage.setItem(scopedKey, legacyValue);
-      localStorage.removeItem(LEGACY_CYCLE_HISTORY_KEY);
     }
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.

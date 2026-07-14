@@ -129,12 +129,12 @@ describe('cycleHistoryPersistence', () => {
 
     mod.migrateLegacyCycleHistory('user-1');
 
-    expect(localStorage.getItem('gfc-cycle-history')).toBeNull();
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'legacy' }]));
     expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'legacy' }]));
 
     localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'new-legacy' }]));
     mod.migrateLegacyCycleHistory('user-1');
-    expect(localStorage.getItem('gfc-cycle-history')).toBeNull();
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
     expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
   });
 
@@ -151,7 +151,7 @@ describe('cycleHistoryPersistence', () => {
     expect(loaded).toHaveLength(1);
     expect(loaded[0].id).toBe('legacy');
     expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify(legacy));
-    expect(localStorage.getItem('gfc-cycle-history')).toBeNull();
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify(legacy));
   });
 
   test('loadCycleHistoryFromStorage returns empty on invalid stored data', async () => {
