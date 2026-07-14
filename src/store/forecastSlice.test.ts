@@ -440,6 +440,22 @@ describe('forecastSlice undo/redo', () => {
     expect(state.discussionDraftsByDay).toEqual({});
   });
 
+  test('same-session restore preserves unpublished discussion drafts', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Unsaved text survives local restore',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
+
+    state = reducer(state, restoreForecastCycle(state.forecastCycle, true));
+
+    expect(state.discussionDraftsByDay[1]).toEqual(draft);
+  });
+
   test('importing a workflow package clears drafts from the replaced cycle', () => {
     const draft = {
       mode: 'diy' as const,

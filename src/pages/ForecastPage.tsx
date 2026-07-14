@@ -641,7 +641,7 @@ const restoreStoredForecastPayload = (
   preserveDiscussionDrafts = false,
 ) => {
   const deserializedCycle = deserializeForecast(data);
-  dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle) : importForecastCycle(deserializedCycle));
+  dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle, true) : importForecastCycle(deserializedCycle));
   if (data.cycleMetadata) {
     dispatch(setWorkflowMetadata(data.cycleMetadata));
   }

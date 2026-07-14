@@ -872,17 +872,24 @@ export const forecastSlice = createSlice({
       state.isSaved = true;
     },
 
-    // Restores the local auto-save snapshot and discards drafts from the previous cycle.
-    restoreForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
-      state.forecastCycle = action.payload;
-      state.discussionDraftsByDay = {};
-      clearHistory(state);
-      state.isSaved = true;
-      state.outlookVersionSnapshots = [];
-      state.workflowMetadata = undefined;
-      state.workflowTemplate = undefined;
-      state.isWorkflowActive = false;
-      writeStoredWorkflowActive(false);
+    // Restores the local auto-save snapshot. Same-session restores may retain unpublished drafts.
+    restoreForecastCycle: {
+      reducer: (state, action: PayloadAction<{ cycle: ForecastCycle; preserveDiscussionDrafts?: boolean }>) => {
+        state.forecastCycle = action.payload.cycle;
+        if (!action.payload.preserveDiscussionDrafts) {
+          state.discussionDraftsByDay = {};
+        }
+        clearHistory(state);
+        state.isSaved = true;
+        state.outlookVersionSnapshots = [];
+        state.workflowMetadata = undefined;
+        state.workflowTemplate = undefined;
+        state.isWorkflowActive = false;
+        writeStoredWorkflowActive(false);
+      },
+      prepare: (cycle: ForecastCycle, preserveDiscussionDrafts = false) => ({
+        payload: { cycle, preserveDiscussionDrafts },
+      }),
     },
 
     // Import forecast data: Now handles Cycle
