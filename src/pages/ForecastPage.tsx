@@ -827,12 +827,17 @@ const useSessionRestore = (
   addToast: AddToastFn,
   currentSession: {
     forecastCycle: ReturnType<typeof selectForecastCycle>;
+    currentMapView: RootState['forecast']['currentMapView'];
+    workflowMetadata: RootState['forecast']['workflowMetadata'];
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
   },
   userId?: string | null
 ) => {
   const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
   const forecastCycleRef = useRef(currentSession.forecastCycle);
+  const currentMapViewRef = useRef(currentSession.currentMapView);
+  const workflowMetadataRef = useRef(currentSession.workflowMetadata);
+  const previousUserIdRef = useRef(userId);
   const [restoreComplete, setRestoreComplete] = useState(false);
   const [restoredSession, setRestoredSession] = useState(false);
   const [restoreAttempted, setRestoreAttempted] = useState(false);
@@ -840,11 +845,17 @@ const useSessionRestore = (
   useEffect(() => {
     onCloudCycleLoadedRef.current = currentSession.onCloudCycleLoaded;
     forecastCycleRef.current = currentSession.forecastCycle;
-  }, [currentSession.forecastCycle, currentSession.onCloudCycleLoaded]);
+    currentMapViewRef.current = currentSession.currentMapView;
+    workflowMetadataRef.current = currentSession.workflowMetadata;
+  }, [currentSession.currentMapView, currentSession.forecastCycle, currentSession.onCloudCycleLoaded, currentSession.workflowMetadata]);
 
   useEffect(() => {
     try {
-      migrateLegacyAutoSave(userId);
+      const liveSession = previousUserIdRef.current == null && userId
+        ? serializeForecast(forecastCycleRef.current, currentMapViewRef.current, workflowMetadataRef.current)
+        : undefined;
+      migrateLegacyAutoSave(userId, liveSession);
+      previousUserIdRef.current = userId;
       setRestoredSession(restoreAvailableSession(dispatch, addToast, {
         forecastCycle: forecastCycleRef.current,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
@@ -854,7 +865,7 @@ const useSessionRestore = (
     } finally {
       setRestoreAttempted(true);
     }
-  }, [dispatch, addToast, userId]);
+  }, [addToast, dispatch, userId]);
 
   useEffect(() => {
     if (restoreAttempted) setRestoreComplete(true);
@@ -1305,6 +1316,8 @@ const useForecastPageWorkspace = ({
 
   const { restoreComplete, restoredSession } = useSessionRestore(dispatch, addToast, {
     forecastCycle,
+    currentMapView,
+    workflowMetadata,
     onCloudCycleLoaded: handleCloudCycleLoaded,
   }, user?.uid);
   useUnsavedChangesWarning(isSaved);

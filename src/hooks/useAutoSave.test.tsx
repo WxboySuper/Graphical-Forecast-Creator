@@ -42,6 +42,15 @@ describe('useAutoSave', () => {
     expect(localStorage.getItem('forecastData:user-user%2F1')).toBe(JSON.stringify({ legacy: true }));
   });
 
+  test('persists live in-memory edits instead of migrating a stale legacy snapshot', () => {
+    localStorage.setItem('forecastData', JSON.stringify({ legacy: true }));
+
+    migrateLegacyAutoSave('user-1', { live: true, unsaved: 'edit' });
+
+    expect(localStorage.getItem('forecastData')).toBeNull();
+    expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ live: true, unsaved: 'edit' }));
+  });
+
   test('does not overwrite an existing signed-in autosave during migration', () => {
     localStorage.setItem('forecastData', JSON.stringify({ legacy: true }));
     localStorage.setItem('forecastData:user-user-1', JSON.stringify({ account: true }));
