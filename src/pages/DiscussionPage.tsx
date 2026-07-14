@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { 
@@ -390,17 +390,6 @@ const useDiscussionEditorState = ({
     dispatch(updateDiscussionDraft({ day: currentDay, draft: buildDiscussionData() }));
     form.setHasUnsavedChanges(false);
   }, [buildDiscussionData, currentDay, dispatch, form.hasUnsavedChanges, form.setHasUnsavedChanges]);
-
-  const previousScopeRef = useRef({ discussionKey, currentDay });
-  useEffect(() => {
-    const previousScope = previousScopeRef.current;
-    if (previousScope.discussionKey !== discussionKey && form.hasUnsavedChanges) {
-      // Keep the old scope's unsaved text as a draft; changing scope must not publish it.
-      dispatch(updateDiscussionDraft({ day: previousScope.currentDay, draft: buildDiscussionData() }));
-      form.setHasUnsavedChanges(false);
-    }
-    previousScopeRef.current = { discussionKey, currentDay };
-  }, [buildDiscussionData, currentDay, discussionKey, dispatch, form.hasUnsavedChanges, form.setHasUnsavedChanges]);
 
   useDiscussionAutoSave({
     hasUnsavedChanges: form.hasUnsavedChanges,
