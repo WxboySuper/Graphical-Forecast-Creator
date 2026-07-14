@@ -79,11 +79,13 @@ const AppHooks = () => {
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
 
-  // Load and persist Cycle History for the active account only
-  useCycleHistoryPersistence(userId);
+  // Tear down the previous account's persistence listener before hydration clears
+  // Redux. This ordering prevents the old scope from persisting the empty rollover state.
   useEffect(() => {
     return setupCycleHistoryListener(store, userId);
   }, [userId]);
+  // Load and persist Cycle History for the active account only
+  useCycleHistoryPersistence(userId);
 
   // Derive emergency mode and the first exposed outlook from build-target exposure.
   useEffect(() => {

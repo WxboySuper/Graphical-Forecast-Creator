@@ -221,6 +221,33 @@ describe('cycleHistoryPersistence', () => {
     spy.mockRestore();
   });
 
+  test('account rollover cleanup prevents the old listener from persisting the hydration clear', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    const oldCycle: SavedCycle = { id: 'old', timestamp: 't', cycleDate: 'd', forecastCycle: {}, stats: {} };
+    const listeners: Array<() => void> = [];
+    let state = { forecast: { savedCycles: [oldCycle] } };
+    const store: StoreLike = {
+      subscribe: (cb: () => void) => {
+        listeners.push(cb);
+        return () => {
+          const index = listeners.indexOf(cb);
+          if (index >= 0) listeners.splice(index, 1);
+        };
+      },
+      getState: () => state,
+    };
+
+    const oldScopeKey = mod.getCycleHistoryStorageKey('old-user');
+    const existingHistory = JSON.stringify([{ id: 'persisted-old-history' }]);
+    localStorage.setItem(oldScopeKey, existingHistory);
+    const oldScopeCleanup = mod.setupCycleHistoryListener(store as never, 'old-user');
+    state = { forecast: { savedCycles: [] } };
+    oldScopeCleanup();
+    listeners.forEach((listener) => listener());
+
+    expect(localStorage.getItem(oldScopeKey)).toBe(existingHistory);
+  });
+
   test('loadCycleHistoryFromStorage returns empty on JSON parse error', async () => {
     localStorage.setItem('gfc-cycle-history', 'not-json');
     const mod = await import('./cycleHistoryPersistence');
