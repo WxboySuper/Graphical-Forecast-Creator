@@ -239,7 +239,7 @@ describe('ForecastPage layout selection', () => {
     expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('autosave-outlook');
   });
 
-  test('prefers newer anonymous autosave over stale signed-in snapshot on sign-in', async () => {
+  test('keeps in-memory anonymous edits on sign-in without overwriting account autosave', async () => {
     const store = createStore();
     const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [0, 0], zoom: 0 });
     stalePayload.timestamp = '2026-07-13T12:00:00.000Z';
@@ -289,8 +289,7 @@ describe('ForecastPage layout selection', () => {
     await waitFor(() => {
       expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('anonymous-outlook');
       expect(localStorage.getItem('forecastData')).toBe(JSON.stringify(anonymousPayload));
-      const scopedPayload = parseStoredForecastPayload(localStorage.getItem('forecastData:user-user-1'));
-      expect(scopedPayload?.forecastCycle?.days?.[1]?.data?.tornado?.[0]?.[1]?.[0]?.id).toBe('anonymous-outlook');
+      expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify(stalePayload));
     });
   });
 

@@ -53,8 +53,8 @@ export const migrateLegacyAutoSave = (userId?: string | null, liveSession?: unkn
     const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
 
     if (liveSession !== undefined) {
-      const liveValue = JSON.stringify(liveSession);
       if (scopedValue === null) {
+        const liveValue = JSON.stringify(liveSession);
         const preferred = pickNewestAutoSaveValue(legacyValue, liveValue);
         if (preferred) {
           localStorage.setItem(scopedKey, preferred);
@@ -62,12 +62,6 @@ export const migrateLegacyAutoSave = (userId?: string | null, liveSession?: unkn
         if (legacyValue !== null) {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
         }
-        return;
-      }
-
-      const preferred = pickNewestAutoSaveValue(scopedValue, liveValue);
-      if (preferred) {
-        localStorage.setItem(scopedKey, preferred);
       }
       return;
     }

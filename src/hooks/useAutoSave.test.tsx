@@ -51,14 +51,14 @@ describe('useAutoSave', () => {
     expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ live: true, unsaved: 'edit', timestamp: '2026-07-14T00:00:00.000Z' }));
   });
 
-  test('does not promote unscoped legacy over an existing account autosave on sign-in', () => {
+  test('does not promote anonymous live state over an existing account autosave on sign-in', () => {
     localStorage.setItem('forecastData', JSON.stringify({ legacy: true, timestamp: '2026-07-14T12:00:00.000Z' }));
     localStorage.setItem('forecastData:user-user-1', JSON.stringify({ account: true, timestamp: '2026-07-13T12:00:00.000Z' }));
 
     migrateLegacyAutoSave('user-1', { live: true, timestamp: '2026-07-14T11:00:00.000Z' });
 
     expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ legacy: true, timestamp: '2026-07-14T12:00:00.000Z' }));
-    expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ live: true, timestamp: '2026-07-14T11:00:00.000Z' }));
+    expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ account: true, timestamp: '2026-07-13T12:00:00.000Z' }));
   });
 
   test('selectPreferredAutoSaveValue keeps account autosave over legacy copies', () => {
