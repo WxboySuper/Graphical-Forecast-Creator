@@ -79,13 +79,13 @@ const AppHooks = () => {
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
 
-  // Tear down the previous account's persistence listener before hydration clears
-  // Redux. This ordering prevents the old scope from persisting the empty rollover state.
+  // Hydrate the active account before starting its persistence listener. React runs
+  // effect cleanups before new effects, so the previous listener is removed before
+  // this clears Redux and the new listener only observes the hydrated scope.
+  useCycleHistoryPersistence(userId);
   useEffect(() => {
     return setupCycleHistoryListener(store, userId);
   }, [userId]);
-  // Load and persist Cycle History for the active account only
-  useCycleHistoryPersistence(userId);
 
   // Derive emergency mode and the first exposed outlook from build-target exposure.
   useEffect(() => {
