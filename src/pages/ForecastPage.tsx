@@ -31,6 +31,7 @@ import {
   redoLastEdit,
   undoLastEdit,
   setWorkflowMetadata,
+  clearWorkflowMetadata,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
@@ -307,6 +308,8 @@ const applyLoadedForecast = (
   dispatch(importForecastCycle(payload.deserializedCycle));
   if (payload.rawData.cycleMetadata) {
     dispatch(setWorkflowMetadata(payload.rawData.cycleMetadata));
+  } else if (payload.rawData.cycleMetadata === null) {
+    dispatch(clearWorkflowMetadata());
   }
 
   if (payload.rawData.mapView) {
@@ -649,8 +652,9 @@ const restoreStoredForecastPayload = (
   dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle, true) : importForecastCycle(deserializedCycle));
   if (data.cycleMetadata) {
     dispatch(setWorkflowMetadata(data.cycleMetadata));
+  } else if (data.cycleMetadata === null) {
+    dispatch(clearWorkflowMetadata());
   }
-
   const rawData = data as LoadedForecastPayload['rawData'];
   if (rawData.mapView) {
     dispatch(setMapView(rawData.mapView));
@@ -1127,7 +1131,7 @@ const useCloudForecastActions = ({
 
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload);
+      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');

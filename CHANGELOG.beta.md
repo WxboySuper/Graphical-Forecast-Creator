@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #695
+
+- Add consented, metadata-only workflow awareness synchronization with strict persistence safeguards.
+
 ### PR #694
 
 - Preserve discussions and drafts across workflow grouping, scope, and route changes.

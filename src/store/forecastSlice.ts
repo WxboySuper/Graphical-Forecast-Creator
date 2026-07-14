@@ -1131,6 +1131,13 @@ export const forecastSlice = createSlice({
       writeStoredWorkflowActive(true);
     },
 
+    clearWorkflowMetadata: (state) => {
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
+      state.isWorkflowActive = false;
+      writeStoredWorkflowActive(false);
+    },
+
     setWorkflowTemplate: (state, action: PayloadAction<WorkflowMetadata>) => {
       state.workflowTemplate = action.payload;
     },
@@ -1177,7 +1184,14 @@ export const forecastSlice = createSlice({
     },
 
     completeCycle: (state) => {
-      state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
+      const completedAt = new Date().toISOString();
+      state.forecastCycle.completionAcknowledgedAt = completedAt;
+      if (state.workflowMetadata) {
+        state.workflowMetadata.status = 'completed';
+        state.workflowMetadata.updatedAt = completedAt;
+        const currentVersion = state.workflowMetadata.outlookVersions[state.workflowMetadata.outlookVersions.length - 1];
+        if (currentVersion?.status === 'in-progress') currentVersion.status = 'completed';
+      }
       delete state.forecastCycle.omittedDayReasons;
       delete state.forecastCycle.updateInProgressVersion;
       state.completionValidation.showCompletionModal = false;
@@ -1187,7 +1201,14 @@ export const forecastSlice = createSlice({
     },
 
     completeWithOmissions: (state) => {
-      state.forecastCycle.completionAcknowledgedAt = new Date().toISOString();
+      const completedAt = new Date().toISOString();
+      state.forecastCycle.completionAcknowledgedAt = completedAt;
+      if (state.workflowMetadata) {
+        state.workflowMetadata.status = 'completed-with-omissions';
+        state.workflowMetadata.updatedAt = completedAt;
+        const currentVersion = state.workflowMetadata.outlookVersions[state.workflowMetadata.outlookVersions.length - 1];
+        if (currentVersion?.status === 'in-progress') currentVersion.status = 'omitted';
+      }
       state.forecastCycle.omittedDayReasons = { ...state.completionValidation.omittedDays };
       delete state.forecastCycle.updateInProgressVersion;
       state.completionValidation.showCompletionModal = false;
@@ -1409,6 +1430,7 @@ export const {
   undoLastEdit,
   redoLastEdit,
   setWorkflowMetadata,
+  clearWorkflowMetadata,
   setWorkflowTemplate,
   importWorkflowPackage,
   validateCompletion,

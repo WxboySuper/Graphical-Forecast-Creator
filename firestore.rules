@@ -1,0 +1,203 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasOnlyKeys(value, allowed) {
+      return value is map && value.keys().hasOnly(allowed);
+    }
+
+    function isValidOutlookVersion(value) {
+      return value is map &&
+        value.keys().hasOnly(['version', 'status', 'derivedFrom', 'createdAt']) &&
+        value.keys().hasAll(['version', 'status', 'createdAt']) &&
+        value.version is int &&
+        value.version >= 1 &&
+        value.version <= 32 &&
+        value.status is string &&
+        ['in-progress', 'completed', 'skipped', 'omitted'].hasAny([value.status]) &&
+        value.createdAt is string &&
+        value.createdAt.size() > 0 &&
+        (!('derivedFrom' in value) ||
+          (value.derivedFrom is int && value.derivedFrom >= 1 && value.derivedFrom <= 32));
+    }
+
+    // Rules language has no collection-wide every() operation. Validate each
+    // possible list slot explicitly so no arbitrary nested data can be stored.
+    function isValidOutlookVersions(value) {
+      return value is list &&
+        value.size() <= 32 &&
+        (value.size() <= 0 || isValidOutlookVersion(value[0])) &&
+        (value.size() <= 1 || isValidOutlookVersion(value[1])) &&
+        (value.size() <= 2 || isValidOutlookVersion(value[2])) &&
+        (value.size() <= 3 || isValidOutlookVersion(value[3])) &&
+        (value.size() <= 4 || isValidOutlookVersion(value[4])) &&
+        (value.size() <= 5 || isValidOutlookVersion(value[5])) &&
+        (value.size() <= 6 || isValidOutlookVersion(value[6])) &&
+        (value.size() <= 7 || isValidOutlookVersion(value[7])) &&
+        (value.size() <= 8 || isValidOutlookVersion(value[8])) &&
+        (value.size() <= 9 || isValidOutlookVersion(value[9])) &&
+        (value.size() <= 10 || isValidOutlookVersion(value[10])) &&
+        (value.size() <= 11 || isValidOutlookVersion(value[11])) &&
+        (value.size() <= 12 || isValidOutlookVersion(value[12])) &&
+        (value.size() <= 13 || isValidOutlookVersion(value[13])) &&
+        (value.size() <= 14 || isValidOutlookVersion(value[14])) &&
+        (value.size() <= 15 || isValidOutlookVersion(value[15])) &&
+        (value.size() <= 16 || isValidOutlookVersion(value[16])) &&
+        (value.size() <= 17 || isValidOutlookVersion(value[17])) &&
+        (value.size() <= 18 || isValidOutlookVersion(value[18])) &&
+        (value.size() <= 19 || isValidOutlookVersion(value[19])) &&
+        (value.size() <= 20 || isValidOutlookVersion(value[20])) &&
+        (value.size() <= 21 || isValidOutlookVersion(value[21])) &&
+        (value.size() <= 22 || isValidOutlookVersion(value[22])) &&
+        (value.size() <= 23 || isValidOutlookVersion(value[23])) &&
+        (value.size() <= 24 || isValidOutlookVersion(value[24])) &&
+        (value.size() <= 25 || isValidOutlookVersion(value[25])) &&
+        (value.size() <= 26 || isValidOutlookVersion(value[26])) &&
+        (value.size() <= 27 || isValidOutlookVersion(value[27])) &&
+        (value.size() <= 28 || isValidOutlookVersion(value[28])) &&
+        (value.size() <= 29 || isValidOutlookVersion(value[29])) &&
+        (value.size() <= 30 || isValidOutlookVersion(value[30])) &&
+        (value.size() <= 31 || isValidOutlookVersion(value[31]));
+    }
+
+    function isValidWorkflowMetadata(value) {
+      return value is map &&
+        value.keys().hasOnly([
+          'id', 'workflowId', 'cycleDate', 'status',
+          'outlookVersions', 'createdAt', 'updatedAt'
+        ]) &&
+        value.keys().hasAll([
+          'id', 'workflowId', 'cycleDate', 'status',
+          'outlookVersions', 'createdAt', 'updatedAt'
+        ]) &&
+        value.id is string && value.id.size() > 0 &&
+        value.workflowId is string && value.workflowId.size() > 0 &&
+        value.cycleDate is string && value.cycleDate.size() > 0 &&
+        value.status is string &&
+        ['in-progress', 'completed', 'completed-with-omissions'].hasAny([value.status]) &&
+        isValidOutlookVersions(value.outlookVersions) &&
+        value.createdAt is string && value.createdAt.size() > 0 &&
+        value.updatedAt is string && value.updatedAt.size() > 0;
+    }
+
+    function isValidWorkflowAwarenessMetadata(value, cycleId) {
+      return value is map &&
+        value.keys().hasOnly([
+          'cycleId', 'workflowId', 'cycleDate', 'status',
+          'outlookVersions', 'createdAt', 'updatedAt'
+        ]) &&
+        value.keys().hasAll([
+          'cycleId', 'workflowId', 'cycleDate', 'status',
+          'outlookVersions', 'createdAt', 'updatedAt'
+        ]) &&
+        value.cycleId == cycleId &&
+        value.cycleId is string && value.cycleId.size() > 0 &&
+        value.workflowId is string && value.workflowId.size() > 0 &&
+        value.cycleDate is string && value.cycleDate.size() > 0 &&
+        value.status is string &&
+        ['in-progress', 'completed', 'completed-with-omissions'].hasAny([value.status]) &&
+        isValidOutlookVersions(value.outlookVersions) &&
+        value.createdAt is string && value.createdAt.size() > 0 &&
+        value.updatedAt is string && value.updatedAt.size() > 0;
+    }
+
+    function isValidWorkflowAwarenessDocument(data, cycleId) {
+      return data is map &&
+        data.keys().hasOnly(['consentVersion', 'schemaVersion', 'metadata']) &&
+        data.keys().hasAll(['consentVersion', 'schemaVersion', 'metadata']) &&
+        data.consentVersion == 1 &&
+        data.schemaVersion == 1 &&
+        isValidWorkflowAwarenessMetadata(data.metadata, cycleId);
+    }
+
+    function isValidCloudCycle(data, cycleId) {
+      return data is map &&
+        data.keys().hasOnly([
+          'id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt',
+          'forecastDays', 'totalOutlooks', 'totalFeatures', 'isReadOnly',
+          'payloadHash', 'payloadJson', 'payloadBytes', 'workflowMetadata'
+        ]) &&
+        data.keys().hasAll([
+          'id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt',
+          'forecastDays', 'totalOutlooks', 'totalFeatures', 'isReadOnly',
+          'payloadJson', 'payloadBytes'
+        ]) &&
+        data.id == cycleId &&
+        data.id is string && data.id.size() > 0 &&
+        data.userId is string && data.userId.size() > 0 &&
+        data.label is string && data.label.size() > 0 &&
+        data.cycleDate is string && data.cycleDate.size() > 0 &&
+        data.createdAt is string && data.createdAt.size() > 0 &&
+        data.updatedAt is string && data.updatedAt.size() > 0 &&
+        data.forecastDays is int && data.forecastDays >= 0 &&
+        data.totalOutlooks is int && data.totalOutlooks >= 0 &&
+        data.totalFeatures is int && data.totalFeatures >= 0 &&
+        data.isReadOnly is bool &&
+        data.payloadJson is string &&
+        data.payloadBytes is int && data.payloadBytes >= 0 &&
+        (!('payloadHash' in data) || data.payloadHash is string) &&
+        (!('workflowMetadata' in data) ||
+          (isValidWorkflowMetadata(data.workflowMetadata) &&
+            data.workflowMetadata.cycleDate == data.cycleDate));
+    }
+
+    match /userProfiles/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /userSettings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /userEntitlements/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /userMetrics/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /users/{userId}/workflowAwareness/{cycleId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+        isValidWorkflowAwarenessDocument(request.resource.data, cycleId);
+      allow update: if isOwner(userId) &&
+        isValidWorkflowAwarenessDocument(request.resource.data, cycleId);
+      allow delete: if isOwner(userId);
+    }
+
+    match /cloudCycles/{cycleId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidCloudCycle(request.resource.data, cycleId);
+      allow update: if isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        isValidCloudCycle(request.resource.data, cycleId);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /adminDailyMetrics/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /adminMetricDedupes/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

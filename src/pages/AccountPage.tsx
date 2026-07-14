@@ -23,6 +23,7 @@ import { Input } from "../components/ui/input";
 import { useAuth } from "../auth/AuthProvider";
 import { useEntitlement } from "../billing/EntitlementProvider";
 import { useUserMetrics } from "../metrics/useUserMetrics";
+import { useWorkflowAwareness } from "../hooks/useWorkflowAwarenessSync";
 import type { RootState } from "../store";
 import { selectForecastCycle, selectSavedCycles } from "../store/forecastSlice";
 import { computeHomeStats } from "./homeUtils";
@@ -289,6 +290,33 @@ const DiscussionDefaultsSection: React.FC<{
 );
 
 /** Bottom action row for saving defaults and ending the current session. */
+/** Opt-in disclosure for the metadata-only workflow awareness feature. */
+const WorkflowAwarenessSection: React.FC<{
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+}> = ({ enabled, onEnabledChange }) => (
+  <div className="account-subsection-card">
+    <div className="account-subsection-header">
+      <h2>Workflow awareness</h2>
+      <p>
+        Share only cycle IDs, workflow status, dates, and version relationships to help Home surface unfinished work.
+        Forecast maps, geometry, discussions, package content, and map views never upload here.
+      </p>
+    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      className="account-button-row"
+      onClick={() => onEnabledChange(!enabled)}
+    >
+      <Badge variant={enabled ? "success" : "outline"}>{enabled ? "Enabled" : "Disabled"}</Badge>
+      <span className="text-sm text-muted-foreground">{enabled ? "Disable and delete shared awareness metadata" : "Enable metadata-only awareness sync"}</span>
+    </button>
+  </div>
+);
+
+/** Renders one account action row for an authenticated user. */
 const SignedInActionRow: React.FC<{
   savingDefaults: boolean;
   saveMessage: string | null;
@@ -696,6 +724,8 @@ const SignedInPrimaryCard: React.FC<{
   providerLabels: string[];
   defaultForecasterName: string;
   setDefaultForecasterName: React.Dispatch<React.SetStateAction<string>>;
+  awarenessEnabled: boolean;
+  onAwarenessEnabledChange: (enabled: boolean) => void;
   forecastUiMessage: string | null;
   savingDefaults: boolean;
   saveMessage: string | null;
@@ -707,6 +737,8 @@ const SignedInPrimaryCard: React.FC<{
   providerLabels,
   defaultForecasterName,
   setDefaultForecasterName,
+  awarenessEnabled,
+  onAwarenessEnabledChange,
   savingDefaults,
   saveMessage,
   onSaveDefaults,
@@ -727,6 +759,10 @@ const SignedInPrimaryCard: React.FC<{
       <DiscussionDefaultsSection
         defaultForecasterName={defaultForecasterName}
         setDefaultForecasterName={setDefaultForecasterName}
+      />
+      <WorkflowAwarenessSection
+        enabled={awarenessEnabled}
+        onEnabledChange={onAwarenessEnabledChange}
       />
       <SignedInActionRow
         savingDefaults={savingDefaults}
@@ -756,6 +792,7 @@ const SignedInAccountView: React.FC = () => {
   );
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [savingDefaults, setSavingDefaults] = useState(false);
+  const { enabled: awarenessEnabled, setEnabled: setAwarenessEnabled } = useWorkflowAwareness();
 
   const providerLabels = useMemo(
     () =>
@@ -827,6 +864,8 @@ const SignedInAccountView: React.FC = () => {
             providerLabels={providerLabels}
             defaultForecasterName={defaultForecasterName}
             setDefaultForecasterName={setDefaultForecasterName}
+            awarenessEnabled={awarenessEnabled}
+            onAwarenessEnabledChange={setAwarenessEnabled}
             forecastUiMessage={forecastUiMessage}
             savingDefaults={savingDefaults}
             saveMessage={saveMessage}

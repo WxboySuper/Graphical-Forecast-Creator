@@ -239,8 +239,8 @@ export interface GFCForecastSaveData {
     updateInProgressVersion?: number;
   };
 
-  /** Optional v2 workflow cycle metadata embedded in v1.0.0 saves. */
-  cycleMetadata?: import('./workflow').CycleMetadata;
+  /** Optional v2 workflow cycle metadata embedded in v1.0.0 saves. Null clears an active workflow on load. */
+  cycleMetadata?: import('./workflow').CycleMetadata | null;
 }
 
 // ---------------------------------------------------------------------------
