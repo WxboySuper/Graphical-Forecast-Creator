@@ -37,8 +37,8 @@ export const useAutoSave = (userId?: string | null) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isFirstRender = useRef(true);
+  const saveGenerationRef = useRef(0);
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -46,11 +46,9 @@ export const useAutoSave = (userId?: string | null) => {
       return;
     }
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-
-    timerRef.current = setTimeout(() => {
+    const generation = ++saveGenerationRef.current;
+    setTimeout(() => {
+      if (generation !== saveGenerationRef.current) return;
       try {
         const data = serializeForecast(forecastCycle, mapView, workflowMetadata);
         localStorage.setItem(getAutoSaveStorageKey(userId), JSON.stringify(data));
@@ -58,11 +56,5 @@ export const useAutoSave = (userId?: string | null) => {
         // Auto-save silently fails to avoid disrupting the user
       }
     }, AUTOSAVE_DELAY);
-
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
   }, [forecastCycle, mapView, userId, workflowMetadata]);
 };
