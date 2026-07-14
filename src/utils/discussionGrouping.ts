@@ -25,6 +25,49 @@ export const hasDiscussionContent = (discussion: DiscussionData | undefined): bo
   );
 };
 
+/** Merges multiple unpublished drafts into one combined-scope draft. */
+export const mergeDiscussionDrafts = (
+  drafts: DiscussionData[],
+  preferredDraft?: DiscussionData,
+): DiscussionData | undefined => {
+  const ordered = preferredDraft
+    ? [preferredDraft, ...drafts.filter((draft) => draft !== preferredDraft)]
+    : drafts.filter(Boolean);
+  if (ordered.length === 0) return undefined;
+
+  const primary = ordered[0];
+  const lastModified = new Date().toISOString();
+
+  if (ordered.every((draft) => draft.mode === 'diy')) {
+    const diyContent = ordered
+      .map((draft) => draft.diyContent?.trim())
+      .filter(Boolean)
+      .join('\n\n');
+    return { ...primary, mode: 'diy', diyContent, guidedContent: undefined, lastModified };
+  }
+
+  if (ordered.every((draft) => draft.mode === 'guided')) {
+    const guidedContent = {
+      synopsis: '',
+      meteorologicalSetup: '',
+      severeWeatherExpectations: '',
+      timing: '',
+      regionalBreakdown: '',
+      additionalConsiderations: '',
+    };
+    ordered.forEach((draft) => {
+      if (!draft.guidedContent) return;
+      (Object.keys(guidedContent) as Array<keyof typeof guidedContent>).forEach((key) => {
+        const value = draft.guidedContent?.[key]?.trim();
+        if (value && !guidedContent[key].trim()) guidedContent[key] = value;
+      });
+    });
+    return { ...primary, mode: 'guided', guidedContent, diyContent: undefined, lastModified };
+  }
+
+  return { ...primary, lastModified };
+};
+
 /** Returns the standard discussion grouping for one workflow grouping. */
 export const discussionGroupingForStandard = (
   grouping: StandardGrouping,

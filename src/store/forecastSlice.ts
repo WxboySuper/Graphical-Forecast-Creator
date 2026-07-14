@@ -11,7 +11,7 @@ import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
-import { isValidDiscussionGroupings, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
+import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -954,17 +954,21 @@ export const forecastSlice = createSlice({
       const { migrations, preferScopeId } = action.payload;
       const preferredDraft = preferScopeId ? state.discussionDraftsByScope[preferScopeId] : undefined;
       const nextDrafts = { ...state.discussionDraftsByScope };
+      const targetsToSources = new Map<string, string[]>();
 
-      for (const [fromScopeId, toScopeId] of Object.entries(migrations)) {
-        const draft = nextDrafts[fromScopeId];
-        if (!draft || (nextDrafts[toScopeId] && fromScopeId !== preferScopeId)) continue;
-        nextDrafts[toScopeId] = draft;
-      }
+      Object.entries(migrations).forEach(([fromScopeId, toScopeId]) => {
+        const sources = targetsToSources.get(toScopeId) ?? [];
+        sources.push(fromScopeId);
+        targetsToSources.set(toScopeId, sources);
+      });
 
-      if (preferredDraft && preferScopeId) {
-        const targetScopeId = migrations[preferScopeId];
-        if (targetScopeId) nextDrafts[targetScopeId] = preferredDraft;
-      }
+      targetsToSources.forEach((fromScopeIds, toScopeId) => {
+        const sourceDrafts = fromScopeIds
+          .map((scopeId) => nextDrafts[scopeId])
+          .filter(Boolean) as DiscussionData[];
+        const mergedDraft = mergeDiscussionDrafts(sourceDrafts, preferredDraft);
+        if (mergedDraft) nextDrafts[toScopeId] = mergedDraft;
+      });
 
       const removedScopeIds = new Set(Object.keys(migrations));
       state.discussionDraftsByScope = Object.fromEntries(

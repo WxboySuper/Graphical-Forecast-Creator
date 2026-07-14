@@ -530,7 +530,7 @@ describe('forecastSlice undo/redo', () => {
       preferScopeId: 'day1',
     }));
 
-    expect(state.discussionDraftsByScope).toEqual({ 'custom-combined': dayOneDraft });
+    expect(state.discussionDraftsByScope['custom-combined']?.diyContent).toBe('Day 1 draft\n\nDay 2 draft');
   });
 
   test('migrates custom scope drafts back to default scope ids on reset', () => {
@@ -541,7 +541,8 @@ describe('forecastSlice undo/redo', () => {
       migrations: { 'custom-1': 'day1' },
     }));
 
-    expect(state.discussionDraftsByScope).toEqual({ day1: customDraft });
+    expect(state.discussionDraftsByScope.day1?.diyContent).toBe('Custom scope draft');
+    expect(state.discussionDraftsByScope['custom-1']).toBeUndefined();
   });
 
   test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {
