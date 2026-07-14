@@ -177,24 +177,38 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
 };
 
 // Main App with Router
+interface AppContentProps {
+  showComingSoon: boolean;
+}
+
+/** Renders the routed application inside the shared providers. */
+const AppContent: React.FC<AppContentProps> = ({ showComingSoon }) => (
+  <BrowserRouter>
+    <GoogleAnalyticsRouteTracker />
+    <AgreementGate showComingSoon={showComingSoon} />
+    <AppRoutes showComingSoon={showComingSoon} />
+  </BrowserRouter>
+);
+
+/** Composes the application providers without coupling them to route markup. */
+const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
+  <Provider store={store}>
+    <AuthProvider>
+      <EntitlementProvider>
+        <WorkflowAwarenessProvider>{children}</WorkflowAwarenessProvider>
+      </EntitlementProvider>
+    </AuthProvider>
+  </Provider>
+);
+
 function App() {
   const isLaunched = useLaunchGate();
   const showComingSoon = COMING_SOON_MODE && !isLaunched;
 
   return (
-    <Provider store={store}>
-      <AuthProvider>
-        <EntitlementProvider>
-          <WorkflowAwarenessProvider>
-          <BrowserRouter>
-            <GoogleAnalyticsRouteTracker />
-            <AgreementGate showComingSoon={showComingSoon} />
-            <AppRoutes showComingSoon={showComingSoon} />
-          </BrowserRouter>
-          </WorkflowAwarenessProvider>
-        </EntitlementProvider>
-      </AuthProvider>
-    </Provider>
+    <AppProviders>
+      <AppContent showComingSoon={showComingSoon} />
+    </AppProviders>
   );
 }
 

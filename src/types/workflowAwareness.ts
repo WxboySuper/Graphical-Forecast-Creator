@@ -46,6 +46,7 @@ export interface WorkflowAwarenessRecommendation extends WorkflowAwarenessMetada
   reason: 'in-progress-cycle';
 }
 
+/** Projects full cycle metadata into the privacy-safe awareness allowlist. */
 export const createAwarenessMetadata = (metadata: CycleMetadata): WorkflowAwarenessMetadata => ({
   cycleId: metadata.id,
   workflowId: metadata.workflowId,
@@ -61,6 +62,7 @@ export const createAwarenessMetadata = (metadata: CycleMetadata): WorkflowAwaren
   updatedAt: metadata.updatedAt,
 });
 
+/** Returns true only for the currently supported enabled consent version. */
 export const isCurrentAwarenessConsent = (
   consent: WorkflowAwarenessConsent | undefined,
 ): consent is WorkflowAwarenessConsent & { version: typeof WORKFLOW_AWARENESS_CONSENT_VERSION } =>

@@ -16,9 +16,11 @@ const OUTLOOK_STATUSES: readonly OutlookStatus[] = [
   'omitted',
 ];
 
+/** Narrows unknown input to a non-array object record. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** Ensures a contract object contains only its required and optional keys. */
 const hasExactKeys = (value: Record<string, unknown>, required: readonly string[], optional: readonly string[] = []): boolean => {
   const allowed = new Set([...required, ...optional]);
   const keys = Object.keys(value);

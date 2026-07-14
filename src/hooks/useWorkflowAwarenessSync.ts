@@ -23,8 +23,10 @@ import {
 const AWARENESS_CONSENT_KEY_PREFIX = 'gfc-workflow-awareness-consent:';
 const AWARENESS_CONSENT_EVENT = 'gfc-workflow-awareness-consent-changed';
 
+/** Builds the per-user local-storage key for awareness consent. */
 const getConsentKey = (userId: string): string => `${AWARENESS_CONSENT_KEY_PREFIX}${userId}`;
 
+/** Reads opt-in consent without enabling awareness when storage is unavailable. */
 export const readWorkflowAwarenessConsent = (userId: string | undefined): WorkflowAwarenessConsent => {
   if (!userId || typeof localStorage === 'undefined') return { enabled: false, version: WORKFLOW_AWARENESS_CONSENT_VERSION };
   try {
@@ -40,6 +42,7 @@ export const readWorkflowAwarenessConsent = (userId: string | undefined): Workfl
   }
 };
 
+/** Persists consent and notifies other mounted consumers in this tab. */
 export const writeWorkflowAwarenessConsent = (userId: string, consent: WorkflowAwarenessConsent): void => {
   try {
     localStorage.setItem(getConsentKey(userId), JSON.stringify(consent));
@@ -62,6 +65,7 @@ export interface WorkflowAwarenessSyncResult {
 
 const WorkflowAwarenessContext = createContext<WorkflowAwarenessSyncResult | null>(null);
 
+/** Returns the shared awareness state, or a disabled fallback outside its provider. */
 export const useWorkflowAwareness = (): WorkflowAwarenessSyncResult => {
   const context = useContext(WorkflowAwarenessContext);
   if (context) return context;
@@ -83,6 +87,7 @@ interface ActiveRequest {
   queue: WorkflowAwarenessWriteQueue;
 }
 
+/** Checks that an async response still belongs to the active auth generation. */
 export const isWorkflowAwarenessResponseCurrent = ({
   requestGeneration,
   currentGeneration,
@@ -95,6 +100,7 @@ export const isWorkflowAwarenessResponseCurrent = ({
   currentUserId?: string;
 }): boolean => requestGeneration === currentGeneration && requestUserId === currentUserId;
 
+/** Applies the generation and user identity guard to a pending operation. */
 const isActiveRequest = (active: ActiveRequest, generation: number, userId?: string): boolean =>
   isWorkflowAwarenessResponseCurrent({
     requestGeneration: generation,
@@ -288,6 +294,7 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
   return { enabled: isCurrentAwarenessConsent(consent), loading, saving, error, records, recommendations, setEnabled, refresh };
 };
 
+/** Provides opt-in awareness synchronization to the application tree. */
 export const WorkflowAwarenessProvider: FC<PropsWithChildren> = ({ children }) => createElement(
   WorkflowAwarenessContext.Provider,
   { value: useWorkflowAwarenessSync() },

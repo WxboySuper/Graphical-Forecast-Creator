@@ -340,6 +340,7 @@ const HomePage: React.FC = () => {
     isSaved,
   } = logic;
 
+  /** Restores a matching local cycle, or opens the editor when none is available. */
   const handleAwarenessRestore = (savedCycleId?: string) => {
     if (savedCycleId) {
       if (logic.handleRestoreSavedCycle) {

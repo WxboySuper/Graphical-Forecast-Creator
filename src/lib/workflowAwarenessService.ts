@@ -31,13 +31,16 @@ const OUTLOOK_STATUSES = new Set(['in-progress', 'completed', 'skipped', 'omitte
 
 type AwarenessSnapshot = QuerySnapshot<DocumentData>;
 
+/** Compares an object's keys with an exact allowlist. */
 const sortedKeysEqual = (value: Record<string, unknown>, keys: string[]): boolean => {
   const actual = Object.keys(value).sort();
   return actual.length === keys.length && actual.every((key, index) => key === [...keys].sort()[index]);
 };
 
+/** Checks that a persisted string field is present and non-blank. */
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
+/** Validates one privacy-safe outlook version entry. */
 const isValidOutlookVersion = (value: unknown): value is WorkflowAwarenessRecord['outlookVersions'][number] => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const version = value as Record<string, unknown>;
@@ -88,11 +91,13 @@ export const isValidWorkflowAwarenessMetadata = (value: unknown): value is Workf
   });
 };
 
+/** Returns the current user's isolated awareness collection. */
 const getAwarenessCollection = (userId: string) => {
   if (!db) throw new Error('Firestore is not initialized');
   return collection(db, 'users', userId, AWARENESS_COLLECTION);
 };
 
+/** Returns one awareness document reference without accessing cycle documents. */
 const getAwarenessDoc = (userId: string, cycleId: string) => doc(getAwarenessCollection(userId), cycleId);
 
 const toRecord = (metadata: WorkflowAwarenessMetadata): WorkflowAwarenessDocument => ({
