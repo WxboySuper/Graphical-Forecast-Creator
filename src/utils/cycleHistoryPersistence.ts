@@ -12,6 +12,7 @@ import { getScopedStorageKey, getStorageScope } from './storageScope';
 
 const CYCLE_HISTORY_KEY = 'gfc-cycle-history';
 const LEGACY_CYCLE_HISTORY_KEY = CYCLE_HISTORY_KEY;
+const CYCLE_HISTORY_CLAIM_KEY = 'gfc-cycle-history-claim';
 const STORAGE_MAP_VIEW = { center: [0, 0] as [number, number], zoom: 0 };
 
 interface PersistedSavedCycle {
@@ -102,20 +103,42 @@ const parseStoredCycleHistory = (serialized: string | null): SavedCycle[] => {
   }
 };
 
+/** Returns the account that claimed the legacy cycle-history copy, if any. */
+const readLegacyCycleHistoryClaim = (): string | null => localStorage.getItem(CYCLE_HISTORY_CLAIM_KEY);
+
+/** Records which account claimed the legacy cycle-history copy. */
+const writeLegacyCycleHistoryClaim = (userId: string): void => {
+  localStorage.setItem(CYCLE_HISTORY_CLAIM_KEY, userId);
+};
+
+/** Returns true when the signed-in account may import the unscoped legacy history. */
+const canImportLegacyCycleHistory = (userId: string): boolean => {
+  const claim = readLegacyCycleHistoryClaim();
+  return claim === null || claim === userId;
+};
+
+/** Copies legacy cycle history into an account scope when it is empty and claimable. */
+const importLegacyCycleHistoryToScope = (userId: string, legacyValue: string): void => {
+  if (!canImportLegacyCycleHistory(userId)) return;
+
+  const scopedKey = getCycleHistoryStorageKey(userId);
+  const scopedValue = localStorage.getItem(scopedKey);
+  const scopedCycles = parseStoredCycleHistory(scopedValue);
+  if (scopedValue !== null && scopedCycles.length > 0) return;
+
+  localStorage.setItem(scopedKey, legacyValue);
+  writeLegacyCycleHistoryClaim(userId);
+};
+
 /** Moves usable anonymous cycle history into the signed-in account scope when its current scope is empty or unusable. */
 export const migrateLegacyCycleHistory = (userId?: string | null): void => {
   if (!userId) return;
 
   try {
-    const scopedKey = getCycleHistoryStorageKey(userId);
-    const scopedValue = localStorage.getItem(scopedKey);
     const legacyValue = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
     if (legacyValue === null) return;
 
-    const scopedCycles = parseStoredCycleHistory(scopedValue);
-    if (scopedValue === null || scopedCycles.length === 0) {
-      localStorage.setItem(scopedKey, legacyValue);
-    }
+    importLegacyCycleHistoryToScope(userId, legacyValue);
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.
   }
@@ -153,8 +176,8 @@ export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[
     // During rollout, signed-in users may still have only the pre-scope history.
     const legacySerialized = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
     const legacyCycles = parseStoredCycleHistory(legacySerialized);
-    if (legacyCycles.length > 0) {
-      localStorage.setItem(scopedKey, legacySerialized as string);
+    if (legacyCycles.length > 0 && canImportLegacyCycleHistory(userId)) {
+      importLegacyCycleHistoryToScope(userId, legacySerialized as string);
       return legacyCycles;
     }
     return scopedCycles;

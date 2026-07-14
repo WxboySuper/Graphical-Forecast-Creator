@@ -138,6 +138,21 @@ describe('cycleHistoryPersistence', () => {
     expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
   });
 
+  test('does not import legacy cycle history into a different signed-in account', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'legacy' }]));
+
+    mod.migrateLegacyCycleHistory('user-1');
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'legacy' }]));
+    expect(localStorage.getItem('gfc-cycle-history-claim')).toBe('user-1');
+
+    localStorage.removeItem('gfc-cycle-history:user-user-2');
+    mod.migrateLegacyCycleHistory('user-2');
+    expect(localStorage.getItem('gfc-cycle-history:user-user-2')).toBeNull();
+    expect(mod.loadCycleHistoryFromStorage('user-2')).toEqual([]);
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'legacy' }]));
+  });
+
   test('falls back to usable legacy history when signed-in scope is empty or unusable', async () => {
     jest.doMock('./outlookMapCoercion', () => ({ normalizeForecastCycle: (cycle: unknown) => cycle }));
     const mod = await import('./cycleHistoryPersistence');
