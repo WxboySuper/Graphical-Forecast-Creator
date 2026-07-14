@@ -264,19 +264,14 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
     if (!currentUserId || !isCurrentAwarenessConsent(currentConsent)) return undefined;
     const generation = active.generation;
     if (!workflowMetadata) {
-      if (!metadata?.cycleId) return undefined;
-      const deletePromise = active.queue.enqueue(() => deleteOneWorkflowAwareness(currentUserId, metadata.cycleId));
-      deletePromise
-        .then(() => {
-          if (isActiveRequest(active, generation, currentUserId)) {
-            setRecords((previous) => previous.filter((entry) => entry.cycleId !== metadata.cycleId));
-          }
-        })
-        .catch((nextError: unknown) => {
-          if (isActiveRequest(active, generation, currentUserId)) {
-            setError(nextError instanceof Error ? nextError.message : 'Unable to clear workflow awareness.');
-          }
-        });
+      const cycleId = metadata?.cycleId;
+      if (!cycleId) return undefined;
+      setRecords((previous) => previous.filter((entry) => entry.cycleId !== cycleId));
+      active.queue.enqueue(() => deleteOneWorkflowAwareness(currentUserId, cycleId)).catch((nextError: unknown) => {
+        if (isActiveRequest(active, generation, currentUserId)) {
+          setError(nextError instanceof Error ? nextError.message : 'Unable to clear workflow awareness.');
+        }
+      });
       return undefined;
     }
     const awarenessMetadata = createAwarenessMetadata(workflowMetadata);
