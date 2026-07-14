@@ -38,6 +38,19 @@ import {
   shouldActivateEmergencyMode,
 } from '../config/productExposureSelectors';
 import { getAutoSaveStorageKey, migrateLegacyAutoSave } from '../hooks/useAutoSave';
+import {
+  DAY_ROLLOVER_CHECK_INTERVAL_MS,
+  DAY_ROLLOVER_LAST_ACTIVE_KEY,
+  DAY_ROLLOVER_PENDING_KEY,
+  DAY_ROLLOVER_PROMPTED_KEY,
+  type DayRolloverPromptState,
+  clearStoredRolloverPrompt,
+  getRolloverStorageKey,
+  readStoredDayValue,
+  readStoredRolloverPrompt,
+  writeStoredDayValue,
+  writeStoredRolloverPrompt,
+} from '../utils/dayRolloverStorage';
 import { getStorageScope, getScopedStorageKey } from '../utils/storageScope';
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import { useAutoTstm } from '../hooks/useAutoTstm';
@@ -63,6 +76,15 @@ import {
   type ForecastUiVariant,
 } from '../utils/forecastUiVariant';
 import './ForecastPage.css';
+
+export {
+  clearStoredRolloverPrompt,
+  getRolloverStorageKey,
+  readStoredDayValue,
+  readStoredRolloverPrompt,
+  writeStoredDayValue,
+  writeStoredRolloverPrompt,
+};
 
 interface PageContext {
   addToast: AddToastFn;
@@ -123,71 +145,6 @@ const EmergencyModeMessage: React.FC = () => (
     </div>
   </div>
 );
-
-interface DayRolloverPromptState {
-  previousDay: string;
-  currentDay: string;
-}
-
-const DAY_ROLLOVER_LAST_ACTIVE_KEY = 'gfc-last-active-local-day';
-const DAY_ROLLOVER_PROMPTED_KEY = 'gfc-day-rollover-prompt-day';
-const DAY_ROLLOVER_PENDING_KEY = 'gfc-day-rollover-pending';
-const DAY_ROLLOVER_CHECK_INTERVAL_MS = 60_000;
-
-type StoredRolloverPrompt = DayRolloverPromptState;
-
-/** Returns the localStorage key for rollover state in the current workspace scope. */
-function getRolloverStorageKey(key: string, userId?: string | null): string {
-  return getScopedStorageKey(key, getStorageScope(userId));
-}
-
-/** Reads a pending rollover prompt, ignoring malformed or unavailable storage. */
-function readStoredRolloverPrompt(userId?: string | null): StoredRolloverPrompt | null {
-  const stored = readStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId));
-  if (!stored) return null;
-
-  try {
-    const parsed = JSON.parse(stored) as Partial<StoredRolloverPrompt>;
-    return typeof parsed.previousDay === 'string' && typeof parsed.currentDay === 'string'
-      ? { previousDay: parsed.previousDay, currentDay: parsed.currentDay }
-      : null;
-  } catch {
-    return null;
-  }
-};
-
-/** Persists a pending rollover prompt for the active workspace scope. */
-const writeStoredRolloverPrompt = (prompt: StoredRolloverPrompt, userId?: string | null): void => {
-  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId), JSON.stringify(prompt));
-};
-
-/** Removes a pending rollover prompt for the active workspace scope. */
-const clearStoredRolloverPrompt = (userId?: string | null): void => {
-  try {
-    localStorage.removeItem(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId));
-  } catch {
-    // Ignore storage failures.
-  }
-};
-
-/** Reads one stored day string from localStorage, returning null when storage is unavailable. */
-/** Reads one stored day string from localStorage, returning null when storage is unavailable. */
-export function readStoredDayValue(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-/** Persists one day string into localStorage, ignoring storage errors. */
-export function writeStoredDayValue(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Ignore storage write failures so the editor keeps functioning.
-  }
-}
 
 /** Returns true when the forecast cycle contains any drawable outlook data or saved low-probability state. */
 export const hasRolloverForecastData = (
