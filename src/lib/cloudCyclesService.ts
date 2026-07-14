@@ -4,7 +4,7 @@ import { db } from './firebase';
 import { CloudCycleMetadata, CloudCycle, CloudOperationResult } from '../types/cloudCycles';
 import { GFCForecastSaveData } from '../types/outlooks';
 import type { CycleMetadata } from '../types/workflow';
-import { isValidWorkflowMetadata } from './workflowMetadataContract';
+import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './workflowMetadataContract';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
 
@@ -242,8 +242,13 @@ const normalizeCloudCycleMetadataRecord = ({
 };
 
 /** Keeps workflow metadata only when it belongs to the same cycle date. */
-const getCompatibleWorkflowMetadata = (workflowMetadata: unknown, cycleDate: string): CycleMetadata | undefined =>
-  isValidWorkflowMetadata(workflowMetadata) && workflowMetadata.cycleDate === cycleDate ? workflowMetadata : undefined;
+const getCompatibleWorkflowMetadata = (workflowMetadata: unknown, cycleDate: string): CycleMetadata | undefined => {
+  if (!isPlainObject(workflowMetadata)) return undefined;
+  if (workflowMetadata.cycleDate !== cycleDate) return undefined;
+
+  const bounded = boundWorkflowMetadataForPersistence(workflowMetadata as CycleMetadata);
+  return isValidWorkflowMetadata(bounded) ? bounded : undefined;
+};
 
 /** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {

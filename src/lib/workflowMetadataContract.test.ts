@@ -1,4 +1,5 @@
 import {
+  boundWorkflowMetadataForPersistence,
   isMetadataOnlyOutlookVersion,
   isValidWorkflowMetadata,
   MAX_OUTLOOK_VERSIONS,
@@ -49,5 +50,18 @@ describe('workflow metadata Firestore contract', () => {
     expect(isMetadataOnlyOutlookVersion({ ...baseVersion, status: 'draft' })).toBe(false);
     expect(isMetadataOnlyOutlookVersion({ ...baseVersion, derivedFrom: '1' })).toBe(false);
     expect(isValidWorkflowMetadata({ ...baseMetadata, outlookVersions: [] })).toBe(true);
+  });
+
+  it('bounds oversized workflow metadata for cloud persistence', () => {
+    const versions = Array.from({ length: MAX_OUTLOOK_VERSIONS + 1 }, (_, index) => ({
+      ...baseVersion,
+      version: index + 1,
+    }));
+
+    const bounded = boundWorkflowMetadataForPersistence({ ...baseMetadata, outlookVersions: versions });
+
+    expect(isValidWorkflowMetadata(bounded)).toBe(true);
+    expect(bounded.outlookVersions).toHaveLength(MAX_OUTLOOK_VERSIONS);
+    expect(bounded.outlookVersions[MAX_OUTLOOK_VERSIONS - 1].version).toBe(MAX_OUTLOOK_VERSIONS);
   });
 });

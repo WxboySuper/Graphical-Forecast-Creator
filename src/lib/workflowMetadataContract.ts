@@ -57,6 +57,30 @@ function isValidDerivedFrom(value: Record<string, unknown>): boolean {
   return !('derivedFrom' in value) || isValidVersionNumber(value.derivedFrom);
 }
 
+/** Clamps workflow version numbers to the Firestore persistence contract. */
+const clampWorkflowVersionNumber = (version: number): number =>
+  Math.min(Math.max(version, 1), MAX_OUTLOOK_VERSIONS);
+
+/** Projects workflow metadata into the bounded shape accepted by Firestore rules. */
+export const boundWorkflowMetadataForPersistence = (metadata: CycleMetadata): CycleMetadata => ({
+  ...metadata,
+  outlookVersions: metadata.outlookVersions
+    .slice(-MAX_OUTLOOK_VERSIONS)
+    .map(({ version, status, derivedFrom, createdAt }) => {
+      const boundedVersion = clampWorkflowVersionNumber(version);
+      const boundedDerivedFrom = derivedFrom === undefined
+        ? undefined
+        : clampWorkflowVersionNumber(derivedFrom);
+
+      return {
+        version: boundedVersion,
+        status,
+        ...(boundedDerivedFrom === undefined ? {} : { derivedFrom: boundedDerivedFrom }),
+        createdAt,
+      };
+    }),
+});
+
 /** Validates the exact workflow metadata object persisted inside a cloud cycle. */
 export const isValidWorkflowMetadata = (value: unknown): value is CycleMetadata => {
   return isWorkflowMetadataShape(value)
