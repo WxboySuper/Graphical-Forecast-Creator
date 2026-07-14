@@ -62,12 +62,6 @@ export interface WorkflowAwarenessSyncResult {
 
 const WorkflowAwarenessContext = createContext<WorkflowAwarenessSyncResult | null>(null);
 
-export const WorkflowAwarenessProvider: FC<PropsWithChildren> = ({ children }) => createElement(
-  WorkflowAwarenessContext.Provider,
-  { value: useWorkflowAwarenessSync() },
-  children,
-);
-
 export const useWorkflowAwareness = (): WorkflowAwarenessSyncResult => {
   const context = useContext(WorkflowAwarenessContext);
   if (context) return context;
@@ -78,8 +72,8 @@ export const useWorkflowAwareness = (): WorkflowAwarenessSyncResult => {
     error: null,
     records: [],
     recommendations: [],
-    setEnabled: async () => false,
-    refresh: async () => undefined,
+    setEnabled: () => Promise.resolve(false),
+    refresh: () => Promise.resolve(),
   };
 };
 
@@ -293,6 +287,12 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
 
   return { enabled: isCurrentAwarenessConsent(consent), loading, saving, error, records, recommendations, setEnabled, refresh };
 };
+
+export const WorkflowAwarenessProvider: FC<PropsWithChildren> = ({ children }) => createElement(
+  WorkflowAwarenessContext.Provider,
+  { value: useWorkflowAwarenessSync() },
+  children,
+);
 
 /** Small account-page adapter that shares the same consent key without starting a sync. */
 export const useWorkflowAwarenessConsentSetting = (): {
