@@ -6,6 +6,7 @@ import reducer, {
   applyAutoCategoricalSync,
   copyFeaturesFromPrevious,
   importForecastCycle,
+  importWorkflowPackage,
   restoreForecastCycle,
   redoLastEdit,
   replaceTstmFeatures,
@@ -435,6 +436,40 @@ describe('forecastSlice undo/redo', () => {
     expect(state.discussionDraftsByDay[1]).toEqual(draft);
 
     state = reducer(state, restoreForecastCycle(state.forecastCycle));
+
+    expect(state.discussionDraftsByDay).toEqual({});
+  });
+
+  test('importing a workflow package clears drafts from the replaced cycle', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Stale imported-cycle draft',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
+
+    state = reducer(state, importWorkflowPackage({
+      metadata: {
+        workflowId: 'severe-day1',
+        cycleId: 'cycle-2026-07-04',
+        version: 1,
+        status: 'in-progress',
+        includesDiscussions: true,
+        includesStyleSnapshots: false,
+      },
+      cycles: [{
+        id: 'cycle-2026-07-04',
+        workflowId: 'severe-day1',
+        cycleDate: '2026-07-04',
+        status: 'in-progress',
+        outlookVersions: [],
+        createdAt: '2026-07-04T00:00:00.000Z',
+        updatedAt: '2026-07-04T12:00:00.000Z',
+      }],
+    }));
 
     expect(state.discussionDraftsByDay).toEqual({});
   });

@@ -1116,6 +1116,7 @@ export const forecastSlice = createSlice({
           groupings: [],
         };
       }
+      state.discussionDraftsByDay = {};
       clearHistory(state);
       state.isSaved = true;
       state.outlookVersionSnapshots = [];
