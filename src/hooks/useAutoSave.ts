@@ -21,8 +21,8 @@ export const useAutoSave = () => {
   const forecastCycle = useSelector(selectForecastCycle);
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isFirstRender = useRef(true);
+  const saveGenerationRef = useRef(0);
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -30,16 +30,9 @@ export const useAutoSave = () => {
       return;
     }
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-
-    timerRef.current = setTimeout(() => persistAutoSave(forecastCycle, mapView, workflowMetadata), AUTOSAVE_DELAY);
-
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
+    const generation = ++saveGenerationRef.current;
+    setTimeout(() => {
+      if (generation === saveGenerationRef.current) persistAutoSave(forecastCycle, mapView, workflowMetadata);
+    }, AUTOSAVE_DELAY);
   }, [forecastCycle, mapView, workflowMetadata]);
 };
