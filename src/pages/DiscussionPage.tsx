@@ -13,7 +13,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import {
-  selectDiscussionDraftForDay,
+  selectDiscussionDraftForScope,
   selectForecastCycle,
   selectHasActiveWorkflow,
   selectWorkflowTemplate,
@@ -276,22 +276,23 @@ const useDiscussionAutoSave = (opts: {
   hasUnsavedChanges: boolean;
   buildDiscussionData: () => DiscussionData;
   currentDay: DayType;
+  scopeId: string;
   dispatch: ReturnType<typeof useDispatch>;
   clearUnsaved: (v: boolean) => void;
 }) => {
-  const { hasUnsavedChanges, buildDiscussionData, currentDay, dispatch, clearUnsaved } = opts;
+  const { hasUnsavedChanges, buildDiscussionData, currentDay, scopeId, dispatch, clearUnsaved } = opts;
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (hasUnsavedChanges) {
       timer = setTimeout(() => {
-        dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+        dispatch(updateDiscussion({ day: currentDay, scopeId, discussion: buildDiscussionData() }));
         clearUnsaved(false);
       }, DISCUSSION_AUTOSAVE_DELAY_MS);
     }
 
     return () => { if (timer !== null) clearTimeout(timer); };
-  }, [hasUnsavedChanges, buildDiscussionData, currentDay, dispatch, clearUnsaved]);
+  }, [hasUnsavedChanges, buildDiscussionData, currentDay, dispatch, clearUnsaved, scopeId]);
 };
 
 // Computes derived values (compiled text and word count) in a focused hook.
@@ -321,21 +322,22 @@ const useDiscussionComputed = (
 const useDiscussionActions = (opts: {
   dispatch: ReturnType<typeof useDispatch>;
   currentDay: DayType;
+  scopeId: string;
   buildDiscussionData: () => DiscussionData;
   clearUnsaved: (v: boolean) => void;
   addToast: AddToastFn;
   user: ReturnType<typeof useAuth>['user'];
   onSaved: () => void;
 }) => {
-  const { dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast, user, onSaved } = opts;
+  const { dispatch, currentDay, scopeId, buildDiscussionData, clearUnsaved, addToast, user, onSaved } = opts;
 
   const handleSave = useCallback(() => {
-    dispatch(updateDiscussion({ day: currentDay, discussion: buildDiscussionData() }));
+    dispatch(updateDiscussion({ day: currentDay, scopeId, discussion: buildDiscussionData() }));
     clearUnsaved(false);
     queueProductMetric({ event: 'discussion_saved', user });
     addToast('Discussion saved!', 'success');
     onSaved();
-  }, [dispatch, currentDay, buildDiscussionData, clearUnsaved, addToast, user, onSaved]);
+  }, [dispatch, currentDay, scopeId, buildDiscussionData, clearUnsaved, addToast, user, onSaved]);
 
   const handleExport = useCallback(() => {
     exportDiscussionToFile(buildDiscussionData(), currentDay);
@@ -387,14 +389,15 @@ const useDiscussionEditorState = ({
   const persistDraft = useCallback(() => {
     if (!form.hasUnsavedChanges) return;
     // Scope changes preserve edits as drafts; only explicit save/autosave publishes them.
-    dispatch(updateDiscussionDraft({ day: currentDay, draft: buildDiscussionData() }));
+    dispatch(updateDiscussionDraft({ scopeId: discussionKey, draft: buildDiscussionData() }));
     form.setHasUnsavedChanges(false);
-  }, [buildDiscussionData, currentDay, dispatch, form.hasUnsavedChanges, form.setHasUnsavedChanges]);
+  }, [buildDiscussionData, discussionKey, dispatch, form.hasUnsavedChanges, form.setHasUnsavedChanges]);
 
   useDiscussionAutoSave({
     hasUnsavedChanges: form.hasUnsavedChanges,
     buildDiscussionData,
     currentDay,
+    scopeId: discussionKey,
     dispatch,
     clearUnsaved: form.setHasUnsavedChanges
   });
@@ -410,6 +413,7 @@ const useDiscussionEditorState = ({
   const { handleSave, handleExport } = useDiscussionActions({
     dispatch,
     currentDay,
+    scopeId: discussionKey,
     buildDiscussionData,
     clearUnsaved: form.setHasUnsavedChanges,
     addToast,
@@ -487,7 +491,7 @@ export const DiscussionPage: React.FC = () => {
   );
   const discussionDay = getDiscussionOwnerDay(forecastCycle, selectedGrouping);
   const outlookDay = forecastCycle.days[discussionDay];
-  const discussionDraft = useSelector((state: RootState) => selectDiscussionDraftForDay(state, discussionDay));
+  const discussionDraft = useSelector((state: RootState) => selectDiscussionDraftForScope(state, selectedGrouping.id));
   const existingDiscussion = discussionDraft ?? getDiscussionForGrouping(forecastCycle, selectedGrouping);
   const defaultForecasterName = syncedSettings?.defaultForecasterName ?? user?.displayName ?? '';
 

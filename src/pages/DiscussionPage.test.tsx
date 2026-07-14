@@ -88,7 +88,7 @@ describe('DiscussionPage', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Discussion scope' }), { target: { value: 'day-2' } });
 
     const state = store.getState().forecast;
-    expect(state.discussionDraftsByDay[1]?.diyContent).toBe('Unsaved scope text');
+    expect(state.discussionDraftsByScope['day-1']?.diyContent).toBe('Unsaved scope text');
     expect(state.forecastCycle.days[1].discussion).toBeUndefined();
   });
 

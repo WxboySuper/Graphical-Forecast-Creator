@@ -432,12 +432,12 @@ describe('forecastSlice undo/redo', () => {
       diyContent: 'Unsaved text',
       lastModified: '2026-07-04T12:00:00.000Z',
     };
-    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
-    expect(state.discussionDraftsByDay[1]).toEqual(draft);
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
+    expect(state.discussionDraftsByScope.day1).toEqual(draft);
 
     state = reducer(state, restoreForecastCycle(state.forecastCycle));
 
-    expect(state.discussionDraftsByDay).toEqual({});
+    expect(state.discussionDraftsByScope).toEqual({});
   });
 
   test('same-session restore preserves unpublished discussion drafts', () => {
@@ -449,11 +449,11 @@ describe('forecastSlice undo/redo', () => {
       diyContent: 'Unsaved text survives local restore',
       lastModified: '2026-07-04T12:00:00.000Z',
     };
-    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
 
     state = reducer(state, restoreForecastCycle(state.forecastCycle, true));
 
-    expect(state.discussionDraftsByDay[1]).toEqual(draft);
+    expect(state.discussionDraftsByScope.day1).toEqual(draft);
   });
 
   test('importing a workflow package clears drafts from the replaced cycle', () => {
@@ -465,7 +465,7 @@ describe('forecastSlice undo/redo', () => {
       diyContent: 'Stale imported-cycle draft',
       lastModified: '2026-07-04T12:00:00.000Z',
     };
-    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
 
     state = reducer(state, importWorkflowPackage({
       metadata: {
@@ -487,7 +487,7 @@ describe('forecastSlice undo/redo', () => {
       }],
     }));
 
-    expect(state.discussionDraftsByDay).toEqual({});
+    expect(state.discussionDraftsByScope).toEqual({});
   });
 
   test('saving a discussion draft does not publish it until updateDiscussion', () => {
@@ -499,14 +499,14 @@ describe('forecastSlice undo/redo', () => {
       diyContent: 'Unsaved text',
       lastModified: '2026-07-04T12:00:00.000Z',
     };
-    let state = reducer(undefined, updateDiscussionDraft({ day: 1, draft }));
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
 
     expect(state.forecastCycle.days[1]?.discussion).toBeUndefined();
-    expect(state.discussionDraftsByDay[1]).toEqual(draft);
+    expect(state.discussionDraftsByScope.day1).toEqual(draft);
 
-    state = reducer(state, updateDiscussion({ day: 1, discussion: draft }));
+    state = reducer(state, updateDiscussion({ day: 1, scopeId: 'day1', discussion: draft }));
     expect(state.forecastCycle.days[1]?.discussion).toEqual(draft);
-    expect(state.discussionDraftsByDay[1]).toBeUndefined();
+    expect(state.discussionDraftsByScope.day1).toBeUndefined();
   });
 
   test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {

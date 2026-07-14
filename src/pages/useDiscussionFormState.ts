@@ -105,10 +105,10 @@ const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, dis
   }, []);
   useDiscussionScopeDrafts({ discussionKey, existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields });
 
-  const persist = useCallback((next: DiscussionFormDefaults) => dispatch(updateDiscussionDraft({ day: currentDay, draft: {
+  const persist = useCallback((next: DiscussionFormDefaults) => dispatch(updateDiscussionDraft({ scopeId: discussionKey, draft: {
     ...next, diyContent: next.mode === 'diy' ? next.diyContent : undefined,
     guidedContent: next.mode === 'guided' ? next.guidedContent : undefined, lastModified: new Date().toISOString(),
-  } })), [currentDay, dispatch]);
+  } })), [discussionKey, dispatch]);
   const update = useCallback((next: DiscussionFormDefaults) => { setHasUnsavedChanges(true); persist(next); }, [persist]);
   const handleModeChange = useCallback((value: string) => { const next = { ...fields, mode: value as DiscussionMode }; setMode(next.mode); update(next); }, [fields, update]);
   const handleValidStart = useCallback((value: string) => { const next = { ...fields, validStart: value }; setValidStart(value); update(next); }, [fields, update]);
