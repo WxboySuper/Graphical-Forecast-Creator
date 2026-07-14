@@ -9,6 +9,7 @@ import {
 import type { DayType, DiscussionGrouping, ForecastCycle } from '../types/outlooks';
 import { getDiscussionOwnerDay } from '../utils/discussionGrouping';
 
+/** Combines selected discussion scopes into one custom grouping. */
 const combineDiscussionGroupings = (
   selected: DiscussionGrouping[],
   label: string,
@@ -27,6 +28,7 @@ interface DiscussionGroupingActionsOptions {
   currentDay: DayType;
 }
 
+/** Provides navigation and reset actions for discussion scopes. */
 export const useDiscussionGroupingActions = ({
   forecastCycle,
   groupings,

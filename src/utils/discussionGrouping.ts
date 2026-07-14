@@ -48,6 +48,7 @@ export const standaloneDiscussionGrouping = (day: DayType): DiscussionGrouping =
 const hasNonEmptyText = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
+/** Checks that a grouping covers unique supported days including its owner day. */
 const hasUniqueDayCoverage = (days: unknown[], discussionDay: unknown): discussionDay is DayType =>
   days.length > 0
   && days.every(isDayType)
@@ -55,12 +56,14 @@ const hasUniqueDayCoverage = (days: unknown[], discussionDay: unknown): discussi
   && isDayType(discussionDay)
   && days.includes(discussionDay);
 
+/** Checks the scalar fields and day list shape of one persisted grouping. */
 const hasValidGroupingShape = (candidate: Partial<DiscussionGrouping>): candidate is DiscussionGrouping =>
   hasNonEmptyText(candidate.id)
   && hasNonEmptyText(candidate.label)
   && Array.isArray(candidate.days)
   && hasUniqueDayCoverage(candidate.days, candidate.discussionDay);
 
+/** Validates one grouping and records its ids and covered days. */
 const isValidDiscussionGrouping = (
   value: unknown,
   ids: Set<string>,

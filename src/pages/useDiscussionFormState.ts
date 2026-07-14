@@ -86,6 +86,7 @@ const useDiscussionScopeDrafts = (options: {
   }, [discussionKey, hasUnsavedChanges, fields]);
 };
 
+/** Manages editable discussion fields and persists changes for the active scope. */
 const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, discussionKey, currentDay, dispatch }: DiscussionFormStateOptions) => {
   const defaults = getDiscussionFormDefaults(existingDiscussion);
   const initial = { ...defaults, forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName };

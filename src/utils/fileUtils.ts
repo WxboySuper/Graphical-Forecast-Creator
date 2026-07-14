@@ -233,6 +233,7 @@ interface DiscussionZipEntry {
   identifier: string;
 }
 
+/** Adds a non-empty discussion to a ZIP and records its exported day. */
 const addDiscussionToZip = (
   zip: JSZip,
   usedEntryNames: Set<string>,
