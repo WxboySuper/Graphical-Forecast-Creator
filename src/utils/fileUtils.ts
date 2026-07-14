@@ -1,17 +1,26 @@
 import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType, CycleMetadata } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
+import {
+  getDiscussionForGrouping,
+  getDiscussionGroupings,
+  getDiscussionOwnerDay,
+  hasDiscussionContent,
+  isValidDiscussionGroupings,
+  normalizeDiscussionGroupings,
+} from './discussionGrouping';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
+import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 
 const CURRENT_VERSION = '1.0.0';
 
-// Helper to convert Map to Array for JSON serialization
+/** Converts a Map into JSON-friendly entry tuples. */
 const mapToArray = <K, V>(m: Map<K, V>): [K, V][] =>
   m instanceof Map ? Array.from(m.entries()) : [];
 
-// Helper to convert serializable Array back to Map
+/** Restores an outlook probability map from its supported serialized forms. */
 const deserializeOutlookMap = <K extends string, V>(
   value: [K, V][] | Record<string, V> | Map<K, V> | undefined,
 ): Map<K, V> | undefined => {
@@ -21,6 +30,28 @@ const deserializeOutlookMap = <K extends string, V>(
 
   const coerced = coerceOutlookProbabilityMap(value);
   return coerced ?? new Map<K, V>();
+};
+
+/** Creates a safe, deterministic, collision-free discussion filename for a ZIP archive. */
+export const createUniqueDiscussionEntryName = (
+  identifier: string,
+  usedNames: Set<string>,
+): string => {
+  const safeIdentifier = identifier
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^\.+/, '')
+    .replace(/^-+|-+$/g, '')
+    || 'discussion';
+  const baseName = `discussion_${safeIdentifier}`;
+  let name = `${baseName}.txt`;
+  let suffix = 2;
+  while (usedNames.has(name)) {
+    name = `${baseName}-${suffix}.txt`;
+    suffix += 1;
+  }
+  usedNames.add(name);
+  return name;
 };
 
 // Types for serialization helper
@@ -39,24 +70,32 @@ type SerializedDay = {
 };
 
 // Helper to create empty outlook based on day type
+/** Converts one outlook day into its JSON-compatible representation. */
+const serializeOutlookDay = (outlookDay: OutlookDay): SerializedDay => {
+  const serializedData: SerializedOutlookData = {};
+  const mapFields: (keyof OutlookData)[] = ['tornado', 'wind', 'hail', 'totalSevere', 'day4-8', 'categorical'];
+  mapFields.forEach((field) => {
+    const map = outlookDay.data[field];
+    if (map) serializedData[field] = mapToArray(map);
+  });
+  return {
+    day: outlookDay.day,
+    metadata: { ...outlookDay.metadata, lowProbabilityOutlooks: outlookDay.metadata.lowProbabilityOutlooks || [] },
+    data: serializedData,
+    discussion: outlookDay.discussion,
+  };
+};
+
+/** Creates empty Map-backed outlook fields appropriate for a forecast day. */
+const createBaseOutlookData = (day: DayType): OutlookData => {
+  if (day === 1 || day === 2) return { tornado: new Map(), wind: new Map(), hail: new Map(), categorical: new Map() };
+  if (day === 3) return { totalSevere: new Map(), categorical: new Map() };
+  return { 'day4-8': new Map() };
+};
+
+/** Creates a new empty outlook day with current metadata timestamps. */
 const createEmptyOutlook = (day: DayType): OutlookDay => {
-  const baseData: OutlookData = {};
-  
-  if (day === 1 || day === 2) {
-    // Day 1/2: tornado, wind, hail, categorical
-    baseData.tornado = new Map();
-    baseData.wind = new Map();
-    baseData.hail = new Map();
-    baseData.categorical = new Map();
-  } else if (day === 3) {
-    // Day 3: totalSevere, categorical
-    baseData.totalSevere = new Map();
-    baseData.categorical = new Map();
-  } else {
-    // Day 4-8: only day4-8 outlook type
-    baseData['day4-8'] = new Map();
-  }
-  
+  const baseData = createBaseOutlookData(day);
   return {
     day,
     data: baseData,
@@ -82,29 +121,9 @@ export const serializeForecast = (
 ): GFCForecastSaveData => {
   const serializedDays: Partial<Record<DayType, SerializedDay>> = {};
   
-  (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach(day => {
+  (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach((day) => {
     const outlookDay = forecastCycle.days[day];
-    if (outlookDay) {
-      const serializedData: SerializedOutlookData = {};
-      
-      // Only serialize outlook maps that exist for this day
-      if (outlookDay.data.tornado) serializedData.tornado = mapToArray(outlookDay.data.tornado);
-      if (outlookDay.data.wind) serializedData.wind = mapToArray(outlookDay.data.wind);
-      if (outlookDay.data.hail) serializedData.hail = mapToArray(outlookDay.data.hail);
-      if (outlookDay.data.totalSevere) serializedData.totalSevere = mapToArray(outlookDay.data.totalSevere);
-      if (outlookDay.data['day4-8']) serializedData['day4-8'] = mapToArray(outlookDay.data['day4-8']);
-      if (outlookDay.data.categorical) serializedData.categorical = mapToArray(outlookDay.data.categorical);
-      
-      serializedDays[day] = {
-        day: outlookDay.day,
-        metadata: {
-          ...outlookDay.metadata,
-          lowProbabilityOutlooks: outlookDay.metadata.lowProbabilityOutlooks || []
-        },
-        data: serializedData,
-        discussion: outlookDay.discussion
-      };
-    }
+    if (outlookDay) serializedDays[day] = serializeOutlookDay(outlookDay);
   });
 
   const result: GFCForecastSaveData = {
@@ -115,6 +134,9 @@ export const serializeForecast = (
       days: serializedDays,
       currentDay: forecastCycle.currentDay,
       cycleDate: forecastCycle.cycleDate,
+      ...(isValidDiscussionGroupings(forecastCycle.discussionGroupings)
+        ? { discussionGroupings: normalizeDiscussionGroupings(forecastCycle.discussionGroupings) }
+        : {}),
       ...completionMetadataFromForecastCycle(forecastCycle),
     },
     mapView,
@@ -124,38 +146,35 @@ export const serializeForecast = (
   return result;
 };
 
+/** Migrates the legacy single-outlook save format into a day-one forecast cycle. */
+const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => {
+  const day1 = createEmptyOutlook(1);
+  const outlooks = data.outlooks;
+  if (outlooks) {
+    day1.data = Object.fromEntries(
+      (['tornado', 'wind', 'hail', 'categorical'] as const)
+        .filter((field) => outlooks[field])
+        .map((field) => [field, deserializeOutlookMap(outlooks[field])]),
+    ) as OutlookData;
+  }
+  return { days: { 1: day1 }, currentDay: 1, cycleDate: new Date().toISOString().split('T')[0] };
+};
+
 /**
  * Deserializes the saved JSON data back into ForecastCycle.
  * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
 export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
-  if (data.forecastCycle) {
-    const cycle = data.forecastCycle;
-
-    return {
-      days: deserializeForecastCycleDays(cycle),
-      currentDay: cycle.currentDay,
-      cycleDate: cycle.cycleDate,
-      ...completionMetadataFromForecastCycle(cycle),
-    };
-  }
-
-  // Legacy Migration (v0.4.0 and older)
-  // Wrap single outlook into Day 1 of a new cycle
-  const day1 = createEmptyOutlook(1);
-  if (data.outlooks) { // Old format used 'outlooks'
-    const outlookData: OutlookData = {};
-    if (data.outlooks.tornado) outlookData.tornado = deserializeOutlookMap(data.outlooks.tornado);
-    if (data.outlooks.wind) outlookData.wind = deserializeOutlookMap(data.outlooks.wind);
-    if (data.outlooks.hail) outlookData.hail = deserializeOutlookMap(data.outlooks.hail);
-    if (data.outlooks.categorical) outlookData.categorical = deserializeOutlookMap(data.outlooks.categorical);
-    day1.data = outlookData;
-  }
-
+  if (!data.forecastCycle) return deserializeLegacyForecast(data);
+  const cycle = data.forecastCycle;
   return {
-    days: { 1: day1 },
-    currentDay: 1,
-    cycleDate: new Date().toISOString().split('T')[0]
+    days: deserializeForecastCycleDays(cycle),
+    currentDay: cycle.currentDay,
+    cycleDate: cycle.cycleDate,
+    ...(isValidDiscussionGroupings(cycle.discussionGroupings)
+      ? { discussionGroupings: normalizeDiscussionGroupings(cycle.discussionGroupings) }
+      : {}),
+    ...completionMetadataFromForecastCycle(cycle),
   };
 };
 
@@ -207,9 +226,27 @@ export const exportForecastToJson = (
   URL.revokeObjectURL(url);
 };
 
-/**
- * Bundles the forecast JSON and all day discussions into a single .zip package.
- */
+/** Adds a non-empty discussion to the package using a collision-free entry name. */
+interface DiscussionZipEntry {
+  discussion: DiscussionData | undefined;
+  day: DayType;
+  identifier: string;
+}
+
+/** Adds a non-empty discussion to a ZIP and records its exported day. */
+const addDiscussionToZip = (
+  zip: JSZip,
+  usedEntryNames: Set<string>,
+  exportedDays: Set<DayType>,
+  entry: DiscussionZipEntry,
+): void => {
+  const { discussion, day, identifier } = entry;
+  if (!discussion || !hasDiscussionContent(discussion)) return;
+  zip.file(createUniqueDiscussionEntryName(identifier, usedEntryNames), compileDiscussionToText(discussion, day));
+  exportedDays.add(day);
+};
+
+/** Bundles the forecast JSON and all day discussions into a single .zip package. */
 export const downloadGfcPackage = async (
   forecastCycle: ForecastCycle,
   mapView: { center: [number, number]; zoom: number },
@@ -221,14 +258,38 @@ export const downloadGfcPackage = async (
   const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
   zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
 
-  // 2. Discussion text for each day that has content
-  (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach((day) => {
-    const outlookDay = forecastCycle.days[day];
-    if (outlookDay?.discussion) {
-      const text = compileDiscussionToText(outlookDay.discussion, day);
-      zip.file(`discussion_day${day}.txt`, text);
-    }
-  });
+  // 2. Discussion text for configured scopes, with every ungrouped legacy day retained.
+  const workflowTemplate = cycleMetadata ? getWorkflowTemplateById(cycleMetadata.workflowId) : undefined;
+  const hasStandardWorkflowGrouping = workflowTemplate?.groupings.some((grouping) =>
+    grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
+  );
+  const hasValidPersistedGrouping = isValidDiscussionGroupings(forecastCycle.discussionGroupings);
+  const exportedDays = new Set<DayType>();
+  const usedEntryNames = new Set<string>(['forecast_cycle.json']);
+
+  if (hasValidPersistedGrouping || hasStandardWorkflowGrouping) {
+    getDiscussionGroupings(forecastCycle, workflowTemplate).forEach((grouping) => {
+      const ownerDay = getDiscussionOwnerDay(forecastCycle, grouping);
+      addDiscussionToZip(zip, usedEntryNames, exportedDays, {
+        discussion: getDiscussionForGrouping(forecastCycle, grouping),
+        day: ownerDay,
+        identifier: grouping.id,
+      });
+    });
+  }
+
+  // A malformed grouping must never make its covered legacy discussions disappear.
+  (Object.keys(forecastCycle.days) as unknown as DayType[])
+    .sort((a, b) => a - b)
+    .forEach((day) => {
+      if (!exportedDays.has(day)) {
+        addDiscussionToZip(zip, usedEntryNames, exportedDays, {
+          discussion: forecastCycle.days[day]?.discussion,
+          day,
+          identifier: `day${day}`,
+        });
+      }
+    });
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);

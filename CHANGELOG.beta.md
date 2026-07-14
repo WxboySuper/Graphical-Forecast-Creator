@@ -8,6 +8,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Add consented, metadata-only workflow awareness synchronization with strict persistence safeguards.
 
+### PR #694
+
+- Preserve discussions and drafts across workflow grouping, scope, and route changes.
+
 ### PR #693
 
 - Dependency: @radix-ui/react-dialog ^1.1.18 → ^1.1.19

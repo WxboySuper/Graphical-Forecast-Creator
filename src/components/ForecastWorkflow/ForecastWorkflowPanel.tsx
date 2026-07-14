@@ -27,6 +27,13 @@ import { validateCycleCompletion } from '../../utils/completionValidation';
 import { downloadGfcPackage } from '../../utils/fileUtils';
 import type { DayType, OutlookType } from '../../types/outlooks';
 import type { StandardGrouping } from '../../types/workflow';
+import {
+  discussionPathForGrouping,
+  getDiscussionForGrouping,
+  getDiscussionGroupingForDay,
+  getDiscussionGroupings,
+  hasDiscussionContent as hasGroupedDiscussionContent,
+} from '../../utils/discussionGrouping';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import CompletionValidationModal from '../CompletionValidation/CompletionValidationModal';
 import './ForecastWorkflowPanel.css';
@@ -53,16 +60,6 @@ const dayHasMapWork = (day: NonNullable<ReturnType<typeof selectForecastCycle>['
 /** True when one forecast day has any map or discussion work started. */
 const dayHasPackageWork = (day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]>): boolean => {
   return dayHasMapWork(day) || Boolean(day.discussion);
-};
-
-/** Returns true when a discussion contains user-authored content. */
-const hasDiscussionContent = (discussion: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]>['discussion']): boolean => {
-  if (!discussion) return false;
-  if (discussion.mode === 'diy') {
-    return Boolean(discussion.diyContent?.trim());
-  }
-  const guidedContent = discussion.guidedContent;
-  return Boolean(guidedContent && Object.values(guidedContent).some((value) => value.trim().length > 0));
 };
 
 /** Returns yesterday's local calendar date as YYYY-MM-DD. */
@@ -160,6 +157,7 @@ interface WorkflowPanelActionsProps {
   onCreateUpdate: () => void;
   onStartFromPrevious: () => void;
   onNavigate: (path: string) => void;
+  discussionPath: string;
 }
 
 /** Adds the optional workflow export action. */
@@ -228,6 +226,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
   isUpdating,
   mapIsComplete,
   isPackageDownloading,
+  discussionPath,
   onExport,
   onOpenReview,
   onNavigate,
@@ -252,7 +251,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
     return (
       <>
         {context === 'forecast' ? (
-          <Button size="sm" onClick={() => onNavigate('/discussion')} disabled={!mapIsComplete}>
+          <Button size="sm" onClick={() => onNavigate(discussionPath)} disabled={!mapIsComplete}>
             <FileText className="h-4 w-4 mr-2" />
             Update Discussion
           </Button>
@@ -278,7 +277,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
     );
   }
   return (
-    <Button size="sm" onClick={() => onNavigate('/discussion')} disabled={!mapIsComplete}>
+    <Button size="sm" onClick={() => onNavigate(discussionPath)} disabled={!mapIsComplete}>
       <FileText className="h-4 w-4 mr-2" />
       Write Discussion
     </Button>
@@ -444,8 +443,15 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   }
 
   const currentDay = forecastCycle.days[forecastCycle.currentDay];
+  const discussionGroupings = getDiscussionGroupings(forecastCycle, workflowTemplate, forecastCycle.currentDay);
+  const currentDiscussionGrouping = getDiscussionGroupingForDay(discussionGroupings, forecastCycle.currentDay);
   const hasMapStarted = Boolean(currentDay && dayHasMapWork(currentDay));
-  const hasDiscussion = hasDiscussionContent(currentDay?.discussion);
+  const hasDiscussion = hasGroupedDiscussionContent(
+    currentDiscussionGrouping ? getDiscussionForGrouping(forecastCycle, currentDiscussionGrouping) : currentDay?.discussion,
+  );
+  const discussionPath = currentDiscussionGrouping
+    ? discussionPathForGrouping(currentDiscussionGrouping)
+    : '/discussion';
   const currentValidation = validateCycleCompletion(forecastCycle, getWorkflowValidationGroupings(workflowTemplate));
   const mapIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-polygon');
   const discussionIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-discussion');
@@ -550,6 +556,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           isPackageDownloading={isPackageDownloading}
           previousSuggestion={previousSuggestion}
           activeUpdateVersion={activeUpdateVersion}
+          discussionPath={discussionPath}
           onExport={() => { handleWorkflowExport().catch(() => undefined); }}
           onOpenReview={handleOpenReview}
           onCreateUpdate={handleCreateUpdate}

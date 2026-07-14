@@ -15,6 +15,7 @@ import ForecastPage, {
   hasAnyModifierKey,
   hasRestorableCloudSelection,
   hasRolloverForecastData,
+  hasUnpublishedDiscussionDrafts,
   hasUnsavedRolloverCandidateSession,
   isTypingTarget,
   normalizeProbability,
@@ -26,7 +27,7 @@ import ForecastPage, {
   writeStoredDayValue,
 } from './ForecastPage';
 import forecastReducer from '../store/forecastSlice';
-import { addFeature } from '../store/forecastSlice';
+import { addFeature, updateDiscussionDraft } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -182,6 +183,29 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('live-outlook');
+  });
+
+  test('does not overwrite in-memory discussion drafts with an older local autosave on remount', () => {
+    const store = createStore();
+    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
+    localStorage.setItem('forecastData', JSON.stringify(stalePayload));
+
+    store.dispatch(updateDiscussionDraft({
+      scopeId: 'day-1',
+      draft: {
+        mode: 'diy',
+        validStart: '2026-07-13T00:00',
+        validEnd: '2026-07-14T00:00',
+        forecasterName: 'Draft author',
+        diyContent: 'Unsaved discussion draft',
+        lastModified: '2026-07-13T00:00:00.000Z',
+      },
+    }));
+
+    renderForecastPage(store);
+
+    expect(store.getState().forecast.discussionDraftsByScope['day-1']?.diyContent).toBe('Unsaved discussion draft');
+    expect(hasUnpublishedDiscussionDrafts(store.getState().forecast.discussionDraftsByScope)).toBe(true);
   });
 
   test('restores the local autosave when the current cycle is empty', () => {

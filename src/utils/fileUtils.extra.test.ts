@@ -16,6 +16,15 @@ type BlobUrlHelpers = typeof URL & {
   revokeObjectURL: jest.Mock<void, [string]>;
 };
 
+const discussion = {
+  mode: 'diy' as const,
+  validStart: '2026-04-21T00:00',
+  validEnd: '2026-04-22T00:00',
+  forecasterName: 'E2E',
+  diyContent: 'Discussion content',
+  lastModified: '2026-04-21T00:00:00.000Z',
+};
+
 afterEach(() => {
   jest.resetAllMocks();
   jest.restoreAllMocks();
@@ -69,6 +78,52 @@ describe('fileUtils extra', () => {
     spy.mockRestore();
   });
 
+  test('createUniqueDiscussionEntryName sanitizes paths and preserves colliding entries', async () => {
+    jest.resetModules();
+    const { createUniqueDiscussionEntryName } = await import('./fileUtils');
+    const used = new Set<string>(['forecast_cycle.json']);
+
+    expect(createUniqueDiscussionEntryName('../day 1', used)).toBe('discussion_day-1.txt');
+    expect(createUniqueDiscussionEntryName('day/1', used)).toBe('discussion_day-1-2.txt');
+    expect(createUniqueDiscussionEntryName('day 1', used)).toBe('discussion_day-1-3.txt');
+  });
+
+  test('downloadGfcPackage retains legacy discussions when persisted grouping data is malformed', async () => {
+    jest.resetModules();
+    let generatedFiles: Record<string, string> = {};
+
+    jest.doMock('jszip', () => {
+      return class MockJSZip {
+        files: Record<string, string> = {};
+        file(name: string, content: string) { this.files[name] = content; }
+        generateAsync(_opts: unknown) {
+          generatedFiles = this.files;
+          return Promise.resolve(new Blob([JSON.stringify(this.files)]));
+        }
+      };
+    });
+    jest.doMock('./discussionUtils', () => ({ compileDiscussionToText: (_discussion: unknown, day: number) => `Discussion ${day}` }));
+
+    const { downloadGfcPackage } = await import('./fileUtils');
+    const forecast = {
+      days: {
+        1: { day: 1, metadata: {}, data: { categorical: new Map() }, discussion },
+        2: { day: 2, metadata: {}, data: { categorical: new Map() }, discussion },
+      },
+      currentDay: 1,
+      cycleDate: '2026-04-21',
+      discussionGroupings: [{ id: 'bad', label: ' ', days: [1, 2], discussionDay: 9 }],
+    } as unknown as ForecastCycle;
+
+    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 });
+
+    expect(Object.keys(generatedFiles).sort()).toEqual([
+      'discussion_day1.txt',
+      'discussion_day2.txt',
+      'forecast_cycle.json',
+    ]);
+  });
+
   test('downloadGfcPackage zips one workflow-ready forecast JSON with discussions', async () => {
     jest.resetModules();
     let generatedFiles: Record<string, string> = {};
@@ -100,7 +155,7 @@ describe('fileUtils extra', () => {
     }) as BlobUrlHelpers;
     globalThis.URL = urlHelpers;
 
-    const forecast: ForecastCycle = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() }, discussion: { text: 'x' } } }, currentDay: 1, cycleDate: '2026-04-21' };
+    const forecast: ForecastCycle = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() }, discussion } }, currentDay: 1, cycleDate: '2026-04-21' };
 
     await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 });
 
