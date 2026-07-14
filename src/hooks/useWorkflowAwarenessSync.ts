@@ -110,6 +110,28 @@ const isActiveRequest = (active: ActiveRequest, generation: number, userId?: str
     currentUserId: active.userId,
   });
 
+/** Removes one stale awareness record while keeping UI and async auth state aligned. */
+const queueAwarenessDeletion = ({
+  active,
+  generation,
+  userId,
+  cycleId,
+  removeRecord,
+  reportError,
+}: {
+  active: ActiveRequest;
+  generation: number;
+  userId: string;
+  cycleId: string;
+  removeRecord: () => void;
+  reportError: (error: unknown) => void;
+}): void => {
+  removeRecord();
+  active.queue.enqueue(() => deleteOneWorkflowAwareness(userId, cycleId)).catch((nextError: unknown) => {
+    if (isActiveRequest(active, generation, userId)) reportError(nextError);
+  });
+};
+
 /**
  * Opt-in metadata-only awareness synchronization. Every async completion is
  * checked against the current user generation so auth switches cannot hydrate
@@ -263,15 +285,18 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
     metadataRef.current = workflowMetadata;
     if (!currentUserId || !isCurrentAwarenessConsent(currentConsent)) return undefined;
     const generation = active.generation;
-    if (!workflowMetadata) {
-      const cycleId = metadata?.cycleId;
-      if (!cycleId) return undefined;
-      setRecords((previous) => previous.filter((entry) => entry.cycleId !== cycleId));
-      active.queue.enqueue(() => deleteOneWorkflowAwareness(currentUserId, cycleId)).catch((nextError: unknown) => {
-        if (isActiveRequest(active, generation, currentUserId)) {
-          setError(nextError instanceof Error ? nextError.message : 'Unable to clear workflow awareness.');
-        }
+    const previousCycleId = metadata?.cycleId;
+    if (previousCycleId && (!workflowMetadata || previousCycleId !== workflowMetadata.cycleId)) {
+      queueAwarenessDeletion({
+        active,
+        generation,
+        userId: currentUserId,
+        cycleId: previousCycleId,
+        removeRecord: () => setRecords((previous) => previous.filter((entry) => entry.cycleId !== previousCycleId)),
+        reportError: (nextError) => setError(nextError instanceof Error ? nextError.message : 'Unable to clear workflow awareness.'),
       });
+    }
+    if (!workflowMetadata) {
       return undefined;
     }
     const awarenessMetadata = createAwarenessMetadata(workflowMetadata);
