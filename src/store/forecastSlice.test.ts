@@ -509,6 +509,15 @@ describe('forecastSlice undo/redo', () => {
     expect(state.discussionDraftsByScope.day1).toBeUndefined();
   });
 
+  test('keeps drafts for distinct scopes that share an owner day', () => {
+    const firstDraft = { mode: 'diy' as const, diyContent: 'First scope' } as DiscussionData;
+    const secondDraft = { mode: 'diy' as const, diyContent: 'Second scope' } as DiscussionData;
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'combined-a', draft: firstDraft }));
+    state = reducer(state, updateDiscussionDraft({ scopeId: 'combined-b', draft: secondDraft }));
+
+    expect(state.discussionDraftsByScope).toEqual({ 'combined-a': firstDraft, 'combined-b': secondDraft });
+  });
+
   test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {
     const { sourceState, targetState } = createCopyTestSetup({
       sourceDay: 4,
