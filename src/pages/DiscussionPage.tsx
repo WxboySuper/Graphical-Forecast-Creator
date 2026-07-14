@@ -17,14 +17,12 @@ import {
   selectForecastCycle,
   selectHasActiveWorkflow,
   selectWorkflowTemplate,
-  resetDiscussionGroupings,
-  setDiscussionGroupings,
   setForecastDay,
   updateDiscussion,
   updateDiscussionDraft,
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
-import { DiscussionMode, DiscussionData, DayType, DiscussionGrouping } from '../types/outlooks';
+import { DiscussionMode, DiscussionData, DayType } from '../types/outlooks';
 import { compileDiscussionToText, exportDiscussionToFile } from '../utils/discussionUtils';
 import { useAuth } from '../auth/AuthProvider';
 import { queueProductMetric } from '../utils/productMetrics';
@@ -39,6 +37,7 @@ import DIYDiscussionEditor from '../components/DiscussionEditor/DIYDiscussionEdi
 import GuidedDiscussionEditor from '../components/DiscussionEditor/GuidedDiscussionEditor';
 import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
 import DiscussionScopeSection from './DiscussionScopeSection';
+import { useDiscussionGroupingActions } from './useDiscussionGroupingActions';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
@@ -683,17 +682,6 @@ const useDiscussionEditorState = ({
   };
 };
 
-/** Combines selected scopes into one persisted discussion grouping. */
-const combineDiscussionGroupings = (
-  selected: DiscussionGrouping[],
-  label: string,
-  forecastCycle: ForecastCycle,
-): DiscussionGrouping => ({
-  id: `custom-${Date.now()}`,
-  label,
-  days: Array.from(new Set(selected.flatMap((grouping) => grouping.days))).sort((a, b) => a - b) as DayType[],
-  discussionDay: getDiscussionOwnerDay(forecastCycle, selected[0]),
-});
 
 /** The DiscussionPage component is the main forecast discussion workflow surface. */
 export const DiscussionPage: React.FC = () => {
@@ -736,23 +724,12 @@ export const DiscussionPage: React.FC = () => {
     setSearchParams({ group: selectedGrouping.id }, { replace: true });
   }, [hasActiveWorkflow, searchParams, selectedGrouping.id, setSearchParams]);
 
-  const handleCombineGroupings = useCallback((selected: DiscussionGrouping[], label: string) => {
-    if (selected.length < 2) return;
-    const selectedIds = new Set(selected.map((grouping) => grouping.id));
-    const combined = combineDiscussionGroupings(selected, label, forecastCycle);
-    dispatch(setDiscussionGroupings([
-      ...groupings.filter((grouping) => !selectedIds.has(grouping.id)),
-      combined,
-    ]));
-    dispatch(setForecastDay(combined.discussionDay));
-    setSearchParams({ group: combined.id });
-  }, [dispatch, forecastCycle, groupings, setSearchParams]);
-
-  const handleResetGroupings = useCallback(() => {
-    dispatch(resetDiscussionGroupings());
-    const currentDefault = defaultGroupings.find((grouping) => grouping.days.includes(currentDay)) ?? defaultGroupings[0];
-    setSearchParams({ group: currentDefault?.id ?? `day-${currentDay}` });
-  }, [currentDay, defaultGroupings, dispatch, setSearchParams]);
+  const { handleCombine: handleCombineGroupings, handleReset: handleResetGroupings } = useDiscussionGroupingActions({
+    forecastCycle,
+    groupings,
+    defaultGroupings,
+    currentDay,
+  });
 
   const editorState = useDiscussionEditorState({
     existingDiscussion,

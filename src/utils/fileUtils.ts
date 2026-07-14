@@ -241,14 +241,19 @@ export const exportForecastToJson = (
 };
 
 /** Adds a non-empty discussion to the package using a collision-free entry name. */
+interface DiscussionZipEntry {
+  discussion: DiscussionData | undefined;
+  day: DayType;
+  identifier: string;
+}
+
 const addDiscussionToZip = (
   zip: JSZip,
   usedEntryNames: Set<string>,
   exportedDays: Set<DayType>,
-  discussion: DiscussionData | undefined,
-  day: DayType,
-  identifier: string,
+  entry: DiscussionZipEntry,
 ): void => {
+  const { discussion, day, identifier } = entry;
   if (!discussion || !hasDiscussionContent(discussion)) return;
   zip.file(createUniqueDiscussionEntryName(identifier, usedEntryNames), compileDiscussionToText(discussion, day));
   exportedDays.add(day);
@@ -278,7 +283,11 @@ export const downloadGfcPackage = async (
   if (hasValidPersistedGrouping || hasStandardWorkflowGrouping) {
     getDiscussionGroupings(forecastCycle, workflowTemplate).forEach((grouping) => {
       const ownerDay = getDiscussionOwnerDay(forecastCycle, grouping);
-      addDiscussionToZip(zip, usedEntryNames, exportedDays, getDiscussionForGrouping(forecastCycle, grouping), ownerDay, grouping.id);
+      addDiscussionToZip(zip, usedEntryNames, exportedDays, {
+        discussion: getDiscussionForGrouping(forecastCycle, grouping),
+        day: ownerDay,
+        identifier: grouping.id,
+      });
     });
   }
 
@@ -287,7 +296,11 @@ export const downloadGfcPackage = async (
     .sort((a, b) => a - b)
     .forEach((day) => {
       if (!exportedDays.has(day)) {
-        addDiscussionToZip(zip, usedEntryNames, exportedDays, forecastCycle.days[day]?.discussion, day, `day${day}`);
+        addDiscussionToZip(zip, usedEntryNames, exportedDays, {
+          discussion: forecastCycle.days[day]?.discussion,
+          day,
+          identifier: `day${day}`,
+        });
       }
     });
 

@@ -45,6 +45,20 @@ export const standaloneDiscussionGrouping = (day: DayType): DiscussionGrouping =
  * id, day list, or overlap can hide a legacy day discussion.
  */
 /** Returns whether one persisted grouping has valid fields and day coverage. */
+const hasValidGroupingShape = (candidate: Partial<DiscussionGrouping>): candidate is DiscussionGrouping => {
+  const days = candidate.days;
+  return typeof candidate.id === 'string'
+    && candidate.id.trim().length > 0
+    && typeof candidate.label === 'string'
+    && candidate.label.trim().length > 0
+    && Array.isArray(days)
+    && days.length > 0
+    && isDayType(candidate.discussionDay)
+    && days.every(isDayType)
+    && new Set(days).size === days.length
+    && days.includes(candidate.discussionDay);
+};
+
 const isValidDiscussionGrouping = (
   value: unknown,
   ids: Set<string>,
@@ -52,14 +66,10 @@ const isValidDiscussionGrouping = (
 ): value is DiscussionGrouping => {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<DiscussionGrouping>;
-  const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
-  const days = candidate.days;
-  if (id.length === 0 || ids.has(id) || typeof candidate.label !== 'string'
-    || candidate.label.trim().length === 0 || !Array.isArray(days) || days.length === 0
-    || !isDayType(candidate.discussionDay) || !days.every(isDayType)
-    || new Set(days).size !== days.length || !days.includes(candidate.discussionDay)) return false;
-  const typedDays = days as DayType[];
-  if (typedDays.some((day) => coveredDays.has(day))) return false;
+  if (!hasValidGroupingShape(candidate)) return false;
+  const id = candidate.id.trim();
+  const typedDays = candidate.days;
+  if (ids.has(id) || typedDays.some((day) => coveredDays.has(day))) return false;
   ids.add(id);
   typedDays.forEach((day) => coveredDays.add(day));
   return true;
