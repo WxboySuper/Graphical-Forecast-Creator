@@ -9,11 +9,11 @@
     "test": "node --test billing-stripe-period.test.js qs-dos.test.js lib/serverTarget.test.js lib/featureCapabilities.test.js server-stack.test.js tstm.test.js tstm-ingestion.test.js testing/featureExposureHarness.test.js testing/autoTstm.exposure.test.js lib/capabilityStatus.test.js"
   },
   "dependencies": {
-    "@sentry/node": "^10.63.0",
+    "@sentry/node": "^10.65.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "firebase-admin": "^14.1.0",
-    "stripe": "^22.3.0"
+    "stripe": "^22.3.1"
   },
   "overrides": {
     "http-proxy-agent": "^7.0.2",

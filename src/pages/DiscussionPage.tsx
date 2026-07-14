@@ -373,7 +373,6 @@ const useDiscussionEditorState = ({
     existingDiscussion,
     defaultForecasterName,
     discussionKey,
-    currentDay,
     dispatch,
   });
 

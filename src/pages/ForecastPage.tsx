@@ -162,6 +162,11 @@ export const cycleHasDiscussionContent = (
   forecastCycle: ReturnType<typeof selectForecastCycle>
 ): boolean => Object.values(forecastCycle.days).some((dayData) => Boolean(dayData?.discussion));
 
+/** Returns true when unpublished discussion drafts are still held in memory. */
+export const hasUnpublishedDiscussionDrafts = (
+  discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope']
+): boolean => Object.keys(discussionDraftsByScope).length > 0;
+
 /** Returns true when the current session has unsaved work worth saving during a day rollover. */
 export const hasUnsavedRolloverCandidateSession = (
   forecastCycle: ReturnType<typeof selectForecastCycle>,
@@ -711,17 +716,23 @@ const restoreCloudSession = (
 
 /** Returns true when the current cycle already holds content (rolled over or discussion) that should not be clobbered by a local autosave restore. */
 const shouldSkipLocalRestore = (
-  forecastCycle: ReturnType<typeof selectForecastCycle>
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'],
 ): boolean =>
-  hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
+  hasRolloverForecastData(forecastCycle)
+  || cycleHasDiscussionContent(forecastCycle)
+  || hasUnpublishedDiscussionDrafts(discussionDraftsByScope);
 
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
 const restoreLocalSession = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
-  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle> }
+  currentSession: {
+    forecastCycle: ReturnType<typeof selectForecastCycle>;
+    discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'];
+  }
 ): void => {
-  if (shouldSkipLocalRestore(currentSession.forecastCycle)) {
+  if (shouldSkipLocalRestore(currentSession.forecastCycle, currentSession.discussionDraftsByScope)) {
     return;
   }
 
@@ -740,6 +751,7 @@ const restoreAvailableSession = (
   addToast: AddToastFn,
   currentSession: {
     forecastCycle: ReturnType<typeof selectForecastCycle>;
+    discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'];
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
   }
 ) => {
@@ -757,11 +769,13 @@ const useSessionRestore = (
   addToast: AddToastFn,
   currentSession: {
     forecastCycle: ReturnType<typeof selectForecastCycle>;
+    discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'];
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
   }
 ) => {
   const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
   const initialCycleRef = useRef(currentSession.forecastCycle);
+  const initialDraftsRef = useRef(currentSession.discussionDraftsByScope);
   const [restoreComplete, setRestoreComplete] = useState(false);
 
   useEffect(() => {
@@ -772,6 +786,7 @@ const useSessionRestore = (
     try {
       restoreAvailableSession(dispatch, addToast, {
         forecastCycle: initialCycleRef.current,
+        discussionDraftsByScope: initialDraftsRef.current,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
       });
     } catch {
@@ -1173,6 +1188,7 @@ const useForecastPageWorkspace = ({
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 }) => {
   const forecastCycle = useSelector(selectForecastCycle);
+  const discussionDraftsByScope = useSelector((state: RootState) => state.forecast.discussionDraftsByScope);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const canUndo = useSelector(selectCanUndo);
@@ -1207,6 +1223,7 @@ const useForecastPageWorkspace = ({
 
   const restoreComplete = useSessionRestore(dispatch, addToast, {
     forecastCycle,
+    discussionDraftsByScope,
     onCloudCycleLoaded: handleCloudCycleLoaded,
   });
   useUnsavedChangesWarning(isSaved);

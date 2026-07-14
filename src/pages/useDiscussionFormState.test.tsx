@@ -21,7 +21,6 @@ describe('useDiscussionFormState', () => {
           discussionKey,
           existingDiscussion,
           defaultForecasterName: 'Default forecaster',
-          currentDay: 1,
           dispatch,
         }),
       { initialProps: { discussionKey: 'group-a', existingDiscussion: undefined } },

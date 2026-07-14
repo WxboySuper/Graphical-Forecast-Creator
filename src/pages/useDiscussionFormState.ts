@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { updateDiscussionDraft } from '../store/forecastSlice';
-import type { DiscussionData, DiscussionMode, DayType } from '../types/outlooks';
+import type { DiscussionData, DiscussionMode } from '../types/outlooks';
 
 export type GuidedContentState = NonNullable<DiscussionData['guidedContent']>;
 
@@ -17,7 +17,6 @@ export interface DiscussionFormStateOptions {
   existingDiscussion: DiscussionData | undefined;
   defaultForecasterName: string;
   discussionKey: string;
-  currentDay: DayType;
   dispatch: ReturnType<typeof import('react-redux').useDispatch>;
 }
 
@@ -87,7 +86,7 @@ const useDiscussionScopeDrafts = (options: {
 };
 
 /** Manages editable discussion fields and persists changes for the active scope. */
-const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, discussionKey, currentDay, dispatch }: DiscussionFormStateOptions) => {
+const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, discussionKey, dispatch }: DiscussionFormStateOptions) => {
   const defaults = getDiscussionFormDefaults(existingDiscussion);
   const initial = { ...defaults, forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName };
   const [mode, setMode] = useState<DiscussionMode>(initial.mode);

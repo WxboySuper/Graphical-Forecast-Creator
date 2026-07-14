@@ -956,7 +956,10 @@ export const forecastSlice = createSlice({
       if (dayData) {
         dayData.discussion = discussion;
         dayData.metadata.lastModified = new Date().toISOString();
-        if (scopeId) delete state.discussionDraftsByScope[scopeId];
+        if (scopeId) {
+          const { [scopeId]: _removed, ...remainingDrafts } = state.discussionDraftsByScope;
+          state.discussionDraftsByScope = remainingDrafts;
+        }
         invalidateCompletionAcknowledgement(state);
         state.isSaved = false;
       }
