@@ -60,9 +60,8 @@ jest.mock('../components/ForecastWorkspace/ForecastWorkspaceLayouts', () => ({
 jest.mock('../components/ForecastWorkspace/ForecastWorkspaceModals', () => () => null);
 
 jest.mock('../hooks/useAutoSave', () => ({
+  ...jest.requireActual('../hooks/useAutoSave'),
   useAutoSave: jest.fn(),
-  migrateLegacyAutoSave: jest.fn(),
-  getAutoSaveStorageKey: (userId?: string | null) => userId ? `forecastData:user-${userId}` : 'forecastData',
 }));
 
 jest.mock('../hooks/useAutoCategorical', () => jest.fn());
@@ -238,6 +237,61 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('autosave-outlook');
+  });
+
+  test('prefers newer anonymous autosave over stale signed-in snapshot on sign-in', async () => {
+    const store = createStore();
+    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [0, 0], zoom: 0 });
+    stalePayload.timestamp = '2026-07-13T12:00:00.000Z';
+
+    const anonymousCycle = { ...store.getState().forecast.forecastCycle };
+    const features = new Map<string, Feature[]>();
+    features.set('10%', [{
+      type: 'Feature',
+      id: 'anonymous-outlook',
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
+    } as Feature]);
+    anonymousCycle.days = {
+      1: {
+        data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
+        metadata: { lowProbabilityOutlooks: [] },
+      },
+    } as typeof anonymousCycle.days;
+    const anonymousPayload = serializeForecast(anonymousCycle, { center: [0, 0], zoom: 0 });
+    anonymousPayload.timestamp = '2026-07-14T12:00:00.000Z';
+
+    localStorage.setItem('forecastData', JSON.stringify(anonymousPayload));
+    localStorage.setItem('forecastData:user-user-1', JSON.stringify(stalePayload));
+
+    mockUseAuth.mockReturnValue({ user: null, syncedSettings: null });
+    const view = render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastPage />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('anonymous-outlook');
+    });
+
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, syncedSettings: null });
+    view.rerender(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastPage />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('anonymous-outlook');
+      expect(localStorage.getItem('forecastData')).toBeNull();
+      const scopedPayload = parseStoredForecastPayload(localStorage.getItem('forecastData:user-user-1'));
+      expect(scopedPayload?.forecastCycle?.days?.[1]?.data?.tornado?.[0]?.[1]?.[0]?.id).toBe('anonymous-outlook');
+    });
   });
 
   test('waits for restored session state before committing the local-day baseline', async () => {

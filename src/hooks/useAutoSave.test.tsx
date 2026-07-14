@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView, setCycleDate } from '../store/forecastSlice';
-import { migrateLegacyAutoSave, useAutoSave } from './useAutoSave';
+import { migrateLegacyAutoSave, pickNewestAutoSaveValue, selectPreferredAutoSaveValue, useAutoSave } from './useAutoSave';
 import { serializeForecast } from '../utils/fileUtils';
 
 jest.mock('../utils/fileUtils', () => ({
@@ -43,12 +43,30 @@ describe('useAutoSave', () => {
   });
 
   test('persists live in-memory edits instead of migrating a stale legacy snapshot', () => {
-    localStorage.setItem('forecastData', JSON.stringify({ legacy: true }));
+    localStorage.setItem('forecastData', JSON.stringify({ legacy: true, timestamp: '2026-07-13T00:00:00.000Z' }));
 
-    migrateLegacyAutoSave('user-1', { live: true, unsaved: 'edit' });
+    migrateLegacyAutoSave('user-1', { live: true, unsaved: 'edit', timestamp: '2026-07-14T00:00:00.000Z' });
 
     expect(localStorage.getItem('forecastData')).toBeNull();
-    expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ live: true, unsaved: 'edit' }));
+    expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ live: true, unsaved: 'edit', timestamp: '2026-07-14T00:00:00.000Z' }));
+  });
+
+  test('prefers the newest snapshot when signing in with both scoped and legacy autosaves', () => {
+    localStorage.setItem('forecastData', JSON.stringify({ legacy: true, timestamp: '2026-07-14T12:00:00.000Z' }));
+    localStorage.setItem('forecastData:user-user-1', JSON.stringify({ account: true, timestamp: '2026-07-13T12:00:00.000Z' }));
+
+    migrateLegacyAutoSave('user-1', { live: true, timestamp: '2026-07-14T11:00:00.000Z' });
+
+    expect(localStorage.getItem('forecastData')).toBeNull();
+    expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ legacy: true, timestamp: '2026-07-14T12:00:00.000Z' }));
+  });
+
+  test('selectPreferredAutoSaveValue keeps the newest snapshot', () => {
+    const scoped = JSON.stringify({ account: true, timestamp: '2026-07-13T12:00:00.000Z' });
+    const legacy = JSON.stringify({ legacy: true, timestamp: '2026-07-14T12:00:00.000Z' });
+
+    expect(selectPreferredAutoSaveValue(scoped, legacy)).toBe(legacy);
+    expect(pickNewestAutoSaveValue(scoped, legacy, JSON.stringify({ live: true, timestamp: '2026-07-14T11:00:00.000Z' }))).toBe(legacy);
   });
 
   test('does not overwrite an existing signed-in autosave during migration', () => {

@@ -37,7 +37,7 @@ import {
   getFirstExposedOutlookType,
   shouldActivateEmergencyMode,
 } from '../config/productExposureSelectors';
-import { getAutoSaveStorageKey, migrateLegacyAutoSave } from '../hooks/useAutoSave';
+import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
   DAY_ROLLOVER_CHECK_INTERVAL_MS,
   DAY_ROLLOVER_LAST_ACTIVE_KEY,
@@ -742,35 +742,11 @@ const shouldSkipLocalRestore = (
   || cycleHasDiscussionContent(forecastCycle)
   || hasUnpublishedDiscussionDrafts(discussionDraftsByScope);
 
-/** Returns the legacy auto-save only when a signed-in scope has no snapshot. */
-const readLegacyAutoSave = (userId: string | null | undefined, scopedValue: string | null): string | null => {
-  if (!userId || scopedValue !== null) return null;
-  return localStorage.getItem('forecastData');
-};
-
-/** Returns true when a legacy auto-save should be copied into the signed-in scope. */
-const shouldMigrateLegacyAutoSave = (
-  userId: string | null | undefined,
-  scopedValue: string | null,
-  legacyValue: string | null,
-): boolean => Boolean(userId) && scopedValue === null && legacyValue !== null;
-
 /** Copies a legacy auto-save into the signed-in scope and removes the unscoped copy. */
 const copyLegacyAutoSaveToScopedStorage = (scopedKey: string, legacyValue: string | null): void => {
   if (legacyValue === null) return;
   localStorage.setItem(scopedKey, legacyValue);
   localStorage.removeItem('forecastData');
-};
-
-/** Migrates a legacy auto-save into the signed-in scope after it is selected. */
-const migrateLegacyAutoSaveIfNeeded = (
-  userId: string | null | undefined,
-  scopedKey: string,
-  scopedValue: string | null,
-  legacyValue: string | null,
-): void => {
-  if (!shouldMigrateLegacyAutoSave(userId, scopedValue, legacyValue)) return;
-  copyLegacyAutoSaveToScopedStorage(scopedKey, legacyValue);
 };
 
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
@@ -787,11 +763,14 @@ const restoreLocalSession = (
 
   const scopedKey = getAutoSaveStorageKey(userId);
   const scopedValue = localStorage.getItem(scopedKey);
-  const legacyValue = readLegacyAutoSave(userId, scopedValue);
-  const data = parseStoredForecastPayload(scopedValue ?? legacyValue);
+  const legacyValue = userId ? localStorage.getItem('forecastData') : null;
+  const storedValue = userId ? selectPreferredAutoSaveValue(scopedValue, legacyValue) : scopedValue;
+  const data = parseStoredForecastPayload(storedValue);
   if (!data) return false;
 
-  migrateLegacyAutoSaveIfNeeded(userId, scopedKey, scopedValue, legacyValue);
+  if (userId && legacyValue !== null && storedValue === legacyValue) {
+    copyLegacyAutoSaveToScopedStorage(scopedKey, legacyValue);
+  }
   restoreStoredForecastPayload(data, dispatch, true);
   addToast('Session restored from auto-save.', 'success');
   return true;

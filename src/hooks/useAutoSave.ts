@@ -12,20 +12,59 @@ const LOCAL_STORAGE_KEY = 'forecastData';
 export const getAutoSaveStorageKey = (userId?: string | null): string =>
   userId ? getScopedStorageKey(LOCAL_STORAGE_KEY, getStorageScope(userId)) : LOCAL_STORAGE_KEY;
 
+/** Returns the persisted autosave timestamp, or 0 when missing or malformed. */
+export const getAutoSaveTimestamp = (storedValue: string | null): number => {
+  if (!storedValue) return 0;
+
+  try {
+    const parsed = JSON.parse(storedValue) as { timestamp?: string };
+    return parsed.timestamp ? Date.parse(parsed.timestamp) : 0;
+  } catch {
+    return 0;
+  }
+};
+
+/** Picks the newest autosave snapshot when multiple scoped copies exist. */
+export const pickNewestAutoSaveValue = (...values: (string | null)[]): string | null => {
+  const candidates = values.filter((value): value is string => value !== null);
+  if (candidates.length === 0) return null;
+
+  return candidates.reduce((best, current) => (
+    getAutoSaveTimestamp(current) > getAutoSaveTimestamp(best) ? current : best
+  ));
+};
+
+/** Picks the newest autosave snapshot when both scoped and legacy copies exist. */
+export const selectPreferredAutoSaveValue = (
+  scopedValue: string | null,
+  legacyValue: string | null,
+): string | null => pickNewestAutoSaveValue(scopedValue, legacyValue);
+
 /** Moves an anonymous autosave into the signed-in account scope once, without overwriting account data.
- * When the live editor is available, persist it instead of copying a potentially stale legacy snapshot.
+ * On sign-in, reconcile scoped, legacy, and live editor snapshots by timestamp so anonymous work is not dropped.
  */
 export const migrateLegacyAutoSave = (userId?: string | null, liveSession?: unknown): void => {
   if (!userId) return;
 
   try {
     const scopedKey = getAutoSaveStorageKey(userId);
-    if (localStorage.getItem(scopedKey) === null) {
-      const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const scopedValue = localStorage.getItem(scopedKey);
+    const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
+
+    if (liveSession !== undefined) {
+      const preferred = pickNewestAutoSaveValue(scopedValue, legacyValue, JSON.stringify(liveSession));
+      if (preferred) {
+        localStorage.setItem(scopedKey, preferred);
+      }
       if (legacyValue !== null) {
-        localStorage.setItem(scopedKey, liveSession === undefined ? legacyValue : JSON.stringify(liveSession));
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
+      return;
+    }
+
+    if (scopedValue === null && legacyValue !== null) {
+      localStorage.setItem(scopedKey, legacyValue);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.
