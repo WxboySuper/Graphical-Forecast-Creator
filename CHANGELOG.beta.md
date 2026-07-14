@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #694
+
+- Preserve discussions and drafts across workflow grouping, scope, and route changes.
+
 ### PR #693
 
 - Dependency: @radix-ui/react-dialog ^1.1.18 → ^1.1.19

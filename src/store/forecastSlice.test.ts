@@ -6,6 +6,8 @@ import reducer, {
   applyAutoCategoricalSync,
   copyFeaturesFromPrevious,
   importForecastCycle,
+  importWorkflowPackage,
+  restoreForecastCycle,
   redoLastEdit,
   replaceTstmFeatures,
   resetForecasts,
@@ -27,6 +29,8 @@ import reducer, {
   startFromPreviousCycle,
   saveCurrentCycle,
   updateDiscussion,
+  updateDiscussionDraft,
+  migrateDiscussionDrafts,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -418,6 +422,127 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, resetForecasts());
     expect(selectCanUndo({ forecast: state } as never)).toBe(false);
     expect(selectCanRedo({ forecast: state } as never)).toBe(false);
+  });
+
+  test('restoring a cycle clears drafts from the previous cycle', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Unsaved text',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
+    expect(state.discussionDraftsByScope.day1).toEqual(draft);
+
+    state = reducer(state, restoreForecastCycle(state.forecastCycle));
+
+    expect(state.discussionDraftsByScope).toEqual({});
+  });
+
+  test('same-session restore preserves unpublished discussion drafts', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Unsaved text survives local restore',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
+
+    state = reducer(state, restoreForecastCycle(state.forecastCycle, true));
+
+    expect(state.discussionDraftsByScope.day1).toEqual(draft);
+  });
+
+  test('importing a workflow package clears drafts from the replaced cycle', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Stale imported-cycle draft',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
+
+    state = reducer(state, importWorkflowPackage({
+      metadata: {
+        workflowId: 'severe-day1',
+        cycleId: 'cycle-2026-07-04',
+        version: 1,
+        status: 'in-progress',
+        includesDiscussions: true,
+        includesStyleSnapshots: false,
+      },
+      cycles: [{
+        id: 'cycle-2026-07-04',
+        workflowId: 'severe-day1',
+        cycleDate: '2026-07-04',
+        status: 'in-progress',
+        outlookVersions: [],
+        createdAt: '2026-07-04T00:00:00.000Z',
+        updatedAt: '2026-07-04T12:00:00.000Z',
+      }],
+    }));
+
+    expect(state.discussionDraftsByScope).toEqual({});
+  });
+
+  test('saving a discussion draft does not publish it until updateDiscussion', () => {
+    const draft = {
+      mode: 'diy' as const,
+      validStart: '2026-07-04T12:00',
+      validEnd: '2026-07-05T12:00',
+      forecasterName: 'Draft author',
+      diyContent: 'Unsaved text',
+      lastModified: '2026-07-04T12:00:00.000Z',
+    };
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft }));
+
+    expect(state.forecastCycle.days[1]?.discussion).toBeUndefined();
+    expect(state.discussionDraftsByScope.day1).toEqual(draft);
+
+    state = reducer(state, updateDiscussion({ day: 1, scopeId: 'day1', discussion: draft }));
+    expect(state.forecastCycle.days[1]?.discussion).toEqual(draft);
+    expect(state.discussionDraftsByScope.day1).toBeUndefined();
+  });
+
+  test('keeps drafts for distinct scopes that share an owner day', () => {
+    const firstDraft = { mode: 'diy' as const, diyContent: 'First scope' } as DiscussionData;
+    const secondDraft = { mode: 'diy' as const, diyContent: 'Second scope' } as DiscussionData;
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'combined-a', draft: firstDraft }));
+    state = reducer(state, updateDiscussionDraft({ scopeId: 'combined-b', draft: secondDraft }));
+
+    expect(state.discussionDraftsByScope).toEqual({ 'combined-a': firstDraft, 'combined-b': secondDraft });
+  });
+
+  test('migrates combined scope drafts onto the new combined scope id', () => {
+    const dayOneDraft = { mode: 'diy' as const, diyContent: 'Day 1 draft' } as DiscussionData;
+    const dayTwoDraft = { mode: 'diy' as const, diyContent: 'Day 2 draft' } as DiscussionData;
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft: dayOneDraft }));
+    state = reducer(state, updateDiscussionDraft({ scopeId: 'day2', draft: dayTwoDraft }));
+
+    state = reducer(state, migrateDiscussionDrafts({
+      migrations: { day1: 'custom-combined', day2: 'custom-combined' },
+      preferScopeId: 'day1',
+    }));
+
+    expect(state.discussionDraftsByScope['custom-combined']?.diyContent).toBe('Day 1 draft\n\nDay 2 draft');
+  });
+
+  test('migrates custom scope drafts back to default scope ids on reset', () => {
+    const customDraft = { mode: 'diy' as const, diyContent: 'Custom scope draft' } as DiscussionData;
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'custom-1', draft: customDraft }));
+
+    state = reducer(state, migrateDiscussionDrafts({
+      migrations: { 'custom-1': 'day1' },
+    }));
+
+    expect(state.discussionDraftsByScope.day1?.diyContent).toBe('Custom scope draft');
+    expect(state.discussionDraftsByScope['custom-1']).toBeUndefined();
   });
 
   test('copies compatible day 4-8 features into day 3 total severe and clears old target data', () => {

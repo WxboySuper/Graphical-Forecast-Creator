@@ -5,6 +5,11 @@ import type {
   CycleValidationResult,
 } from '../types/workflow';
 import type { ForecastCycle, DayType, OutlookType, OutlookDay, DiscussionData } from '../types/outlooks';
+import {
+  getDiscussionGroupingForDay,
+  getDiscussionForGrouping,
+  getValidationDiscussionGroupings,
+} from './discussionGrouping';
 
 // ---------------------------------------------------------------------------
 // Expected outlook types per day grouping
@@ -39,6 +44,7 @@ interface DayValidationContext {
   issues: ValidationIssue[];
   missingGroupings: Set<StandardGrouping>;
   dayData?: OutlookDay;
+  forecastCycle: ForecastCycle;
 }
 
 interface ValidationAccumulator {
@@ -106,6 +112,7 @@ const createDayContext = (
   issues: accumulator.issues,
   missingGroupings: accumulator.missingGroupings,
   dayData: forecastCycle.days[day],
+  forecastCycle,
 });
 
 /** Adds critical issues when an expected day has no saved outlook data. */
@@ -220,13 +227,21 @@ const validateNoTstmForecast = (ctx: DayValidationContext): void => {
 };
 
 /** Adds a warning when the expected day discussion is missing. */
-const validateDiscussion = (ctx: DayValidationContext): void => {
+const validateDiscussion = (
+  ctx: DayValidationContext,
+  discussionGroupings: ReturnType<typeof getValidationDiscussionGroupings>,
+): void => {
   const dayData = ctx.dayData;
   if (!dayData) {
     return;
   }
 
-  if (hasDiscussionContent(dayData.discussion)) {
+  const grouping = getDiscussionGroupingForDay(discussionGroupings, ctx.day);
+  const discussion = grouping
+    ? getDiscussionForGrouping(ctx.forecastCycle, grouping)
+    : dayData.discussion;
+
+  if (hasDiscussionContent(discussion)) {
     return;
   }
 
@@ -245,6 +260,7 @@ const validateDay = (
   day: DayType,
   forecastCycle: ForecastCycle,
   accumulator: ValidationAccumulator,
+  discussionGroupings: ReturnType<typeof getValidationDiscussionGroupings>,
 ): void => {
   const ctx = createDayContext(day, forecastCycle, accumulator);
 
@@ -255,7 +271,7 @@ const validateDay = (
 
   validateOutlookPolygons(ctx);
   validateNoTstmForecast(ctx);
-  validateDiscussion(ctx);
+  validateDiscussion(ctx, discussionGroupings);
 };
 
 // ---------------------------------------------------------------------------
@@ -273,9 +289,10 @@ export function validateCycleCompletion(
     issues: [],
     missingGroupings: new Set<StandardGrouping>(),
   };
+  const discussionGroupings = getValidationDiscussionGroupings(forecastCycle, expectedGroupings);
 
   for (const day of collectDaysToValidate(expectedGroupings)) {
-    validateDay(day, forecastCycle, accumulator);
+    validateDay(day, forecastCycle, accumulator, discussionGroupings);
   }
 
   const missingGroupings = Array.from(accumulator.missingGroupings).sort();
