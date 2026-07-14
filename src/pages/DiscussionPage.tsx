@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { 
@@ -24,6 +24,7 @@ import {
 import type { RootState } from '../store';
 import { DiscussionMode, DiscussionData, DayType } from '../types/outlooks';
 import { compileDiscussionToText, exportDiscussionToFile } from '../utils/discussionUtils';
+import useDiscussionFormState, { GuidedContentState, buildDiscussionDataFrom } from './useDiscussionFormState';
 import { useAuth } from '../auth/AuthProvider';
 import { queueProductMetric } from '../utils/productMetrics';
 import {
@@ -50,71 +51,6 @@ interface PageContext {
 }
 
 const DISCUSSION_AUTOSAVE_DELAY_MS = 1500;
-
-type GuidedContentState = NonNullable<DiscussionData['guidedContent']>;
-
-interface DiscussionFormDefaults {
-  mode: DiscussionMode;
-  validStart: string;
-  validEnd: string;
-  forecasterName: string;
-  diyContent: string;
-  guidedContent: GuidedContentState;
-}
-
-interface DiscussionEditorState {
-  mode: DiscussionMode;
-  validStart: string;
-  validEnd: string;
-  forecasterName: string;
-  diyContent: string;
-  guidedContent: GuidedContentState;
-  hasUnsavedChanges: boolean;
-  compiledText: string;
-  wordCount: number;
-  setValidStart: (value: string) => void;
-  setValidEnd: (value: string) => void;
-  setForecasterName: (value: string) => void;
-  handleModeChange: (value: string) => void;
-  handleContentChange: (newContent: string) => void;
-  handleGuidedChange: (newContent: GuidedContentState) => void;
-  handleSave: () => void;
-  handleExport: () => void;
-  persistDraft: () => void;
-}
-
-// Creates a default empty state for the guided discussion content when starting fresh or if no existing guided content is found.
-const createDefaultGuidedContent = (): GuidedContentState => ({
-  synopsis: '',
-  meteorologicalSetup: '',
-  severeWeatherExpectations: '',
-  timing: '',
-  regionalBreakdown: '',
-  additionalConsiderations: ''
-});
-
-// Determines the initial valid end time for the discussion.
-// If an existing discussion has a valid end time, it uses that.
-// Otherwise, it defaults to 24 hours from the current time.
-const getInitialValidEnd = (existingDiscussion?: DiscussionData): string => {
-  if (existingDiscussion?.validEnd) {
-    return existingDiscussion.validEnd;
-  }
-
-  const end = new Date();
-  end.setHours(end.getHours() + 24);
-  return end.toISOString().slice(0, 16);
-};
-
-/** Returns default form field values for the Discussion editor, seeded from an existing discussion or blank defaults. */
-const getDiscussionFormDefaults = (existingDiscussion?: DiscussionData): DiscussionFormDefaults => ({
-  mode: existingDiscussion?.mode ?? 'diy',
-  validStart: existingDiscussion?.validStart ?? new Date().toISOString().slice(0, 16),
-  validEnd: getInitialValidEnd(existingDiscussion),
-  forecasterName: existingDiscussion?.forecasterName ?? '',
-  diyContent: existingDiscussion?.diyContent ?? '',
-  guidedContent: existingDiscussion?.guidedContent ?? createDefaultGuidedContent()
-});
 
 // Formats an ISO datetime string into a more human-readable format for display in the metadata section of the discussion editor.
 const formatDateTime = (isoString: string): string => {
@@ -333,177 +269,7 @@ const DiscussionPreviewPane: React.FC<{ compiledText: string }> = ({ compiledTex
   </div>
 );
 
-// The useDiscussionEditorState hook encapsulates all the state management logic for the discussion editor,
-// Lightweight helper: build DiscussionData from form fields
-const buildDiscussionDataFrom = (fields: {
-  mode: DiscussionMode;
-  validStart: string;
-  validEnd: string;
-  forecasterName: string;
-  diyContent: string;
-  guidedContent: GuidedContentState;
-}): DiscussionData => ({
-  mode: fields.mode,
-  validStart: fields.validStart,
-  validEnd: fields.validEnd,
-  forecasterName: fields.forecasterName,
-  diyContent: fields.mode === 'diy' ? fields.diyContent : undefined,
-  guidedContent: fields.mode === 'guided' ? fields.guidedContent : undefined,
-  lastModified: new Date().toISOString()
-});
-
-// Manages the editable form state and unsaved flag; keeps setters small and focused.
-interface DiscussionFormStateOptions {
-  existingDiscussion: DiscussionData | undefined;
-  defaultForecasterName: string;
-  discussionKey: string;
-  currentDay: DayType;
-  dispatch: ReturnType<typeof useDispatch>;
-}
-
-const useDiscussionFormState = ({
-  existingDiscussion,
-  defaultForecasterName,
-  discussionKey,
-  currentDay,
-  dispatch,
-}: DiscussionFormStateOptions) => {
-  const defaults = getDiscussionFormDefaults(existingDiscussion);
-  const mergedDefaults = {
-    ...defaults,
-    forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName,
-  };
-
-  const [mode, setMode] = useState<DiscussionMode>(mergedDefaults.mode);
-  const [validStart, setValidStart] = useState(mergedDefaults.validStart);
-  const [validEnd, setValidEnd] = useState(mergedDefaults.validEnd);
-  const [forecasterName, setForecasterName] = useState(mergedDefaults.forecasterName);
-  const [diyContent, setDiyContent] = useState(mergedDefaults.diyContent);
-  const [guidedContent, setGuidedContent] = useState<GuidedContentState>(mergedDefaults.guidedContent);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const previousDiscussionKeyRef = useRef(discussionKey);
-  const scopeChangedRef = useRef(false);
-  const draftsRef = useRef(new Map<string, {
-    mode: DiscussionMode;
-    validStart: string;
-    validEnd: string;
-    forecasterName: string;
-    diyContent: string;
-    guidedContent: GuidedContentState;
-  }>());
-
-  useEffect(() => {
-    const previousDiscussionKey = previousDiscussionKeyRef.current;
-    if (previousDiscussionKey === discussionKey) return;
-    scopeChangedRef.current = true;
-
-    if (hasUnsavedChanges) {
-      draftsRef.current.set(previousDiscussionKey, {
-        mode,
-        validStart,
-        validEnd,
-        forecasterName,
-        diyContent,
-        guidedContent,
-      });
-    }
-
-    const savedDraft = draftsRef.current.get(discussionKey);
-    const nextDefaults = getDiscussionFormDefaults(existingDiscussion);
-    const next = savedDraft ?? {
-      mode: nextDefaults.mode,
-      validStart: nextDefaults.validStart,
-      validEnd: nextDefaults.validEnd,
-      forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName,
-      diyContent: nextDefaults.diyContent,
-      guidedContent: nextDefaults.guidedContent,
-    };
-    setMode(next.mode);
-    setValidStart(next.validStart);
-    setValidEnd(next.validEnd);
-    setForecasterName(next.forecasterName);
-    setDiyContent(next.diyContent);
-    setGuidedContent(next.guidedContent);
-    setHasUnsavedChanges(Boolean(savedDraft));
-    previousDiscussionKeyRef.current = discussionKey;
-  }, [discussionKey, defaultForecasterName, diyContent, existingDiscussion, forecasterName, guidedContent, hasUnsavedChanges, mode, validEnd, validStart]);
-
-  useEffect(() => {
-    if (scopeChangedRef.current) {
-      scopeChangedRef.current = false;
-      return;
-    }
-    if (previousDiscussionKeyRef.current !== discussionKey || !hasUnsavedChanges) return;
-    draftsRef.current.set(discussionKey, {
-      mode,
-      validStart,
-      validEnd,
-      forecasterName,
-      diyContent,
-      guidedContent,
-    });
-  }, [discussionKey, diyContent, forecasterName, guidedContent, hasUnsavedChanges, mode, validEnd, validStart]);
-
-  // Persist every edit synchronously in Redux so route navigation cannot unmount the only copy.
-  const persistDraft = useCallback((fields: DiscussionFormDefaults) => {
-    dispatch(updateDiscussionDraft({
-      day: currentDay,
-      draft: buildDiscussionDataFrom(fields),
-    }));
-  }, [currentDay, dispatch]);
-
-  const markUnsaved = useCallback(() => setHasUnsavedChanges(true), []);
-
-  const handleModeChange = useCallback((value: string) => {
-    const nextMode = value as DiscussionMode;
-    setMode(nextMode);
-    markUnsaved();
-    persistDraft({ mode: nextMode, validStart, validEnd, forecasterName, diyContent, guidedContent });
-  }, [diyContent, forecasterName, guidedContent, markUnsaved, persistDraft, validEnd, validStart]);
-  const handleValidStart = useCallback((v: string) => {
-    setValidStart(v);
-    markUnsaved();
-    persistDraft({ mode, validStart: v, validEnd, forecasterName, diyContent, guidedContent });
-  }, [diyContent, forecasterName, guidedContent, markUnsaved, mode, persistDraft, validEnd]);
-  const handleValidEnd = useCallback((v: string) => {
-    setValidEnd(v);
-    markUnsaved();
-    persistDraft({ mode, validStart, validEnd: v, forecasterName, diyContent, guidedContent });
-  }, [diyContent, forecasterName, guidedContent, markUnsaved, mode, persistDraft, validStart]);
-  const handleForecasterName = useCallback((v: string) => {
-    setForecasterName(v);
-    markUnsaved();
-    persistDraft({ mode, validStart, validEnd, forecasterName: v, diyContent, guidedContent });
-  }, [diyContent, guidedContent, markUnsaved, mode, persistDraft, validEnd, validStart]);
-  const handleDiy = useCallback((c: string) => {
-    setDiyContent(c);
-    markUnsaved();
-    persistDraft({ mode, validStart, validEnd, forecasterName, diyContent: c, guidedContent });
-  }, [forecasterName, guidedContent, markUnsaved, mode, persistDraft, validEnd, validStart]);
-  const handleGuided = useCallback((c: GuidedContentState) => {
-    setGuidedContent(c);
-    markUnsaved();
-    persistDraft({ mode, validStart, validEnd, forecasterName, diyContent, guidedContent: c });
-  }, [diyContent, forecasterName, markUnsaved, mode, persistDraft, validEnd, validStart]);
-
-  return {
-    mode,
-    validStart,
-    validEnd,
-    forecasterName,
-    diyContent,
-    guidedContent,
-    hasUnsavedChanges,
-    setHasUnsavedChanges,
-    handleModeChange,
-    handleValidStart,
-    handleValidEnd,
-    handleForecasterName,
-    handleDiy,
-    handleGuided
-  } as const;
-};
-
+// Discussion form state lives in useDiscussionFormState to keep the page focused on composition.
 // Auto-save hook keeps the effect isolated and simple. Accepts a single options object
 const useDiscussionAutoSave = (opts: {
   hasUnsavedChanges: boolean;

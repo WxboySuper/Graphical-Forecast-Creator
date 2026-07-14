@@ -86,24 +86,14 @@ const serializeOutlookDay = (outlookDay: OutlookDay): SerializedDay => {
   };
 };
 
+const createBaseOutlookData = (day: DayType): OutlookData => {
+  if (day === 1 || day === 2) return { tornado: new Map(), wind: new Map(), hail: new Map(), categorical: new Map() };
+  if (day === 3) return { totalSevere: new Map(), categorical: new Map() };
+  return { 'day4-8': new Map() };
+};
+
 const createEmptyOutlook = (day: DayType): OutlookDay => {
-  const baseData: OutlookData = {};
-  
-  if (day === 1 || day === 2) {
-    // Day 1/2: tornado, wind, hail, categorical
-    baseData.tornado = new Map();
-    baseData.wind = new Map();
-    baseData.hail = new Map();
-    baseData.categorical = new Map();
-  } else if (day === 3) {
-    // Day 3: totalSevere, categorical
-    baseData.totalSevere = new Map();
-    baseData.categorical = new Map();
-  } else {
-    // Day 4-8: only day4-8 outlook type
-    baseData['day4-8'] = new Map();
-  }
-  
+  const baseData = createBaseOutlookData(day);
   return {
     day,
     data: baseData,
