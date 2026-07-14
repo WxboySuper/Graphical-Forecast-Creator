@@ -74,7 +74,9 @@ const useDiscussionScopeDrafts = (options: {
     if (hasUnsavedChanges) draftsRef.current.set(previousKey, fields);
     const saved = draftsRef.current.get(discussionKey);
     const defaults = getDiscussionFormDefaults(existingDiscussion);
-    applyFields(saved ?? { ...defaults, forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, Boolean(saved));
+    // Loading a saved scope restores its fields, but does not make them edited.
+    // Only an explicit field handler should arm autosave.
+    applyFields(saved ?? { ...defaults, forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, false);
     previousKeyRef.current = discussionKey;
   }, [discussionKey, existingDiscussion, defaultForecasterName, hasUnsavedChanges, fields, applyFields]);
 
