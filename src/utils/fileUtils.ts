@@ -70,6 +70,22 @@ type SerializedDay = {
 };
 
 // Helper to create empty outlook based on day type
+/** Converts one outlook day into its JSON-compatible representation. */
+const serializeOutlookDay = (outlookDay: OutlookDay): SerializedDay => {
+  const serializedData: SerializedOutlookData = {};
+  const mapFields: (keyof OutlookData)[] = ['tornado', 'wind', 'hail', 'totalSevere', 'day4-8', 'categorical'];
+  mapFields.forEach((field) => {
+    const map = outlookDay.data[field];
+    if (map) serializedData[field] = mapToArray(map);
+  });
+  return {
+    day: outlookDay.day,
+    metadata: { ...outlookDay.metadata, lowProbabilityOutlooks: outlookDay.metadata.lowProbabilityOutlooks || [] },
+    data: serializedData,
+    discussion: outlookDay.discussion,
+  };
+};
+
 const createEmptyOutlook = (day: DayType): OutlookDay => {
   const baseData: OutlookData = {};
   
@@ -113,29 +129,9 @@ export const serializeForecast = (
 ): GFCForecastSaveData => {
   const serializedDays: Partial<Record<DayType, SerializedDay>> = {};
   
-  (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach(day => {
+  (Object.keys(forecastCycle.days) as unknown as DayType[]).forEach((day) => {
     const outlookDay = forecastCycle.days[day];
-    if (outlookDay) {
-      const serializedData: SerializedOutlookData = {};
-      
-      // Only serialize outlook maps that exist for this day
-      if (outlookDay.data.tornado) serializedData.tornado = mapToArray(outlookDay.data.tornado);
-      if (outlookDay.data.wind) serializedData.wind = mapToArray(outlookDay.data.wind);
-      if (outlookDay.data.hail) serializedData.hail = mapToArray(outlookDay.data.hail);
-      if (outlookDay.data.totalSevere) serializedData.totalSevere = mapToArray(outlookDay.data.totalSevere);
-      if (outlookDay.data['day4-8']) serializedData['day4-8'] = mapToArray(outlookDay.data['day4-8']);
-      if (outlookDay.data.categorical) serializedData.categorical = mapToArray(outlookDay.data.categorical);
-      
-      serializedDays[day] = {
-        day: outlookDay.day,
-        metadata: {
-          ...outlookDay.metadata,
-          lowProbabilityOutlooks: outlookDay.metadata.lowProbabilityOutlooks || []
-        },
-        data: serializedData,
-        discussion: outlookDay.discussion
-      };
-    }
+    if (outlookDay) serializedDays[day] = serializeOutlookDay(outlookDay);
   });
 
   const result: GFCForecastSaveData = {
@@ -244,9 +240,21 @@ export const exportForecastToJson = (
   URL.revokeObjectURL(url);
 };
 
-/**
- * Bundles the forecast JSON and all day discussions into a single .zip package.
- */
+/** Adds a non-empty discussion to the package using a collision-free entry name. */
+const addDiscussionToZip = (
+  zip: JSZip,
+  usedEntryNames: Set<string>,
+  exportedDays: Set<DayType>,
+  discussion: DiscussionData | undefined,
+  day: DayType,
+  identifier: string,
+): void => {
+  if (!discussion || !hasDiscussionContent(discussion)) return;
+  zip.file(createUniqueDiscussionEntryName(identifier, usedEntryNames), compileDiscussionToText(discussion, day));
+  exportedDays.add(day);
+};
+
+/** Bundles the forecast JSON and all day discussions into a single .zip package. */
 export const downloadGfcPackage = async (
   forecastCycle: ForecastCycle,
   mapView: { center: [number, number]; zoom: number },
@@ -267,18 +275,10 @@ export const downloadGfcPackage = async (
   const exportedDays = new Set<DayType>();
   const usedEntryNames = new Set<string>(['forecast_cycle.json']);
 
-  /** Adds a non-empty discussion to the package using a collision-free entry name. */
-  const addDiscussion = (discussion: DiscussionData | undefined, day: DayType, identifier: string): void => {
-    if (!discussion || !hasDiscussionContent(discussion)) return;
-    const entryName = createUniqueDiscussionEntryName(identifier, usedEntryNames);
-    zip.file(entryName, compileDiscussionToText(discussion, day));
-    exportedDays.add(day);
-  };
-
   if (hasValidPersistedGrouping || hasStandardWorkflowGrouping) {
     getDiscussionGroupings(forecastCycle, workflowTemplate).forEach((grouping) => {
       const ownerDay = getDiscussionOwnerDay(forecastCycle, grouping);
-      addDiscussion(getDiscussionForGrouping(forecastCycle, grouping), ownerDay, grouping.id);
+      addDiscussionToZip(zip, usedEntryNames, exportedDays, getDiscussionForGrouping(forecastCycle, grouping), ownerDay, grouping.id);
     });
   }
 
@@ -286,8 +286,9 @@ export const downloadGfcPackage = async (
   (Object.keys(forecastCycle.days) as unknown as DayType[])
     .sort((a, b) => a - b)
     .forEach((day) => {
-      if (exportedDays.has(day)) return;
-      addDiscussion(forecastCycle.days[day]?.discussion, day, `day${day}`);
+      if (!exportedDays.has(day)) {
+        addDiscussionToZip(zip, usedEntryNames, exportedDays, forecastCycle.days[day]?.discussion, day, `day${day}`);
+      }
     });
 
   const blob = await zip.generateAsync({ type: 'blob' });

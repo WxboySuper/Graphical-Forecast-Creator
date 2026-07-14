@@ -354,13 +354,21 @@ const buildDiscussionDataFrom = (fields: {
 });
 
 // Manages the editable form state and unsaved flag; keeps setters small and focused.
-const useDiscussionFormState = (
-  existingDiscussion: DiscussionData | undefined,
-  defaultForecasterName: string,
-  discussionKey: string,
-  currentDay: DayType,
-  dispatch: ReturnType<typeof useDispatch>,
-) => {
+interface DiscussionFormStateOptions {
+  existingDiscussion: DiscussionData | undefined;
+  defaultForecasterName: string;
+  discussionKey: string;
+  currentDay: DayType;
+  dispatch: ReturnType<typeof useDispatch>;
+}
+
+const useDiscussionFormState = ({
+  existingDiscussion,
+  defaultForecasterName,
+  discussionKey,
+  currentDay,
+  dispatch,
+}: DiscussionFormStateOptions) => {
   const defaults = getDiscussionFormDefaults(existingDiscussion);
   const mergedDefaults = {
     ...defaults,
@@ -592,7 +600,13 @@ const useDiscussionEditorState = ({
   user,
   onSaved,
 }: DiscussionEditorStateOptions): DiscussionEditorState => {
-  const form = useDiscussionFormState(existingDiscussion, defaultForecasterName, discussionKey, currentDay, dispatch);
+  const form = useDiscussionFormState({
+    existingDiscussion,
+    defaultForecasterName,
+    discussionKey,
+    currentDay,
+    dispatch,
+  });
 
   const buildDiscussionData = useCallback(() => buildDiscussionDataFrom({
     mode: form.mode,
@@ -669,7 +683,19 @@ const useDiscussionEditorState = ({
   };
 };
 
-// The DiscussionPage component is the main forecast discussion workflow surface.
+/** Combines selected scopes into one persisted discussion grouping. */
+const combineDiscussionGroupings = (
+  selected: DiscussionGrouping[],
+  label: string,
+  forecastCycle: ForecastCycle,
+): DiscussionGrouping => ({
+  id: `custom-${Date.now()}`,
+  label,
+  days: Array.from(new Set(selected.flatMap((grouping) => grouping.days))).sort((a, b) => a - b) as DayType[],
+  discussionDay: getDiscussionOwnerDay(forecastCycle, selected[0]),
+});
+
+/** The DiscussionPage component is the main forecast discussion workflow surface. */
 export const DiscussionPage: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -713,13 +739,7 @@ export const DiscussionPage: React.FC = () => {
   const handleCombineGroupings = useCallback((selected: DiscussionGrouping[], label: string) => {
     if (selected.length < 2) return;
     const selectedIds = new Set(selected.map((grouping) => grouping.id));
-    const days = Array.from(new Set(selected.flatMap((grouping) => grouping.days))).sort((a, b) => a - b) as DayType[];
-    const combined: DiscussionGrouping = {
-      id: `custom-${Date.now()}`,
-      label,
-      days,
-      discussionDay: getDiscussionOwnerDay(forecastCycle, selected[0]),
-    };
+    const combined = combineDiscussionGroupings(selected, label, forecastCycle);
     dispatch(setDiscussionGroupings([
       ...groupings.filter((grouping) => !selectedIds.has(grouping.id)),
       combined,

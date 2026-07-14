@@ -11,6 +11,7 @@ export const STANDARD_DISCUSSION_GROUPINGS: readonly DiscussionGrouping[] = [
 const STANDARD_GROUPING_IDS = new Set(STANDARD_DISCUSSION_GROUPINGS.map(({ id }) => id));
 
 /** Returns true when a value is one of the supported forecast day numbers. */
+/** @internal */
 const isDayType = (value: unknown): value is DayType =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 8;
 
@@ -43,36 +44,33 @@ export const standaloneDiscussionGrouping = (day: DayType): DiscussionGrouping =
  * Invalid scopes must not control export or completion behavior because a malformed
  * id, day list, or overlap can hide a legacy day discussion.
  */
+/** Returns whether one persisted grouping has valid fields and day coverage. */
+const isValidDiscussionGrouping = (
+  value: unknown,
+  ids: Set<string>,
+  coveredDays: Set<DayType>,
+): value is DiscussionGrouping => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<DiscussionGrouping>;
+  const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
+  const days = candidate.days;
+  if (id.length === 0 || ids.has(id) || typeof candidate.label !== 'string'
+    || candidate.label.trim().length === 0 || !Array.isArray(days) || days.length === 0
+    || !isDayType(candidate.discussionDay) || !days.every(isDayType)
+    || new Set(days).size !== days.length || !days.includes(candidate.discussionDay)) return false;
+  const typedDays = days as DayType[];
+  if (typedDays.some((day) => coveredDays.has(day))) return false;
+  ids.add(id);
+  typedDays.forEach((day) => coveredDays.add(day));
+  return true;
+};
+
+/** Validates persisted grouping data without silently repairing it. */
 export const isValidDiscussionGroupings = (value: unknown): value is DiscussionGrouping[] => {
   if (!Array.isArray(value) || value.length === 0) return false;
-
   const ids = new Set<string>();
   const coveredDays = new Set<DayType>();
-
-  for (const grouping of value) {
-    if (!grouping || typeof grouping !== 'object') return false;
-    const candidate = grouping as Partial<DiscussionGrouping>;
-    const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
-    if (
-      id.length === 0
-      || ids.has(id)
-      || typeof candidate.label !== 'string'
-      || candidate.label.trim().length === 0
-      || !Array.isArray(candidate.days)
-      || candidate.days.length === 0
-      || !isDayType(candidate.discussionDay)
-      || !candidate.days.every(isDayType)
-      || new Set(candidate.days).size !== candidate.days.length
-      || !candidate.days.includes(candidate.discussionDay)
-    ) return false;
-
-    const days = candidate.days as DayType[];
-    if (days.some((day) => coveredDays.has(day))) return false;
-    ids.add(id);
-    days.forEach((day) => coveredDays.add(day));
-  }
-
-  return true;
+  return value.every((grouping) => isValidDiscussionGrouping(grouping, ids, coveredDays));
 };
 
 /** Normalizes valid persisted grouping data while preserving its explicit scope boundaries. */

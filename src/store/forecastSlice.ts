@@ -949,7 +949,10 @@ export const forecastSlice = createSlice({
       if (dayData) {
         dayData.discussion = discussion;
         dayData.metadata.lastModified = new Date().toISOString();
-        delete state.discussionDraftsByDay[day];
+        const remainingDrafts = Object.fromEntries(
+          Object.entries(state.discussionDraftsByDay).filter(([draftDay]) => Number(draftDay) !== day),
+        );
+        state.discussionDraftsByDay = remainingDrafts;
         invalidateCompletionAcknowledgement(state);
         state.isSaved = false;
       }
