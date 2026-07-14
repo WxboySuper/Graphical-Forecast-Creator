@@ -289,6 +289,7 @@ const DiscussionDefaultsSection: React.FC<{
 );
 
 /** Bottom action row for saving defaults and ending the current session. */
+/** Renders one account action row for an authenticated user. */
 const SignedInActionRow: React.FC<{
   savingDefaults: boolean;
   saveMessage: string | null;

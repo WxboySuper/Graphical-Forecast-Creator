@@ -183,6 +183,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
 };
 
 // Main App with Router
+/** Renders the authenticated application shell and route tree. */
 function App() {
   const isLaunched = useLaunchGate();
   const showComingSoon = COMING_SOON_MODE && !isLaunched;
