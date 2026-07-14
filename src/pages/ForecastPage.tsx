@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
@@ -41,7 +40,6 @@ import { getAutoSaveStorageKey, migrateLegacyAutoSave } from '../hooks/useAutoSa
 import {
   DAY_ROLLOVER_CHECK_INTERVAL_MS,
   DAY_ROLLOVER_LAST_ACTIVE_KEY,
-  DAY_ROLLOVER_PENDING_KEY,
   DAY_ROLLOVER_PROMPTED_KEY,
   type DayRolloverPromptState,
   clearStoredRolloverPrompt,
@@ -871,12 +869,16 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [isSaved]);
 };
 
 /** Returns true when legacy rollover keys describe a prompt for today. */
 const isLegacyPromptForToday = (today: string, legacyPromptedDay: string | null): boolean => legacyPromptedDay === today;
+
+/** Returns true when a legacy active day exists and differs from today. */
 const hasPriorLegacyDay = (today: string, legacyLastActiveDay: string | null): legacyLastActiveDay is string => Boolean(legacyLastActiveDay) && legacyLastActiveDay !== today;
 
 /** Returns a pending prompt reconstructed from legacy rollover keys when needed. */
@@ -1135,6 +1137,7 @@ const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addT
 
   useEffect(() => {
     detectDayRollover();
+    /** Rechecks rollover state when the document becomes visible again. */
     const handleVisibilityChange = () => {
       if (!document.hidden) detectDayRollover();
     };
@@ -1148,12 +1151,6 @@ const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addT
 
   const completeRollover = useCallback(() => { clearStoredRolloverPrompt(userId); setPromptState(null); setActionError(null); }, [userId]);
   const handleKeepCurrentSession = useCallback(() => completeRollover(), [completeRollover]);
-  const handleSaveAndStartNewDay = useCallback(() => {
-    clearCurrent();
-    const didSaveSession = runDayRolloverSaveAction({ forecastCycle, isSaved: isSaved && !restoredSession, dispatch });
-    addToast(didSaveSession ? 'Saved the previous session to Cycle History and started a new forecast for today.' : 'Started a new forecast for today.', 'success');
-    completeRollover();
-  }, [addToast, clearCurrent, completeRollover, dispatch, forecastCycle, isSaved, restoredSession]);
   const handleDownloadAndStartNewDay = useCallback(() => {
     if (!runDayRolloverDownloadAction({ forecastCycle, mapView: currentMapView, dispatch, clearCurrent })) { setActionError('Unable to download this session. Your current forecast is still open.'); return; }
     addToast('Forecast downloaded and a new day started.', 'success');
