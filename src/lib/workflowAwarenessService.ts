@@ -62,18 +62,22 @@ export const isValidWorkflowAwarenessRecord = (value: unknown): value is Workflo
     && isValidWorkflowAwarenessRecordTimestamps(value);
 };
 
+/** Checks the persisted record object and exact top-level key set. */
 const isValidWorkflowAwarenessRecordShape = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
   && sortedKeysEqual(value as Record<string, unknown>, FLAT_RECORD_KEYS);
 
+/** Checks the persisted consent and schema versions. */
 const isValidWorkflowAwarenessRecordVersion = (value: Record<string, unknown>): boolean =>
   value.consentVersion === WORKFLOW_AWARENESS_CONSENT_VERSION
   && value.schemaVersion === WORKFLOW_AWARENESS_SCHEMA_VERSION;
 
+/** Checks the required cycle identity and lifecycle status fields. */
 const isValidWorkflowAwarenessRecordIdentity = (value: Record<string, unknown>): boolean =>
   isNonEmptyString(value.cycleId) && isNonEmptyString(value.workflowId) && isNonEmptyString(value.cycleDate)
   && typeof value.status === 'string' && CYCLE_STATUSES.has(value.status);
 
+/** Checks every nested outlook version entry. */
 const isValidWorkflowAwarenessRecordVersions = (value: Record<string, unknown>): boolean =>
   Array.isArray(value.outlookVersions) && value.outlookVersions.every(isValidOutlookVersion);
 
