@@ -203,6 +203,11 @@ describe('cycleHistoryPersistence', () => {
       getState: () => state,
     };
 
+    const unsubscribe = mod.setupCycleHistoryListener(store as never);
+    expect(listeners).toHaveLength(1);
+    unsubscribe();
+    expect(listeners).toHaveLength(0);
+
     mod.setupCycleHistoryListener(store as never);
 
     state = { forecast: { savedCycles: [{ id: 'a', timestamp: 't', cycleDate: 'd', forecastCycle: {}, stats: {} }] } };

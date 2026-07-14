@@ -81,7 +81,9 @@ const AppHooks = () => {
 
   // Load and persist Cycle History for the active account only
   useCycleHistoryPersistence(userId);
-  useEffect(() => setupCycleHistoryListener(store, userId), [userId]);
+  useEffect(() => {
+    return setupCycleHistoryListener(store, userId);
+  }, [userId]);
 
   // Derive emergency mode and the first exposed outlook from build-target exposure.
   useEffect(() => {
