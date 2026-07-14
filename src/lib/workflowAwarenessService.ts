@@ -55,41 +55,65 @@ const isValidOutlookVersion = (value: unknown): value is WorkflowAwarenessRecord
 
 /** Validates the exact persisted record shape, including the nested allowlist. */
 export const isValidWorkflowAwarenessRecord = (value: unknown): value is WorkflowAwarenessRecord => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const record = value as Record<string, unknown>;
-  if (!sortedKeysEqual(record, FLAT_RECORD_KEYS)) return false;
-  if (record.consentVersion !== WORKFLOW_AWARENESS_CONSENT_VERSION || record.schemaVersion !== WORKFLOW_AWARENESS_SCHEMA_VERSION) return false;
-  if (!isNonEmptyString(record.cycleId) || !isNonEmptyString(record.workflowId) || !isNonEmptyString(record.cycleDate)) return false;
-  if (typeof record.status !== 'string' || !CYCLE_STATUSES.has(record.status)) return false;
-  if (!Array.isArray(record.outlookVersions) || !record.outlookVersions.every(isValidOutlookVersion)) return false;
-  return isNonEmptyString(record.createdAt) && isNonEmptyString(record.updatedAt);
+  return isValidWorkflowAwarenessRecordShape(value)
+    && isValidWorkflowAwarenessRecordVersion(value)
+    && isValidWorkflowAwarenessRecordIdentity(value)
+    && isValidWorkflowAwarenessRecordVersions(value)
+    && isValidWorkflowAwarenessRecordTimestamps(value);
 };
+
+const isValidWorkflowAwarenessRecordShape = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+  && sortedKeysEqual(value as Record<string, unknown>, FLAT_RECORD_KEYS);
+
+const isValidWorkflowAwarenessRecordVersion = (value: Record<string, unknown>): boolean =>
+  value.consentVersion === WORKFLOW_AWARENESS_CONSENT_VERSION
+  && value.schemaVersion === WORKFLOW_AWARENESS_SCHEMA_VERSION;
+
+const isValidWorkflowAwarenessRecordIdentity = (value: Record<string, unknown>): boolean =>
+  isNonEmptyString(value.cycleId) && isNonEmptyString(value.workflowId) && isNonEmptyString(value.cycleDate)
+  && typeof value.status === 'string' && CYCLE_STATUSES.has(value.status);
+
+const isValidWorkflowAwarenessRecordVersions = (value: Record<string, unknown>): boolean =>
+  Array.isArray(value.outlookVersions) && value.outlookVersions.every(isValidOutlookVersion);
+
+const isValidWorkflowAwarenessRecordTimestamps = (value: Record<string, unknown>): boolean =>
+  isNonEmptyString(value.createdAt) && isNonEmptyString(value.updatedAt);
 
 /** Validates the nested Firestore document shape and its metadata allowlist. */
 export const isValidWorkflowAwarenessDocument = (value: unknown): value is WorkflowAwarenessDocument => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (!isValidWorkflowAwarenessDocumentShape(value)) return false;
   const document = value as Record<string, unknown>;
-  if (!sortedKeysEqual(document, RECORD_KEYS)) return false;
-  if (document.consentVersion !== WORKFLOW_AWARENESS_CONSENT_VERSION || document.schemaVersion !== WORKFLOW_AWARENESS_SCHEMA_VERSION) return false;
-  if (!document.metadata || typeof document.metadata !== 'object' || Array.isArray(document.metadata)) return false;
-  return isValidWorkflowAwarenessRecord({
-    ...(document.metadata as Record<string, unknown>),
-    consentVersion: document.consentVersion,
-    schemaVersion: document.schemaVersion,
-  });
+  return isValidWorkflowAwarenessDocumentMetadata(document)
+    && isValidWorkflowAwarenessRecord({
+      ...(document.metadata as Record<string, unknown>),
+      consentVersion: document.consentVersion,
+      schemaVersion: document.schemaVersion,
+    });
 };
+
+const isValidWorkflowAwarenessDocumentShape = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+  && sortedKeysEqual(value as Record<string, unknown>, RECORD_KEYS);
+
+const isValidWorkflowAwarenessDocumentMetadata = (value: Record<string, unknown>): boolean =>
+  value.consentVersion === WORKFLOW_AWARENESS_CONSENT_VERSION
+  && value.schemaVersion === WORKFLOW_AWARENESS_SCHEMA_VERSION
+  && typeof value.metadata === 'object' && value.metadata !== null && !Array.isArray(value.metadata);
 
 /** Validates the metadata subset before it is wrapped into a Firestore document. */
 export const isValidWorkflowAwarenessMetadata = (value: unknown): value is WorkflowAwarenessMetadata => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const metadata = value as Record<string, unknown>;
-  if (!sortedKeysEqual(metadata, METADATA_KEYS)) return false;
+  if (!isValidWorkflowAwarenessMetadataShape(value)) return false;
   return isValidWorkflowAwarenessRecord({
-    ...metadata,
+    ...(value as Record<string, unknown>),
     consentVersion: WORKFLOW_AWARENESS_CONSENT_VERSION,
     schemaVersion: WORKFLOW_AWARENESS_SCHEMA_VERSION,
   });
 };
+
+const isValidWorkflowAwarenessMetadataShape = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+  && sortedKeysEqual(value as Record<string, unknown>, METADATA_KEYS);
 
 /** Returns the current user's isolated awareness collection. */
 const getAwarenessCollection = (userId: string) => {
@@ -100,12 +124,14 @@ const getAwarenessCollection = (userId: string) => {
 /** Returns one awareness document reference without accessing cycle documents. */
 const getAwarenessDoc = (userId: string, cycleId: string) => doc(getAwarenessCollection(userId), cycleId);
 
+/** Wraps awareness metadata in the persisted Firestore document envelope. */
 const toRecord = (metadata: WorkflowAwarenessMetadata): WorkflowAwarenessDocument => ({
   consentVersion: WORKFLOW_AWARENESS_CONSENT_VERSION,
   schemaVersion: WORKFLOW_AWARENESS_SCHEMA_VERSION,
   metadata,
 });
 
+/** Separates valid awareness records from malformed documents requiring cleanup. */
 const readSnapshotRecords = (snapshot: AwarenessSnapshot): { valid: WorkflowAwarenessRecord[]; malformedIds: string[] } => {
   const valid: WorkflowAwarenessRecord[] = [];
   const malformedIds: string[] = [];
@@ -177,10 +203,12 @@ export const deleteWorkflowAwareness = async (userId: string): Promise<void> => 
   await Promise.all(snapshot.docs.map((entry) => removeDoc(getAwarenessDoc(userId, entry.id))));
 };
 
+/** Deletes one cycle-scoped awareness record for the current user. */
 export const deleteOneWorkflowAwareness = async (userId: string, cycleId: string): Promise<void> => {
   await deleteDoc(getAwarenessDoc(userId, cycleId));
 };
 
 /** Exposes the exact fields used by the dashboard rules handoff for tests and review tooling. */
 export const getWorkflowAwarenessAllowlist = (): readonly string[] => RECORD_KEYS;
+/** Returns the exact metadata fields allowed in persisted awareness records. */
 export const getWorkflowAwarenessMetadataAllowlist = (): readonly string[] => METADATA_KEYS;

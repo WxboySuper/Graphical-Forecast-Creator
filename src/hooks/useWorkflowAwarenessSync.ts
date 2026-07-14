@@ -210,6 +210,7 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    /** Refreshes consent when the account settings broadcast changes. */
     const handleConsentChanged = (event: Event) => {
       const detail = (event as CustomEvent<{ userId?: string }>).detail;
       if (detail?.userId !== userId || !userId) return;
@@ -348,6 +349,7 @@ export const useWorkflowAwarenessConsentSetting = (): {
   }, [userId]);
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    /** Refreshes this adapter when another consumer changes consent. */
     const listener = (event: Event) => {
       const detail = (event as CustomEvent<{ userId?: string }>).detail;
       if (detail?.userId === userId) setConsent(readWorkflowAwarenessConsent(userId));

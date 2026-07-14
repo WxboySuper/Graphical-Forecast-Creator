@@ -316,6 +316,7 @@ const WorkflowAwarenessSection: React.FC<{
   </div>
 );
 
+/** Renders one account action row for an authenticated user. */
 const SignedInActionRow: React.FC<{
   savingDefaults: boolean;
   saveMessage: string | null;

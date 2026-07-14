@@ -201,6 +201,7 @@ const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
   </Provider>
 );
 
+/** Renders the authenticated application shell and route tree. */
 function App() {
   const isLaunched = useLaunchGate();
   const showComingSoon = COMING_SOON_MODE && !isLaunched;
