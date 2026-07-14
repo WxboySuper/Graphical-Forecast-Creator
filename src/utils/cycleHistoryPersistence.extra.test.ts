@@ -123,6 +123,52 @@ describe('cycleHistoryPersistence', () => {
     expect(loaded[0].stats).toEqual({});
   });
 
+  test('migrates legacy cycle history into a signed-in scope without overwriting account history', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'legacy' }]));
+
+    mod.migrateLegacyCycleHistory('user-1');
+
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'legacy' }]));
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'legacy' }]));
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'new-legacy' }]));
+    mod.migrateLegacyCycleHistory('user-1');
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'new-legacy' }]));
+  });
+
+  test('does not import legacy cycle history into a different signed-in account', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{ id: 'legacy' }]));
+
+    mod.migrateLegacyCycleHistory('user-1');
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify([{ id: 'legacy' }]));
+    expect(localStorage.getItem('gfc-cycle-history-claim')).toBe('user-1');
+
+    localStorage.removeItem('gfc-cycle-history:user-user-2');
+    mod.migrateLegacyCycleHistory('user-2');
+    expect(localStorage.getItem('gfc-cycle-history:user-user-2')).toBeNull();
+    expect(mod.loadCycleHistoryFromStorage('user-2')).toEqual([]);
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify([{ id: 'legacy' }]));
+  });
+
+  test('falls back to usable legacy history when signed-in scope is empty or unusable', async () => {
+    jest.doMock('./outlookMapCoercion', () => ({ normalizeForecastCycle: (cycle: unknown) => cycle }));
+    const mod = await import('./cycleHistoryPersistence');
+    const legacy = [{ id: 'legacy', timestamp: 't1', cycleDate: 'd1', forecastCycle: {} }];
+    localStorage.setItem('gfc-cycle-history:user-user-1', JSON.stringify({ invalid: true }));
+    localStorage.setItem('gfc-cycle-history', JSON.stringify(legacy));
+
+    mod.migrateLegacyCycleHistory('user-1');
+    const loaded = mod.loadCycleHistoryFromStorage('user-1');
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].id).toBe('legacy');
+    expect(localStorage.getItem('gfc-cycle-history:user-user-1')).toBe(JSON.stringify(legacy));
+    expect(localStorage.getItem('gfc-cycle-history')).toBe(JSON.stringify(legacy));
+  });
+
   test('loadCycleHistoryFromStorage returns empty on invalid stored data', async () => {
     localStorage.setItem('gfc-cycle-history', JSON.stringify({ not: 'an array' }));
     const mod = await import('./cycleHistoryPersistence');
@@ -172,6 +218,11 @@ describe('cycleHistoryPersistence', () => {
       getState: () => state,
     };
 
+    const unsubscribe = mod.setupCycleHistoryListener(store as never);
+    expect(listeners).toHaveLength(1);
+    unsubscribe();
+    expect(listeners).toHaveLength(0);
+
     mod.setupCycleHistoryListener(store as never);
 
     state = { forecast: { savedCycles: [{ id: 'a', timestamp: 't', cycleDate: 'd', forecastCycle: {}, stats: {} }] } };
@@ -183,6 +234,71 @@ describe('cycleHistoryPersistence', () => {
     expect(spy).not.toHaveBeenCalled();
 
     spy.mockRestore();
+  });
+
+  test('account rollover cleanup prevents the old listener from persisting the hydration clear', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    const oldCycle: SavedCycle = { id: 'old', timestamp: 't', cycleDate: 'd', forecastCycle: {}, stats: {} };
+    const listeners: Array<() => void> = [];
+    let state = { forecast: { savedCycles: [oldCycle] } };
+    const store: StoreLike = {
+      subscribe: (cb: () => void) => {
+        listeners.push(cb);
+        return () => {
+          const index = listeners.indexOf(cb);
+          if (index >= 0) listeners.splice(index, 1);
+        };
+      },
+      getState: () => state,
+    };
+
+    const oldScopeKey = mod.getCycleHistoryStorageKey('old-user');
+    const existingHistory = JSON.stringify([{ id: 'persisted-old-history' }]);
+    localStorage.setItem(oldScopeKey, existingHistory);
+    const oldScopeCleanup = mod.setupCycleHistoryListener(store as never, 'old-user');
+    state = { forecast: { savedCycles: [] } };
+    oldScopeCleanup();
+    listeners.forEach((listener) => listener());
+
+    expect(localStorage.getItem(oldScopeKey)).toBe(existingHistory);
+  });
+
+  test('account switch preserves non-empty target history when listener starts after hydration', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    const oldCycle: SavedCycle = { id: 'old', timestamp: 't', cycleDate: 'd', forecastCycle: {}, stats: {} };
+    const targetCycle: SavedCycle = { id: 'target', timestamp: 't2', cycleDate: 'd2', forecastCycle: {}, stats: {} };
+    const listeners: Array<() => void> = [];
+    let state = { forecast: { savedCycles: [oldCycle] } };
+    const store: StoreLike = {
+      subscribe: (cb: () => void) => {
+        listeners.push(cb);
+        return () => {
+          const index = listeners.indexOf(cb);
+          if (index >= 0) listeners.splice(index, 1);
+        };
+      },
+      getState: () => state,
+    };
+
+    const targetKey = mod.getCycleHistoryStorageKey('target-user');
+    const targetHistory = JSON.stringify([{
+      id: targetCycle.id,
+      timestamp: targetCycle.timestamp,
+      cycleDate: targetCycle.cycleDate,
+      forecastCycle: targetCycle.forecastCycle,
+      stats: targetCycle.stats,
+    }]);
+    localStorage.setItem(targetKey, targetHistory);
+
+    const oldCleanup = mod.setupCycleHistoryListener(store as never, 'old-user');
+    oldCleanup();
+    state = { forecast: { savedCycles: [] } };
+    listeners.forEach((listener) => listener());
+
+    // The new listener is attached only after account-scoped history is hydrated.
+    state = { forecast: { savedCycles: [targetCycle] } };
+    mod.setupCycleHistoryListener(store as never, 'target-user');
+    expect(localStorage.getItem(targetKey)).toBe(targetHistory);
   });
 
   test('loadCycleHistoryFromStorage returns empty on JSON parse error', async () => {

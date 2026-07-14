@@ -26,6 +26,7 @@ export interface UseCloudCyclesResult {
     stats: SavedCycleStats,
     payload: GFCForecastSaveData,
     workflowMetadata?: CycleMetadata,
+    options?: { saveAsNew?: boolean },
   ) => Promise<boolean>;
   loadCycle: (cycleId: string) => Promise<GFCForecastSaveData | null>;
   deleteCycle: (cycleId: string) => Promise<boolean>;
@@ -259,6 +260,26 @@ function useCloudCycleMutation<TArgs extends unknown[]>({
   );
 }
 
+/** Returns true when a cloud save can proceed for the current access context. */
+function canSaveCloudCycle({ userId, canWrite }: CloudAccessContext): boolean {
+  return Boolean(userId && canWrite);
+}
+
+/** Handles a failed cloud save and updates the active sync state. */
+function handleCloudSaveFailure({
+  result,
+  setError,
+  updateSyncState,
+}: {
+  result: CloudOperationResult;
+  setError: Dispatch<SetStateAction<string | null>>;
+  updateSyncState: (state: CloudSyncState, error?: string) => void;
+}): false {
+  setError(result.error || 'Failed to save cloud cycle');
+  updateSyncState('error', result.error);
+  return false;
+}
+
 /** Returns the save callback for hosted cloud cycles. */
 function useCloudSaveCycle({
   userId,
@@ -279,8 +300,9 @@ function useCloudSaveCycle({
       stats: SavedCycleStats,
       payload: GFCForecastSaveData,
       workflowMetadata?: CycleMetadata,
+      options?: { saveAsNew?: boolean },
     ): Promise<boolean> => {
-      if (!userId || !canWrite) {
+      if (!canSaveCloudCycle({ userId, canWrite })) {
         setError(getCloudWriteBlockedMessage({ userId, canWrite }));
         return false;
       }
@@ -297,13 +319,11 @@ function useCloudSaveCycle({
         stats,
         payload,
         workflowMetadata,
-        existingId: currentCloudRef.current?.id,
+        existingId: options?.saveAsNew ? undefined : currentCloudRef.current?.id,
       });
 
       if (!result.success) {
-        setError(result.error || 'Failed to save cloud cycle');
-        updateSyncState('error', result.error);
-        return false;
+        return handleCloudSaveFailure({ result, setError, updateSyncState });
       }
 
       if (result.data) {

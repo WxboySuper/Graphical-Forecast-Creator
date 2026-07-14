@@ -15,9 +15,9 @@ import {
 
 import { useAutoSave } from './hooks/useAutoSave';
 import { useFirestoreSleepRecovery } from './hooks/useFirestoreSleepRecovery';
+import { setupCycleHistoryListener, useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
 import { WorkflowAwarenessProvider } from './hooks/useWorkflowAwarenessSync';
-import { useCycleHistoryPersistence } from './utils/cycleHistoryPersistence';
-import { AuthProvider } from './auth/AuthProvider';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
@@ -68,18 +68,25 @@ function useLaunchGate(): boolean {
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
   const dispatch = useDispatch();
+  const { user } = useAuth();
+  const userId = user?.uid;
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
-  
-  // Enable Auto-Save
-  useAutoSave();
+
+  // Enable account-scoped Auto-Save
+  useAutoSave(userId);
 
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
 
-  // Load cycle history from localStorage
-  useCycleHistoryPersistence();
+  // Hydrate the active account before starting its persistence listener. React runs
+  // effect cleanups before new effects, so the previous listener is removed before
+  // this clears Redux and the new listener only observes the hydrated scope.
+  useCycleHistoryPersistence(userId);
+  useEffect(() => {
+    return setupCycleHistoryListener(store, userId);
+  }, [userId]);
 
   // Derive emergency mode and the first exposed outlook from build-target exposure.
   useEffect(() => {
