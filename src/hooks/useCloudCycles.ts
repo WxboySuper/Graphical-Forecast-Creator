@@ -317,6 +317,18 @@ function useCloudSaveCycle({
   );
 }
 
+/** Builds the forecast payload handed to the editor after a cloud load. */
+export const buildLoadedCloudForecastPayload = (
+  record: Pick<import('../types/cloudCycles').CloudCycle, 'payload' | 'workflowMetadata'>,
+): GFCForecastSaveData => {
+  if (record.workflowMetadata) {
+    return { ...record.payload, cycleMetadata: record.workflowMetadata };
+  }
+
+  const { cycleMetadata: _staleEmbedded, ...plainPayload } = record.payload;
+  return { ...plainPayload, cycleMetadata: null };
+};
+
 /** Returns the load callback for hosted cloud cycles. */
 function useCloudLoadCycle({
   userId,
@@ -349,9 +361,7 @@ function useCloudLoadCycle({
       syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
       queueProductMetric({ event: 'cloud_cycle_loaded', user });
       updateSyncState('saved');
-      return result.data.workflowMetadata
-        ? { ...result.data.payload, cycleMetadata: result.data.workflowMetadata }
-        : result.data.payload;
+      return buildLoadedCloudForecastPayload(result.data);
     },
     [cycles, setCurrentCloud, setError, updateSyncState, user, userId]
   );

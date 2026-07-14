@@ -650,7 +650,6 @@ const restoreStoredForecastPayload = (
   if (data.cycleMetadata) {
     dispatch(setWorkflowMetadata(data.cycleMetadata));
   }
-
   const rawData = data as LoadedForecastPayload['rawData'];
   if (rawData.mapView) {
     dispatch(setMapView(rawData.mapView));
