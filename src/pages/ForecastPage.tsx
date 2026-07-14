@@ -777,6 +777,19 @@ const shouldSkipLocalRestore = (
 ): boolean =>
   hasRolloverForecastData(forecastCycle) || cycleHasDiscussionContent(forecastCycle);
 
+/** Returns the legacy auto-save only when a signed-in scope has no snapshot. */
+const readLegacyAutoSave = (userId: string | null | undefined, scopedValue: string | null): string | null => {
+  if (!userId || scopedValue !== null) return null;
+  return localStorage.getItem('forecastData');
+};
+
+/** Migrates a legacy auto-save into the signed-in scope after it is selected. */
+const migrateLegacyAutoSaveIfNeeded = (userId: string | null | undefined, scopedKey: string, scopedValue: string | null, legacyValue: string | null): void => {
+  if (!userId || scopedValue !== null || legacyValue === null) return;
+  localStorage.setItem(scopedKey, legacyValue);
+  localStorage.removeItem('forecastData');
+};
+
 /** Restores the last local auto-saved forecast when no cloud-loaded payload is pending. */
 const restoreLocalSession = (
   dispatch: ShortcutDispatch,
@@ -784,22 +797,15 @@ const restoreLocalSession = (
   currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle> },
   userId?: string | null
 ): boolean => {
-  if (shouldSkipLocalRestore(currentSession.forecastCycle)) {
-    return false;
-  }
+  if (shouldSkipLocalRestore(currentSession.forecastCycle)) return false;
 
   const scopedKey = getAutoSaveStorageKey(userId);
   const scopedValue = localStorage.getItem(scopedKey);
-  const legacyValue = userId && scopedValue === null ? localStorage.getItem('forecastData') : null;
+  const legacyValue = readLegacyAutoSave(userId, scopedValue);
   const data = parseStoredForecastPayload(scopedValue ?? legacyValue);
-  if (!data) {
-    return false;
-  }
+  if (!data) return false;
 
-  if (userId && scopedValue === null && legacyValue !== null) {
-    localStorage.setItem(scopedKey, legacyValue);
-    localStorage.removeItem('forecastData');
-  }
+  migrateLegacyAutoSaveIfNeeded(userId, scopedKey, scopedValue, legacyValue);
   restoreStoredForecastPayload(data, dispatch);
   addToast('Session restored from auto-save.', 'success');
   return true;
@@ -894,17 +900,27 @@ const useUnsavedChangesWarning = (isSaved: boolean) => {
   }, [isSaved]);
 };
 
+/** Returns true when legacy rollover keys describe a prompt for today. */
+const isLegacyPromptForToday = (today: string, legacyPromptedDay: string | null): boolean => legacyPromptedDay === today;
+const hasPriorLegacyDay = (today: string, legacyLastActiveDay: string | null): legacyLastActiveDay is string => Boolean(legacyLastActiveDay) && legacyLastActiveDay !== today;
+
 /** Returns a pending prompt reconstructed from legacy rollover keys when needed. */
 const getLegacyPendingRolloverPrompt = (
   today: string,
   legacyLastActiveDay: string | null,
   legacyPromptedDay: string | null,
 ): DayRolloverPromptState | null => {
-  if (legacyPromptedDay !== today || !legacyLastActiveDay || legacyLastActiveDay === today) {
-    return null;
-  }
+  if (!isLegacyPromptForToday(today, legacyPromptedDay)) return null;
+  if (!hasPriorLegacyDay(today, legacyLastActiveDay)) return null;
   return { previousDay: legacyLastActiveDay, currentDay: today };
 };
+
+/** Returns true when the anonymous baseline can be copied into its scoped key. */
+const canMigrateLegacyRolloverBaseline = (
+  userId: string | null | undefined,
+  legacyLastActiveDay: string | null,
+  scopedLastActiveDay: string | null,
+): legacyLastActiveDay is string => !userId && Boolean(legacyLastActiveDay) && !scopedLastActiveDay;
 
 /** Copies the anonymous rollover baseline into its scoped key during migration. */
 const migrateLegacyRolloverBaseline = (
@@ -913,9 +929,8 @@ const migrateLegacyRolloverBaseline = (
   legacyLastActiveDay: string | null,
   scopedLastActiveDay: string | null,
 ): void => {
-  if (!userId && legacyLastActiveDay && !scopedLastActiveDay) {
-    writeStoredDayValue(scopedLastActiveKey, legacyLastActiveDay);
-  }
+  if (!canMigrateLegacyRolloverBaseline(userId, legacyLastActiveDay, scopedLastActiveDay)) return;
+  writeStoredDayValue(scopedLastActiveKey, legacyLastActiveDay);
 };
 
 /** Reads the stored day-rollover snapshot without mutating the baseline used by the decision. */
@@ -970,6 +985,14 @@ export const shouldSkipDayRolloverPrompt = ({
   return !hasUnsavedWork;
 };
 
+/** Returns true when a stored pending prompt can be reused for the current day. */
+const isCurrentPendingRolloverPrompt = (
+  restoreComplete: boolean,
+  pendingPrompt: DayRolloverPromptState | null | undefined,
+  today: string,
+  promptOpen: boolean,
+): pendingPrompt is DayRolloverPromptState => restoreComplete && !promptOpen && pendingPrompt?.currentDay === today;
+
 /** Saves the previous cycle when needed, resets the editor, and returns whether a history save occurred. */
 export const getDayRolloverPromptState = ({
   restoreComplete,
@@ -991,11 +1014,7 @@ export const getDayRolloverPromptState = ({
   pendingPrompt?: DayRolloverPromptState | null;
 }): DayRolloverPromptState | null => {
   const hasUnsavedWork = hasUnsavedRolloverCandidateSession(forecastCycle, isSaved);
-
-  if (restoreComplete && pendingPrompt?.currentDay === today && !promptOpen) {
-    return pendingPrompt;
-  }
-
+  if (isCurrentPendingRolloverPrompt(restoreComplete, pendingPrompt, today, promptOpen)) return pendingPrompt;
   if (shouldSkipDayRolloverPrompt({
     restoreComplete,
     lastActiveDay,
@@ -1003,14 +1022,9 @@ export const getDayRolloverPromptState = ({
     alreadyPromptedToday,
     promptOpen,
     hasUnsavedWork,
-  })) {
-    return null;
-  }
+  })) return null;
 
-  return {
-    previousDay: lastActiveDay as string,
-    currentDay: today,
-  };
+  return { previousDay: lastActiveDay as string, currentDay: today };
 };
 
 /** Saves the current session to Cycle History when needed, then resets the editor for the new local day. */
@@ -1065,6 +1079,13 @@ export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapV
   } catch { return false; }
 };
 
+/** Stores the detected prompt and marks today's rollover check as handled. */
+const persistDetectedRolloverPrompt = (prompt: DayRolloverPromptState, today: string, userId?: string): void => {
+  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId), today);
+  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
+  writeStoredRolloverPrompt(prompt, userId);
+};
+
 /** Watches for a local calendar-day rollover and offers to save the previous session before starting a new one. */
 const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addToast, forecastCycle, currentMapView, isSaved, userId, canSaveToCloud, saveCycle, clearCurrent }: {
   restoreComplete: boolean;
@@ -1100,9 +1121,7 @@ const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addT
       if (restoreComplete) writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
       return;
     }
-    writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId), today);
-    writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
-    writeStoredRolloverPrompt(nextPromptState, userId);
+    persistDetectedRolloverPrompt(nextPromptState, today, userId);
     setActionError(null);
     setPromptState(nextPromptState);
   }, [restoreComplete, restoredSession, userId]);
