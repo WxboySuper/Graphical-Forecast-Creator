@@ -160,14 +160,22 @@ export interface DiscussionData {
   validStart: string; // ISO date-time
   validEnd: string; // ISO date-time
   forecasterName: string;
-  
+
   // DIY mode - simple text editor
   diyContent?: string;
-  
+
   // Guided mode - structured questions
   guidedContent?: GuidedDiscussionData;
-  
+
   lastModified: string;
+}
+
+/** A discussion scope. Content remains canonical on one legacy day slot. */
+export interface DiscussionGrouping {
+  id: string;
+  label: string;
+  days: DayType[];
+  discussionDay: DayType;
 }
 
 export interface OutlookDay {
@@ -188,6 +196,8 @@ export interface ForecastCycle {
   days: Partial<Record<DayType, OutlookDay>>;
   currentDay: DayType;
   cycleDate: string;
+  /** Optional workflow discussion scopes; legacy content stays on OutlookDay.discussion. */
+  discussionGroupings?: DiscussionGrouping[];
   /** ISO timestamp when the forecaster acknowledged completion with omissions. */
   completionAcknowledgedAt?: string;
   /** User-provided reasons for omitted forecast days at completion time. */
@@ -223,6 +233,7 @@ export interface GFCForecastSaveData {
     }>>;
     currentDay: DayType;
     cycleDate: string;
+    discussionGroupings?: DiscussionGrouping[];
     completionAcknowledgedAt?: string;
     omittedDayReasons?: Partial<Record<DayType, string>>;
     updateInProgressVersion?: number;

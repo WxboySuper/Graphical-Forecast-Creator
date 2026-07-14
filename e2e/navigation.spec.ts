@@ -30,4 +30,37 @@ test.describe('Navigation', () => {
     // toHaveURL matches the full URL, so match either bare / or the full origin
     await expect(page).toHaveURL(/\/$/);
   });
+
+  test('preserves unsaved discussion drafts by day across route navigation', async ({ page }) => {
+    await page.goto('/discussion');
+    const editor = page.getByPlaceholder(/Write your forecast discussion here/i);
+    await expect(editor).toBeVisible();
+
+    await editor.fill('Day 1 draft');
+    await page.getByRole('link', { name: /^Forecast$/i }).click();
+    await expect(page).toHaveURL(/\/forecast$/);
+    await page.getByRole('tab', { name: /^Days$/i }).click();
+    await page.getByRole('button', { name: '2', exact: true }).click();
+
+    await page.getByRole('link', { name: /^Discussion$/i }).click();
+    await expect(page).toHaveURL(/\/discussion$/);
+    await expect(editor).toHaveValue('');
+    await editor.fill('Day 2 draft');
+
+    await page.getByRole('link', { name: /^Forecast$/i }).click();
+    await expect(page).toHaveURL(/\/forecast$/);
+    await page.getByRole('tab', { name: /^Days$/i }).click();
+    await page.getByRole('button', { name: '1', exact: true }).click();
+    await page.getByRole('link', { name: /^Discussion$/i }).click();
+    await expect(page).toHaveURL(/\/discussion$/);
+    await expect(editor).toHaveValue('Day 1 draft');
+
+    await page.getByRole('link', { name: /^Forecast$/i }).click();
+    await expect(page).toHaveURL(/\/forecast$/);
+    await page.getByRole('tab', { name: /^Days$/i }).click();
+    await page.getByRole('button', { name: '2', exact: true }).click();
+    await page.getByRole('link', { name: /^Discussion$/i }).click();
+    await expect(page).toHaveURL(/\/discussion$/);
+    await expect(editor).toHaveValue('Day 2 draft');
+  });
 });
