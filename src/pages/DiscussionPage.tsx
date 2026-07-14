@@ -449,6 +449,26 @@ const useDiscussionEditorState = ({
 };
 
 
+const useDiscussionScopeSync = (options: {
+  currentDay: DayType;
+  discussionDay: DayType;
+  dispatch: ReturnType<typeof useDispatch>;
+  hasActiveWorkflow: boolean;
+  selectedGroupingId: string;
+  searchParams: URLSearchParams;
+  setSearchParams: ReturnType<typeof useSearchParams>[1];
+}) => {
+  const { currentDay, discussionDay, dispatch, hasActiveWorkflow, selectedGroupingId, searchParams, setSearchParams } = options;
+  useEffect(() => {
+    if (currentDay !== discussionDay) dispatch(setForecastDay(discussionDay));
+  }, [currentDay, discussionDay, dispatch]);
+  useEffect(() => {
+    if (hasActiveWorkflow && searchParams.get('group') !== selectedGroupingId) {
+      setSearchParams({ group: selectedGroupingId }, { replace: true });
+    }
+  }, [hasActiveWorkflow, searchParams, selectedGroupingId, setSearchParams]);
+};
+
 /** The DiscussionPage component is the main forecast discussion workflow surface. */
 export const DiscussionPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -479,16 +499,15 @@ export const DiscussionPage: React.FC = () => {
   const existingDiscussion = discussionDraft ?? getDiscussionForGrouping(forecastCycle, selectedGrouping);
   const defaultForecasterName = syncedSettings?.defaultForecasterName ?? user?.displayName ?? '';
 
-  useEffect(() => {
-    if (forecastCycle.currentDay !== discussionDay) {
-      dispatch(setForecastDay(discussionDay));
-    }
-  }, [dispatch, discussionDay, forecastCycle.currentDay]);
-
-  useEffect(() => {
-    if (!hasActiveWorkflow || searchParams.get('group') === selectedGrouping.id) return;
-    setSearchParams({ group: selectedGrouping.id }, { replace: true });
-  }, [hasActiveWorkflow, searchParams, selectedGrouping.id, setSearchParams]);
+  useDiscussionScopeSync({
+    currentDay: forecastCycle.currentDay,
+    discussionDay,
+    dispatch,
+    hasActiveWorkflow,
+    selectedGroupingId: selectedGrouping.id,
+    searchParams,
+    setSearchParams,
+  });
 
   const { handleCombine: handleCombineGroupings, handleReset: handleResetGroupings } = useDiscussionGroupingActions({
     forecastCycle,

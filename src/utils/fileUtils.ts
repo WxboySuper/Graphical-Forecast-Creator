@@ -148,37 +148,30 @@ export const serializeForecast = (
  * Deserializes the saved JSON data back into ForecastCycle.
  * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
-export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
-  if (data.forecastCycle) {
-    const cycle = data.forecastCycle;
-
-    return {
-      days: deserializeForecastCycleDays(cycle),
-      currentDay: cycle.currentDay,
-      cycleDate: cycle.cycleDate,
-      ...(isValidDiscussionGroupings(cycle.discussionGroupings)
-        ? { discussionGroupings: normalizeDiscussionGroupings(cycle.discussionGroupings) }
-        : {}),
-      ...completionMetadataFromForecastCycle(cycle),
-    };
-  }
-
-  // Legacy Migration (v0.4.0 and older)
-  // Wrap single outlook into Day 1 of a new cycle
+const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => {
   const day1 = createEmptyOutlook(1);
-  if (data.outlooks) { // Old format used 'outlooks'
-    const outlookData: OutlookData = {};
-    if (data.outlooks.tornado) outlookData.tornado = deserializeOutlookMap(data.outlooks.tornado);
-    if (data.outlooks.wind) outlookData.wind = deserializeOutlookMap(data.outlooks.wind);
-    if (data.outlooks.hail) outlookData.hail = deserializeOutlookMap(data.outlooks.hail);
-    if (data.outlooks.categorical) outlookData.categorical = deserializeOutlookMap(data.outlooks.categorical);
-    day1.data = outlookData;
+  const outlooks = data.outlooks;
+  if (outlooks) {
+    day1.data = Object.fromEntries(
+      (['tornado', 'wind', 'hail', 'categorical'] as const)
+        .filter((field) => outlooks[field])
+        .map((field) => [field, deserializeOutlookMap(outlooks[field])]),
+    ) as OutlookData;
   }
+  return { days: { 1: day1 }, currentDay: 1, cycleDate: new Date().toISOString().split('T')[0] };
+};
 
+export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
+  if (!data.forecastCycle) return deserializeLegacyForecast(data);
+  const cycle = data.forecastCycle;
   return {
-    days: { 1: day1 },
-    currentDay: 1,
-    cycleDate: new Date().toISOString().split('T')[0]
+    days: deserializeForecastCycleDays(cycle),
+    currentDay: cycle.currentDay,
+    cycleDate: cycle.cycleDate,
+    ...(isValidDiscussionGroupings(cycle.discussionGroupings)
+      ? { discussionGroupings: normalizeDiscussionGroupings(cycle.discussionGroupings) }
+      : {}),
+    ...completionMetadataFromForecastCycle(cycle),
   };
 };
 
