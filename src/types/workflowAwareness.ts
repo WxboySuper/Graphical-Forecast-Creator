@@ -1,3 +1,4 @@
+import { MAX_OUTLOOK_VERSIONS } from '../lib/workflowMetadataContract';
 import type { CycleMetadata, CycleStatus, OutlookStatus } from './workflow';
 
 /** Version of the opt-in awareness consent contract stored beside each record. */
@@ -52,12 +53,14 @@ export const createAwarenessMetadata = (metadata: CycleMetadata): WorkflowAwaren
   workflowId: metadata.workflowId,
   cycleDate: metadata.cycleDate,
   status: metadata.status,
-  outlookVersions: metadata.outlookVersions.map(({ version, status, derivedFrom, createdAt }) => ({
-    version,
-    status,
-    ...(derivedFrom === undefined ? {} : { derivedFrom }),
-    createdAt,
-  })),
+  outlookVersions: metadata.outlookVersions
+    .slice(-MAX_OUTLOOK_VERSIONS)
+    .map(({ version, status, derivedFrom, createdAt }) => ({
+      version,
+      status,
+      ...(derivedFrom === undefined ? {} : { derivedFrom }),
+      createdAt,
+    })),
   createdAt: metadata.createdAt,
   updatedAt: metadata.updatedAt,
 });
