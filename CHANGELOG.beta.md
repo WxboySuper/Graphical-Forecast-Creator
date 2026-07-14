@@ -8,6 +8,21 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Add consented, metadata-only workflow awareness synchronization with strict persistence safeguards.
 
+### PR #693
+
+- Dependency: @radix-ui/react-dialog ^1.1.18 → ^1.1.19
+- Dependency: @radix-ui/react-dropdown-menu ^2.1.19 → ^2.1.20
+- Dependency: @radix-ui/react-popover ^1.1.18 → ^1.1.19
+- Dependency: @radix-ui/react-tabs ^1.1.16 → ^1.1.17
+- Dependency: @radix-ui/react-tooltip ^1.2.11 → ^1.2.12
+- Dependency: @sentry/react ^10.63.0 → ^10.65.0
+- Dependency: @types/node ^26.1.0 → ^26.1.1
+- Dependency: firebase ^12.15.0 → ^12.16.0
+- Dependency: lucide-react ^1.23.0 → ^1.24.0
+- Dependency: @sentry/vite-plugin ^5.3.0 → ^5.4.0
+- Dependency: vite ^8.1.3 → ^8.1.4
+- Dependency: @sentry/node ^10.63.0 → ^10.65.0 (`server`)
+- Dependency: stripe ^22.3.0 → ^22.3.1 (`server`)
 ### PR #692
 
 - Preserve the exact forecast day and outlook section when navigating from a workflow completion missing-item prompt.
