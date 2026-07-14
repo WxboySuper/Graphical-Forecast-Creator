@@ -285,8 +285,8 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
     metadataRef.current = workflowMetadata;
     if (!currentUserId || !isCurrentAwarenessConsent(currentConsent)) return undefined;
     const generation = active.generation;
-    const previousCycleId = metadata?.cycleId;
-    if (previousCycleId && (!workflowMetadata || previousCycleId !== workflowMetadata.cycleId)) {
+    const previousCycleId = metadata?.id;
+    if (previousCycleId && (!workflowMetadata || previousCycleId !== workflowMetadata.id)) {
       queueAwarenessDeletion({
         active,
         generation,
