@@ -1131,6 +1131,13 @@ export const forecastSlice = createSlice({
       writeStoredWorkflowActive(true);
     },
 
+    clearWorkflowMetadata: (state) => {
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
+      state.isWorkflowActive = false;
+      writeStoredWorkflowActive(false);
+    },
+
     setWorkflowTemplate: (state, action: PayloadAction<WorkflowMetadata>) => {
       state.workflowTemplate = action.payload;
     },
@@ -1423,6 +1430,7 @@ export const {
   undoLastEdit,
   redoLastEdit,
   setWorkflowMetadata,
+  clearWorkflowMetadata,
   setWorkflowTemplate,
   importWorkflowPackage,
   validateCompletion,

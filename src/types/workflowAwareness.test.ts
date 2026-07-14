@@ -42,7 +42,33 @@ test(`bounds outlookVersions to ${MAX_OUTLOOK_VERSIONS} entries for Firestore`, 
 
   expect(awareness.outlookVersions).toHaveLength(MAX_OUTLOOK_VERSIONS);
   expect(awareness.outlookVersions[0].version).toBe(6);
-  expect(awareness.outlookVersions[MAX_OUTLOOK_VERSIONS - 1].version).toBe(MAX_OUTLOOK_VERSIONS + 5);
+  expect(awareness.outlookVersions[MAX_OUTLOOK_VERSIONS - 1].version).toBe(MAX_OUTLOOK_VERSIONS);
+});
+
+test(`clamps outlook version numbers to ${MAX_OUTLOOK_VERSIONS} for Firestore`, () => {
+  const metadata: CycleMetadata = {
+    id: 'cycle',
+    workflowId: 'severe-day1',
+    cycleDate: '2026-07-13',
+    status: 'in-progress',
+    outlookVersions: [{
+      version: MAX_OUTLOOK_VERSIONS + 1,
+      status: 'in-progress',
+      derivedFrom: MAX_OUTLOOK_VERSIONS,
+      createdAt: '2026-07-13T00:00:00.000Z',
+    }],
+    createdAt: '2026-07-13T00:00:00.000Z',
+    updatedAt: '2026-07-13T01:00:00.000Z',
+  };
+
+  const awareness = createAwarenessMetadata(metadata);
+
+  expect(awareness.outlookVersions).toEqual([{
+    version: MAX_OUTLOOK_VERSIONS,
+    status: 'in-progress',
+    derivedFrom: MAX_OUTLOOK_VERSIONS,
+    createdAt: '2026-07-13T00:00:00.000Z',
+  }]);
 });
 
 test('does not recommend completed cycles and sorts unfinished cycles newest first', () => {

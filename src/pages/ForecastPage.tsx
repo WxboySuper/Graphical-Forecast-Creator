@@ -31,6 +31,7 @@ import {
   redoLastEdit,
   undoLastEdit,
   setWorkflowMetadata,
+  clearWorkflowMetadata,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
@@ -307,6 +308,8 @@ const applyLoadedForecast = (
   dispatch(importForecastCycle(payload.deserializedCycle));
   if (payload.rawData.cycleMetadata) {
     dispatch(setWorkflowMetadata(payload.rawData.cycleMetadata));
+  } else if (payload.rawData.cycleMetadata === null) {
+    dispatch(clearWorkflowMetadata());
   }
 
   if (payload.rawData.mapView) {
@@ -649,6 +652,8 @@ const restoreStoredForecastPayload = (
   dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle, true) : importForecastCycle(deserializedCycle));
   if (data.cycleMetadata) {
     dispatch(setWorkflowMetadata(data.cycleMetadata));
+  } else if (data.cycleMetadata === null) {
+    dispatch(clearWorkflowMetadata());
   }
   const rawData = data as LoadedForecastPayload['rawData'];
   if (rawData.mapView) {

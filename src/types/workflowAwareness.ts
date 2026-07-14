@@ -47,6 +47,10 @@ export interface WorkflowAwarenessRecommendation extends WorkflowAwarenessMetada
   reason: 'in-progress-cycle';
 }
 
+/** Clamps workflow version numbers to the Firestore awareness contract. */
+const clampAwarenessVersionNumber = (version: number): number =>
+  Math.min(Math.max(version, 1), MAX_OUTLOOK_VERSIONS);
+
 /** Projects full cycle metadata into the privacy-safe awareness allowlist. */
 export const createAwarenessMetadata = (metadata: CycleMetadata): WorkflowAwarenessMetadata => ({
   cycleId: metadata.id,
@@ -55,12 +59,19 @@ export const createAwarenessMetadata = (metadata: CycleMetadata): WorkflowAwaren
   status: metadata.status,
   outlookVersions: metadata.outlookVersions
     .slice(-MAX_OUTLOOK_VERSIONS)
-    .map(({ version, status, derivedFrom, createdAt }) => ({
-      version,
-      status,
-      ...(derivedFrom === undefined ? {} : { derivedFrom }),
-      createdAt,
-    })),
+    .map(({ version, status, derivedFrom, createdAt }) => {
+      const boundedVersion = clampAwarenessVersionNumber(version);
+      const boundedDerivedFrom = derivedFrom === undefined
+        ? undefined
+        : clampAwarenessVersionNumber(derivedFrom);
+
+      return {
+        version: boundedVersion,
+        status,
+        ...(boundedDerivedFrom === undefined ? {} : { derivedFrom: boundedDerivedFrom }),
+        createdAt,
+      };
+    }),
   createdAt: metadata.createdAt,
   updatedAt: metadata.updatedAt,
 });
