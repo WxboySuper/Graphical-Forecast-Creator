@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
@@ -36,6 +36,13 @@ import {
 } from '../../utils/discussionGrouping';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import CompletionValidationModal from '../CompletionValidation/CompletionValidationModal';
+import CompletionHandoff from './CompletionHandoff';
+import {
+  getCompletionHandoffEligibility,
+  getCompletionHandoffIdentity,
+  hasHandledCompletionHandoff,
+  markCompletionHandoffHandled,
+} from './completionHandoffPolicy';
 import './ForecastWorkflowPanel.css';
 
 interface ForecastWorkflowPanelProps {
@@ -430,6 +437,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
+  const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
@@ -437,8 +445,16 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const validationResult = useSelector(selectCompletionValidationResult);
   const omittedDays = useSelector(selectOmittedDays);
   const previousSuggestion = usePreviousOutlookSuggestion();
+  const handoffEligibility = getCompletionHandoffEligibility(workflowTemplate, workflowMetadata);
+  const handoffIdentity = workflowMetadata ? getCompletionHandoffIdentity(workflowMetadata) : '';
 
-  if (shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
+  useEffect(() => {
+    setShowCompletionHandoff(
+      Boolean(handoffIdentity) && handoffEligibility.showHandoff && !hasHandledCompletionHandoff(handoffIdentity),
+    );
+  }, [handoffEligibility.showHandoff, handoffIdentity]);
+
+  if (!workflowMetadata || shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
     return null;
   }
 
@@ -462,7 +478,6 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const isReviewed = Boolean(forecastCycle.completionAcknowledgedAt);
   const hasSameDayWork = hasSameDayWorkflowWork(forecastCycle.cycleDate, currentDay);
   const currentVersion = getCurrentWorkflowVersion(workflowMetadata.outlookVersions);
-
   const statusLabel = getWorkflowStatusLabel({
     hasMapStarted,
     isUpdating,
@@ -505,6 +520,34 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     } finally {
       setIsPackageDownloading(false);
     }
+  }
+  /** Exports the complete cycle through the existing WF-09 package path. */
+  function handleCycleExport(): void {
+    if (controller) {
+      controller.onCyclePackageDownload();
+      return;
+    }
+    setIsPackageDownloading(true);
+    downloadGfcPackage(
+      forecastCycle,
+      { center: [39.8283, -98.5795], zoom: 4 },
+      workflowMetadata,
+      'cycle',
+    ).finally(() => setIsPackageDownloading(false)).catch(() => undefined);
+  }
+  function handleDismissHandoff(): void {
+    markCompletionHandoffHandled(handoffIdentity);
+    setShowCompletionHandoff(false);
+  }
+  function handleOpenMonitor(): void {
+    markCompletionHandoffHandled(handoffIdentity);
+    setShowCompletionHandoff(false);
+    navigate(`/monitor?workflowId=${encodeURIComponent(workflowMetadata!.workflowId)}&cycleId=${encodeURIComponent(workflowMetadata!.id)}`);
+  }
+  function handleReturnToMap(): void {
+    markCompletionHandoffHandled(handoffIdentity);
+    setShowCompletionHandoff(false);
+    navigate('/forecast');
   }
   /** Starts today's workflow from the suggested previous-cycle outlook. */
   function handleStartFromPrevious(): void {
@@ -582,6 +625,16 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           navigate('/forecast');
         }}
         onExport={() => { handleWorkflowExport().catch(() => undefined); }}
+      />
+      <CompletionHandoff
+        open={showCompletionHandoff}
+        showMonitor={handoffEligibility.showMonitor}
+        isDownloading={isPackageDownloading || Boolean(controller?.isPackageDownloading)}
+        onWorkflowExport={controller?.onWorkflowPackageDownload ?? (() => { handleWorkflowExport().catch(() => undefined); })}
+        onCycleExport={handleCycleExport}
+        onMonitor={handleOpenMonitor}
+        onReturnToMap={handleReturnToMap}
+        onDismiss={handleDismissHandoff}
       />
     </section>
   );
