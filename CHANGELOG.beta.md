@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #698
+
+- Add distinct workflow-scoped and complete-cycle package exports with compatibility-preserving manifests.
+
 ### PR #696
 
 - Preserve forecast sessions and cloud handoffs across day rollover choices.
