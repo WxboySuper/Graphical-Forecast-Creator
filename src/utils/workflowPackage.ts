@@ -1,8 +1,7 @@
-import type { GFCForecastSaveData } from '../types/outlooks';
+import type { DayType, GFCForecastSaveData } from '../types/outlooks';
 import type { CycleMetadata, SerializedWorkflowPackage } from '../types/workflow';
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
-import type { DayType } from '../types/outlooks';
 
 export type WorkflowExportScope = 'workflow' | 'cycle';
 
@@ -15,7 +14,18 @@ export interface WorkflowExportPackage {
   styleSnapshots?: Record<string, unknown>;
 }
 
-const packageTypeFor = (scope: WorkflowExportScope): WorkflowExportScope => scope;
+const WORKFLOW_GROUPING_DAYS: Record<string, DayType[]> = {
+  day1: [1],
+  day2: [2],
+  day3: [3],
+  'day4-8': [4, 5, 6, 7, 8],
+};
+
+/** Returns the day slots owned by a workflow template. */
+const getWorkflowDays = (workflowId: string): Set<DayType> => {
+  const template = getWorkflowTemplateById(workflowId);
+  return new Set(template?.groupings.flatMap((grouping) => WORKFLOW_GROUPING_DAYS[grouping] ?? []) ?? []);
+};
 
 /** Keeps a workflow-scoped export limited to the days owned by its workflow template. */
 export const restrictForecastToWorkflow = (
@@ -23,16 +33,8 @@ export const restrictForecastToWorkflow = (
   cycleMetadata?: CycleMetadata,
 ): GFCForecastSaveData => {
   if (!cycleMetadata?.workflowId || !forecast.forecastCycle) return forecast;
-  const template = getWorkflowTemplateById(cycleMetadata.workflowId);
-  if (!template || template.groupings.length === 0 || template.groupings.length === 4) return forecast;
-
-  const allowedDays = new Set<DayType>();
-  template.groupings.forEach((grouping) => {
-    if (grouping === 'day1') allowedDays.add(1);
-    if (grouping === 'day2') allowedDays.add(2);
-    if (grouping === 'day3') allowedDays.add(3);
-    if (grouping === 'day4-8') [4, 5, 6, 7, 8].forEach((day) => allowedDays.add(day as DayType));
-  });
+  const allowedDays = getWorkflowDays(cycleMetadata.workflowId);
+  if (allowedDays.size === 0 || allowedDays.size === 8) return forecast;
   const days = Object.fromEntries(
     Object.entries(forecast.forecastCycle.days).filter(([day]) => allowedDays.has(Number(day) as DayType)),
   );
@@ -62,7 +64,7 @@ export const buildWorkflowExportPackage = ({
   styleSnapshots?: Record<string, unknown>;
   exportedAt?: string;
 }): WorkflowExportPackage => ({
-  packageType: packageTypeFor(scope),
+  packageType: scope,
   schemaVersion: WORKFLOW_SCHEMA_VERSION,
   exportedAt,
   ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
