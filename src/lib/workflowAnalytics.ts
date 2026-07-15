@@ -30,7 +30,9 @@ const isAllowedDimension = (key: string, value: unknown): boolean =>
 
 /** Validates the strict metadata-only payload before it can reach the transport. */
 export const validateWorkflowAnalyticsPayload = (value: unknown): value is WorkflowAnalyticsPayload => {
-  if (!isRecord(value) || typeof value.event !== 'string' || !EVENT_SET.has(value.event)) return false;
+  if (!isRecord(value)) return false;
+  if (typeof value.event !== 'string') return false;
+  if (!EVENT_SET.has(value.event)) return false;
   if (value.dimensions === undefined) return true;
   if (!isRecord(value.dimensions)) return false;
   return Object.entries(value.dimensions).every(([key, dimension]) => isAllowedDimension(key, dimension));
