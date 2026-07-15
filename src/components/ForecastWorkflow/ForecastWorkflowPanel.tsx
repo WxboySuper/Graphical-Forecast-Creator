@@ -546,7 +546,13 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   function handleOpenMonitor(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);
-    const savedCycle = savedCycles.find((cycle) => cycle.workflowMetadata?.id === activeWorkflowMetadata.id);
+    const savedCycle = savedCycles
+      .filter((cycle) => cycle.workflowMetadata?.id === activeWorkflowMetadata.id)
+      .sort((left, right) => {
+        const leftRevision = new Date(left.workflowMetadata?.updatedAt ?? left.timestamp).getTime();
+        const rightRevision = new Date(right.workflowMetadata?.updatedAt ?? right.timestamp).getTime();
+        return rightRevision - leftRevision || right.id.localeCompare(left.id);
+      })[0];
     const sourceKind = savedCycle ? 'local-cycle' : 'current';
     const sourceId = savedCycle?.id ?? 'current';
     navigate(`/monitor?workflowId=${encodeURIComponent(activeWorkflowMetadata.workflowId)}&sourceKind=${sourceKind}&sourceId=${encodeURIComponent(sourceId)}`);
