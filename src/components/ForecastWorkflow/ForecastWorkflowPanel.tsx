@@ -439,6 +439,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
   const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
+  const savedCycles = useSelector(selectSavedCycles);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
   const workflowTemplate = useSelector(selectWorkflowTemplate);
@@ -447,6 +448,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const previousSuggestion = usePreviousOutlookSuggestion();
   const handoffEligibility = getCompletionHandoffEligibility(workflowTemplate, workflowMetadata);
   const handoffIdentity = workflowMetadata ? getCompletionHandoffIdentity(workflowMetadata) : '';
+  const activeWorkflowMetadata = workflowMetadata;
 
   useEffect(() => {
     setShowCompletionHandoff(
@@ -535,15 +537,22 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
       'cycle',
     ).finally(() => setIsPackageDownloading(false)).catch(() => undefined);
   }
+  /** Dismisses guidance while leaving the completed workflow untouched. */
   function handleDismissHandoff(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);
   }
+  /** Opens Monitor with the active cycle's actual source-option namespace. */
   function handleOpenMonitor(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);
-    navigate(`/monitor?workflowId=${encodeURIComponent(workflowMetadata!.workflowId)}&cycleId=${encodeURIComponent(workflowMetadata!.id)}`);
+    if (!activeWorkflowMetadata) return;
+    const savedCycle = savedCycles.find((cycle) => cycle.workflowMetadata?.id === activeWorkflowMetadata.id);
+    const sourceKind = savedCycle ? 'local-cycle' : 'current';
+    const sourceId = savedCycle?.id ?? 'current';
+    navigate(`/monitor?workflowId=${encodeURIComponent(activeWorkflowMetadata.workflowId)}&sourceKind=${sourceKind}&sourceId=${encodeURIComponent(sourceId)}`);
   }
+  /** Closes guidance and returns the user to the forecast map. */
   function handleReturnToMap(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);

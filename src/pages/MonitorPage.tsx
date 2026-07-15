@@ -47,6 +47,22 @@ interface PageContext {
   addToast: AddToastFn;
 }
 
+/** Resolves a handoff source only when its kind and ID match a real Monitor option. */
+const resolveHandoffSource = (
+  searchParams: URLSearchParams,
+  options: MonitorOutlookSourceOption[],
+): MonitorOutlookSourceOption | undefined => {
+  const sourceKind = searchParams.get('sourceKind');
+  const sourceId = searchParams.get('sourceId');
+  if (sourceKind && sourceId) {
+    return options.find((option) => option.kind === sourceKind && option.id === sourceId);
+  }
+  if (searchParams.get('workflowId')) {
+    return options.find((option) => option.kind === 'current' && option.id === 'current');
+  }
+  return undefined;
+};
+
 interface MonitorPageWorkspaceProps {
   settings: MonitorSettings;
   outlookOptions: MonitorOutlookSourceOption[];
@@ -171,16 +187,11 @@ export const MonitorPage: React.FC = () => {
 
   useEffect(() => {
     if (didApplyHandoffSource.current) return;
-    const cycleId = searchParams.get('cycleId');
-    const matchingCycle = cycleId && outlookOptions.find((option) => option.id === cycleId);
-    if (matchingCycle) {
-      dispatch(setMonitorOutlookSource({ kind: matchingCycle.kind, id: matchingCycle.id }));
+    const matchingSource = resolveHandoffSource(searchParams, outlookOptions);
+    if (matchingSource) {
+      dispatch(setMonitorOutlookSource({ kind: matchingSource.kind, id: matchingSource.id }));
       didApplyHandoffSource.current = true;
       return;
-    }
-    if (searchParams.get('workflowId') && outlookOptions.some((option) => option.id === 'current')) {
-      dispatch(setMonitorOutlookSource({ kind: 'current', id: 'current' }));
-      didApplyHandoffSource.current = true;
     }
   }, [dispatch, outlookOptions, searchParams]);
   const selectedOutlook = useMonitorCloudOutlook({ selectedOption, today, addToast });
