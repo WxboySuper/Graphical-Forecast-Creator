@@ -61,6 +61,27 @@ const dispatchHistoryAction = (
   }
 };
 
+/** Downloads one package scope and reports success or failure without leaking errors to the caller. */
+const downloadPackageForScope = async (
+  scope: WorkflowExportScope,
+  forecastCycle: ForecastCycle,
+  cycleMetadata: CycleMetadata | undefined,
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+  addToast: AddToastFn,
+  setIsPackageDownloading: React.Dispatch<React.SetStateAction<boolean>>,
+): Promise<void> => {
+  setIsPackageDownloading(true);
+  try {
+    const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
+    await downloadGfcPackage(forecastCycle, mapView, cycleMetadata, scope);
+    addToast(scope === 'workflow' ? 'Workflow package downloaded!' : 'Cycle package downloaded!', 'success');
+  } catch {
+    addToast('Failed to create package.', 'error');
+  } finally {
+    setIsPackageDownloading(false);
+  }
+};
+
 /** Constructs all event-handler callbacks for workspace actions. */
 export const useForecastWorkspaceActionHandlers = ({
   dispatch,
@@ -78,18 +99,9 @@ export const useForecastWorkspaceActionHandlers = ({
   fileInputRef,
   handleCancelReset,
 }: ForecastWorkspaceActionParams) => {
-  const handlePackageDownload = useCallback(async (scope: WorkflowExportScope) => {
-    setIsPackageDownloading(true);
-    try {
-      const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
-      await downloadGfcPackage(forecastCycle, mapView, cycleMetadata, scope);
-      addToast(`${scope === 'workflow' ? 'Workflow' : 'Cycle'} package downloaded!`, 'success');
-    } catch {
-      addToast('Failed to create package.', 'error');
-    } finally {
-      setIsPackageDownloading(false);
-    }
-  }, [mapRef, forecastCycle, cycleMetadata, addToast, setIsPackageDownloading]);
+  const handlePackageDownload = useCallback((scope: WorkflowExportScope) => downloadPackageForScope(
+    scope, forecastCycle, cycleMetadata, mapRef, addToast, setIsPackageDownloading,
+  ), [mapRef, forecastCycle, cycleMetadata, addToast, setIsPackageDownloading]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = getSelectedFile(e);

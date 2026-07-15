@@ -500,6 +500,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         forecastCycle,
         { center: [39.8283, -98.5795], zoom: 4 },
         workflowMetadata,
+        'workflow',
       );
     } finally {
       setIsPackageDownloading(false);

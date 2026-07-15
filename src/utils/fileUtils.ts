@@ -194,6 +194,7 @@ export const cloneForecastCycle = (forecastCycle: ForecastCycle): ForecastCycle 
  * Validates that the input data conforms to the GFCForecastSaveData schema.
  */
 export const validateForecastData = (data: unknown): data is GFCForecastSaveData => {
+  if (isWorkflowExportPackage(data)) return validateForecastData(data.forecast);
   if (typeof data !== 'object' || data === null) return false;
   const candidate = data as Partial<GFCForecastSaveData>;
 
@@ -263,21 +264,23 @@ export const downloadGfcPackage = async (
   const data = pkg.forecast;
   zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
   zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
+  const exportedCycle = data.forecastCycle;
+  const exportedForecastCycle = deserializeForecast(data);
 
   // 2. Discussion text for configured scopes, with every ungrouped legacy day retained.
   const workflowTemplate = cycleMetadata ? getWorkflowTemplateById(cycleMetadata.workflowId) : undefined;
   const hasStandardWorkflowGrouping = workflowTemplate?.groupings.some((grouping) =>
     grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
   );
-  const hasValidPersistedGrouping = isValidDiscussionGroupings(forecastCycle.discussionGroupings);
+  const hasValidPersistedGrouping = isValidDiscussionGroupings(exportedCycle?.discussionGroupings);
   const exportedDays = new Set<DayType>();
   const usedEntryNames = new Set<string>(['forecast_cycle.json']);
 
   if (hasValidPersistedGrouping || hasStandardWorkflowGrouping) {
-    getDiscussionGroupings(forecastCycle, workflowTemplate).forEach((grouping) => {
-      const ownerDay = getDiscussionOwnerDay(forecastCycle, grouping);
+    getDiscussionGroupings(exportedForecastCycle, workflowTemplate).forEach((grouping) => {
+      const ownerDay = getDiscussionOwnerDay(exportedForecastCycle, grouping);
       addDiscussionToZip(zip, usedEntryNames, exportedDays, {
-        discussion: getDiscussionForGrouping(forecastCycle, grouping),
+        discussion: getDiscussionForGrouping(exportedForecastCycle, grouping),
         day: ownerDay,
         identifier: grouping.id,
       });
@@ -285,12 +288,12 @@ export const downloadGfcPackage = async (
   }
 
   // A malformed grouping must never make its covered legacy discussions disappear.
-  (Object.keys(forecastCycle.days) as unknown as DayType[])
+  (Object.keys(exportedCycle?.days ?? {}) as unknown as DayType[])
     .sort((a, b) => a - b)
     .forEach((day) => {
       if (!exportedDays.has(day)) {
         addDiscussionToZip(zip, usedEntryNames, exportedDays, {
-          discussion: forecastCycle.days[day]?.discussion,
+          discussion: exportedCycle?.days[day]?.discussion,
           day,
           identifier: `day${day}`,
         });

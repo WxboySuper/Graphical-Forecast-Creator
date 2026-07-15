@@ -34,6 +34,7 @@ import {
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
+import { isWorkflowExportPackage } from '../utils/workflowPackage';
 import {
   getFirstExposedOutlookType,
   shouldActivateEmergencyMode,
@@ -316,8 +317,9 @@ const applyLoadedForecast = (
   mapRef: React.RefObject<ForecastMapHandle | null>
 ) => {
   dispatch(importForecastCycle(payload.deserializedCycle));
-  if (payload.rawData.cycleMetadata) {
-    dispatch(setWorkflowMetadata(payload.rawData.cycleMetadata));
+  const packageMetadata = isWorkflowExportPackage(payload.rawData) ? payload.rawData.metadata : payload.rawData.cycleMetadata;
+  if (packageMetadata) {
+    dispatch(setWorkflowMetadata(packageMetadata));
   } else if (payload.rawData.cycleMetadata === null) {
     dispatch(clearWorkflowMetadata());
   }

@@ -28,3 +28,11 @@ test('converts packages into the existing v2 serialized package contract', () =>
 test('rejects lookalike packages with missing export markers', () => {
   expect(isWorkflowExportPackage({ forecast: {} })).toBe(false);
 });
+
+test('fails closed when a workflow template is unknown', () => {
+  expect(() => buildWorkflowExportPackage({
+    scope: 'workflow',
+    forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+    cycleMetadata: { ...metadata, workflowId: 'retired-workflow' },
+  })).toThrow('Unknown workflow template');
+});

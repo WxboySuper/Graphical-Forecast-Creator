@@ -24,8 +24,26 @@ const WORKFLOW_GROUPING_DAYS: Record<string, DayType[]> = {
 /** Returns the day slots owned by a workflow template. */
 const getWorkflowDays = (workflowId: string): Set<DayType> => {
   const template = getWorkflowTemplateById(workflowId);
-  return new Set(template?.groupings.flatMap((grouping) => WORKFLOW_GROUPING_DAYS[grouping] ?? []) ?? []);
+  if (!template) throw new Error(`Unknown workflow template: ${workflowId}`);
+  return new Set(template.groupings.flatMap((grouping) => WORKFLOW_GROUPING_DAYS[grouping] ?? []));
 };
+
+/** Removes cycle-wide completion and discussion metadata that refers to excluded days. */
+const restrictCycleMetadataToDays = (cycle: NonNullable<GFCForecastSaveData['forecastCycle']>, allowedDays: Set<DayType>) => ({
+  ...cycle,
+  discussionGroupings: cycle.discussionGroupings
+    ?.map((grouping) => ({
+      ...grouping,
+      days: grouping.days.filter((day) => allowedDays.has(day)),
+      discussionDay: allowedDays.has(grouping.discussionDay)
+        ? grouping.discussionDay
+        : grouping.days.find((day) => allowedDays.has(day)),
+    }))
+    .filter((grouping) => grouping.days.length > 0 && grouping.discussionDay !== undefined),
+  omittedDayReasons: cycle.omittedDayReasons
+    ? Object.fromEntries(Object.entries(cycle.omittedDayReasons).filter(([day]) => allowedDays.has(Number(day) as DayType)))
+    : undefined,
+});
 
 /** Keeps a workflow-scoped export limited to the days owned by its workflow template. */
 export const restrictForecastToWorkflow = (
@@ -41,7 +59,7 @@ export const restrictForecastToWorkflow = (
   return {
     ...forecast,
     forecastCycle: {
-      ...forecast.forecastCycle,
+      ...restrictCycleMetadataToDays(forecast.forecastCycle, allowedDays),
       days,
       currentDay: allowedDays.has(forecast.forecastCycle.currentDay)
         ? forecast.forecastCycle.currentDay

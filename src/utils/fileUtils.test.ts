@@ -1,4 +1,5 @@
 import { serializeForecast, deserializeForecast, validateForecastData } from './fileUtils';
+import { buildWorkflowExportPackage } from './workflowPackage';
 
 describe('fileUtils', () => {
   type ForecastCycle = {
@@ -34,6 +35,15 @@ describe('fileUtils', () => {
     expect(validateForecastData(ser)).toBe(true);
     const des = deserializeForecast(ser);
     expect(des.days[1].data.categorical instanceof Map).toBe(true);
+  });
+
+  test('validates and deserializes a workflow package wrapper', () => {
+    const serialized = serializeForecast({
+      days: {}, currentDay: 1, cycleDate: '2026-04-21',
+    }, { center: [0, 0], zoom: 0 });
+    const wrapper = buildWorkflowExportPackage({ scope: 'cycle', forecast: serialized });
+    expect(validateForecastData(wrapper)).toBe(true);
+    expect(deserializeForecast(wrapper).cycleDate).toBe('2026-04-21');
   });
 
   test('serialize/deserialize preserves discussion scopes without changing day data', () => {
