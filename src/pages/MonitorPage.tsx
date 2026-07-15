@@ -190,7 +190,6 @@ export const MonitorPage: React.FC = () => {
     if (matchingSource) {
       dispatch(setMonitorOutlookSource({ kind: matchingSource.kind, id: matchingSource.id }));
       didApplyHandoffSource.current = true;
-      return;
     }
   }, [dispatch, outlookOptions, searchParams]);
   const selectedOutlook = useMonitorCloudOutlook({ selectedOption, today, addToast });
