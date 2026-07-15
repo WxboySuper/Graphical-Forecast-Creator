@@ -250,29 +250,18 @@ const addDiscussionToZip = (
   exportedDays.add(day);
 };
 
-/** Bundles the forecast JSON and all day discussions into a single .zip package. */
-export const downloadGfcPackage = async (
-  forecastCycle: ForecastCycle,
-  mapView: { center: [number, number]; zoom: number },
-  cycleMetadata?: CycleMetadata,
-  scope: WorkflowExportScope = 'cycle',
-): Promise<void> => {
-  const zip = new JSZip();
-
-  // 1. Forecast JSON
-  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata });
-  const data = pkg.forecast;
-  zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
-  zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
-  const exportedCycle = data.forecastCycle;
-  const exportedForecastCycle = deserializeForecast(data);
-
-  // 2. Discussion text for configured scopes, with every ungrouped legacy day retained.
+/** Adds only discussions belonging to the forecast scope represented by the package. */
+const addPackageDiscussions = (
+  zip: JSZip,
+  forecast: GFCForecastSaveData,
+  cycleMetadata: CycleMetadata | undefined,
+): void => {
+  const exportedForecastCycle = deserializeForecast(forecast);
   const workflowTemplate = cycleMetadata ? getWorkflowTemplateById(cycleMetadata.workflowId) : undefined;
   const hasStandardWorkflowGrouping = workflowTemplate?.groupings.some((grouping) =>
     grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
   );
-  const hasValidPersistedGrouping = isValidDiscussionGroupings(exportedCycle?.discussionGroupings);
+  const hasValidPersistedGrouping = isValidDiscussionGroupings(exportedForecastCycle.discussionGroupings);
   const exportedDays = new Set<DayType>();
   const usedEntryNames = new Set<string>(['forecast_cycle.json']);
 
@@ -287,18 +276,34 @@ export const downloadGfcPackage = async (
     });
   }
 
-  // A malformed grouping must never make its covered legacy discussions disappear.
-  (Object.keys(exportedCycle?.days ?? {}) as unknown as DayType[])
+  (Object.keys(exportedForecastCycle.days) as unknown as DayType[])
     .sort((a, b) => a - b)
     .forEach((day) => {
       if (!exportedDays.has(day)) {
         addDiscussionToZip(zip, usedEntryNames, exportedDays, {
-          discussion: exportedCycle?.days[day]?.discussion,
+          discussion: exportedForecastCycle.days[day]?.discussion,
           day,
           identifier: `day${day}`,
         });
       }
     });
+};
+
+/** Bundles the forecast JSON and all day discussions into a single .zip package. */
+export const downloadGfcPackage = async (
+  forecastCycle: ForecastCycle,
+  mapView: { center: [number, number]; zoom: number },
+  cycleMetadata?: CycleMetadata,
+  scope: WorkflowExportScope = 'cycle',
+): Promise<void> => {
+  const zip = new JSZip();
+
+  // 1. Forecast JSON
+  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata });
+  const data = pkg.forecast;
+  zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
+  zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
+  addPackageDiscussions(zip, data, cycleMetadata);
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
