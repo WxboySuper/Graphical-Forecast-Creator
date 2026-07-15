@@ -22,6 +22,7 @@ export const WORKFLOW_ANALYTICS_CONSENT_KEY = 'gfc-workflow-analytics-enabled';
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** Returns true only for one of the named, low-risk analytics dimensions. */
 const isAllowedDimension = (key: string, value: unknown): boolean =>
   DIMENSION_KEYS.includes(key as typeof DIMENSION_KEYS[number])
   && typeof value === 'string'
@@ -51,7 +52,7 @@ export const sendWorkflowAnalyticsPayload = (payload: WorkflowAnalyticsPayload):
     const queued = typeof navigator.sendBeacon === 'function'
       && navigator.sendBeacon('/api/collect', new Blob([body], { type: 'application/json' }));
     if (!queued) {
-      void fetch('/api/collect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
+      fetch('/api/collect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
     }
   } catch { /* analytics is best effort */ }
 };

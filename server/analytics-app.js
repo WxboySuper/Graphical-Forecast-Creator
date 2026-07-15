@@ -15,15 +15,23 @@ const ALLOWED_ANALYTICS_DIMENSION_VALUES = {
 /** Extracts only the closed, metadata-only analytics contract from a request. */
 function sanitizeAnalyticsPayload(body) {
   const event = ALLOWED_ANALYTICS_EVENTS.has(body?.event) ? body.event : undefined;
-  if (!event || !body?.dimensions || typeof body.dimensions !== 'object' || Array.isArray(body.dimensions)) {
-    return event ? { event } : {};
-  }
-  const dimensions = Object.fromEntries(
-    Object.entries(body.dimensions)
+  if (!event) return {};
+  if (!hasAnalyticsDimensions(body)) return { event };
+  return { event, dimensions: filterAnalyticsDimensions(body.dimensions) };
+}
+
+/** Returns true when the request carries an object of candidate dimensions. */
+function hasAnalyticsDimensions(body) {
+  return Boolean(body?.dimensions && typeof body.dimensions === 'object' && !Array.isArray(body.dimensions));
+}
+
+/** Keeps only enum-valued dimensions and caps the number of stored fields. */
+function filterAnalyticsDimensions(dimensions) {
+  return Object.fromEntries(
+    Object.entries(dimensions)
       .filter(([key, value]) => ALLOWED_ANALYTICS_DIMENSION_VALUES[key]?.has(value))
       .slice(0, 6),
   );
-  return { event, dimensions };
 }
 
 /** Returns the POST /collect handler that appends sanitized entries to the log file. */
