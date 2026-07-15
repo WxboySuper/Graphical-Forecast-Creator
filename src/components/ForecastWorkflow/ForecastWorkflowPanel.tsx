@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
@@ -36,6 +36,13 @@ import {
 } from '../../utils/discussionGrouping';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import CompletionValidationModal from '../CompletionValidation/CompletionValidationModal';
+import CompletionHandoff from './CompletionHandoff';
+import {
+  getCompletionHandoffEligibility,
+  getCompletionHandoffIdentity,
+  hasHandledCompletionHandoff,
+  markCompletionHandoffHandled,
+} from './completionHandoffPolicy';
 import './ForecastWorkflowPanel.css';
 
 interface ForecastWorkflowPanelProps {
@@ -430,13 +437,24 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
+  const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
+  const savedCycles = useSelector(selectSavedCycles);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
   const workflowTemplate = useSelector(selectWorkflowTemplate);
   const validationResult = useSelector(selectCompletionValidationResult);
   const omittedDays = useSelector(selectOmittedDays);
   const previousSuggestion = usePreviousOutlookSuggestion();
+  const handoffEligibility = getCompletionHandoffEligibility(workflowTemplate, workflowMetadata);
+  const handoffIdentity = workflowMetadata ? getCompletionHandoffIdentity(workflowMetadata) : '';
+  const activeWorkflowMetadata = workflowMetadata as NonNullable<typeof workflowMetadata>;
+
+  useEffect(() => {
+    setShowCompletionHandoff(
+      Boolean(handoffIdentity) && handoffEligibility.showHandoff && !hasHandledCompletionHandoff(handoffIdentity),
+    );
+  }, [handoffEligibility.showHandoff, handoffIdentity]);
 
   if (shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
     return null;
@@ -458,11 +476,10 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const activeUpdateVersion = forecastCycle.updateInProgressVersion;
   const isUpdating = typeof activeUpdateVersion === 'number';
   const canReviewPackage = canReviewWorkflowPackage(mapIsComplete, discussionIsComplete, isUpdating, Boolean(controller), context);
-  const canExportPackage = canExportWorkflowPackage(hasMapStarted, hasDiscussion, workflowMetadata.outlookVersions.length);
+  const canExportPackage = canExportWorkflowPackage(hasMapStarted, hasDiscussion, activeWorkflowMetadata.outlookVersions.length);
   const isReviewed = Boolean(forecastCycle.completionAcknowledgedAt);
   const hasSameDayWork = hasSameDayWorkflowWork(forecastCycle.cycleDate, currentDay);
-  const currentVersion = getCurrentWorkflowVersion(workflowMetadata.outlookVersions);
-
+  const currentVersion = getCurrentWorkflowVersion(activeWorkflowMetadata.outlookVersions);
   const statusLabel = getWorkflowStatusLabel({
     hasMapStarted,
     isUpdating,
@@ -505,6 +522,46 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     } finally {
       setIsPackageDownloading(false);
     }
+  }
+  /** Exports the complete cycle through the existing WF-09 package path. */
+  function handleCycleExport(): void {
+    if (controller) {
+      controller.onCyclePackageDownload();
+      return;
+    }
+    setIsPackageDownloading(true);
+    downloadGfcPackage(
+      forecastCycle,
+      { center: [39.8283, -98.5795], zoom: 4 },
+      workflowMetadata,
+      'cycle',
+    ).finally(() => setIsPackageDownloading(false)).catch(() => undefined);
+  }
+  /** Dismisses guidance while leaving the completed workflow untouched. */
+  function handleDismissHandoff(): void {
+    markCompletionHandoffHandled(handoffIdentity);
+    setShowCompletionHandoff(false);
+  }
+  /** Opens Monitor with the active cycle's actual source-option namespace. */
+  function handleOpenMonitor(): void {
+    markCompletionHandoffHandled(handoffIdentity);
+    setShowCompletionHandoff(false);
+    const savedCycle = savedCycles
+      .filter((cycle) => cycle.workflowMetadata?.id === activeWorkflowMetadata.id)
+      .sort((left, right) => {
+        const leftRevision = new Date(left.workflowMetadata?.updatedAt ?? left.timestamp).getTime();
+        const rightRevision = new Date(right.workflowMetadata?.updatedAt ?? right.timestamp).getTime();
+        return rightRevision - leftRevision || right.id.localeCompare(left.id);
+      })[0];
+    const sourceKind = savedCycle ? 'local-cycle' : 'current';
+    const sourceId = savedCycle?.id ?? 'current';
+    navigate(`/monitor?workflowId=${encodeURIComponent(activeWorkflowMetadata.workflowId)}&sourceKind=${sourceKind}&sourceId=${encodeURIComponent(sourceId)}`);
+  }
+  /** Closes guidance and returns the user to the forecast map. */
+  function handleReturnToMap(): void {
+    markCompletionHandoffHandled(handoffIdentity);
+    setShowCompletionHandoff(false);
+    navigate('/forecast');
   }
   /** Starts today's workflow from the suggested previous-cycle outlook. */
   function handleStartFromPrevious(): void {
@@ -582,6 +639,16 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           navigate('/forecast');
         }}
         onExport={() => { handleWorkflowExport().catch(() => undefined); }}
+      />
+      <CompletionHandoff
+        open={showCompletionHandoff}
+        showMonitor={handoffEligibility.showMonitor}
+        isDownloading={isPackageDownloading || Boolean(controller?.isPackageDownloading)}
+        onWorkflowExport={controller?.onWorkflowPackageDownload ?? (() => { handleWorkflowExport().catch(() => undefined); })}
+        onCycleExport={handleCycleExport}
+        onMonitor={handleOpenMonitor}
+        onReturnToMap={handleReturnToMap}
+        onDismiss={handleDismissHandoff}
       />
     </section>
   );

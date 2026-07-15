@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #699
+
+- Add post-completion handoff guidance for workflow and complete-cycle exports, eligible Monitor navigation, return-to-map, and duplicate-prompt suppression.
+
 ### PR #698
 
 - Add distinct workflow-scoped and complete-cycle package exports with compatibility-preserving manifests.
