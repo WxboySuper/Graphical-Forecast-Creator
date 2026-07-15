@@ -13,6 +13,7 @@ import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
+import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
 
 const CURRENT_VERSION = '1.0.0';
 
@@ -164,7 +165,9 @@ const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => 
  * Deserializes the saved JSON data back into ForecastCycle.
  * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
-export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
+export const deserializeForecast = (data: GFCForecastSaveData | unknown): ForecastCycle => {
+  if (isWorkflowExportPackage(data)) return deserializeForecast(data.forecast);
+  if (!data || typeof data !== 'object') return deserializeLegacyForecast({} as GFCForecastSaveData);
   if (!data.forecastCycle) return deserializeLegacyForecast(data);
   const cycle = data.forecastCycle;
   return {
@@ -251,12 +254,15 @@ export const downloadGfcPackage = async (
   forecastCycle: ForecastCycle,
   mapView: { center: [number, number]; zoom: number },
   cycleMetadata?: CycleMetadata,
+  scope: WorkflowExportScope = 'cycle',
 ): Promise<void> => {
   const zip = new JSZip();
 
   // 1. Forecast JSON
-  const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
+  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata });
+  const data = pkg.forecast;
   zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
+  zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
 
   // 2. Discussion text for configured scopes, with every ungrouped legacy day retained.
   const workflowTemplate = cycleMetadata ? getWorkflowTemplateById(cycleMetadata.workflowId) : undefined;
@@ -295,7 +301,7 @@ export const downloadGfcPackage = async (
   const url = URL.createObjectURL(blob);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const filename = `gfc-package-${timestamp}.zip`;
+  const filename = `gfc-${scope}-package-${timestamp}.zip`;
 
   const link = document.createElement('a');
   link.href = url;

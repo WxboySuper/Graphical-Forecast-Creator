@@ -121,6 +121,7 @@ describe('fileUtils extra', () => {
       'discussion_day1.txt',
       'discussion_day2.txt',
       'forecast_cycle.json',
+      'workflow_package.json',
     ]);
   });
 
@@ -161,9 +162,8 @@ describe('fileUtils extra', () => {
 
     expect(clickMock).toHaveBeenCalled();
     expect(urlHelpers.createObjectURL).toHaveBeenCalled();
-    expect(Object.keys(generatedFiles).sort()).toEqual(['discussion_day1.txt', 'forecast_cycle.json']);
-    expect(generatedFiles.workflow_package_json).toBeUndefined();
-    expect(generatedFiles['workflow_package.json']).toBeUndefined();
+    expect(Object.keys(generatedFiles).sort()).toEqual(['discussion_day1.txt', 'forecast_cycle.json', 'workflow_package.json']);
+    expect(generatedFiles['workflow_package.json']).toBeDefined();
     spy.mockRestore();
   });
 });

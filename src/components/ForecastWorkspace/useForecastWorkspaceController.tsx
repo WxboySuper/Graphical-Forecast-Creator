@@ -92,6 +92,8 @@ export interface ForecastWorkspaceController {
   onSave: () => void;
   onLoadClick: () => void;
   onPackageDownload: () => void;
+  onWorkflowPackageDownload: () => void;
+  onCyclePackageDownload: () => void;
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
   onOpenResetConfirm: () => void;
