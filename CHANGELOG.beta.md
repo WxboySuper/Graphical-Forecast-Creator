@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #697
+
+- Add privacy-safe, allowlisted workflow lifecycle analytics with failure isolation.
+
 ### PR #696
 
 - Preserve forecast sessions and cloud handoffs across day rollover choices.
