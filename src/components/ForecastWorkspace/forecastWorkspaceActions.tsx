@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { downloadGfcPackage } from '../../utils/fileUtils';
+import type { WorkflowExportScope } from '../../utils/workflowPackage';
 import {
   redoLastEdit,
   resetForecasts,
@@ -13,7 +14,7 @@ import type { AddToastFn } from '../Layout';
 import type { DayType, ForecastCycle } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
 import { useDispatch } from 'react-redux';
-import { readWorkflowAnalyticsPreference, trackWorkflowEvent } from '../../lib/workflowAnalytics';
+import { trackWorkflowEvent } from '../../lib/workflowAnalytics';
 
 export interface ForecastWorkspaceActionParams {
   dispatch: ReturnType<typeof useDispatch>;
@@ -61,6 +62,29 @@ const dispatchHistoryAction = (
   }
 };
 
+/** Downloads one package scope and reports success or failure without leaking errors to the caller. */
+const downloadPackageForScope = async ({ scope, forecastCycle, cycleMetadata, mapRef, addToast, setIsPackageDownloading }: {
+  scope: WorkflowExportScope;
+  forecastCycle: ForecastCycle;
+  cycleMetadata?: CycleMetadata;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
+  addToast: AddToastFn;
+  setIsPackageDownloading: React.Dispatch<React.SetStateAction<boolean>>;
+}): Promise<boolean> => {
+  setIsPackageDownloading(true);
+  try {
+    const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
+    await downloadGfcPackage(forecastCycle, mapView, cycleMetadata, scope);
+    addToast(scope === 'workflow' ? 'Workflow package downloaded!' : 'Cycle package downloaded!', 'success');
+    return true;
+  } catch {
+    addToast('Failed to create package.', 'error');
+    return false;
+  } finally {
+    setIsPackageDownloading(false);
+  }
+};
+
 /** Constructs all event-handler callbacks for workspace actions. */
 export const useForecastWorkspaceActionHandlers = ({
   dispatch,
@@ -78,19 +102,15 @@ export const useForecastWorkspaceActionHandlers = ({
   fileInputRef,
   handleCancelReset,
 }: ForecastWorkspaceActionParams) => {
-  const handlePackageDownload = useCallback(async () => {
-    setIsPackageDownloading(true);
-    try {
-      const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
-      await downloadGfcPackage(forecastCycle, mapView, cycleMetadata);
-      trackWorkflowEvent('export', { result: 'success', entryPath: 'forecast-workspace', packageScope: 'cycle' }, { enabled: readWorkflowAnalyticsPreference() });
-      addToast('Package downloaded!', 'success');
-    } catch {
-      trackWorkflowEvent('export', { result: 'failure', entryPath: 'forecast-workspace', packageScope: 'cycle' }, { enabled: readWorkflowAnalyticsPreference() });
-      addToast('Failed to create package.', 'error');
-    } finally {
-      setIsPackageDownloading(false);
-    }
+  const handlePackageDownload = useCallback(async (scope: WorkflowExportScope) => {
+    const succeeded = await downloadPackageForScope({
+      scope, forecastCycle, cycleMetadata, mapRef, addToast, setIsPackageDownloading,
+    });
+    trackWorkflowEvent('export', {
+      result: succeeded ? 'success' : 'failure',
+      entryPath: 'forecast-workspace',
+      packageScope: scope,
+    });
   }, [mapRef, forecastCycle, cycleMetadata, addToast, setIsPackageDownloading]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,7 +165,9 @@ export const useForecastWorkspaceActionHandlers = ({
     onUndo: handleUndo,
     onRedo: handleRedo,
     onLoadClick: handleLoadClick,
-    onPackageDownload: () => { handlePackageDownload().catch((err) => { console.debug('Package download failed (ignored):', err); }); },
+    onPackageDownload: () => { handlePackageDownload('cycle'); },
+    onWorkflowPackageDownload: () => { handlePackageDownload('workflow'); },
+    onCyclePackageDownload: () => { handlePackageDownload('cycle'); },
     onDateSave: handleDateSave,
     onDayButtonClick: handleDayButtonClick,
     onPrevDay: handlePrevDay,

@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #698
+
+- Add distinct workflow-scoped and complete-cycle package exports with compatibility-preserving manifests.
+
 ### PR #697
 
 - Add privacy-safe, allowlisted workflow lifecycle analytics with failure isolation.

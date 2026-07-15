@@ -17,6 +17,7 @@ import {
   Undo2,
   Upload,
   Wrench,
+  PackageOpen,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -113,9 +114,17 @@ const ToolbarToolsSection: React.FC<{ controller: ForecastWorkspaceController }>
       />
       <ToolbarTooltipButton
         icon={<Archive className="h-6 w-6" />}
-        tooltip={<p>Download Package <span className="text-muted-foreground">(JSON + Discussions)</span></p>}
+        tooltip={<p>Export complete cycle <span className="text-muted-foreground">(JSON + discussions)</span></p>}
         className="h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400"
         onClick={controller.onPackageDownload}
+        disabled={controller.isPackageDownloading}
+      />
+      <ToolbarTooltipButton
+        icon={<PackageOpen className="h-6 w-6" />}
+        tooltip={<p>Export current workflow <span className="text-muted-foreground">(scoped package)</span></p>}
+        className="h-14 w-14 lg:h-16 lg:w-16 bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/50 text-violet-700 dark:!bg-violet-500/20 dark:hover:!bg-violet-500/30 dark:border-violet-500/50 dark:text-violet-400"
+        ariaLabel="Export current workflow package"
+        onClick={controller.onWorkflowPackageDownload}
         disabled={controller.isPackageDownloading}
       />
       <ToolbarTooltipButton
@@ -842,6 +851,16 @@ const getTabbedToolbarActionItems = (
     accentClass: 'bg-violet-500/15 text-violet-700',
   },
   {
+    key: 'workflow-package',
+    label: 'Workflow package',
+    description: 'Export the current workflow only',
+    icon: <PackageOpen className="h-4 w-4" />,
+    onClick: controller.onWorkflowPackageDownload,
+    disabled: controller.isPackageDownloading,
+    tone: 'primary',
+    accentClass: 'bg-violet-500/15 text-violet-700',
+  },
+  {
     key: 'history',
     label: 'History',
     description: 'Reopen saved sessions',
@@ -942,7 +961,7 @@ const TabbedToolbarToolsTab: React.FC<{
 }> = ({ controller, autoTstmTools = null }) => {
   const actionItems = getTabbedToolbarActionItems(controller);
   const historyItems = actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key));
-  const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package'].includes(item.key));
+  const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package', 'workflow-package'].includes(item.key));
   const completionItems = actionItems.filter((item) => item.key === 'complete');
   const destructiveItems = actionItems.filter((item) => item.key === 'reset');
 

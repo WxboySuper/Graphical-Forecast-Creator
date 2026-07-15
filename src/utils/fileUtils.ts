@@ -13,6 +13,7 @@ import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
+import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
 
 const CURRENT_VERSION = '1.0.0';
 
@@ -164,7 +165,9 @@ const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => 
  * Deserializes the saved JSON data back into ForecastCycle.
  * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
-export const deserializeForecast = (data: GFCForecastSaveData): ForecastCycle => {
+export const deserializeForecast = (data: GFCForecastSaveData | unknown): ForecastCycle => {
+  if (isWorkflowExportPackage(data)) return deserializeForecast(data.forecast);
+  if (!data || typeof data !== 'object') return deserializeLegacyForecast({} as GFCForecastSaveData);
   if (!data.forecastCycle) return deserializeLegacyForecast(data);
   const cycle = data.forecastCycle;
   return {
@@ -191,6 +194,7 @@ export const cloneForecastCycle = (forecastCycle: ForecastCycle): ForecastCycle 
  * Validates that the input data conforms to the GFCForecastSaveData schema.
  */
 export const validateForecastData = (data: unknown): data is GFCForecastSaveData => {
+  if (isWorkflowExportPackage(data)) return validateForecastData(data.forecast);
   if (typeof data !== 'object' || data === null) return false;
   const candidate = data as Partial<GFCForecastSaveData>;
 
@@ -246,56 +250,66 @@ const addDiscussionToZip = (
   exportedDays.add(day);
 };
 
-/** Bundles the forecast JSON and all day discussions into a single .zip package. */
-export const downloadGfcPackage = async (
-  forecastCycle: ForecastCycle,
-  mapView: { center: [number, number]; zoom: number },
-  cycleMetadata?: CycleMetadata,
-): Promise<void> => {
-  const zip = new JSZip();
-
-  // 1. Forecast JSON
-  const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
-  zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
-
-  // 2. Discussion text for configured scopes, with every ungrouped legacy day retained.
+/** Adds only discussions belonging to the forecast scope represented by the package. */
+const addPackageDiscussions = (
+  zip: JSZip,
+  forecast: GFCForecastSaveData,
+  cycleMetadata: CycleMetadata | undefined,
+): void => {
+  const exportedForecastCycle = deserializeForecast(forecast);
   const workflowTemplate = cycleMetadata ? getWorkflowTemplateById(cycleMetadata.workflowId) : undefined;
   const hasStandardWorkflowGrouping = workflowTemplate?.groupings.some((grouping) =>
     grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
   );
-  const hasValidPersistedGrouping = isValidDiscussionGroupings(forecastCycle.discussionGroupings);
+  const hasValidPersistedGrouping = isValidDiscussionGroupings(exportedForecastCycle.discussionGroupings);
   const exportedDays = new Set<DayType>();
   const usedEntryNames = new Set<string>(['forecast_cycle.json']);
 
   if (hasValidPersistedGrouping || hasStandardWorkflowGrouping) {
-    getDiscussionGroupings(forecastCycle, workflowTemplate).forEach((grouping) => {
-      const ownerDay = getDiscussionOwnerDay(forecastCycle, grouping);
+    getDiscussionGroupings(exportedForecastCycle, workflowTemplate).forEach((grouping) => {
+      const ownerDay = getDiscussionOwnerDay(exportedForecastCycle, grouping);
       addDiscussionToZip(zip, usedEntryNames, exportedDays, {
-        discussion: getDiscussionForGrouping(forecastCycle, grouping),
+        discussion: getDiscussionForGrouping(exportedForecastCycle, grouping),
         day: ownerDay,
         identifier: grouping.id,
       });
     });
   }
 
-  // A malformed grouping must never make its covered legacy discussions disappear.
-  (Object.keys(forecastCycle.days) as unknown as DayType[])
+  (Object.keys(exportedForecastCycle.days) as unknown as DayType[])
     .sort((a, b) => a - b)
     .forEach((day) => {
       if (!exportedDays.has(day)) {
         addDiscussionToZip(zip, usedEntryNames, exportedDays, {
-          discussion: forecastCycle.days[day]?.discussion,
+          discussion: exportedForecastCycle.days[day]?.discussion,
           day,
           identifier: `day${day}`,
         });
       }
     });
+};
+
+/** Bundles the forecast JSON and all day discussions into a single .zip package. */
+export const downloadGfcPackage = async (
+  forecastCycle: ForecastCycle,
+  mapView: { center: [number, number]; zoom: number },
+  cycleMetadata?: CycleMetadata,
+  scope: WorkflowExportScope = 'cycle',
+): Promise<void> => {
+  const zip = new JSZip();
+
+  // 1. Forecast JSON
+  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata });
+  const data = pkg.forecast;
+  zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
+  zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
+  addPackageDiscussions(zip, data, cycleMetadata);
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const filename = `gfc-package-${timestamp}.zip`;
+  const filename = `gfc-${scope}-package-${timestamp}.zip`;
 
   const link = document.createElement('a');
   link.href = url;
