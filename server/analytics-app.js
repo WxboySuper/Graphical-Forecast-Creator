@@ -8,12 +8,19 @@ function createCollectHandler(fs, LOG_FILE) {
     // Sanitise and cap all user-controlled fields
     const page = (typeof req.body?.page === 'string' ? req.body.page : '/').slice(0, 200);
     const referrer = (typeof req.body?.referrer === 'string' ? req.body.referrer : '').slice(0, 500);
+    const allowedEvents = new Set(['start', 'continue', 'derive', 'revise', 'complete', 'complete-with-omissions', 'export', 'rollover-action']);
+    const allowedDimensions = new Set(['dayGrouping', 'accountTier', 'entryPath', 'result', 'packageScope', 'action']);
+    const event = allowedEvents.has(req.body?.event) ? req.body.event : undefined;
+    const dimensions = event && req.body?.dimensions && typeof req.body.dimensions === 'object' && !Array.isArray(req.body.dimensions)
+      ? Object.fromEntries(Object.entries(req.body.dimensions).filter(([key, value]) => allowedDimensions.has(key) && typeof value === 'string').slice(0, 6))
+      : undefined;
 
     const entry = {
       ts: new Date().toISOString(),
       ua: (req.headers['user-agent'] || '').slice(0, 300),
       page,
       ref: referrer,
+      ...(event ? { event, dimensions } : {}),
     };
 
     try {

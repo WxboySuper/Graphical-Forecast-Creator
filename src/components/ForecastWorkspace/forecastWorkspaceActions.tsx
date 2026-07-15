@@ -13,6 +13,7 @@ import type { AddToastFn } from '../Layout';
 import type { DayType, ForecastCycle } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
 import { useDispatch } from 'react-redux';
+import { trackWorkflowEvent } from '../../lib/workflowAnalytics';
 
 export interface ForecastWorkspaceActionParams {
   dispatch: ReturnType<typeof useDispatch>;
@@ -82,8 +83,10 @@ export const useForecastWorkspaceActionHandlers = ({
     try {
       const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
       await downloadGfcPackage(forecastCycle, mapView, cycleMetadata);
+      trackWorkflowEvent('export', { result: 'success', entryPath: 'forecast-workspace', packageScope: 'cycle' });
       addToast('Package downloaded!', 'success');
     } catch {
+      trackWorkflowEvent('export', { result: 'failure', entryPath: 'forecast-workspace', packageScope: 'cycle' });
       addToast('Failed to create package.', 'error');
     } finally {
       setIsPackageDownloading(false);
