@@ -16,6 +16,7 @@ const DIMENSION_VALUES: Record<string, readonly string[]> = {
   packageScope: ['workflow', 'cycle'],
   action: ['keep', 'save-and-start-new', 'replace-without-saving'],
 };
+export const WORKFLOW_ANALYTICS_CONSENT_KEY = 'gfc-workflow-analytics-enabled';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -32,6 +33,15 @@ export const validateWorkflowAnalyticsPayload = (value: unknown): value is Workf
   );
 };
 
+/** Reads the local analytics preference; absence preserves the existing hosted tracking default. */
+export const readWorkflowAnalyticsPreference = (): boolean => {
+  try {
+    return typeof localStorage === 'undefined' || localStorage.getItem(WORKFLOW_ANALYTICS_CONSENT_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+};
+
 /** Sends a consent-gated event without ever allowing analytics failures into workflow code. */
 export const trackWorkflowEvent = (
   event: WorkflowAnalyticsEvent,
@@ -39,17 +49,22 @@ export const trackWorkflowEvent = (
   options: { enabled?: boolean; transport?: (payload: WorkflowAnalyticsPayload) => void } = {},
 ): void => {
   const payload: WorkflowAnalyticsPayload = dimensions ? { event, dimensions } : { event };
-  if (options.enabled === false || !validateWorkflowAnalyticsPayload(payload)) return;
+  if (options.enabled === false || !readWorkflowAnalyticsPreference() || !validateWorkflowAnalyticsPayload(payload)) return;
   if (options.transport) {
     try { options.transport(payload); } catch { /* analytics must never block forecasting */ }
     return;
   }
   if (!shouldTrack()) return;
+  sendWorkflowAnalyticsPayload(payload);
+};
+
+/** Delivers an already validated payload, falling back when Beacon declines the queue. */
+export const sendWorkflowAnalyticsPayload = (payload: WorkflowAnalyticsPayload): void => {
   try {
     const body = JSON.stringify(payload);
-    if (typeof navigator.sendBeacon === 'function') {
-      navigator.sendBeacon('/api/collect', new Blob([body], { type: 'application/json' }));
-    } else {
+    const queued = typeof navigator.sendBeacon === 'function'
+      && navigator.sendBeacon('/api/collect', new Blob([body], { type: 'application/json' }));
+    if (!queued) {
       void fetch('/api/collect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
     }
   } catch { /* analytics is best effort */ }

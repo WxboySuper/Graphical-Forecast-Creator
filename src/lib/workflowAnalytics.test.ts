@@ -1,4 +1,4 @@
-import { trackWorkflowEvent, validateWorkflowAnalyticsPayload } from './workflowAnalytics';
+import { sendWorkflowAnalyticsPayload, trackWorkflowEvent, validateWorkflowAnalyticsPayload } from './workflowAnalytics';
 import { WORKFLOW_ANALYTICS_EVENTS } from '../types/workflowAnalytics';
 
 test.each(WORKFLOW_ANALYTICS_EVENTS)('accepts the allowlisted %s event', (event) => {
@@ -21,4 +21,17 @@ test('opt-out and provider failures are no-ops', () => {
   expect(transport).not.toHaveBeenCalled();
   expect(() => trackWorkflowEvent('complete', { result: 'success' }, { transport })).not.toThrow();
   expect(transport).toHaveBeenCalledTimes(1);
+});
+
+test('falls back to fetch when Beacon refuses to queue an event', () => {
+  const sendBeacon = jest.fn(() => false);
+  Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: sendBeacon });
+  const fetchMock = jest.fn(() => Promise.resolve());
+  const originalFetch = global.fetch;
+  global.fetch = fetchMock as typeof fetch;
+  sendWorkflowAnalyticsPayload({ event: 'export', dimensions: { result: 'success' } });
+  expect(sendBeacon).toHaveBeenCalled();
+  expect(fetchMock).toHaveBeenCalledWith('/api/collect', expect.objectContaining({ method: 'POST' }));
+  global.fetch = originalFetch;
+  Reflect.deleteProperty(navigator, 'sendBeacon');
 });

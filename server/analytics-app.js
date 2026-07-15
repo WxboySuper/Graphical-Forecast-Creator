@@ -9,10 +9,17 @@ function createCollectHandler(fs, LOG_FILE) {
     const page = (typeof req.body?.page === 'string' ? req.body.page : '/').slice(0, 200);
     const referrer = (typeof req.body?.referrer === 'string' ? req.body.referrer : '').slice(0, 500);
     const allowedEvents = new Set(['start', 'continue', 'derive', 'revise', 'complete', 'complete-with-omissions', 'export', 'rollover-action']);
-    const allowedDimensions = new Set(['dayGrouping', 'accountTier', 'entryPath', 'result', 'packageScope', 'action']);
+    const allowedDimensionValues = {
+      dayGrouping: new Set(['day1', 'day2', 'day3', 'day4-8', 'full-cycle']),
+      accountTier: new Set(['signed-out', 'free', 'premium']),
+      entryPath: new Set(['home', 'forecast', 'cloud-library', 'forecast-workspace', 'rollover']),
+      result: new Set(['success', 'failure', 'cancelled']),
+      packageScope: new Set(['workflow', 'cycle']),
+      action: new Set(['keep', 'save-and-start-new', 'replace-without-saving']),
+    };
     const event = allowedEvents.has(req.body?.event) ? req.body.event : undefined;
     const dimensions = event && req.body?.dimensions && typeof req.body.dimensions === 'object' && !Array.isArray(req.body.dimensions)
-      ? Object.fromEntries(Object.entries(req.body.dimensions).filter(([key, value]) => allowedDimensions.has(key) && typeof value === 'string').slice(0, 6))
+      ? Object.fromEntries(Object.entries(req.body.dimensions).filter(([key, value]) => allowedDimensionValues[key]?.has(value)).slice(0, 6))
       : undefined;
 
     const entry = {
