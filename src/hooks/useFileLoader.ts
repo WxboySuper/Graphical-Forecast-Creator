@@ -1,4 +1,5 @@
 import { exportForecastToJson, deserializeForecast, validateForecastData } from '../utils/fileUtils';
+import { isWorkflowExportPackage } from '../utils/workflowPackage';
 import {
   markAsSaved,
   importForecastCycle,
@@ -37,8 +38,9 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
 
       const deserializedCycle = deserializeForecast(data);
       dispatch(importForecastCycle(deserializedCycle));
-      if (data.cycleMetadata) {
-        dispatch(setWorkflowMetadata(data.cycleMetadata));
+      const packageMetadata = isWorkflowExportPackage(data) ? data.metadata : data.cycleMetadata;
+      if (packageMetadata) {
+        dispatch(setWorkflowMetadata(packageMetadata));
       } else if (data.cycleMetadata === null) {
         dispatch(clearWorkflowMetadata());
       }

@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { downloadGfcPackage } from '../../utils/fileUtils';
+import type { WorkflowExportScope } from '../../utils/workflowPackage';
 import {
   redoLastEdit,
   resetForecasts,
@@ -60,6 +61,27 @@ const dispatchHistoryAction = (
   }
 };
 
+/** Downloads one package scope and reports success or failure without leaking errors to the caller. */
+const downloadPackageForScope = async ({ scope, forecastCycle, cycleMetadata, mapRef, addToast, setIsPackageDownloading }: {
+  scope: WorkflowExportScope;
+  forecastCycle: ForecastCycle;
+  cycleMetadata?: CycleMetadata;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
+  addToast: AddToastFn;
+  setIsPackageDownloading: React.Dispatch<React.SetStateAction<boolean>>;
+}): Promise<void> => {
+  setIsPackageDownloading(true);
+  try {
+    const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
+    await downloadGfcPackage(forecastCycle, mapView, cycleMetadata, scope);
+    addToast(scope === 'workflow' ? 'Workflow package downloaded!' : 'Cycle package downloaded!', 'success');
+  } catch {
+    addToast('Failed to create package.', 'error');
+  } finally {
+    setIsPackageDownloading(false);
+  }
+};
+
 /** Constructs all event-handler callbacks for workspace actions. */
 export const useForecastWorkspaceActionHandlers = ({
   dispatch,
@@ -77,18 +99,9 @@ export const useForecastWorkspaceActionHandlers = ({
   fileInputRef,
   handleCancelReset,
 }: ForecastWorkspaceActionParams) => {
-  const handlePackageDownload = useCallback(async () => {
-    setIsPackageDownloading(true);
-    try {
-      const mapView = mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
-      await downloadGfcPackage(forecastCycle, mapView, cycleMetadata);
-      addToast('Package downloaded!', 'success');
-    } catch {
-      addToast('Failed to create package.', 'error');
-    } finally {
-      setIsPackageDownloading(false);
-    }
-  }, [mapRef, forecastCycle, cycleMetadata, addToast, setIsPackageDownloading]);
+  const handlePackageDownload = useCallback((scope: WorkflowExportScope) => downloadPackageForScope({
+    scope, forecastCycle, cycleMetadata, mapRef, addToast, setIsPackageDownloading,
+  }), [mapRef, forecastCycle, cycleMetadata, addToast, setIsPackageDownloading]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = getSelectedFile(e);
@@ -142,7 +155,9 @@ export const useForecastWorkspaceActionHandlers = ({
     onUndo: handleUndo,
     onRedo: handleRedo,
     onLoadClick: handleLoadClick,
-    onPackageDownload: () => { handlePackageDownload().catch((err) => { console.debug('Package download failed (ignored):', err); }); },
+    onPackageDownload: () => { handlePackageDownload('cycle').catch((err) => { console.debug('Package download failed (ignored):', err); }); },
+    onWorkflowPackageDownload: () => { handlePackageDownload('workflow').catch((err) => { console.debug('Workflow package download failed (ignored):', err); }); },
+    onCyclePackageDownload: () => { handlePackageDownload('cycle').catch((err) => { console.debug('Cycle package download failed (ignored):', err); }); },
     onDateSave: handleDateSave,
     onDayButtonClick: handleDayButtonClick,
     onPrevDay: handlePrevDay,
