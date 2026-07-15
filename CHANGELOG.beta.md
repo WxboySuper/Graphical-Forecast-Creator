@@ -8,6 +8,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Add distinct workflow-scoped and complete-cycle package exports with compatibility-preserving manifests.
 
+### PR #697
+
+- Add privacy-safe, allowlisted workflow lifecycle analytics with failure isolation.
+
 ### PR #696
 
 - Preserve forecast sessions and cloud handoffs across day rollover choices.
