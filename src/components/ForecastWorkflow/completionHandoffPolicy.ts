@@ -5,9 +5,11 @@ export interface CompletionHandoffEligibility { showHandoff: boolean; showMonito
 const MONITOR_SUPPORTED_GROUPINGS = new Set(['day1']);
 const COMPLETED_STATUSES = new Set(['completed', 'completed-with-omissions']);
 
+/** Returns whether the cycle reached a completion status eligible for handoff guidance. */
 const isCompletedCycle = (cycle: CycleMetadata | undefined): cycle is CycleMetadata =>
   Boolean(cycle && COMPLETED_STATUSES.has(cycle.status));
 
+/** Returns whether the workflow uses one of the supported short-term groupings. */
 const isSupportedShortTermWorkflow = (workflow: WorkflowMetadata | undefined): workflow is WorkflowMetadata =>
   Boolean(
     workflow
@@ -15,6 +17,7 @@ const isSupportedShortTermWorkflow = (workflow: WorkflowMetadata | undefined): w
     && workflow.groupings.every((grouping) => ['day1', 'day2', 'day3'].includes(grouping)),
   );
 
+/** Returns whether Monitor is supported for at least one grouping in the workflow. */
 const supportsMonitor = (workflow: WorkflowMetadata): boolean =>
   workflow.groupings.some((grouping) => MONITOR_SUPPORTED_GROUPINGS.has(grouping));
 
