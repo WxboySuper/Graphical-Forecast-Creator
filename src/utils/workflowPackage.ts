@@ -11,6 +11,8 @@ export interface WorkflowExportPackage {
   exportedAt: string;
   metadata?: CycleMetadata;
   forecast: GFCForecastSaveData;
+  cycleMetadata?: CycleMetadata;
+  mapView?: GFCForecastSaveData['mapView'];
   styleSnapshots?: Record<string, unknown>;
 }
 
@@ -87,6 +89,8 @@ export const buildWorkflowExportPackage = ({
   schemaVersion: WORKFLOW_SCHEMA_VERSION,
   exportedAt,
   ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
+  ...(cycleMetadata ? { cycleMetadata } : {}),
+  ...(forecast.mapView ? { mapView: forecast.mapView } : {}),
   forecast: scope === 'workflow' ? restrictForecastToWorkflow(forecast, cycleMetadata) : forecast,
   ...(styleSnapshots ? { styleSnapshots } : {}),
 });

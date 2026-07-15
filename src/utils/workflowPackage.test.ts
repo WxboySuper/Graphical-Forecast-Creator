@@ -17,6 +17,7 @@ test.each(['workflow', 'cycle'] as const)('builds a discriminated %s package', (
   expect(pkg.packageType).toBe(scope);
   expect(isWorkflowExportPackage(pkg)).toBe(true);
   expect(pkg.exportedAt).toBe('2026-07-15T12:00:00.000Z');
+  expect(pkg.cycleMetadata).toEqual(metadata);
 });
 
 test('converts packages into the existing v2 serialized package contract', () => {
