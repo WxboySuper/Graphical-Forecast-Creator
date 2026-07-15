@@ -324,8 +324,9 @@ const applyLoadedForecast = (
     dispatch(clearWorkflowMetadata());
   }
 
-  if (payload.rawData.mapView) {
-    dispatch(setMapView(payload.rawData.mapView));
+  const savedMapView = isWorkflowExportPackage(payload.rawData) ? payload.rawData.forecast.mapView : payload.rawData.mapView;
+  if (savedMapView) {
+    dispatch(setMapView(savedMapView));
     return;
   }
 

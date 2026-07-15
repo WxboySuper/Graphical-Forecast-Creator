@@ -50,7 +50,8 @@ export const restrictForecastToWorkflow = (
   forecast: GFCForecastSaveData,
   cycleMetadata?: CycleMetadata,
 ): GFCForecastSaveData => {
-  if (!cycleMetadata?.workflowId || !forecast.forecastCycle) return forecast;
+  if (!forecast.forecastCycle) return forecast;
+  if (!cycleMetadata?.workflowId) throw new Error('Workflow export requires workflow metadata');
   const allowedDays = getWorkflowDays(cycleMetadata.workflowId);
   if (allowedDays.size === 0 || allowedDays.size === 8) return forecast;
   const days = Object.fromEntries(

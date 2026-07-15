@@ -34,5 +34,12 @@ test('fails closed when a workflow template is unknown', () => {
     scope: 'workflow',
     forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
     cycleMetadata: { ...metadata, workflowId: 'retired-workflow' },
-  })).toThrow('Unknown workflow template');
+})).toThrow('Unknown workflow template');
+});
+
+test('requires metadata for a workflow-scoped export', () => {
+  expect(() => buildWorkflowExportPackage({
+    scope: 'workflow',
+    forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+  })).toThrow('Workflow export requires workflow metadata');
 });
