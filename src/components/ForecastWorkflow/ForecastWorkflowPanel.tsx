@@ -448,7 +448,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const previousSuggestion = usePreviousOutlookSuggestion();
   const handoffEligibility = getCompletionHandoffEligibility(workflowTemplate, workflowMetadata);
   const handoffIdentity = workflowMetadata ? getCompletionHandoffIdentity(workflowMetadata) : '';
-  const activeWorkflowMetadata = workflowMetadata;
+  const activeWorkflowMetadata = workflowMetadata as NonNullable<typeof workflowMetadata>;
 
   useEffect(() => {
     setShowCompletionHandoff(
@@ -456,7 +456,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     );
   }, [handoffEligibility.showHandoff, handoffIdentity]);
 
-  if (!workflowMetadata || shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
+  if (shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
     return null;
   }
 
@@ -476,10 +476,10 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const activeUpdateVersion = forecastCycle.updateInProgressVersion;
   const isUpdating = typeof activeUpdateVersion === 'number';
   const canReviewPackage = canReviewWorkflowPackage(mapIsComplete, discussionIsComplete, isUpdating, Boolean(controller), context);
-  const canExportPackage = canExportWorkflowPackage(hasMapStarted, hasDiscussion, workflowMetadata.outlookVersions.length);
+  const canExportPackage = canExportWorkflowPackage(hasMapStarted, hasDiscussion, activeWorkflowMetadata.outlookVersions.length);
   const isReviewed = Boolean(forecastCycle.completionAcknowledgedAt);
   const hasSameDayWork = hasSameDayWorkflowWork(forecastCycle.cycleDate, currentDay);
-  const currentVersion = getCurrentWorkflowVersion(workflowMetadata.outlookVersions);
+  const currentVersion = getCurrentWorkflowVersion(activeWorkflowMetadata.outlookVersions);
   const statusLabel = getWorkflowStatusLabel({
     hasMapStarted,
     isUpdating,
@@ -546,7 +546,6 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   function handleOpenMonitor(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);
-    if (!activeWorkflowMetadata) return;
     const savedCycle = savedCycles.find((cycle) => cycle.workflowMetadata?.id === activeWorkflowMetadata.id);
     const sourceKind = savedCycle ? 'local-cycle' : 'current';
     const sourceId = savedCycle?.id ?? 'current';
