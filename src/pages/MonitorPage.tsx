@@ -60,6 +60,7 @@ const resolveHandoffSource = (
   if (searchParams.get('workflowId')) {
     return options.find((option) => option.kind === 'current' && option.id === 'current');
   }
+  return undefined;
 };
 
 interface MonitorPageWorkspaceProps {
