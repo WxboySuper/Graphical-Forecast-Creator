@@ -880,6 +880,14 @@ export const localSignOutUser = async (deps: {
   setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
   const { setUser, setStatus, setSyncedSettings, setSettingsSyncStatus, setBetaAccess } = deps;
+  const fixtureActive = Boolean(readLocalTestAccount());
+  if (fixtureActive && auth) {
+    try {
+      await signOut(auth);
+    } catch {
+      // Fixture sign-out must still clear the local session if hosted auth is unavailable.
+    }
+  }
   try {
     await postLocalJson('/api/local/signout', { failureMessage: 'Unable to sign out right now.' });
   } catch {
