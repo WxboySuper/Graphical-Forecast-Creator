@@ -153,8 +153,8 @@ const useHomePageLogic = () => {
 
   /** Confirm starting a new cycle (discard changes). */
   const handleConfirmNewCycle = () => {
+    clearAutoSave(user?.uid);
     if (pendingWorkflow) {
-      clearAutoSave(user?.uid);
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,
         cycleDate: getLocalCalendarDate(),
