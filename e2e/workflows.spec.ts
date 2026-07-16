@@ -90,6 +90,7 @@ test.describe('Workflow continuity', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await discussionNav(page).click();
     await scope.selectOption('day4-8');
+    await expect(scope).toHaveValue('day4-8');
     await editor.fill('Days 4-8 draft survives a hard reload.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await discussionNav(page).click();
