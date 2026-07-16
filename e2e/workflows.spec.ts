@@ -117,12 +117,13 @@ test.describe('Workflow continuity', () => {
     expect(download.suggestedFilename()).toMatch(/workflow|forecast/i);
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
+    if (downloadPath === null) throw new Error('Workflow export did not produce a readable file');
 
     await page.goto('/');
     const chooserPromise = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: 'Upload workflow', exact: true }).click();
     const chooser = await chooserPromise;
-    await chooser.setFiles(downloadPath!);
+    await chooser.setFiles(downloadPath);
     await page.waitForTimeout(1000);
 
     await expect(page).toHaveURL(/\/$/);
