@@ -58,6 +58,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+          ref: ${{ needs.classify-request.outputs.branch || github.sha }}
           persist-credentials: true
 
       - name: Configure git author
@@ -71,8 +72,16 @@ jobs:
           PR_BRANCH: ${{ needs.classify-request.outputs.branch }}
         run: |
           git fetch origin "$PR_BRANCH"
+          expected_sha="$(git rev-parse FETCH_HEAD)"
+          start_sha="$(git rev-parse HEAD)"
+          if [[ "$start_sha" != "$expected_sha" ]]; then
+            echo "Refusing recovery because the checked-out commit is not the PR branch tip."
+            exit 1
+          fi
+
           printf 'OPENCODE_FORCE_PUSH_BRANCH=%s\n' "$PR_BRANCH" >> "$GITHUB_ENV"
-          printf 'OPENCODE_FORCE_PUSH_EXPECTED_SHA=%s\n' "$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+          printf 'OPENCODE_FORCE_PUSH_EXPECTED_SHA=%s\n' "$expected_sha" >> "$GITHUB_ENV"
+          printf 'OPENCODE_FORCE_PUSH_START_SHA=%s\n' "$start_sha" >> "$GITHUB_ENV"
 
       - name: Run opencode
         id: run-opencode
@@ -102,7 +111,7 @@ jobs:
             exit 0
           fi
 
-          if [[ "$local_sha" == "$OPENCODE_FORCE_PUSH_EXPECTED_SHA" ]]; then
+          if [[ "$local_sha" == "$OPENCODE_FORCE_PUSH_START_SHA" ]]; then
             echo "OpenCode did not create a commit to recover."
             exit 0
           fi
