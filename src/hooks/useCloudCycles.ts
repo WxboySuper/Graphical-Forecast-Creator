@@ -244,6 +244,7 @@ function useCloudCycleSubscription({
 function useCloudCycleMutation<TArgs extends unknown[]>({
   userId,
   canWrite,
+  localFixtureActive,
   setError,
   action,
   onSuccess,
