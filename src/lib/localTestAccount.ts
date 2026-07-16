@@ -22,6 +22,12 @@ export const readLocalTestAccount = (): LocalTestAccountTier | null => {
   return storedTier === 'free' || storedTier === 'premium' ? storedTier : null;
 };
 
+/** Clears the disposable fixture so a developer can return to normal local or hosted auth. */
+export const clearLocalTestAccount = (): void => {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY);
+};
+
 /** Builds the stable identity used by the disposable local account fixture. */
 export const createLocalTestUser = (tier: LocalTestAccountTier) => ({
   uid: `local-test-${tier}`,
