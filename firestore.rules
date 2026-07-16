@@ -166,7 +166,6 @@ service cloud.firestore {
         );
     }
 
-<<<<<<< HEAD
     function hasOnlyKeys(value, allowed) {
       return value is map && value.keys().hasOnly(allowed);
     }
@@ -275,18 +274,12 @@ service cloud.firestore {
         isValidWorkflowAwarenessMetadata(data.metadata, cycleId);
     }
 
-=======
->>>>>>> origin/pr/724
     function isValidCloudCycle(data, cycleId) {
       return data is map &&
         data.keys().hasOnly([
           'id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt',
           'forecastDays', 'totalOutlooks', 'totalFeatures', 'isReadOnly',
-<<<<<<< HEAD
           'payloadHash', 'payloadJson', 'payloadBytes', 'workflowMetadata'
-=======
-          'payloadHash', 'payloadJson', 'payloadBytes'
->>>>>>> origin/pr/724
         ]) &&
         data.keys().hasAll([
           'id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt',
@@ -307,14 +300,10 @@ service cloud.firestore {
         data.payloadJson is string && data.payloadJson.toUtf8().size() <= 750000 &&
         data.payloadBytes is int && data.payloadBytes == data.payloadJson.toUtf8().size() &&
         (!('payloadHash' in data) ||
-<<<<<<< HEAD
           (data.payloadHash is string && data.payloadHash.size() <= 128)) &&
         (!('workflowMetadata' in data) ||
           (isValidWorkflowMetadata(data.workflowMetadata) &&
             data.workflowMetadata.cycleDate == data.cycleDate));
-=======
-          (data.payloadHash is string && data.payloadHash.size() <= 128));
->>>>>>> origin/pr/724
     }
 
     match /userProfiles/{userId} {
@@ -345,7 +334,6 @@ service cloud.firestore {
       allow write: if false;
     }
 
-<<<<<<< HEAD
     match /users/{userId}/workflowAwareness/{cycleId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) &&
@@ -355,8 +343,6 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
-=======
->>>>>>> origin/pr/724
     match /cloudCycles/{cycleId} {
       // Owners retain read/delete access after downgrade so they can export or
       // remove existing data. Only create/update consume the premium benefit.
