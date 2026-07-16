@@ -182,6 +182,10 @@ function clearDeletedCloudSelection({
   }
 }
 
+/** Returns whether a signed-in user can access hosted cloud cycles. */
+export const canAccessHostedCloudCycles = (userId: string | undefined, premiumActive: boolean): boolean =>
+  Boolean(userId && premiumActive);
+
 /** Starts the realtime hosted-cycle subscription for the signed-in user. */
 function useCloudCycleSubscription({
   userId,
@@ -357,10 +361,6 @@ export const getCloudLoadBlockedMessage = ({ userId, canWrite }: Pick<CloudAcces
   if (!userId) return 'Not signed in';
   return canWrite ? 'Action not allowed' : 'Premium subscription required to restore full cloud packages';
 };
-
-/** Returns true only when an authenticated premium user may access hosted cycles. */
-export const canAccessHostedCloudCycles = (userId: string | undefined, premiumActive: boolean): boolean =>
-  Boolean(userId && premiumActive);
 
 /** Returns the load callback for hosted cloud cycles. */
 function useCloudLoadCycle({
