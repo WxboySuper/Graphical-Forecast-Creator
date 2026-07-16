@@ -2,6 +2,23 @@ export type LocalTestAccountTier = 'free' | 'premium';
 
 const LOCAL_TEST_ACCOUNT_STORAGE_KEY = 'gfc-local-test-account';
 
+const readStoredTestAccount = (): string | null => {
+  try {
+    return window.sessionStorage.getItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredTestAccount = (tier: LocalTestAccountTier): boolean => {
+  try {
+    window.sessionStorage.setItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY, tier);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** Keeps test-account fixtures out of production/staging builds even when served from a local hostname. */
 export const isLocalTestAccountEnabled = (hostname: string, developmentMode: boolean): boolean =>
   developmentMode && ['localhost', '127.0.0.1'].includes(hostname);
@@ -14,18 +31,21 @@ export const readLocalTestAccount = (): LocalTestAccountTier | null => {
 
   const queryTier = new URLSearchParams(window.location.search).get('localTestAccount');
   if (queryTier === 'free' || queryTier === 'premium') {
-    window.sessionStorage.setItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY, queryTier);
-    return queryTier;
+    return writeStoredTestAccount(queryTier) ? queryTier : null;
   }
 
-  const storedTier = window.sessionStorage.getItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY);
+  const storedTier = readStoredTestAccount();
   return storedTier === 'free' || storedTier === 'premium' ? storedTier : null;
 };
 
 /** Clears the disposable fixture so a developer can return to normal local or hosted auth. */
 export const clearLocalTestAccount = (): void => {
   if (typeof window === 'undefined') return;
-  window.sessionStorage.removeItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY);
+  try {
+    window.sessionStorage.removeItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY);
+  } catch {
+    // Storage may be blocked; still remove the URL fixture request below.
+  }
   const url = new URL(window.location.href);
   if (!url.searchParams.has('localTestAccount')) return;
   url.searchParams.delete('localTestAccount');
