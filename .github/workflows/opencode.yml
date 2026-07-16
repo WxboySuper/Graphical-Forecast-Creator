@@ -66,6 +66,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Require trusted workflow push credential
+        if: needs.classify-request.outputs.mode == 'trusted-pr'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [[ -z "$GH_PAT" ]]; then
+            echo "GH_PAT is required before OpenCode can safely update workflow files."
+            exit 1
+          fi
+
       - name: Record trusted PR branch tip
         if: needs.classify-request.outputs.mode == 'trusted-pr'
         env:
@@ -100,6 +110,7 @@ jobs:
         if: always() && needs.classify-request.outputs.mode == 'trusted-pr'
         env:
           PR_BRANCH: ${{ needs.classify-request.outputs.branch }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
           remote_ref="refs/heads/$PR_BRANCH"
@@ -121,6 +132,8 @@ jobs:
             exit 1
           fi
 
+          git config --local --replace-all http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_PAT" | base64 -w 0)"
           git push \
             "--force-with-lease=$remote_ref:$OPENCODE_FORCE_PUSH_EXPECTED_SHA" \
             origin "HEAD:$remote_ref"
