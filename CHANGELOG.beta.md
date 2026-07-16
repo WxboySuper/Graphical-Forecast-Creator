@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #713
+
+- Enforce premium entitlement for hosted full-package workflow restore and cloud-cycle Firestore access, including defense-in-depth Rules authorization.
+
 ### PR #699
 
 - Add post-completion handoff guidance for workflow and complete-cycle exports, eligible Monitor navigation, return-to-map, and duplicate-prompt suppression.
