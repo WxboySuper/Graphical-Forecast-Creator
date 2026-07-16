@@ -23,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Run opencode
         uses: anomalyco/opencode/github@a3b97d9090ccf4aa9ac32268486283e3131e36b4 # fix(github): enforce existing git author identity
