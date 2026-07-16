@@ -349,22 +349,34 @@ export const buildLoadedCloudForecastPayload = (
   return { ...plainPayload, cycleMetadata: null };
 };
 
+/** Returns the access message shown when a non-premium account tries to restore a full package. */
+export const getCloudLoadBlockedMessage = ({ userId, canWrite }: Pick<CloudAccessContext, 'userId' | 'canWrite'>): string => {
+  if (!userId) return 'Not signed in';
+  return canWrite ? 'Action not allowed' : 'Premium subscription required to restore full cloud packages';
+};
+
 /** Returns the load callback for hosted cloud cycles. */
 function useCloudLoadCycle({
   userId,
+  canWrite,
   user,
   cycles,
   setCurrentCloud,
   setError,
   updateSyncState,
 }: Pick<CloudStateContext, 'cycles' | 'setCurrentCloud' | 'setError' | 'updateSyncState'> &
-  Pick<CloudAccessContext, 'userId'> & {
+  Pick<CloudAccessContext, 'userId' | 'canWrite'> & {
     user: ReturnType<typeof useAuth>['user'];
   }) {
   return useCallback(
     async (cycleId: string): Promise<GFCForecastSaveData | null> => {
       if (!userId) {
         setError('Not signed in');
+        return null;
+      }
+
+      if (!canWrite) {
+        setError(getCloudLoadBlockedMessage({ userId, canWrite }));
         return null;
       }
 
@@ -383,7 +395,7 @@ function useCloudLoadCycle({
       updateSyncState('saved');
       return buildLoadedCloudForecastPayload(result.data);
     },
-    [cycles, setCurrentCloud, setError, updateSyncState, user, userId]
+    [canWrite, cycles, setCurrentCloud, setError, updateSyncState, user, userId]
   );
 }
 

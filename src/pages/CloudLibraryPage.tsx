@@ -44,7 +44,7 @@ const CloudLibraryHero: React.FC<{
       </div>
       <div className="cloud-library-hero-text">
         <h1>Your saved cloud cycles.</h1>
-        <p>Load a hosted package back into the editor, rename it, or clean up old saves without digging through menus.</p>
+        <p>Premium restores hosted packages. Free accounts can see workflow metadata, while forecast content remains local.</p>
       </div>
     </div>
 
@@ -71,7 +71,7 @@ const ExpiredPremiumNotice: React.FC = () => (
       <div>
         <strong>Premium expired</strong>
         <p>
-          Your library is still readable, but new saves, renames, and deletes are locked until premium is active again.
+          Workflow metadata remains visible, but full package restore and cloud writes are locked until premium is active again.
         </p>
       </div>
     </CardContent>
@@ -98,10 +98,10 @@ const getUtilityCardCopy = (premiumActive: boolean, isExpiredPremium: boolean): 
   }
 
   if (isExpiredPremium) {
-    return 'Your saved cycles are still available to open, but writes stay off until premium is active again.';
+    return 'Workflow metadata remains available, but package restore and writes stay off until premium is active again.';
   }
 
-  return 'Premium unlocks hosted saves. Until then, your forecast workflow stays local.';
+    return 'Free accounts retain metadata-only workflow awareness. Premium unlocks full hosted package restore.';
 };
 
 /** Support actions rendered in the right-side cloud utility card. */
@@ -356,9 +356,14 @@ const CloudCycleActions: React.FC<{
   onConfirmDelete,
 }) => (
   <div className="cloud-cycle-actions">
-    <Button className="cloud-cycle-button cloud-cycle-button--load" onClick={onLoad} disabled={loading || isDeleting || isSavingRename}>
+    <Button
+      className="cloud-cycle-button cloud-cycle-button--load"
+      onClick={onLoad}
+      disabled={!canWrite || loading || isDeleting || isSavingRename}
+      title={canWrite ? 'Restore the full cloud package' : 'Premium is required to restore the full cloud package'}
+    >
       <Download className="mr-2 h-4 w-4" />
-      Load
+      {canWrite ? 'Load package' : 'Premium required'}
     </Button>
     <CloudCycleWriteActions
       cycle={cycle}
@@ -535,8 +540,12 @@ const CloudLibraryMainCard: React.FC<{
 }) => (
   <Card className="cloud-library-surface-card">
     <CardHeader className="cloud-library-section-header">
-      <CardTitle>Your cloud cycles</CardTitle>
-      <CardDescription>Open a saved package, rename it, or clear out older copies.</CardDescription>
+      <CardTitle>Your workflow records</CardTitle>
+      <CardDescription>
+        {premiumActive
+          ? 'Restore a full package, rename it, or clear out older copies.'
+          : 'Free accounts retain metadata-only workflow records. Full package restore requires premium.'}
+      </CardDescription>
     </CardHeader>
     <CardContent className="cloud-library-list-content">
       {loading && cycles.length === 0 ? (
@@ -549,7 +558,7 @@ const CloudLibraryMainCard: React.FC<{
         <>
           <div className="cloud-library-list-header">
             <strong>{cycleCountLabel}</strong>
-            {!premiumActive ? <Badge variant="outline">Read-only</Badge> : null}
+            {!premiumActive ? <Badge variant="outline">Metadata only</Badge> : null}
           </div>
 
           <div className="cloud-library-list">

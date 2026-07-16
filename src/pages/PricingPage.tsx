@@ -35,8 +35,9 @@ const comparisonRows: ComparisonRow[] = [
   { label: 'Local autosave and cycle history', freeIncluded: true, premiumIncluded: true },
   { label: 'JSON export and packaged downloads', freeIncluded: true, premiumIncluded: true },
   { label: 'Account settings sync', freeIncluded: true, premiumIncluded: true },
+  { label: 'Metadata-only workflow awareness', freeIncluded: true, premiumIncluded: true },
   { label: 'Hosted cloud cycle storage', freeIncluded: false, premiumIncluded: true },
-  { label: 'Cross-device cloud access', freeIncluded: false, premiumIncluded: true },
+  { label: 'Full package restore across devices', freeIncluded: false, premiumIncluded: true },
 ];
 
 /** Returns the premium-card badge for the current entitlement state. */
@@ -293,7 +294,7 @@ const ComparisonTable: React.FC = () => (
     <CardHeader className="pricing-section-header">
       <CardTitle>Compare plans</CardTitle>
       <CardDescription>
-        Free covers the full local workflow. Premium adds the hosted service on top of it.
+        Anyone can use the full local workflow. Free accounts can optionally preserve metadata-only awareness; premium adds full package storage and restore.
       </CardDescription>
     </CardHeader>
     <CardContent className="pricing-comparison-content">

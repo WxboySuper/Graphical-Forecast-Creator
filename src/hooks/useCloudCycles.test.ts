@@ -1,4 +1,4 @@
-import { buildLoadedCloudForecastPayload } from './useCloudCycles';
+import { buildLoadedCloudForecastPayload, getCloudLoadBlockedMessage } from './useCloudCycles';
 import type { CloudCycle } from '../types/cloudCycles';
 import type { GFCForecastSaveData } from '../types/outlooks';
 
@@ -54,5 +54,19 @@ describe('buildLoadedCloudForecastPayload', () => {
 
     expect(payload.cycleMetadata).toBeNull();
     expect(payload).not.toHaveProperty('cycleMetadata', expect.objectContaining({ id: 'stale-cycle' }));
+  });
+});
+
+describe('getCloudLoadBlockedMessage', () => {
+  test('keeps signed-out users out of cloud package restore', () => {
+    expect(getCloudLoadBlockedMessage({ userId: undefined, canWrite: false })).toBe('Not signed in');
+  });
+
+  test('keeps full package restore premium-only for signed-in free users', () => {
+    expect(getCloudLoadBlockedMessage({ userId: 'free-user', canWrite: false })).toMatch(/Premium subscription required/);
+  });
+
+  test('does not block premium accounts', () => {
+    expect(getCloudLoadBlockedMessage({ userId: 'premium-user', canWrite: true })).toBe('Action not allowed');
   });
 });
