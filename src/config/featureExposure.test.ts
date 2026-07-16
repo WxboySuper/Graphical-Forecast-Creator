@@ -112,7 +112,7 @@ describe('featureExposure registry', () => {
     }
   });
 
-  test('keeps unreleased v1.7 workstream keys disabled while local exposes forecast workflow v2', () => {
+  test('keeps unreleased v1.7 workstream keys disabled while local and beta expose forecast workflow v2', () => {
     const workstreamKeys = [
       'forecastWorkflowV2',
       'verificationRelaunch',
@@ -128,7 +128,7 @@ describe('featureExposure registry', () => {
     }
 
     expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'local')).toBe(true);
-    expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'beta')).toBe(false);
+    expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'beta')).toBe(true);
     expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'staging')).toBe(false);
     expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'production')).toBe(false);
 

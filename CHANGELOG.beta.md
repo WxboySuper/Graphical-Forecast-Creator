@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #729
+
+- Enable the validated forecast workflow v2 surfaces for beta testers while keeping staging and production disabled.
+
 ### PR #720
 
 - Add authenticated workflow continuity E2E coverage across all built-in scopes, discussion grouping, package transfer, and second-page restore paths.

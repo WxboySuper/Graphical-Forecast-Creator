@@ -19,9 +19,9 @@ export const V17_WORKSTREAM_KEYS = [
 type V17WorkstreamKey = (typeof V17_WORKSTREAM_KEYS)[number];
 
 describe('v1.7 workstream adoption contract', () => {
-  test('forecastWorkflowV2 is enabled only for local development', () => {
+  test('forecastWorkflowV2 is enabled for local development and beta testers', () => {
     for (const target of BUILD_TARGETS) {
-      const expected = target === 'local';
+      const expected = target === 'local' || target === 'beta';
       expect(isFeatureExposedOnTarget('forecastWorkflowV2', target)).toBe(expected);
       expect(FEATURE_EXPOSURE_REGISTRY.forecastWorkflowV2.exposure[target]).toBe(expected);
     }
