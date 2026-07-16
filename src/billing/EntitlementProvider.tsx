@@ -317,7 +317,7 @@ const createEntitlementContextValue = (args: {
   currentPeriodEnd: args.entitlement.currentPeriodEnd?.toDate?.() ?? null,
   stripeCustomerId: args.entitlement.stripeCustomerId,
   betaOverrideActive: args.entitlement.betaOverrideActive,
-  checkoutEnabled: args.billingConfig.checkoutEnabled && args.hostedAuthEnabled,
+  checkoutEnabled: args.billingConfig.checkoutEnabled && args.hostedAuthEnabled && !readLocalTestAccount(),
   billingEnabled: args.billingConfig.billingEnabled,
   annualPromoActive: args.billingConfig.annualPromoActive,
   monthlyDisplayPrice: args.billingConfig.monthlyDisplayPrice,
