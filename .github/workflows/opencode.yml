@@ -23,6 +23,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+<<<<<<< HEAD
+=======
+          ref: ${{ needs.classify-request.outputs.branch || github.sha }}
+          token: ${{ secrets.GH_PAT }}
+>>>>>>> 5cb0ee7 (fix(actions): authorize opencode workflow pushes)
           persist-credentials: true
 
       - name: Run opencode
