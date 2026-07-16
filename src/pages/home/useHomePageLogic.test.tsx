@@ -70,6 +70,15 @@ describe('useHomePageLogic', () => {
           cycleDate: '2026-03-27',
         },
         stats: { forecastDays: 1, totalOutlooks: 1, totalFeatures: 1 },
+        workflowMetadata: {
+          id: 'WF-severe-day1-2026-03-27',
+          workflowId: 'severe-day1',
+          cycleDate: '2026-03-27',
+          status: 'in-progress',
+          outlookVersions: [{ version: 1, status: 'in-progress', createdAt: '2026-03-27T12:00:00Z' }],
+          createdAt: '2026-03-27T12:00:00Z',
+          updatedAt: '2026-03-27T12:00:00Z',
+        },
       },
     ];
 
@@ -110,6 +119,8 @@ describe('useHomePageLogic', () => {
     });
     expect(addToast).toHaveBeenCalledWith('Cycle loaded from history', 'success');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(8);
+    expect(store.getState().forecast.workflowMetadata?.workflowId).toBe('severe-day1');
+    expect(store.getState().forecast.isWorkflowActive).toBe(true);
 
     act(() => {
       result.current.handleNewCycle();

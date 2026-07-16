@@ -12,6 +12,18 @@ const LOCAL_STORAGE_KEY = 'forecastData';
 export const getAutoSaveStorageKey = (userId?: string | null): string =>
   userId ? getScopedStorageKey(LOCAL_STORAGE_KEY, getStorageScope(userId)) : LOCAL_STORAGE_KEY;
 
+/** Clears autosave snapshots before starting a deliberately fresh forecast workflow. */
+export const clearAutoSave = (userId?: string | null): void => {
+  try {
+    localStorage.removeItem(getAutoSaveStorageKey(userId));
+    if (userId) {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures so starting a workflow remains usable.
+  }
+};
+
 /** Returns the persisted autosave timestamp, or 0 when missing or malformed. */
 export const getAutoSaveTimestamp = (storedValue: string | null): number => {
   if (!storedValue) return 0;
