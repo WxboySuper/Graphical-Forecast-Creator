@@ -16,7 +16,7 @@ jobs:
        startsWith(github.event.comment.body, '/opencode '))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       issues: write
       pull-requests: write
     steps:
@@ -24,6 +24,11 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Run opencode
         uses: anomalyco/opencode/github@a3b97d9090ccf4aa9ac32268486283e3131e36b4 # fix(github): enforce existing git author identity
