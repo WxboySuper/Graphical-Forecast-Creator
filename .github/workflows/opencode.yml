@@ -33,3 +33,7 @@ jobs:
         with:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
+<<<<<<< HEAD
+=======
+          mentions: /oc,/opencode
+>>>>>>> origin/pr/724

@@ -80,6 +80,7 @@ const settings = (overrides = {}) => ({
   ...overrides,
 });
 
+<<<<<<< HEAD
 /** Build valid beta workflow metadata embedded in a cloud cycle. */
 const workflowMetadata = (overrides = {}) => ({
   id: 'workflow-1',
@@ -98,6 +99,8 @@ const workflowMetadata = (overrides = {}) => ({
   ...overrides,
 });
 
+=======
+>>>>>>> origin/pr/724
 /** Return a Firestore client authenticated as the supplied user. */
 const dbFor = (uid) => testEnv.authenticatedContext(uid).firestore();
 /** Return an unauthenticated Firestore client. */
@@ -205,6 +208,7 @@ describe('userSettings schema boundary', () => {
   });
 });
 
+<<<<<<< HEAD
 describe('beta workflow awareness authorization', () => {
   /** Build a valid beta workflow-awareness document. */
   const awareness = (overrides = {}) => ({
@@ -240,6 +244,8 @@ describe('beta workflow awareness authorization', () => {
   });
 });
 
+=======
+>>>>>>> origin/pr/724
 describe('cloudCycles entitlement boundary', () => {
   test('rejects client writes to server-owned entitlement records', async () => {
     await assertFails(
@@ -320,6 +326,7 @@ describe('cloudCycles entitlement boundary', () => {
     );
   });
 
+<<<<<<< HEAD
   test('preserves bounded beta workflow metadata for entitled owners', async () => {
     await seed((db) => setEntitlement(db, ALICE, true));
     const ref = doc(dbFor(ALICE), 'cloudCycles', 'cycle-1');
@@ -340,6 +347,8 @@ describe('cloudCycles entitlement boundary', () => {
     );
   });
 
+=======
+>>>>>>> origin/pr/724
   test('lets a downgraded owner read and delete but not update existing data', async () => {
     await seed(async (db) => {
       await setEntitlement(db, ALICE, false);

@@ -116,15 +116,26 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
+<<<<<<< HEAD
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+=======
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+>>>>>>> origin/pr/724
         with:
           version: 9
 
       - name: Setup Node.js
+<<<<<<< HEAD
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+=======
+        uses: actions/setup-node@v4
+>>>>>>> origin/pr/724
         with:
           node-version: '24.x'
           cache: 'pnpm'
@@ -141,6 +152,7 @@ jobs:
       - name: Run hostile-client Firestore rules tests
         run: pnpm test:firestore-rules
 
+<<<<<<< HEAD
   feature-exposure-policy:
     runs-on: ubuntu-latest
     steps:
@@ -171,6 +183,8 @@ jobs:
       - name: Run feature exposure integration tests
         run: node --test scripts/validate-feature-exposure.integration.test.mjs scripts/generate-exposure-report.integration.test.mjs
 
+=======
+>>>>>>> origin/pr/724
   build-and-test:
     needs: [package-version-policy, pr-governance, feature-exposure-policy]
     if: >-
