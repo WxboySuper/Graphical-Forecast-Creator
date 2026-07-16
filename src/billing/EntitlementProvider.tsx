@@ -248,6 +248,7 @@ const startSignedInEntitlementSubscription = (
   return subscribeToEntitlements(userId, handlers);
 };
 
+/** Applies deterministic entitlement state for a local account fixture. */
 const applyLocalTestEntitlementState = (
   tier: 'free' | 'premium',
   handlers: {

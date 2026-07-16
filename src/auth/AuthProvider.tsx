@@ -1467,6 +1467,7 @@ const LocalAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+/** Provides hosted auth state and listeners when no local fixture is active. */
 const HostedAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const hostedValue = useHostedAuthState();
   const localValue = useLocalAuthState();

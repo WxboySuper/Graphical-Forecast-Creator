@@ -66,6 +66,7 @@ function getCloudWriteBlockedMessage({ userId, canWrite, localFixtureActive }: C
   return canWrite ? 'Action not allowed' : 'Premium subscription required to save cloud cycles';
 }
 
+/** Returns whether a hosted cloud mutation is allowed for the current access context. */
 function isCloudMutationAllowed({ userId, canWrite, localFixtureActive }: CloudAccessContext): boolean {
   return Boolean(userId && canWrite && !localFixtureActive);
 }
