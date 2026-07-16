@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
 import { db, requireDb } from '../lib/firebase';
 import { useAuth } from '../auth/AuthProvider';
+import { readLocalTestAccount } from '../lib/localTestAccount';
 
 export type EntitlementStatus = 'disabled' | 'loading' | 'free' | 'premium' | 'error';
 export type PlanInterval = 'monthly' | 'annual' | null;
@@ -260,6 +261,21 @@ const resolveEntitlementEffect = (
     setError: React.Dispatch<React.SetStateAction<string | null>>;
   }
 ) => {
+  const localTestAccount = readLocalTestAccount();
+  if (localTestAccount) {
+    handlers.setEntitlement({
+      ...DEFAULT_ENTITLEMENT,
+      uid: `local-test-${localTestAccount}`,
+      premiumActive: localTestAccount === 'premium',
+      effectiveSource: localTestAccount === 'premium' ? 'stripe' : 'none',
+      planInterval: localTestAccount === 'premium' ? 'monthly' : null,
+      billingStatus: localTestAccount === 'premium' ? 'active' : 'inactive',
+    });
+    handlers.setEntitlementStatus(localTestAccount === 'premium' ? 'premium' : 'free');
+    handlers.setError(null);
+    return null;
+  }
+
   if (!isHostedEntitlementMode(args.hostedAuthEnabled)) {
     applyDisabledEntitlementState(handlers.setEntitlement, handlers.setEntitlementStatus, handlers.setError);
     return null;

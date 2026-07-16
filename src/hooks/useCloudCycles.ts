@@ -14,6 +14,7 @@ import { GFCForecastSaveData } from '../types/outlooks';
 import type { CycleMetadata } from '../types/workflow';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
+import { readLocalTestAccount } from '../lib/localTestAccount';
 
 export interface UseCloudCyclesResult {
   cycles: CloudCycleMetadata[];
@@ -197,6 +198,17 @@ function useCloudCycleSubscription({
   unsubscribeRef: MutableRefObject<(() => void) | null>;
 }): void {
   useEffect(() => {
+    // Local account fixtures exercise entitlement and UI access without touching
+    // a developer's Firebase project or requiring seeded cloud data.
+    if (readLocalTestAccount()) {
+      setCycles([]);
+      setLoading(false);
+      setError(null);
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      return;
+    }
+
     if (!userId) {
       setCycles([]);
       setLoading(false);
