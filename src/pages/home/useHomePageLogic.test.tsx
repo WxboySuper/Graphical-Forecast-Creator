@@ -115,10 +115,12 @@ describe('useHomePageLogic', () => {
     expect(result.current.showHistoryModal).toBe(false);
 
     act(() => {
+      localStorage.setItem('forecastData:user-user-1', JSON.stringify({ stale: true }));
       result.current.handleQuickStartClick({ currentTarget: { dataset: { day: '5' } } } as React.MouseEvent<HTMLButtonElement>);
     });
     expect(navigate).toHaveBeenCalledWith('/forecast');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(5);
+    expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
 
     act(() => {
       result.current.handleLoadRecentCycleClick({ currentTarget: { dataset: { cycleId: 'cycle-1' } } } as React.MouseEvent<HTMLButtonElement>);
