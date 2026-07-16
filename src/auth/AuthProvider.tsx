@@ -23,6 +23,7 @@ import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
+import { createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import type { MonitorSettings } from '../monitor/types';
 import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual } from '../monitor/types';
@@ -600,6 +601,27 @@ export const initLocalAuthState = async (opts: {
   } = opts;
 
   try {
+    const localTestAccount = readLocalTestAccount();
+    if (localTestAccount) {
+      applyLocalAuthData({
+        ...createLocalTestUser(localTestAccount),
+        betaAccess: true,
+      }, {
+        dispatch,
+        currentDarkModeRef,
+        currentOverlaysRef,
+        setUser,
+        setStatus,
+        setSyncedSettings,
+        setSettingsSyncStatus,
+        lastSyncedSettingsRef,
+        setBetaAccess,
+        setBetaAccessLoading,
+        setError,
+      });
+      return;
+    }
+
     const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
     if (!isActive()) return;
 
@@ -1434,7 +1456,11 @@ const useHostedAuthState = (): AuthContextValue => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const hostedValue = useHostedAuthState();
   const localValue = useLocalAuthState();
-  const value = isHostedAuthEnabled ? hostedValue : localValue;
+  // Local test accounts must take precedence on localhost so the fixture remains
+  // usable even when a developer has Firebase variables in their .env file.
+  const value = readLocalTestAccount()
+    ? localValue
+    : (isHostedAuthEnabled ? hostedValue : localValue);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
