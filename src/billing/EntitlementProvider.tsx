@@ -248,6 +248,27 @@ const startSignedInEntitlementSubscription = (
   return subscribeToEntitlements(userId, handlers);
 };
 
+const applyLocalTestEntitlementState = (
+  tier: 'free' | 'premium',
+  handlers: {
+    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
+    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
+  },
+): void => {
+  const premium = tier === 'premium';
+  handlers.setEntitlement({
+    ...DEFAULT_ENTITLEMENT,
+    uid: `local-test-${tier}`,
+    premiumActive: premium,
+    effectiveSource: premium ? 'stripe' : 'none',
+    planInterval: premium ? 'monthly' : null,
+    billingStatus: premium ? 'active' : 'inactive',
+  });
+  handlers.setEntitlementStatus(premium ? 'premium' : 'free');
+  handlers.setError(null);
+};
+
 /** Resolves the next entitlement effect outcome for the current auth snapshot. */
 const resolveEntitlementEffect = (
   args: {
@@ -263,16 +284,7 @@ const resolveEntitlementEffect = (
 ) => {
   const localTestAccount = readLocalTestAccount();
   if (localTestAccount) {
-    handlers.setEntitlement({
-      ...DEFAULT_ENTITLEMENT,
-      uid: `local-test-${localTestAccount}`,
-      premiumActive: localTestAccount === 'premium',
-      effectiveSource: localTestAccount === 'premium' ? 'stripe' : 'none',
-      planInterval: localTestAccount === 'premium' ? 'monthly' : null,
-      billingStatus: localTestAccount === 'premium' ? 'active' : 'inactive',
-    });
-    handlers.setEntitlementStatus(localTestAccount === 'premium' ? 'premium' : 'free');
-    handlers.setError(null);
+    applyLocalTestEntitlementState(localTestAccount, handlers);
     return null;
   }
 

@@ -66,6 +66,10 @@ function getCloudWriteBlockedMessage({ userId, canWrite, localFixtureActive }: C
   return canWrite ? 'Action not allowed' : 'Premium subscription required to save cloud cycles';
 }
 
+function isCloudMutationAllowed({ userId, canWrite, localFixtureActive }: CloudAccessContext): boolean {
+  return Boolean(userId && canWrite && !localFixtureActive);
+}
+
 /** Returns true when the requested sync state already matches the current cloud context. */
 function hasMatchingSyncState({
   currentCloud,
@@ -258,7 +262,7 @@ function useCloudCycleMutation<TArgs extends unknown[]>({
 }) {
   return useCallback(
     async (...args: TArgs): Promise<boolean> => {
-      if (!userId || !canWrite || localFixtureActive) {
+      if (!isCloudMutationAllowed({ userId, canWrite, localFixtureActive })) {
         setError(blockedMessage);
         return false;
       }
