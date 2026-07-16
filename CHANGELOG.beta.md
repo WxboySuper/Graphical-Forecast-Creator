@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #712
+
+- Add guarded localhost free and premium account fixtures for authenticated workflow E2E testing without hosted Firebase sessions or cloud writes.
+
 ### PR #723
 
 - Add hostile-client hosted authorization coverage, protect server-managed account fields, enforce trusted premium eligibility for cloud writes, and preserve bounded beta workflow data plus owner export/delete access after downgrade.
