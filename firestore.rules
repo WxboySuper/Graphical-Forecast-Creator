@@ -10,6 +10,162 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Entitlement records are server-owned. Client-side premium checks are UX
+    // only and never authorize hosted writes.
+    function hasPremiumAccess() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/userEntitlements/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/userEntitlements/$(request.auth.uid)).data.premiumActive == true;
+    }
+
+    function isValidProviders(value) {
+      return value is list && value.size() <= 20 &&
+        (value.size() <= 0 || (value[0] is string && value[0].size() <= 128)) &&
+        (value.size() <= 1 || (value[1] is string && value[1].size() <= 128)) &&
+        (value.size() <= 2 || (value[2] is string && value[2].size() <= 128)) &&
+        (value.size() <= 3 || (value[3] is string && value[3].size() <= 128)) &&
+        (value.size() <= 4 || (value[4] is string && value[4].size() <= 128)) &&
+        (value.size() <= 5 || (value[5] is string && value[5].size() <= 128)) &&
+        (value.size() <= 6 || (value[6] is string && value[6].size() <= 128)) &&
+        (value.size() <= 7 || (value[7] is string && value[7].size() <= 128)) &&
+        (value.size() <= 8 || (value[8] is string && value[8].size() <= 128)) &&
+        (value.size() <= 9 || (value[9] is string && value[9].size() <= 128)) &&
+        (value.size() <= 10 || (value[10] is string && value[10].size() <= 128)) &&
+        (value.size() <= 11 || (value[11] is string && value[11].size() <= 128)) &&
+        (value.size() <= 12 || (value[12] is string && value[12].size() <= 128)) &&
+        (value.size() <= 13 || (value[13] is string && value[13].size() <= 128)) &&
+        (value.size() <= 14 || (value[14] is string && value[14].size() <= 128)) &&
+        (value.size() <= 15 || (value[15] is string && value[15].size() <= 128)) &&
+        (value.size() <= 16 || (value[16] is string && value[16].size() <= 128)) &&
+        (value.size() <= 17 || (value[17] is string && value[17].size() <= 128)) &&
+        (value.size() <= 18 || (value[18] is string && value[18].size() <= 128)) &&
+        (value.size() <= 19 || (value[19] is string && value[19].size() <= 128));
+    }
+
+    function hasValidClientProfileFields(data) {
+      return data.email is string && data.email.size() <= 320 &&
+        data.displayName is string && data.displayName.size() <= 200 &&
+        data.photoURL is string && data.photoURL.size() <= 2048 &&
+        isValidProviders(data.providers) &&
+        data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+
+    function isValidClientProfileCreate(data) {
+      return data is map &&
+        data.keys().hasOnly([
+          'email', 'displayName', 'photoURL', 'providers', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'email', 'displayName', 'photoURL', 'providers', 'createdAt', 'updatedAt'
+        ]) &&
+        hasValidClientProfileFields(data);
+    }
+
+    function isValidClientProfileUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'email', 'displayName', 'photoURL', 'providers', 'updatedAt'
+        ]) &&
+        hasValidClientProfileFields(request.resource.data);
+    }
+
+    function hasValidClientSettingsKeys(data) {
+      return data is map && data.keys().hasOnly([
+        'darkMode', 'baseMapStyle', 'stateBorders', 'counties',
+        'ghostOutlooks', 'defaultForecasterName', 'forecastUiVariant',
+        'monitorSettings', 'createdAt', 'updatedAt', 'cloudCycles'
+      ]);
+    }
+
+    function hasValidClientSettingsFields(data) {
+      return (!('darkMode' in data) || data.darkMode is bool) &&
+        (!('baseMapStyle' in data) ||
+          ['osm', 'carto-light', 'carto-dark', 'esri-satellite', 'blank'].hasAny([data.baseMapStyle])) &&
+        (!('stateBorders' in data) || data.stateBorders is bool) &&
+        (!('counties' in data) || data.counties is bool) &&
+        (!('ghostOutlooks' in data) || isValidGhostOutlooks(data.ghostOutlooks)) &&
+        (!('defaultForecasterName' in data) ||
+          (data.defaultForecasterName is string && data.defaultForecasterName.size() <= 200)) &&
+        (!('forecastUiVariant' in data) ||
+          ['integrated', 'workspace_dock', 'floating_panels', 'tabbed_toolbar'].hasAny([data.forecastUiVariant])) &&
+        (!('monitorSettings' in data) || isValidMonitorSettings(data.monitorSettings));
+    }
+
+    function isValidGhostOutlooks(value) {
+      return value is map &&
+        value.keys().hasOnly(['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8']) &&
+        value.keys().hasAll(['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8']) &&
+        value.tornado is bool && value.wind is bool && value.hail is bool &&
+        value.categorical is bool && value.totalSevere is bool && value['day4-8'] is bool;
+    }
+
+    function isNumeric(value) {
+      return value is int || value is float;
+    }
+
+    function isValidMonitorSettings(value) {
+      return value is map && value.keys().hasOnly([
+          'radarMode', 'radarProduct', 'radarSite', 'radarOpacity',
+          'satelliteProduct', 'satelliteOpacity', 'outlookSource', 'outlookType',
+          'mapView', 'animationEnabled', 'animationSpeedMs', 'stormReportsEnabled',
+          'stormReportsFilterTornado', 'stormReportsFilterWind', 'stormReportsFilterHail',
+          'stormReportsMatchOutlookType', 'alertsEnabled', 'alertsOpacity',
+          'alertsShowWatches', 'alertsShowWarnings', 'alertsShowAdvisories'
+        ]) && value.keys().hasAll([
+          'radarMode', 'radarProduct', 'radarSite', 'radarOpacity',
+          'satelliteProduct', 'satelliteOpacity', 'outlookSource', 'outlookType',
+          'mapView', 'animationEnabled', 'animationSpeedMs', 'stormReportsEnabled',
+          'stormReportsFilterTornado', 'stormReportsFilterWind', 'stormReportsFilterHail',
+          'stormReportsMatchOutlookType', 'alertsEnabled', 'alertsOpacity',
+          'alertsShowWatches', 'alertsShowWarnings', 'alertsShowAdvisories'
+        ]) &&
+        ['none', 'mrms-conus', 'site'].hasAny([value.radarMode]) &&
+        ['bref-qcd', 'cref-qcd', 'sr-bref', 'sr-bvel'].hasAny([value.radarProduct]) &&
+        value.radarSite is string && value.radarSite.size() <= 4 &&
+        isNumeric(value.radarOpacity) && value.radarOpacity >= 0 && value.radarOpacity <= 1 &&
+        ['none', 'goes-visible', 'goes-longwave', 'goes-water-vapor', 'goes-shortwave'].hasAny([value.satelliteProduct]) &&
+        isNumeric(value.satelliteOpacity) && value.satelliteOpacity >= 0 && value.satelliteOpacity <= 1 &&
+        value.outlookSource is map && value.outlookSource.keys().hasOnly(['kind', 'id']) &&
+        value.outlookSource.keys().hasAll(['kind', 'id']) &&
+        ['current', 'local-cycle', 'cloud-cycle'].hasAny([value.outlookSource.kind]) &&
+        value.outlookSource.id is string && value.outlookSource.id.size() <= 128 &&
+        ['tornado', 'wind', 'hail', 'categorical'].hasAny([value.outlookType]) &&
+        value.mapView is map && value.mapView.keys().hasOnly(['center', 'zoom']) &&
+        value.mapView.keys().hasAll(['center', 'zoom']) && value.mapView.center is list &&
+        value.mapView.center.size() == 2 && isNumeric(value.mapView.center[0]) &&
+        isNumeric(value.mapView.center[1]) && value.mapView.center[0] >= -90 &&
+        value.mapView.center[0] <= 90 && value.mapView.center[1] >= -180 &&
+        value.mapView.center[1] <= 180 && isNumeric(value.mapView.zoom) &&
+        value.mapView.zoom >= 2 && value.mapView.zoom <= 14 &&
+        value.animationEnabled is bool && value.animationSpeedMs is int &&
+        value.animationSpeedMs >= 150 && value.animationSpeedMs <= 2000 &&
+        value.stormReportsEnabled is bool && value.stormReportsFilterTornado is bool &&
+        value.stormReportsFilterWind is bool && value.stormReportsFilterHail is bool &&
+        value.stormReportsMatchOutlookType is bool && value.alertsEnabled is bool &&
+        isNumeric(value.alertsOpacity) && value.alertsOpacity >= 0 && value.alertsOpacity <= 1 &&
+        value.alertsShowWatches is bool && value.alertsShowWarnings is bool &&
+        value.alertsShowAdvisories is bool;
+    }
+
+    function isValidClientSettingsCreate(data) {
+      return hasValidClientSettingsKeys(data) &&
+        hasValidClientSettingsFields(data) &&
+        !('cloudCycles' in data);
+    }
+
+    function isValidClientSettingsUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'darkMode', 'baseMapStyle', 'stateBorders', 'counties',
+          'ghostOutlooks', 'defaultForecasterName', 'forecastUiVariant',
+          'monitorSettings', 'createdAt', 'updatedAt', 'cloudCycles'
+        ]) &&
+        hasValidClientSettingsKeys(request.resource.data) &&
+        hasValidClientSettingsFields(request.resource.data) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cloudCycles']) ||
+          (('cloudCycles' in resource.data) && !('cloudCycles' in request.resource.data))
+        );
+    }
+
     function hasOnlyKeys(value, allowed) {
       return value is map && value.keys().hasOnly(allowed);
     }
@@ -24,7 +180,7 @@ service cloud.firestore {
         value.status is string &&
         ['in-progress', 'completed', 'skipped', 'omitted'].hasAny([value.status]) &&
         value.createdAt is string &&
-        value.createdAt.size() > 0 &&
+        value.createdAt.size() > 0 && value.createdAt.size() <= 64 &&
         (!('derivedFrom' in value) ||
           (value.derivedFrom is int && value.derivedFrom >= 1 && value.derivedFrom <= 32));
     }
@@ -78,14 +234,14 @@ service cloud.firestore {
           'id', 'workflowId', 'cycleDate', 'status',
           'outlookVersions', 'createdAt', 'updatedAt'
         ]) &&
-        value.id is string && value.id.size() > 0 &&
-        value.workflowId is string && value.workflowId.size() > 0 &&
-        value.cycleDate is string && value.cycleDate.size() > 0 &&
+        value.id is string && value.id.size() > 0 && value.id.size() <= 128 &&
+        value.workflowId is string && value.workflowId.size() > 0 && value.workflowId.size() <= 128 &&
+        value.cycleDate is string && value.cycleDate.size() > 0 && value.cycleDate.size() <= 32 &&
         value.status is string &&
         ['in-progress', 'completed', 'completed-with-omissions'].hasAny([value.status]) &&
         isValidOutlookVersions(value.outlookVersions) &&
-        value.createdAt is string && value.createdAt.size() > 0 &&
-        value.updatedAt is string && value.updatedAt.size() > 0;
+        value.createdAt is string && value.createdAt.size() > 0 && value.createdAt.size() <= 64 &&
+        value.updatedAt is string && value.updatedAt.size() > 0 && value.updatedAt.size() <= 64;
     }
 
     function isValidWorkflowAwarenessMetadata(value, cycleId) {
@@ -99,14 +255,14 @@ service cloud.firestore {
           'outlookVersions', 'createdAt', 'updatedAt'
         ]) &&
         value.cycleId == cycleId &&
-        value.cycleId is string && value.cycleId.size() > 0 &&
-        value.workflowId is string && value.workflowId.size() > 0 &&
-        value.cycleDate is string && value.cycleDate.size() > 0 &&
+        value.cycleId is string && value.cycleId.size() > 0 && value.cycleId.size() <= 128 &&
+        value.workflowId is string && value.workflowId.size() > 0 && value.workflowId.size() <= 128 &&
+        value.cycleDate is string && value.cycleDate.size() > 0 && value.cycleDate.size() <= 32 &&
         value.status is string &&
         ['in-progress', 'completed', 'completed-with-omissions'].hasAny([value.status]) &&
         isValidOutlookVersions(value.outlookVersions) &&
-        value.createdAt is string && value.createdAt.size() > 0 &&
-        value.updatedAt is string && value.updatedAt.size() > 0;
+        value.createdAt is string && value.createdAt.size() > 0 && value.createdAt.size() <= 64 &&
+        value.updatedAt is string && value.updatedAt.size() > 0 && value.updatedAt.size() <= 64;
     }
 
     function isValidWorkflowAwarenessDocument(data, cycleId) {
@@ -131,30 +287,41 @@ service cloud.firestore {
           'payloadJson', 'payloadBytes'
         ]) &&
         data.id == cycleId &&
-        data.id is string && data.id.size() > 0 &&
-        data.userId is string && data.userId.size() > 0 &&
-        data.label is string && data.label.size() > 0 &&
-        data.cycleDate is string && data.cycleDate.size() > 0 &&
-        data.createdAt is string && data.createdAt.size() > 0 &&
-        data.updatedAt is string && data.updatedAt.size() > 0 &&
-        data.forecastDays is int && data.forecastDays >= 0 &&
-        data.totalOutlooks is int && data.totalOutlooks >= 0 &&
-        data.totalFeatures is int && data.totalFeatures >= 0 &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+        data.label is string && data.label.size() > 0 && data.label.size() <= 200 &&
+        data.cycleDate is string && data.cycleDate.size() > 0 && data.cycleDate.size() <= 32 &&
+        data.createdAt is string && data.createdAt.size() > 0 && data.createdAt.size() <= 64 &&
+        data.updatedAt is string && data.updatedAt.size() > 0 && data.updatedAt.size() <= 64 &&
+        data.forecastDays is int && data.forecastDays >= 0 && data.forecastDays <= 8 &&
+        data.totalOutlooks is int && data.totalOutlooks >= 0 && data.totalOutlooks <= 100000 &&
+        data.totalFeatures is int && data.totalFeatures >= 0 && data.totalFeatures <= 100000 &&
         data.isReadOnly is bool &&
-        data.payloadJson is string &&
-        data.payloadBytes is int && data.payloadBytes >= 0 &&
-        (!('payloadHash' in data) || data.payloadHash is string) &&
+        data.payloadJson is string && data.payloadJson.toUtf8().size() <= 750000 &&
+        data.payloadBytes is int && data.payloadBytes == data.payloadJson.toUtf8().size() &&
+        (!('payloadHash' in data) ||
+          (data.payloadHash is string && data.payloadHash.size() <= 128)) &&
         (!('workflowMetadata' in data) ||
           (isValidWorkflowMetadata(data.workflowMetadata) &&
             data.workflowMetadata.cycleDate == data.cycleDate));
     }
 
     match /userProfiles/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+        isValidClientProfileCreate(request.resource.data);
+      allow update: if isOwner(userId) &&
+        isValidClientProfileUpdate();
+      allow delete: if isOwner(userId);
     }
 
     match /userSettings/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+        isValidClientSettingsCreate(request.resource.data);
+      allow update: if isOwner(userId) &&
+        isValidClientSettingsUpdate();
+      allow delete: if isOwner(userId);
     }
 
     match /userEntitlements/{userId} {
@@ -177,11 +344,13 @@ service cloud.firestore {
     }
 
     match /cloudCycles/{cycleId} {
+      // Owners retain read/delete access after downgrade so they can export or
+      // remove existing data. Only create/update consume the premium benefit.
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() &&
+      allow create: if hasPremiumAccess() &&
         request.resource.data.userId == request.auth.uid &&
         isValidCloudCycle(request.resource.data, cycleId);
-      allow update: if isSignedIn() &&
+      allow update: if hasPremiumAccess() &&
         resource.data.userId == request.auth.uid &&
         request.resource.data.userId == resource.data.userId &&
         isValidCloudCycle(request.resource.data, cycleId);

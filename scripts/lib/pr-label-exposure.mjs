@@ -14,6 +14,7 @@ const REGISTRY_TEST_PATTERNS = [
 
 // Exact file paths for server-side exposure and capability files.
 const SERVER_EXPOSURE_FILE_PATTERNS = [
+  'firestore.rules',
   'server/lib/serverFeatureExposure.js',
   'server/lib/featureCapabilities.js',
 ];
