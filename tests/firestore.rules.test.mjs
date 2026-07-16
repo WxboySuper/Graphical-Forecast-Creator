@@ -22,8 +22,9 @@ import {
 const PROJECT_ID = 'gfc-rules-test';
 const ALICE = 'alice';
 const BOB = 'bob';
-let testEnv;
+let testEnv = null;
 
+/** Build a valid client-managed profile document. */
 const profile = (overrides = {}) => ({
   email: 'alice@example.test',
   displayName: 'Alice',
@@ -34,6 +35,7 @@ const profile = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Build a valid hosted cloud-cycle document. */
 const cloudCycle = (overrides = {}) => ({
   id: 'cycle-1',
   userId: ALICE,
@@ -50,15 +52,19 @@ const cloudCycle = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Return a Firestore client authenticated as the supplied user. */
 const dbFor = (uid) => testEnv.authenticatedContext(uid).firestore();
+/** Return an unauthenticated Firestore client. */
 const anonymousDb = () => testEnv.unauthenticatedContext().firestore();
 
+/** Seed trusted server-owned state without applying client rules. */
 const seed = async (writes) => {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await writes(context.firestore());
   });
 };
 
+/** Seed a server-owned premium entitlement. */
 const setEntitlement = (db, uid, premiumActive) =>
   setDoc(doc(db, 'userEntitlements', uid), { premiumActive });
 
