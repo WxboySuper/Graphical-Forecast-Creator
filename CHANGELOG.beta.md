@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #720
+
+- Add authenticated workflow continuity E2E coverage across all built-in scopes, discussion grouping, package transfer, and second-page restore paths.
+
 ### PR #711
 
 - Clear scoped autosaves when users confirm a fresh blank or workflow start, restore workflow metadata from saved cycles, and keep workflow confirmation and completion dialogs usable on small screens.

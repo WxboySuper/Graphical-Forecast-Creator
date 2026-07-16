@@ -32,6 +32,40 @@ describe('local test account fixture', () => {
     expect(readLocalTestAccount()).toBeNull();
   });
 
+  test('returns null instead of throwing when session storage is unavailable', () => {
+    const originalSessionStorage = window.sessionStorage;
+    const blockedSessionStorage = {
+      clear: () => undefined,
+      getItem: () => {
+        throw new Error('session storage blocked');
+      },
+      key: () => null,
+      length: 0,
+      removeItem: () => {
+        throw new Error('session storage blocked');
+      },
+      setItem: () => {
+        throw new Error('session storage blocked');
+      },
+    };
+
+    Object.defineProperty(window, 'sessionStorage', {
+      configurable: true,
+      value: blockedSessionStorage,
+    });
+
+    try {
+      window.history.replaceState({}, '', '/?localTestAccount=premium');
+
+      expect(readLocalTestAccount()).toBeNull();
+    } finally {
+      Object.defineProperty(window, 'sessionStorage', {
+        configurable: true,
+        value: originalSessionStorage,
+      });
+    }
+  });
+
   test('keeps the fixture active after local SPA navigation removes the query string', () => {
     window.history.replaceState({}, '', '/?localTestAccount=free');
     expect(readLocalTestAccount()).toBe('free');
