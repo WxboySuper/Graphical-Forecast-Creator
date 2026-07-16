@@ -26,6 +26,10 @@ export const readLocalTestAccount = (): LocalTestAccountTier | null => {
 export const clearLocalTestAccount = (): void => {
   if (typeof window === 'undefined') return;
   window.sessionStorage.removeItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY);
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('localTestAccount')) return;
+  url.searchParams.delete('localTestAccount');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 };
 
 /** Builds the stable identity used by the disposable local account fixture. */

@@ -1,4 +1,4 @@
-import { createLocalTestUser, isLocalTestAccountEnabled, readLocalTestAccount } from './localTestAccount';
+import { clearLocalTestAccount, createLocalTestUser, isLocalTestAccountEnabled, readLocalTestAccount } from './localTestAccount';
 
 describe('local test account fixture', () => {
   beforeEach(() => {
@@ -38,6 +38,16 @@ describe('local test account fixture', () => {
 
     window.history.replaceState({}, '', '/account');
     expect(readLocalTestAccount()).toBe('free');
+  });
+
+  test('clears both persisted fixture state and the activation query', () => {
+    window.history.replaceState({}, '', '/?localTestAccount=premium');
+    expect(readLocalTestAccount()).toBe('premium');
+
+    clearLocalTestAccount();
+
+    expect(window.location.search).toBe('');
+    expect(readLocalTestAccount()).toBeNull();
   });
 
   test('creates a stable disposable identity', () => {
