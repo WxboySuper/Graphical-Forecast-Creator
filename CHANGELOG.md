@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Security
+- **Hosted authorization boundaries:** Add source-controlled Firestore rules, hostile-client emulator coverage, reserved profile-field protection, trusted premium enforcement for cloud writes, and bounded cloud-cycle documents while retaining owner export/delete access after downgrade.
 - **CI shell injection:** Pass PR branch refs through `env` in `ci.yml` and `pr-governance.yml` `git fetch` steps so branch names cannot break out of the shell command.
 - **Dependabot changelog workflow:** Require Dependabot PR provenance before checking out PR head code with `GH_PAT`; pass base ref through env in shell steps; pin `actions/checkout` to an immutable SHA.
 - **Beta deploy supply chain:** Use `pnpm install --frozen-lockfile` in the beta deploy workflow so builds cannot silently resolve new dependency versions at deploy time.
@@ -28,9 +29,13 @@ All notable changes to this project will be documented in this file.
 
 ## v1.6.6
 
+### Dependencies
+<!-- dependabot-automation -->
+
+- **uuid:** ^14.0.0 → ^14.0.1
+
 ### Security
 - **Dependency vulnerability remediation:** Upgraded `protobufjs` to 7.6.4 across the browser and analytics server dependency graphs, `js-yaml` to 4.2.0 in test tooling, and `ws` to 8.21.0 in jsdom tooling to resolve Dependabot denial-of-service and schema-name collision advisories.
-
 ## v1.6.4
 
 ### Fixed
