@@ -2,6 +2,7 @@ export type LocalTestAccountTier = 'free' | 'premium';
 
 const LOCAL_TEST_ACCOUNT_STORAGE_KEY = 'gfc-local-test-account';
 
+/** Reads the disposable fixture tier without allowing blocked storage to crash app startup. */
 const readStoredTestAccount = (): string | null => {
   try {
     return window.sessionStorage.getItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY);
@@ -10,6 +11,7 @@ const readStoredTestAccount = (): string | null => {
   }
 };
 
+/** Persists the disposable fixture tier and reports whether browser storage accepted it. */
 const writeStoredTestAccount = (tier: LocalTestAccountTier): boolean => {
   try {
     window.sessionStorage.setItem(LOCAL_TEST_ACCOUNT_STORAGE_KEY, tier);
