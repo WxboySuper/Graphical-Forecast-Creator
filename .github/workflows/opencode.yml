@@ -16,7 +16,46 @@ jobs:
        startsWith(github.event.comment.body, '/opencode '))
     runs-on: ubuntu-latest
     permissions:
+<<<<<<< HEAD
       contents: read
+=======
+      pull-requests: read
+    outputs:
+      mode: ${{ steps.classify.outputs.result }}
+      branch: ${{ steps.classify.outputs.branch }}
+    steps:
+      - id: classify
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const pullNumber = context.payload.pull_request?.number ??
+              (context.payload.issue?.pull_request ? context.payload.issue.number : undefined)
+            if (pullNumber) {
+              const { data: pull } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+              })
+              const head = pull.head.repo
+              core.setOutput('branch', pull.head.ref)
+              return head?.full_name === `${context.repo.owner}/${context.repo.repo}` && !head.fork
+                ? 'trusted-pr'
+                : 'blocked'
+            }
+
+            core.setOutput('branch', '')
+            return context.payload.issue?.user?.login === 'WxboySuper'
+              ? 'trusted-issue'
+              : 'triage-issue'
+
+  opencode-write:
+    needs: classify-request
+    if: needs.classify-request.outputs.mode == 'trusted-pr' || needs.classify-request.outputs.mode == 'trusted-issue'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+>>>>>>> 34de352 (fix(actions): lease force pushes after opencode rebase)
       issues: write
       pull-requests: write
     steps:
@@ -25,6 +64,41 @@ jobs:
         with:
           persist-credentials: true
 
+<<<<<<< HEAD
+=======
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Guard rebased PR pushes
+        if: needs.classify-request.outputs.mode == 'trusted-pr'
+        env:
+          PR_BRANCH: ${{ needs.classify-request.outputs.branch }}
+        run: |
+          git fetch origin "$PR_BRANCH"
+          printf 'OPENCODE_FORCE_PUSH_BRANCH=%s\n' "$PR_BRANCH" >> "$GITHUB_ENV"
+          printf 'OPENCODE_FORCE_PUSH_EXPECTED_SHA=%s\n' "$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+
+          mkdir -p "$RUNNER_TEMP/opencode-git"
+          cat > "$RUNNER_TEMP/opencode-git/git" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          if [[ "${1:-}" == "push" && "$#" -eq 1 && -n "${OPENCODE_FORCE_PUSH_BRANCH:-}" ]] &&
+             [[ "$(/usr/bin/git rev-parse --abbrev-ref HEAD)" == "$OPENCODE_FORCE_PUSH_BRANCH" ]]; then
+            remote_ref="refs/heads/$OPENCODE_FORCE_PUSH_BRANCH"
+            exec /usr/bin/git push \
+              "--force-with-lease=$remote_ref:$OPENCODE_FORCE_PUSH_EXPECTED_SHA" \
+              origin "HEAD:$remote_ref"
+          fi
+
+          exec /usr/bin/git "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/opencode-git/git"
+          echo "$RUNNER_TEMP/opencode-git" >> "$GITHUB_PATH"
+
+>>>>>>> 34de352 (fix(actions): lease force pushes after opencode rebase)
       - name: Run opencode
         uses: anomalyco/opencode/github@a3b97d9090ccf4aa9ac32268486283e3131e36b4 # fix(github): enforce existing git author identity
         env:
