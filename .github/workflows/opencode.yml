@@ -7,7 +7,7 @@ on:
     types: [created]
 
 jobs:
-  opencode:
+  classify-request:
     if: |
       github.event.comment.user.login == 'WxboySuper' &&
       (github.event.comment.body == '/oc' ||
@@ -16,7 +16,38 @@ jobs:
        startsWith(github.event.comment.body, '/opencode '))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      pull-requests: read
+    outputs:
+      mode: ${{ steps.classify.outputs.result }}
+    steps:
+      - id: classify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pullNumber = context.payload.pull_request?.number ??
+              (context.payload.issue?.pull_request ? context.payload.issue.number : undefined)
+            if (pullNumber) {
+              const { data: pull } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+              })
+              const head = pull.head.repo
+              return head?.full_name === `${context.repo.owner}/${context.repo.repo}` && !head.fork
+                ? 'trusted-pr'
+                : 'blocked'
+            }
+
+            return context.payload.issue?.user?.login === 'WxboySuper'
+              ? 'trusted-issue'
+              : 'triage-issue'
+
+  opencode-write:
+    needs: classify-request
+    if: needs.classify-request.outputs.mode == 'trusted-pr' || needs.classify-request.outputs.mode == 'trusted-issue'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
       issues: write
       pull-requests: write
     steps:
@@ -24,6 +55,11 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Run opencode
         uses: anomalyco/opencode/github@a3b97d9090ccf4aa9ac32268486283e3131e36b4 # fix(github): enforce existing git author identity
@@ -34,3 +70,30 @@ jobs:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
           mentions: /oc,/opencode
+
+  opencode-triage:
+    needs: classify-request
+    if: needs.classify-request.outputs.mode == 'triage-issue'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Run opencode triage
+        uses: anomalyco/opencode/github@a3b97d9090ccf4aa9ac32268486283e3131e36b4 # fix(github): enforce existing git author identity
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode/deepseek-v4-flash-free
+          use_github_token: true
+          mentions: /oc,/opencode
+          prompt: >-
+            Triage this issue. Do not edit repository files, create branches or pull requests,
+            commit, or push. Reply with a concise assessment, reproduction questions, labels, and
+            recommended next steps.
