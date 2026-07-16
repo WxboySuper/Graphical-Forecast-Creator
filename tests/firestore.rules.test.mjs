@@ -15,6 +15,7 @@ import {
   getDocs,
   query,
   setDoc,
+  Timestamp,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -23,6 +24,8 @@ const PROJECT_ID = 'gfc-rules-test';
 const ALICE = 'alice';
 const BOB = 'bob';
 let testEnv = null;
+const TEST_TIMESTAMP = Timestamp.fromDate(new Date('2026-07-16T00:00:00.000Z'));
+const UPDATED_TEST_TIMESTAMP = Timestamp.fromDate(new Date('2026-07-16T01:00:00.000Z'));
 
 /** Build a valid client-managed profile document. */
 const profile = (overrides = {}) => ({
@@ -30,8 +33,8 @@ const profile = (overrides = {}) => ({
   displayName: 'Alice',
   photoURL: '',
   providers: ['password'],
-  createdAt: '2026-07-16T00:00:00.000Z',
-  updatedAt: '2026-07-16T00:00:00.000Z',
+  createdAt: TEST_TIMESTAMP,
+  updatedAt: TEST_TIMESTAMP,
   ...overrides,
 });
 
@@ -161,7 +164,7 @@ describe('userProfiles authorization', () => {
     await assertSucceeds(
       updateDoc(doc(dbFor(ALICE), 'userProfiles', ALICE), {
         displayName: 'Updated Alice',
-        updatedAt: '2026-07-16T01:00:00.000Z',
+        updatedAt: UPDATED_TEST_TIMESTAMP,
       })
     );
     const snapshot = await getDoc(doc(dbFor(ALICE), 'userProfiles', ALICE));
