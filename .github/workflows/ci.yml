@@ -80,6 +80,36 @@ jobs:
           GITHUB_HEAD_REF: ${{ github.head_ref }}
         run: node scripts/validate-package-version.mjs
 
+  firestore-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'pnpm'
+
+      - name: Setup Java for the Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run hostile-client Firestore rules tests
+        run: pnpm test:firestore-rules
+
   build-and-test:
     needs: [package-version-policy, pr-governance]
     if: >-

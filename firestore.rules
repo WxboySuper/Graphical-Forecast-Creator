@@ -1,0 +1,169 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Entitlement records are server-owned. Client-side premium checks are UX
+    // only and never authorize hosted writes.
+    function hasPremiumAccess() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/userEntitlements/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/userEntitlements/$(request.auth.uid)).data.premiumActive == true;
+    }
+
+    function hasValidClientProfileFields(data) {
+      return data.email is string && data.email.size() <= 320 &&
+        data.displayName is string && data.displayName.size() <= 200 &&
+        data.photoURL is string && data.photoURL.size() <= 2048 &&
+        data.providers is list && data.providers.size() <= 20;
+    }
+
+    function isValidClientProfileCreate(data) {
+      return data is map &&
+        data.keys().hasOnly([
+          'email', 'displayName', 'photoURL', 'providers', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'email', 'displayName', 'photoURL', 'providers', 'createdAt', 'updatedAt'
+        ]) &&
+        hasValidClientProfileFields(data);
+    }
+
+    function isValidClientProfileUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'email', 'displayName', 'photoURL', 'providers', 'createdAt', 'updatedAt'
+        ]) &&
+        hasValidClientProfileFields(request.resource.data);
+    }
+
+    function hasValidClientSettingsKeys(data) {
+      return data is map && data.keys().hasOnly([
+        'darkMode', 'baseMapStyle', 'stateBorders', 'counties',
+        'ghostOutlooks', 'defaultForecasterName', 'forecastUiVariant',
+        'monitorSettings', 'createdAt', 'updatedAt', 'cloudCycles'
+      ]);
+    }
+
+    function hasValidClientSettingsFields(data) {
+      return (!('darkMode' in data) || data.darkMode is bool) &&
+        (!('baseMapStyle' in data) || data.baseMapStyle is string) &&
+        (!('stateBorders' in data) || data.stateBorders is bool) &&
+        (!('counties' in data) || data.counties is bool) &&
+        (!('ghostOutlooks' in data) || data.ghostOutlooks is bool) &&
+        (!('defaultForecasterName' in data) ||
+          (data.defaultForecasterName is string && data.defaultForecasterName.size() <= 200)) &&
+        (!('forecastUiVariant' in data) || data.forecastUiVariant is string) &&
+        (!('monitorSettings' in data) || data.monitorSettings is map);
+    }
+
+    function isValidClientSettingsCreate(data) {
+      return hasValidClientSettingsKeys(data) &&
+        hasValidClientSettingsFields(data) &&
+        !('cloudCycles' in data);
+    }
+
+    function isValidClientSettingsUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'darkMode', 'baseMapStyle', 'stateBorders', 'counties',
+          'ghostOutlooks', 'defaultForecasterName', 'forecastUiVariant',
+          'monitorSettings', 'createdAt', 'updatedAt', 'cloudCycles'
+        ]) &&
+        hasValidClientSettingsKeys(request.resource.data) &&
+        hasValidClientSettingsFields(request.resource.data) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cloudCycles']) ||
+          (('cloudCycles' in resource.data) && !('cloudCycles' in request.resource.data))
+        );
+    }
+
+    function isValidCloudCycle(data, cycleId) {
+      return data is map &&
+        data.keys().hasOnly([
+          'id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt',
+          'forecastDays', 'totalOutlooks', 'totalFeatures', 'isReadOnly',
+          'payloadHash', 'payloadJson', 'payloadBytes'
+        ]) &&
+        data.keys().hasAll([
+          'id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt',
+          'forecastDays', 'totalOutlooks', 'totalFeatures', 'isReadOnly',
+          'payloadJson', 'payloadBytes'
+        ]) &&
+        data.id == cycleId &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+        data.label is string && data.label.size() > 0 && data.label.size() <= 200 &&
+        data.cycleDate is string && data.cycleDate.size() > 0 && data.cycleDate.size() <= 32 &&
+        data.createdAt is string && data.createdAt.size() > 0 && data.createdAt.size() <= 64 &&
+        data.updatedAt is string && data.updatedAt.size() > 0 && data.updatedAt.size() <= 64 &&
+        data.forecastDays is int && data.forecastDays >= 0 && data.forecastDays <= 8 &&
+        data.totalOutlooks is int && data.totalOutlooks >= 0 && data.totalOutlooks <= 100000 &&
+        data.totalFeatures is int && data.totalFeatures >= 0 && data.totalFeatures <= 100000 &&
+        data.isReadOnly is bool &&
+        data.payloadJson is string && data.payloadJson.size() <= 750000 &&
+        data.payloadBytes is int && data.payloadBytes >= 0 && data.payloadBytes <= 750000 &&
+        (!('payloadHash' in data) ||
+          (data.payloadHash is string && data.payloadHash.size() <= 128));
+    }
+
+    match /userProfiles/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+        isValidClientProfileCreate(request.resource.data);
+      allow update: if isOwner(userId) &&
+        isValidClientProfileUpdate();
+      allow delete: if isOwner(userId);
+    }
+
+    match /userSettings/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+        isValidClientSettingsCreate(request.resource.data);
+      allow update: if isOwner(userId) &&
+        isValidClientSettingsUpdate();
+      allow delete: if isOwner(userId);
+    }
+
+    match /userEntitlements/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /userMetrics/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /cloudCycles/{cycleId} {
+      // Owners retain read/delete access after downgrade so they can export or
+      // remove existing data. Only create/update consume the premium benefit.
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if hasPremiumAccess() &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidCloudCycle(request.resource.data, cycleId);
+      allow update: if hasPremiumAccess() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        isValidCloudCycle(request.resource.data, cycleId);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /adminDailyMetrics/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /adminMetricDedupes/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
