@@ -66,6 +66,7 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
+    clearAutoSave(user?.uid);
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
   };
