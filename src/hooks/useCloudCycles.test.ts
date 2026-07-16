@@ -1,4 +1,4 @@
-import { buildLoadedCloudForecastPayload, getCloudLoadBlockedMessage } from './useCloudCycles';
+import { buildLoadedCloudForecastPayload, canAccessHostedCloudCycles, getCloudLoadBlockedMessage } from './useCloudCycles';
 import type { CloudCycle } from '../types/cloudCycles';
 import type { GFCForecastSaveData } from '../types/outlooks';
 
@@ -58,6 +58,12 @@ describe('buildLoadedCloudForecastPayload', () => {
 });
 
 describe('getCloudLoadBlockedMessage', () => {
+  test('requires both an authenticated identity and premium entitlement for hosted cycles', () => {
+    expect(canAccessHostedCloudCycles(undefined, true)).toBe(false);
+    expect(canAccessHostedCloudCycles('free-user', false)).toBe(false);
+    expect(canAccessHostedCloudCycles('premium-user', true)).toBe(true);
+  });
+
   test('keeps signed-out users out of cloud package restore', () => {
     expect(getCloudLoadBlockedMessage({ userId: undefined, canWrite: false })).toBe('Not signed in');
   });

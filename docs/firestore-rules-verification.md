@@ -42,10 +42,14 @@ Exact dashboard steps:
 3. Open **Rules Playground** (or the simulator in the Rules editor), choose
    Firestore, and create authenticated test contexts for UIDs `wf07-alice` and
    `wf07-bob`. Also run one unauthenticated context.
-4. Run the matrix below against the document paths shown. For queries, use the
+4. Create entitlement documents for `wf07-premium` with `premiumActive: true`
+   and `wf07-free` with `premiumActive: false`. The entitlement documents must
+   be created through the trusted server/admin path; Rules Playground writes to
+   `userEntitlements` must be denied.
+5. Run the matrix below against the document paths shown. For queries, use the
    Firestore query simulator with `where('userId', '==', request.auth.uid)` for
    `cloudCycles`; also try a query for another user's UID.
-5. Record each simulator result (Allow or Deny) in the PR/checklist before
+6. Record each simulator result (Allow or Deny) in the PR/checklist before
    promoting rules. Do not treat the Jest result or a successful client build
    as proof of Firebase authorization.
 
@@ -106,18 +110,20 @@ Run the following matrix and record the result before promoting rules:
 
 | Auth / operation | Expected result |
 | --- | --- |
-| Alice creates `cycle-a` with the valid document | Allow |
-| Alice reads `cycle-a` | Allow |
-| Alice updates label or appends a valid metadata-only version | Allow |
-| Alice deletes `cycle-a` | Allow |
+| Premium Alice creates `cycle-a` with the valid document | Allow |
+| Premium Alice reads `cycle-a` | Allow |
+| Premium Alice updates label or appends a valid metadata-only version | Allow |
+| Premium Alice deletes `cycle-a` | Allow |
+| Free Alice reads or queries `cycle-a` | Deny |
+| Free Alice creates, updates, or deletes a cloud cycle | Deny |
 | Bob reads `cycle-a` | Deny |
 | Bob updates `cycle-a`, including changing only `label` | Deny |
 | Bob deletes `cycle-a` | Deny |
-| Alice creates with `userId: wf07-bob` | Deny |
-| Alice updates `userId` to `wf07-bob` | Deny |
-| Alice creates with `outlookVersions` containing `payloadJson` or `geometry` | Deny |
-| Alice creates with 33 `outlookVersions` entries | Deny |
-| Alice creates with a top-level unknown field | Deny |
+| Premium Alice creates with `userId: wf07-bob` | Deny |
+| Premium Alice updates `userId` to `wf07-bob` | Deny |
+| Premium Alice creates with `outlookVersions` containing `payloadJson` or `geometry` | Deny |
+| Premium Alice creates with 33 `outlookVersions` entries | Deny |
+| Premium Alice creates with a top-level unknown field | Deny |
 | Alice creates, reads, updates, or deletes her awareness document | Allow |
 | Bob reads, updates, or deletes Alice's awareness document | Deny |
 | Alice creates awareness metadata containing `payloadJson`, `geometry`, or another nested unknown field | Deny |

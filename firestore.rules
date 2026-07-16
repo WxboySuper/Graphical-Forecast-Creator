@@ -10,6 +10,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Cloud-cycle documents contain the full forecast package. Premium access
+    // is enforced here as the authorization boundary; client-side entitlement
+    // checks are only UX guards and must not be trusted for data protection.
+    function hasPremiumAccess() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/userEntitlements/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/userEntitlements/$(request.auth.uid)).data.premiumActive == true;
+    }
+
     function hasOnlyKeys(value, allowed) {
       return value is map && value.keys().hasOnly(allowed);
     }
@@ -177,15 +186,15 @@ service cloud.firestore {
     }
 
     match /cloudCycles/{cycleId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() &&
+      allow read: if hasPremiumAccess() && resource.data.userId == request.auth.uid;
+      allow create: if hasPremiumAccess() &&
         request.resource.data.userId == request.auth.uid &&
         isValidCloudCycle(request.resource.data, cycleId);
-      allow update: if isSignedIn() &&
+      allow update: if hasPremiumAccess() &&
         resource.data.userId == request.auth.uid &&
         request.resource.data.userId == resource.data.userId &&
         isValidCloudCycle(request.resource.data, cycleId);
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if hasPremiumAccess() && resource.data.userId == request.auth.uid;
     }
 
     match /adminDailyMetrics/{documentId} {

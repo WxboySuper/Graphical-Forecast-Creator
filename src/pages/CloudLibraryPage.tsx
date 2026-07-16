@@ -44,7 +44,7 @@ const CloudLibraryHero: React.FC<{
       </div>
       <div className="cloud-library-hero-text">
         <h1>Your saved cloud cycles.</h1>
-        <p>Premium restores hosted packages. Free accounts can see workflow metadata, while forecast content remains local.</p>
+        <p>Premium restores hosted packages. Free accounts keep forecast content local and can use separate metadata-only workflow awareness.</p>
       </div>
     </div>
 
@@ -71,7 +71,7 @@ const ExpiredPremiumNotice: React.FC = () => (
       <div>
         <strong>Premium expired</strong>
         <p>
-          Workflow metadata remains visible, but full package restore and cloud writes are locked until premium is active again.
+          Metadata-only workflow awareness remains available, but full package restore and cloud writes are locked until premium is active again.
         </p>
       </div>
     </CardContent>
@@ -101,7 +101,7 @@ const getUtilityCardCopy = (premiumActive: boolean, isExpiredPremium: boolean): 
     return 'Workflow metadata remains available, but package restore and writes stay off until premium is active again.';
   }
 
-    return 'Free accounts retain metadata-only workflow awareness. Premium unlocks full hosted package restore.';
+  return 'Free accounts retain metadata-only workflow awareness. Premium unlocks full hosted package restore.';
 };
 
 /** Support actions rendered in the right-side cloud utility card. */
@@ -131,8 +131,8 @@ const CloudLibraryUtilityCard: React.FC<{
     <CloudLibraryUtilityHeader />
     <CardContent className="cloud-library-support-content">
       <div className="cloud-library-support-grid">
-        <CloudLibraryStat label="Mode" value={premiumActive ? 'Full access' : isExpiredPremium ? 'Read-only' : 'Locked'} />
-        <CloudLibraryStat label="Library" value={premiumActive ? 'Writable' : 'Readable'} />
+        <CloudLibraryStat label="Mode" value={premiumActive ? 'Full access' : 'Metadata only'} />
+        <CloudLibraryStat label="Library" value={premiumActive ? 'Writable' : 'Awareness only'} />
       </div>
       <p className="cloud-library-support-copy">{getUtilityCardCopy(premiumActive, isExpiredPremium)}</p>
       <div className="cloud-library-divider" />
@@ -544,7 +544,7 @@ const CloudLibraryMainCard: React.FC<{
       <CardDescription>
         {premiumActive
           ? 'Restore a full package, rename it, or clear out older copies.'
-          : 'Free accounts retain metadata-only workflow records. Full package restore requires premium.'}
+          : 'Hosted forecast packages are premium-only. Free accounts continue locally with optional metadata-only awareness.'}
       </CardDescription>
     </CardHeader>
     <CardContent className="cloud-library-list-content">

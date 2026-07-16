@@ -185,21 +185,24 @@ function clearDeletedCloudSelection({
 /** Starts the realtime hosted-cycle subscription for the signed-in user. */
 function useCloudCycleSubscription({
   userId,
+  canWrite,
   setCycles,
   setLoading,
   setError,
   unsubscribeRef,
 }: {
   userId?: string;
+  canWrite: boolean;
   setCycles: Dispatch<SetStateAction<CloudCycleMetadata[]>>;
   setLoading: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | null>>;
   unsubscribeRef: MutableRefObject<(() => void) | null>;
 }): void {
   useEffect(() => {
-    if (!userId) {
+    if (!canAccessHostedCloudCycles(userId, canWrite)) {
       setCycles([]);
       setLoading(false);
+      setError(null);
       return;
     }
 
@@ -221,7 +224,7 @@ function useCloudCycleSubscription({
     return function cleanupCloudCycleSubscription() {
       unsubscribeRef.current?.();
     };
-  }, [userId, setCycles, setError, setLoading, unsubscribeRef]);
+  }, [canWrite, userId, setCycles, setError, setLoading, unsubscribeRef]);
 }
 
 /** Shared mutation hook for guarded cloud-cycle write actions like rename and delete. */
@@ -354,6 +357,10 @@ export const getCloudLoadBlockedMessage = ({ userId, canWrite }: Pick<CloudAcces
   if (!userId) return 'Not signed in';
   return canWrite ? 'Action not allowed' : 'Premium subscription required to restore full cloud packages';
 };
+
+/** Returns true only when an authenticated premium user may access hosted cycles. */
+export const canAccessHostedCloudCycles = (userId: string | undefined, premiumActive: boolean): boolean =>
+  Boolean(userId && premiumActive);
 
 /** Returns the load callback for hosted cloud cycles. */
 function useCloudLoadCycle({
@@ -582,6 +589,7 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
 
   useCloudCycleSubscription({
     userId: user?.uid,
+    canWrite,
     setCycles,
     setLoading,
     setError,
