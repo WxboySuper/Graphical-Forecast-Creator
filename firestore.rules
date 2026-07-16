@@ -46,7 +46,8 @@ service cloud.firestore {
       return data.email is string && data.email.size() <= 320 &&
         data.displayName is string && data.displayName.size() <= 200 &&
         data.photoURL is string && data.photoURL.size() <= 2048 &&
-        isValidProviders(data.providers);
+        isValidProviders(data.providers) &&
+        data.createdAt is timestamp && data.updatedAt is timestamp;
     }
 
     function isValidClientProfileCreate(data) {
@@ -62,7 +63,7 @@ service cloud.firestore {
 
     function isValidClientProfileUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'email', 'displayName', 'photoURL', 'providers', 'createdAt', 'updatedAt'
+          'email', 'displayName', 'photoURL', 'providers', 'updatedAt'
         ]) &&
         hasValidClientProfileFields(request.resource.data);
     }
