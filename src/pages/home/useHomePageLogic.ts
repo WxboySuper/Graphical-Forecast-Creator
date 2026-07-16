@@ -7,7 +7,6 @@ import {
   selectForecastCycle,
   setForecastDay,
   resetForecasts,
-  importForecastCycle,
   loadSavedCycle,
   selectWorkflowMetadata,
   selectHasActiveWorkflow,
@@ -20,6 +19,7 @@ import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { clearAutoSave } from '../../hooks/useAutoSave';
 
 /** Returns today's local calendar date as YYYY-MM-DD without UTC conversion. */
 function getLocalCalendarDate(): string {
@@ -38,7 +38,7 @@ const useHomePageLogic = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { addToast } = useOutletContext<{ addToast: AddToastFn }>();
-  const { hostedAuthEnabled, status } = useAuth();
+  const { hostedAuthEnabled, status, user } = useAuth();
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
@@ -66,12 +66,14 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
+    clearAutoSave(user?.uid);
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
   };
 
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
+    clearAutoSave(user?.uid);
     dispatch(setForecastDay(day));
     navigate('/forecast');
   };
@@ -84,6 +86,7 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
+    clearAutoSave(user?.uid);
     dispatch(startBlankCycle({
       workflowTemplate,
       cycleDate: getLocalCalendarDate(),
@@ -138,7 +141,7 @@ const useHomePageLogic = () => {
       return;
     }
 
-    dispatch(importForecastCycle(cycle.forecastCycle));
+    dispatch(loadSavedCycle(cycleId));
     addToast('Cycle loaded from history', 'success');
   };
 
@@ -152,6 +155,7 @@ const useHomePageLogic = () => {
 
   /** Confirm starting a new cycle (discard changes). */
   const handleConfirmNewCycle = () => {
+    clearAutoSave(user?.uid);
     if (pendingWorkflow) {
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,
@@ -199,6 +203,7 @@ const useHomePageLogic = () => {
     savedCycles,
     forecastCycle,
     workflowMetadata,
+    pendingWorkflow,
     hasActiveWorkflow,
     isSaved,
     workflowEnabled,

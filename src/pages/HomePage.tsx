@@ -263,11 +263,13 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
       <ConfirmationModal
         isOpen={confirmNewCycle}
-        title="Start Blank Cycle"
-        message="You have unsaved changes. Start a blank forecast cycle without workflow steps?"
+        title={logic.pendingWorkflow ? 'Start Workflow' : 'Start Blank Cycle'}
+        message={logic.pendingWorkflow
+          ? `You have unsaved changes. Start the ${logic.pendingWorkflow.label} workflow and discard the current changes?`
+          : 'You have unsaved changes. Start a blank forecast cycle and discard the current changes?'}
         onConfirm={handleConfirmNewCycle}
         onCancel={handleCancelNewCycle}
-        confirmLabel="Start Blank Cycle"
+        confirmLabel={logic.pendingWorkflow ? 'Start Workflow' : 'Start Blank Cycle'}
       />
     </div>
   );
@@ -395,11 +397,13 @@ const HomePage: React.FC = () => {
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
       <ConfirmationModal
         isOpen={confirmNewCycle}
-        title="Start Blank Cycle"
-        message="You have unsaved changes. Start a blank forecast cycle without workflow steps?"
+        title={logic.pendingWorkflow ? 'Start Workflow' : 'Start Blank Cycle'}
+        message={logic.pendingWorkflow
+          ? `You have unsaved changes. Start the ${logic.pendingWorkflow.label} workflow and discard the current changes?`
+          : 'You have unsaved changes. Start a blank forecast cycle and discard the current changes?'}
         onConfirm={handleConfirmNewCycle}
         onCancel={handleCancelNewCycle}
-        confirmLabel="Start Blank Cycle"
+        confirmLabel={logic.pendingWorkflow ? 'Start Workflow' : 'Start Blank Cycle'}
       />
     </div>
   );

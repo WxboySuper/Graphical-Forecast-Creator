@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #711
+
+- Clear scoped autosaves when users confirm a fresh blank or workflow start, restore workflow metadata from saved cycles, and keep workflow confirmation and completion dialogs usable on small screens.
+
 ### PR #712
 
 - Add guarded localhost free and premium account fixtures for authenticated workflow E2E testing without hosted Firebase sessions or cloud writes.

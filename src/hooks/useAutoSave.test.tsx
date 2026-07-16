@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView, setCycleDate } from '../store/forecastSlice';
-import { migrateLegacyAutoSave, pickNewestAutoSaveValue, selectPreferredAutoSaveValue, useAutoSave } from './useAutoSave';
+import { clearAutoSave, migrateLegacyAutoSave, pickNewestAutoSaveValue, selectPreferredAutoSaveValue, useAutoSave } from './useAutoSave';
 import { serializeForecast } from '../utils/fileUtils';
 
 jest.mock('../utils/fileUtils', () => ({
@@ -68,6 +68,16 @@ describe('useAutoSave', () => {
     expect(selectPreferredAutoSaveValue(scoped, legacy)).toBe(scoped);
     expect(selectPreferredAutoSaveValue(null, legacy)).toBe(legacy);
     expect(pickNewestAutoSaveValue(scoped, legacy, JSON.stringify({ live: true, timestamp: '2026-07-14T11:00:00.000Z' }))).toBe(legacy);
+  });
+
+  test('clears the active account autosave and legacy fallback for a fresh workflow', () => {
+    localStorage.setItem('forecastData:user-user-1', JSON.stringify({ account: true }));
+    localStorage.setItem('forecastData', JSON.stringify({ legacy: true }));
+
+    clearAutoSave('user-1');
+
+    expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
+    expect(localStorage.getItem('forecastData')).toBeNull();
   });
 
   test('does not overwrite an existing signed-in autosave during migration', () => {
