@@ -26,6 +26,12 @@ describe('exposureLabels', () => {
     assert.ok(labels.has('exposure:production'));
   });
 
+  it('applies server-backed production exposure when Firestore rules change', () => {
+    const labels = exposureLabels({ changedFiles: ['firestore.rules'] });
+    assert.ok(labels.has('exposure:server-backed'));
+    assert.ok(labels.has('exposure:production'));
+  });
+
   it('does not apply exposure labels when featureCapabilities test is changed', () => {
     const labels = exposureLabels({ changedFiles: ['server/lib/featureCapabilities.test.js'] });
     assert.ok(!labels.has('exposure:server-backed'));

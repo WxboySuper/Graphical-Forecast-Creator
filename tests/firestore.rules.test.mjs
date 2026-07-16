@@ -52,6 +52,31 @@ const cloudCycle = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Build a valid synchronized settings document. */
+const settings = (overrides = {}) => ({
+  darkMode: false,
+  baseMapStyle: 'osm',
+  stateBorders: true,
+  counties: false,
+  ghostOutlooks: {
+    tornado: false, wind: false, hail: false, categorical: false,
+    totalSevere: false, 'day4-8': false,
+  },
+  defaultForecasterName: 'Alice',
+  forecastUiVariant: 'integrated',
+  monitorSettings: {
+    radarMode: 'none', radarProduct: 'bref-qcd', radarSite: 'KTLX', radarOpacity: 0.72,
+    satelliteProduct: 'none', satelliteOpacity: 0.68,
+    outlookSource: { kind: 'current', id: 'current' }, outlookType: 'categorical',
+    mapView: { center: [39.8283, -98.5795], zoom: 4 }, animationEnabled: false,
+    animationSpeedMs: 400, stormReportsEnabled: true, stormReportsFilterTornado: true,
+    stormReportsFilterWind: true, stormReportsFilterHail: true,
+    stormReportsMatchOutlookType: false, alertsEnabled: true, alertsOpacity: 0.55,
+    alertsShowWatches: true, alertsShowWarnings: true, alertsShowAdvisories: false,
+  },
+  ...overrides,
+});
+
 /** Return a Firestore client authenticated as the supplied user. */
 const dbFor = (uid) => testEnv.authenticatedContext(uid).firestore();
 /** Return an unauthenticated Firestore client. */
@@ -97,6 +122,12 @@ describe('userProfiles authorization', () => {
     await assertFails(
       setDoc(doc(dbFor(ALICE), 'userProfiles', ALICE), profile({ role: 'admin' }))
     );
+    await assertFails(
+      setDoc(doc(dbFor(ALICE), 'userProfiles', ALICE), profile({ providers: [{}] }))
+    );
+    await assertFails(
+      setDoc(doc(dbFor(ALICE), 'userProfiles', ALICE), profile({ providers: ['x'.repeat(129)] }))
+    );
   });
 
   test('preserves server-owned access fields during ordinary owner updates', async () => {
@@ -136,6 +167,20 @@ describe('userProfiles authorization', () => {
     await seed((db) => setDoc(doc(db, 'userProfiles', ALICE), profile()));
     await assertFails(getDoc(doc(dbFor(BOB), 'userProfiles', ALICE)));
     await assertFails(setDoc(doc(dbFor(BOB), 'userProfiles', ALICE), profile()));
+  });
+});
+
+describe('userSettings schema boundary', () => {
+  test('allows the normalized settings shape', async () => {
+    await assertSucceeds(setDoc(doc(dbFor(ALICE), 'userSettings', ALICE), settings()));
+  });
+
+  test('rejects unsupported and unbounded settings values', async () => {
+    const ref = doc(dbFor(ALICE), 'userSettings', ALICE);
+    await assertFails(setDoc(ref, settings({ baseMapStyle: 'x'.repeat(5000) })));
+    await assertFails(setDoc(ref, settings({ forecastUiVariant: 'unknown' })));
+    await assertFails(setDoc(ref, settings({ monitorSettings: { arbitrary: { nested: true } } })));
+    await assertFails(setDoc(ref, settings({ ghostOutlooks: { tornado: true } })));
   });
 });
 
@@ -295,6 +340,12 @@ describe('cloudCycles entitlement boundary', () => {
       setDoc(
         doc(dbFor(ALICE), 'cloudCycles', 'cycle-1'),
         cloudCycle({ payloadJson: 'x'.repeat(750001), payloadBytes: 750001 })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(dbFor(ALICE), 'cloudCycles', 'cycle-1'),
+        cloudCycle({ payloadJson: '€'.repeat(250001), payloadBytes: 250001 })
       )
     );
   });
