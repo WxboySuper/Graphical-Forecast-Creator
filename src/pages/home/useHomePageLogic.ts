@@ -66,12 +66,14 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
+    clearAutoSave(user?.uid);
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
   };
 
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
+    clearAutoSave(user?.uid);
     dispatch(setForecastDay(day));
     navigate('/forecast');
   };

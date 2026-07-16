@@ -53,7 +53,13 @@ describe('useHomePageLogic', () => {
     mockUseAuth.mockReturnValue({
       hostedAuthEnabled: true,
       status: 'signed_in',
+      user: { uid: 'user-1' },
     });
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   test('returns signed-in home state and handles quick-start, history, and cycle loading', () => {
@@ -109,10 +115,12 @@ describe('useHomePageLogic', () => {
     expect(result.current.showHistoryModal).toBe(false);
 
     act(() => {
+      localStorage.setItem('forecastData:user-user-1', JSON.stringify({ stale: true }));
       result.current.handleQuickStartClick({ currentTarget: { dataset: { day: '5' } } } as React.MouseEvent<HTMLButtonElement>);
     });
     expect(navigate).toHaveBeenCalledWith('/forecast');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(5);
+    expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
 
     act(() => {
       result.current.handleLoadRecentCycleClick({ currentTarget: { dataset: { cycleId: 'cycle-1' } } } as React.MouseEvent<HTMLButtonElement>);
@@ -141,6 +149,7 @@ describe('useHomePageLogic', () => {
 
   test('starts a new cycle immediately when the workspace is already saved', () => {
     const store = buildStore({ isSaved: true });
+    localStorage.setItem('forecastData:user-user-1', JSON.stringify({ stale: true }));
 
     const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
 
@@ -152,6 +161,7 @@ describe('useHomePageLogic', () => {
     expect(addToast).toHaveBeenCalledWith('Started new forecast cycle', 'success');
     expect(result.current.confirmNewCycle).toBe(false);
     expect(handleSave).toHaveBeenCalledTimes(0);
+    expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
   });
 
   test('ignores malformed quick-start and recent-cycle clicks', () => {

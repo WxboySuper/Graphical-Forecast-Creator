@@ -1,6 +1,6 @@
 {
   "name": "graphical-forecast-creator",
-  "version": "1.7.0-beta.61",
+  "version": "1.7.0-beta.64",
   "private": true,
   "engines": {
     "node": ">=22.12.0 <23 || >=24 <26"
@@ -78,6 +78,7 @@
     "start": "vite",
     "build": "vite build",
     "test": "jest",
+    "test:firestore-rules": "pnpm exec firebase emulators:exec --only firestore --project gfc-rules-test \"node --test tests/firestore.rules.test.mjs\"",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "changelog:consolidate-beta": "node scripts/consolidate-beta-changelog.mjs",
@@ -125,6 +126,7 @@
     "@babel/preset-env": "^8.0.2",
     "@babel/preset-react": "^8.0.1",
     "@babel/preset-typescript": "^8.0.1",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@playwright/test": "^1.61.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@tailwindcss/postcss": "^4.3.2",
@@ -135,6 +137,7 @@
     "babel-jest": "^30.2.0",
     "babel-plugin-istanbul": "^8.0.0",
     "esbuild": "^0.28.1",
+    "firebase-tools": "15.24.0",
     "gh-pages": "^6.3.0",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.2.0",
