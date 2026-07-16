@@ -360,16 +360,20 @@ const fetchBillingAction = async (
 /** Creates the billing action callbacks used by the entitlement provider. */
 const useBillingActions = (
   user: ReturnType<typeof useAuth>['user'],
-  checkoutEnabled: boolean
+  checkoutEnabled: boolean,
+  localFixtureActive: boolean,
 ) => {
   /** Returns the current signed-in user or throws a user-facing error for billing actions. */
   const requireBillingUser = useCallback(() => {
+    if (localFixtureActive) {
+      throw new Error('Billing is unavailable for local test accounts.');
+    }
     if (!user) {
       throw new Error('Sign in before starting billing actions.');
     }
 
     return user;
-  }, [user]);
+  }, [localFixtureActive, user]);
 
   /** Returns billing availability or throws a user-facing error for checkout attempts. */
   const requireCheckoutEnabled = useCallback(() => {
@@ -433,7 +437,11 @@ export const EntitlementProvider: React.FC<{ children: React.ReactNode }> = ({ c
       unsubscribe();
     };
   }, [hostedAuthEnabled, status, user]);
-  const { openCheckout, openBillingPortal } = useBillingActions(user, billingConfig.checkoutEnabled);
+  const { openCheckout, openBillingPortal } = useBillingActions(
+    user,
+    billingConfig.checkoutEnabled,
+    Boolean(readLocalTestAccount()),
+  );
 
   const value = useMemo<EntitlementContextValue>(
     () =>
