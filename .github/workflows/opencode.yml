@@ -58,6 +58,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+          ref: ${{ needs.classify-request.outputs.branch || github.sha }}
           persist-credentials: true
 
       - name: Configure git author
@@ -65,34 +66,26 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Guard rebased PR pushes
+      - name: Record trusted PR branch tip
         if: needs.classify-request.outputs.mode == 'trusted-pr'
         env:
           PR_BRANCH: ${{ needs.classify-request.outputs.branch }}
         run: |
           git fetch origin "$PR_BRANCH"
-          printf 'OPENCODE_FORCE_PUSH_BRANCH=%s\n' "$PR_BRANCH" >> "$GITHUB_ENV"
-          printf 'OPENCODE_FORCE_PUSH_EXPECTED_SHA=%s\n' "$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
-
-          mkdir -p "$RUNNER_TEMP/opencode-git"
-          cat > "$RUNNER_TEMP/opencode-git/git" <<'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-
-          if [[ "${1:-}" == "push" && "$#" -eq 1 && -n "${OPENCODE_FORCE_PUSH_BRANCH:-}" ]] &&
-             [[ "$(/usr/bin/git rev-parse --abbrev-ref HEAD)" == "$OPENCODE_FORCE_PUSH_BRANCH" ]]; then
-            remote_ref="refs/heads/$OPENCODE_FORCE_PUSH_BRANCH"
-            exec /usr/bin/git push \
-              "--force-with-lease=$remote_ref:$OPENCODE_FORCE_PUSH_EXPECTED_SHA" \
-              origin "HEAD:$remote_ref"
+          expected_sha="$(git rev-parse FETCH_HEAD)"
+          start_sha="$(git rev-parse HEAD)"
+          if [[ "$start_sha" != "$expected_sha" ]]; then
+            echo "Refusing recovery because the checked-out commit is not the PR branch tip."
+            exit 1
           fi
 
-          exec /usr/bin/git "$@"
-          EOF
-          chmod +x "$RUNNER_TEMP/opencode-git/git"
-          echo "$RUNNER_TEMP/opencode-git" >> "$GITHUB_PATH"
+          printf 'OPENCODE_FORCE_PUSH_BRANCH=%s\n' "$PR_BRANCH" >> "$GITHUB_ENV"
+          printf 'OPENCODE_FORCE_PUSH_EXPECTED_SHA=%s\n' "$expected_sha" >> "$GITHUB_ENV"
+          printf 'OPENCODE_FORCE_PUSH_START_SHA=%s\n' "$start_sha" >> "$GITHUB_ENV"
 
       - name: Run opencode
+        id: run-opencode
+        continue-on-error: true
         uses: anomalyco/opencode/github@a3b97d9090ccf4aa9ac32268486283e3131e36b4 # fix(github): enforce existing git author identity
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,6 +94,43 @@ jobs:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
           mentions: /oc,/opencode
+
+      - name: Push a rebased trusted PR branch
+        id: push-rebased-pr
+        if: always() && needs.classify-request.outputs.mode == 'trusted-pr'
+        env:
+          PR_BRANCH: ${{ needs.classify-request.outputs.branch }}
+        run: |
+          set -euo pipefail
+          remote_ref="refs/heads/$PR_BRANCH"
+          local_sha="$(git rev-parse HEAD)"
+          remote_sha="$(git ls-remote origin "$remote_ref" | awk '{print $1}')"
+
+          if [[ "$remote_sha" == "$local_sha" ]]; then
+            echo "OpenCode already pushed this commit."
+            exit 0
+          fi
+
+          if [[ "$local_sha" == "$OPENCODE_FORCE_PUSH_START_SHA" ]]; then
+            echo "OpenCode did not create a commit to recover."
+            exit 0
+          fi
+
+          if [[ "$remote_sha" != "$OPENCODE_FORCE_PUSH_EXPECTED_SHA" ]]; then
+            echo "Refusing to overwrite $PR_BRANCH because it changed during the OpenCode run."
+            exit 1
+          fi
+
+          git push \
+            "--force-with-lease=$remote_ref:$OPENCODE_FORCE_PUSH_EXPECTED_SHA" \
+            origin "HEAD:$remote_ref"
+          echo "recovered=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fail unrecovered OpenCode errors
+        if: steps.run-opencode.outcome == 'failure' && steps.push-rebased-pr.outputs.recovered != 'true'
+        run: |
+          echo "OpenCode failed before its rewritten branch could be safely pushed."
+          exit 1
 
   opencode-triage:
     needs: classify-request
