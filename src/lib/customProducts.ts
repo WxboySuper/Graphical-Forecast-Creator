@@ -158,18 +158,26 @@ const hasValidGeometryDimensions = (value: Record<string, unknown>): boolean => 
   return positions.every((position) => position.length === positions[0].length);
 };
 
+/** Validates one Polygon coordinate collection and its shared dimension. */
+const hasValidPolygonGeometry = (value: Record<string, unknown>): boolean =>
+  value.type === 'Polygon'
+  && isPolygonCoordinates(value.coordinates)
+  && hasValidGeometryDimensions(value);
+
+/** Validates one bounded MultiPolygon coordinate collection. */
+const hasValidMultiPolygonGeometry = (value: Record<string, unknown>): boolean =>
+  value.type === 'MultiPolygon'
+  && Array.isArray(value.coordinates)
+  && value.coordinates.length > 0
+  && value.coordinates.length <= CUSTOM_PRODUCT_LIMITS.polygonsPerFeature
+  && value.coordinates.every(isPolygonCoordinates)
+  && hasValidGeometryDimensions(value);
+
 /** Accepts only Polygon or MultiPolygon geometry for custom forecast content. */
 const isCustomPolygonGeometry = (value: unknown): value is Geometry => {
   if (!isRecord(value)) return false;
   if (!hasOnlyKeys(value, ['type', 'coordinates'])) return false;
-  if (value.type === 'Polygon') {
-    return isPolygonCoordinates(value.coordinates) && hasValidGeometryDimensions(value);
-  }
-  if (value.type !== 'MultiPolygon') return false;
-  if (!Array.isArray(value.coordinates)) return false;
-  if (value.coordinates.length === 0) return false;
-  if (value.coordinates.length > CUSTOM_PRODUCT_LIMITS.polygonsPerFeature) return false;
-  return value.coordinates.every(isPolygonCoordinates) && hasValidGeometryDimensions(value);
+  return hasValidPolygonGeometry(value) || hasValidMultiPolygonGeometry(value);
 };
 
 /** Validates a finite, ordered GeoJSON bbox matching the geometry dimension. */
