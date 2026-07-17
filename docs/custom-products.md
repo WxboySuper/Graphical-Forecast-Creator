@@ -33,3 +33,19 @@ popup, legend, and image capture use the embedded style values, so a saved file
 needs no separate template. Signed-out local users receive the same one-off
 layer workflow. Hosted builds take the unchanged Severe-only rendering path.
 
+## Local reusable product workflow
+
+Local premium test accounts can manage reusable products from the gated product
+library. A product has a non-reused logical UUID while hosted persistence uses
+one of 20 fixed owner-scoped document slots. Create, edit, duplicate, archive,
+restore, and delete operations validate the full schema; hosted edits use an
+expected version inside a Firestore transaction, and live subscriptions keep
+open clients synchronized.
+
+Using a product stages a validated, detached layer snapshot for the forecast
+editor. The editor consumes and clears that handoff once, then stores the layer
+inside the cycle. Later product edits cannot change the embedded layer. The
+Firestore adapter remains unreachable from hosted UI while the
+`customProducts` exposure is local-only; server rules and hosted expiration
+behavior are delivered as a separate rollout slice before any hosted exposure.
+

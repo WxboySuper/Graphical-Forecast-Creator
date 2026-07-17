@@ -45,6 +45,7 @@ import {
 } from '../ForecastWorkspace/workspaceMeta';
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
+import CustomProductsEntryButton from './CustomProductsEntryButton';
 import type { RootState } from '../../store';
 import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
@@ -609,7 +610,16 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
         </div>
       </TabbedToolbarStripSection>
       <div key={storedMode} className="custom-product-mode-panel">
-        {storedMode === 'severe' ? <SevereDrawControls controller={controller} /> : <CustomDrawPanel />}
+        {storedMode === 'severe' ? (
+          <SevereDrawControls controller={controller} />
+        ) : (
+          <>
+            <TabbedToolbarStripSection label="Custom" hint="Reusable" className="w-[190px]">
+              <CustomProductsEntryButton />
+            </TabbedToolbarStripSection>
+            <CustomDrawPanel />
+          </>
+        )}
       </div>
     </TabbedToolbarTabRow>
   );
@@ -1239,6 +1249,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller
         <div className="flex items-center justify-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 h-full min-w-max">
           <ToolbarToolsSection controller={controller} />
           <ToolbarForecastDaySection controller={controller} />
+          <CustomProductsEntryButton />
           <ToolbarOutlookTypeSection controller={controller} />
           <ToolbarGhostLayersSection controller={controller} />
           <ToolbarProbabilitySection controller={controller} />

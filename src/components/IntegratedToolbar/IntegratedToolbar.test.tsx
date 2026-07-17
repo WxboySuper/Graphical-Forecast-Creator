@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { IntegratedToolbar, TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
@@ -83,9 +84,11 @@ const ToolbarTestHarness: React.FC<{ variant: 'legacy' | 'tabbed' }> = ({ varian
 };
 
 const renderToolbar = (variant: 'legacy' | 'tabbed', store = createStore()) => render(
-  <Provider store={store}>
-    <ToolbarTestHarness variant={variant} />
-  </Provider>
+  <MemoryRouter>
+    <Provider store={store}>
+      <ToolbarTestHarness variant={variant} />
+    </Provider>
+  </MemoryRouter>
 );
 
 describe('IntegratedToolbar undo/redo buttons', () => {
@@ -155,6 +158,7 @@ describe('local-only custom Draw mode', () => {
     jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature: string) => feature !== 'customProducts');
     renderToolbar('tabbed');
     expect(screen.queryByRole('radiogroup', { name: 'Drawing product' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Products/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /wind/i })).toBeInTheDocument();
     expect(screen.queryByText(/not available/i)).not.toBeInTheDocument();
   });
@@ -165,9 +169,11 @@ describe('local-only custom Draw mode', () => {
     const store = createStore();
     renderToolbar('tabbed', store);
     expect(screen.getByRole('radio', { name: 'Severe' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('link', { name: /Products/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('radio', { name: 'Custom' }));
     expect(screen.queryByRole('button', { name: /wind/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Products/i })).toHaveAttribute('href', '/custom-products');
     expect(screen.getByTestId('custom-draw-panel')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add custom layer' }));
     expect(screen.getByLabelText('Layer title')).toHaveValue('Custom Layer 1');

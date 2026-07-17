@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   LogOut,
   Mail,
+  Palette,
 } from "lucide-react";
 import { Badge, type BadgeProps } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -27,6 +28,7 @@ import { useWorkflowAwareness } from "../hooks/useWorkflowAwarenessSync";
 import type { RootState } from "../store";
 import { selectForecastCycle, selectSavedCycles } from "../store/forecastSlice";
 import { computeHomeStats } from "./homeUtils";
+import { isFeatureExposed } from "../config/featureExposure";
 import "./AccountPage.css";
 
 type AuthMode = "sign_in" | "sign_up";
@@ -401,6 +403,27 @@ const CloudLibraryCard: React.FC = () => {
     <Card>
       <CloudLibraryCardHeader />
       <CloudLibraryCardContent />
+    </Card>
+  );
+};
+
+/** Local-only entry to the reusable product library; absent from every hosted build. */
+const CustomProductsCard: React.FC = () => {
+  const { premiumActive } = useEntitlement();
+  if (!isFeatureExposed('customProducts') || !premiumActive) return null;
+
+  return (
+    <Card>
+      <CardHeader className="account-section-header">
+        <CardTitle className="flex items-center gap-2 text-2xl">
+          <Palette className="h-6 w-6" />
+          Reusable custom products
+        </CardTitle>
+        <CardDescription>Build ordered category templates and snapshot them into future forecasts.</CardDescription>
+      </CardHeader>
+      <CardContent className="account-section-content">
+        <Button asChild><Link to="/custom-products">Manage Custom Products</Link></Button>
+      </CardContent>
     </Card>
   );
 };
@@ -874,6 +897,7 @@ const SignedInAccountView: React.FC = () => {
             onSignOut={handleSignOutClick}
           />
           <CloudLibraryCard />
+          <CustomProductsCard />
         </div>
         <div className="account-side-stack">
           <MetricsCard />

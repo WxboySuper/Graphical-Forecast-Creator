@@ -64,6 +64,7 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
+import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
 
 export { hasAnyModifierKey, isTypingTarget };
 import { queueProductMetric } from '../utils/productMetrics';
@@ -1406,6 +1407,7 @@ const useForecastPageWorkspace = ({
     mapRef,
     currentDay: forecastCycle.currentDay,
   });
+  useCustomProductForecastHandoff(restoreComplete, addToast);
 
   const dayRolloverPrompt = useDayRolloverPrompt({
     restoreComplete,

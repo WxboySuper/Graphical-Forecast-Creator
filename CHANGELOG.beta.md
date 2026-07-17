@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #744
+
+- Add reusable custom product creation, editing, lifecycle management, and snapshot-based use in local forecasts.
+
 ### PR #743
 
 - Add local-only custom forecast layers with category styling, polygon drawing, map legend support, and regression coverage while hosted environments remain unchanged.

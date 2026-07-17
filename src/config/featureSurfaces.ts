@@ -19,9 +19,15 @@ export const GATED_ROUTE_DEFINITIONS = [
     path: 'collaborate',
     loadPage: () => import('../pages/gated/CollaborationRoomPage'),
   },
+  {
+    feature: 'customProducts',
+    path: 'custom-products',
+    loadPage: () => import('../pages/gated/CustomProductsPage'),
+  },
 ] as const satisfies readonly GatedRouteDefinition[];
 
 /** Documents modules that must only initialize behind a feature boundary. */
 export const FEATURE_SIDE_EFFECT_MODULES = {
   autoTstm: ['../utils/tstmGeneration'],
+  customProducts: ['../lib/customProductsRepository'],
 } as const satisfies Partial<Record<FeatureKey, readonly string[]>>;

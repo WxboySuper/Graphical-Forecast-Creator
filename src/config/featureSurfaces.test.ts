@@ -5,10 +5,12 @@ describe('featureSurfaces', () => {
     expect(GATED_ROUTE_DEFINITIONS.map((definition) => definition.path)).toEqual([
       'tropical',
       'collaborate',
+      'custom-products',
     ]);
   });
 
   test('documents side-effect modules that must stay behind feature boundaries', () => {
     expect(FEATURE_SIDE_EFFECT_MODULES.autoTstm).toEqual(['../utils/tstmGeneration']);
+    expect(FEATURE_SIDE_EFFECT_MODULES.customProducts).toEqual(['../lib/customProductsRepository']);
   });
 });
