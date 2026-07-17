@@ -295,6 +295,15 @@ export const getCustomProductAccessState = ({
   return { mode: 'editable' };
 };
 
+/** Returns the next safe revision number or rejects an exhausted counter. */
+const getNextProductVersion = (version: number): number => {
+  const nextVersion = version + 1;
+  if (!Number.isSafeInteger(nextVersion)) {
+    throw new RangeError('Custom product version has reached the safe integer limit');
+  }
+  return nextVersion;
+};
+
 /** Produces the next stable product revision while preserving identity and creation time. */
 export const reviseHostedCustomProduct = (
   product: HostedCustomProduct,
@@ -304,7 +313,7 @@ export const reviseHostedCustomProduct = (
   ...product,
   ...changes,
   categories: changes.categories.map((category) => ({ ...category, style: { ...category.style } })),
-  version: product.version + 1,
+  version: getNextProductVersion(product.version),
   updatedAt,
 });
 

@@ -181,4 +181,13 @@ describe('custom product schema', () => {
     expect(revised.createdAt).toBe(original.createdAt);
     expect(original.categories[0].style.fillColor).toBe('#8a3ffc');
   });
+
+  test('rejects a revision that would exceed the safe integer range', () => {
+    expect(() => reviseHostedCustomProduct(product({ version: Number.MAX_SAFE_INTEGER }), {
+      label: 'Cannot revise',
+      description: undefined,
+      categories: [category()],
+      status: 'active',
+    })).toThrow(RangeError);
+  });
 });
