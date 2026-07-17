@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #744
+
+- Add reusable custom product creation, editing, lifecycle management, and snapshot-based use in local forecasts.
+
 ### PR #742
 
 - Define versioned one-off custom layer, reusable hosted product, embedded snapshot, and expiration/read-only contracts with strict validation and local-only exposure.
