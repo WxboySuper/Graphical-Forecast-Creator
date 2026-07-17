@@ -1,8 +1,6 @@
 import {
   CUSTOM_PRODUCT_LIMITS,
   CUSTOM_PRODUCTS_SCHEMA_VERSION,
-  type CustomCategoryStyle,
-  type CustomCategoryTemplate,
   type CustomLayerId,
   type CustomLayerCollection,
   type CustomProductAccessState,
@@ -13,12 +11,16 @@ import {
   type OneOffCustomLayer,
 } from '../types/customProducts';
 import { isCustomPolygonFeature } from './customGeometry';
+import { isCustomCategoryList } from './customCategoryValidation';
 
 export { isCustomPolygonFeature } from './customGeometry';
+export {
+  isCustomCategoryList,
+  isCustomCategoryStyle,
+  isCustomCategoryTemplate,
+} from './customCategoryValidation';
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-const HATCH_PATTERNS = new Set(['none', 'diagonal', 'reverse-diagonal', 'crosshatch']);
 
 /** Returns true only for non-array object records. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -39,10 +41,6 @@ const isIsoTimestamp = (value: unknown): value is string =>
   && !Number.isNaN(Date.parse(value))
   && new Date(value).toISOString() === value;
 
-/** Validates an opacity-like value in the inclusive zero-to-one interval. */
-const isUnitInterval = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
-
 /** Validates a whole number that may be zero. */
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -57,65 +55,8 @@ const hasValidChronology = (createdAt: unknown, updatedAt: unknown): boolean =>
   && isIsoTimestamp(updatedAt)
   && Date.parse(updatedAt) >= Date.parse(createdAt);
 
-/** Validates one six-digit hexadecimal color. */
-const isHexColor = (value: unknown): value is string =>
-  typeof value === 'string' && HEX_COLOR.test(value);
-
-/** Validates a bounded map stroke width. */
-const isStrokeWidth = (value: unknown): value is number =>
-  typeof value === 'number'
-  && Number.isFinite(value)
-  && value >= 0
-  && value <= 8;
-
-/** Validates one supported custom hatch identifier. */
-const isHatchPattern = (value: unknown): boolean =>
-  typeof value === 'string' && HATCH_PATTERNS.has(value);
-
 /** Combines field-level checks without a compound validator conditional. */
 const areAllValid = (checks: readonly boolean[]): boolean => checks.every(Boolean);
-
-/** Validates the primitive fields of a category style record. */
-const hasValidCategoryStyleFields = (value: Record<string, unknown>): boolean => areAllValid([
-  isHexColor(value.fillColor),
-  isUnitInterval(value.fillOpacity),
-  isHexColor(value.strokeColor),
-  isUnitInterval(value.strokeOpacity),
-  isStrokeWidth(value.strokeWidth),
-  isHatchPattern(value.hatch),
-]);
-
-/** Validates a complete category style without accepting unknown persistence fields. */
-export const isCustomCategoryStyle = (value: unknown): value is CustomCategoryStyle => {
-  if (!isRecord(value)) return false;
-  if (!hasOnlyKeys(value, [
-    'fillColor', 'fillOpacity', 'strokeColor', 'strokeOpacity', 'strokeWidth', 'hatch',
-  ])) return false;
-  return hasValidCategoryStyleFields(value);
-};
-
-/** Validates one bounded ordered category definition. */
-export const isCustomCategoryTemplate = (value: unknown): value is CustomCategoryTemplate => {
-  if (!isRecord(value)) return false;
-  if (!hasOnlyKeys(value, ['id', 'label', 'order', 'style'])) return false;
-  return areAllValid([
-    isBoundedText(value.id),
-    isBoundedText(value.label),
-    isNonNegativeInteger(value.order),
-    isCustomCategoryStyle(value.style),
-  ]);
-};
-
-/** Validates category limits, unique identifiers, and stable ordering. */
-export const isCustomCategoryList = (value: unknown): value is CustomCategoryTemplate[] => {
-  if (!Array.isArray(value)) return false;
-  if (value.length === 0) return false;
-  if (value.length > CUSTOM_PRODUCT_LIMITS.categoriesPerProduct) return false;
-  if (!value.every(isCustomCategoryTemplate)) return false;
-  const ids = new Set(value.map((category) => category.id));
-  if (ids.size !== value.length) return false;
-  return value.every((category, index) => category.order === index);
-};
 
 /** Creates a detached snapshot so future product edits cannot alter old maps. */
 export const createEmbeddedCustomProductSnapshot = (

@@ -22,11 +22,13 @@ const isPosition = (value: unknown): value is Position =>
   && value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate));
 
 const isLinearRing = (value: unknown): value is Position[] => {
-  if (!Array.isArray(value) || value.length < 4 || !value.every(isPosition)) return false;
+  if (!Array.isArray(value)) return false;
+  if (value.length < 4) return false;
+  if (!value.every(isPosition)) return false;
   const first = value[0];
   const last = value[value.length - 1];
-  return first.length === last.length
-    && first.every((coordinate, index) => coordinate === last[index]);
+  if (first.length !== last.length) return false;
+  return first.every((coordinate, index) => coordinate === last[index]);
 };
 
 const isPolygonCoordinates = (value: unknown): value is Position[][] =>
