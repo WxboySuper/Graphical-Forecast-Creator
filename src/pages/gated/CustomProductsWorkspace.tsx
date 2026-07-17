@@ -9,6 +9,47 @@ import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct } from '../../types/cus
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
 
+const newProductDisabled = (
+  customProducts: UseCustomProductsResult,
+  editorOpen: boolean,
+): boolean => Boolean(customProducts.pendingAction)
+  || !customProducts.premiumActive
+  || editorOpen
+  || customProducts.products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount;
+
+const WorkspaceNotices = ({ customProducts }: { customProducts: UseCustomProductsResult }) => (
+  <>
+    {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Reusable product editing and use require premium. Existing products remain visible.</CardContent></Card> : null}
+    {customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
+  </>
+);
+
+const WorkspaceEditors = ({
+  creating,
+  editing,
+  customProducts,
+  stopCreating,
+  stopEditing,
+}: {
+  creating: boolean;
+  editing: HostedCustomProduct | null;
+  customProducts: UseCustomProductsResult;
+  stopCreating(): void;
+  stopEditing(): void;
+}) => (
+  <>
+    {creating ? <CustomProductEditor onCancel={stopCreating} onSave={customProducts.createProduct} /> : null}
+    {editing ? <CustomProductEditor product={editing} onCancel={stopEditing} onSave={(draft) => customProducts.updateProduct(editing, draft)} /> : null}
+  </>
+);
+
+const createProductNavigator = (
+  customProducts: UseCustomProductsResult,
+  navigate: ReturnType<typeof useNavigate>,
+) => (product: HostedCustomProduct) => {
+  if (customProducts.useProduct(product)) navigate('/forecast');
+};
+
 const SignedOutProducts = () => (
   <div className="custom-products-page">
     <Card><CardHeader><CardTitle>Sign in to manage reusable products</CardTitle></CardHeader><CardContent><Button asChild><Link to="/account">Open Account</Link></Button></CardContent></Card>
@@ -88,30 +129,28 @@ const CustomProductsWorkspace = () => {
 
   if (!user) return <SignedOutProducts />;
   const editorOpen = creating || Boolean(editing);
-  const newDisabled = Boolean(customProducts.pendingAction)
-    || !customProducts.premiumActive
-    || editorOpen
-    || customProducts.products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount;
   const openEditor = (product: HostedCustomProduct) => {
     setCreating(false);
     setEditing(product);
   };
-  const useProduct = (product: HostedCustomProduct) => {
-    if (customProducts.useProduct(product)) navigate('/forecast');
-  };
+  const useProduct = createProductNavigator(customProducts, navigate);
 
   return (
     <main className="custom-products-page">
       <ProductsHero
         productCount={customProducts.products.length}
         activeCount={activeCount}
-        newDisabled={newDisabled}
+        newDisabled={newProductDisabled(customProducts, editorOpen)}
         onNew={() => { setEditing(null); setCreating(true); }}
       />
-      {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Reusable product editing and use require premium. Existing products remain visible.</CardContent></Card> : null}
-      {customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
-      {creating ? <CustomProductEditor onCancel={() => setCreating(false)} onSave={customProducts.createProduct} /> : null}
-      {editing ? <CustomProductEditor product={editing} onCancel={() => setEditing(null)} onSave={(draft) => customProducts.updateProduct(editing, draft)} /> : null}
+      <WorkspaceNotices customProducts={customProducts} />
+      <WorkspaceEditors
+        creating={creating}
+        editing={editing}
+        customProducts={customProducts}
+        stopCreating={() => setCreating(false)}
+        stopEditing={() => setEditing(null)}
+      />
       <ProductsLibrary customProducts={customProducts} editorOpen={editorOpen} onEdit={openEditor} onUse={useProduct} />
     </main>
   );

@@ -1,13 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { HostedCustomProduct, HostedCustomProductStatus, OneOffCustomLayer } from '../types/customProducts';
 import type { CustomProductDraft, CustomProductsRepository } from '../lib/customProductsRepository';
 import { stageCustomProductForForecast } from '../lib/customProductHandoff';
-
-type PendingAction = { action: string; productId?: string } | null;
-
-const mutationError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to update custom products.';
+import { useCustomProductWriter } from './useCustomProductWriter';
 
 const handoffError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to load custom product.';
@@ -29,37 +25,7 @@ export const useCustomProductActions = ({
   premiumActive: boolean;
   setError: Dispatch<SetStateAction<string | null>>;
 }) => {
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const pendingRef = useRef(false);
-
-  const runWrite = useCallback(async (
-    action: string,
-    productId: string | undefined,
-    operation: (resolvedUserId: string) => Promise<unknown>,
-  ): Promise<boolean> => {
-    if (!userId) {
-      setError('Sign in to manage reusable products.');
-      return false;
-    }
-    if (!premiumActive) {
-      setError('Premium is required to change reusable products.');
-      return false;
-    }
-    if (pendingRef.current) return false;
-    pendingRef.current = true;
-    setPendingAction({ action, ...(productId ? { productId } : {}) });
-    try {
-      setError(null);
-      await operation(userId);
-      return true;
-    } catch (error) {
-      setError(mutationError(error));
-      return false;
-    } finally {
-      pendingRef.current = false;
-      setPendingAction(null);
-    }
-  }, [premiumActive, setError, userId]);
+  const { pendingAction, runWrite } = useCustomProductWriter({ userId, premiumActive, setError });
 
   const createProduct = useCallback((draft: CustomProductDraft) =>
     runWrite('create', undefined, (uid) => repository.create(uid, draft)), [repository, runWrite]);
