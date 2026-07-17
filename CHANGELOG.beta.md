@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #746
+
+- Integrate local custom layers with forecast workflows, exports, imports, map legends, and workflow disclosures.
+
 ### PR #742
 
 - Define versioned one-off custom layer, reusable hosted product, embedded snapshot, and expiration/read-only contracts with strict validation and local-only exposure.
