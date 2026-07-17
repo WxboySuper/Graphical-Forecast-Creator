@@ -58,6 +58,7 @@ const STORAGE_COLLECTIONS = [
   'userMetrics',
   'adminDailyMetrics',
   'adminMetricDedupes',
+  'processedBillingWebhookEvents',
 ];
 const STORAGE_CACHE_TTL_MS = 5 * 60 * 1000;
 let storageBytesCache = {
@@ -587,20 +588,37 @@ const recordMetricEvent = async ({ eventType, installationId, uid }) => {
   return true;
 };
 
-/** Records admin-only billing metric events that come from trusted Stripe webhooks. */
-const recordBillingMetricEvent = async (eventType) => {
+/** Returns a bounded Stripe event id suitable for a Firestore document id. */
+const normalizeBillingWebhookEventId = (value) =>
+  typeof value === 'string' && value.trim() ? value.trim().slice(0, 256) : null;
+
+/** Records admin-only billing metric events once per trusted Stripe webhook delivery id. */
+const recordBillingMetricEvent = async (eventType, webhookEventId) => {
   const normalizedEventType = normalizeBillingMetricEventType(eventType);
+  const normalizedWebhookEventId = normalizeBillingWebhookEventId(webhookEventId);
   const db = getAdminDb();
-  if (!db || !normalizedEventType) {
-    return;
+  if (!db || !normalizedEventType || !normalizedWebhookEventId) {
+    return false;
   }
 
   const dayKey = getDayKey();
   const dailyRef = db.collection('adminDailyMetrics').doc(dayKey);
+  const processedEventRef = db.collection('processedBillingWebhookEvents').doc(normalizedWebhookEventId);
   const premiumSubscriptions = await countPremiumSubscriptions();
 
-  await db.runTransaction(async (transaction) => {
-    const dailySnapshot = await transaction.get(dailyRef);
+  return db.runTransaction(async (transaction) => {
+    const [dailySnapshot, processedEventSnapshot] = await Promise.all([
+      transaction.get(dailyRef),
+      transaction.get(processedEventRef),
+    ]);
+    if (processedEventSnapshot.exists) {
+      return false;
+    }
+
+    transaction.set(processedEventRef, {
+      eventType: normalizedEventType,
+      processedAt: new Date(),
+    });
     transaction.set(
       dailyRef,
       buildNextAdminDailyMetrics({
@@ -612,6 +630,7 @@ const recordBillingMetricEvent = async (eventType) => {
       }),
       { merge: true }
     );
+    return true;
   });
 };
 

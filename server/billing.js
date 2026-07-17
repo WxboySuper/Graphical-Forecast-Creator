@@ -392,9 +392,12 @@ const createInvoiceEntitlementWrite = (eventType, invoice) => {
 };
 
 /** Applies the checkout-complete event to the entitlement document. */
-const recordBillingMetricEventSafely = async (eventType) => {
+const recordBillingMetricEventSafely = async (eventType, webhookEventId) => {
   try {
-    await recordBillingMetricEvent(eventType);
+    const recorded = await recordBillingMetricEvent(eventType, webhookEventId);
+    if (!recorded) {
+      console.log('[billing] metrics:duplicate-or-skipped', { eventType, webhookEventId });
+    }
   } catch (error) {
     console.warn('[billing] metrics:nonfatal', {
       eventType,
@@ -404,16 +407,18 @@ const recordBillingMetricEventSafely = async (eventType) => {
 };
 
 /** Applies the checkout-complete event to the entitlement document. */
-const handleCheckoutSessionCompleted = async (session) => {
+const handleCheckoutSessionCompleted = async (event) => {
+  const session = event.data.object;
   await writeEntitlement(createCheckoutEntitlementWrite(session));
-  await recordBillingMetricEventSafely('premium_upgrade');
+  await recordBillingMetricEventSafely('premium_upgrade', event.id);
 };
 
 /** Applies the subscription lifecycle event to the entitlement document. */
-const handleSubscriptionEvent = async (subscription, eventType) => {
+const handleSubscriptionEvent = async (event) => {
+  const subscription = event.data.object;
   await writeEntitlement(createSubscriptionEntitlementWrite(subscription));
-  if (eventType === 'customer.subscription.deleted') {
-    await recordBillingMetricEventSafely('premium_cancellation');
+  if (event.type === 'customer.subscription.deleted') {
+    await recordBillingMetricEventSafely('premium_cancellation', event.id);
   }
 };
 
@@ -421,9 +426,9 @@ const handleSubscriptionEvent = async (subscription, eventType) => {
 const handleInvoiceEvent = (eventType, invoice) => writeEntitlement(createInvoiceEntitlementWrite(eventType, invoice));
 
 const webhookHandlers = {
-  'checkout.session.completed': (event) => handleCheckoutSessionCompleted(event.data.object),
-  'customer.subscription.updated': (event) => handleSubscriptionEvent(event.data.object, event.type),
-  'customer.subscription.deleted': (event) => handleSubscriptionEvent(event.data.object, event.type),
+  'checkout.session.completed': handleCheckoutSessionCompleted,
+  'customer.subscription.updated': handleSubscriptionEvent,
+  'customer.subscription.deleted': handleSubscriptionEvent,
   'invoice.paid': (event) => handleInvoiceEvent(event.type, event.data.object),
   'invoice.payment_failed': (event) => handleInvoiceEvent(event.type, event.data.object),
 };
