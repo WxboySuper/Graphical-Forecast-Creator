@@ -18,24 +18,31 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const HATCH_PATTERNS = new Set(['none', 'diagonal', 'reverse-diagonal', 'crosshatch']);
 
+/** Returns true only for non-array object records. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+/** Rejects persistence fields outside a contract's explicit allowlist. */
 const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
   Object.keys(value).every((key) => keys.includes(key));
 
+/** Validates trimmed non-empty text against a bounded length. */
 const isBoundedText = (value: unknown, max = CUSTOM_PRODUCT_LIMITS.labelLength): value is string =>
   typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= max;
 
+/** Validates a canonical UTC ISO timestamp. */
 const isIsoTimestamp = (value: unknown): value is string =>
   typeof value === 'string' && ISO_TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value));
 
+/** Validates an opacity-like value in the inclusive zero-to-one interval. */
 const isUnitInterval = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 
+/** Validates a whole number that may be zero. */
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0;
 
+/** Validates a whole number that starts at one. */
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1;
 
@@ -79,11 +86,13 @@ export const isCustomCategoryList = (value: unknown): value is CustomCategoryTem
   return ids.size === value.length && orders.size === value.length;
 };
 
+/** Validates one finite GeoJSON coordinate position. */
 const isPosition = (value: unknown): value is Position =>
   Array.isArray(value)
   && value.length >= 2
   && value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate));
 
+/** Validates a closed GeoJSON linear ring with enough positions. */
 const isLinearRing = (value: unknown): value is Position[] => {
   if (!Array.isArray(value) || value.length < 4 || !value.every(isPosition)) return false;
   const first = value[0];
@@ -91,9 +100,11 @@ const isLinearRing = (value: unknown): value is Position[] => {
   return first.length === last.length && first.every((coordinate, index) => coordinate === last[index]);
 };
 
+/** Validates the ring collection used by one GeoJSON polygon. */
 const isPolygonCoordinates = (value: unknown): value is Position[][] =>
   Array.isArray(value) && value.length > 0 && value.every(isLinearRing);
 
+/** Accepts only Polygon or MultiPolygon geometry for custom forecast content. */
 const isCustomPolygonGeometry = (value: unknown): value is Geometry => {
   if (!isRecord(value) || !hasOnlyKeys(value, ['type', 'coordinates'])) return false;
   if (value.type === 'Polygon') return isPolygonCoordinates(value.coordinates);
@@ -134,6 +145,7 @@ export const createEmbeddedCustomProductSnapshot = (
   capturedAt,
 });
 
+/** Validates an immutable-by-contract embedded product snapshot. */
 export const isEmbeddedCustomProductSnapshot = (value: unknown): value is EmbeddedCustomProductSnapshot => {
   if (!isRecord(value) || !hasOnlyKeys(value, [
     'schemaVersion', 'sourceProductId', 'sourceProductVersion', 'label', 'categories', 'capturedAt',
@@ -235,6 +247,8 @@ export const createLayerFromHostedProduct = ({
   };
 };
 
+/** Brands a validated opaque string as a custom layer identifier. */
 export const asCustomLayerId = (value: string): CustomLayerId => value as CustomLayerId;
-export const asCustomProductId = (value: string): CustomProductId => value as CustomProductId;
 
+/** Brands a validated opaque string as a hosted custom product identifier. */
+export const asCustomProductId = (value: string): CustomProductId => value as CustomProductId;
