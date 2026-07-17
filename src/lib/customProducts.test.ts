@@ -64,6 +64,10 @@ describe('custom product schema', () => {
     expect(isCustomCategoryList([category()])).toBe(true);
     expect(isCustomCategoryList([])).toBe(false);
     expect(isCustomCategoryList([category(), category()])).toBe(false);
+    expect(isCustomCategoryList([
+      category(),
+      category({ id: 'cat-2' as CustomCategoryTemplate['id'], order: 2 }),
+    ])).toBe(false);
     expect(isCustomCategoryList(Array.from(
       { length: CUSTOM_PRODUCT_LIMITS.categoriesPerProduct + 1 },
       (_, index) => category({ id: `cat-${index}` as CustomCategoryTemplate['id'], order: index }),
@@ -77,8 +81,14 @@ describe('custom product schema', () => {
     } as const;
     expect(isCustomPolygonFeature({
       ...base,
+      bbox: [0, 0, 1, 1],
       geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
     }, 'layer-1', new Set(['cat-1']))).toBe(true);
+    expect(isCustomPolygonFeature({
+      ...base,
+      bbox: [0, 0, Number.POSITIVE_INFINITY, 1],
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+    })).toBe(false);
     expect(isCustomPolygonFeature({
       ...base,
       geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] },
@@ -93,8 +103,10 @@ describe('custom product schema', () => {
     expect(isHostedCustomProduct(product())).toBe(true);
     expect(isHostedCustomProduct({ ...product(), userId: '' })).toBe(false);
     expect(isHostedCustomProduct({ ...product(), version: 0 })).toBe(false);
+    expect(isHostedCustomProduct({ ...product(), version: Number.MAX_SAFE_INTEGER + 1 })).toBe(false);
     expect(isHostedCustomProduct({ ...product(), label: 'x'.repeat(65) })).toBe(false);
     expect(isHostedCustomProduct({ ...product(), internalRole: 'admin' })).toBe(false);
+    expect(isHostedCustomProduct({ ...product(), updatedAt: '2026-02-31T12:00:00.000Z' })).toBe(false);
   });
 
   test('creates a detached immutable-by-value package snapshot', () => {
@@ -170,4 +182,3 @@ describe('custom product schema', () => {
     expect(original.categories[0].style.fillColor).toBe('#8a3ffc');
   });
 });
-

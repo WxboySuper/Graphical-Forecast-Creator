@@ -15,7 +15,7 @@ import {
 } from '../types/customProducts';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const HATCH_PATTERNS = new Set(['none', 'diagonal', 'reverse-diagonal', 'crosshatch']);
 
 /** Returns true only for non-array object records. */
@@ -32,7 +32,10 @@ const isBoundedText = (value: unknown, max = CUSTOM_PRODUCT_LIMITS.labelLength):
 
 /** Validates a canonical UTC ISO timestamp. */
 const isIsoTimestamp = (value: unknown): value is string =>
-  typeof value === 'string' && ISO_TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value));
+  typeof value === 'string'
+  && ISO_TIMESTAMP.test(value)
+  && !Number.isNaN(Date.parse(value))
+  && new Date(value).toISOString() === value;
 
 /** Validates an opacity-like value in the inclusive zero-to-one interval. */
 const isUnitInterval = (value: unknown): value is number =>
@@ -40,11 +43,11 @@ const isUnitInterval = (value: unknown): value is number =>
 
 /** Validates a whole number that may be zero. */
 const isNonNegativeInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 0;
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 
 /** Validates a whole number that starts at one. */
 const isPositiveInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 1;
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
 
 /** Validates a complete category style without accepting unknown persistence fields. */
 export const isCustomCategoryStyle = (value: unknown): value is CustomCategoryStyle => {
@@ -82,8 +85,8 @@ export const isCustomCategoryList = (value: unknown): value is CustomCategoryTem
   }
   if (!value.every(isCustomCategoryTemplate)) return false;
   const ids = new Set(value.map((category) => category.id));
-  const orders = new Set(value.map((category) => category.order));
-  return ids.size === value.length && orders.size === value.length;
+  return ids.size === value.length
+    && value.every((category, index) => category.order === index);
 };
 
 /** Validates one finite GeoJSON coordinate position. */
@@ -114,14 +117,21 @@ const isCustomPolygonGeometry = (value: unknown): value is Geometry => {
     && value.coordinates.every(isPolygonCoordinates);
 };
 
+/** Validates the finite four- or six-number GeoJSON bounding-box shape. */
+const isBoundingBox = (value: unknown): boolean =>
+  Array.isArray(value)
+  && (value.length === 4 || value.length === 6)
+  && value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate));
+
 /** Validates a custom GeoJSON polygon against its owning layer/category identities. */
 export const isCustomPolygonFeature = (
   value: unknown,
   layerId?: string,
   categoryIds?: ReadonlySet<string>,
 ): value is CustomPolygonFeature => {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['type', 'id', 'geometry', 'properties'])) return false;
+  if (!isRecord(value) || !hasOnlyKeys(value, ['type', 'id', 'geometry', 'properties', 'bbox'])) return false;
   if (value.type !== 'Feature' || !isCustomPolygonGeometry(value.geometry) || !isRecord(value.properties)) return false;
+  if (value.bbox !== undefined && !isBoundingBox(value.bbox)) return false;
   if (!hasOnlyKeys(value.properties, ['customLayerId', 'categoryId', 'title'])) return false;
   if (!isBoundedText(value.properties.customLayerId) || !isBoundedText(value.properties.categoryId)) return false;
   if (!isBoundedText(value.properties.title)) return false;
