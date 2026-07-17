@@ -21,6 +21,7 @@ import { asCustomLayerId } from '../../lib/customProducts';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 const colors = ['#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#3b82f6'];
+const colorChoices = ['#22c55e', '#0ea5e9', '#2563eb', '#a855f7', '#ef4444', '#f97316', '#eab308', '#64748b'];
 const isHexColor = (value: string): boolean => /^#[0-9a-f]{6}$/i.test(value);
 const hexToHsv = (hex: string) => {
   const rgb = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
@@ -131,11 +132,14 @@ const FillColorPicker = ({
     </PopoverTrigger>
     <PopoverContent className="custom-draw-panel__color-menu" align="start">
       <p>Fill color</p>
+      <div className="custom-draw-panel__color-grid" aria-label="Suggested fill colors">
+        {colorChoices.map((choice) => <button key={choice} type="button" aria-label={`Use ${choice}`} className={choice === color ? 'is-selected' : ''} style={{ backgroundColor: choice }} onClick={() => commit(choice)}>{choice === color ? <Check aria-hidden="true" /> : null}</button>)}
+      </div>
       <div className="custom-draw-panel__color-plane" style={{ backgroundColor: `hsl(${hsv.hue} 100% 50%)` }} onPointerDown={updatePlane} onPointerMove={(event) => { if (event.buttons === 1) updatePlane(event); }}>
         <span style={{ left: `${hsv.saturation * 100}%`, top: `${(1 - hsv.value) * 100}%` }} />
       </div>
       <input className="custom-draw-panel__hue-slider" aria-label="Fill color hue" type="range" min="0" max="360" value={hsv.hue} onChange={(event) => updateHsv({ ...hsv, hue: Number(event.target.value) })} />
-      <label>Hex <input aria-label="Custom fill hex" value={draft} maxLength={7} onChange={(event) => setDraft(event.target.value)} onBlur={() => commit(draft)} onKeyDown={(event) => { if (event.key === 'Enter') commit(draft); }} /></label>
+      <label><span>Hex color</span><input aria-label="Custom fill hex" value={draft} maxLength={7} onChange={(event) => setDraft(event.target.value)} onBlur={() => commit(draft)} onKeyDown={(event) => { if (event.key === 'Enter') commit(draft); }} /></label>
     </PopoverContent>
   </Popover>;
 };
