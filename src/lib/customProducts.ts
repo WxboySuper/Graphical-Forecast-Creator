@@ -1,4 +1,3 @@
-import type { Geometry, Position } from 'geojson';
 import {
   CUSTOM_PRODUCT_LIMITS,
   CUSTOM_PRODUCTS_SCHEMA_VERSION,
@@ -6,7 +5,6 @@ import {
   type CustomCategoryTemplate,
   type CustomLayerId,
   type CustomLayerCollection,
-  type CustomPolygonFeature,
   type CustomProductAccessState,
   type CustomProductId,
   type EmbeddedCustomProductSnapshot,
@@ -14,6 +12,9 @@ import {
   type HostedCustomProductStatus,
   type OneOffCustomLayer,
 } from '../types/customProducts';
+import { isCustomPolygonFeature } from './customGeometry';
+
+export { isCustomPolygonFeature } from './customGeometry';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -114,128 +115,6 @@ export const isCustomCategoryList = (value: unknown): value is CustomCategoryTem
   const ids = new Set(value.map((category) => category.id));
   if (ids.size !== value.length) return false;
   return value.every((category, index) => category.order === index);
-};
-
-/** Validates one finite GeoJSON coordinate position. */
-const isPosition = (value: unknown): value is Position =>
-  Array.isArray(value) && areAllValid([
-    [2, 3].includes(value.length),
-    value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate)),
-  ]);
-
-/** Validates a closed GeoJSON linear ring with enough positions. */
-const isLinearRing = (value: unknown): value is Position[] => {
-  if (!Array.isArray(value)) return false;
-  if (value.length < 4) return false;
-  if (!value.every(isPosition)) return false;
-  const first = value[0];
-  const last = value[value.length - 1];
-  return areAllValid([
-    first.length === last.length,
-    first.every((coordinate, index) => coordinate === last[index]),
-  ]);
-};
-
-/** Validates the ring collection used by one GeoJSON polygon. */
-const isPolygonCoordinates = (value: unknown): value is Position[][] =>
-  Array.isArray(value) && areAllValid([
-    value.length > 0,
-    value.length <= CUSTOM_PRODUCT_LIMITS.ringsPerPolygon,
-    value.every(isLinearRing),
-  ]);
-
-/** Flattens one supported polygon geometry into positions for bounded validation. */
-const getGeometryPositions = (value: Record<string, unknown>): Position[] => {
-  if (!Array.isArray(value.coordinates)) return [];
-  const polygons = value.type === 'Polygon' ? [value.coordinates] : value.coordinates;
-  return (polygons as Position[][][]).flat(2);
-};
-
-/** Ensures every coordinate in a geometry uses one consistent dimension. */
-const hasValidGeometryDimensions = (value: Record<string, unknown>): boolean => {
-  const positions = getGeometryPositions(value);
-  if (positions.length === 0 || positions.length > CUSTOM_PRODUCT_LIMITS.coordinatesPerFeature) return false;
-  return positions.every((position) => position.length === positions[0].length);
-};
-
-/** Validates one Polygon coordinate collection and its shared dimension. */
-const hasValidPolygonGeometry = (value: Record<string, unknown>): boolean =>
-  value.type === 'Polygon'
-  && isPolygonCoordinates(value.coordinates)
-  && hasValidGeometryDimensions(value);
-
-/** Validates one bounded MultiPolygon coordinate collection. */
-const hasValidMultiPolygonGeometry = (value: Record<string, unknown>): boolean =>
-  value.type === 'MultiPolygon'
-  && Array.isArray(value.coordinates)
-  && value.coordinates.length > 0
-  && value.coordinates.length <= CUSTOM_PRODUCT_LIMITS.polygonsPerFeature
-  && value.coordinates.every(isPolygonCoordinates)
-  && hasValidGeometryDimensions(value);
-
-/** Accepts only Polygon or MultiPolygon geometry for custom forecast content. */
-const isCustomPolygonGeometry = (value: unknown): value is Geometry => {
-  if (!isRecord(value)) return false;
-  if (!hasOnlyKeys(value, ['type', 'coordinates'])) return false;
-  return hasValidPolygonGeometry(value) || hasValidMultiPolygonGeometry(value);
-};
-
-/** Validates a finite, ordered GeoJSON bbox matching the geometry dimension. */
-const isBoundingBox = (value: unknown, dimension: number): boolean => {
-  if (!Array.isArray(value) || value.length !== dimension * 2) return false;
-  if (!value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))) return false;
-  return value.slice(0, dimension).every((minimum, index) => minimum <= value[index + dimension]);
-};
-
-/** Accepts the GeoJSON string or finite numeric feature identifier contract. */
-const isOptionalFeatureId = (value: unknown): boolean =>
-  value === undefined
-  || typeof value === 'string'
-  || (typeof value === 'number' && Number.isFinite(value));
-
-/** Validates the persistence shell shared by all custom GeoJSON features. */
-const hasValidCustomFeatureShape = (value: Record<string, unknown>): boolean => {
-  if (!hasOnlyKeys(value, ['type', 'id', 'geometry', 'properties', 'bbox'])) return false;
-  if (value.type !== 'Feature') return false;
-  if (!isCustomPolygonGeometry(value.geometry)) return false;
-  if (!isRecord(value.properties)) return false;
-  if (!isOptionalFeatureId(value.id)) return false;
-  const dimension = getGeometryPositions(value.geometry as Record<string, unknown>)[0]?.length;
-  return value.bbox === undefined || isBoundingBox(value.bbox, dimension);
-};
-
-/** Validates the category identity and display title stored on a custom feature. */
-const hasValidCustomFeatureProperties = (properties: Record<string, unknown>): boolean => {
-  if (!hasOnlyKeys(properties, ['customLayerId', 'categoryId', 'title'])) return false;
-  return areAllValid([
-    isBoundedText(properties.customLayerId),
-    isBoundedText(properties.categoryId),
-    isBoundedText(properties.title),
-  ]);
-};
-
-/** Checks optional owning-layer and category constraints for one feature. */
-const matchesCustomFeatureOwner = (
-  properties: Record<string, unknown>,
-  layerId?: string,
-  categoryIds?: ReadonlySet<string>,
-): boolean => {
-  if (layerId !== undefined && properties.customLayerId !== layerId) return false;
-  if (categoryIds === undefined) return true;
-  return typeof properties.categoryId === 'string' && categoryIds.has(properties.categoryId);
-};
-
-/** Validates a custom GeoJSON polygon against its owning layer/category identities. */
-export const isCustomPolygonFeature = (
-  value: unknown,
-  layerId?: string,
-  categoryIds?: ReadonlySet<string>,
-): value is CustomPolygonFeature => {
-  if (!isRecord(value)) return false;
-  if (!hasValidCustomFeatureShape(value)) return false;
-  const properties = value.properties as Record<string, unknown>;
-  if (!hasValidCustomFeatureProperties(properties)) return false;
-  return matchesCustomFeatureOwner(properties, layerId, categoryIds);
 };
 
 /** Creates a detached snapshot so future product edits cannot alter old maps. */
