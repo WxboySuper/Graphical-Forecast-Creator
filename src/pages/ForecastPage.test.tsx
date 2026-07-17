@@ -30,7 +30,7 @@ import ForecastPage, {
   writeStoredDayValue,
 } from './ForecastPage';
 import forecastReducer from '../store/forecastSlice';
-import { addFeature, updateDiscussionDraft } from '../store/forecastSlice';
+import { addCustomLayer, addFeature, updateDiscussionDraft } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -42,7 +42,7 @@ import { serializeForecast } from '../utils/fileUtils';
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
-import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -128,6 +128,7 @@ describe('ForecastPage layout selection', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    mockAddToast.mockClear();
     mockUseAuth.mockReturnValue({ user: null, syncedSettings: null });
   });
 
@@ -175,6 +176,53 @@ describe('ForecastPage layout selection', () => {
     await waitFor(() => expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers[0]?.label).toBe('Fire weather'));
     expect(store.getState().forecast.customEditor.mode).toBe('custom');
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
+  });
+
+  test('preserves a reusable-product handoff and reports the custom-layer limit', async () => {
+    const store = createStore();
+    for (let index = 0; index < CUSTOM_PRODUCT_LIMITS.layersPerCollection; index += 1) {
+      store.dispatch(addCustomLayer({
+        schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+        id: `existing-layer-${index}` as never,
+        label: `Existing layer ${index + 1}`,
+        order: index,
+        categories: [{
+          id: `existing-category-${index}` as never,
+          label: 'Existing category',
+          order: 0,
+          style: { fillColor: '#f97316', fillOpacity: 0.45, strokeColor: '#123456', strokeOpacity: 1, strokeWidth: 2, hatch: 'none' },
+        }],
+        features: [],
+        createdAt: '2026-07-17T12:00:00.000Z',
+        updatedAt: '2026-07-17T12:00:00.000Z',
+      }));
+    }
+    const stagedLayer = {
+      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+      id: 'staged-layer' as never,
+      label: 'Preserved product',
+      order: 0,
+      categories: [{
+        id: 'staged-category' as never,
+        label: 'Staged category',
+        order: 0,
+        style: { fillColor: '#f97316', fillOpacity: 0.45, strokeColor: '#123456', strokeOpacity: 1, strokeWidth: 2, hatch: 'none' as const },
+      }],
+      features: [],
+      createdAt: '2026-07-17T12:00:00.000Z',
+      updatedAt: '2026-07-17T12:00:00.000Z',
+    };
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(stagedLayer));
+
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+      `Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`,
+      'error',
+    ));
+    expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers).toHaveLength(CUSTOM_PRODUCT_LIMITS.layersPerCollection);
+    expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual(stagedLayer);
+    expect(store.getState().forecast.customEditor.mode).toBe('severe');
   });
 
   test('query string or stored/remote overrides resolve to the tabbed toolbar when other variants are removed', () => {

@@ -135,6 +135,29 @@ const writeLocalProducts = (userId: string, products: HostedCustomProduct[]): vo
 };
 
 const localSubscribers = new Map<string, Set<(products: HostedCustomProduct[]) => void>>();
+const localMutationQueues = new Map<string, Promise<void>>();
+
+/** Serializes one account's local read/validate/write cycle across tabs and test environments. */
+const withLocalMutationLock = async <T>(userId: string, operation: () => T | Promise<T>): Promise<T> => {
+  const lockName = `${LOCAL_LIBRARY_PREFIX}:${userId}:mutation`;
+  const webLocks = globalThis.navigator?.locks;
+  if (webLocks) {
+    return webLocks.request(lockName, operation);
+  }
+
+  const previous = localMutationQueues.get(lockName) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  const tail = previous.catch(() => undefined).then(() => current);
+  localMutationQueues.set(lockName, tail);
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (localMutationQueues.get(lockName) === tail) localMutationQueues.delete(lockName);
+  }
+};
 
 const emitLocalProducts = (userId: string): void => {
   const products = readLocalProducts(userId);
@@ -168,42 +191,50 @@ export const localCustomProductsRepository: CustomProductsRepository = {
     };
   },
   async create(userId, draft) {
-    const products = readLocalProducts(userId);
-    if (products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount) {
-      throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
-    }
-    const product = createHostedProduct({ id: uuidv4(), userId, draft });
-    writeLocalProducts(userId, [...products, product]);
-    emitLocalProducts(userId);
-    return product;
+    return withLocalMutationLock(userId, () => {
+      const products = readLocalProducts(userId);
+      if (products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount) {
+        throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
+      }
+      const product = createHostedProduct({ id: uuidv4(), userId, draft });
+      writeLocalProducts(userId, [...products, product]);
+      emitLocalProducts(userId);
+      return product;
+    });
   },
   async update(userId, product, draft) {
-    const products = readLocalProducts(userId);
-    const current = products.find((candidate) => candidate.id === product.id);
-    if (!current) throw new Error('Custom product not found.');
-    assertExpectedVersion(current, product);
-    const revised = reviseProduct(current, draft);
-    writeLocalProducts(userId, products.map((candidate) => candidate.id === revised.id ? revised : candidate));
-    emitLocalProducts(userId);
-    return revised;
+    return withLocalMutationLock(userId, () => {
+      const products = readLocalProducts(userId);
+      const current = products.find((candidate) => candidate.id === product.id);
+      if (!current) throw new Error('Custom product not found.');
+      assertExpectedVersion(current, product);
+      const revised = reviseProduct(current, draft);
+      writeLocalProducts(userId, products.map((candidate) => candidate.id === revised.id ? revised : candidate));
+      emitLocalProducts(userId);
+      return revised;
+    });
   },
   async setStatus(userId, product, status) {
-    const products = readLocalProducts(userId);
-    const current = products.find((candidate) => candidate.id === product.id);
-    if (!current) throw new Error('Custom product not found.');
-    assertExpectedVersion(current, product);
-    const revised = reviseProduct(current, current, status);
-    writeLocalProducts(userId, products.map((candidate) => candidate.id === revised.id ? revised : candidate));
-    emitLocalProducts(userId);
-    return revised;
+    return withLocalMutationLock(userId, () => {
+      const products = readLocalProducts(userId);
+      const current = products.find((candidate) => candidate.id === product.id);
+      if (!current) throw new Error('Custom product not found.');
+      assertExpectedVersion(current, product);
+      const revised = reviseProduct(current, current, status);
+      writeLocalProducts(userId, products.map((candidate) => candidate.id === revised.id ? revised : candidate));
+      emitLocalProducts(userId);
+      return revised;
+    });
   },
   async delete(userId, product) {
-    const products = readLocalProducts(userId);
-    const current = products.find((candidate) => candidate.id === product.id);
-    if (!current) return;
-    assertExpectedVersion(current, product);
-    writeLocalProducts(userId, products.filter((candidate) => candidate.id !== product.id));
-    emitLocalProducts(userId);
+    return withLocalMutationLock(userId, () => {
+      const products = readLocalProducts(userId);
+      const current = products.find((candidate) => candidate.id === product.id);
+      if (!current) return;
+      assertExpectedVersion(current, product);
+      writeLocalProducts(userId, products.filter((candidate) => candidate.id !== product.id));
+      emitLocalProducts(userId);
+    });
   },
 };
 

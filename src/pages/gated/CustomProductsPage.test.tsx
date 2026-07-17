@@ -123,4 +123,21 @@ describe('CustomProductsPage', () => {
     expect(screen.getByRole('button', { name: /Archive/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Delete$/i })).toBeDisabled();
   });
+
+  test('keeps create and edit modes mutually exclusive', async () => {
+    const user = userEvent.setup();
+    mockUseCustomProducts.mockReturnValue(result({ products: [product] }));
+    render(<MemoryRouter><CustomProductsPage /></MemoryRouter>);
+
+    await user.click(screen.getByRole('button', { name: /Edit/i }));
+    expect(screen.getByRole('heading', { name: /Edit Winter hazards/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New product/i })).toBeDisabled();
+    expect(screen.queryByText(/Create reusable product/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Cancel/i }));
+    await user.click(screen.getByRole('button', { name: /New product/i }));
+    expect(screen.getByRole('heading', { name: /Create reusable product/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Edit/i })).toBeDisabled();
+    expect(screen.queryByRole('heading', { name: /Edit Winter hazards/i })).not.toBeInTheDocument();
+  });
 });

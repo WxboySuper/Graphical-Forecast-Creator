@@ -333,7 +333,10 @@ const CustomProductsPage = () => {
         </div>
         <div className="custom-products-hero__actions">
           <span>{customProducts.products.length}/{CUSTOM_PRODUCT_LIMITS.productsPerAccount} products · {activeCount} active</span>
-          <Button onClick={() => setCreating(true)} disabled={Boolean(customProducts.pendingAction) || !customProducts.premiumActive || creating || customProducts.products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount}>
+          <Button
+            onClick={() => { setEditing(null); setCreating(true); }}
+            disabled={Boolean(customProducts.pendingAction) || !customProducts.premiumActive || creating || Boolean(editing) || customProducts.products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount}
+          >
             <Plus className="mr-2 h-4 w-4" /> New product
           </Button>
         </div>
@@ -358,8 +361,8 @@ const CustomProductsPage = () => {
               key={product.id}
               product={product}
               premiumActive={customProducts.premiumActive}
-              pending={Boolean(customProducts.pendingAction)}
-              onEdit={() => setEditing(product)}
+              pending={Boolean(customProducts.pendingAction) || creating || Boolean(editing)}
+              onEdit={() => { setCreating(false); setEditing(product); }}
               onDuplicate={() => void customProducts.duplicateProduct(product)}
               onStatus={() => void customProducts.setProductStatus(product, product.status === 'active' ? 'archived' : 'active')}
               onDelete={() => void customProducts.deleteProduct(product)}

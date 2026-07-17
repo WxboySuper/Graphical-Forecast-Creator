@@ -85,6 +85,32 @@ describe('customProductsRepository', () => {
     expect((await localCustomProductsRepository.list('user-1'))[0]).toEqual(updated);
   });
 
+  test('serializes concurrent local mutations with the deterministic fallback lock', async () => {
+    const originalLocks = navigator.locks;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined });
+    try {
+      await Promise.all([
+        localCustomProductsRepository.create('user-1', draft('First concurrent product')),
+        localCustomProductsRepository.create('user-1', draft('Second concurrent product')),
+      ]);
+      expect((await localCustomProductsRepository.list('user-1')).map(({ label }) => label).sort()).toEqual([
+        'First concurrent product',
+        'Second concurrent product',
+      ]);
+
+      const current = (await localCustomProductsRepository.list('user-1'))[0];
+      const updates = await Promise.allSettled([
+        localCustomProductsRepository.update('user-1', current, draft('Winning revision A')),
+        localCustomProductsRepository.update('user-1', current, draft('Winning revision B')),
+      ]);
+      expect(updates.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
+      expect(updates.filter(({ status }) => status === 'rejected')).toHaveLength(1);
+      expect(Math.max(...(await localCustomProductsRepository.list('user-1')).map(({ version }) => version))).toBe(2);
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: originalLocks });
+    }
+  });
+
   test('subscribes to live local updates and releases the listener cleanly', async () => {
     const onUpdate = jest.fn();
     const unsubscribe = localCustomProductsRepository.subscribe('user-1', onUpdate);

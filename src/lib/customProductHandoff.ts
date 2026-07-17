@@ -7,6 +7,12 @@ import {
 
 export const CUSTOM_PRODUCT_HANDOFF_KEY = 'gfc-custom-product-handoff';
 
+/** Restores a validated handoff when the forecast cannot accept it yet. */
+export const restoreCustomProductForecastHandoff = (layer: OneOffCustomLayer): void => {
+  if (!isOneOffCustomLayer(layer)) throw new TypeError('Cannot restore an invalid custom product handoff.');
+  sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
+};
+
 /** Stages a detached empty layer for the forecast editor to consume without retaining a live template reference. */
 export const stageCustomProductForForecast = (
   product: HostedCustomProduct,
@@ -20,7 +26,7 @@ export const stageCustomProductForForecast = (
     layerId: asCustomLayerId(`custom-${nonce}`),
     order: 0,
   });
-  sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
+  restoreCustomProductForecastHandoff(layer);
   return layer;
 };
 
