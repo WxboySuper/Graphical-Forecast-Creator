@@ -214,7 +214,7 @@ const CustomCategorySections: React.FC<{
       <MenuPicker label="Category hatch" testId="custom-hatch-select" value={activeCategory.style.hatch} options={[
         { id: 'none', label: 'No hatch' }, { id: 'diagonal', label: 'Diagonal' }, { id: 'reverse-diagonal', label: 'Reverse diagonal' }, { id: 'crosshatch', label: 'Crosshatch' },
       ]} onChange={(hatch) => updateCategory({ style: { hatch: hatch as CustomHatchPattern } })} />
-      <span className={`custom-style-swatch hatch-${activeCategory.style.hatch}`} style={{ '--custom-fill': activeCategory.style.fillColor, '--custom-opacity': activeCategory.style.fillOpacity } as React.CSSProperties} aria-label={`${activeCategory.label} preview`} />
+      <span className={`custom-style-swatch hatch-${activeCategory.style.hatch}`} style={{ '--custom-fill': activeCategory.style.fillColor, '--custom-opacity': 1 } as React.CSSProperties} aria-label={`${activeCategory.label} selected color`} />
     </section>
   </>;
 };

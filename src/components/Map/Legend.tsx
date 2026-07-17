@@ -38,7 +38,7 @@ const Legend: React.FC<LegendProps> = React.memo(({
     const reverse = `repeating-linear-gradient(-45deg, transparent 0 6px, ${category.style.strokeColor} 6px 8px)`;
     return {
       backgroundColor: category.style.fillColor,
-      opacity: category.style.fillOpacity,
+      opacity: 1,
       backgroundImage: category.style.hatch === 'none' ? undefined : category.style.hatch === 'crosshatch' ? `${diagonal}, ${reverse}` : diagonal,
       borderColor: category.style.strokeColor,
       borderWidth: category.style.strokeWidth,

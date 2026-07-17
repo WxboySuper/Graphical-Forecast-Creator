@@ -34,7 +34,7 @@ export const categoryPreviewStyle = (category: CustomCategoryTemplate): CSSPrope
     crosshatch: `${diagonal}, ${reverse}`,
   };
   return {
-    backgroundColor: hexToRgba(category.style.fillColor, category.style.fillOpacity),
+    backgroundColor: category.style.fillColor,
     backgroundImage: backgrounds[category.style.hatch],
     borderColor: stroke,
     borderWidth: category.style.strokeWidth,
