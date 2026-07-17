@@ -133,7 +133,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 430,
   },
   customProducts: {
-    exposure: { ...ALL_TARGETS_OFF },
+    exposure: { ...ALL_TARGETS_OFF, local: true },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
     temporary: true,

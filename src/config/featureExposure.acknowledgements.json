@@ -23,7 +23,8 @@
     "trackingIssue": 530
   },
   "customProducts": {
-    "reason": "Registry-only until custom product surfaces merge; adoption contract in src/config/v17WorkstreamAdoption.exposure.test.ts",
-    "trackingIssue": 530
+    "reason": "Local-only implementation and review under #431; beta, staging, and production remain disabled until separate owner authorization. Adoption contract in src/config/v17WorkstreamAdoption.exposure.test.ts",
+    "trackingIssue": 530,
+    "localDevelopmentApproved": true
   }
 }
