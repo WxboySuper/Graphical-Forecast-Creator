@@ -49,79 +49,137 @@ const isNonNegativeInteger = (value: unknown): value is number =>
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
 
+/** Validates one six-digit hexadecimal color. */
+const isHexColor = (value: unknown): value is string =>
+  typeof value === 'string' && HEX_COLOR.test(value);
+
+/** Validates a bounded map stroke width. */
+const isStrokeWidth = (value: unknown): value is number =>
+  typeof value === 'number'
+  && Number.isFinite(value)
+  && value >= 0
+  && value <= 8;
+
+/** Validates one supported custom hatch identifier. */
+const isHatchPattern = (value: unknown): boolean =>
+  typeof value === 'string' && HATCH_PATTERNS.has(value);
+
+/** Combines field-level checks without a compound validator conditional. */
+const areAllValid = (checks: readonly boolean[]): boolean => checks.every(Boolean);
+
+/** Validates the primitive fields of a category style record. */
+const hasValidCategoryStyleFields = (value: Record<string, unknown>): boolean => areAllValid([
+  isHexColor(value.fillColor),
+  isUnitInterval(value.fillOpacity),
+  isHexColor(value.strokeColor),
+  isUnitInterval(value.strokeOpacity),
+  isStrokeWidth(value.strokeWidth),
+  isHatchPattern(value.hatch),
+]);
+
 /** Validates a complete category style without accepting unknown persistence fields. */
 export const isCustomCategoryStyle = (value: unknown): value is CustomCategoryStyle => {
-  if (!isRecord(value) || !hasOnlyKeys(value, [
+  if (!isRecord(value)) return false;
+  if (!hasOnlyKeys(value, [
     'fillColor', 'fillOpacity', 'strokeColor', 'strokeOpacity', 'strokeWidth', 'hatch',
   ])) return false;
-
-  return typeof value.fillColor === 'string'
-    && HEX_COLOR.test(value.fillColor)
-    && isUnitInterval(value.fillOpacity)
-    && typeof value.strokeColor === 'string'
-    && HEX_COLOR.test(value.strokeColor)
-    && isUnitInterval(value.strokeOpacity)
-    && typeof value.strokeWidth === 'number'
-    && Number.isFinite(value.strokeWidth)
-    && value.strokeWidth >= 0
-    && value.strokeWidth <= 8
-    && typeof value.hatch === 'string'
-    && HATCH_PATTERNS.has(value.hatch);
+  return hasValidCategoryStyleFields(value);
 };
 
 /** Validates one bounded ordered category definition. */
 export const isCustomCategoryTemplate = (value: unknown): value is CustomCategoryTemplate => {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['id', 'label', 'order', 'style'])) return false;
-  return isBoundedText(value.id)
-    && isBoundedText(value.label)
-    && isNonNegativeInteger(value.order)
-    && isCustomCategoryStyle(value.style);
+  if (!isRecord(value)) return false;
+  if (!hasOnlyKeys(value, ['id', 'label', 'order', 'style'])) return false;
+  return areAllValid([
+    isBoundedText(value.id),
+    isBoundedText(value.label),
+    isNonNegativeInteger(value.order),
+    isCustomCategoryStyle(value.style),
+  ]);
 };
 
 /** Validates category limits, unique identifiers, and stable ordering. */
 export const isCustomCategoryList = (value: unknown): value is CustomCategoryTemplate[] => {
-  if (!Array.isArray(value) || value.length === 0 || value.length > CUSTOM_PRODUCT_LIMITS.categoriesPerProduct) {
-    return false;
-  }
+  if (!Array.isArray(value)) return false;
+  if (value.length === 0) return false;
+  if (value.length > CUSTOM_PRODUCT_LIMITS.categoriesPerProduct) return false;
   if (!value.every(isCustomCategoryTemplate)) return false;
   const ids = new Set(value.map((category) => category.id));
-  return ids.size === value.length
-    && value.every((category, index) => category.order === index);
+  if (ids.size !== value.length) return false;
+  return value.every((category, index) => category.order === index);
 };
 
 /** Validates one finite GeoJSON coordinate position. */
 const isPosition = (value: unknown): value is Position =>
-  Array.isArray(value)
-  && value.length >= 2
-  && value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate));
+  Array.isArray(value) && areAllValid([
+    value.length >= 2,
+    value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate)),
+  ]);
 
 /** Validates a closed GeoJSON linear ring with enough positions. */
 const isLinearRing = (value: unknown): value is Position[] => {
-  if (!Array.isArray(value) || value.length < 4 || !value.every(isPosition)) return false;
+  if (!Array.isArray(value)) return false;
+  if (value.length < 4) return false;
+  if (!value.every(isPosition)) return false;
   const first = value[0];
   const last = value[value.length - 1];
-  return first.length === last.length && first.every((coordinate, index) => coordinate === last[index]);
+  return areAllValid([
+    first.length === last.length,
+    first.every((coordinate, index) => coordinate === last[index]),
+  ]);
 };
 
 /** Validates the ring collection used by one GeoJSON polygon. */
 const isPolygonCoordinates = (value: unknown): value is Position[][] =>
-  Array.isArray(value) && value.length > 0 && value.every(isLinearRing);
+  Array.isArray(value) && areAllValid([value.length > 0, value.every(isLinearRing)]);
 
 /** Accepts only Polygon or MultiPolygon geometry for custom forecast content. */
 const isCustomPolygonGeometry = (value: unknown): value is Geometry => {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['type', 'coordinates'])) return false;
+  if (!isRecord(value)) return false;
+  if (!hasOnlyKeys(value, ['type', 'coordinates'])) return false;
   if (value.type === 'Polygon') return isPolygonCoordinates(value.coordinates);
-  return value.type === 'MultiPolygon'
-    && Array.isArray(value.coordinates)
-    && value.coordinates.length > 0
-    && value.coordinates.every(isPolygonCoordinates);
+  if (value.type !== 'MultiPolygon') return false;
+  if (!Array.isArray(value.coordinates)) return false;
+  if (value.coordinates.length === 0) return false;
+  return value.coordinates.every(isPolygonCoordinates);
 };
 
 /** Validates the finite four- or six-number GeoJSON bounding-box shape. */
 const isBoundingBox = (value: unknown): boolean =>
-  Array.isArray(value)
-  && (value.length === 4 || value.length === 6)
-  && value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate));
+  Array.isArray(value) && areAllValid([
+    [4, 6].includes(value.length),
+    value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate)),
+  ]);
+
+/** Validates the persistence shell shared by all custom GeoJSON features. */
+const hasValidCustomFeatureShape = (value: Record<string, unknown>): boolean => {
+  if (!hasOnlyKeys(value, ['type', 'id', 'geometry', 'properties', 'bbox'])) return false;
+  if (value.type !== 'Feature') return false;
+  if (!isCustomPolygonGeometry(value.geometry)) return false;
+  if (!isRecord(value.properties)) return false;
+  return value.bbox === undefined || isBoundingBox(value.bbox);
+};
+
+/** Validates the category identity and display title stored on a custom feature. */
+const hasValidCustomFeatureProperties = (properties: Record<string, unknown>): boolean => {
+  if (!hasOnlyKeys(properties, ['customLayerId', 'categoryId', 'title'])) return false;
+  return areAllValid([
+    isBoundedText(properties.customLayerId),
+    isBoundedText(properties.categoryId),
+    isBoundedText(properties.title),
+  ]);
+};
+
+/** Checks optional owning-layer and category constraints for one feature. */
+const matchesCustomFeatureOwner = (
+  properties: Record<string, unknown>,
+  layerId?: string,
+  categoryIds?: ReadonlySet<string>,
+): boolean => {
+  if (layerId !== undefined && properties.customLayerId !== layerId) return false;
+  if (categoryIds === undefined) return true;
+  return typeof properties.categoryId === 'string' && categoryIds.has(properties.categoryId);
+};
 
 /** Validates a custom GeoJSON polygon against its owning layer/category identities. */
 export const isCustomPolygonFeature = (
@@ -129,14 +187,11 @@ export const isCustomPolygonFeature = (
   layerId?: string,
   categoryIds?: ReadonlySet<string>,
 ): value is CustomPolygonFeature => {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['type', 'id', 'geometry', 'properties', 'bbox'])) return false;
-  if (value.type !== 'Feature' || !isCustomPolygonGeometry(value.geometry) || !isRecord(value.properties)) return false;
-  if (value.bbox !== undefined && !isBoundingBox(value.bbox)) return false;
-  if (!hasOnlyKeys(value.properties, ['customLayerId', 'categoryId', 'title'])) return false;
-  if (!isBoundedText(value.properties.customLayerId) || !isBoundedText(value.properties.categoryId)) return false;
-  if (!isBoundedText(value.properties.title)) return false;
-  if (layerId && value.properties.customLayerId !== layerId) return false;
-  return !categoryIds || categoryIds.has(value.properties.categoryId);
+  if (!isRecord(value)) return false;
+  if (!hasValidCustomFeatureShape(value)) return false;
+  const properties = value.properties as Record<string, unknown>;
+  if (!hasValidCustomFeatureProperties(properties)) return false;
+  return matchesCustomFeatureOwner(properties, layerId, categoryIds);
 };
 
 /** Creates a detached snapshot so future product edits cannot alter old maps. */
@@ -157,52 +212,74 @@ export const createEmbeddedCustomProductSnapshot = (
 
 /** Validates an immutable-by-contract embedded product snapshot. */
 export const isEmbeddedCustomProductSnapshot = (value: unknown): value is EmbeddedCustomProductSnapshot => {
-  if (!isRecord(value) || !hasOnlyKeys(value, [
+  if (!isRecord(value)) return false;
+  if (!hasOnlyKeys(value, [
     'schemaVersion', 'sourceProductId', 'sourceProductVersion', 'label', 'categories', 'capturedAt',
   ])) return false;
-  return value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION
-    && (value.sourceProductId === undefined || isBoundedText(value.sourceProductId))
-    && (value.sourceProductVersion === undefined || isPositiveInteger(value.sourceProductVersion))
-    && isBoundedText(value.label)
-    && isCustomCategoryList(value.categories)
-    && isIsoTimestamp(value.capturedAt);
+  return areAllValid([
+    value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
+    value.sourceProductId === undefined || isBoundedText(value.sourceProductId),
+    value.sourceProductVersion === undefined || isPositiveInteger(value.sourceProductVersion),
+    isBoundedText(value.label),
+    isCustomCategoryList(value.categories),
+    isIsoTimestamp(value.capturedAt),
+  ]);
 };
+
+/** Validates the scalar, category, snapshot, and timestamp fields on a one-off layer. */
+const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => areAllValid([
+  value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
+  isBoundedText(value.id),
+  isBoundedText(value.label),
+  isNonNegativeInteger(value.order),
+  isCustomCategoryList(value.categories),
+  Array.isArray(value.features),
+  isIsoTimestamp(value.createdAt),
+  isIsoTimestamp(value.updatedAt),
+  value.productSnapshot === undefined || isEmbeddedCustomProductSnapshot(value.productSnapshot),
+]);
 
 /** Validates a complete self-contained one-off layer. */
 export const isOneOffCustomLayer = (value: unknown): value is OneOffCustomLayer => {
-  if (!isRecord(value) || !hasOnlyKeys(value, [
+  if (!isRecord(value)) return false;
+  if (!hasOnlyKeys(value, [
     'schemaVersion', 'id', 'label', 'order', 'categories', 'features', 'productSnapshot', 'createdAt', 'updatedAt',
   ])) return false;
-  if (value.schemaVersion !== CUSTOM_PRODUCTS_SCHEMA_VERSION
-    || !isBoundedText(value.id)
-    || !isBoundedText(value.label)
-    || !isNonNegativeInteger(value.order)
-    || !isCustomCategoryList(value.categories)
-    || !Array.isArray(value.features)
-    || !isIsoTimestamp(value.createdAt)
-    || !isIsoTimestamp(value.updatedAt)
-    || (value.productSnapshot !== undefined && !isEmbeddedCustomProductSnapshot(value.productSnapshot))) {
-    return false;
-  }
-  const categoryIds = new Set(value.categories.map((category) => category.id));
-  return value.features.every((feature) => isCustomPolygonFeature(feature, value.id as string, categoryIds));
+  if (!hasValidOneOffLayerFields(value)) return false;
+  const layer = value as unknown as OneOffCustomLayer;
+  const categoryIds = new Set(layer.categories.map((category) => category.id));
+  return layer.features.every((feature) => isCustomPolygonFeature(feature, layer.id, categoryIds));
 };
+
+/** Validates an optional bounded product description. */
+const isOptionalDescription = (value: unknown): boolean =>
+  value === undefined || (typeof value === 'string' && value.length <= 500);
+
+/** Validates the active/archive lifecycle value. */
+const isHostedProductStatus = (value: unknown): value is HostedCustomProductStatus =>
+  value === 'active' || value === 'archived';
+
+/** Validates all fields after a hosted product's strict key check. */
+const hasValidHostedProductFields = (value: Record<string, unknown>): boolean => areAllValid([
+  value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
+  isBoundedText(value.id),
+  isBoundedText(value.userId, 128),
+  isBoundedText(value.label),
+  isOptionalDescription(value.description),
+  isPositiveInteger(value.version),
+  isHostedProductStatus(value.status),
+  isCustomCategoryList(value.categories),
+  isIsoTimestamp(value.createdAt),
+  isIsoTimestamp(value.updatedAt),
+]);
 
 /** Validates the owner-scoped reusable product persistence shape. */
 export const isHostedCustomProduct = (value: unknown): value is HostedCustomProduct => {
-  if (!isRecord(value) || !hasOnlyKeys(value, [
+  if (!isRecord(value)) return false;
+  if (!hasOnlyKeys(value, [
     'schemaVersion', 'id', 'userId', 'label', 'description', 'version', 'status', 'categories', 'createdAt', 'updatedAt',
   ])) return false;
-  return value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION
-    && isBoundedText(value.id)
-    && isBoundedText(value.userId, 128)
-    && isBoundedText(value.label)
-    && (value.description === undefined || (typeof value.description === 'string' && value.description.length <= 500))
-    && isPositiveInteger(value.version)
-    && (value.status === 'active' || value.status === 'archived')
-    && isCustomCategoryList(value.categories)
-    && isIsoTimestamp(value.createdAt)
-    && isIsoTimestamp(value.updatedAt);
+  return hasValidHostedProductFields(value);
 };
 
 /** Derives editability without mutating persisted product or embedded snapshot data. */
