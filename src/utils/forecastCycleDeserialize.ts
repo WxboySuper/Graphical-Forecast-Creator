@@ -9,6 +9,7 @@ import type {
   OutlookType,
 } from '../types/outlooks';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
+import { isCustomLayerCollection } from '../lib/customProducts';
 
 type SerializedDay = {
   day: DayType;
@@ -21,6 +22,7 @@ type SerializedDay = {
     lastModified?: string;
   };
   data: SerializedOutlookData;
+  customLayers?: OutlookDay['customLayers'];
   discussion?: DiscussionData;
 };
 
@@ -67,6 +69,9 @@ const deserializeSavedOutlookDay = (savedDay: SerializedDay): OutlookDay => {
       lastModified: meta.lastModified ?? new Date().toISOString(),
     },
     data: outlookData,
+    ...(isCustomLayerCollection(savedDay.customLayers)
+      ? { customLayers: JSON.parse(JSON.stringify(savedDay.customLayers)) as OutlookDay['customLayers'] }
+      : {}),
     discussion: (savedDay as Partial<{ discussion?: DiscussionData }>).discussion,
   };
 };

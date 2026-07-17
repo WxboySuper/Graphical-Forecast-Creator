@@ -35,6 +35,9 @@ import {
   toOlStyle,
   toGhostOlStyle,
   removeDrawInteraction,
+  getCustomFeatureIdentity,
+  toUpdatedCustomFeature,
+  toCustomOlStyle,
 } from './OpenLayersForecastMap';
 
 type FeatureStub = {
@@ -178,6 +181,25 @@ describe('OpenLayersForecastMap helpers', () => {
     const s2 = toGhostOlStyle({ outlookType: 'categorical', probability: 'P10', isCategorical: true });
     expect(s1).toBeTruthy();
     expect(s2).toBeTruthy();
+  });
+
+  test('custom feature identity and geometry round-trip stay separate from severe metadata', () => {
+    const values = { featureId: 'custom-1', customLayerId: 'layer-1', categoryId: 'cat-1', title: 'Heavy snow' };
+    const feature: FeatureStub = { get: (key) => values[key as keyof typeof values], getGeometry: () => ({ type: 'Polygon' }) };
+    expect(getCustomFeatureIdentity(feature)).toEqual(values);
+    const format: GeometryFormatStub = { writeGeometryObject: () => ({ type: 'Polygon', coordinates: [] }) };
+    expect(toUpdatedCustomFeature(feature, format as never)?.properties).toEqual({ customLayerId: 'layer-1', categoryId: 'cat-1', title: 'Heavy snow' });
+    expect(getFeatureIdentity(feature)).toBeNull();
+  });
+
+  test('custom solid style preserves color, opacity, stroke, and category order', () => {
+    const style = toCustomOlStyle({
+      id: 'cat-1' as never, label: 'Heavy snow', order: 4,
+      style: { fillColor: '#3b82f6', fillOpacity: .45, strokeColor: '#ffffff', strokeOpacity: .9, strokeWidth: 2, hatch: 'none' },
+    });
+    expect(style.getFill()?.getColor()).toBe('rgba(59, 130, 246, 0.45)');
+    expect(style.getStroke()?.getColor()).toBe('rgba(255, 255, 255, 0.9)');
+    expect(style.getZIndex()).toBe(704);
   });
 
   test('toOlStyle transparencyScale reduces fill and stroke alpha', () => {

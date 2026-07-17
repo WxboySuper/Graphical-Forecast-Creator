@@ -29,10 +29,14 @@ import { v4 as uuidv4 } from "uuid";
 import { RootState } from "../../store";
 import {
   addFeature,
+  addCustomFeature,
   removeFeature,
+  removeCustomFeature,
+  selectCurrentCustomLayers,
   selectCurrentOutlooks,
   setMapView,
   updateFeature,
+  updateCustomFeature,
 } from "../../store/forecastSlice";
 
 import type { BaseMapStyle } from "../../store/overlaysSlice";
@@ -52,6 +56,8 @@ import {
   isOpenFreeMapStyle,
 } from "../../lib/openFreeMap";
 import "./ForecastMap.css";
+import { isFeatureExposed } from "../../config/featureExposure";
+import type { CustomCategoryStyle, CustomCategoryTemplate, CustomPolygonFeature } from "../../types/customProducts";
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
 type EditableOutlookType =
@@ -66,6 +72,13 @@ interface FeatureIdentity {
   featureId: string;
   outlookType: string;
   probability: string;
+}
+
+interface CustomFeatureIdentity {
+  featureId: string;
+  customLayerId: string;
+  categoryId: string;
+  title: string;
 }
 
 interface BlankLayerConfig {
@@ -405,6 +418,62 @@ export const toOlStyle = (
   });
 };
 
+/** Builds an exact custom category fill, including all supported hatch directions. */
+export const createCustomFill = (style: CustomCategoryStyle): Fill => {
+  if (style.hatch === "none") {
+    return new Fill({ color: toRgbaColor({ color: style.fillColor, alpha: style.fillOpacity }) });
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = 12;
+  canvas.height = 12;
+  const context = canvas.getContext("2d");
+  if (!context) return new Fill({ color: toRgbaColor({ color: style.fillColor, alpha: style.fillOpacity }) });
+  context.fillStyle = toRgbaColor({ color: style.fillColor, alpha: style.fillOpacity });
+  context.fillRect(0, 0, 12, 12);
+  context.strokeStyle = toRgbaColor({ color: style.strokeColor, alpha: style.strokeOpacity });
+  context.lineWidth = Math.max(1, style.strokeWidth / 2);
+  const line = (x1: number, y1: number, x2: number, y2: number) => {
+    context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
+  };
+  if (style.hatch === "diagonal" || style.hatch === "crosshatch") {
+    line(-2, 10, 10, -2); line(2, 14, 14, 2);
+  }
+  if (style.hatch === "reverse-diagonal" || style.hatch === "crosshatch") {
+    line(-2, 2, 10, 14); line(2, -2, 14, 10);
+  }
+  const pattern = context.createPattern(canvas, "repeat");
+  return new Fill({ color: pattern ?? toRgbaColor({ color: style.fillColor, alpha: style.fillOpacity }) });
+};
+
+export const toCustomOlStyle = (category: CustomCategoryTemplate, isTopLayer = false, zIndex = 700 + category.order): Style => new Style({
+  fill: createCustomFill(category.style),
+  stroke: new Stroke({
+    color: toRgbaColor({ color: category.style.strokeColor, alpha: category.style.strokeOpacity }),
+    width: isTopLayer ? Math.max(3, category.style.strokeWidth) : category.style.strokeWidth,
+  }),
+  zIndex,
+});
+
+export const getCustomFeatureIdentity = (feature: FeatureLike): CustomFeatureIdentity | null => {
+  const featureId = feature.get("featureId") as string | undefined;
+  const customLayerId = feature.get("customLayerId") as string | undefined;
+  const categoryId = feature.get("categoryId") as string | undefined;
+  const title = feature.get("title") as string | undefined;
+  return featureId && customLayerId && categoryId && title ? { featureId, customLayerId, categoryId, title } : null;
+};
+
+export const toUpdatedCustomFeature = (feature: FeatureLike, format: GeoJSON): CustomPolygonFeature | null => {
+  const identity = getCustomFeatureIdentity(feature);
+  const geometry = feature.getGeometry();
+  if (!identity || !geometry) return null;
+  return {
+    type: "Feature",
+    id: identity.featureId,
+    geometry: format.writeGeometryObject(geometry as Geometry, { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" }) as Polygon,
+    properties: { customLayerId: identity.customLayerId as CustomPolygonFeature['properties']['customLayerId'], categoryId: identity.categoryId as CustomPolygonFeature['properties']['categoryId'], title: identity.title },
+  };
+};
+
 /** Creates a dashed preview style for uncommitted Auto-TSTM guidance. */
 export const toTstmPreviewOlStyle = () => {
   const style = getFeatureStyle("categorical", "TSTM");
@@ -641,6 +710,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const drawingState = useSelector(
       (state: RootState) => state.forecast.drawingState,
     );
+    const customEditor = useSelector((state: RootState) => state.forecast.customEditor);
+    const customLayers = useSelector(selectCurrentCustomLayers);
+    const customMode = isFeatureExposed("customProducts") && customEditor.mode === "custom";
+    const activeCustomLayer = customLayers.layers.find(({ id }) => id === customEditor.activeLayerId) ?? customLayers.layers[0];
+    const activeCustomCategory = activeCustomLayer?.categories.find(({ id }) => id === customEditor.activeCategoryId) ?? activeCustomLayer?.categories[0];
     const currentMapView = useSelector(
       (state: RootState) => state.forecast.currentMapView,
     );
@@ -656,10 +730,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const popupRef = useRef<HTMLDivElement>(null);
     const overlayRef = useRef<Overlay | null>(null);
     const interactionModeRef = useRef(interactionMode);
+    const customModeRef = useRef(customMode);
 
     useEffect(() => {
       interactionModeRef.current = interactionMode;
     }, [interactionMode]);
+
+    useEffect(() => { customModeRef.current = customMode; }, [customMode]);
 
     useEffect(() => {
       currentMapViewRef.current = currentMapView;
@@ -703,6 +780,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         probability: string;
         feature: GeoJsonFeature;
       }> = [];
+      if (customMode) return items;
       Object.entries(outlooks).forEach(([outlookType, probs]) => {
         if (outlookType !== drawingState.activeOutlookType) {
           return;
@@ -716,7 +794,18 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         });
       });
       return items;
-    }, [outlooks, drawingState.activeOutlookType]);
+    }, [outlooks, drawingState.activeOutlookType, customMode]);
+
+    const serializedCustomFeatures = useMemo(() => {
+      if (!customMode) return [];
+      return customLayers.layers.flatMap((layer) => {
+        const categories = new Map(layer.categories.map((category) => [category.id, category]));
+        return layer.features.flatMap((feature) => {
+          const category = categories.get(feature.properties.categoryId);
+          return category ? [{ feature, category, layer }] : [];
+        });
+      });
+    }, [customLayers.layers, customMode]);
 
     useImperativeHandle(
       ref,
@@ -928,8 +1017,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             layer === vectorLayerRef.current || layer === catLayerRef.current,
         });
         if (feature && overlayRef.current) {
-          const outlookType = feature.get("outlookType") as string;
-          const probability = feature.get("probability") as string;
+          const customIdentity = getCustomFeatureIdentity(feature);
+          const outlookType = customIdentity
+            ? (feature.get("customLayerTitle") as string || "Custom layer")
+            : feature.get("outlookType") as string;
+          const probability = customIdentity?.title ?? feature.get("probability") as string;
           const isSignificant = feature.get("isSignificant") as boolean;
 
           setPopupInfo({ outlookType, probability, isSignificant });
@@ -945,6 +1037,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       modify.on("modifyend", (event) => {
         const format = new GeoJSON();
         event.features.forEach((feature) => {
+          const customFeature = toUpdatedCustomFeature(feature, format);
+          if (customFeature) {
+            dispatch(updateCustomFeature(customFeature));
+            return;
+          }
           const updatedFeature = toUpdatedGeoJsonFeature(
             feature,
             format,
@@ -1012,6 +1109,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         // Keep them read-only here; users should edit tornado/wind/hail/totalSevere
         // (or draw/delete TSTM manually) and let auto-categorical regenerate.
         if (outlookType === "categorical" && derivedFrom === "auto-generated") {
+          select.getFeatures().clear();
+          return;
+        }
+
+        const customIdentity = getCustomFeatureIdentity(selected);
+        if (customIdentity) {
+          dispatch(removeCustomFeature({ layerId: customIdentity.customLayerId, featureId: customIdentity.featureId }));
           select.getFeatures().clear();
           return;
         }
@@ -1371,10 +1475,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       }
 
       if (
-        !isDrawableOutlookType({ outlookType: drawingState.activeOutlookType })
+        !customMode && !isDrawableOutlookType({ outlookType: drawingState.activeOutlookType })
       ) {
         return;
       }
+
+      if (customMode && (!activeCustomLayer || !activeCustomCategory)) return;
 
       const drawSource =
         drawingState.activeOutlookType === "categorical"
@@ -1395,6 +1501,21 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         });
         // Create a new feature object with the drawn geometry and current drawing state properties,
         // then dispatch an action to add it to the Redux store.
+        if (customMode && activeCustomLayer && activeCustomCategory) {
+          const customFeature: CustomPolygonFeature = {
+            type: "Feature",
+            id: uuidv4(),
+            geometry: geometry as Polygon,
+            properties: {
+              customLayerId: activeCustomLayer.id,
+              categoryId: activeCustomCategory.id,
+              title: activeCustomCategory.label,
+            },
+          };
+          dispatch(addCustomFeature(customFeature));
+          return;
+        }
+
         const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
           type: "Feature",
           id: uuidv4(),
@@ -1430,6 +1551,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       drawingState.activeOutlookType,
       drawingState.activeProbability,
       drawingState.isSignificant,
+      customMode,
+      activeCustomLayer,
+      activeCustomCategory,
       interactionMode,
     ]);
 
@@ -1441,6 +1565,25 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       catSource.clear();
       ghostSource.clear();
       const format = new GeoJSON();
+
+      if (customMode) {
+        const highestZIndex = Math.max(...serializedCustomFeatures.map(({ layer, category }) => 700 + layer.order * 20 + category.order), 700);
+        serializedCustomFeatures.forEach(({ feature, category, layer }) => {
+          const zIndex = 700 + layer.order * 20 + category.order;
+          const olFeature = format.readFeature(feature, { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" });
+          const applyCustomProps = (item: OLFeature<Geometry>) => {
+            item.setStyle(toCustomOlStyle(category, zIndex === highestZIndex, zIndex));
+            item.set("featureId", feature.id as string);
+            item.set("customLayerId", layer.id);
+            item.set("customLayerTitle", layer.label);
+            item.set("categoryId", category.id);
+            item.set("title", category.label);
+            source.addFeature(item);
+          };
+          if (Array.isArray(olFeature)) olFeature.forEach((item) => applyCustomProps(item as OLFeature<Geometry>));
+          else applyCustomProps(olFeature as OLFeature<Geometry>);
+        });
+      }
 
       // Find the maximum z-index for bold styling
       let maxZIndex = -Infinity;
@@ -1489,6 +1632,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
       Object.entries(outlooks).forEach(([outlookType, probs]) => {
         if (
+          customMode ||
           outlookType === drawingState.activeOutlookType ||
           !ghostOutlooks[outlookType as EditableOutlookType]
         ) {
@@ -1534,6 +1678,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       });
     }, [
       serializedFeatures,
+      serializedCustomFeatures,
+      customMode,
       outlooks,
       drawingState.activeOutlookType,
       ghostOutlooks,

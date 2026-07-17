@@ -4,6 +4,8 @@ import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, Outlook
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
+import type { CustomCategoryTemplate, CustomLayerCollection, CustomPolygonFeature, OneOffCustomLayer } from '../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
 import { RootState } from './index'; // Need RootState for selectors
 import { cloneForecastCycle } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
@@ -33,6 +35,11 @@ export interface SavedCycle {
 export interface ForecastState {
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
+  customEditor: {
+    mode: 'severe' | 'custom';
+    activeLayerId: string | null;
+    activeCategoryId: string | null;
+  };
   currentMapView: {
     center: [number, number]; // [latitude, longitude]
     zoom: number;
@@ -62,6 +69,7 @@ interface ForecastDaySnapshot {
   day: DayType;
   data: OutlookData;
   lowProbabilityOutlooks: OutlookType[];
+  customLayers?: CustomLayerCollection;
 }
 
 interface ForecastHistoryEntry {
@@ -253,6 +261,11 @@ const initialState: ForecastState = {
     activeProbability: '2%',
     isSignificant: false
   },
+  customEditor: {
+    mode: 'severe',
+    activeLayerId: null,
+    activeCategoryId: null,
+  },
   currentMapView: {
     center: [39.8283, -98.5795],
     zoom: 4
@@ -397,6 +410,20 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
   };
 };
 
+const getCurrentCustomLayers = (state: ForecastState): CustomLayerCollection | undefined =>
+  state.forecastCycle.days[state.forecastCycle.currentDay]?.customLayers;
+
+const touchCustomLayer = (layer: OneOffCustomLayer) => {
+  layer.updatedAt = new Date().toISOString();
+};
+
+const normalizeCustomOrder = <T extends { order: number }>(items: T[]) => {
+  items.forEach((item, order) => { item.order = order; });
+};
+
+const cloneCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
+  customLayers ? cloneJsonValue(customLayers) : undefined;
+
 /** Captures the current day's drawable outlook data and low-probability metadata for history. */
 const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {
   const currentDay = state.forecastCycle.currentDay;
@@ -407,6 +434,7 @@ const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null
     day: currentDay,
     data: cloneOutlookData(dayData.data),
     lowProbabilityOutlooks: [...(dayData.metadata.lowProbabilityOutlooks || [])],
+    customLayers: cloneCustomLayers(dayData.customLayers),
   };
 };
 
@@ -421,6 +449,7 @@ const applyDaySnapshot = (state: ForecastState, snapshot: ForecastDaySnapshot) =
   if (!targetDay) return;
 
   targetDay.data = cloneOutlookData(snapshot.data);
+  targetDay.customLayers = cloneCustomLayers(snapshot.customLayers);
   targetDay.metadata.lowProbabilityOutlooks = [...snapshot.lowProbabilityOutlooks];
   targetDay.metadata.lastModified = new Date().toISOString();
 };
@@ -645,6 +674,144 @@ export const forecastSlice = createSlice({
 
     toggleSignificant: (state) => {
       state.drawingState.isSignificant = false;
+    },
+
+    setCustomEditorMode: (state, action: PayloadAction<'severe' | 'custom'>) => {
+      state.customEditor.mode = action.payload;
+    },
+
+    selectCustomLayer: (state, action: PayloadAction<string | null>) => {
+      state.customEditor.activeLayerId = action.payload;
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload);
+      state.customEditor.activeCategoryId = layer?.categories[0]?.id ?? null;
+    },
+
+    selectCustomCategory: (state, action: PayloadAction<string | null>) => {
+      state.customEditor.activeCategoryId = action.payload;
+    },
+
+    addCustomLayer: (state, action: PayloadAction<OneOffCustomLayer>) => {
+      const day = state.forecastCycle.days[state.forecastCycle.currentDay];
+      if (!day) return;
+      if ((day.customLayers?.layers.length ?? 0) >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) return;
+      pushUndoSnapshot(state);
+      day.customLayers ??= { schemaVersion: action.payload.schemaVersion, layers: [] };
+      day.customLayers.layers.push(cloneJsonValue(action.payload));
+      normalizeCustomOrder(day.customLayers.layers);
+      state.customEditor.activeLayerId = action.payload.id;
+      state.customEditor.activeCategoryId = action.payload.categories[0]?.id ?? null;
+      state.isSaved = false;
+    },
+
+    updateCustomLayerLabel: (state, action: PayloadAction<{ layerId: string; label: string }>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
+      if (!layer || !action.payload.label.trim()) return;
+      pushUndoSnapshot(state);
+      layer.label = action.payload.label.trim().slice(0, 64);
+      touchCustomLayer(layer);
+      state.isSaved = false;
+    },
+
+    removeCustomLayer: (state, action: PayloadAction<string>) => {
+      const collection = getCurrentCustomLayers(state);
+      const index = collection?.layers.findIndex(({ id }) => id === action.payload) ?? -1;
+      if (!collection || index < 0) return;
+      pushUndoSnapshot(state);
+      collection.layers.splice(index, 1);
+      normalizeCustomOrder(collection.layers);
+      const next = collection.layers[Math.min(index, collection.layers.length - 1)];
+      state.customEditor.activeLayerId = next?.id ?? null;
+      state.customEditor.activeCategoryId = next?.categories[0]?.id ?? null;
+      state.isSaved = false;
+    },
+
+    moveCustomLayer: (state, action: PayloadAction<{ layerId: string; direction: -1 | 1 }>) => {
+      const layers = getCurrentCustomLayers(state)?.layers;
+      const index = layers?.findIndex(({ id }) => id === action.payload.layerId) ?? -1;
+      const target = index + action.payload.direction;
+      if (!layers || index < 0 || target < 0 || target >= layers.length) return;
+      pushUndoSnapshot(state);
+      [layers[index], layers[target]] = [layers[target], layers[index]];
+      normalizeCustomOrder(layers);
+      state.isSaved = false;
+    },
+
+    addCustomCategory: (state, action: PayloadAction<{ layerId: string; category: CustomCategoryTemplate }>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
+      if (!layer || layer.categories.length >= CUSTOM_PRODUCT_LIMITS.categoriesPerProduct) return;
+      pushUndoSnapshot(state);
+      layer.categories.push(cloneJsonValue(action.payload.category));
+      normalizeCustomOrder(layer.categories);
+      touchCustomLayer(layer);
+      state.customEditor.activeCategoryId = action.payload.category.id;
+      state.isSaved = false;
+    },
+
+    updateCustomCategory: (state, action: PayloadAction<{ layerId: string; category: CustomCategoryTemplate }>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
+      const index = layer?.categories.findIndex(({ id }) => id === action.payload.category.id) ?? -1;
+      if (!layer || index < 0) return;
+      pushUndoSnapshot(state);
+      layer.categories[index] = { ...cloneJsonValue(action.payload.category), order: layer.categories[index].order };
+      layer.features.forEach((feature) => {
+        if (feature.properties.categoryId === action.payload.category.id) feature.properties.title = action.payload.category.label;
+      });
+      touchCustomLayer(layer);
+      state.isSaved = false;
+    },
+
+    removeCustomCategory: (state, action: PayloadAction<{ layerId: string; categoryId: string }>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
+      const index = layer?.categories.findIndex(({ id }) => id === action.payload.categoryId) ?? -1;
+      if (!layer || index < 0 || layer.categories.length === 1) return;
+      pushUndoSnapshot(state);
+      layer.categories.splice(index, 1);
+      layer.features = layer.features.filter(({ properties }) => properties.categoryId !== action.payload.categoryId);
+      normalizeCustomOrder(layer.categories);
+      state.customEditor.activeCategoryId = layer.categories[Math.min(index, layer.categories.length - 1)]?.id ?? null;
+      touchCustomLayer(layer);
+      state.isSaved = false;
+    },
+
+    moveCustomCategory: (state, action: PayloadAction<{ layerId: string; categoryId: string; direction: -1 | 1 }>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
+      const index = layer?.categories.findIndex(({ id }) => id === action.payload.categoryId) ?? -1;
+      const target = index + action.payload.direction;
+      if (!layer || index < 0 || target < 0 || target >= layer.categories.length) return;
+      pushUndoSnapshot(state);
+      [layer.categories[index], layer.categories[target]] = [layer.categories[target], layer.categories[index]];
+      normalizeCustomOrder(layer.categories);
+      touchCustomLayer(layer);
+      state.isSaved = false;
+    },
+
+    addCustomFeature: (state, action: PayloadAction<CustomPolygonFeature>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.properties.customLayerId);
+      if (!layer || layer.features.length >= CUSTOM_PRODUCT_LIMITS.featuresPerLayer || !layer.categories.some(({ id }) => id === action.payload.properties.categoryId)) return;
+      pushUndoSnapshot(state);
+      layer.features.push(cloneJsonValue(action.payload));
+      touchCustomLayer(layer);
+      state.isSaved = false;
+    },
+
+    updateCustomFeature: (state, action: PayloadAction<CustomPolygonFeature>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.properties.customLayerId);
+      const index = layer?.features.findIndex(({ id }) => id === action.payload.id) ?? -1;
+      if (!layer || index < 0) return;
+      pushUndoSnapshot(state);
+      layer.features[index] = cloneJsonValue(action.payload);
+      touchCustomLayer(layer);
+      state.isSaved = false;
+    },
+
+    removeCustomFeature: (state, action: PayloadAction<{ layerId: string; featureId: string }>) => {
+      const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
+      const index = layer?.features.findIndex(({ id }) => id === action.payload.featureId) ?? -1;
+      if (!layer || index < 0) return;
+      pushUndoSnapshot(state);
+      layer.features.splice(index, 1);
+      touchCustomLayer(layer);
+      state.isSaved = false;
     },
 
     addFeature: (state, action: PayloadAction<{ feature: Feature }>) => {
@@ -1399,6 +1566,20 @@ export const {
   setActiveOutlookType,
   setActiveProbability,
   toggleSignificant,
+  setCustomEditorMode,
+  selectCustomLayer,
+  selectCustomCategory,
+  addCustomLayer,
+  updateCustomLayerLabel,
+  removeCustomLayer,
+  moveCustomLayer,
+  addCustomCategory,
+  updateCustomCategory,
+  removeCustomCategory,
+  moveCustomCategory,
+  addCustomFeature,
+  updateCustomFeature,
+  removeCustomFeature,
   addFeature,
   updateFeature,
   removeFeature,
@@ -1457,6 +1638,10 @@ export const selectDiscussionDraftForScope = (state: RootState, scopeId: string)
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
   return cycle.days[cycle.currentDay]?.data || createEmptyOutlook(cycle.currentDay).data;
+};
+export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollection => {
+  const cycle = state.forecast.forecastCycle;
+  return cycle?.days?.[cycle.currentDay]?.customLayers || { schemaVersion: '1.0.0', layers: [] };
 };
 /** Selects the outlook maps for a specific day, falling back to an empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {

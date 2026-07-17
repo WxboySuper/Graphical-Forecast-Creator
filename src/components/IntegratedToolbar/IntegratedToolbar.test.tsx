@@ -147,3 +147,32 @@ describe('TabbedIntegratedToolbar completion validation exposure', () => {
     }
   );
 });
+
+describe('local-only custom Draw mode', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('keeps hosted Draw UI unchanged with no custom toggle or placeholder', () => {
+    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature: string) => feature !== 'customProducts');
+    renderToolbar('tabbed');
+    expect(screen.queryByRole('radiogroup', { name: 'Drawing product' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /wind/i })).toBeInTheDocument();
+    expect(screen.queryByText(/not available/i)).not.toBeInTheDocument();
+  });
+
+  test('animates a clean Severe/Custom swap and creates signed-out layers', async () => {
+    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderToolbar('tabbed');
+    expect(screen.getByRole('radio', { name: 'Severe' })).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(screen.getByRole('radio', { name: 'Custom' }));
+    expect(screen.queryByRole('button', { name: /wind/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('custom-draw-panel')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add custom layer' }));
+    expect(screen.getByLabelText('Layer title')).toHaveValue('Custom Layer 1');
+
+    await user.click(screen.getByRole('radio', { name: 'Severe' }));
+    expect(screen.getByRole('button', { name: /wind/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('custom-draw-panel')).not.toBeInTheDocument();
+  });
+});
