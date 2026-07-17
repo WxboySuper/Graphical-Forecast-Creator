@@ -13,6 +13,8 @@ import { useWorkflowAwareness } from '../hooks/useWorkflowAwarenessSync';
 import type { WorkflowAwarenessRecommendation } from '../types/workflowAwareness';
 import { isFeatureExposed } from '../config/featureExposure';
 
+const FORECAST_IMPORT_ACCEPT = isFeatureExposed('customProducts') ? '.json,.zip' : '.json';
+
 type HomeLogic = ReturnType<typeof useHomePageLogic>;
 
 type HomeSectionProps = Pick<
@@ -259,7 +261,7 @@ const LegacyHomePage: React.FC<{ logic: HomeLogic }> = ({ logic }) => {
         <AIDisclosure />
       </div>
 
-      <input ref={fileInputRef} type="file" accept={isFeatureExposed('customProducts') ? '.json,.zip' : '.json'} onChange={handleFileSelect} className="hidden" />
+      <input ref={fileInputRef} type="file" accept={FORECAST_IMPORT_ACCEPT} onChange={handleFileSelect} className="hidden" />
 
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
       <ConfirmationModal
@@ -394,7 +396,7 @@ const HomePage: React.FC = () => {
         onLoadRecentCycle={handleLoadRecentCycleClick}
         onNavigateAccount={handleNavigateAccount}
       />
-      <input ref={fileInputRef} type="file" accept={isFeatureExposed('customProducts') ? '.json,.zip' : '.json'} onChange={handleFileSelect} className="hidden" />
+      <input ref={fileInputRef} type="file" accept={FORECAST_IMPORT_ACCEPT} onChange={handleFileSelect} className="hidden" />
       <CycleHistoryModal isOpen={showHistoryModal} onClose={handleCloseHistoryModal} />
       <ConfirmationModal
         isOpen={confirmNewCycle}

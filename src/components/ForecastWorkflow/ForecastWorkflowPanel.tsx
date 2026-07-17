@@ -433,6 +433,16 @@ const hasSameDayWorkflowWork = (
   currentDay: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
 ): boolean => cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
 
+/** Discloses custom workflow ownership only on builds where the custom editor is exposed. */
+const CustomWorkflowDisclosure: React.FC<{ hasCustomContent: boolean }> = ({ hasCustomContent }) => {
+  if (!isFeatureExposed('customProducts') || !hasCustomContent) return null;
+  return (
+    <p className="forecast-workflow-panel__custom-disclosure" role="note">
+      Custom layers belong to this workflow grouping and are included in copies, updates, cloud saves, and packages. They are excluded from severe analytics and Auto-Categorical.
+    </p>
+  );
+};
+
 /** Persistent package workflow prompt for the forecast editor. */
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
@@ -604,11 +614,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           isUpdating={isUpdating}
           activeUpdateVersion={activeUpdateVersion}
         />
-        {isFeatureExposed('customProducts') && hasCustomContent ? (
-          <p className="forecast-workflow-panel__custom-disclosure" role="note">
-            Custom layers belong to this workflow grouping and are included in copies, updates, cloud saves, and packages. They are excluded from severe analytics and Auto-Categorical.
-          </p>
-        ) : null}
+        <CustomWorkflowDisclosure hasCustomContent={hasCustomContent} />
         <WorkflowPanelActions
           context={context}
           isReviewed={isReviewed}

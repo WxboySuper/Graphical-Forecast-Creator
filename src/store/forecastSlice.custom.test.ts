@@ -10,6 +10,8 @@ import reducer, {
   moveCustomCategory,
   removeCustomFeature,
   redoLastEdit,
+  saveCurrentCycle,
+  startFromPreviousCycle,
   undoLastEdit,
   updateCustomCategory,
   startBlankCycle,
@@ -42,36 +44,38 @@ describe('custom layer forecast state', () => {
   test('stores custom geometry outside severe outlook maps', () => {
     let state = reducer(undefined, addCustomLayer(layer()));
     state = reducer(state, addCustomFeature(feature()));
-    expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(1);
-    expect(state.forecastCycle.days[1]?.data.tornado?.size).toBe(0);
+    const day = state.forecastCycle.days[1]!;
+    expect(day.customLayers!.layers[0].features).toHaveLength(1);
+    expect(day.data.tornado!.size).toBe(0);
   });
 
   test('includes custom geometry in day-scoped undo and redo history', () => {
     let state = reducer(undefined, addCustomLayer(layer()));
     state = reducer(state, addCustomFeature(feature()));
     state = reducer(state, undoLastEdit());
-    expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(0);
+    expect(state.forecastCycle.days[1]!.customLayers!.layers[0].features).toHaveLength(0);
     state = reducer(state, redoLastEdit());
-    expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(1);
+    expect(state.forecastCycle.days[1]!.customLayers!.layers[0].features).toHaveLength(1);
   });
 
   test('removes a custom feature without changing severe outlook maps', () => {
     let state = reducer(undefined, addCustomLayer(layer()));
     state = reducer(state, addCustomFeature(feature()));
     state = reducer(state, removeCustomFeature({ layerId: 'layer-1', featureId: 'custom-1' }));
-    expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(0);
-    expect(state.forecastCycle.days[1]?.data.tornado?.size).toBe(0);
+    const day = state.forecastCycle.days[1]!;
+    expect(day.customLayers!.layers[0].features).toHaveLength(0);
+    expect(day.data.tornado!.size).toBe(0);
   });
 
   test('reorders categories and propagates edited labels to existing polygon titles', () => {
     let state = reducer(undefined, addCustomLayer(layer()));
     state = reducer(state, addCustomFeature(feature()));
     state = reducer(state, moveCustomCategory({ layerId: 'layer-1', categoryId: 'cat-2', direction: -1 }));
-    expect(state.forecastCycle.days[1]?.customLayers?.layers[0].categories.map(({ id, order }) => [id, order])).toEqual([['cat-2', 0], ['cat-1', 1]]);
+    expect(state.forecastCycle.days[1]!.customLayers!.layers[0].categories.map(({ id, order }) => [id, order])).toEqual([['cat-2', 0], ['cat-1', 1]]);
 
     const edited = { ...layer().categories[0], label: 'Elevated icing' };
     state = reducer(state, updateCustomCategory({ layerId: 'layer-1', category: edited }));
-    expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features[0].properties.title).toBe('Elevated icing');
+    expect(state.forecastCycle.days[1]!.customLayers!.layers[0].features[0].properties.title).toBe('Elevated icing');
   });
 
   test('copies a grouping as a detached replacement while leaving severe conversion independent', () => {
@@ -83,15 +87,18 @@ describe('custom layer forecast state', () => {
       targetDay: 2,
     }));
 
-    expect(copied.forecastCycle.days[2]?.customLayers).toEqual(source.forecastCycle.days[1]?.customLayers);
-    expect(copied.forecastCycle.days[2]?.customLayers).not.toBe(source.forecastCycle.days[1]?.customLayers);
-    expect(copied.forecastCycle.days[2]?.customLayers?.layers[0].features[0].geometry).not
-      .toBe(source.forecastCycle.days[1]?.customLayers?.layers[0].features[0].geometry);
-    expect(processOutlooksToCategorical(copied.forecastCycle.days[2]!.data, 2)).toEqual([]);
-    expect(copied.forecastCycle.days[2]?.data.categorical?.size).toBe(0);
+    const sourceLayers = source.forecastCycle.days[1]!.customLayers!;
+    const copiedDay = copied.forecastCycle.days[2]!;
+    const copiedLayers = copiedDay.customLayers!;
+    expect(copiedLayers).toEqual(sourceLayers);
+    expect(copiedLayers).not.toBe(sourceLayers);
+    expect(copiedLayers.layers[0].features[0].geometry).not.toBe(sourceLayers.layers[0].features[0].geometry);
+    expect(processOutlooksToCategorical(copiedDay.data, 2)).toEqual([]);
+    expect(copiedDay.data.categorical!.size).toBe(0);
   });
 
-  test('deep-snapshots custom geometry and appearance before a same-cycle update', () => {
+  test('deep-snapshots custom geometry and appearance before a hosted same-cycle update', () => {
+    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
     let state = reducer(undefined, startBlankCycle({
       workflowTemplate: { id: 'severe-day1', label: 'Day 1', groupings: ['day1'] },
       cycleDate: '2026-07-17',
@@ -107,22 +114,46 @@ describe('custom layer forecast state', () => {
     };
     state = reducer(state, updateCustomCategory({ layerId: 'layer-1', category: revised }));
 
-    expect(state.outlookVersionSnapshots[0].days[1]?.customLayers?.layers[0].categories[0]).toEqual(
+    const snapshotLayer = state.outlookVersionSnapshots[0].days[1]!.customLayers!.layers[0];
+    expect(snapshotLayer.categories[0]).toEqual(
       expect.objectContaining({ label: 'Minor', style: expect.objectContaining({ strokeWidth: 2 }) }),
     );
-    expect(state.outlookVersionSnapshots[0].days[1]?.customLayers?.layers[0].features[0].properties.title).toBe('Minor');
-    expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features[0].properties.title).toBe('Revised minor');
+    expect(snapshotLayer.features[0].properties.title).toBe('Minor');
+    expect(state.forecastCycle.days[1]!.customLayers!.layers[0].features[0].properties.title).toBe('Revised minor');
   });
 
-  test('keeps copy integration inert when the custom feature is not exposed', () => {
+  test('preserves loaded custom layers through hosted copy transitions while the editor is hidden', () => {
     jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
-    const source = reducer(undefined, addCustomLayer(layer()));
+    let source = reducer(undefined, addCustomLayer(layer()));
+    source = reducer(source, addCustomFeature(feature()));
     const copied = reducer(undefined, copyFeaturesFromPrevious({
       sourceCycle: source.forecastCycle,
       sourceDay: 1,
       targetDay: 2,
     }));
 
-    expect(copied.forecastCycle.days[2]?.customLayers).toBeUndefined();
+    const sourceLayers = source.forecastCycle.days[1]!.customLayers!;
+    const copiedLayers = copied.forecastCycle.days[2]!.customLayers!;
+    expect(copiedLayers).toEqual(sourceLayers);
+    expect(copiedLayers).not.toBe(sourceLayers);
+  });
+
+  test('preserves loaded custom layers through a hosted previous-cycle rollover', () => {
+    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    let state = reducer(undefined, addCustomLayer(layer()));
+    state = reducer(state, addCustomFeature(feature()));
+    state = reducer(state, saveCurrentCycle({ label: 'Custom source' }));
+    const sourceLayers = state.savedCycles[0].forecastCycle.days[1]!.customLayers!;
+
+    state = reducer(state, startFromPreviousCycle({
+      sourceCycleId: state.savedCycles[0].id,
+      sourceDay: 1,
+      targetDay: 2,
+      newCycleDate: '2026-07-18',
+    }));
+
+    const rolledLayers = state.forecastCycle.days[2]!.customLayers!;
+    expect(rolledLayers).toEqual(sourceLayers);
+    expect(rolledLayers).not.toBe(sourceLayers);
   });
 });

@@ -16,7 +16,6 @@ import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
-import { isFeatureExposed } from '../config/featureExposure';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -416,9 +415,9 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
 const cloneCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
   customLayers ? cloneJsonValue(customLayers) : undefined;
 
-/** CUS-05 integrations remain inert on every hosted build until rollout approval. */
+/** Lifecycle transitions preserve stored custom content even while its editor is hidden. */
 const cloneIntegratedCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
-  isFeatureExposed('customProducts') ? cloneCustomLayers(customLayers) : undefined;
+  cloneCustomLayers(customLayers);
 
 /** Captures the current day's drawable outlook data and low-probability metadata for history. */
 const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {

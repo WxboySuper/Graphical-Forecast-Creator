@@ -93,7 +93,9 @@ with a detached deep clone. Internal layer/category IDs stay stable so feature
 references and product lineage remain valid, but later edits cannot mutate the
 source. Starting a new cycle from a previous grouping uses the same rule.
 Creating a same-cycle update snapshots all custom geometry and appearance into
-the previous version while the active collection remains editable.
+the previous version while the active collection remains editable. These
+lifecycle clones preserve custom content already present in a loaded cycle even
+on hosted builds where the custom editor and its controls remain hidden.
 
 Custom layers do not satisfy severe-outlook completion requirements and are
 explicitly excluded from existing severe `forecastDays`, `totalOutlooks`, and
