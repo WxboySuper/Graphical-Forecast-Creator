@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #742
+
+- Define versioned one-off custom layer, reusable hosted product, embedded snapshot, and expiration/read-only contracts with strict validation and local-only exposure.
+
 ### PR #740
 
 - Require protected reviewer approval and pre-promotion build/test validation for the legacy direct beta-to-main emergency workflow.
