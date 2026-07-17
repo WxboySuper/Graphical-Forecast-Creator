@@ -41,6 +41,8 @@ import * as fileUtils from '../utils/fileUtils';
 import { serializeForecast } from '../utils/fileUtils';
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
+import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
+import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -134,6 +136,45 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+  });
+
+  test('consumes a validated reusable-product handoff into custom forecast state', async () => {
+    const store = createStore();
+    const layer = {
+      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+      id: 'layer-reusable-1',
+      label: 'Fire weather',
+      order: 0,
+      categories: [{
+        id: 'elevated',
+        label: 'Elevated',
+        order: 0,
+        style: { fillColor: '#f97316', fillOpacity: 0.45, strokeColor: '#123456', strokeOpacity: 0.4, strokeWidth: 4, hatch: 'crosshatch' },
+      }],
+      features: [],
+      productSnapshot: {
+        schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+        sourceProductId: 'product-reusable-1',
+        sourceProductVersion: 1,
+        label: 'Fire weather',
+        categories: [{
+          id: 'elevated',
+          label: 'Elevated',
+          order: 0,
+          style: { fillColor: '#f97316', fillOpacity: 0.45, strokeColor: '#123456', strokeOpacity: 0.4, strokeWidth: 4, hatch: 'crosshatch' },
+        }],
+        capturedAt: '2026-07-17T12:00:00.000Z',
+      },
+      createdAt: '2026-07-17T12:00:00.000Z',
+      updatedAt: '2026-07-17T12:00:00.000Z',
+    };
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
+
+    renderForecastPage(store);
+
+    await waitFor(() => expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers[0]?.label).toBe('Fire weather'));
+    expect(store.getState().forecast.customEditor.mode).toBe('custom');
+    expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
   });
 
   test('query string or stored/remote overrides resolve to the tabbed toolbar when other variants are removed', () => {

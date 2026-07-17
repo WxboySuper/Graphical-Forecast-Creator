@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import {
   Archive,
   CalendarDays,
@@ -19,6 +20,7 @@ import {
   Upload,
   Wrench,
   PackageOpen,
+  Palette,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -419,6 +421,16 @@ const tabbedToolbarTypeLabels: Partial<Record<OutlookType, string>> = {
 
 type TabbedToolbarTabKey = 'draw' | 'days' | 'layers' | 'tools';
 
+/** Local-only link to reusable product management; no hosted build renders this control. */
+const CustomProductsEntryButton: React.FC = () => {
+  if (!isFeatureExposed('customProducts')) return null;
+  return (
+    <Button asChild variant="outline" className="h-10 rounded-xl px-3">
+      <Link to="/custom-products"><Palette className="mr-2 h-4 w-4" /> Products</Link>
+    </Button>
+  );
+};
+
 /** Section wrapper used inside tab rows to group related controls. */
 const TabbedToolbarStripSection: React.FC<{
   label: string;
@@ -609,7 +621,16 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
         </div>
       </TabbedToolbarStripSection>
       <div key={storedMode} className="custom-product-mode-panel">
-        {storedMode === 'severe' ? <SevereDrawControls controller={controller} /> : <CustomDrawPanel />}
+        {storedMode === 'severe' ? (
+          <SevereDrawControls controller={controller} />
+        ) : (
+          <>
+            <TabbedToolbarStripSection label="Custom" hint="Reusable" className="w-[190px]">
+              <CustomProductsEntryButton />
+            </TabbedToolbarStripSection>
+            <CustomDrawPanel />
+          </>
+        )}
       </div>
     </TabbedToolbarTabRow>
   );
@@ -1239,6 +1260,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller
         <div className="flex items-center justify-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 h-full min-w-max">
           <ToolbarToolsSection controller={controller} />
           <ToolbarForecastDaySection controller={controller} />
+          <CustomProductsEntryButton />
           <ToolbarOutlookTypeSection controller={controller} />
           <ToolbarGhostLayersSection controller={controller} />
           <ToolbarProbabilitySection controller={controller} />

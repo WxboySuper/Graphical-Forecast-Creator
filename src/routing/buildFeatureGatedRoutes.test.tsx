@@ -18,6 +18,11 @@ jest.mock('../pages/gated/CollaborationRoomPage', () => ({
   default: () => <div>Collaboration room page</div>,
 }));
 
+jest.mock('../pages/gated/CustomProductsPage', () => ({
+  __esModule: true,
+  default: () => <div>Custom products page</div>,
+}));
+
 describe('buildFeatureGatedRoutes', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -32,10 +37,23 @@ describe('buildFeatureGatedRoutes', () => {
     });
   });
 
+  test('registers custom products only on the local target', async () => {
+    expect(getExposedGatedRoutePaths('local')).toContain('/custom-products');
+    expect(getExposedGatedRoutePaths('beta')).not.toContain('/custom-products');
+
+    render(
+      <MemoryRouter initialEntries={['/custom-products']}>
+        <Routes>{buildFeatureGatedRoutes('local')}</Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Custom products page')).toBeInTheDocument();
+  });
+
   test('registers exposed gated routes and lazy-loads their modules', async () => {
     const exposureSpy = mockFeatureExposureOnTarget('tropicalWorkspace', singleTargetOn('local'));
 
-    expect(getExposedGatedRoutePaths('local')).toEqual(['/tropical']);
+    expect(getExposedGatedRoutePaths('local')).toEqual(['/tropical', '/custom-products']);
 
     render(
       <MemoryRouter initialEntries={['/tropical']}>

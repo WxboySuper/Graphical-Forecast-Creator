@@ -31,6 +31,8 @@ import {
   undoLastEdit,
   setWorkflowMetadata,
   clearWorkflowMetadata,
+  addCustomLayer,
+  setCustomEditorMode,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
@@ -64,6 +66,8 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
+import { isFeatureExposed } from '../config/featureExposure';
+import { consumeCustomProductForecastHandoff } from '../lib/customProductHandoff';
 
 export { hasAnyModifierKey, isTypingTarget };
 import { queueProductMetric } from '../utils/productMetrics';
@@ -1455,6 +1459,15 @@ export const ForecastPage: React.FC = () => {
   const { syncedSettings } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isFeatureExposed('customProducts')) return;
+    const stagedLayer = consumeCustomProductForecastHandoff();
+    if (!stagedLayer) return;
+    dispatch(addCustomLayer(stagedLayer));
+    dispatch(setCustomEditorMode('custom'));
+  }, [dispatch]);
+
   const {
     emergencyMode,
     dayRolloverPrompt,
