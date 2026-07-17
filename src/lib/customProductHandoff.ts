@@ -1,4 +1,4 @@
-import type { HostedCustomProduct, OneOffCustomLayer } from '../types/customProducts';
+import type { CustomProductId, HostedCustomProduct, OneOffCustomLayer } from '../types/customProducts';
 import {
   asCustomLayerId,
   createLayerFromHostedProduct,
@@ -31,14 +31,29 @@ export const stageCustomProductForForecast = (
 };
 
 /** Consumes only a fully validated staged layer and clears malformed handoffs defensively. */
-export const consumeCustomProductForecastHandoff = (): OneOffCustomLayer | null => {
+export const consumeCustomProductForecastHandoff = (premiumActive: boolean): OneOffCustomLayer | null => {
   const serialized = sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   if (!serialized) return null;
   sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  if (!premiumActive) return null;
   try {
     const parsed = JSON.parse(serialized) as unknown;
     return isOneOffCustomLayer(parsed) ? parsed : null;
   } catch {
     return null;
+  }
+};
+
+/** Clears a staged layer only when it was created from the deleted product. */
+export const clearCustomProductForecastHandoff = (sourceProductId: CustomProductId): void => {
+  const serialized = sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  if (!serialized) return;
+  try {
+    const parsed = JSON.parse(serialized) as unknown;
+    if (isOneOffCustomLayer(parsed) && parsed.productSnapshot?.sourceProductId === sourceProductId) {
+      sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+    }
+  } catch {
+    sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   }
 };

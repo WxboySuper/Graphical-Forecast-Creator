@@ -170,6 +170,29 @@ test.describe('Local reusable custom products', () => {
       await page.getByRole('button', { name: 'Cancel' }).click();
     }
   });
+
+  test('keeps an expired local account read-only while allowing permanent cleanup', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('gfc-local-custom-products:local-test-free', JSON.stringify([{
+        schemaVersion: '1.0.0', id: 'expired-product', userId: 'local-test-free',
+        label: 'Expired fire product', version: 1, status: 'active',
+        categories: [{
+          id: 'elevated', label: 'Elevated', order: 0,
+          style: { fillColor: '#f97316', fillOpacity: 0.45, strokeColor: '#123456', strokeOpacity: 1, strokeWidth: 2, hatch: 'none' },
+        }],
+        createdAt: '2026-07-17T00:00:00.000Z', updatedAt: '2026-07-17T00:00:00.000Z',
+      }]));
+    });
+    await page.goto('/custom-products?localTestAccount=free');
+
+    await expect(page.getByRole('heading', { name: 'Expired fire product' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Use in Forecast' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    await expect(page.getByText(/remain visible and can be deleted/i)).toBeVisible();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.getByRole('heading', { name: 'Expired fire product' })).toHaveCount(0);
+  });
 });
 
 test.describe('Hosted custom-product absence', () => {
