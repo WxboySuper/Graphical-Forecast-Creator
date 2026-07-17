@@ -602,7 +602,8 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
               type="button"
               role="radio"
               aria-checked={storedMode === mode}
-              className={cn('custom-product-toggle__button', storedMode === mode && 'is-active')}
+              className={cn('custom-product-toggle__button mode-toggle-btn', storedMode === mode && 'is-active')}
+              style={{ backgroundColor: storedMode === mode ? 'var(--button-bg)' : 'transparent' }}
               onClick={() => dispatch(setCustomEditorMode(mode))}
             >
               {mode === 'severe' ? 'Severe' : 'Custom'}

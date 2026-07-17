@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useCustomProducts, type UseCustomProductsResult } from '../../hooks/useCustomProducts';
 import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct, type OneOffCustomLayer } from '../../types/customProducts';
+import { consumeCustomProductForecastHandoff } from '../../lib/customProductHandoff';
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
 
@@ -51,7 +52,8 @@ const createProductNavigator = (
   const layer = customProducts.useProduct(product);
   if (!layer) return;
   if (onProductUse) {
-    onProductUse(layer);
+    const consumedLayer = consumeCustomProductForecastHandoff(customProducts.premiumActive);
+    if (consumedLayer) onProductUse(consumedLayer);
     return;
   }
   navigate('/forecast');
