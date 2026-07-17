@@ -24,10 +24,14 @@ const isOptionalFeatureId = (value: unknown): boolean => {
   return typeof value === 'number' && Number.isFinite(value);
 };
 
+const isFeatureType = (value: Record<string, unknown>): boolean => value.type === 'Feature';
+
+const hasFeatureProperties = (value: Record<string, unknown>): boolean => isRecord(value.properties);
+
 const hasValidShape = (value: Record<string, unknown>): boolean => {
   if (!hasOnlyKeys(value, ['type', 'id', 'geometry', 'properties', 'bbox'])) return false;
-  if (value.type !== 'Feature' || !isCustomPolygonGeometry(value.geometry)) return false;
-  if (!isRecord(value.properties) || !isOptionalFeatureId(value.id)) return false;
+  if (!isFeatureType(value) || !isCustomPolygonGeometry(value.geometry)) return false;
+  if (!hasFeatureProperties(value) || !isOptionalFeatureId(value.id)) return false;
   if (value.bbox === undefined) return true;
   return isBoundingBox(value.bbox, getCustomGeometryDimension(value.geometry));
 };
