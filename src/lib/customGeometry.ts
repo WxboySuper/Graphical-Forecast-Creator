@@ -80,10 +80,13 @@ const isOptionalFeatureId = (value: unknown): boolean =>
 
 const hasValidCustomFeatureShape = (value: Record<string, unknown>): boolean => {
   if (!hasOnlyKeys(value, ['type', 'id', 'geometry', 'properties', 'bbox'])) return false;
-  if (value.type !== 'Feature' || !isCustomPolygonGeometry(value.geometry) || !isRecord(value.properties)) return false;
+  if (value.type !== 'Feature') return false;
+  if (!isCustomPolygonGeometry(value.geometry)) return false;
+  if (!isRecord(value.properties)) return false;
   if (!isOptionalFeatureId(value.id)) return false;
   const dimension = getGeometryPositions(value.geometry as Record<string, unknown>)[0]?.length;
-  return value.bbox === undefined || isBoundingBox(value.bbox, dimension);
+  if (value.bbox === undefined) return true;
+  return isBoundingBox(value.bbox, dimension);
 };
 
 const hasValidCustomFeatureProperties = (properties: Record<string, unknown>): boolean =>

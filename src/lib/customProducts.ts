@@ -5,13 +5,16 @@ import {
   type CustomLayerCollection,
   type CustomProductAccessState,
   type CustomProductId,
-  type EmbeddedCustomProductSnapshot,
   type HostedCustomProduct,
   type HostedCustomProductStatus,
   type OneOffCustomLayer,
 } from '../types/customProducts';
 import { isCustomPolygonFeature } from './customGeometry';
 import { isCustomCategoryList } from './customCategoryValidation';
+import {
+  createEmbeddedCustomProductSnapshot,
+  isEmbeddedCustomProductSnapshot,
+} from './customProductSnapshots';
 
 export { isCustomPolygonFeature } from './customGeometry';
 export {
@@ -19,6 +22,10 @@ export {
   isCustomCategoryStyle,
   isCustomCategoryTemplate,
 } from './customCategoryValidation';
+export {
+  createEmbeddedCustomProductSnapshot,
+  isEmbeddedCustomProductSnapshot,
+} from './customProductSnapshots';
 
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -57,38 +64,6 @@ const hasValidChronology = (createdAt: unknown, updatedAt: unknown): boolean =>
 
 /** Combines field-level checks without a compound validator conditional. */
 const areAllValid = (checks: readonly boolean[]): boolean => checks.every(Boolean);
-
-/** Creates a detached snapshot so future product edits cannot alter old maps. */
-export const createEmbeddedCustomProductSnapshot = (
-  product: HostedCustomProduct,
-  capturedAt = new Date().toISOString(),
-): EmbeddedCustomProductSnapshot => ({
-  schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
-  sourceProductId: product.id,
-  sourceProductVersion: product.version,
-  label: product.label,
-  categories: product.categories.map((category) => ({
-    ...category,
-    style: { ...category.style },
-  })),
-  capturedAt,
-});
-
-/** Validates an immutable-by-contract embedded product snapshot. */
-export const isEmbeddedCustomProductSnapshot = (value: unknown): value is EmbeddedCustomProductSnapshot => {
-  if (!isRecord(value)) return false;
-  if (!hasOnlyKeys(value, [
-    'schemaVersion', 'sourceProductId', 'sourceProductVersion', 'label', 'categories', 'capturedAt',
-  ])) return false;
-  return areAllValid([
-    value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
-    value.sourceProductId === undefined || isBoundedText(value.sourceProductId),
-    value.sourceProductVersion === undefined || isPositiveInteger(value.sourceProductVersion),
-    isBoundedText(value.label),
-    isCustomCategoryList(value.categories),
-    isIsoTimestamp(value.capturedAt),
-  ]);
-};
 
 /** Validates the scalar, category, snapshot, and timestamp fields on a one-off layer. */
 const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => areAllValid([
