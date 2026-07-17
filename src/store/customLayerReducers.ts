@@ -4,7 +4,7 @@ import {
   type OneOffCustomLayer,
 } from '../types/customProducts';
 import type { ForecastState } from './forecastSlice';
-import { cloneCustomValue, getCurrentCustomLayers, normalizeCustomOrder, touchCustomLayer } from './customLayerReducerUtils';
+import { canMoveCustomItem, cloneCustomValue, getCurrentCustomLayers, normalizeCustomOrder, touchCustomLayer } from './customLayerReducerUtils';
 
 /** Builds the custom-layer reducer group while reusing forecast day history. */
 export const createCustomLayerReducers = (pushUndoSnapshot: (state: ForecastState) => void) => ({
@@ -58,9 +58,10 @@ export const createCustomLayerReducers = (pushUndoSnapshot: (state: ForecastStat
 
   moveCustomLayer: (state: ForecastState, action: PayloadAction<{ layerId: string; direction: -1 | 1 }>) => {
     const layers = getCurrentCustomLayers(state)?.layers;
+    if (!layers) return;
     const index = layers?.findIndex(({ id }) => id === action.payload.layerId) ?? -1;
     const target = index + action.payload.direction;
-    if (!layers || index < 0 || target < 0 || target >= layers.length) return;
+    if (!canMoveCustomItem(index, target, layers.length)) return;
     pushUndoSnapshot(state);
     [layers[index], layers[target]] = [layers[target], layers[index]];
     normalizeCustomOrder(layers);

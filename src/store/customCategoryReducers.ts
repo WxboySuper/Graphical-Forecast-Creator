@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { CUSTOM_PRODUCT_LIMITS, type CustomCategoryTemplate } from '../types/customProducts';
 import type { ForecastState } from './forecastSlice';
-import { cloneCustomValue, getCurrentCustomLayers, normalizeCustomOrder, touchCustomLayer } from './customLayerReducerUtils';
+import { canMoveCustomItem, cloneCustomValue, getCurrentCustomLayers, normalizeCustomOrder, touchCustomLayer } from './customLayerReducerUtils';
 
 /** Category reducers that share the parent forecast day's undo history. */
 export const createCustomCategoryReducers = (pushUndoSnapshot: (state: ForecastState) => void) => ({
@@ -30,7 +30,8 @@ export const createCustomCategoryReducers = (pushUndoSnapshot: (state: ForecastS
   removeCustomCategory: (state: ForecastState, action: PayloadAction<{ layerId: string; categoryId: string }>) => {
     const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
     const index = layer?.categories.findIndex(({ id }) => id === action.payload.categoryId) ?? -1;
-    if (!layer || index < 0 || layer.categories.length === 1) return;
+    if (!layer || index < 0) return;
+    if (layer.categories.length === 1) return;
     pushUndoSnapshot(state);
     layer.categories.splice(index, 1);
     layer.features = layer.features.filter(({ properties }) => properties.categoryId !== action.payload.categoryId);
@@ -43,7 +44,8 @@ export const createCustomCategoryReducers = (pushUndoSnapshot: (state: ForecastS
     const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.layerId);
     const index = layer?.categories.findIndex(({ id }) => id === action.payload.categoryId) ?? -1;
     const target = index + action.payload.direction;
-    if (!layer || index < 0 || target < 0 || target >= layer.categories.length) return;
+    if (!layer) return;
+    if (!canMoveCustomItem(index, target, layer.categories.length)) return;
     pushUndoSnapshot(state);
     [layer.categories[index], layer.categories[target]] = [layer.categories[target], layer.categories[index]];
     normalizeCustomOrder(layer.categories);

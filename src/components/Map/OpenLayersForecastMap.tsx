@@ -481,7 +481,9 @@ export const toDrawnCustomFeature = (
   category: CustomCategoryTemplate | undefined,
   enabled: boolean,
 ): CustomPolygonFeature | null => {
-  if (!enabled || !layer || !category) return null;
+  if (!enabled) return null;
+  if (!layer) return null;
+  if (!category) return null;
   return {
     type: "Feature",
     id: uuidv4(),

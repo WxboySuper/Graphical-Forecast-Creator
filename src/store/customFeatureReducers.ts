@@ -7,8 +7,9 @@ import { cloneCustomValue, getCurrentCustomLayers, touchCustomLayer } from './cu
 export const createCustomFeatureReducers = (pushUndoSnapshot: (state: ForecastState) => void) => ({
   addCustomFeature: (state: ForecastState, action: PayloadAction<CustomPolygonFeature>) => {
     const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload.properties.customLayerId);
-    if (!layer || layer.features.length >= CUSTOM_PRODUCT_LIMITS.featuresPerLayer
-      || !layer.categories.some(({ id }) => id === action.payload.properties.categoryId)) return;
+    if (!layer) return;
+    if (layer.features.length >= CUSTOM_PRODUCT_LIMITS.featuresPerLayer) return;
+    if (!layer.categories.some(({ id }) => id === action.payload.properties.categoryId)) return;
     pushUndoSnapshot(state);
     layer.features.push(cloneCustomValue(action.payload));
     touchCustomLayer(layer);

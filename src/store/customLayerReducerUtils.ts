@@ -13,3 +13,6 @@ export const touchCustomLayer = (layer: OneOffCustomLayer) => {
 export const normalizeCustomOrder = <T extends { order: number }>(items: T[]) => {
   items.forEach((item, order) => { item.order = order; });
 };
+
+export const canMoveCustomItem = (index: number, target: number, length: number): boolean =>
+  index >= 0 && target >= 0 && target < length;

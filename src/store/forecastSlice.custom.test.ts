@@ -33,12 +33,16 @@ const feature = (): CustomPolygonFeature => ({
 });
 
 describe('custom layer forecast state', () => {
-  test('stores custom geometry outside severe outlook maps and supports undo/redo', () => {
+  test('stores custom geometry outside severe outlook maps', () => {
     let state = reducer(undefined, addCustomLayer(layer()));
     state = reducer(state, addCustomFeature(feature()));
     expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(1);
     expect(state.forecastCycle.days[1]?.data.tornado?.size).toBe(0);
+  });
 
+  test('includes custom geometry in day-scoped undo and redo history', () => {
+    let state = reducer(undefined, addCustomLayer(layer()));
+    state = reducer(state, addCustomFeature(feature()));
     state = reducer(state, undoLastEdit());
     expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(0);
     state = reducer(state, redoLastEdit());

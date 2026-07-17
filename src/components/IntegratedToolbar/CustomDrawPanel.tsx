@@ -53,32 +53,43 @@ const IconButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { lab
   <button type="button" aria-label={label} title={label} className="custom-draw-panel__icon-button" {...props}>{children}</button>
 );
 
-const CustomLayerSection: React.FC<{
+const CustomLayerTitleInput: React.FC<{ layer: OneOffCustomLayer }> = ({ layer }) => {
+  const dispatch = useDispatch();
+  const [draft, setDraft] = useState(layer.label);
+  useEffect(() => setDraft(layer.label), [layer.id, layer.label]);
+  return <input aria-label="Layer title" maxLength={64} value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={() => {
+    const label = draft.trim();
+    if (label) dispatch(updateCustomLayerLabel({ layerId: layer.id, label }));
+    setDraft(label || layer.label);
+  }} />;
+};
+
+const CustomLayerActionRow: React.FC<{
   layers: OneOffCustomLayer[];
   activeLayer?: OneOffCustomLayer;
 }> = ({ layers, activeLayer }) => {
   const dispatch = useDispatch();
-  const [layerLabelDraft, setLayerLabelDraft] = useState(activeLayer?.label ?? '');
-  useEffect(() => setLayerLabelDraft(activeLayer?.label ?? ''), [activeLayer?.id, activeLayer?.label]);
+  return <div className="custom-draw-panel__row">
+    <select aria-label="Custom layer" data-testid="custom-layer-picker" value={activeLayer?.id ?? ''} onChange={(event) => dispatch(selectCustomLayer(event.target.value))}>
+      {!activeLayer ? <option value="">Create a layer</option> : null}
+      {layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.label}</option>)}
+    </select>
+    <IconButton label="Add custom layer" disabled={layers.length >= CUSTOM_PRODUCT_LIMITS.layersPerCollection} onClick={() => dispatch(addCustomLayer(makeLayer(layers.length)))}><Plus /></IconButton>
+    <IconButton label="Move layer up" disabled={!activeLayer || activeLayer.order === 0} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: -1 }))}><ArrowUp /></IconButton>
+    <IconButton label="Move layer down" disabled={!activeLayer || activeLayer.order === layers.length - 1} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: 1 }))}><ArrowDown /></IconButton>
+    <IconButton label="Delete custom layer" disabled={!activeLayer} onClick={() => activeLayer && dispatch(removeCustomLayer(activeLayer.id))}><Trash2 /></IconButton>
+  </div>;
+};
 
+const CustomLayerSection: React.FC<{
+  layers: OneOffCustomLayer[];
+  activeLayer?: OneOffCustomLayer;
+}> = ({ layers, activeLayer }) => {
   return (
     <section className="custom-draw-panel__group" aria-label="Custom layers">
       <span className="custom-draw-panel__label">Layer</span>
-      <div className="custom-draw-panel__row">
-        <select aria-label="Custom layer" data-testid="custom-layer-picker" value={activeLayer?.id ?? ''} onChange={(event) => dispatch(selectCustomLayer(event.target.value))}>
-          {!activeLayer ? <option value="">Create a layer</option> : null}
-          {layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.label}</option>)}
-        </select>
-        <IconButton label="Add custom layer" disabled={layers.length >= CUSTOM_PRODUCT_LIMITS.layersPerCollection} onClick={() => dispatch(addCustomLayer(makeLayer(layers.length)))}><Plus /></IconButton>
-        <IconButton label="Move layer up" disabled={!activeLayer || activeLayer.order === 0} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: -1 }))}><ArrowUp /></IconButton>
-        <IconButton label="Move layer down" disabled={!activeLayer || activeLayer.order === layers.length - 1} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: 1 }))}><ArrowDown /></IconButton>
-        <IconButton label="Delete custom layer" disabled={!activeLayer} onClick={() => activeLayer && dispatch(removeCustomLayer(activeLayer.id))}><Trash2 /></IconButton>
-      </div>
-      {activeLayer ? <input aria-label="Layer title" maxLength={64} value={layerLabelDraft} onChange={(event) => setLayerLabelDraft(event.target.value)} onBlur={() => {
-        const label = layerLabelDraft.trim();
-        if (label) dispatch(updateCustomLayerLabel({ layerId: activeLayer.id, label }));
-        setLayerLabelDraft(label || activeLayer.label);
-      }} /> : null}
+      <CustomLayerActionRow layers={layers} activeLayer={activeLayer} />
+      {activeLayer ? <CustomLayerTitleInput layer={activeLayer} /> : null}
     </section>
   );
 };
