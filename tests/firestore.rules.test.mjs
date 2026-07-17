@@ -525,6 +525,30 @@ describe('customProducts security and lifecycle boundary', () => {
     await assertFails(setDoc(aliceRef(), customProduct({ internalRole: 'admin' })));
     await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, order: 1 }] })));
     await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, style: { ...baseCategory.style, fillColor: 'red' } }] })));
-    await assertFails(setDoc(aliceRef(), customProduct({ categories: [baseCategory, { ...baseCategory, order: 1 }] })));
+    const secondCategory = { ...baseCategory, id: 'critical', label: 'Critical', order: 1 };
+    await assertSucceeds(setDoc(aliceRef(), customProduct({ categories: [baseCategory, secondCategory] })));
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-02'),
+      customProduct({
+        id: 'product-logical-2',
+        categories: [baseCategory, { ...secondCategory, id: baseCategory.id }],
+      }),
+    ));
+  });
+
+  test('rejects non-canonical and out-of-range ISO timestamps', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
+    await assertFails(setDoc(aliceRef(), customProduct({ createdAt: 'not-a-timestamp' })));
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-02'),
+      customProduct({ id: 'product-logical-2', updatedAt: '2026-13-17T25:00:00.000Z' }),
+    ));
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-03'),
+      customProduct({ id: 'product-logical-3', updatedAt: '2026-07-17T01:00:00Z' }),
+    ));
   });
 });

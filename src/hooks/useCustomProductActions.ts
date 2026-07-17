@@ -1,18 +1,13 @@
 import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { HostedCustomProduct, HostedCustomProductStatus, OneOffCustomLayer } from '../types/customProducts';
-import type { CustomProductDraft, CustomProductsRepository } from '../lib/customProductsRepository';
-import { clearCustomProductForecastHandoff, stageCustomProductForForecast } from '../lib/customProductHandoff';
+import type { HostedCustomProduct, OneOffCustomLayer } from '../types/customProducts';
+import type { CustomProductsRepository } from '../lib/customProductsRepository';
+import { stageCustomProductForForecast } from '../lib/customProductHandoff';
+import { useCustomProductCrudActions } from './useCustomProductCrudActions';
 import { useCustomProductWriter } from './useCustomProductWriter';
 
 const handoffError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to load custom product.';
-
-const duplicateDraft = (product: HostedCustomProduct): CustomProductDraft => ({
-  label: `${product.label} copy`.slice(0, 64),
-  description: product.description,
-  categories: product.categories,
-});
 
 export const useCustomProductActions = ({
   repository,
@@ -26,20 +21,7 @@ export const useCustomProductActions = ({
   setError: Dispatch<SetStateAction<string | null>>;
 }) => {
   const { pendingAction, runWrite } = useCustomProductWriter({ userId, premiumActive, setError });
-
-  const createProduct = useCallback((draft: CustomProductDraft) =>
-    runWrite('create', undefined, (uid) => repository.create(uid, draft)), [repository, runWrite]);
-  const updateProduct = useCallback((product: HostedCustomProduct, draft: CustomProductDraft) =>
-    runWrite('update', product.id, (uid) => repository.update(uid, product, draft)), [repository, runWrite]);
-  const duplicateProduct = useCallback((product: HostedCustomProduct) =>
-    runWrite('duplicate', product.id, (uid) => repository.create(uid, duplicateDraft(product))), [repository, runWrite]);
-  const setProductStatus = useCallback((product: HostedCustomProduct, status: HostedCustomProductStatus) =>
-    runWrite('status', product.id, (uid) => repository.setStatus(uid, product, status)), [repository, runWrite]);
-  const deleteProduct = useCallback((product: HostedCustomProduct) =>
-    runWrite('delete', product.id, async (uid) => {
-      await repository.delete(uid, product);
-      clearCustomProductForecastHandoff(product.id);
-    }, false), [repository, runWrite]);
+  const crudActions = useCustomProductCrudActions(repository, runWrite);
   const useProduct = useCallback((product: HostedCustomProduct): OneOffCustomLayer | null => {
     try {
       setError(null);
@@ -52,11 +34,7 @@ export const useCustomProductActions = ({
 
   return {
     pendingAction,
-    createProduct,
-    updateProduct,
-    duplicateProduct,
-    setProductStatus,
-    deleteProduct,
+    ...crudActions,
     useProduct,
   };
 };

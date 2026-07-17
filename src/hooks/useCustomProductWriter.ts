@@ -6,6 +6,7 @@ export type RunCustomProductWrite = (
   action: string,
   productId: string | undefined,
   operation: (resolvedUserId: string) => Promise<unknown>,
+  requiresPremium?: boolean,
 ) => Promise<boolean>;
 
 const mutationError = (error: unknown): string =>
@@ -24,12 +25,14 @@ export const useCustomProductWriter = ({
   const [pendingAction, setPendingAction] = useState<PendingCustomProductAction>(null);
   const pendingRef = useRef(false);
 
-  const runWrite = useCallback<RunCustomProductWrite>(async (action, productId, operation) => {
+  const runWrite = useCallback<RunCustomProductWrite>(async (
+    action, productId, operation, requiresPremium = true,
+  ) => {
     if (!userId) {
       setError('Sign in to manage reusable products.');
       return false;
     }
-    if (!premiumActive) {
+    if (requiresPremium && !premiumActive) {
       setError('Premium is required to change reusable products.');
       return false;
     }
