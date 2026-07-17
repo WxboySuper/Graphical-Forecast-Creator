@@ -433,6 +433,10 @@ const hasSameDayWorkflowWork = (
   currentDay: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
 ): boolean => cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
 
+const dayHasCustomContent = (
+  day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
+): boolean => Boolean(day?.customLayers?.layers.length);
+
 /** Discloses custom workflow ownership only on builds where the custom editor is exposed. */
 const CustomWorkflowDisclosure: React.FC<{ hasCustomContent: boolean }> = ({ hasCustomContent }) => {
   if (!isFeatureExposed('customProducts') || !hasCustomContent) return null;
@@ -472,7 +476,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   }
 
   const currentDay = forecastCycle.days[forecastCycle.currentDay];
-  const hasCustomContent = Boolean(currentDay?.customLayers?.layers.length);
+  const hasCustomContent = dayHasCustomContent(currentDay);
   const discussionGroupings = getDiscussionGroupings(forecastCycle, workflowTemplate, forecastCycle.currentDay);
   const currentDiscussionGrouping = getDiscussionGroupingForDay(discussionGroupings, forecastCycle.currentDay);
   const hasMapStarted = Boolean(currentDay && dayHasMapWork(currentDay));
