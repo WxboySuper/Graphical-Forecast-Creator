@@ -26,10 +26,11 @@ const CustomProductsDialog = () => {
   if (!isFeatureExposed('customProducts')) return null;
 
   const useProduct = (layer: OneOffCustomLayer) => {
-    if (layerCount >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) return;
+    if (layerCount >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) return false;
     dispatch(addCustomLayer(layer));
     dispatch(selectCustomLayer(layer.id));
     setOpen(false);
+    return true;
   };
 
   return (

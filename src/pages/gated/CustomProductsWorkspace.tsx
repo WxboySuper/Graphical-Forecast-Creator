@@ -18,10 +18,11 @@ const newProductDisabled = (
   || editorOpen
   || customProducts.products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount;
 
-const WorkspaceNotices = ({ customProducts }: { customProducts: UseCustomProductsResult }) => (
+const WorkspaceNotices = ({ customProducts, applicationError }: { customProducts: UseCustomProductsResult; applicationError?: string | null }) => (
   <>
     {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Your reusable products remain visible and can be deleted, but premium is required to edit, duplicate, archive, restore, or use them in a new forecast.</CardContent></Card> : null}
     {customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
+    {applicationError ? <p role="alert" className="custom-product-error">{applicationError}</p> : null}
   </>
 );
 
@@ -43,21 +44,6 @@ const WorkspaceEditors = ({
     {editing ? <CustomProductEditor product={editing} onCancel={stopEditing} onSave={(draft) => customProducts.updateProduct(editing, draft)} /> : null}
   </>
 );
-
-const createProductNavigator = (
-  customProducts: UseCustomProductsResult,
-  navigate: ReturnType<typeof useNavigate>,
-  onProductUse?: (layer: OneOffCustomLayer) => void,
-) => (product: HostedCustomProduct) => {
-  const layer = customProducts.useProduct(product);
-  if (!layer) return;
-  if (onProductUse) {
-    const consumedLayer = consumeCustomProductForecastHandoff(customProducts.premiumActive);
-    if (consumedLayer) onProductUse(consumedLayer);
-    return;
-  }
-  navigate('/forecast');
-};
 
 const SignedOutProducts = ({ embedded = false }: { embedded?: boolean }) => (
   <div className={`custom-products-page${embedded ? ' custom-products-page--dialog' : ''}`}>
@@ -127,7 +113,7 @@ const ProductsLibrary = ({
 
 interface CustomProductsWorkspaceProps {
   embedded?: boolean;
-  onProductUse?(layer: OneOffCustomLayer): void;
+  onProductUse?(layer: OneOffCustomLayer): boolean;
 }
 
 const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProductsWorkspaceProps) => {
@@ -136,6 +122,7 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
   const customProducts = useCustomProducts();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<HostedCustomProduct | null>(null);
+  const [applicationError, setApplicationError] = useState<string | null>(null);
   const activeCount = useMemo(
     () => customProducts.products.filter((product) => product.status === 'active').length,
     [customProducts.products],
@@ -147,7 +134,20 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
     setCreating(false);
     setEditing(product);
   };
-  const useProduct = createProductNavigator(customProducts, navigate, onProductUse);
+  const useProduct = (product: HostedCustomProduct) => {
+    const layer = customProducts.useProduct(product);
+    if (!layer) return;
+    if (onProductUse) {
+      if (onProductUse(layer)) {
+        consumeCustomProductForecastHandoff(customProducts.premiumActive);
+        setApplicationError(null);
+      } else {
+        setApplicationError(`Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`);
+      }
+      return;
+    }
+    navigate('/forecast');
+  };
 
   return (
     <main className={`custom-products-page${embedded ? ' custom-products-page--dialog' : ''}`}>
@@ -157,7 +157,7 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
         newDisabled={newProductDisabled(customProducts, editorOpen)}
         onNew={() => { setEditing(null); setCreating(true); }}
       />
-      <WorkspaceNotices customProducts={customProducts} />
+      <WorkspaceNotices customProducts={customProducts} applicationError={applicationError} />
       <WorkspaceEditors
         creating={creating}
         editing={editing}
