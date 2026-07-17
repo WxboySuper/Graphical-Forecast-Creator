@@ -9,14 +9,14 @@ import {
   type HostedCustomProductStatus,
   type OneOffCustomLayer,
 } from '../types/customProducts';
-import { isCustomPolygonFeature } from './customGeometry';
+import { isCustomPolygonFeature } from './customFeatureValidation';
 import { isCustomCategoryList } from './customCategoryValidation';
 import {
   createEmbeddedCustomProductSnapshot,
   isEmbeddedCustomProductSnapshot,
 } from './customProductSnapshots';
 
-export { isCustomPolygonFeature } from './customGeometry';
+export { isCustomPolygonFeature } from './customFeatureValidation';
 export {
   isCustomCategoryList,
   isCustomCategoryStyle,

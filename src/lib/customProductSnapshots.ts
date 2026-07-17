@@ -42,14 +42,21 @@ export const createEmbeddedCustomProductSnapshot = (
   capturedAt,
 });
 
+const hasValidSnapshotReferences = (value: Record<string, unknown>): boolean => {
+  if (value.sourceProductId !== undefined && !isBoundedText(value.sourceProductId)) return false;
+  if (value.sourceProductVersion !== undefined && !isPositiveInteger(value.sourceProductVersion)) return false;
+  return true;
+};
+
+const hasValidSnapshotContent = (value: Record<string, unknown>): boolean =>
+  isBoundedText(value.label)
+  && isCustomCategoryList(value.categories)
+  && isIsoTimestamp(value.capturedAt);
+
 /** Validates an immutable-by-contract embedded product snapshot. */
 export const isEmbeddedCustomProductSnapshot = (value: unknown): value is EmbeddedCustomProductSnapshot => {
   if (!isRecord(value)) return false;
   if (!hasOnlyKeys(value, ['schemaVersion', 'sourceProductId', 'sourceProductVersion', 'label', 'categories', 'capturedAt'])) return false;
   if (value.schemaVersion !== CUSTOM_PRODUCTS_SCHEMA_VERSION) return false;
-  if (value.sourceProductId !== undefined && !isBoundedText(value.sourceProductId)) return false;
-  if (value.sourceProductVersion !== undefined && !isPositiveInteger(value.sourceProductVersion)) return false;
-  return isBoundedText(value.label)
-    && isCustomCategoryList(value.categories)
-    && isIsoTimestamp(value.capturedAt);
+  return hasValidSnapshotReferences(value) && hasValidSnapshotContent(value);
 };
