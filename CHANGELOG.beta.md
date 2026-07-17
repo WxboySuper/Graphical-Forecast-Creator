@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #741
+
+- Prevent replayed Stripe webhook deliveries from double-counting premium upgrade and cancellation metrics.
+
 ### PR #729
 
 - Enable the validated forecast workflow v2 surfaces for beta testers while keeping staging and production disabled.
