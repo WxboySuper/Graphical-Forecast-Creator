@@ -1,6 +1,5 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
 import {
   Archive,
   CalendarDays,
@@ -20,7 +19,6 @@ import {
   Upload,
   Wrench,
   PackageOpen,
-  Palette,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -47,6 +45,7 @@ import {
 } from '../ForecastWorkspace/workspaceMeta';
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
+import CustomProductsEntryButton from './CustomProductsEntryButton';
 import type { RootState } from '../../store';
 import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
@@ -420,16 +419,6 @@ const tabbedToolbarTypeLabels: Partial<Record<OutlookType, string>> = {
 };
 
 type TabbedToolbarTabKey = 'draw' | 'days' | 'layers' | 'tools';
-
-/** Local-only link to reusable product management; no hosted build renders this control. */
-const CustomProductsEntryButton: React.FC = () => {
-  if (!isFeatureExposed('customProducts')) return null;
-  return (
-    <Button asChild variant="outline" className="h-10 rounded-xl px-3">
-      <Link to="/custom-products"><Palette className="mr-2 h-4 w-4" /> Products</Link>
-    </Button>
-  );
-};
 
 /** Section wrapper used inside tab rows to group related controls. */
 const TabbedToolbarStripSection: React.FC<{

@@ -31,11 +31,8 @@ import {
   undoLastEdit,
   setWorkflowMetadata,
   clearWorkflowMetadata,
-  addCustomLayer,
-  setCustomEditorMode,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType, GFCForecastSaveData } from '../types/outlooks';
-import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
 import { deserializeForecast, validateForecastData, exportForecastToJson, serializeForecast } from '../utils/fileUtils';
 import {
   getFirstExposedOutlookType,
@@ -67,11 +64,7 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
-import { isFeatureExposed } from '../config/featureExposure';
-import {
-  consumeCustomProductForecastHandoff,
-  restoreCustomProductForecastHandoff,
-} from '../lib/customProductHandoff';
+import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
 
 export { hasAnyModifierKey, isTypingTarget };
 import { queueProductMetric } from '../utils/productMetrics';
@@ -1414,6 +1407,7 @@ const useForecastPageWorkspace = ({
     mapRef,
     currentDay: forecastCycle.currentDay,
   });
+  useCustomProductForecastHandoff(restoreComplete, addToast);
 
   const dayRolloverPrompt = useDayRolloverPrompt({
     restoreComplete,
@@ -1463,27 +1457,6 @@ export const ForecastPage: React.FC = () => {
   const { syncedSettings } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const currentCustomLayerCount = useSelector((state: RootState) => {
-    const cycle = state.forecast.forecastCycle;
-    return cycle.days[cycle.currentDay]?.customLayers?.layers.length ?? 0;
-  });
-
-  useEffect(() => {
-    if (!isFeatureExposed('customProducts')) return;
-    const stagedLayer = consumeCustomProductForecastHandoff();
-    if (!stagedLayer) return;
-    if (currentCustomLayerCount >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) {
-      restoreCustomProductForecastHandoff(stagedLayer);
-      addToast(
-        `Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`,
-        'error',
-      );
-      return;
-    }
-    dispatch(addCustomLayer(stagedLayer));
-    dispatch(setCustomEditorMode('custom'));
-  }, [addToast, currentCustomLayerCount, dispatch]);
-
   const {
     emergencyMode,
     dayRolloverPrompt,
