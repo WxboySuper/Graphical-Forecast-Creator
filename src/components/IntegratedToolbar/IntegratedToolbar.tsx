@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   Archive,
   CalendarDays,
@@ -43,6 +44,9 @@ import {
   outlookShortcuts,
 } from '../ForecastWorkspace/workspaceMeta';
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
+import CustomDrawPanel from './CustomDrawPanel';
+import type { RootState } from '../../store';
+import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
 
 interface IntegratedToolbarProps {
@@ -543,9 +547,9 @@ const TabbedToolbarStatPill: React.FC<{ label: string; value: string }> = ({ lab
   </div>
 );
 
-/** Draw tab containing outlook type and probability controls. */
-const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
-  <TabbedToolbarTabRow>
+/** Existing severe-weather controls, unchanged when custom products are unavailable. */
+const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
+  <>
     <TabbedToolbarStripSection label="Outlook Type" hint="T / W / H / C" className="tabbed-integrated-toolbar__section--type w-[316px]">
       <div className="flex flex-wrap items-center gap-1.5">
         {controller.availableTypes.map((type) => (
@@ -573,8 +577,43 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
     <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection w-[360px]">
       <TabbedToolbarSelectionStrip controller={controller} showShortcuts={false} />
     </TabbedToolbarStripSection>
-  </TabbedToolbarTabRow>
+  </>
 );
+
+/** Draw tab with a local-only animated switch between severe and custom layers. */
+const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
+  const dispatch = useDispatch();
+  const storedMode = useSelector((state: RootState) => state.forecast.customEditor.mode);
+  const customExposed = isFeatureExposed('customProducts');
+
+  if (!customExposed) {
+    return <TabbedToolbarTabRow><SevereDrawControls controller={controller} /></TabbedToolbarTabRow>;
+  }
+
+  return (
+    <TabbedToolbarTabRow>
+      <TabbedToolbarStripSection label="Product" className="tabbed-integrated-toolbar__section--product-mode w-[150px]">
+        <div className="custom-product-toggle" role="radiogroup" aria-label="Drawing product" data-testid="custom-product-toggle">
+          {(['severe', 'custom'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={storedMode === mode}
+              className={cn('custom-product-toggle__button', storedMode === mode && 'is-active')}
+              onClick={() => dispatch(setCustomEditorMode(mode))}
+            >
+              {mode === 'severe' ? 'Severe' : 'Custom'}
+            </button>
+          ))}
+        </div>
+      </TabbedToolbarStripSection>
+      <div key={storedMode} className="custom-product-mode-panel">
+        {storedMode === 'severe' ? <SevereDrawControls controller={controller} /> : <CustomDrawPanel />}
+      </div>
+    </TabbedToolbarTabRow>
+  );
+};
 
 /** Control for cycle date selection/editor used in the Days tab. */
 const CycleDateControl: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {

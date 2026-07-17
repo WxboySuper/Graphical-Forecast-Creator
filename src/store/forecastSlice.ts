@@ -4,9 +4,13 @@ import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, Outlook
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
+import type { CustomLayerCollection } from '../types/customProducts';
 import { RootState } from './index'; // Need RootState for selectors
 import { cloneForecastCycle } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
+import { createCustomLayerReducers } from './customLayerReducers';
+import { createCustomCategoryReducers } from './customCategoryReducers';
+import { createCustomFeatureReducers } from './customFeatureReducers';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
@@ -33,6 +37,11 @@ export interface SavedCycle {
 export interface ForecastState {
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
+  customEditor: {
+    mode: 'severe' | 'custom';
+    activeLayerId: string | null;
+    activeCategoryId: string | null;
+  };
   currentMapView: {
     center: [number, number]; // [latitude, longitude]
     zoom: number;
@@ -62,6 +71,7 @@ interface ForecastDaySnapshot {
   day: DayType;
   data: OutlookData;
   lowProbabilityOutlooks: OutlookType[];
+  customLayers?: CustomLayerCollection;
 }
 
 interface ForecastHistoryEntry {
@@ -253,6 +263,11 @@ const initialState: ForecastState = {
     activeProbability: '2%',
     isSignificant: false
   },
+  customEditor: {
+    mode: 'severe',
+    activeLayerId: null,
+    activeCategoryId: null,
+  },
   currentMapView: {
     center: [39.8283, -98.5795],
     zoom: 4
@@ -397,6 +412,9 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
   };
 };
 
+const cloneCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
+  customLayers ? cloneJsonValue(customLayers) : undefined;
+
 /** Captures the current day's drawable outlook data and low-probability metadata for history. */
 const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {
   const currentDay = state.forecastCycle.currentDay;
@@ -407,6 +425,7 @@ const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null
     day: currentDay,
     data: cloneOutlookData(dayData.data),
     lowProbabilityOutlooks: [...(dayData.metadata.lowProbabilityOutlooks || [])],
+    customLayers: cloneCustomLayers(dayData.customLayers),
   };
 };
 
@@ -421,6 +440,7 @@ const applyDaySnapshot = (state: ForecastState, snapshot: ForecastDaySnapshot) =
   if (!targetDay) return;
 
   targetDay.data = cloneOutlookData(snapshot.data);
+  targetDay.customLayers = cloneCustomLayers(snapshot.customLayers);
   targetDay.metadata.lowProbabilityOutlooks = [...snapshot.lowProbabilityOutlooks];
   targetDay.metadata.lastModified = new Date().toISOString();
 };
@@ -646,6 +666,10 @@ export const forecastSlice = createSlice({
     toggleSignificant: (state) => {
       state.drawingState.isSignificant = false;
     },
+
+    ...createCustomLayerReducers(pushUndoSnapshot),
+    ...createCustomCategoryReducers(pushUndoSnapshot),
+    ...createCustomFeatureReducers(pushUndoSnapshot),
 
     addFeature: (state, action: PayloadAction<{ feature: Feature }>) => {
       const feature = action.payload.feature;
@@ -1399,6 +1423,20 @@ export const {
   setActiveOutlookType,
   setActiveProbability,
   toggleSignificant,
+  setCustomEditorMode,
+  selectCustomLayer,
+  selectCustomCategory,
+  addCustomLayer,
+  updateCustomLayerLabel,
+  removeCustomLayer,
+  moveCustomLayer,
+  addCustomCategory,
+  updateCustomCategory,
+  removeCustomCategory,
+  moveCustomCategory,
+  addCustomFeature,
+  updateCustomFeature,
+  removeCustomFeature,
   addFeature,
   updateFeature,
   removeFeature,
@@ -1457,6 +1495,14 @@ export const selectDiscussionDraftForScope = (state: RootState, scopeId: string)
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
   return cycle.days[cycle.currentDay]?.data || createEmptyOutlook(cycle.currentDay).data;
+};
+const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
+  schemaVersion: '1.0.0',
+  layers: [],
+};
+export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollection => {
+  const cycle = state.forecast.forecastCycle;
+  return cycle?.days?.[cycle.currentDay]?.customLayers || EMPTY_CUSTOM_LAYERS;
 };
 /** Selects the outlook maps for a specific day, falling back to an empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {

@@ -140,6 +140,40 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32), 0 10px 24px -18px rgba(15, 23, 42, 0.55);
 }
 
+.custom-product-mode-panel,
+.custom-draw-panel { display: flex; height: 100%; align-items: stretch; gap: 8px; }
+.custom-product-mode-panel { animation: custom-product-panel-enter 190ms ease-out; }
+.custom-product-toggle { display: grid; grid-template-columns: 1fr; width: 132px; gap: 6px; }
+.custom-product-toggle__button,
+.custom-draw-panel button,
+.custom-draw-panel input,
+.custom-draw-panel select { min-height: 34px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--background)); color: hsl(var(--foreground)); }
+.custom-product-toggle__button { padding: 6px 12px; font-size: 12px; font-weight: 800; transition: background-color 160ms ease, color 160ms ease, transform 160ms ease; }
+.custom-product-toggle__button.is-active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); transform: translateX(3px); }
+.custom-draw-panel__group { display: flex; min-width: 250px; flex-direction: column; justify-content: center; gap: 6px; border-right: 1px solid hsl(var(--border)); padding: 0 12px 0 4px; }
+.custom-draw-panel__group > input,
+.custom-draw-panel__group select { min-width: 0; padding: 5px 8px; }
+.custom-draw-panel__row { display: flex; align-items: center; gap: 5px; }
+.custom-draw-panel__row select { width: 142px; }
+.custom-draw-panel__icon-button { display: inline-flex; width: 34px; align-items: center; justify-content: center; padding: 7px; }
+.custom-draw-panel__icon-button svg { width: 15px; height: 15px; }
+.custom-draw-panel__label { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.custom-draw-panel__appearance { min-width: 520px; display: grid; grid-template-columns: 120px 132px 155px 145px 34px; grid-template-rows: 20px 38px; align-content: center; align-items: center; }
+.custom-draw-panel__appearance .custom-draw-panel__label { grid-column: 1 / -1; }
+.custom-draw-panel__appearance label { display: flex; align-items: center; gap: 5px; font-size: 11px; white-space: nowrap; }
+.custom-draw-panel__appearance input[type='color'] { width: 38px; padding: 2px; }
+.custom-draw-panel__appearance input[type='range'] { width: 90px; }
+.custom-style-swatch { width: 34px; height: 34px; border: 2px solid #111827; border-radius: 8px; background-color: var(--custom-fill); opacity: var(--custom-opacity); }
+.custom-style-swatch.hatch-diagonal { background-image: repeating-linear-gradient(45deg, transparent 0 6px, #111 6px 8px); }
+.custom-style-swatch.hatch-reverse-diagonal { background-image: repeating-linear-gradient(-45deg, transparent 0 6px, #111 6px 8px); }
+.custom-style-swatch.hatch-crosshatch { background-image: repeating-linear-gradient(45deg, transparent 0 6px, #111 6px 8px), repeating-linear-gradient(-45deg, transparent 0 6px, #111 6px 8px); }
+.custom-draw-panel__empty { min-width: 330px; display: flex; align-items: center; padding: 12px; color: hsl(var(--muted-foreground)); }
+
+@keyframes custom-product-panel-enter {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .tabbed-integrated-toolbar__row {
   box-sizing: border-box;
   scroll-behavior: smooth;
@@ -214,6 +248,8 @@
     transition: none !important;
     transform: none !important;
   }
+  .custom-product-mode-panel,
+  .custom-product-toggle__button { animation: none !important; transition: none !important; transform: none !important; }
 }
 
 .dark-mode .tabbed-integrated-toolbar {
@@ -959,4 +995,19 @@
   .tabbed-integrated-toolbar__section--workspace-actions .tabbed-integrated-toolbar__section-content > div {
     width: max-content;
   }
+}
+
+@media (max-width: 768px) {
+  .tabbed-integrated-toolbar__section--product-mode { flex: 0 0 132px; }
+  .custom-product-toggle { width: 120px; }
+  .custom-draw-panel__group { min-width: 238px; }
+  .custom-draw-panel__appearance { min-width: 500px; }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .tabbed-integrated-toolbar__section--product-mode { flex-basis: 230px; }
+  .custom-product-toggle { width: 220px; grid-template-columns: 1fr 1fr; }
+  .custom-draw-panel__group { min-width: 300px; flex-direction: row; align-items: center; padding-block: 0; }
+  .custom-draw-panel__label { display: none; }
+  .custom-draw-panel__appearance { display: flex; min-width: 760px; }
 }

@@ -19,3 +19,17 @@ The `customProducts` registry key is enabled only for the `local` build target w
 
 The TypeScript contracts live in `src/types/customProducts.ts`; strict runtime validators and snapshot/version helpers live in `src/lib/customProducts.ts`.
 
+## Local one-off layer workflow
+
+On a local build, the Draw tab starts in the existing Severe mode and exposes a
+leftmost Severe/Custom switch. Custom mode replaces the severe controls with
+layer and category controls while leaving the severe forecast data untouched.
+Each forecast day owns its custom layers independently. Layer/category order,
+labels, fill and stroke appearance, hatching, and polygon geometry are included
+in normal forecast JSON saves and restored only after strict schema validation.
+
+Custom edits participate in the existing day-scoped undo/redo history. The map,
+popup, legend, and image capture use the embedded style values, so a saved file
+needs no separate template. Signed-out local users receive the same one-off
+layer workflow. Hosted builds take the unchanged Severe-only rendering path.
+

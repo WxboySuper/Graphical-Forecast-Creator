@@ -67,6 +67,7 @@ type SerializedDay = {
     lastModified?: string;
   };
   data: SerializedOutlookData;
+  customLayers?: OutlookDay['customLayers'];
   discussion?: DiscussionData;
 };
 
@@ -83,6 +84,7 @@ const serializeOutlookDay = (outlookDay: OutlookDay): SerializedDay => {
     day: outlookDay.day,
     metadata: { ...outlookDay.metadata, lowProbabilityOutlooks: outlookDay.metadata.lowProbabilityOutlooks || [] },
     data: serializedData,
+    ...(outlookDay.customLayers ? { customLayers: JSON.parse(JSON.stringify(outlookDay.customLayers)) as OutlookDay['customLayers'] } : {}),
     discussion: outlookDay.discussion,
   };
 };

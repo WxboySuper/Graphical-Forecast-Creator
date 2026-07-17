@@ -181,6 +181,8 @@ export interface DiscussionGrouping {
 export interface OutlookDay {
   day: DayType;
   data: OutlookData; // The actual polygon data
+  /** Self-contained custom layers kept outside severe-weather outlook maps. */
+  customLayers?: import('./customProducts').CustomLayerCollection;
   metadata: {
     issueDate: string;
     validDate: string;
@@ -224,6 +226,7 @@ export interface GFCForecastSaveData {
     days: Partial<Record<DayType, {
       day: DayType;
       data: SerializedOutlookData;
+      customLayers?: import('./customProducts').CustomLayerCollection;
       metadata: {
         issueDate: string;
         validDate: string;
