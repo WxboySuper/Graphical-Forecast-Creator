@@ -14,7 +14,9 @@ permissions:
 # It remains only for documented emergency recovery when a PAT push to main is required.
 #
 # Required secrets:
-#   GH_PAT — Personal Access Token with `repo` scope.
+#   GH_PAT — Fine-grained personal access token restricted to this repository
+#            with Contents: Read and write. This token authorizes the legacy
+#            direct push; it is intentionally outside GITHUB_TOKEN permissions.
 on:
   workflow_dispatch:
     inputs:
@@ -27,24 +29,66 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.confirm_legacy == 'LEGACY-DIRECT-PROMOTE' }}
+    environment:
+      name: production-promote
 
     steps:
       - name: Checkout with full history
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+          ref: beta
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
+
+      - name: Record the beta revision to validate and promote
+        run: echo "VALIDATED_BETA_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Configure git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Merge beta into main
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.x'
+          cache: pnpm
+
+      - name: Install dependencies
         run: |
-          git fetch origin beta main
+          pnpm install --frozen-lockfile
+          npm --prefix server ci
+
+      - name: Validate beta before direct promotion
+        run: |
+          pnpm run build
+          pnpm test --silent
+          npm --prefix server test
+        env:
+          VITE_BUILD_TARGET: production
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_MODE: false
+          VITE_BETA_INVITE_PATH: ''
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          CI: false
+
+      - name: Merge the validated beta revision into main
+        run: |
+          git fetch origin main
           git checkout main
-          git merge --no-ff origin/beta -m "chore: promote beta → main [legacy direct]"
+          git merge --no-ff "$VALIDATED_BETA_SHA" -m "chore: promote beta → main [legacy direct]"
 
       - name: Strip beta prerelease from package version on main
         run: node scripts/strip-beta-prerelease-version.mjs

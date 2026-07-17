@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #740
+
+- Require protected reviewer approval and pre-promotion build/test validation for the legacy direct beta-to-main emergency workflow.
+
 ### PR #741
 
 - Prevent replayed Stripe webhook deliveries from double-counting premium upgrade and cancellation metrics.
