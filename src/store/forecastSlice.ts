@@ -1639,9 +1639,13 @@ export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
   return cycle.days[cycle.currentDay]?.data || createEmptyOutlook(cycle.currentDay).data;
 };
+const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
+  schemaVersion: '1.0.0',
+  layers: [],
+};
 export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollection => {
   const cycle = state.forecast.forecastCycle;
-  return cycle?.days?.[cycle.currentDay]?.customLayers || { schemaVersion: '1.0.0', layers: [] };
+  return cycle?.days?.[cycle.currentDay]?.customLayers || EMPTY_CUSTOM_LAYERS;
 };
 /** Selects the outlook maps for a specific day, falling back to an empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {

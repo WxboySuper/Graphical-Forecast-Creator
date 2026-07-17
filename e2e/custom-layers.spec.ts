@@ -8,8 +8,21 @@ const openForecast = async (page: import('@playwright/test').Page) => {
   await expect(page.locator('.map-container')).toBeVisible({ timeout: 10_000 });
 };
 
+const downloadForecast = async (page: import('@playwright/test').Page) => {
+  await page.getByRole('tab', { name: 'Tools' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save' }).first().click();
+  const download = await downloadPromise;
+  const savedPath = await download.path();
+  if (!savedPath) throw new Error('Custom forecast download has no readable path');
+  const saved = JSON.parse(await readFile(savedPath, 'utf8'));
+  await page.getByRole('tab', { name: 'Draw' }).click();
+  return saved;
+};
+
 test.describe('local-only custom layers', () => {
   test('switches cleanly, draws, identifies, deletes, and undoes a custom polygon', async ({ page }) => {
+    test.setTimeout(60_000);
     await openForecast(page);
     await expect(page.getByRole('radiogroup', { name: 'Drawing product' })).toBeVisible();
     await page.getByRole('radio', { name: 'Custom' }).click();
@@ -35,22 +48,26 @@ test.describe('local-only custom layers', () => {
     await page.mouse.dblclick(...points[2]);
 
     await page.getByRole('button', { name: 'Pan map' }).click();
+    const edgeMidpoint = [
+      (points[0][0] + points[1][0]) / 2,
+      (points[0][1] + points[1][1]) / 2,
+    ] as const;
+    await page.mouse.move(...edgeMidpoint);
+    await page.mouse.down();
+    await page.mouse.move(edgeMidpoint[0], edgeMidpoint[1] - 28, { steps: 8 });
+    await page.mouse.up();
     await page.mouse.click(box.x + box.width * .51, box.y + box.height * .46);
     await expect(page.locator('.ol-popup')).toContainText('Heavy snow');
+
+    const saved = await downloadForecast(page);
+    expect(saved.forecastCycle.days['1'].customLayers.layers[0].features[0].geometry.coordinates[0]).toHaveLength(5);
+    expect(saved.forecastCycle.days['1'].customLayers.layers[0].categories[0].style.hatch).toBe('crosshatch');
 
     await page.getByRole('button', { name: 'Delete polygons' }).click();
     await page.mouse.click(box.x + box.width * .51, box.y + box.height * .46);
     await page.getByRole('tab', { name: 'Tools' }).click();
     await page.getByRole('button', { name: 'Undo' }).first().click();
     await expect(page.getByRole('button', { name: 'Redo' }).first()).toBeEnabled();
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Save' }).first().click();
-    const download = await downloadPromise;
-    const savedPath = await download.path();
-    if (!savedPath) throw new Error('Custom forecast download has no readable path');
-    const saved = JSON.parse(await readFile(savedPath, 'utf8'));
-    expect(saved.forecastCycle.days['1'].customLayers.layers[0].features).toHaveLength(1);
-    expect(saved.forecastCycle.days['1'].customLayers.layers[0].categories[0].style.hatch).toBe('crosshatch');
   });
 
   for (const viewport of [

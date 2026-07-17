@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -61,6 +61,11 @@ const CustomDrawPanel: React.FC = () => {
   const activeLayer = layers.find(({ id }) => id === editor.activeLayerId) ?? layers[0];
   const categories = activeLayer ? [...activeLayer.categories].sort((a, b) => a.order - b.order) : [];
   const activeCategory = categories.find(({ id }) => id === editor.activeCategoryId) ?? categories[0];
+  const [layerLabelDraft, setLayerLabelDraft] = useState(activeLayer?.label ?? '');
+  const [categoryLabelDraft, setCategoryLabelDraft] = useState(activeCategory?.label ?? '');
+
+  useEffect(() => setLayerLabelDraft(activeLayer?.label ?? ''), [activeLayer?.id, activeLayer?.label]);
+  useEffect(() => setCategoryLabelDraft(activeCategory?.label ?? ''), [activeCategory?.id, activeCategory?.label]);
 
   const updateCategory = (changes: Partial<CustomCategoryTemplate> & { style?: Partial<CustomCategoryTemplate['style']> }) => {
     if (!activeLayer || !activeCategory) return;
@@ -97,9 +102,13 @@ const CustomDrawPanel: React.FC = () => {
           <input
             aria-label="Layer title"
             maxLength={64}
-            defaultValue={activeLayer.label}
-            key={activeLayer.id}
-            onBlur={(event) => dispatch(updateCustomLayerLabel({ layerId: activeLayer.id, label: event.target.value }))}
+            value={layerLabelDraft}
+            onChange={(event) => setLayerLabelDraft(event.target.value)}
+            onBlur={() => {
+              const label = layerLabelDraft.trim();
+              if (label) dispatch(updateCustomLayerLabel({ layerId: activeLayer.id, label }));
+              setLayerLabelDraft(label || activeLayer.label);
+            }}
           />
         ) : null}
       </section>
@@ -121,7 +130,11 @@ const CustomDrawPanel: React.FC = () => {
 
           <section className="custom-draw-panel__group custom-draw-panel__appearance" aria-label="Category appearance">
             <span className="custom-draw-panel__label">Appearance</span>
-            <input aria-label="Category label" data-testid="custom-label-input" maxLength={64} defaultValue={activeCategory.label} key={activeCategory.id} onBlur={(event) => updateCategory({ label: event.target.value.trim() || 'Category' })} />
+            <input aria-label="Category label" data-testid="custom-label-input" maxLength={64} value={categoryLabelDraft} onChange={(event) => setCategoryLabelDraft(event.target.value)} onBlur={() => {
+              const label = categoryLabelDraft.trim() || 'Category';
+              updateCategory({ label });
+              setCategoryLabelDraft(label);
+            }} />
             <label>Color <input aria-label="Category color" data-testid="custom-color-input" type="color" value={activeCategory.style.fillColor} onChange={(event) => updateCategory({ style: { fillColor: event.target.value } })} /></label>
             <label>Opacity <input aria-label="Category opacity" data-testid="custom-opacity-input" type="range" min="0" max="1" step="0.05" value={activeCategory.style.fillOpacity} onChange={(event) => updateCategory({ style: { fillOpacity: Number(event.target.value) } })} /></label>
             <select aria-label="Category hatch" data-testid="custom-hatch-select" value={activeCategory.style.hatch} onChange={(event) => updateCategory({ style: { hatch: event.target.value as CustomHatchPattern } })}>
