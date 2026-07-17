@@ -5,6 +5,7 @@ import {
   type CustomCategoryStyle,
   type CustomCategoryTemplate,
   type CustomLayerId,
+  type CustomLayerCollection,
   type CustomPolygonFeature,
   type CustomProductAccessState,
   type CustomProductId,
@@ -48,6 +49,12 @@ const isNonNegativeInteger = (value: unknown): value is number =>
 /** Validates a whole number that starts at one. */
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
+
+/** Validates a timestamp pair whose update cannot precede creation. */
+const hasValidChronology = (createdAt: unknown, updatedAt: unknown): boolean =>
+  isIsoTimestamp(createdAt)
+  && isIsoTimestamp(updatedAt)
+  && Date.parse(updatedAt) >= Date.parse(createdAt);
 
 /** Validates one six-digit hexadecimal color. */
 const isHexColor = (value: unknown): value is string =>
@@ -112,7 +119,7 @@ export const isCustomCategoryList = (value: unknown): value is CustomCategoryTem
 /** Validates one finite GeoJSON coordinate position. */
 const isPosition = (value: unknown): value is Position =>
   Array.isArray(value) && areAllValid([
-    value.length >= 2,
+    [2, 3].includes(value.length),
     value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate)),
   ]);
 
@@ -131,25 +138,52 @@ const isLinearRing = (value: unknown): value is Position[] => {
 
 /** Validates the ring collection used by one GeoJSON polygon. */
 const isPolygonCoordinates = (value: unknown): value is Position[][] =>
-  Array.isArray(value) && areAllValid([value.length > 0, value.every(isLinearRing)]);
+  Array.isArray(value) && areAllValid([
+    value.length > 0,
+    value.length <= CUSTOM_PRODUCT_LIMITS.ringsPerPolygon,
+    value.every(isLinearRing),
+  ]);
+
+/** Flattens one supported polygon geometry into positions for bounded validation. */
+const getGeometryPositions = (value: Record<string, unknown>): Position[] => {
+  if (!Array.isArray(value.coordinates)) return [];
+  const polygons = value.type === 'Polygon' ? [value.coordinates] : value.coordinates;
+  return (polygons as Position[][][]).flat(2);
+};
+
+/** Ensures every coordinate in a geometry uses one consistent dimension. */
+const hasValidGeometryDimensions = (value: Record<string, unknown>): boolean => {
+  const positions = getGeometryPositions(value);
+  if (positions.length === 0 || positions.length > CUSTOM_PRODUCT_LIMITS.coordinatesPerFeature) return false;
+  return positions.every((position) => position.length === positions[0].length);
+};
 
 /** Accepts only Polygon or MultiPolygon geometry for custom forecast content. */
 const isCustomPolygonGeometry = (value: unknown): value is Geometry => {
   if (!isRecord(value)) return false;
   if (!hasOnlyKeys(value, ['type', 'coordinates'])) return false;
-  if (value.type === 'Polygon') return isPolygonCoordinates(value.coordinates);
+  if (value.type === 'Polygon') {
+    return isPolygonCoordinates(value.coordinates) && hasValidGeometryDimensions(value);
+  }
   if (value.type !== 'MultiPolygon') return false;
   if (!Array.isArray(value.coordinates)) return false;
   if (value.coordinates.length === 0) return false;
-  return value.coordinates.every(isPolygonCoordinates);
+  if (value.coordinates.length > CUSTOM_PRODUCT_LIMITS.polygonsPerFeature) return false;
+  return value.coordinates.every(isPolygonCoordinates) && hasValidGeometryDimensions(value);
 };
 
-/** Validates the finite four- or six-number GeoJSON bounding-box shape. */
-const isBoundingBox = (value: unknown): boolean =>
-  Array.isArray(value) && areAllValid([
-    [4, 6].includes(value.length),
-    value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate)),
-  ]);
+/** Validates a finite, ordered GeoJSON bbox matching the geometry dimension. */
+const isBoundingBox = (value: unknown, dimension: number): boolean => {
+  if (!Array.isArray(value) || value.length !== dimension * 2) return false;
+  if (!value.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))) return false;
+  return value.slice(0, dimension).every((minimum, index) => minimum <= value[index + dimension]);
+};
+
+/** Accepts the GeoJSON string or finite numeric feature identifier contract. */
+const isOptionalFeatureId = (value: unknown): boolean =>
+  value === undefined
+  || typeof value === 'string'
+  || (typeof value === 'number' && Number.isFinite(value));
 
 /** Validates the persistence shell shared by all custom GeoJSON features. */
 const hasValidCustomFeatureShape = (value: Record<string, unknown>): boolean => {
@@ -157,7 +191,9 @@ const hasValidCustomFeatureShape = (value: Record<string, unknown>): boolean => 
   if (value.type !== 'Feature') return false;
   if (!isCustomPolygonGeometry(value.geometry)) return false;
   if (!isRecord(value.properties)) return false;
-  return value.bbox === undefined || isBoundingBox(value.bbox);
+  if (!isOptionalFeatureId(value.id)) return false;
+  const dimension = getGeometryPositions(value.geometry as Record<string, unknown>)[0]?.length;
+  return value.bbox === undefined || isBoundingBox(value.bbox, dimension);
 };
 
 /** Validates the category identity and display title stored on a custom feature. */
@@ -234,8 +270,8 @@ const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => a
   isNonNegativeInteger(value.order),
   isCustomCategoryList(value.categories),
   Array.isArray(value.features),
-  isIsoTimestamp(value.createdAt),
-  isIsoTimestamp(value.updatedAt),
+  value.features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer,
+  hasValidChronology(value.createdAt, value.updatedAt),
   value.productSnapshot === undefined || isEmbeddedCustomProductSnapshot(value.productSnapshot),
 ]);
 
@@ -249,6 +285,18 @@ export const isOneOffCustomLayer = (value: unknown): value is OneOffCustomLayer 
   const layer = value as unknown as OneOffCustomLayer;
   const categoryIds = new Set(layer.categories.map((category) => category.id));
   return layer.features.every((feature) => isCustomPolygonFeature(feature, layer.id, categoryIds));
+};
+
+/** Validates a bounded, uniquely identified, contiguously ordered layer collection. */
+export const isCustomLayerCollection = (value: unknown): value is CustomLayerCollection => {
+  if (!isRecord(value)) return false;
+  if (!hasOnlyKeys(value, ['schemaVersion', 'layers'])) return false;
+  if (value.schemaVersion !== CUSTOM_PRODUCTS_SCHEMA_VERSION || !Array.isArray(value.layers)) return false;
+  if (value.layers.length > CUSTOM_PRODUCT_LIMITS.layersPerCollection) return false;
+  if (!value.layers.every(isOneOffCustomLayer)) return false;
+  const ids = new Set(value.layers.map((layer) => layer.id));
+  return ids.size === value.layers.length
+    && value.layers.every((layer, index) => layer.order === index);
 };
 
 /** Validates an optional bounded product description. */
@@ -269,8 +317,7 @@ const hasValidHostedProductFields = (value: Record<string, unknown>): boolean =>
   isPositiveInteger(value.version),
   isHostedProductStatus(value.status),
   isCustomCategoryList(value.categories),
-  isIsoTimestamp(value.createdAt),
-  isIsoTimestamp(value.updatedAt),
+  hasValidChronology(value.createdAt, value.updatedAt),
 ]);
 
 /** Validates the owner-scoped reusable product persistence shape. */
@@ -309,13 +356,20 @@ export const reviseHostedCustomProduct = (
   product: HostedCustomProduct,
   changes: Pick<HostedCustomProduct, 'label' | 'description' | 'categories' | 'status'>,
   updatedAt = new Date().toISOString(),
-): HostedCustomProduct => ({
-  ...product,
-  ...changes,
-  categories: changes.categories.map((category) => ({ ...category, style: { ...category.style } })),
-  version: getNextProductVersion(product.version),
-  updatedAt,
-});
+): HostedCustomProduct => {
+  if (!isHostedCustomProduct(product)) throw new TypeError('Cannot revise an invalid custom product');
+  const revised: HostedCustomProduct = {
+    ...product,
+    ...changes,
+    categories: changes.categories.map((category) => ({ ...category, style: { ...category.style } })),
+    version: getNextProductVersion(product.version),
+    updatedAt,
+  };
+  if (!isHostedCustomProduct(revised) || Date.parse(updatedAt) < Date.parse(product.updatedAt)) {
+    throw new TypeError('Custom product revision is invalid');
+  }
+  return revised;
+};
 
 /** Seeds a self-contained empty layer from a reusable product snapshot. */
 export const createLayerFromHostedProduct = ({
@@ -329,8 +383,9 @@ export const createLayerFromHostedProduct = ({
   order: number;
   createdAt?: string;
 }): OneOffCustomLayer => {
+  if (!isHostedCustomProduct(product)) throw new TypeError('Cannot create a layer from an invalid custom product');
   const productSnapshot = createEmbeddedCustomProductSnapshot(product, createdAt);
-  return {
+  const layer: OneOffCustomLayer = {
     schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
     id: layerId,
     label: product.label,
@@ -341,6 +396,8 @@ export const createLayerFromHostedProduct = ({
     createdAt,
     updatedAt: createdAt,
   };
+  if (!isOneOffCustomLayer(layer)) throw new TypeError('Custom layer seed is invalid');
+  return layer;
 };
 
 /** Brands a validated opaque string as a custom layer identifier. */

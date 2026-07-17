@@ -6,7 +6,12 @@ export const CUSTOM_PRODUCTS_SCHEMA_VERSION = '1.0.0' as const;
 /** Product limits shared by client validation and hosted persistence. */
 export const CUSTOM_PRODUCT_LIMITS = {
   productsPerAccount: 20,
+  layersPerCollection: 12,
   categoriesPerProduct: 12,
+  featuresPerLayer: 500,
+  polygonsPerFeature: 32,
+  ringsPerPolygon: 64,
+  coordinatesPerFeature: 10_000,
   labelLength: 64,
 } as const;
 
@@ -95,4 +100,3 @@ export interface CustomLayerCollection {
   schemaVersion: typeof CUSTOM_PRODUCTS_SCHEMA_VERSION;
   layers: OneOffCustomLayer[];
 }
-

@@ -8,6 +8,7 @@ import {
   getCustomProductAccessState,
   isCustomCategoryList,
   isCustomCategoryStyle,
+  isCustomLayerCollection,
   isCustomPolygonFeature,
   isEmbeddedCustomProductSnapshot,
   isHostedCustomProduct,
@@ -91,6 +92,21 @@ describe('custom product schema', () => {
     })).toBe(false);
     expect(isCustomPolygonFeature({
       ...base,
+      id: Number.POSITIVE_INFINITY,
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+    })).toBe(false);
+    expect(isCustomPolygonFeature({
+      ...base,
+      bbox: [10, 10, -10, -10],
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+    })).toBe(false);
+    expect(isCustomPolygonFeature({
+      ...base,
+      bbox: [0, 0, 1, 1],
+      geometry: { type: 'Polygon', coordinates: [[[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 0, 0]]] },
+    })).toBe(false);
+    expect(isCustomPolygonFeature({
+      ...base,
       geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] },
     })).toBe(false);
     expect(isCustomPolygonFeature({
@@ -107,6 +123,7 @@ describe('custom product schema', () => {
     expect(isHostedCustomProduct({ ...product(), label: 'x'.repeat(65) })).toBe(false);
     expect(isHostedCustomProduct({ ...product(), internalRole: 'admin' })).toBe(false);
     expect(isHostedCustomProduct({ ...product(), updatedAt: '2026-02-31T12:00:00.000Z' })).toBe(false);
+    expect(isHostedCustomProduct({ ...product(), updatedAt: '2026-07-17T11:59:59.999Z' })).toBe(false);
   });
 
   test('creates a detached immutable-by-value package snapshot', () => {
@@ -154,6 +171,12 @@ describe('custom product schema', () => {
       ...layer,
       features: [{ ...layer.features[0], properties: { ...layer.features[0].properties, customLayerId: asCustomLayerId('other') } }],
     })).toBe(false);
+    expect(isOneOffCustomLayer({ ...layer, updatedAt: '2026-07-17T12:59:59.999Z' })).toBe(false);
+    expect(isCustomLayerCollection({ schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, layers: [layer] })).toBe(true);
+    expect(isCustomLayerCollection({
+      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+      layers: [layer, { ...layer, id: asCustomLayerId('layer-2'), order: 2 }],
+    })).toBe(false);
   });
 
   test('derives active, expired, and archived access without changing snapshots', () => {
@@ -180,6 +203,7 @@ describe('custom product schema', () => {
     expect(revised.id).toBe(original.id);
     expect(revised.createdAt).toBe(original.createdAt);
     expect(original.categories[0].style.fillColor).toBe('#8a3ffc');
+    expect(isHostedCustomProduct(revised)).toBe(true);
   });
 
   test('rejects a revision that would exceed the safe integer range', () => {
@@ -189,5 +213,22 @@ describe('custom product schema', () => {
       categories: [category()],
       status: 'active',
     })).toThrow(RangeError);
+    expect(() => reviseHostedCustomProduct(product(), {
+      label: '',
+      description: undefined,
+      categories: [category()],
+      status: 'active',
+    })).toThrow(TypeError);
+    expect(() => reviseHostedCustomProduct(product(), {
+      label: 'Moves backward',
+      description: undefined,
+      categories: [category()],
+      status: 'active',
+    }, '2026-07-17T11:59:59.999Z')).toThrow(TypeError);
+    expect(() => createLayerFromHostedProduct({
+      product: product({ label: '' }),
+      layerId: asCustomLayerId('layer-invalid'),
+      order: 0,
+    })).toThrow(TypeError);
   });
 });
