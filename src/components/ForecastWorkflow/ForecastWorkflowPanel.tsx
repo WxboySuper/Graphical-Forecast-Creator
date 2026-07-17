@@ -61,7 +61,8 @@ interface PreviousOutlookSuggestion {
 const dayHasMapWork = (day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]>): boolean => {
   const hasMapData = Object.values(day.data).some((outlookMap) => (outlookMap?.size ?? 0) > 0);
   const hasLowProbability = (day.metadata.lowProbabilityOutlooks?.length ?? 0) > 0;
-  return hasMapData || hasLowProbability;
+  const hasCustomLayers = isFeatureExposed('customProducts') && (day.customLayers?.layers.length ?? 0) > 0;
+  return hasMapData || hasLowProbability || hasCustomLayers;
 };
 
 /** True when one forecast day has any map or discussion work started. */
@@ -461,6 +462,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   }
 
   const currentDay = forecastCycle.days[forecastCycle.currentDay];
+  const hasCustomContent = Boolean(currentDay?.customLayers?.layers.length);
   const discussionGroupings = getDiscussionGroupings(forecastCycle, workflowTemplate, forecastCycle.currentDay);
   const currentDiscussionGrouping = getDiscussionGroupingForDay(discussionGroupings, forecastCycle.currentDay);
   const hasMapStarted = Boolean(currentDay && dayHasMapWork(currentDay));
@@ -602,6 +604,11 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           isUpdating={isUpdating}
           activeUpdateVersion={activeUpdateVersion}
         />
+        {isFeatureExposed('customProducts') && hasCustomContent ? (
+          <p className="forecast-workflow-panel__custom-disclosure" role="note">
+            Custom layers belong to this workflow grouping and are included in copies, updates, cloud saves, and packages. They are excluded from severe analytics and Auto-Categorical.
+          </p>
+        ) : null}
         <WorkflowPanelActions
           context={context}
           isReviewed={isReviewed}

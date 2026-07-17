@@ -1,4 +1,4 @@
-import { exportForecastToJson, deserializeForecast, validateForecastData } from '../utils/fileUtils';
+import { exportForecastToJson, deserializeForecast, readForecastImportFile, validateForecastData } from '../utils/fileUtils';
 import { isWorkflowExportPackage } from '../utils/workflowPackage';
 import {
   markAsSaved,
@@ -22,12 +22,17 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
   /** Reads a File object, validates the JSON content, deserializes it, and imports it as the active forecast cycle. */
   const handleLoad = async (file: File) => {
     try {
-      const text = await file.text();
       let data: unknown;
       try {
-        data = JSON.parse(text);
-      } catch {
-        addToast('File is not valid JSON.', 'error');
+        data = await readForecastImportFile(file);
+      } catch (error) {
+        if (file.name.toLowerCase().endsWith('.zip')) {
+          addToast('File is not a valid GFC package.', 'error');
+        } else if (error instanceof SyntaxError) {
+          addToast('File is not valid JSON.', 'error');
+        } else {
+          addToast('Error reading file.', 'error');
+        }
         return;
       }
 

@@ -17,6 +17,7 @@ import type {
   DiscussionData,
 } from '../types/outlooks';
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
+import { isFeatureExposed } from '../config/featureExposure';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -102,6 +103,9 @@ const buildGroupingData = (
     groupingData[groupingKey] = {
       day,
       data: savedDay.data,
+      ...(isFeatureExposed('customProducts') && savedDay.customLayers
+        ? { customLayers: JSON.parse(JSON.stringify(savedDay.customLayers)) as typeof savedDay.customLayers }
+        : {}),
       metadata: {
         issueDate: savedDay.metadata.issueDate,
         validDate: savedDay.metadata.validDate,
@@ -232,7 +236,8 @@ export const migrateLegacyForecastToSerializedPackage = (
     version: 1,
     status,
     includesDiscussions: Object.values(groupingData).some((grouping) => grouping.discussion !== undefined),
-    includesStyleSnapshots: false,
+    includesStyleSnapshots: isFeatureExposed('customProducts')
+      && Object.values(groupingData).some((grouping) => Boolean(grouping.customLayers?.layers.length)),
   };
 
   const serializedCycle: SerializedCycle = {

@@ -244,6 +244,27 @@ describe('workflowSerialization', () => {
       expect(pkg.metadata.includesDiscussions).toBe(true);
     });
 
+    test('attaches detached custom geometry and appearance to the owning grouping', () => {
+      const legacy = makeLegacySaveData();
+      const customLayers = {
+        schemaVersion: '1.0.0' as const,
+        layers: [{
+          schemaVersion: '1.0.0' as const, id: 'layer-1' as never, label: 'Fire', order: 0,
+          categories: [{ id: 'cat-1' as never, label: 'Critical', order: 0, style: { fillColor: '#ef4444', fillOpacity: .6, strokeColor: '#123456', strokeOpacity: .4, strokeWidth: 4, hatch: 'crosshatch' as const } }],
+          features: [{ type: 'Feature' as const, id: 'feature-1', geometry: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: { customLayerId: 'layer-1' as never, categoryId: 'cat-1' as never, title: 'Critical' } }],
+          createdAt: '2026-07-17T00:00:00.000Z', updatedAt: '2026-07-17T00:00:00.000Z',
+        }],
+      };
+      legacy.forecastCycle!.days[1]!.customLayers = customLayers;
+
+      const serialized = migrateLegacyForecastToSerializedPackage(legacy, 'severe-day1');
+      const grouped = serialized.cycles[0].groupingData['day1-v1'];
+
+      expect(grouped.customLayers).toEqual(customLayers);
+      expect(grouped.customLayers).not.toBe(customLayers);
+      expect(serialized.metadata.includesStyleSnapshots).toBe(true);
+    });
+
     test('sets version to 1', () => {
       const legacy = makeLegacySaveData();
       const pkg = migrateLegacyForecastToWorkflowPackage(legacy);

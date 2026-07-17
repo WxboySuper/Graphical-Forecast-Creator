@@ -55,4 +55,26 @@ describe('buildLoadedCloudForecastPayload', () => {
     expect(payload.cycleMetadata).toBeNull();
     expect(payload).not.toHaveProperty('cycleMetadata', expect.objectContaining({ id: 'stale-cycle' }));
   });
+
+  test('preserves custom geometry and appearance when loading a cloud payload', () => {
+    const customLayers = {
+      schemaVersion: '1.0.0' as const,
+      layers: [{
+        schemaVersion: '1.0.0' as const, id: 'layer-1' as never, label: 'Fire', order: 0,
+        categories: [{ id: 'cat-1' as never, label: 'Critical', order: 0, style: { fillColor: '#ef4444', fillOpacity: .6, strokeColor: '#123456', strokeOpacity: .4, strokeWidth: 4, hatch: 'crosshatch' as const } }],
+        features: [{ type: 'Feature' as const, id: 'feature-1', geometry: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: { customLayerId: 'layer-1' as never, categoryId: 'cat-1' as never, title: 'Critical' } }],
+        createdAt: '2026-07-17T00:00:00.000Z', updatedAt: '2026-07-17T00:00:00.000Z',
+      }],
+    };
+    const cloudPayload = {
+      ...basePayload,
+      forecastCycle: {
+        ...basePayload.forecastCycle!,
+        days: { 1: { day: 1, data: {}, metadata: { issueDate: '', validDate: '', issuanceTime: '' }, customLayers } },
+      },
+    } as GFCForecastSaveData;
+
+    const loaded = buildLoadedCloudForecastPayload({ payload: cloudPayload } as CloudCycle);
+    expect(loaded.forecastCycle?.days[1]?.customLayers).toEqual(customLayers);
+  });
 });
