@@ -36,8 +36,12 @@ jobs:
       - name: Checkout with full history
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+          ref: beta
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
+
+      - name: Record the beta revision to validate and promote
+        run: echo "VALIDATED_BETA_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Configure git identity
         run: |
@@ -56,21 +60,35 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile
+          npm --prefix server ci
 
       - name: Validate beta before direct promotion
         run: |
           pnpm run build
           pnpm test --silent
+          npm --prefix server test
         env:
-          CI: true
-          VITE_BUILD_TARGET: local
+          VITE_BUILD_TARGET: production
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_MODE: false
+          VITE_BETA_INVITE_PATH: ''
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          CI: false
 
-      - name: Merge beta into main
+      - name: Merge the validated beta revision into main
         run: |
-          git fetch origin beta main
+          git fetch origin main
           git checkout main
-          git merge --no-ff origin/beta -m "chore: promote beta → main [legacy direct]"
+          git merge --no-ff "$VALIDATED_BETA_SHA" -m "chore: promote beta → main [legacy direct]"
 
       - name: Strip beta prerelease from package version on main
         run: node scripts/strip-beta-prerelease-version.mjs
