@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { HostedCustomProduct, HostedCustomProductStatus, OneOffCustomLayer } from '../types/customProducts';
 import type { CustomProductDraft, CustomProductsRepository } from '../lib/customProductsRepository';
-import { stageCustomProductForForecast } from '../lib/customProductHandoff';
+import { clearCustomProductForecastHandoff, stageCustomProductForForecast } from '../lib/customProductHandoff';
 import { useCustomProductWriter } from './useCustomProductWriter';
 
 const handoffError = (error: unknown): string =>
@@ -36,7 +36,10 @@ export const useCustomProductActions = ({
   const setProductStatus = useCallback((product: HostedCustomProduct, status: HostedCustomProductStatus) =>
     runWrite('status', product.id, (uid) => repository.setStatus(uid, product, status)), [repository, runWrite]);
   const deleteProduct = useCallback((product: HostedCustomProduct) =>
-    runWrite('delete', product.id, (uid) => repository.delete(uid, product)), [repository, runWrite]);
+    runWrite('delete', product.id, async (uid) => {
+      await repository.delete(uid, product);
+      clearCustomProductForecastHandoff(product.id);
+    }, false), [repository, runWrite]);
   const useProduct = useCallback((product: HostedCustomProduct): OneOffCustomLayer | null => {
     try {
       setError(null);

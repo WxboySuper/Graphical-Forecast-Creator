@@ -55,6 +55,30 @@ const cloudCycle = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Build a valid reusable custom product. */
+const customProduct = (overrides = {}) => ({
+  schemaVersion: '1.0.0',
+  id: 'product-logical-1',
+  userId: ALICE,
+  label: 'Fire weather',
+  description: 'Reusable desk template',
+  version: 1,
+  status: 'active',
+  categories: [{
+    id: 'elevated',
+    label: 'Elevated',
+    order: 0,
+    style: {
+      fillColor: '#f97316', fillOpacity: 0.45,
+      strokeColor: '#123456', strokeOpacity: 1,
+      strokeWidth: 2, hatch: 'diagonal',
+    },
+  }],
+  createdAt: '2026-07-17T00:00:00.000Z',
+  updatedAt: '2026-07-17T00:00:00.000Z',
+  ...overrides,
+});
+
 /** Build a valid synchronized settings document. */
 const settings = (overrides = {}) => ({
   darkMode: false,
@@ -113,6 +137,10 @@ const seed = async (writes) => {
 /** Seed a server-owned premium entitlement. */
 const setEntitlement = (db, uid, premiumActive) =>
   setDoc(doc(db, 'userEntitlements', uid), { premiumActive });
+
+/** Enable hosted custom-product writes as trusted server state. */
+const enableCustomProducts = (db, enabled = true) =>
+  setDoc(doc(db, 'serverFeatureCapabilities', 'customProducts'), { enabled });
 
 before(async () => {
   testEnv = await initializeTestEnvironment({
@@ -424,5 +452,79 @@ describe('cloudCycles entitlement boundary', () => {
         cloudCycle({ payloadJson: '€'.repeat(250001), payloadBytes: 250001 })
       )
     );
+  });
+});
+
+describe('customProducts security and lifecycle boundary', () => {
+  const aliceRef = () => doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-01');
+
+  test('is fail-closed until both server capability and entitlement are active', async () => {
+    await seed((db) => setEntitlement(db, ALICE, true));
+    await assertFails(setDoc(aliceRef(), customProduct()));
+
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, false);
+    });
+    await assertFails(setDoc(aliceRef(), customProduct()));
+    await assertFails(getDoc(doc(dbFor(ALICE), 'serverFeatureCapabilities', 'customProducts')));
+  });
+
+  test('allows entitled owner create and strict versioned active edits in one of twenty slots', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
+    await assertSucceeds(setDoc(aliceRef(), customProduct()));
+    await assertSucceeds(updateDoc(aliceRef(), {
+      label: 'Updated fire weather', version: 2, updatedAt: '2026-07-17T01:00:00.000Z',
+    }));
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-21'),
+      customProduct({ id: 'another-product' }),
+    ));
+  });
+
+  test('preserves owner read and delete after expiration or rollout shutdown', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db, false);
+      await setEntitlement(db, ALICE, false);
+      await setDoc(doc(db, 'users', ALICE, 'customProducts', 'product-01'), customProduct());
+    });
+    await assertSucceeds(getDoc(aliceRef()));
+    await assertFails(updateDoc(aliceRef(), { label: 'Expired edit', version: 2 }));
+    await assertSucceeds(deleteDoc(aliceRef()));
+  });
+
+  test('rejects anonymous and cross-account access', async () => {
+    await seed((db) => setDoc(doc(db, 'users', ALICE, 'customProducts', 'product-01'), customProduct()));
+    await assertFails(getDoc(doc(anonymousDb(), 'users', ALICE, 'customProducts', 'product-01')));
+    await assertFails(getDoc(doc(dbFor(BOB), 'users', ALICE, 'customProducts', 'product-01')));
+    await assertFails(deleteDoc(doc(dbFor(BOB), 'users', ALICE, 'customProducts', 'product-01')));
+  });
+
+  test('enforces immutable identity, monotonic versions, and status-only lifecycle transitions', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+      await setDoc(doc(db, 'users', ALICE, 'customProducts', 'product-01'), customProduct());
+    });
+    await assertFails(updateDoc(aliceRef(), { userId: BOB, version: 2, updatedAt: '2026-07-17T01:00:00.000Z' }));
+    await assertFails(updateDoc(aliceRef(), { label: 'No bump', updatedAt: '2026-07-17T01:00:00.000Z' }));
+    await assertSucceeds(updateDoc(aliceRef(), { status: 'archived', version: 2, updatedAt: '2026-07-17T01:00:00.000Z' }));
+    await assertFails(updateDoc(aliceRef(), { label: 'Archived edit', version: 3, updatedAt: '2026-07-17T02:00:00.000Z' }));
+    await assertSucceeds(updateDoc(aliceRef(), { status: 'active', version: 3, updatedAt: '2026-07-17T02:00:00.000Z' }));
+  });
+
+  test('rejects malformed styles, category order, duplicate IDs, and unknown fields', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
+    const baseCategory = customProduct().categories[0];
+    await assertFails(setDoc(aliceRef(), customProduct({ internalRole: 'admin' })));
+    await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, order: 1 }] })));
+    await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, style: { ...baseCategory.style, fillColor: 'red' } }] })));
+    await assertFails(setDoc(aliceRef(), customProduct({ categories: [baseCategory, { ...baseCategory, order: 1 }] })));
   });
 });

@@ -7,7 +7,11 @@ import { useCustomProducts } from './useCustomProducts';
 jest.mock('../auth/AuthProvider', () => ({ useAuth: jest.fn() }));
 jest.mock('../billing/EntitlementProvider', () => ({ useEntitlement: jest.fn() }));
 jest.mock('../lib/customProductsRepository', () => ({ getCustomProductsRepository: jest.fn() }));
-jest.mock('../lib/customProductHandoff', () => ({ stageCustomProductForForecast: jest.fn() }));
+const mockClearHandoff = jest.fn();
+jest.mock('../lib/customProductHandoff', () => ({
+  stageCustomProductForForecast: jest.fn(),
+  clearCustomProductForecastHandoff: (...args: unknown[]) => mockClearHandoff(...args),
+}));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseEntitlement = useEntitlement as jest.MockedFunction<typeof useEntitlement>;
@@ -41,6 +45,11 @@ const draft = {
     },
   }],
 };
+const product = {
+  schemaVersion: '1.0.0', id: 'product-1', userId: 'user-1', label: 'Fire weather',
+  version: 1, status: 'active', categories: draft.categories,
+  createdAt: '2026-07-17T00:00:00.000Z', updatedAt: '2026-07-17T00:00:00.000Z',
+} as Parameters<ReturnType<typeof useCustomProducts>['deleteProduct']>[0];
 
 describe('useCustomProducts', () => {
   beforeEach(() => {
@@ -91,5 +100,21 @@ describe('useCustomProducts', () => {
       await first;
     });
     expect(result.current.pendingAction).toBeNull();
+  });
+
+  test('allows an expired signed-in owner to delete but blocks premium mutations', async () => {
+    const repository = makeRepository();
+    mockGetRepository.mockReturnValue(repository);
+    mockUseEntitlement.mockReturnValue({ premiumActive: false } as ReturnType<typeof useEntitlement>);
+    const { result } = renderHook(() => useCustomProducts());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await expect(result.current.updateProduct(product, draft)).resolves.toBe(false);
+      await expect(result.current.deleteProduct(product)).resolves.toBe(true);
+    });
+    expect(repository.update).not.toHaveBeenCalled();
+    expect(repository.delete).toHaveBeenCalledWith('user-1', product);
+    expect(mockClearHandoff).toHaveBeenCalledWith(product.id);
   });
 });

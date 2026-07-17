@@ -100,13 +100,20 @@ describe('CustomProductsPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/forecast');
   });
 
-  test('keeps editing and new-map use unavailable without premium', () => {
-    mockUseCustomProducts.mockReturnValue(result({ products: [product], premiumActive: false }));
+  test('keeps editing and new-map use unavailable without premium while retaining deletion', async () => {
+    const user = userEvent.setup();
+    const customProducts = result({ products: [product], premiumActive: false });
+    mockUseCustomProducts.mockReturnValue(customProducts);
     render(<MemoryRouter><CustomProductsPage /></MemoryRouter>);
 
     expect(screen.getByRole('button', { name: /New product/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Use in Forecast/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Edit/i })).toBeDisabled();
+    expect(screen.getByText(/remain visible and can be deleted/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Delete$/i })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: /^Delete$/i }));
+    await user.click(screen.getByRole('button', { name: /^Delete$/i }));
+    expect(customProducts.deleteProduct).toHaveBeenCalledWith(product);
   });
 
   test('disables every product mutation while an action is pending', () => {

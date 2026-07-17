@@ -42,7 +42,7 @@ const ProductActions = ({ product, premiumActive, pending, onEdit, onDuplicate, 
         {active ? <Archive className="mr-2 h-4 w-4" /> : <RotateCcw className="mr-2 h-4 w-4" />}
         {active ? 'Archive' : 'Restore'}
       </Button>
-      <DeleteAction pending={mutationsDisabled} onDelete={onDelete} />
+      <DeleteAction pending={pending} onDelete={onDelete} />
     </div>
   );
 };
