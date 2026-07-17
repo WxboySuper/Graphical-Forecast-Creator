@@ -21,6 +21,8 @@ import { asCustomLayerId } from '../../lib/customProducts';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 const colors = ['#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#3b82f6'];
+const colorChoices = ['#22c55e', '#0ea5e9', '#2563eb', '#a855f7', '#ef4444', '#f97316', '#eab308', '#64748b'];
+const isHexColor = (value: string): boolean => /^#[0-9a-f]{6}$/i.test(value);
 
 const makeCategory = (order: number): CustomCategoryTemplate => ({
   id: `category-${uuidv4()}` as CustomCategoryTemplate['id'],
@@ -87,6 +89,40 @@ const MenuPicker = ({
       </PopoverContent>
     </Popover>
   );
+};
+
+const FillColorPicker = ({
+  color,
+  opacity,
+  onChange,
+}: {
+  color: string;
+  opacity: number;
+  onChange(color: string): void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(color);
+  useEffect(() => setDraft(color), [color]);
+  const commit = (value: string) => {
+    if (!isHexColor(value)) return;
+    onChange(value.toLowerCase());
+    setOpen(false);
+  };
+  return <Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger asChild>
+      <button type="button" className="custom-draw-panel__color-trigger" aria-label="Category color" data-testid="custom-color-input">
+        <span className="custom-style-swatch" style={{ '--custom-fill': color, '--custom-opacity': opacity } as React.CSSProperties} />
+        <span>{color.toUpperCase()}</span><ChevronDown aria-hidden="true" />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent className="custom-draw-panel__color-menu" align="start">
+      <p>Fill color</p>
+      <div className="custom-draw-panel__color-grid">
+        {colorChoices.map((choice) => <button key={choice} type="button" aria-label={`Use ${choice}`} className={choice === color ? 'is-selected' : ''} style={{ backgroundColor: choice }} onClick={() => commit(choice)}>{choice === color ? <Check aria-hidden="true" /> : null}</button>)}
+      </div>
+      <label>Hex <input aria-label="Custom fill hex" value={draft} maxLength={7} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') commit(draft); }} /></label>
+    </PopoverContent>
+  </Popover>;
 };
 
 const CustomLayerTitleInput: React.FC<{ layer: OneOffCustomLayer }> = ({ layer }) => {
@@ -158,7 +194,7 @@ const CustomCategorySections: React.FC<{
       </div>
     </section>
     <section className="custom-draw-panel__group custom-draw-panel__appearance" aria-label="Category appearance">
-      <label className="custom-draw-panel__color-control">Fill <input aria-label="Category color" data-testid="custom-color-input" type="color" value={activeCategory.style.fillColor} style={{ opacity: activeCategory.style.fillOpacity }} onChange={(event) => updateCategory({ style: { fillColor: event.target.value } })} /></label>
+      <div className="custom-draw-panel__color-control"><span>Fill</span><FillColorPicker color={activeCategory.style.fillColor} opacity={activeCategory.style.fillOpacity} onChange={(fillColor) => updateCategory({ style: { fillColor } })} /></div>
       <label className="custom-draw-panel__opacity-control">Opacity <input aria-label="Category opacity" data-testid="custom-opacity-input" type="range" min="0" max="1" step="0.05" value={activeCategory.style.fillOpacity} onChange={(event) => updateCategory({ style: { fillOpacity: Number(event.target.value) } })} /><span>{Math.round(activeCategory.style.fillOpacity * 100)}%</span></label>
       <MenuPicker label="Category hatch" testId="custom-hatch-select" value={activeCategory.style.hatch} options={[
         { id: 'none', label: 'No hatch' }, { id: 'diagonal', label: 'Diagonal' }, { id: 'reverse-diagonal', label: 'Reverse diagonal' }, { id: 'crosshatch', label: 'Crosshatch' },

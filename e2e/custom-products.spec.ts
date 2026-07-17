@@ -46,7 +46,7 @@ test.describe('Local reusable custom products', () => {
     await expect(page).toHaveURL(/\/forecast(?:\?localTestAccount=premium)?$/);
     await expect(page.getByLabel('Layer title')).toHaveValue('Fire weather');
     await expect(page.getByLabel('Category label')).toHaveValue('Critical');
-    await expect(page.getByLabel('Category color')).toHaveValue('#f97316');
+    await expect(page.getByLabel('Category color')).toContainText('#F97316');
     await expect.poll(() => page.evaluate(() => sessionStorage.getItem('gfc-custom-product-handoff'))).toBeNull();
 
     await page.getByRole('button', { name: 'Saved products' }).click();
