@@ -43,9 +43,14 @@ describe('custom layer forecast state', () => {
     expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(0);
     state = reducer(state, redoLastEdit());
     expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(1);
+  });
 
+  test('removes a custom feature without changing severe outlook maps', () => {
+    let state = reducer(undefined, addCustomLayer(layer()));
+    state = reducer(state, addCustomFeature(feature()));
     state = reducer(state, removeCustomFeature({ layerId: 'layer-1', featureId: 'custom-1' }));
     expect(state.forecastCycle.days[1]?.customLayers?.layers[0].features).toHaveLength(0);
+    expect(state.forecastCycle.days[1]?.data.tornado?.size).toBe(0);
   });
 
   test('reorders categories and propagates edited labels to existing polygon titles', () => {

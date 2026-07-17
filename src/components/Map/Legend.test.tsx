@@ -17,6 +17,18 @@ const createMockStore = (preloadedState = {}) =>
     preloadedState,
   });
 
+const renderSevereLegend = (
+  activeOutlookType: 'categorical' | 'tornado' | 'wind' | 'hail' | 'totalSevere' | 'day4-8',
+  props: Partial<React.ComponentProps<typeof Legend>> = {},
+  darkMode = false,
+) => {
+  const store = createMockStore({
+    forecast: { drawingState: { activeOutlookType }, uiVariant: 'standard' },
+    theme: { darkMode },
+  });
+  return render(<Provider store={store}><Legend activeOutlookType={activeOutlookType} {...props} /></Provider>);
+};
+
 describe('Legend', () => {
   it('renders ordered custom labels and exact hatch appearance in local custom mode', () => {
     const store = createMockStore();
@@ -37,74 +49,24 @@ describe('Legend', () => {
   });
 
   it('renders the legend component without crashing', () => {
-    const store = createMockStore({
-      forecast: {
-        drawingState: { activeOutlookType: 'categorical' },
-        uiVariant: 'standard',
-      },
-      theme: { darkMode: false },
-    });
-    
-    render(
-      <Provider store={store}>
-        <Legend />
-      </Provider>
-    );
-    
+    renderSevereLegend('categorical');
     // Legend should render its title
     expect(screen.getByText(/categorical risk levels/i)).toBeInTheDocument();
   });
 
   it('renders tornado outlook type', () => {
-    const store = createMockStore({
-      forecast: {
-        drawingState: { activeOutlookType: 'tornado' },
-        uiVariant: 'standard',
-      },
-      theme: { darkMode: false },
-    });
-    
-    render(
-      <Provider store={store}>
-        <Legend activeOutlookType="tornado" />
-      </Provider>
-    );
-    
+    renderSevereLegend('tornado');
     expect(screen.getByText(/tornado/i)).toBeInTheDocument();
   });
 
   it('marks the legend as open for the mobile popout state', () => {
-    const store = createMockStore({
-      forecast: {
-        drawingState: { activeOutlookType: 'tornado' },
-        uiVariant: 'standard',
-      },
-      theme: { darkMode: false },
-    });
-
-    render(
-      <Provider store={store}>
-        <Legend activeOutlookType="tornado" mobileOpen />
-      </Provider>
-    );
+    renderSevereLegend('tornado', { mobileOpen: true });
 
     expect(screen.getByRole('complementary', { name: /map legend/i })).toHaveClass('map-legend--mobile-open');
   });
 
   it('marks the legend as hidden when the desktop key is toggled off', () => {
-    const store = createMockStore({
-      forecast: {
-        drawingState: { activeOutlookType: 'tornado' },
-        uiVariant: 'standard',
-      },
-      theme: { darkMode: false },
-    });
-
-    render(
-      <Provider store={store}>
-        <Legend activeOutlookType="tornado" desktopOpen={false} />
-      </Provider>
-    );
+    renderSevereLegend('tornado', { desktopOpen: false });
 
     expect(screen.getByRole('complementary', { name: /map legend/i })).toHaveClass('map-legend--desktop-hidden');
   });
@@ -115,19 +77,7 @@ describe('Legend', () => {
     ['totalSevere', /totalsevere probabilities/i, /45%/i, /CIG1 \(Hatching\)/i],
     ['day4-8', /day4-8 probabilities/i, /15%/i, /30%/i],
   ] as const)('renders %s probability entries', (activeOutlookType, title, firstEntry, secondEntry) => {
-    const store = createMockStore({
-      forecast: {
-        drawingState: { activeOutlookType },
-        uiVariant: 'standard',
-      },
-      theme: { darkMode: false },
-    });
-
-    render(
-      <Provider store={store}>
-        <Legend activeOutlookType={activeOutlookType} />
-      </Provider>
-    );
+    renderSevereLegend(activeOutlookType);
 
     expect(screen.getByText(title)).toBeInTheDocument();
     expect(screen.getByText(firstEntry)).toBeInTheDocument();
@@ -135,19 +85,7 @@ describe('Legend', () => {
   });
 
   it('uses dark-mode styling for hatch swatches', () => {
-    const store = createMockStore({
-      forecast: {
-        drawingState: { activeOutlookType: 'tornado' },
-        uiVariant: 'standard',
-      },
-      theme: { darkMode: true },
-    });
-
-    render(
-      <Provider store={store}>
-        <Legend activeOutlookType="tornado" />
-      </Provider>
-    );
+    renderSevereLegend('tornado', {}, true);
 
     expect(screen.getByRole('img', { name: /Legend for CIG1/i })).toHaveStyle({
       border: '1px solid rgba(255,255,255,0.55)',

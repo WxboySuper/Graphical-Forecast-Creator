@@ -57,7 +57,7 @@ import {
 } from "../../lib/openFreeMap";
 import "./ForecastMap.css";
 import { isFeatureExposed } from "../../config/featureExposure";
-import type { CustomCategoryStyle, CustomCategoryTemplate, CustomPolygonFeature } from "../../types/customProducts";
+import type { CustomCategoryStyle, CustomCategoryTemplate, CustomPolygonFeature, OneOffCustomLayer } from "../../types/customProducts";
 
 type OutlookMapLike = Record<string, globalThis.Map<string, GeoJsonFeature[]>>;
 type EditableOutlookType =
@@ -471,6 +471,26 @@ export const toUpdatedCustomFeature = (feature: FeatureLike, format: GeoJSON): C
     id: identity.featureId,
     geometry: format.writeGeometryObject(geometry as Geometry, { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" }) as Polygon,
     properties: { customLayerId: identity.customLayerId as CustomPolygonFeature['properties']['customLayerId'], categoryId: identity.categoryId as CustomPolygonFeature['properties']['categoryId'], title: identity.title },
+  };
+};
+
+/** Converts a completed draw geometry when an active custom draw target exists. */
+export const toDrawnCustomFeature = (
+  geometry: Geometry,
+  layer: OneOffCustomLayer | undefined,
+  category: CustomCategoryTemplate | undefined,
+  enabled: boolean,
+): CustomPolygonFeature | null => {
+  if (!enabled || !layer || !category) return null;
+  return {
+    type: "Feature",
+    id: uuidv4(),
+    geometry: geometry as Polygon,
+    properties: {
+      customLayerId: layer.id,
+      categoryId: category.id,
+      title: category.label,
+    },
   };
 };
 
@@ -1501,17 +1521,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         });
         // Create a new feature object with the drawn geometry and current drawing state properties,
         // then dispatch an action to add it to the Redux store.
-        if (customMode && activeCustomLayer && activeCustomCategory) {
-          const customFeature: CustomPolygonFeature = {
-            type: "Feature",
-            id: uuidv4(),
-            geometry: geometry as Polygon,
-            properties: {
-              customLayerId: activeCustomLayer.id,
-              categoryId: activeCustomCategory.id,
-              title: activeCustomCategory.label,
-            },
-          };
+        const customFeature = toDrawnCustomFeature(
+          geometry as Geometry,
+          activeCustomLayer,
+          activeCustomCategory,
+          customMode,
+        );
+        if (customFeature) {
           dispatch(addCustomFeature(customFeature));
           return;
         }
