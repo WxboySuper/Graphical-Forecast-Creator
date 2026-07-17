@@ -1,0 +1,53 @@
+import { useState } from 'react';
+import { LibraryBig } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../ui/dialog';
+import { isFeatureExposed } from '../../config/featureExposure';
+import { addCustomLayer, selectCustomLayer } from '../../store/forecastSlice';
+import type { RootState } from '../../store';
+import type { OneOffCustomLayer } from '../../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS } from '../../types/customProducts';
+import CustomProductsWorkspace from '../../pages/gated/CustomProductsWorkspace';
+
+/** Keeps reusable custom products in the forecast workspace rather than navigating away from in-progress work. */
+const CustomProductsDialog = () => {
+  const dispatch = useDispatch();
+  const [open, setOpen] = useState(false);
+  const layerCount = useSelector((state: RootState) => state.forecast.forecastCycle.days[state.forecast.forecastCycle.currentDay]?.customLayers?.layers.length ?? 0);
+
+  if (!isFeatureExposed('customProducts')) return null;
+
+  const useProduct = (layer: OneOffCustomLayer) => {
+    if (layerCount >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) return;
+    dispatch(addCustomLayer(layer));
+    dispatch(selectCustomLayer(layer.id));
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" className="custom-products-dialog-trigger">
+          <LibraryBig className="h-4 w-4" /> Saved products
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="custom-products-dialog-content">
+        <DialogHeader className="custom-products-dialog-header">
+          <DialogTitle>Saved products</DialogTitle>
+          <DialogDescription>Apply a reusable category set without leaving this forecast.</DialogDescription>
+        </DialogHeader>
+        <CustomProductsWorkspace embedded onProductUse={useProduct} />
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default CustomProductsDialog;

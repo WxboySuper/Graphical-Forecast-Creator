@@ -40,22 +40,20 @@ test.describe('Local reusable custom products', () => {
     await page.getByRole('button', { name: 'Use in Forecast' }).click();
     await expect(page).toHaveURL(/\/forecast$/);
     await expect(page.getByLabel('Layer title')).toHaveValue('Fire weather');
-    await expect(page.getByTestId('custom-category-list')).toHaveValue(/.+/);
-    await expect(page.getByTestId('custom-category-list').locator('option:checked')).toHaveText('Critical');
+    await expect(page.getByLabel('Category label')).toHaveValue('Critical');
     await expect(page.getByLabel('Category color')).toHaveValue('#f97316');
     await expect.poll(() => page.evaluate(() => sessionStorage.getItem('gfc-custom-product-handoff'))).toBeNull();
 
-    await page.getByRole('link', { name: /Products/i }).click();
-    await expect(page).toHaveURL(/\/custom-products$/);
-    await page.getByRole('button', { name: 'Edit' }).click();
-    await page.getByLabel('Product name').fill('Updated fire weather');
-    await page.getByRole('button', { name: 'Save changes' }).click();
-    await expect(page.getByRole('heading', { name: 'Updated fire weather' })).toBeVisible();
-
-    await page.goBack();
-    await expect(page).toHaveURL(/\/forecast$/);
+    await page.getByRole('button', { name: 'Saved products' }).click();
+    const savedProductsDialog = page.getByRole('dialog', { name: 'Saved products' });
+    await expect(savedProductsDialog).toBeVisible();
+    await savedProductsDialog.getByRole('button', { name: 'Edit' }).click();
+    await savedProductsDialog.getByLabel('Product name').fill('Updated fire weather');
+    await savedProductsDialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(savedProductsDialog.getByRole('heading', { name: 'Updated fire weather' })).toBeVisible();
+    await savedProductsDialog.getByRole('button', { name: 'Close' }).click();
     await expect(page.getByLabel('Layer title')).toHaveValue('Fire weather');
-    await expect(page.getByTestId('custom-category-list').locator('option:checked')).toHaveText('Critical');
+    await expect(page.getByLabel('Category label')).toHaveValue('Critical');
   });
 
   test('duplicates, archives, restores, and permanently deletes products', async ({ page }) => {

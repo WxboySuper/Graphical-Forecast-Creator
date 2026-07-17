@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import type { RootState } from '../../store';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../../store/forecastSlice';
 import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION, type CustomCategoryTemplate, type CustomHatchPattern, type OneOffCustomLayer } from '../../types/customProducts';
 import { asCustomLayerId } from '../../lib/customProducts';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 const colors = ['#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#3b82f6'];
 
@@ -53,6 +54,40 @@ const IconButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { lab
   <button type="button" aria-label={label} title={label} className="custom-draw-panel__icon-button" {...props}>{children}</button>
 );
 
+const MenuPicker = ({
+  label,
+  options,
+  value,
+  onChange,
+  testId,
+  compact = false,
+}: {
+  label: string;
+  options: { id: string; label: string }[];
+  value?: string;
+  onChange(value: string): void;
+  testId?: string;
+  compact?: boolean;
+}) => {
+  const selected = options.find((option) => option.id === value);
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className={`custom-draw-panel__picker${compact ? ' custom-draw-panel__picker--compact' : ''}`} aria-label={label} data-testid={testId}>
+          {compact ? null : <span className="truncate">{selected?.label ?? label}</span>}<ChevronDown aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="custom-draw-panel__picker-menu" align="start">
+        {options.map((option) => (
+          <button key={option.id} type="button" className="custom-draw-panel__picker-option" onClick={() => onChange(option.id)}>
+            <span>{option.label}</span>{option.id === value ? <Check aria-hidden="true" /> : null}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const CustomLayerTitleInput: React.FC<{ layer: OneOffCustomLayer }> = ({ layer }) => {
   const dispatch = useDispatch();
   const [draft, setDraft] = useState(layer.label);
@@ -69,11 +104,10 @@ const CustomLayerActionRow: React.FC<{
   activeLayer?: OneOffCustomLayer;
 }> = ({ layers, activeLayer }) => {
   const dispatch = useDispatch();
-  return <div className="custom-draw-panel__row">
-    <select aria-label="Custom layer" data-testid="custom-layer-picker" value={activeLayer?.id ?? ''} onChange={(event) => dispatch(selectCustomLayer(event.target.value))}>
-      {!activeLayer ? <option value="">Create a layer</option> : null}
-      {layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.label}</option>)}
-    </select>
+  const layerOptions = layers.map((layer) => ({ id: layer.id, label: layer.label }));
+  return <div className="custom-draw-panel__row custom-draw-panel__layer-row">
+    <MenuPicker label="Select custom layer" testId="custom-layer-picker" value={activeLayer?.id} options={layerOptions} compact onChange={(id) => dispatch(selectCustomLayer(id))} />
+    {activeLayer ? <CustomLayerTitleInput layer={activeLayer} /> : null}
     <IconButton label="Add custom layer" disabled={layers.length >= CUSTOM_PRODUCT_LIMITS.layersPerCollection} onClick={() => dispatch(addCustomLayer(makeLayer(layers.length)))}><Plus /></IconButton>
     <IconButton label="Move layer up" disabled={!activeLayer || activeLayer.order === 0} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: -1 }))}><ArrowUp /></IconButton>
     <IconButton label="Move layer down" disabled={!activeLayer || activeLayer.order === layers.length - 1} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: 1 }))}><ArrowDown /></IconButton>
@@ -87,9 +121,7 @@ const CustomLayerSection: React.FC<{
 }> = ({ layers, activeLayer }) => {
   return (
     <section className="custom-draw-panel__group" aria-label="Custom layers">
-      <span className="custom-draw-panel__label">Layer</span>
       <CustomLayerActionRow layers={layers} activeLayer={activeLayer} />
-      {activeLayer ? <CustomLayerTitleInput layer={activeLayer} /> : null}
     </section>
   );
 };
@@ -109,11 +141,11 @@ const CustomCategorySections: React.FC<{
 
   return <>
     <section className="custom-draw-panel__group" aria-label="Custom categories">
-      <span className="custom-draw-panel__label">Category</span>
       <div className="custom-draw-panel__row">
-        <select aria-label="Custom category" data-testid="custom-category-list" value={activeCategory.id} onChange={(event) => dispatch(selectCustomCategory(event.target.value))}>
-          {categories.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
-        </select>
+        <MenuPicker label="Select custom category" testId="custom-category-list" value={activeCategory.id} options={categories.map((category) => ({ id: category.id, label: category.label }))} compact onChange={(id) => dispatch(selectCustomCategory(id))} />
+        <input className="custom-draw-panel__category-name" aria-label="Category label" data-testid="custom-label-input" maxLength={64} value={labelDraft} onChange={(event) => setLabelDraft(event.target.value)} onBlur={() => {
+          const label = labelDraft.trim() || 'Category'; updateCategory({ label }); setLabelDraft(label);
+        }} />
         <IconButton label="Add custom category" disabled={categories.length >= CUSTOM_PRODUCT_LIMITS.categoriesPerProduct} onClick={() => dispatch(addCustomCategory({ layerId: layer.id, category: makeCategory(categories.length) }))}><Plus /></IconButton>
         <IconButton label="Move category up" disabled={activeCategory.order === 0} onClick={() => dispatch(moveCustomCategory({ layerId: layer.id, categoryId: activeCategory.id, direction: -1 }))}><ArrowUp /></IconButton>
         <IconButton label="Move category down" disabled={activeCategory.order === categories.length - 1} onClick={() => dispatch(moveCustomCategory({ layerId: layer.id, categoryId: activeCategory.id, direction: 1 }))}><ArrowDown /></IconButton>
@@ -121,15 +153,11 @@ const CustomCategorySections: React.FC<{
       </div>
     </section>
     <section className="custom-draw-panel__group custom-draw-panel__appearance" aria-label="Category appearance">
-      <span className="custom-draw-panel__label">Appearance</span>
-      <input aria-label="Category label" data-testid="custom-label-input" maxLength={64} value={labelDraft} onChange={(event) => setLabelDraft(event.target.value)} onBlur={() => {
-        const label = labelDraft.trim() || 'Category'; updateCategory({ label }); setLabelDraft(label);
-      }} />
-      <label>Color <input aria-label="Category color" data-testid="custom-color-input" type="color" value={activeCategory.style.fillColor} onChange={(event) => updateCategory({ style: { fillColor: event.target.value } })} /></label>
-      <label>Opacity <input aria-label="Category opacity" data-testid="custom-opacity-input" type="range" min="0" max="1" step="0.05" value={activeCategory.style.fillOpacity} onChange={(event) => updateCategory({ style: { fillOpacity: Number(event.target.value) } })} /></label>
-      <select aria-label="Category hatch" data-testid="custom-hatch-select" value={activeCategory.style.hatch} onChange={(event) => updateCategory({ style: { hatch: event.target.value as CustomHatchPattern } })}>
-        <option value="none">No hatch</option><option value="diagonal">Diagonal</option><option value="reverse-diagonal">Reverse diagonal</option><option value="crosshatch">Crosshatch</option>
-      </select>
+      <label className="custom-draw-panel__color-control">Fill <input aria-label="Category color" data-testid="custom-color-input" type="color" value={activeCategory.style.fillColor} onChange={(event) => updateCategory({ style: { fillColor: event.target.value } })} /></label>
+      <label className="custom-draw-panel__opacity-control">Opacity <input aria-label="Category opacity" data-testid="custom-opacity-input" type="range" min="0" max="1" step="0.05" value={activeCategory.style.fillOpacity} onChange={(event) => updateCategory({ style: { fillOpacity: Number(event.target.value) } })} /><span>{Math.round(activeCategory.style.fillOpacity * 100)}%</span></label>
+      <MenuPicker label="Category hatch" testId="custom-hatch-select" value={activeCategory.style.hatch} options={[
+        { id: 'none', label: 'No hatch' }, { id: 'diagonal', label: 'Diagonal' }, { id: 'reverse-diagonal', label: 'Reverse diagonal' }, { id: 'crosshatch', label: 'Crosshatch' },
+      ]} onChange={(hatch) => updateCategory({ style: { hatch: hatch as CustomHatchPattern } })} />
       <span className={`custom-style-swatch hatch-${activeCategory.style.hatch}`} style={{ '--custom-fill': activeCategory.style.fillColor, '--custom-opacity': activeCategory.style.fillOpacity } as React.CSSProperties} aria-label={`${activeCategory.label} preview`} />
     </section>
   </>;

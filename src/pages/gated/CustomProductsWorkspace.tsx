@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useCustomProducts, type UseCustomProductsResult } from '../../hooks/useCustomProducts';
-import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct } from '../../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct, type OneOffCustomLayer } from '../../types/customProducts';
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
 
@@ -46,12 +46,19 @@ const WorkspaceEditors = ({
 const createProductNavigator = (
   customProducts: UseCustomProductsResult,
   navigate: ReturnType<typeof useNavigate>,
+  onProductUse?: (layer: OneOffCustomLayer) => void,
 ) => (product: HostedCustomProduct) => {
-  if (customProducts.useProduct(product)) navigate('/forecast');
+  const layer = customProducts.useProduct(product);
+  if (!layer) return;
+  if (onProductUse) {
+    onProductUse(layer);
+    return;
+  }
+  navigate('/forecast');
 };
 
-const SignedOutProducts = () => (
-  <div className="custom-products-page">
+const SignedOutProducts = ({ embedded = false }: { embedded?: boolean }) => (
+  <div className={`custom-products-page${embedded ? ' custom-products-page--dialog' : ''}`}>
     <Card><CardHeader><CardTitle>Sign in to manage reusable products</CardTitle></CardHeader><CardContent><Button asChild><Link to="/account">Open Account</Link></Button></CardContent></Card>
   </div>
 );
@@ -116,7 +123,12 @@ const ProductsLibrary = ({
   );
 };
 
-const CustomProductsWorkspace = () => {
+interface CustomProductsWorkspaceProps {
+  embedded?: boolean;
+  onProductUse?(layer: OneOffCustomLayer): void;
+}
+
+const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProductsWorkspaceProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const customProducts = useCustomProducts();
@@ -127,16 +139,16 @@ const CustomProductsWorkspace = () => {
     [customProducts.products],
   );
 
-  if (!user) return <SignedOutProducts />;
+  if (!user) return <SignedOutProducts embedded={embedded} />;
   const editorOpen = creating || Boolean(editing);
   const openEditor = (product: HostedCustomProduct) => {
     setCreating(false);
     setEditing(product);
   };
-  const useProduct = createProductNavigator(customProducts, navigate);
+  const useProduct = createProductNavigator(customProducts, navigate, onProductUse);
 
   return (
-    <main className="custom-products-page">
+    <main className={`custom-products-page${embedded ? ' custom-products-page--dialog' : ''}`}>
       <ProductsHero
         productCount={customProducts.products.length}
         activeCount={activeCount}
