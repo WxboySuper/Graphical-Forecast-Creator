@@ -28,7 +28,7 @@ describe('v1.7 workstream adoption contract', () => {
   });
 
   test.each(
-    V17_WORKSTREAM_KEYS.filter((feature) => !['autoTstm', 'forecastWorkflowV2'].includes(feature))
+    V17_WORKSTREAM_KEYS.filter((feature) => !['autoTstm', 'forecastWorkflowV2', 'customProducts'].includes(feature))
   )(
     '%s stays disabled on every build target',
     (feature) => {
@@ -38,6 +38,14 @@ describe('v1.7 workstream adoption contract', () => {
       }
     }
   );
+
+  test('customProducts is enabled only for local implementation and review', () => {
+    for (const target of BUILD_TARGETS) {
+      const expected = target === 'local';
+      expect(isFeatureExposedOnTarget('customProducts', target)).toBe(expected);
+      expect(FEATURE_EXPOSURE_REGISTRY.customProducts.exposure[target]).toBe(expected);
+    }
+  });
 
   test('autoTstm is enabled only on beta', () => {
     for (const target of BUILD_TARGETS) {

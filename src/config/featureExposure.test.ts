@@ -112,7 +112,7 @@ describe('featureExposure registry', () => {
     }
   });
 
-  test('keeps unreleased v1.7 workstream keys disabled while local and beta expose forecast workflow v2', () => {
+  test('keeps unreleased v1.7 workstreams disabled outside their explicitly approved targets', () => {
     const workstreamKeys = [
       'forecastWorkflowV2',
       'verificationRelaunch',
@@ -121,7 +121,7 @@ describe('featureExposure registry', () => {
       'collaborationRoom',
     ] as const;
 
-    for (const feature of workstreamKeys.filter((feature) => feature !== 'forecastWorkflowV2')) {
+    for (const feature of workstreamKeys.filter((feature) => !['forecastWorkflowV2', 'customProducts'].includes(feature))) {
       for (const target of ['local', 'beta', 'staging', 'production'] as const) {
         expect(isFeatureExposedOnTarget(feature, target)).toBe(false);
       }
@@ -131,6 +131,11 @@ describe('featureExposure registry', () => {
     expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'beta')).toBe(true);
     expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'staging')).toBe(false);
     expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'production')).toBe(false);
+
+    expect(isFeatureExposedOnTarget('customProducts', 'local')).toBe(true);
+    for (const target of ['beta', 'staging', 'production'] as const) {
+      expect(isFeatureExposedOnTarget('customProducts', target)).toBe(false);
+    }
 
     for (const target of ['local', 'staging', 'production'] as const) {
       expect(isFeatureExposedOnTarget('autoTstm', target)).toBe(false);
