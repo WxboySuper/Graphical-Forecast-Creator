@@ -415,6 +415,10 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
 const cloneCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
   customLayers ? cloneJsonValue(customLayers) : undefined;
 
+/** Lifecycle transitions preserve stored custom content even while its editor is hidden. */
+const cloneIntegratedCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
+  cloneCustomLayers(customLayers);
+
 /** Captures the current day's drawable outlook data and low-probability metadata for history. */
 const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {
   const currentDay = state.forecastCycle.currentDay;
@@ -507,6 +511,7 @@ const buildRolloverCycle = ({
   const targetDayData = newCycle.days[targetDay];
   if (targetDayData) {
     copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDayNumber, targetDay);
+    targetDayData.customLayers = cloneIntegratedCustomLayers(sourceDayData.customLayers);
   }
   return newCycle;
 };
@@ -1108,6 +1113,9 @@ export const forecastSlice = createSlice({
 
       clearOutlookMaps(targetDayData.data);
       copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDay, targetDay);
+      // Custom layers are grouping-agnostic. Copy replaces the target
+      // collection with a detached clone, just like severe outlook data.
+      targetDayData.customLayers = cloneIntegratedCustomLayers(sourceDayData.customLayers);
 
       targetDayData.metadata.lastModified = new Date().toISOString();
       clearHistory(state);
@@ -1351,6 +1359,9 @@ export const forecastSlice = createSlice({
           snapshotDays[day] = {
             ...dayData,
             data: cloneOutlookData(dayData.data),
+            // Version history must retain the exact geometry and appearance
+            // that existed before the update, not a live reference.
+            customLayers: cloneIntegratedCustomLayers(dayData.customLayers),
           };
           hasSnapshot = true;
         },

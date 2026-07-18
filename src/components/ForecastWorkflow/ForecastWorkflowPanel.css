@@ -114,6 +114,14 @@
   border-radius: 8px;
 }
 
+.forecast-workflow-panel__custom-disclosure {
+  grid-column: 1 / -1;
+  margin: 6px 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .forecast-workflow-panel__notice {
   display: inline-flex;
   flex: 0 0 100%;

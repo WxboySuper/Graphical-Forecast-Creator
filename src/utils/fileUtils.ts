@@ -14,8 +14,43 @@ import { completionMetadataFromForecastCycle } from './forecastCompletionMetadat
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
+import { isFeatureExposed } from '../config/featureExposure';
 
 const CURRENT_VERSION = '1.0.0';
+
+/** Reads bytes when the browser File implementation exposes arrayBuffer. */
+const readFileBytes = async (file: File): Promise<Uint8Array | undefined> => {
+  if (typeof file.arrayBuffer !== 'function') return undefined;
+  return new Uint8Array(await file.arrayBuffer());
+};
+
+/** Detects ZIP packages from browser metadata or their standard magic bytes. */
+const isZipImport = (file: File, bytes?: Uint8Array): boolean => [
+  file.name.toLowerCase().endsWith('.zip'),
+  file.type === 'application/zip',
+  bytes?.[0] === 0x50 && bytes?.[1] === 0x4b,
+].includes(true);
+
+/** Extracts the preferred forecast payload from a workflow ZIP package. */
+const readForecastPackage = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
+  const zip = await JSZip.loadAsync(bytes ?? file);
+  const entry = zip.file('workflow_package.json') ?? zip.file('forecast_cycle.json');
+  if (!entry) throw new Error('Package is missing workflow_package.json and forecast_cycle.json.');
+  return JSON.parse(await entry.async('string')) as unknown;
+};
+
+/** Parses a plain JSON forecast from already-read bytes or the File text API. */
+const readForecastJson = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
+  const text = bytes ? new TextDecoder().decode(bytes) : await file.text();
+  return JSON.parse(text) as unknown;
+};
+
+/** Reads either a plain forecast JSON file or a GFC workflow ZIP package. */
+export const readForecastImportFile = async (file: File): Promise<unknown> => {
+  const bytes = await readFileBytes(file);
+  if (isFeatureExposed('customProducts') && isZipImport(file, bytes)) return readForecastPackage(file, bytes);
+  return readForecastJson(file, bytes);
+};
 
 /** Converts a Map into JSON-friendly entry tuples. */
 const mapToArray = <K, V>(m: Map<K, V>): [K, V][] =>

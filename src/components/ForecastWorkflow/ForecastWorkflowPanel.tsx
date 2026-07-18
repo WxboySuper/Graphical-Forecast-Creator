@@ -61,7 +61,8 @@ interface PreviousOutlookSuggestion {
 const dayHasMapWork = (day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]>): boolean => {
   const hasMapData = Object.values(day.data).some((outlookMap) => (outlookMap?.size ?? 0) > 0);
   const hasLowProbability = (day.metadata.lowProbabilityOutlooks?.length ?? 0) > 0;
-  return hasMapData || hasLowProbability;
+  const hasCustomLayers = isFeatureExposed('customProducts') && (day.customLayers?.layers.length ?? 0) > 0;
+  return hasMapData || hasLowProbability || hasCustomLayers;
 };
 
 /** True when one forecast day has any map or discussion work started. */
@@ -432,6 +433,20 @@ const hasSameDayWorkflowWork = (
   currentDay: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
 ): boolean => cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
 
+const dayHasCustomContent = (
+  day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
+): boolean => Boolean(day?.customLayers?.layers.length);
+
+/** Discloses custom workflow ownership only on builds where the custom editor is exposed. */
+const CustomWorkflowDisclosure: React.FC<{ hasCustomContent: boolean }> = ({ hasCustomContent }) => {
+  if (!isFeatureExposed('customProducts') || !hasCustomContent) return null;
+  return (
+    <p className="forecast-workflow-panel__custom-disclosure" role="note">
+      Custom layers belong to this workflow grouping and are included in copies, updates, cloud saves, and packages. They are excluded from severe analytics and Auto-Categorical.
+    </p>
+  );
+};
+
 /** Persistent package workflow prompt for the forecast editor. */
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
@@ -461,6 +476,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   }
 
   const currentDay = forecastCycle.days[forecastCycle.currentDay];
+  const hasCustomContent = dayHasCustomContent(currentDay);
   const discussionGroupings = getDiscussionGroupings(forecastCycle, workflowTemplate, forecastCycle.currentDay);
   const currentDiscussionGrouping = getDiscussionGroupingForDay(discussionGroupings, forecastCycle.currentDay);
   const hasMapStarted = Boolean(currentDay && dayHasMapWork(currentDay));
@@ -602,6 +618,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           isUpdating={isUpdating}
           activeUpdateVersion={activeUpdateVersion}
         />
+        <CustomWorkflowDisclosure hasCustomContent={hasCustomContent} />
         <WorkflowPanelActions
           context={context}
           isReviewed={isReviewed}

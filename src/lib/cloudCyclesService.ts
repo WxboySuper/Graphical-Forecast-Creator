@@ -102,7 +102,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 /** Reads a stored cloud payload from either a JSON string or already-parsed object value. */
-const parseStoredPayload = (value: unknown): GFCForecastSaveData | null => {
+export const parseCloudCyclePayload = (value: unknown): GFCForecastSaveData | null => {
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value) as unknown;
@@ -155,7 +155,7 @@ const readRequiredText = (value: unknown): string | null =>
 const readStoredCount = (value: unknown): number => (typeof value === 'number' ? value : 0);
 
 /** Returns the serialized cloud payload plus its UTF-8 byte length for storage-safe writes. */
-const createPayloadStorageStats = (payload: GFCForecastSaveData): Pick<CloudCycleDocument, 'payloadJson' | 'payloadBytes'> => {
+export const createCloudCyclePayloadStorage = (payload: GFCForecastSaveData): Pick<CloudCycleDocument, 'payloadJson' | 'payloadBytes'> => {
   const payloadJson = JSON.stringify(payload);
   return {
     payloadJson,
@@ -206,7 +206,7 @@ const normalizeCloudCycleRecord = ({
   }
 
   const metadataSource = isPlainObject(rawRecord.metadata) ? (rawRecord.metadata as Record<string, unknown>) : rawRecord;
-  const payload = parseStoredPayload(rawRecord.payloadJson ?? rawRecord.payload);
+  const payload = parseCloudCyclePayload(rawRecord.payloadJson ?? rawRecord.payload);
 
   const metadata = normalizeStoredMetadata({ cycleId, rawMetadata: metadataSource, fallbackUserId });
   if (!metadata || !payload) {
@@ -253,7 +253,7 @@ const getCompatibleWorkflowMetadata = (workflowMetadata: unknown, cycleDate: str
 /** Serializes a runtime cloud cycle back into the Firestore storage format. */
 const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   const { payload, workflowMetadata, ...metadata } = cycle;
-  const payloadStats = createPayloadStorageStats(payload);
+  const payloadStats = createCloudCyclePayloadStorage(payload);
   const validWorkflowMetadata = getCompatibleWorkflowMetadata(workflowMetadata, metadata.cycleDate);
 
   return {
@@ -465,7 +465,7 @@ export const saveCloudCycle = async (
       isReadOnly,
       payloadHash: computePayloadHash(payload),
     };
-    const payloadStats = createPayloadStorageStats(payload);
+    const payloadStats = createCloudCyclePayloadStorage(payload);
     const validWorkflowMetadata = getCompatibleWorkflowMetadata(requestedWorkflowMetadata, cycleDate);
 
     await setDoc(getCloudCycleDocRef(cycleId), {

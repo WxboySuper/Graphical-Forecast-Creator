@@ -1,5 +1,7 @@
 import { buildWorkflowExportPackage, isWorkflowExportPackage, toSerializedWorkflowPackage } from './workflowPackage';
 
+afterEach(() => jest.restoreAllMocks());
+
 const cycle = {
   days: { 1: { day: 1, data: { categorical: new Map([['TSTM', []]]) }, metadata: { issueDate: '2026-07-15', validDate: '2026-07-15', issuanceTime: '0600', createdAt: '2026-07-15T00:00:00.000Z', lastModified: '2026-07-15T00:00:00.000Z' } } },
   currentDay: 1,
@@ -24,6 +26,46 @@ test('converts packages into the existing v2 serialized package contract', () =>
   const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle }, cycleMetadata: metadata });
   expect(toSerializedWorkflowPackage(pkg)?.cycles[0].id).toBe(metadata.id);
   expect(toSerializedWorkflowPackage(pkg)?.metadata.workflowId).toBe(metadata.workflowId);
+});
+
+test('attaches custom geometry and appearance to its workflow grouping with compatibility disclosure', () => {
+  const customLayers = {
+    schemaVersion: '1.0.0',
+    layers: [{
+      schemaVersion: '1.0.0', id: 'layer-1', label: 'Fire weather', order: 0,
+      categories: [{ id: 'cat-1', label: 'Critical', order: 0, style: { fillColor: '#ef4444', fillOpacity: .6, strokeColor: '#123456', strokeOpacity: .4, strokeWidth: 4, hatch: 'crosshatch' } }],
+      features: [{ type: 'Feature', id: 'feature-1', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: { customLayerId: 'layer-1', categoryId: 'cat-1', title: 'Critical' } }],
+      createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-07-15T00:00:00.000Z',
+    }],
+  };
+  const forecast = {
+    version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z',
+    forecastCycle: { ...cycle, days: { 1: { ...cycle.days[1], customLayers } } },
+  } as never;
+  const pkg = buildWorkflowExportPackage({ scope: 'workflow', forecast, cycleMetadata: metadata });
+  const serialized = toSerializedWorkflowPackage(pkg)!;
+
+  expect(pkg.customContent).toEqual({ included: true, severeAnalytics: 'excluded', autoCategorical: 'excluded' });
+  expect(serialized.metadata.includesStyleSnapshots).toBe(true);
+  expect(serialized.cycles[0].groupings).toEqual([{ grouping: 'day1', day: 1 }]);
+  expect(serialized.cycles[0].groupingData['day1-day1-v1'].customLayers).toEqual(customLayers);
+});
+
+test('does not attach custom content to workflow groupings outside the local feature gate', () => {
+  jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+  const forecast = {
+    version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z',
+    forecastCycle: {
+      ...cycle,
+      days: { 1: { ...cycle.days[1], customLayers: { schemaVersion: '1.0.0', layers: [{ id: 'hidden' }] } } },
+    },
+  } as never;
+  const pkg = buildWorkflowExportPackage({ scope: 'workflow', forecast, cycleMetadata: metadata });
+  const serialized = toSerializedWorkflowPackage(pkg)!;
+
+  expect(pkg.customContent).toBeUndefined();
+  expect(serialized.metadata.includesStyleSnapshots).toBe(false);
+  expect(serialized.cycles[0].groupingData['day1-day1-v1'].customLayers).toBeUndefined();
 });
 
 test('rejects lookalike packages with missing export markers', () => {

@@ -77,3 +77,31 @@ archive/restore transitions. Firestore rules cannot stop a user from manually
 copying data they are already authorized to read, so new-forecast use is also
 enforced at both official-client staging and consumption boundaries.
 
+## Workflow, package, and cloud integration
+
+Custom collections belong to the same forecast-day grouping as their geometry.
+Workflow- and cycle-scoped packages retain each included grouping's complete
+layer, category appearance, embedded product snapshot, and polygon geometry.
+The Home workflow uploader accepts both the JSON manifest and the ZIP produced
+by GFC; ZIP imports prefer `workflow_package.json` and fall back to
+`forecast_cycle.json` for older packages. Cloud cycles store the same forecast
+payload, so custom content uses the existing payload hash and round-trips
+without a separate hosted template lookup.
+
+Copying a previous grouping replaces the target grouping's custom collection
+with a detached deep clone. Internal layer/category IDs stay stable so feature
+references and product lineage remain valid, but later edits cannot mutate the
+source. Starting a new cycle from a previous grouping uses the same rule.
+Creating a same-cycle update snapshots all custom geometry and appearance into
+the previous version while the active collection remains editable. These
+lifecycle clones preserve custom content already present in a loaded cycle even
+on hosted builds where the custom editor and its controls remain hidden.
+
+Custom layers do not satisfy severe-outlook completion requirements and are
+explicitly excluded from existing severe `forecastDays`, `totalOutlooks`, and
+`totalFeatures` analytics. They are also never inputs to Auto-Categorical,
+which continues to read only tornado, wind, hail, and total-severe maps. The
+local workflow banner discloses these exclusions whenever its active grouping
+contains custom content. No disclosure or custom UI is rendered by beta,
+staging, or production while `customProducts` remains local-only.
+

@@ -2,6 +2,7 @@ import type { DayType, GFCForecastSaveData } from '../types/outlooks';
 import type { CycleMetadata, SerializedWorkflowPackage } from '../types/workflow';
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
+import { isFeatureExposed } from '../config/featureExposure';
 
 export type WorkflowExportScope = 'workflow' | 'cycle';
 
@@ -14,6 +15,12 @@ export interface WorkflowExportPackage {
   cycleMetadata?: CycleMetadata;
   mapView?: GFCForecastSaveData['mapView'];
   styleSnapshots?: Record<string, unknown>;
+  /** Explicit compatibility disclosure for embedded custom content. */
+  customContent?: {
+    included: true;
+    severeAnalytics: 'excluded';
+    autoCategorical: 'excluded';
+  };
 }
 
 const WORKFLOW_GROUPING_DAYS: Record<string, DayType[]> = {
@@ -22,6 +29,14 @@ const WORKFLOW_GROUPING_DAYS: Record<string, DayType[]> = {
   day3: [3],
   'day4-8': [4, 5, 6, 7, 8],
 };
+
+/** Maps one forecast day to the workflow grouping that owns its custom layers. */
+const groupingForDay = (day: DayType): import('../types/workflow').Grouping =>
+  day <= 3 ? `day${day}` as import('../types/workflow').Grouping : 'day4-8';
+
+/** Returns true when a package contains any detached custom layer definitions. */
+const hasCustomContent = (forecast: GFCForecastSaveData): boolean =>
+  Object.values(forecast.forecastCycle?.days ?? {}).some((day) => Boolean(day?.customLayers?.layers.length));
 
 /** Returns the day slots owned by a workflow template. */
 const getWorkflowDays = (workflowId: string): Set<DayType> => {
@@ -84,16 +99,26 @@ export const buildWorkflowExportPackage = ({
   cycleMetadata?: CycleMetadata;
   styleSnapshots?: Record<string, unknown>;
   exportedAt?: string;
-}): WorkflowExportPackage => ({
-  packageType: scope,
-  schemaVersion: WORKFLOW_SCHEMA_VERSION,
-  exportedAt,
-  ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
-  ...(cycleMetadata ? { cycleMetadata } : {}),
-  ...(forecast.mapView ? { mapView: forecast.mapView } : {}),
-  forecast: scope === 'workflow' ? restrictForecastToWorkflow(forecast, cycleMetadata) : forecast,
-  ...(styleSnapshots ? { styleSnapshots } : {}),
-});
+}): WorkflowExportPackage => {
+  const scopedForecast = scope === 'workflow' ? restrictForecastToWorkflow(forecast, cycleMetadata) : forecast;
+  return {
+    packageType: scope,
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    exportedAt,
+    ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
+    ...(cycleMetadata ? { cycleMetadata } : {}),
+    ...(forecast.mapView ? { mapView: forecast.mapView } : {}),
+    forecast: scopedForecast,
+    ...(styleSnapshots ? { styleSnapshots } : {}),
+    ...(isFeatureExposed('customProducts') && hasCustomContent(scopedForecast) ? {
+      customContent: {
+        included: true,
+        severeAnalytics: 'excluded',
+        autoCategorical: 'excluded',
+      },
+    } : {}),
+  };
+};
 
 /** Returns true only for the exact top-level markers of a workflow export package. */
 export const isWorkflowExportPackage = (value: unknown): value is WorkflowExportPackage => {
@@ -109,19 +134,25 @@ export const isWorkflowExportPackage = (value: unknown): value is WorkflowExport
 export const toSerializedWorkflowPackage = (pkg: WorkflowExportPackage): SerializedWorkflowPackage | null => {
   const metadata = pkg.metadata;
   if (!metadata) return null;
-  const groupingData = Object.fromEntries(
-    Object.entries(pkg.forecast.forecastCycle?.days ?? {}).map(([day, value]) => [String(day), value]),
-  );
+  const version = metadata.outlookVersions.at(-1)?.version ?? 1;
+  const dayEntries = Object.entries(pkg.forecast.forecastCycle?.days ?? {});
+  const groupingData = Object.fromEntries(dayEntries.map(([day, value]) => {
+    const dayNumber = Number(day) as DayType;
+    const groupingValue = isFeatureExposed('customProducts')
+      ? value
+      : { ...value, customLayers: undefined };
+    return [`${groupingForDay(dayNumber)}-day${dayNumber}-v${version}`, groupingValue];
+  }));
   return {
     schemaVersion: pkg.schemaVersion,
     version: pkg.schemaVersion,
     metadata: {
       workflowId: metadata.workflowId,
       cycleId: metadata.id,
-      version: metadata.outlookVersions.at(-1)?.version ?? 1,
+      version,
       status: metadata.status,
       includesDiscussions: Object.values(groupingData).some((day) => Boolean((day as { discussion?: unknown }).discussion)),
-      includesStyleSnapshots: Boolean(pkg.styleSnapshots),
+      includesStyleSnapshots: Boolean(pkg.styleSnapshots || pkg.customContent?.included),
     },
     cycles: [{
       id: metadata.id,
@@ -131,7 +162,10 @@ export const toSerializedWorkflowPackage = (pkg: WorkflowExportPackage): Seriali
       outlookVersions: metadata.outlookVersions,
       createdAt: metadata.createdAt,
       updatedAt: metadata.updatedAt,
-      groupings: Object.keys(groupingData).map((day) => ({ grouping: day, day: Number(day) as never })),
+      groupings: dayEntries.map(([day]) => {
+        const dayNumber = Number(day) as DayType;
+        return { grouping: groupingForDay(dayNumber), day: dayNumber };
+      }),
       groupingData,
     }],
     ...(pkg.styleSnapshots ? { styleSnapshots: pkg.styleSnapshots } : {}),

@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #746
+
+- Integrate local custom layers with forecast workflows, exports, imports, map legends, and workflow disclosures.
+
 ### PR #744
 
 - Add reusable custom product creation, editing, lifecycle management, and snapshot-based use in local forecasts.

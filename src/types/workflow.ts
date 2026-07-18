@@ -182,6 +182,8 @@ export interface Package {
 export interface SerializedOutlookVersionData {
   day: import('./outlooks').DayType;
   data: import('./outlooks').SerializedOutlookData;
+  /** Detached custom geometry and appearance owned by this workflow grouping. */
+  customLayers?: import('./customProducts').CustomLayerCollection;
   metadata: {
     issueDate: string;
     validDate: string;
