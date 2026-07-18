@@ -197,6 +197,20 @@ test.describe('Local reusable custom products', () => {
     await page.getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByRole('heading', { name: 'Expired fire product' })).toHaveCount(0);
   });
+
+  test('shows free users a respectful Premium path from the saved-products panel', async ({ page }) => {
+    await prepareAppState(page);
+    await page.goto('/forecast?localTestAccount=free');
+    await page.getByRole('radio', { name: 'Custom' }).click();
+    await page.getByRole('button', { name: 'Saved products' }).click();
+
+    const savedProductsDialog = page.getByRole('dialog', { name: 'Saved products' });
+    await expect(savedProductsDialog.getByText('Premium feature', { exact: true })).toBeVisible();
+    await expect(savedProductsDialog.getByRole('heading', { name: 'Save a product, use it whenever.' })).toBeVisible();
+    await expect(savedProductsDialog.getByText('Build custom layers now, then save reusable category sets with Premium.')).toBeVisible();
+    await expect(savedProductsDialog.getByRole('link', { name: 'View Premium' })).toHaveAttribute('href', '/account');
+    await expect(savedProductsDialog.getByRole('button', { name: 'New product' })).not.toBeVisible();
+  });
 });
 
 test.describe('Hosted custom-product absence', () => {
