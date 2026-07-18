@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useEntitlement } from '../billing/EntitlementProvider';
 import type { AddToastFn } from '../components/Layout';
 import { isFeatureExposed } from '../config/featureExposure';
 import {
@@ -18,6 +19,7 @@ const restoreWithError = (message: string, addToast: AddToastFn, layer: Paramete
 /** Consumes a staged reusable product only after session restoration has established a valid destination. */
 export const useCustomProductForecastHandoff = (ready: boolean, addToast: AddToastFn): void => {
   const dispatch = useDispatch();
+  const { premiumActive } = useEntitlement();
   const destinationDay = useSelector((state: RootState) => {
     const cycle = state.forecast.forecastCycle;
     return cycle.days[cycle.currentDay];
@@ -25,7 +27,7 @@ export const useCustomProductForecastHandoff = (ready: boolean, addToast: AddToa
 
   useEffect(() => {
     if (!ready || !isFeatureExposed('customProducts')) return;
-    const stagedLayer = consumeCustomProductForecastHandoff();
+    const stagedLayer = consumeCustomProductForecastHandoff(premiumActive);
     if (!stagedLayer) return;
     if (!destinationDay) {
       restoreWithError('Select a valid forecast day before loading this product.', addToast, stagedLayer);
@@ -41,5 +43,5 @@ export const useCustomProductForecastHandoff = (ready: boolean, addToast: AddToa
     }
     dispatch(addCustomLayer(stagedLayer));
     dispatch(setCustomEditorMode('custom'));
-  }, [addToast, destinationDay, dispatch, ready]);
+  }, [addToast, destinationDay, dispatch, premiumActive, ready]);
 };

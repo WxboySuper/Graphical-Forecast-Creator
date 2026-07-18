@@ -46,6 +46,34 @@ Using a product stages a validated, detached layer snapshot for the forecast
 editor. The editor consumes and clears that handoff once, then stores the layer
 inside the cycle. Later product edits cannot change the embedded layer. The
 Firestore adapter remains unreachable from hosted UI while the
-`customProducts` exposure is local-only; server rules and hosted expiration
-behavior are delivered as a separate rollout slice before any hosted exposure.
+`customProducts` exposure is local-only.
+
+## Hosted authorization boundary
+
+Hosted reusable-product documents use the fixed path
+`/users/{userId}/customProducts/{product-01..product-20}`. The logical product
+UUID remains inside the document, so deleting and later reusing a slot cannot
+reconnect an old forecast to a replacement product.
+
+Hosted create and update requests are fail-closed behind two server-owned
+checks: `/userEntitlements/{uid}.premiumActive` and
+`/serverFeatureCapabilities/customProducts.enabled` must both be `true`.
+Clients cannot write either document and cannot read the rollout capability.
+The capability document is intentionally absent in hosted environments until
+the owner authorizes rollout. Emulator tests seed it with security rules
+disabled to exercise the future hosted boundary without exposing it on beta.
+
+Owners retain read and delete access after premium expires or the rollout is
+disabled. Editing, duplication, archive/restore, and loading a product into a
+new forecast remain blocked. Deletion removes only the library document and a
+matching unconsumed session handoff; snapshots already embedded in forecast
+cycles/packages are immutable and are never cascaded or entitlement-checked
+during rendering.
+
+Rules enforce the 20-slot account limit, exact document/category/style fields,
+category count/order/identity, immutable ownership and creation identity,
+one-step version increments, monotonic update timestamps, and status-only
+archive/restore transitions. Firestore rules cannot stop a user from manually
+copying data they are already authorized to read, so new-forecast use is also
+enforced at both official-client staging and consumption boundaries.
 

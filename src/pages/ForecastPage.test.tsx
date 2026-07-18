@@ -46,6 +46,7 @@ import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
+const mockUseEntitlement = jest.fn();
 
 jest.mock('../components/Map/ForecastMap', () => {
   const { forwardRef } = jest.requireActual<typeof import('react')>('react');
@@ -74,7 +75,7 @@ jest.mock('../auth/AuthProvider', () => ({
   useAuth: () => mockUseAuth(),
 }));
 jest.mock('../billing/EntitlementProvider', () => ({
-  useEntitlement: () => ({ premiumActive: false, effectiveSource: 'none' }),
+  useEntitlement: () => mockUseEntitlement(),
 }));
 jest.mock('../hooks/useCloudCycles', () => ({
   useCloudCycles: () => ({
@@ -130,6 +131,7 @@ describe('ForecastPage layout selection', () => {
     sessionStorage.clear();
     mockAddToast.mockClear();
     mockUseAuth.mockReturnValue({ user: null, syncedSettings: null });
+    mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: 'none' });
   });
 
   test('defaults to the tabbed toolbar layout when no local override is present', () => {
@@ -140,6 +142,7 @@ describe('ForecastPage layout selection', () => {
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
+    mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
     const store = createStore();
     const layer = {
       schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
@@ -179,6 +182,7 @@ describe('ForecastPage layout selection', () => {
   });
 
   test('preserves a reusable-product handoff and reports the custom-layer limit', async () => {
+    mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
     const store = createStore();
     for (let index = 0; index < CUSTOM_PRODUCT_LIMITS.layersPerCollection; index += 1) {
       store.dispatch(addCustomLayer({
@@ -223,6 +227,14 @@ describe('ForecastPage layout selection', () => {
     expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers).toHaveLength(CUSTOM_PRODUCT_LIMITS.layersPerCollection);
     expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual(stagedLayer);
     expect(store.getState().forecast.customEditor.mode).toBe('severe');
+  });
+
+  test('discards a staged reusable-product handoff if premium expired before forecast load', async () => {
+    const store = createStore();
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, id: 'stale' }));
+    renderForecastPage(store);
+    await waitFor(() => expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull());
+    expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers ?? []).toHaveLength(0);
   });
 
   test('query string or stored/remote overrides resolve to the tabbed toolbar when other variants are removed', () => {

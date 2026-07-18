@@ -19,7 +19,7 @@ const newProductDisabled = (
 
 const WorkspaceNotices = ({ customProducts }: { customProducts: UseCustomProductsResult }) => (
   <>
-    {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Reusable product editing and use require premium. Existing products remain visible.</CardContent></Card> : null}
+    {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Your reusable products remain visible and can be deleted, but premium is required to edit, duplicate, archive, restore, or use them in a new forecast.</CardContent></Card> : null}
     {customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
   </>
 );
