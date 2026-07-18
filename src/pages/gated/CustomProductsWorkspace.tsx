@@ -5,7 +5,8 @@ import { useAuth } from '../../auth/AuthProvider';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useCustomProducts, type UseCustomProductsResult } from '../../hooks/useCustomProducts';
-import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct } from '../../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct, type OneOffCustomLayer } from '../../types/customProducts';
+import { consumeCustomProductForecastHandoff } from '../../lib/customProductHandoff';
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
 
@@ -17,10 +18,11 @@ const newProductDisabled = (
   || editorOpen
   || customProducts.products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount;
 
-const WorkspaceNotices = ({ customProducts }: { customProducts: UseCustomProductsResult }) => (
+const WorkspaceNotices = ({ customProducts, applicationError }: { customProducts: UseCustomProductsResult; applicationError?: string | null }) => (
   <>
     {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Your reusable products remain visible and can be deleted, but premium is required to edit, duplicate, archive, restore, or use them in a new forecast.</CardContent></Card> : null}
     {customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
+    {applicationError ? <p role="alert" className="custom-product-error">{applicationError}</p> : null}
   </>
 );
 
@@ -43,15 +45,8 @@ const WorkspaceEditors = ({
   </>
 );
 
-const createProductNavigator = (
-  customProducts: UseCustomProductsResult,
-  navigate: ReturnType<typeof useNavigate>,
-) => (product: HostedCustomProduct) => {
-  if (customProducts.useProduct(product)) navigate('/forecast');
-};
-
-const SignedOutProducts = () => (
-  <div className="custom-products-page">
+const SignedOutProducts = ({ embedded = false }: { embedded?: boolean }) => (
+  <div className={`custom-products-page${embedded ? ' custom-products-page--dialog' : ''}`}>
     <Card><CardHeader><CardTitle>Sign in to manage reusable products</CardTitle></CardHeader><CardContent><Button asChild><Link to="/account">Open Account</Link></Button></CardContent></Card>
   </div>
 );
@@ -116,34 +111,54 @@ const ProductsLibrary = ({
   );
 };
 
-const CustomProductsWorkspace = () => {
+interface CustomProductsWorkspaceProps {
+  embedded?: boolean;
+  onProductUse?(layer: OneOffCustomLayer): boolean;
+}
+
+const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProductsWorkspaceProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const customProducts = useCustomProducts();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<HostedCustomProduct | null>(null);
+  const [applicationError, setApplicationError] = useState<string | null>(null);
   const activeCount = useMemo(
     () => customProducts.products.filter((product) => product.status === 'active').length,
     [customProducts.products],
   );
 
-  if (!user) return <SignedOutProducts />;
+  if (!user) return <SignedOutProducts embedded={embedded} />;
   const editorOpen = creating || Boolean(editing);
   const openEditor = (product: HostedCustomProduct) => {
     setCreating(false);
     setEditing(product);
   };
-  const useProduct = createProductNavigator(customProducts, navigate);
+  const useProduct = (product: HostedCustomProduct) => {
+    const layer = customProducts.useProduct(product);
+    if (!layer) return;
+    if (onProductUse) {
+      if (onProductUse(layer)) {
+        consumeCustomProductForecastHandoff(customProducts.premiumActive);
+        setApplicationError(null);
+      } else {
+        consumeCustomProductForecastHandoff(customProducts.premiumActive);
+        setApplicationError(`Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`);
+      }
+      return;
+    }
+    navigate('/forecast');
+  };
 
   return (
-    <main className="custom-products-page">
+    <main className={`custom-products-page${embedded ? ' custom-products-page--dialog' : ''}`}>
       <ProductsHero
         productCount={customProducts.products.length}
         activeCount={activeCount}
         newDisabled={newProductDisabled(customProducts, editorOpen)}
         onNew={() => { setEditing(null); setCreating(true); }}
       />
-      <WorkspaceNotices customProducts={customProducts} />
+      <WorkspaceNotices customProducts={customProducts} applicationError={applicationError} />
       <WorkspaceEditors
         creating={creating}
         editing={editing}

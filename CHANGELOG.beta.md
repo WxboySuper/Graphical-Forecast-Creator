@@ -20,6 +20,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Secure reusable custom products with owner-scoped Firestore rules, premium enforcement, and hostile-client coverage.
 
+### PR #750
+
+- Polish the local custom-product forecast workspace with an animated mode switch, compact controls, saved-product modal, and cohesive color picker.
+
 ### PR #742
 
 - Define versioned one-off custom layer, reusable hosted product, embedded snapshot, and expiration/read-only contracts with strict validation and local-only exposure.

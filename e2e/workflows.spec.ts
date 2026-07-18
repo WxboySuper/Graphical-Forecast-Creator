@@ -111,7 +111,8 @@ test.describe('Workflow continuity', () => {
     await page.getByLabel('Layer title').blur();
     await page.getByLabel('Category label').fill('Critical fire');
     await page.getByLabel('Category label').blur();
-    await page.getByLabel('Category hatch').selectOption('crosshatch');
+    await page.getByLabel('Category hatch').click();
+    await page.getByRole('button', { name: 'Crosshatch', exact: true }).click();
     await page.getByRole('button', { name: 'Draw polygons' }).click();
     const viewport = page.locator('.map-container .ol-viewport');
     const box = await viewport.boundingBox();
@@ -153,7 +154,7 @@ test.describe('Workflow continuity', () => {
     await expect(workflowPanel(page)).toContainText('Day 2 package', { timeout: 15000 });
     await page.getByRole('radio', { name: 'Custom' }).click();
     await expect(page.getByLabel('Layer title')).toHaveValue('Package fire layer');
-    await expect(page.getByLabel('Category hatch')).toHaveValue('crosshatch');
+    await expect(page.getByLabel('Category hatch')).toHaveText('Crosshatch');
     await discussionNav(page).click();
     await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toHaveValue('Package round-trip sentinel.');
   });

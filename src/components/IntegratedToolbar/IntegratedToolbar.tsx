@@ -45,7 +45,7 @@ import {
 } from '../ForecastWorkspace/workspaceMeta';
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
-import CustomProductsEntryButton from './CustomProductsEntryButton';
+import CustomProductsDialog from './CustomProductsDialog';
 import type { RootState } from '../../store';
 import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
@@ -593,15 +593,17 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
 
   return (
     <TabbedToolbarTabRow>
-      <TabbedToolbarStripSection label="Product" className="tabbed-integrated-toolbar__section--product-mode w-[150px]">
+      <TabbedToolbarStripSection label="Draw mode" className="tabbed-integrated-toolbar__section--product-mode w-[226px]">
         <div className="custom-product-toggle" role="radiogroup" aria-label="Drawing product" data-testid="custom-product-toggle">
+          <span className="custom-product-toggle__indicator" aria-hidden="true" />
           {(['severe', 'custom'] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               role="radio"
               aria-checked={storedMode === mode}
-              className={cn('custom-product-toggle__button', storedMode === mode && 'is-active')}
+              className={cn('custom-product-toggle__button mode-toggle-btn', storedMode === mode && 'is-active')}
+              style={{ backgroundColor: storedMode === mode ? 'var(--button-bg)' : 'transparent' }}
               onClick={() => dispatch(setCustomEditorMode(mode))}
             >
               {mode === 'severe' ? 'Severe' : 'Custom'}
@@ -614,8 +616,8 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
           <SevereDrawControls controller={controller} />
         ) : (
           <>
-            <TabbedToolbarStripSection label="Custom" hint="Reusable" className="w-[190px]">
-              <CustomProductsEntryButton />
+            <TabbedToolbarStripSection label="Library" className="w-[184px]">
+              <CustomProductsDialog />
             </TabbedToolbarStripSection>
             <CustomDrawPanel />
           </>
@@ -1249,7 +1251,7 @@ export const IntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller
         <div className="flex items-center justify-center gap-2 lg:gap-3 px-2 sm:px-3 lg:px-4 h-full min-w-max">
           <ToolbarToolsSection controller={controller} />
           <ToolbarForecastDaySection controller={controller} />
-          <CustomProductsEntryButton />
+          <CustomProductsDialog />
           <ToolbarOutlookTypeSection controller={controller} />
           <ToolbarGhostLayersSection controller={controller} />
           <ToolbarProbabilitySection controller={controller} />

@@ -31,7 +31,8 @@ test.describe('local-only custom layers', () => {
     await page.getByLabel('Layer title').blur();
     await page.getByLabel('Category label').fill('Heavy snow');
     await page.getByLabel('Category label').blur();
-    await page.getByLabel('Category hatch').selectOption('crosshatch');
+    await page.getByLabel('Category hatch').click();
+    await page.getByRole('button', { name: 'Crosshatch', exact: true }).click();
     await expect(page.getByRole('complementary', { name: 'Map Legend' })).toContainText('Heavy snow');
 
     await page.getByRole('button', { name: 'Draw polygons' }).click();

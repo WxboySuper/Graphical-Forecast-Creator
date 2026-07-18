@@ -45,7 +45,7 @@ describe('Legend', () => {
     expect(screen.getByText('Winter impacts')).toBeInTheDocument();
     const items = screen.getAllByRole('listitem');
     expect(items.map((item) => item.textContent)).toEqual(['Minor', 'Major']);
-    expect(screen.getByRole('img', { name: 'Major custom style' })).toHaveStyle({ backgroundColor: '#ef4444', opacity: '0.7' });
+    expect(screen.getByRole('img', { name: 'Major custom style' })).toHaveStyle({ backgroundColor: '#ef4444', opacity: '1' });
   });
 
   it('renders the legend component without crashing', () => {
