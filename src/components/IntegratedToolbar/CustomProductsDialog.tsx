@@ -19,6 +19,7 @@ import { CUSTOM_PRODUCT_LIMITS } from '../../types/customProducts';
 import CustomProductsWorkspace from '../../pages/gated/CustomProductsWorkspace';
 import { useAuth } from '../../auth/AuthProvider';
 import { useEntitlement } from '../../billing/EntitlementProvider';
+import './CustomProductsDialog.css';
 
 /** A light-touch upgrade prompt shown only to signed-in free users in the forecast workspace. */
 const CustomProductsUpgradePrompt = ({ onViewPremium }: { onViewPremium(): void }) => (
