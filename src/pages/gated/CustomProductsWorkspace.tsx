@@ -142,6 +142,7 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
         consumeCustomProductForecastHandoff(customProducts.premiumActive);
         setApplicationError(null);
       } else {
+        consumeCustomProductForecastHandoff(customProducts.premiumActive);
         setApplicationError(`Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`);
       }
       return;
