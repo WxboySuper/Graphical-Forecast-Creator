@@ -1,6 +1,6 @@
-# Custom Products: beta tester checklist
+# Custom Products: local preview tester checklist
 
-Use this only when **Custom** is available in the Forecast page's **Draw** tab.
+This checklist is for the **local preview only**. Custom Products are intentionally unavailable on the hosted beta site until the feature is approved. Open the local preview provided to you and continue only when **Custom** appears in the Forecast page's **Draw** tab.
 
 ## Before you start
 
@@ -36,4 +36,3 @@ Please include:
 - What you expected to happen.
 - What happened instead.
 - A screenshot or screen recording, if you can.
-
