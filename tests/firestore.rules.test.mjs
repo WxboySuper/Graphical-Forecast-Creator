@@ -536,7 +536,7 @@ describe('customProducts security and lifecycle boundary', () => {
     ));
   });
 
-  test('rejects non-canonical and out-of-range ISO timestamps', async () => {
+  test('rejects non-canonical, out-of-range, and impossible ISO timestamps', async () => {
     await seed(async (db) => {
       await enableCustomProducts(db);
       await setEntitlement(db, ALICE, true);
@@ -549,6 +549,20 @@ describe('customProducts security and lifecycle boundary', () => {
     await assertFails(setDoc(
       doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-03'),
       customProduct({ id: 'product-logical-3', updatedAt: '2026-07-17T01:00:00Z' }),
+    ));
+    for (const [suffix, timestamp] of [
+      ['04', '2026-02-29T01:00:00.000Z'],
+      ['05', '2026-02-31T01:00:00.000Z'],
+      ['06', '2026-04-31T01:00:00.000Z'],
+    ]) {
+      await assertFails(setDoc(
+        doc(dbFor(ALICE), 'users', ALICE, 'customProducts', `product-${suffix}`),
+        customProduct({ id: `product-logical-${suffix}`, updatedAt: timestamp }),
+      ));
+    }
+    await assertSucceeds(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-07'),
+      customProduct({ id: 'product-logical-07', updatedAt: '2028-02-29T01:00:00.000Z' }),
     ));
   });
 });
