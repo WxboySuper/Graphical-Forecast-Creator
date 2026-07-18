@@ -41,6 +41,8 @@ test.describe('Local reusable custom products', () => {
     await page.getByRole('radio', { name: 'Custom' }).click();
     await page.getByRole('button', { name: 'Saved products' }).click();
     const savedProductsDialog = page.getByRole('dialog', { name: 'Saved products' });
+    await expect(savedProductsDialog.getByText('Custom library', { exact: true })).toBeVisible();
+    await expect(savedProductsDialog.getByText('Apply a reusable category set to this forecast without leaving your workspace.')).toBeVisible();
     await savedProductsDialog.getByRole('button', { name: 'Use in Forecast' }).click();
     await expect(savedProductsDialog).not.toBeVisible();
     await expect(page).toHaveURL(/\/forecast(?:\?localTestAccount=premium)?$/);

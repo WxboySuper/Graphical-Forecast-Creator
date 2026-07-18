@@ -42,8 +42,14 @@ const CustomProductsDialog = () => {
       </DialogTrigger>
       <DialogContent className="custom-products-dialog-content">
         <DialogHeader className="custom-products-dialog-header">
-          <DialogTitle>Saved products</DialogTitle>
-          <DialogDescription>Apply a reusable category set without leaving this forecast.</DialogDescription>
+          <div className="custom-products-dialog-header__identity">
+            <span className="custom-products-dialog-header__icon" aria-hidden="true"><LibraryBig /></span>
+            <div>
+              <span className="custom-products-dialog-header__eyebrow">Custom library</span>
+              <DialogTitle>Saved products</DialogTitle>
+            </div>
+          </div>
+          <DialogDescription>Apply a reusable category set to this forecast without leaving your workspace.</DialogDescription>
         </DialogHeader>
         <CustomProductsWorkspace embedded onProductUse={useProduct} />
       </DialogContent>
