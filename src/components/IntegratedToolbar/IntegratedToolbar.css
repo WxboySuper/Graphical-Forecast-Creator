@@ -1065,10 +1065,10 @@
   .custom-products-dialog-content { width: calc(100vw - 1rem); }
   .custom-products-dialog-header { padding: 16px 50px 14px 16px; }
   .custom-products-dialog-content .custom-products-page--dialog { padding: 12px 14px 16px; }
-  .custom-products-page--dialog .custom-products-hero { align-items: stretch; flex-direction: column; }
-  .custom-products-page--dialog .custom-products-hero__actions { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px; }
+  .custom-products-page--dialog .custom-products-hero { align-items: stretch; flex-direction: column; padding: 14px; }
+  .custom-products-page--dialog .custom-products-hero__actions { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 12px; }
   .custom-products-page--dialog .custom-products-hero__actions span { align-self: flex-start; }
-  .custom-products-page--dialog .custom-products-hero__actions button { width: 100%; }
+  .custom-products-page--dialog .custom-products-hero__actions button { width: 100%; min-height: 42px; }
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
