@@ -4,10 +4,6 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### PR #757
-
-- Keep custom layer and category picker popovers above forecast safety and status overlays.
-
 ### PR #751
 
 - Refine the local-only Saved products experience with a responsive library layout, a respectful free-user Premium path, and a simple local-preview tester checklist.
@@ -19,6 +15,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 ### PR #744
 
 - Add reusable custom product creation, editing, lifecycle management, and snapshot-based use in local forecasts.
+
+### PR #757
+
+- Keep custom layer and category picker popovers above forecast safety and status overlays.
 
 ### PR #743
 

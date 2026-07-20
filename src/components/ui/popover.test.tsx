@@ -52,10 +52,11 @@ describe('Popover components', () => {
   });
 
   it('allows custom alignment, offset, and classes', () => {
-    render(<PopoverContent align="start" sideOffset={12} className="extra">Menu</PopoverContent>);
+    render(<PopoverContent align="start" sideOffset={12} className="extra" style={{ width: 300, zIndex: 1 }}>Menu</PopoverContent>);
 
     expect(screen.getByText('Menu')).toHaveAttribute('data-align', 'start');
     expect(screen.getByText('Menu')).toHaveAttribute('data-side-offset', '12');
     expect(screen.getByText('Menu')).toHaveClass('extra');
+    expect(screen.getByText('Menu')).toHaveStyle({ width: '300px', zIndex: String(POPOVER_Z_INDEX) });
   });
 });
