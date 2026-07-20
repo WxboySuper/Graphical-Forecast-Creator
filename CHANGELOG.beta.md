@@ -4,6 +4,24 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #758
+
+- Dependency: @radix-ui/react-dialog ^1.1.19 → ^1.1.20
+- Dependency: @radix-ui/react-dropdown-menu ^2.1.20 → ^2.1.21
+- Dependency: @radix-ui/react-popover ^1.1.19 → ^1.1.20
+- Dependency: @radix-ui/react-tabs ^1.1.17 → ^1.1.18
+- Dependency: @radix-ui/react-tooltip ^1.2.12 → ^1.2.13
+- Dependency: @sentry/react ^10.65.0 → ^10.67.0
+- Dependency: immer ^11.1.11 → ^11.1.15
+- Dependency: lucide-react ^1.24.0 → ^1.25.0
+- Dependency: @tailwindcss/postcss ^4.3.2 → ^4.3.3
+- Dependency: autoprefixer ^10.5.2 → ^10.5.4
+- Dependency: tailwindcss ^4.3.2 → ^4.3.3
+- Dependency: vite ^8.1.4 → ^8.1.5
+- Dependency: @sentry/node ^10.65.0 → ^10.67.0 (`server`)
+- Dependency: express-rate-limit ^8.5.2 → ^8.6.0 (`server`)
+- Dependency: firebase-admin ^14.1.0 → ^14.2.0 (`server`)
+- Dependency: stripe ^22.3.1 → ^22.3.2 (`server`)
 ### PR #752
 
 - Enable the approved Custom Products workspace for beta testers while keeping staging and production disabled.
