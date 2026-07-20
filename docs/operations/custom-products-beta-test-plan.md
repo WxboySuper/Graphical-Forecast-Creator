@@ -1,10 +1,11 @@
 # Custom Products: beta tester checklist
 
-Use the beta Forecast page. Continue only when **Custom** appears in the **Draw** tab.
-
 ## Before you start
 
-- Open the Forecast page on a desktop or phone.
+1. Open [the beta Forecast page](https://beta-gfc.weatherboysuper.com/forecast).
+2. Sign in with the Premium beta account provided for this test. Saved products require Premium.
+3. Continue only when **Custom** appears in the **Draw** tab.
+
 - Start with a new or disposable forecast. This test creates and edits layers.
 
 ## Quick test
