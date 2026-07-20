@@ -1,16 +1,11 @@
-# Custom Products: local preview tester checklist
-
-This checklist is for the **local preview only**. Custom Products are intentionally unavailable on the hosted beta site until the feature is approved.
-
-## Open the preview
-
-1. Follow the one-time [local setup instructions](../../README.md#getting-started), then run `pnpm run dev` from the GFC folder.
-2. Open `http://localhost:3000/forecast?localTestAccount=premium` in your browser.
-3. Continue only when **Custom** appears in the Forecast page's **Draw** tab.
+# Custom Products: beta tester checklist
 
 ## Before you start
 
-- Open the Forecast page on a desktop or phone.
+1. Open [the beta Forecast page](https://beta-gfc.weatherboysuper.com/forecast).
+2. Sign in with the Premium beta account provided for this test. Saved products require Premium.
+3. Continue only when **Custom** appears in the **Draw** tab.
+
 - Start with a new or disposable forecast. This test creates and edits layers.
 
 ## Quick test

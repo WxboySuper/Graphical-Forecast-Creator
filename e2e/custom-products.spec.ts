@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 
 const buildTarget = process.env.VITE_BUILD_TARGET ?? 'local';
+const customProductsEnabledTarget = buildTarget === 'local' || buildTarget === 'beta';
 
 const createProduct = async (page: Page, name: string): Promise<void> => {
   await page.getByRole('button', { name: 'New product' }).click();
@@ -214,7 +215,7 @@ test.describe('Local reusable custom products', () => {
 });
 
 test.describe('Hosted custom-product absence', () => {
-  test.skip(buildTarget === 'local', 'Requires a beta, staging, or production-target dev server.');
+  test.skip(customProductsEnabledTarget, 'Requires a staging or production-target dev server.');
 
   test('keeps the route, account card, and Draw controls absent', async ({ page }) => {
     await prepareAppState(page);
@@ -230,5 +231,21 @@ test.describe('Hosted custom-product absence', () => {
     await expect(page.getByRole('button', { name: /wind/i })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'Drawing product' })).not.toBeVisible();
     await expect(page.getByRole('link', { name: /Products/i })).not.toBeVisible();
+  });
+});
+
+test.describe('Beta custom-product exposure', () => {
+  test.skip(buildTarget !== 'beta', 'Requires a beta-target dev server.');
+
+  test('registers the library route and exposes Custom drawing controls', async ({ page }) => {
+    await prepareAppState(page);
+    await page.goto('/custom-products');
+    await expect(page.getByRole('heading', { name: 'Sign in to manage reusable products' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open Account' })).toHaveAttribute('href', '/account');
+
+    await page.goto('/forecast');
+    await expect(page.getByRole('radio', { name: 'Custom' })).toBeVisible();
+    await page.getByRole('radio', { name: 'Custom' }).click();
+    await expect(page.getByRole('button', { name: 'Saved products' })).toBeVisible();
   });
 });

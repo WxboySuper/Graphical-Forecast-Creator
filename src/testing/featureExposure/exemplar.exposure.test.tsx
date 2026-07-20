@@ -43,7 +43,7 @@ describe('feature exposure exemplar contract', () => {
       runWithBuildTarget('beta', () => {
         expect(
           require('../../routing/buildFeatureGatedRoutes').getExposedGatedRoutePaths('beta')
-        ).toEqual(['/tropical']);
+        ).toEqual(['/tropical', '/custom-products']);
       });
 
       exposureSpy.mockRestore();

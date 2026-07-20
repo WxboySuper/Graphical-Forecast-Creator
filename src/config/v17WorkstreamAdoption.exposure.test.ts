@@ -39,9 +39,9 @@ describe('v1.7 workstream adoption contract', () => {
     }
   );
 
-  test('customProducts is enabled only for local implementation and review', () => {
+  test('customProducts is enabled for local development and beta testing only', () => {
     for (const target of BUILD_TARGETS) {
-      const expected = target === 'local';
+      const expected = target === 'local' || target === 'beta';
       expect(isFeatureExposedOnTarget('customProducts', target)).toBe(expected);
       expect(FEATURE_EXPOSURE_REGISTRY.customProducts.exposure[target]).toBe(expected);
     }

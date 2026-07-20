@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #752
+
+- Enable the approved Custom Products workspace for beta testers while keeping staging and production disabled.
+
 ### PR #751
 
 - Refine the local-only Saved products experience with a responsive library layout, a respectful free-user Premium path, and a simple local-preview tester checklist.
