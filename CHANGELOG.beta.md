@@ -46,6 +46,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Secure reusable custom products with owner-scoped Firestore rules, premium enforcement, and hostile-client coverage.
 
+### PR #756
+
+- Match exported forecast JPEG bounds to the OpenLayers viewport to remove unused white space below the map.
+
 ### PR #750
 
 - Polish the local custom-product forecast workspace with an animated mode switch, compact controls, saved-product modal, and cohesive color picker.
