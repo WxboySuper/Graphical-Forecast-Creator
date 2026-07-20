@@ -204,12 +204,12 @@ describe('OpenLayersForecastMap helpers', () => {
   });
 
   test.each([
-    ['diagonal', [[-12, 12, 0, 0], [0, 12, 12, 0], [12, 12, 24, 0]]],
-    ['reverse-diagonal', [[-12, 0, 0, 12], [0, 0, 12, 12], [12, 0, 24, 12]]],
-    ['crosshatch', [[-12, 12, 0, 0], [0, 12, 12, 0], [12, 12, 24, 0], [-12, 0, 0, 12], [0, 0, 12, 12], [12, 0, 24, 12]]],
+    ['diagonal', [[-12, 12, 12, -12], [-12, 24, 24, -12], [0, 24, 24, 0]]],
+    ['reverse-diagonal', [[-12, 0, 12, 24], [-12, -12, 24, 24], [0, -12, 24, 12]]],
+    ['crosshatch', [[-12, 12, 12, -12], [-12, 24, 24, -12], [0, 24, 24, 0], [-12, 0, 12, 24], [-12, -12, 24, 24], [0, -12, 24, 12]]],
   ] as const)('custom %s hatch lines continue at every repeated tile edge', (hatch, expectedLines) => {
     const calls: number[][] = [];
-    document.createElement = ((tag: string) => {
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
       if (tag !== 'canvas') return originalCreateElement.call(document, tag);
       const context = {
         fillStyle: '', strokeStyle: '', lineWidth: 0,
@@ -221,11 +221,14 @@ describe('OpenLayersForecastMap helpers', () => {
         createPattern: jest.fn(() => 'custom-pattern'),
       };
       return { width: 0, height: 0, getContext: () => context } as unknown as HTMLElement;
-    }) as typeof document.createElement;
+    }) as typeof document.createElement);
 
-    createCustomFill({ fillColor: '#3b82f6', fillOpacity: .45, strokeColor: '#ffffff', strokeOpacity: .9, strokeWidth: 2, hatch });
-
-    expect(calls).toEqual(expectedLines);
+    try {
+      createCustomFill({ fillColor: '#3b82f6', fillOpacity: .45, strokeColor: '#ffffff', strokeOpacity: .9, strokeWidth: 2, hatch });
+      expect(calls).toEqual(expectedLines);
+    } finally {
+      createElementSpy.mockRestore();
+    }
   });
 
   test('toOlStyle transparencyScale reduces fill and stroke alpha', () => {
