@@ -133,7 +133,8 @@ describe('featureExposure registry', () => {
     expect(isFeatureExposedOnTarget('forecastWorkflowV2', 'production')).toBe(false);
 
     expect(isFeatureExposedOnTarget('customProducts', 'local')).toBe(true);
-    for (const target of ['beta', 'staging', 'production'] as const) {
+    expect(isFeatureExposedOnTarget('customProducts', 'beta')).toBe(true);
+    for (const target of ['staging', 'production'] as const) {
       expect(isFeatureExposedOnTarget('customProducts', target)).toBe(false);
     }
 

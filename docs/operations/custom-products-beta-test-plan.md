@@ -1,12 +1,6 @@
-# Custom Products: local preview tester checklist
+# Custom Products: beta tester checklist
 
-This checklist is for the **local preview only**. Custom Products are intentionally unavailable on the hosted beta site until the feature is approved.
-
-## Open the preview
-
-1. Follow the one-time [local setup instructions](../../README.md#getting-started), then run `pnpm run dev` from the GFC folder.
-2. Open `http://localhost:3000/forecast?localTestAccount=premium` in your browser.
-3. Continue only when **Custom** appears in the Forecast page's **Draw** tab.
+Use the beta Forecast page. Continue only when **Custom** appears in the **Draw** tab.
 
 ## Before you start
 

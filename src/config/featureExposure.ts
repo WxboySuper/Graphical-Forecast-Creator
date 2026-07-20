@@ -133,11 +133,11 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 430,
   },
   customProducts: {
-    exposure: { ...ALL_TARGETS_OFF, local: true },
+    exposure: { ...ALL_TARGETS_OFF, local: true, beta: true },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
     temporary: true,
-    removalCondition: 'Remove after custom layers and premium forecast products ship (#431).',
+    removalCondition: 'Remove after custom layers and premium forecast products complete their production rollout (#431).',
     serverBacked: false,
     trackingIssue: 431,
   },
