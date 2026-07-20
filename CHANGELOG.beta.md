@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #755
+
+- Repair custom diagonal, reverse-diagonal, and crosshatch map fills so their repeated canvas tiles align cleanly.
+
 ### PR #751
 
 - Refine the local-only Saved products experience with a responsive library layout, a respectful free-user Premium path, and a simple local-preview tester checklist.
