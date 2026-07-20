@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import './PrivacyPolicyModal.css';
+import { isProductAnalyticsEnabled, setProductAnalyticsEnabled } from '../../lib/productAnalytics';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.3.0';
-const PRIVACY_POLICY_LAST_UPDATED = 'June 9, 2026';
+const PRIVACY_POLICY_VERSION = '1.4.0';
+const PRIVACY_POLICY_LAST_UPDATED = 'July 20, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 // Changelog of material privacy-policy changes, keyed by the version that introduced them.
@@ -18,6 +19,10 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
   '1.3.0': [
     'We now use Google Analytics (GA4) to measure aggregate traffic on the production site.',
     'GA4 is loaded only on the hosted production domain, not on localhost development builds.',
+  ],
+  '1.4.0': [
+    'We replaced Google Analytics and the previous hosted metrics collector with self-hosted Umami product analytics.',
+    'Production and beta analytics are kept in separate reporting zones, and the same local preference can disable non-essential analytics for both.',
   ],
 };
 
@@ -87,6 +92,23 @@ const PrivacyPolicyWhatsNew: React.FC<{ items: string[] }> = ({ items }) => (
   </aside>
 );
 
+/** Lets people change the local, non-essential telemetry preference without creating an account. */
+const ProductAnalyticsPreference: React.FC = () => {
+  const [enabled, setEnabled] = useState(() => isProductAnalyticsEnabled());
+  const handleChange = () => {
+    const nextEnabled = !enabled;
+    setProductAnalyticsEnabled(nextEnabled);
+    setEnabled(nextEnabled);
+  };
+
+  return (
+    <button type="button" role="switch" aria-checked={enabled} className="privacy-analytics-preference" onClick={handleChange}>
+      <strong>Non-essential product analytics: {enabled ? 'Enabled' : 'Disabled'}</strong>
+      <span>{enabled ? 'Disable local anonymous telemetry' : 'Enable local anonymous telemetry'}</span>
+    </button>
+  );
+};
+
 /** Renders the current in-app Privacy Policy content for both acceptance and view-only modes. */
 const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNewItems }) => (
   <>
@@ -131,10 +153,11 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
 
     <h3>5. Product Analytics &amp; Progress Metrics</h3>
     <p>
-      To monitor the health of the hosted service, we collect privacy-conscious product telemetry such as signups,
-      sign-ins, cloud saves/loads, verification runs, and aggregate storage usage.{' '}
-      <strong>We do not log raw IP addresses for product analytics</strong>, and your forecast payload contents are
-      never exposed to our metrics dashboard.
+      To understand which hosted GFC workflows need improvement, we use self-hosted Umami product analytics on the
+      production and beta deployments in separate reporting zones. We collect page views, coarse browser/device
+      information, and selected milestone events such as completed exports, cloud-save outcomes, workflow outcomes,
+      and custom-layer creation. <strong>We do not use account identity, Firebase UID, email address, forecast
+      contents, coordinates, layer text, filenames, or export contents for product analytics.</strong>
     </p>
     <p>
       If you are signed in, we also store limited progress metrics tied to your account so we can show you your own
@@ -143,24 +166,11 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       your account view.
     </p>
     <p>
-      We also generate a browser-scoped anonymous installation identifier to help estimate daily active devices without
-      relying on long-term raw IP storage. Where possible, admin metrics are aggregated by day and shown only in
-      aggregate form.
+      You can disable non-essential product analytics from your local telemetry preference. When disabled, GFC does
+      not load the Umami tracker or send product-analytics events. Analytics are hosted by GFC on our VPS and are not
+      used for advertising, cross-site tracking, or sale of personal data.
     </p>
-    <p>
-      Separately from product metrics, the hosted service may keep short operational request logs such as page path,
-      referrer, timestamp, and user-agent for maintenance and debugging. These logs are not used to inspect forecast
-      contents and are kept separate from the product metrics dashboard.
-    </p>
-    <p>
-      On the public production site (gfc.weatherboysuper.com), we use Google Analytics (GA4) to measure aggregate
-      traffic and navigation patterns in a separate property from other Weatherboy Super sites. GA is loaded only on
-      the hosted production domain, not on localhost development builds. Google&apos;s processing is governed by{' '}
-      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
-        Google&apos;s privacy policy
-      </a>
-      .
-    </p>
+    <ProductAnalyticsPreference />
     <p>
       On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
       application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics

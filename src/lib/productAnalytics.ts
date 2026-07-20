@@ -1,0 +1,154 @@
+export const PRODUCT_ANALYTICS_PREFERENCE_KEY = 'gfc-analytics-enabled';
+const LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY = 'gfc-workflow-analytics-enabled';
+
+const PRODUCTION_HOSTNAME = 'gfc.weatherboysuper.com';
+const BETA_HOSTNAME = 'beta-gfc.weatherboysuper.com';
+
+export const PRODUCT_ANALYTICS_EVENTS = [
+  'workflow_start', 'workflow_continue', 'workflow_derive', 'workflow_revise',
+  'workflow_complete', 'workflow_complete_with_omissions', 'forecast_exported',
+  'workflow_rollover_action', 'custom_layer_created', 'cloud_save_completed', 'feature_unavailable',
+] as const;
+
+export type ProductAnalyticsEvent = (typeof PRODUCT_ANALYTICS_EVENTS)[number];
+export type ProductAnalyticsProperties = Record<string, string | number | boolean>;
+
+declare global {
+  interface Window {
+    umami?: { track: (event: string, data?: ProductAnalyticsProperties) => void };
+  }
+}
+
+const eventSet = new Set<string>(PRODUCT_ANALYTICS_EVENTS);
+let initializedZone: 'production' | 'beta' | null = null;
+let pendingPagePath: string | null = null;
+
+const WORKFLOW_DIMENSION_VALUES: Record<string, readonly string[]> = {
+  dayGrouping: ['day1', 'day2', 'day3', 'day4-8', 'full-cycle'],
+  accountTier: ['signed-out', 'free', 'premium'],
+  entryPath: ['home', 'forecast', 'cloud-library', 'forecast-workspace', 'rollover'],
+  result: ['success', 'failure', 'cancelled'],
+  packageScope: ['workflow', 'cycle'],
+  action: ['keep', 'save-and-start-new', 'replace-without-saving'],
+};
+
+const WORKFLOW_EVENTS = new Set<ProductAnalyticsEvent>([
+  'workflow_start', 'workflow_continue', 'workflow_derive', 'workflow_revise',
+  'workflow_complete', 'workflow_complete_with_omissions', 'forecast_exported', 'workflow_rollover_action',
+]);
+
+/** Keeps event payloads coarse and prevents future callers from attaching user-created data by accident. */
+const hasAllowedProperties = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): boolean => {
+  if (!properties) return true;
+  const entries = Object.entries(properties);
+  if (WORKFLOW_EVENTS.has(event)) {
+    return entries.every(([key, value]) => typeof value === 'string' && WORKFLOW_DIMENSION_VALUES[key]?.includes(value));
+  }
+  if (event === 'custom_layer_created') {
+    return entries.length === 1 && Number.isInteger(properties.layer_count) && properties.layer_count >= 1 && properties.layer_count <= 50;
+  }
+  return entries.length === 0;
+};
+
+/** Returns the privacy-isolated Umami website zone for a public GFC hostname. */
+export const getProductAnalyticsZone = (hostname?: string): 'production' | 'beta' | null => {
+  const host = hostname ?? (typeof window === 'undefined' ? '' : window.location.hostname);
+  if (host === PRODUCTION_HOSTNAME) return 'production';
+  if (host === BETA_HOSTNAME) return 'beta';
+  return null;
+};
+
+/** False is an explicit opt-out; absence preserves the product default. */
+export const isProductAnalyticsEnabled = (): boolean => {
+  try {
+    if (typeof localStorage === 'undefined') return true;
+    const preference = localStorage.getItem(PRODUCT_ANALYTICS_PREFERENCE_KEY);
+    if (preference !== null) return preference !== 'false';
+    // Preserve an existing workflow-only opt-out when moving to the unified preference.
+    return localStorage.getItem(LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY) !== 'false';
+  } catch {
+    return false;
+  }
+};
+
+/** Stores the local opt-out and removes the injected tracker immediately when it is disabled. */
+export const setProductAnalyticsEnabled = (enabled: boolean): void => {
+  try {
+    localStorage.setItem(PRODUCT_ANALYTICS_PREFERENCE_KEY, String(enabled));
+  } catch {
+    return;
+  }
+  if (!enabled && typeof document !== 'undefined') {
+    document.querySelector('script[data-gfc-umami="true"]')?.remove();
+    initializedZone = null;
+    pendingPagePath = null;
+  }
+};
+
+const getWebsiteId = (zone: 'production' | 'beta'): string =>
+  (zone === 'production' ? __GFC_UMAMI_PRODUCTION_WEBSITE_ID__ : __GFC_UMAMI_BETA_WEBSITE_ID__).trim();
+
+const getUmamiHost = (): string => __GFC_UMAMI_HOST__.trim().replace(/\/$/, '');
+
+/** Loads Umami only for the matching hosted zone and only after the user has not opted out. */
+export const initProductAnalytics = (hostname?: string): void => {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !isProductAnalyticsEnabled()) return;
+  const zone = getProductAnalyticsZone(hostname);
+  const websiteId = zone ? getWebsiteId(zone) : '';
+  const host = getUmamiHost();
+  if (!zone || !websiteId || !host || initializedZone === zone) return;
+
+  initializedZone = zone;
+  const script = document.createElement('script');
+  script.defer = true;
+  script.src = host + '/script.js';
+  script.dataset.websiteId = websiteId;
+  script.dataset.hostUrl = host;
+  script.dataset.autoTrack = 'false';
+  script.dataset.doNotTrack = 'true';
+  script.dataset.gfcUmami = 'true';
+  script.addEventListener('load', () => {
+    if (!pendingPagePath || !isProductAnalyticsEnabled()) return;
+    try {
+      window.umami?.track('page_view', { path: pendingPagePath });
+    } catch {
+      // Analytics is deliberately best effort.
+    } finally {
+      pendingPagePath = null;
+    }
+  });
+  document.head.appendChild(script);
+};
+
+/** Tracks a route without query/hash values, which can contain user-provided data. */
+export const trackProductPageView = (pathname?: string, hostname?: string): void => {
+  if (!isProductAnalyticsEnabled() || !getProductAnalyticsZone(hostname)) return;
+  const path = (pathname ?? window.location.pathname).split(/[?#]/, 1)[0];
+  initProductAnalytics(hostname);
+  try {
+    if (!window.umami) {
+      pendingPagePath = path;
+      return;
+    }
+    window.umami.track('page_view', { path });
+  } catch {
+    // Analytics is deliberately best effort.
+  }
+};
+
+/** Sends only registry-backed, coarse event properties. */
+export const trackProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): void => {
+  if (!eventSet.has(event) || !hasAllowedProperties(event, properties) || !isProductAnalyticsEnabled() || !getProductAnalyticsZone()) return;
+  initProductAnalytics();
+  try {
+    window.umami?.track(event, properties);
+  } catch {
+    // Analytics is deliberately best effort.
+  }
+};
+
+export const resetProductAnalyticsForTests = (): void => {
+  initializedZone = null;
+  pendingPagePath = null;
+  document.querySelectorAll('script[data-gfc-umami="true"]').forEach((script) => script.remove());
+};

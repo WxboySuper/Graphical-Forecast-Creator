@@ -19,6 +19,7 @@ import {
 import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION, type CustomCategoryTemplate, type CustomHatchPattern, type OneOffCustomLayer } from '../../types/customProducts';
 import { asCustomLayerId } from '../../lib/customProducts';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { trackProductEvent } from '../../lib/productAnalytics';
 
 const colors = ['#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#3b82f6'];
 const colorChoices = ['#22c55e', '#0ea5e9', '#2563eb', '#a855f7', '#ef4444', '#f97316', '#eab308', '#64748b'];
@@ -166,7 +167,10 @@ const CustomLayerActionRow: React.FC<{
       <CustomLayerTitleInput layer={activeLayer} />
       <MenuPicker label="Select custom layer" testId="custom-layer-picker" value={activeLayer.id} options={layerOptions} compact onChange={(id) => dispatch(selectCustomLayer(id))} />
     </div> : <MenuPicker label="Select custom layer" testId="custom-layer-picker" value={activeLayer?.id} options={layerOptions} onChange={(id) => dispatch(selectCustomLayer(id))} />}
-    <IconButton label="Add custom layer" disabled={layers.length >= CUSTOM_PRODUCT_LIMITS.layersPerCollection} onClick={() => dispatch(addCustomLayer(makeLayer(layers.length)))}><Plus /></IconButton>
+    <IconButton label="Add custom layer" disabled={layers.length >= CUSTOM_PRODUCT_LIMITS.layersPerCollection} onClick={() => {
+      dispatch(addCustomLayer(makeLayer(layers.length)));
+      trackProductEvent('custom_layer_created', { layer_count: layers.length + 1 });
+    }}><Plus /></IconButton>
     <IconButton label="Move layer up" disabled={!activeLayer || activeLayer.order === 0} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: -1 }))}><ArrowUp /></IconButton>
     <IconButton label="Move layer down" disabled={!activeLayer || activeLayer.order === layers.length - 1} onClick={() => activeLayer && dispatch(moveCustomLayer({ layerId: activeLayer.id, direction: 1 }))}><ArrowDown /></IconButton>
     <IconButton label="Delete custom layer" disabled={!activeLayer} onClick={() => activeLayer && dispatch(removeCustomLayer(activeLayer.id))}><Trash2 /></IconButton>

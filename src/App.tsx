@@ -25,9 +25,10 @@ import { AppLayout } from './components/Layout';
 import { HomePage, ForecastPage, DiscussionPage, VerificationPage, MonitorPage, ComingSoonPage, AccountPage, PricingPage, UpdatesPage, AdminPage, BetaLandingPage, BetaInvitePage } from './pages';
 import CloudLibraryPage from './pages/CloudLibraryPage';
 import BetaAccessGuard from './components/Beta/BetaAccessGuard';
-import { GoogleAnalyticsRouteTracker } from './components/GoogleAnalyticsRouteTracker';
+import { ProductAnalyticsRouteTracker } from './components/ProductAnalyticsRouteTracker';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
+import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 
@@ -115,6 +116,10 @@ const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
   }, []);
 
   useEffect(() => {
+    if (privacyAccepted && !showComingSoon) initProductAnalytics();
+  }, [privacyAccepted, showComingSoon]);
+
+  useEffect(() => {
     if (showComingSoon) {
       return;
     }
@@ -131,7 +136,7 @@ const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
     return <PrivacyPolicyModal onAccept={handleAcceptPrivacyPolicy} />;
   }
 
-  return <AppHooks />;
+  return <><AppHooks /><ProductAnalyticsRouteTracker /></>;
 };
 
 interface AppRoutesProps {
@@ -191,7 +196,6 @@ interface AppContentProps {
 /** Renders the routed application inside the shared providers. */
 const AppContent: React.FC<AppContentProps> = ({ showComingSoon }) => (
   <BrowserRouter>
-    <GoogleAnalyticsRouteTracker />
     <AgreementGate showComingSoon={showComingSoon} />
     <AppRoutes showComingSoon={showComingSoon} />
   </BrowserRouter>

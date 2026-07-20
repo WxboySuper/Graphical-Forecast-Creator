@@ -134,6 +134,31 @@
   color: var(--text-primary);
 }
 
+.privacy-analytics-preference {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0.9rem;
+  margin: 0.75rem 0 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.45rem;
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.privacy-analytics-preference span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.privacy-analytics-preference:hover {
+  border-color: var(--accent-color);
+}
+
 .privacy-modal-footer {
   padding: 16px 24px;
   border-top: 1px solid var(--border-color);

@@ -16,14 +16,8 @@ const getServerPort = (server) => {
 /** @returns {Promise<import('node:http').Server>} */
 const startTestAnalyticsServer = async () => {
   const express = require('express');
-  const fs = require('node:fs');
-  const os = require('node:os');
-  const path = require('node:path');
-
-  const logFile = path.join(os.tmpdir(), `gfc-analytics-test-${process.pid}.log`);
-
   const app = express();
-  configureApp(app, express, fs, logFile);
+  configureApp(app, express);
 
   return new Promise((resolve, reject) => {
     const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
@@ -57,14 +51,10 @@ describe('analytics server stack (express 5)', () => {
     assert.equal(typeof body.capabilities, 'object');
   });
 
-  it('accepts POST /collect with express.json middleware', async () => {
+  it('does not expose the retired POST /collect telemetry endpoint', async () => {
     const server = await serverReady;
     const port = getServerPort(server);
-    const response = await fetch(`http://127.0.0.1:${port}/collect`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ page: '/forecast', referrer: '' }),
-    });
-    assert.equal(response.status, 204);
+    const response = await fetch(`http://127.0.0.1:${port}/collect`, { method: 'POST' });
+    assert.equal(response.status, 404);
   });
 });
