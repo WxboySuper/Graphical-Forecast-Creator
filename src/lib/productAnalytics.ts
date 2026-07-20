@@ -22,6 +22,7 @@ declare global {
 const eventSet = new Set<string>(PRODUCT_ANALYTICS_EVENTS);
 let initializedZone: 'production' | 'beta' | null = null;
 let pendingPagePath: string | null = null;
+let pendingEvents: Array<{ event: ProductAnalyticsEvent; properties?: ProductAnalyticsProperties }> = [];
 
 const WORKFLOW_DIMENSION_VALUES: Record<string, readonly string[]> = {
   dayGrouping: ['day1', 'day2', 'day3', 'day4-8', 'full-cycle'],
@@ -95,6 +96,26 @@ const getWebsiteId = (zone: 'production' | 'beta'): string => {
 const getUmamiHost = (): string =>
   (typeof __GFC_UMAMI_HOST__ === 'string' ? __GFC_UMAMI_HOST__ : '').trim().replace(/\/$/, '');
 
+const trackSafely = (event: string, properties?: ProductAnalyticsProperties): boolean => {
+  try {
+    if (!window.umami) return false;
+    window.umami.track(event, properties);
+    return true;
+  } catch { return false; }
+};
+
+const flushPendingTelemetry = (): void => {
+  if (pendingPagePath) trackSafely('page_view', { path: pendingPagePath });
+  pendingPagePath = null;
+  const queuedEvents = pendingEvents;
+  pendingEvents = [];
+  queuedEvents.forEach(({ event, properties }) => trackSafely(event, properties));
+};
+
+const queueProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): void => {
+  pendingEvents.push({ event, properties });
+};
+
 /** Loads Umami only for the matching hosted zone and only after the user has not opted out. */
 export const initProductAnalytics = (hostname?: string): void => {
   if (typeof window === 'undefined' || typeof document === 'undefined' || !isProductAnalyticsEnabled()) return;
@@ -113,15 +134,9 @@ export const initProductAnalytics = (hostname?: string): void => {
   script.dataset.doNotTrack = 'true';
   script.dataset.gfcUmami = 'true';
   script.addEventListener('load', () => {
-    if (!pendingPagePath || !isProductAnalyticsEnabled()) return;
-    try {
-      window.umami?.track('page_view', { path: pendingPagePath });
-    } catch {
-      // Analytics is deliberately best effort.
-    } finally {
-      pendingPagePath = null;
-    }
+    if (isProductAnalyticsEnabled()) flushPendingTelemetry();
   });
+  script.addEventListener('error', () => { initializedZone = null; });
   document.head.appendChild(script);
 };
 
@@ -130,30 +145,19 @@ export const trackProductPageView = (pathname?: string, hostname?: string): void
   if (!isProductAnalyticsEnabled() || !getProductAnalyticsZone(hostname)) return;
   const path = (pathname ?? window.location.pathname).split(/[?#]/, 1)[0];
   initProductAnalytics(hostname);
-  try {
-    if (!window.umami) {
-      pendingPagePath = path;
-      return;
-    }
-    window.umami.track('page_view', { path });
-  } catch {
-    // Analytics is deliberately best effort.
-  }
+  if (!trackSafely('page_view', { path })) pendingPagePath = path;
 };
 
 /** Sends only registry-backed, coarse event properties. */
 export const trackProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): void => {
   if (!eventSet.has(event) || !hasAllowedProperties(event, properties) || !isProductAnalyticsEnabled() || !getProductAnalyticsZone()) return;
   initProductAnalytics();
-  try {
-    window.umami?.track(event, properties);
-  } catch {
-    // Analytics is deliberately best effort.
-  }
+  if (!trackSafely(event, properties)) queueProductEvent(event, properties);
 };
 
 export const resetProductAnalyticsForTests = (): void => {
   initializedZone = null;
   pendingPagePath = null;
+  pendingEvents = [];
   document.querySelectorAll('script[data-gfc-umami="true"]').forEach((script) => script.remove());
 };
