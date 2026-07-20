@@ -39,6 +39,12 @@ jest.mock('../DrawingTools/useExportMap', () => ({
     cancelExport: jest.fn(),
   }),
 }));
+jest.mock('../../auth/AuthProvider', () => ({
+  useAuth: () => ({ user: null }),
+}));
+jest.mock('../../billing/EntitlementProvider', () => ({
+  useEntitlement: () => ({ premiumActive: false }),
+}));
 
 const mockAddToast = jest.fn();
 
