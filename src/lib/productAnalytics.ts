@@ -85,10 +85,15 @@ export const setProductAnalyticsEnabled = (enabled: boolean): void => {
   }
 };
 
-const getWebsiteId = (zone: 'production' | 'beta'): string =>
-  (zone === 'production' ? __GFC_UMAMI_PRODUCTION_WEBSITE_ID__ : __GFC_UMAMI_BETA_WEBSITE_ID__).trim();
+const getWebsiteId = (zone: 'production' | 'beta'): string => {
+  const websiteId = zone === 'production'
+    ? (typeof __GFC_UMAMI_PRODUCTION_WEBSITE_ID__ === 'string' ? __GFC_UMAMI_PRODUCTION_WEBSITE_ID__ : '')
+    : (typeof __GFC_UMAMI_BETA_WEBSITE_ID__ === 'string' ? __GFC_UMAMI_BETA_WEBSITE_ID__ : '');
+  return websiteId.trim();
+};
 
-const getUmamiHost = (): string => __GFC_UMAMI_HOST__.trim().replace(/\/$/, '');
+const getUmamiHost = (): string =>
+  (typeof __GFC_UMAMI_HOST__ === 'string' ? __GFC_UMAMI_HOST__ : '').trim().replace(/\/$/, '');
 
 /** Loads Umami only for the matching hosted zone and only after the user has not opted out. */
 export const initProductAnalytics = (hostname?: string): void => {
