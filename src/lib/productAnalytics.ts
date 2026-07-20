@@ -116,28 +116,34 @@ const queueProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAna
   pendingEvents.push({ event, properties });
 };
 
-/** Loads Umami only for the matching hosted zone and only after the user has not opted out. */
-export const initProductAnalytics = (hostname?: string): void => {
-  if (typeof window === 'undefined' || typeof document === 'undefined' || !isProductAnalyticsEnabled()) return;
-  const zone = getProductAnalyticsZone(hostname);
-  const websiteId = zone ? getWebsiteId(zone) : '';
-  const host = getUmamiHost();
-  if (!zone || !websiteId || !host || initializedZone === zone) return;
-
-  initializedZone = zone;
+const createTrackerScript = (host: string, websiteId: string): HTMLScriptElement => {
   const script = document.createElement('script');
   script.defer = true;
-  script.src = host + '/script.js';
+  script.src = `${host}/script.js`;
   script.dataset.websiteId = websiteId;
   script.dataset.hostUrl = host;
   script.dataset.autoTrack = 'false';
   script.dataset.doNotTrack = 'true';
   script.dataset.gfcUmami = 'true';
-  script.addEventListener('load', () => {
-    if (isProductAnalyticsEnabled()) flushPendingTelemetry();
-  });
+  script.addEventListener('load', () => { if (isProductAnalyticsEnabled()) flushPendingTelemetry(); });
   script.addEventListener('error', () => { initializedZone = null; });
-  document.head.appendChild(script);
+  return script;
+};
+
+const getTrackerConfiguration = (hostname?: string): { zone: 'production' | 'beta'; host: string; websiteId: string } | null => {
+  const zone = getProductAnalyticsZone(hostname);
+  const host = getUmamiHost();
+  const websiteId = zone ? getWebsiteId(zone) : '';
+  return zone && host && websiteId ? { zone, host, websiteId } : null;
+};
+
+/** Loads Umami only for the matching hosted zone and only after the user has not opted out. */
+export const initProductAnalytics = (hostname?: string): void => {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !isProductAnalyticsEnabled()) return;
+  const config = getTrackerConfiguration(hostname);
+  if (!config || initializedZone === config.zone) return;
+  initializedZone = config.zone;
+  document.head.appendChild(createTrackerScript(config.host, config.websiteId));
 };
 
 /** Tracks a route without query/hash values, which can contain user-provided data. */
