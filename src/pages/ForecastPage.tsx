@@ -67,7 +67,16 @@ import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils
 import { trackProductEvent } from '../lib/productAnalytics';
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
 
-export { hasAnyModifierKey, isTypingTarget };
+export {
+  hasAnyModifierKey,
+  isTypingTarget,
+  clearStoredRolloverPrompt,
+  getRolloverStorageKey,
+  readStoredDayValue,
+  readStoredRolloverPrompt,
+  writeStoredDayValue,
+  writeStoredRolloverPrompt,
+};
 import { queueProductMetric } from '../utils/productMetrics';
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
 import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
@@ -78,15 +87,6 @@ import {
   type ForecastUiVariant,
 } from '../utils/forecastUiVariant';
 import './ForecastPage.css';
-
-export {
-  clearStoredRolloverPrompt,
-  getRolloverStorageKey,
-  readStoredDayValue,
-  readStoredRolloverPrompt,
-  writeStoredDayValue,
-  writeStoredRolloverPrompt,
-};
 
 interface PageContext {
   addToast: AddToastFn;
