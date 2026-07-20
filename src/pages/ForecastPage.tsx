@@ -88,9 +88,7 @@ import {
 } from '../utils/forecastUiVariant';
 import './ForecastPage.css';
 
-interface PageContext {
-  addToast: AddToastFn;
-}
+interface PageContext { addToast: AddToastFn; }
 
 const renderForecastWorkspaceLayout = (
   variant: ForecastUiVariant,
