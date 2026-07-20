@@ -14,7 +14,6 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 - Dependency: @sentry/react ^10.65.0 → ^10.67.0
 - Dependency: immer ^11.1.11 → ^11.1.15
 - Dependency: lucide-react ^1.24.0 → ^1.25.0
-- Dependency: typescript ^6.0.3 → ^7.0.2
 - Dependency: @tailwindcss/postcss ^4.3.2 → ^4.3.3
 - Dependency: autoprefixer ^10.5.2 → ^10.5.4
 - Dependency: tailwindcss ^4.3.2 → ^4.3.3
