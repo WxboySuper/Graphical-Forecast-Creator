@@ -28,22 +28,20 @@ describe('buildFeatureGatedRoutes', () => {
     jest.restoreAllMocks();
   });
 
-  test('does not register gated routes while every feature remains disabled', () => {
+  test('registers only the beta-enabled custom products route while other gated routes remain disabled', () => {
     runWithBuildTarget('beta', () => {
       assertGatedRoutesAbsent('tropicalWorkspace', ['beta']);
       assertGatedRoutesAbsent('collaborationRoom', ['beta']);
-      expect(getExposedGatedRoutePaths('beta')).toEqual([]);
-      expect(buildFeatureGatedRoutes('beta')).toEqual([]);
+      expect(getExposedGatedRoutePaths('beta')).toEqual(['/custom-products']);
     });
   });
 
-  test('registers custom products only on the local target', async () => {
-    expect(getExposedGatedRoutePaths('local')).toContain('/custom-products');
-    expect(getExposedGatedRoutePaths('beta')).not.toContain('/custom-products');
+  test.each(['local', 'beta'] as const)('registers custom products on the %s target', async (target) => {
+    expect(getExposedGatedRoutePaths(target)).toContain('/custom-products');
 
     render(
       <MemoryRouter initialEntries={['/custom-products']}>
-        <Routes>{buildFeatureGatedRoutes('local')}</Routes>
+        <Routes>{buildFeatureGatedRoutes(target)}</Routes>
       </MemoryRouter>
     );
 
