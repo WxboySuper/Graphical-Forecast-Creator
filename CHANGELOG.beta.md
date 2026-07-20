@@ -38,6 +38,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Add reusable custom product creation, editing, lifecycle management, and snapshot-based use in local forecasts.
 
+### PR #757
+
+- Keep custom layer and category picker popovers above forecast safety and status overlays.
+
 ### PR #743
 
 - Add local-only custom forecast layers with category styling, polygon drawing, map legend support, and regression coverage while hosted environments remain unchanged.
