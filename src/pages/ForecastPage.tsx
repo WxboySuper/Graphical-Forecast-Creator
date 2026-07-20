@@ -64,7 +64,6 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
-import { trackProductEvent } from '../lib/productAnalytics';
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
@@ -1053,7 +1052,6 @@ export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapV
   try {
     const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true });
     if (!success) return false;
-    trackProductEvent('cloud_save_completed');
     clearCurrent();
     dispatch(resetForecasts());
     return true;
@@ -1283,7 +1281,6 @@ const useCloudForecastActions = ({
       }
 
       markCurrentStateSynced();
-      trackProductEvent('cloud_save_completed');
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
     [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
