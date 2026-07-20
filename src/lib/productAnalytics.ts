@@ -38,17 +38,17 @@ const WORKFLOW_EVENTS = new Set<ProductAnalyticsEvent>([
   'workflow_complete', 'workflow_complete_with_omissions', 'forecast_exported', 'workflow_rollover_action',
 ]);
 
+const hasAllowedWorkflowProperties = (properties: ProductAnalyticsProperties): boolean =>
+  Object.entries(properties).every(([key, value]) => typeof value === 'string' && WORKFLOW_DIMENSION_VALUES[key]?.includes(value));
+
+const hasAllowedCustomLayerProperties = (properties: ProductAnalyticsProperties): boolean =>
+  Object.keys(properties).length === 1 && Number.isInteger(properties.layer_count) && properties.layer_count >= 1 && properties.layer_count <= 50;
+
 /** Keeps event payloads coarse and prevents future callers from attaching user-created data by accident. */
 const hasAllowedProperties = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): boolean => {
   if (!properties) return true;
-  const entries = Object.entries(properties);
-  if (WORKFLOW_EVENTS.has(event)) {
-    return entries.every(([key, value]) => typeof value === 'string' && WORKFLOW_DIMENSION_VALUES[key]?.includes(value));
-  }
-  if (event === 'custom_layer_created') {
-    return entries.length === 1 && Number.isInteger(properties.layer_count) && properties.layer_count >= 1 && properties.layer_count <= 50;
-  }
-  return entries.length === 0;
+  if (WORKFLOW_EVENTS.has(event)) return hasAllowedWorkflowProperties(properties);
+  return event === 'custom_layer_created' ? hasAllowedCustomLayerProperties(properties) : Object.keys(properties).length === 0;
 };
 
 /** Returns the privacy-isolated Umami website zone for a public GFC hostname. */
