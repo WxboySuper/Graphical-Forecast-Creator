@@ -4,10 +4,6 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### PR #756
-
-- Match exported forecast JPEG bounds to the OpenLayers viewport to remove unused white space below the map.
-
 ### PR #751
 
 - Refine the local-only Saved products experience with a responsive library layout, a respectful free-user Premium path, and a simple local-preview tester checklist.
@@ -27,6 +23,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 ### PR #745
 
 - Secure reusable custom products with owner-scoped Firestore rules, premium enforcement, and hostile-client coverage.
+
+### PR #756
+
+- Match exported forecast JPEG bounds to the OpenLayers viewport to remove unused white space below the map.
 
 ### PR #750
 
