@@ -46,6 +46,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Add local-only custom forecast layers with category styling, polygon drawing, map legend support, and regression coverage while hosted environments remain unchanged.
 
+### PR #755
+
+- Repair custom diagonal, reverse-diagonal, and crosshatch map fills so their repeated canvas tiles align cleanly.
+
 ### PR #745
 
 - Secure reusable custom products with owner-scoped Firestore rules, premium enforcement, and hostile-client coverage.
