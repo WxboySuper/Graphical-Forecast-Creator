@@ -435,11 +435,14 @@ export const createCustomFill = (style: CustomCategoryStyle): Fill => {
   const line = (x1: number, y1: number, x2: number, y2: number) => {
     context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
   };
+  // Each line continues exactly at the opposite edge of the 12px tile. Keeping
+  // the adjacent off-tile segments prevents gaps where a repeated CanvasPattern
+  // joins, including when both directions are combined for crosshatch.
   if (style.hatch === "diagonal" || style.hatch === "crosshatch") {
-    line(-2, 10, 10, -2); line(2, 14, 14, 2);
+    line(-12, 12, 0, 0); line(0, 12, 12, 0); line(12, 12, 24, 0);
   }
   if (style.hatch === "reverse-diagonal" || style.hatch === "crosshatch") {
-    line(-2, 2, 10, 14); line(2, -2, 14, 10);
+    line(-12, 0, 0, 12); line(0, 0, 12, 12); line(12, 0, 24, 12);
   }
   const pattern = context.createPattern(canvas, "repeat");
   return new Fill({ color: pattern ?? toRgbaColor({ color: style.fillColor, alpha: style.fillOpacity }) });

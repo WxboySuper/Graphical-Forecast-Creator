@@ -37,6 +37,7 @@ import {
   removeDrawInteraction,
   getCustomFeatureIdentity,
   toUpdatedCustomFeature,
+  createCustomFill,
   toCustomOlStyle,
 } from './OpenLayersForecastMap';
 
@@ -200,6 +201,31 @@ describe('OpenLayersForecastMap helpers', () => {
     expect(style.getFill()?.getColor()).toBe('rgba(59, 130, 246, 0.45)');
     expect(style.getStroke()?.getColor()).toBe('rgba(255, 255, 255, 0.9)');
     expect(style.getZIndex()).toBe(704);
+  });
+
+  test.each([
+    ['diagonal', [[-12, 12, 0, 0], [0, 12, 12, 0], [12, 12, 24, 0]]],
+    ['reverse-diagonal', [[-12, 0, 0, 12], [0, 0, 12, 12], [12, 0, 24, 12]]],
+    ['crosshatch', [[-12, 12, 0, 0], [0, 12, 12, 0], [12, 12, 24, 0], [-12, 0, 0, 12], [0, 0, 12, 12], [12, 0, 24, 12]]],
+  ] as const)('custom %s hatch lines continue at every repeated tile edge', (hatch, expectedLines) => {
+    const calls: number[][] = [];
+    document.createElement = ((tag: string) => {
+      if (tag !== 'canvas') return originalCreateElement.call(document, tag);
+      const context = {
+        fillStyle: '', strokeStyle: '', lineWidth: 0,
+        fillRect: jest.fn(),
+        beginPath: jest.fn(),
+        moveTo: jest.fn((x: number, y: number) => calls.push([x, y])),
+        lineTo: jest.fn((x: number, y: number) => calls[calls.length - 1].push(x, y)),
+        stroke: jest.fn(),
+        createPattern: jest.fn(() => 'custom-pattern'),
+      };
+      return { width: 0, height: 0, getContext: () => context } as unknown as HTMLElement;
+    }) as typeof document.createElement;
+
+    createCustomFill({ fillColor: '#3b82f6', fillOpacity: .45, strokeColor: '#ffffff', strokeOpacity: .9, strokeWidth: 2, hatch });
+
+    expect(calls).toEqual(expectedLines);
   });
 
   test('toOlStyle transparencyScale reduces fill and stroke alpha', () => {
