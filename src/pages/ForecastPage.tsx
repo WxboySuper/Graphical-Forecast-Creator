@@ -67,16 +67,7 @@ import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils
 import { trackProductEvent } from '../lib/productAnalytics';
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
 
-export {
-  hasAnyModifierKey,
-  isTypingTarget,
-  clearStoredRolloverPrompt,
-  getRolloverStorageKey,
-  readStoredDayValue,
-  readStoredRolloverPrompt,
-  writeStoredDayValue,
-  writeStoredRolloverPrompt,
-};
+export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { queueProductMetric } from '../utils/productMetrics';
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
 import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
