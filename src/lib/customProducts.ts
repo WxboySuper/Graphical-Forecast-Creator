@@ -65,21 +65,21 @@ const hasValidChronology = (createdAt: unknown, updatedAt: unknown): boolean =>
 /** Combines field-level checks without a compound validator conditional. */
 const areAllValid = (checks: readonly boolean[]): boolean => checks.every(Boolean);
 
+/** Validates the bounded feature-array portion of a one-off layer. */
+const hasValidFeatureCount = (features: unknown): boolean =>
+  Array.isArray(features) && features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer;
+
 /** Validates the scalar, category, snapshot, and timestamp fields on a one-off layer. */
-const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => {
-  const features = value.features;
-  return areAllValid([
+const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => areAllValid([
   value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
   isBoundedText(value.id),
   isBoundedText(value.label),
   isNonNegativeInteger(value.order),
   isCustomCategoryList(value.categories),
-  Array.isArray(features),
-  Array.isArray(features) && features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer,
+  hasValidFeatureCount(value.features),
   hasValidChronology(value.createdAt, value.updatedAt),
   value.productSnapshot === undefined || isEmbeddedCustomProductSnapshot(value.productSnapshot),
-  ]);
-};
+]);
 
 /** Validates a complete self-contained one-off layer. */
 export const isOneOffCustomLayer = (value: unknown): value is OneOffCustomLayer => {

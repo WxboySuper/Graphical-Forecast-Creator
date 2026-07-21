@@ -115,27 +115,35 @@ function evaluateObject(expression, constants, resolving) {
   return value;
 }
 
+/** Evaluates one supported array without allowing executable spreads. */
+function evaluateArray(expression, constants, resolving) {
+  return expression.elements.map((element) => {
+    if (!element || element.type === 'SpreadElement') {
+      throw new Error(`Unsupported array element: ${nodeText(element)}`);
+    }
+    return evaluateLiteral(element, constants, resolving);
+  });
+}
+
+const LITERAL_READERS = {
+  StringLiteral: (expression) => expression.value,
+  NumericLiteral: (expression) => expression.value,
+  BooleanLiteral: (expression) => expression.value,
+  NullLiteral: () => null,
+  UnaryExpression: evaluateSignedNumber,
+  ArrowFunctionExpression: () => undefined,
+  FunctionExpression: () => undefined,
+  Identifier: evaluateIdentifier,
+  ArrayExpression: evaluateArray,
+  ObjectExpression: evaluateObject,
+};
+
 /** Safely evaluates the limited literal syntax used by policy configuration. */
 function evaluateLiteral(node, constants, resolving = new Set()) {
   const expression = unwrapExpression(node);
-  switch (expression.type) {
-    case 'StringLiteral': return expression.value;
-    case 'NumericLiteral': return expression.value;
-    case 'BooleanLiteral': return expression.value;
-    case 'NullLiteral': return null;
-    case 'UnaryExpression': return evaluateSignedNumber(expression);
-    case 'ArrowFunctionExpression':
-    case 'FunctionExpression': return undefined;
-    case 'Identifier': return evaluateIdentifier(expression, constants, resolving);
-    case 'ArrayExpression': return expression.elements.map((element) => {
-      if (!element || element.type === 'SpreadElement') {
-        throw new Error(`Unsupported array element: ${nodeText(element)}`);
-      }
-      return evaluateLiteral(element, constants, resolving);
-    });
-    case 'ObjectExpression': return evaluateObject(expression, constants, resolving);
-    default: throw new Error(`Unsupported non-literal expression: ${nodeText(expression)}`);
-  }
+  const reader = LITERAL_READERS[expression.type];
+  if (!reader) throw new Error(`Unsupported non-literal expression: ${nodeText(expression)}`);
+  return reader(expression, constants, resolving);
 }
 
 /** Extracts and safely evaluates a named top-level constant. */

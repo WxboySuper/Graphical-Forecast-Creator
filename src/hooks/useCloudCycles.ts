@@ -330,7 +330,7 @@ function useCloudSaveCycle({
         setError(getCloudWriteBlockedMessage({ userId, canWrite, localFixtureActive }));
         return false;
       }
-      if (!userId) return false;
+      const authenticatedUserId = userId as string;
 
       setError(null);
       if (currentCloudRef.current) {
@@ -338,7 +338,7 @@ function useCloudSaveCycle({
       }
 
       const result = await saveCloudCycle({
-        userId,
+        userId: authenticatedUserId,
         label,
         cycleDate,
         stats,
