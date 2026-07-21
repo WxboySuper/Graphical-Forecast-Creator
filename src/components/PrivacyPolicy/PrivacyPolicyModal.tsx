@@ -4,7 +4,7 @@ import { isProductAnalyticsEnabled, setProductAnalyticsEnabled } from '../../lib
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.6.0';
+const PRIVACY_POLICY_VERSION = '1.7.0';
 const PRIVACY_POLICY_LAST_UPDATED = 'July 21, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
@@ -31,6 +31,10 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
   '1.6.0': [
     'Non-essential product analytics are now disabled by default and require a separate, optional opt-in.',
     'You can withdraw that telemetry permission at any time without affecting access to GFC.',
+  ],
+  '1.7.0': [
+    'We minimized new product-analytics location collection and documented how to request access or deletion help for pseudonymous telemetry.',
+    'We clarified that a fixed event-level telemetry retention period is still an unresolved operational decision.',
   ],
 };
 
@@ -130,8 +134,8 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       <div>
         <h3 id="privacy-analytics-choice-title">Optional product analytics</h3>
         <p>
-          Help us understand which parts of GFC are useful. This is disabled by default, never affects access to GFC,
-          and can be changed here at any time.
+          Help us understand which parts of GFC are useful. This is disabled by default and is a separate choice from
+          accepting this Privacy Policy. It never affects access to GFC and can be changed here at any time.
         </p>
       </div>
       <ProductAnalyticsPreference />
@@ -176,8 +180,10 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       analytics on the production and beta deployments in separate reporting zones. It uses a pseudonymous
       visitor/session identifier to group activity from the same browser without attaching it to your GFC account. We
       collect page views, selected milestone events such as completed exports, cloud-save outcomes, workflow outcomes,
-      and custom-layer creation, plus coarse technical information (browser, operating system, device type, and time)
-      and IP-derived approximate location (country, region, and city). <strong>We do not use account identity,
+      and custom-layer creation, plus route/page activity, timestamps, and coarse technical information (browser,
+      operating system, and device type). The Umami service can derive approximate location from an IP address, but GFC
+      currently removes visitor IP addresses before they reach Umami, so new GFC telemetry does not include country,
+      region, or city. <strong>We do not use account identity,
       Firebase UID, email address, forecast contents, coordinates, layer text, filenames, or export contents for
       product analytics.</strong>
     </p>
@@ -192,8 +198,11 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       preference at the top of this policy; choosing not to enable them does not affect access to GFC. You can withdraw that permission at
       any time from the same control. When disabled, GFC does not load the Umami tracker or send product-analytics
       events. Analytics are hosted by GFC on our VPS and are not used for advertising, cross-site tracking, or sale of
-      personal data. Event-level telemetry is retained only for product operations and may be deleted during routine
-      maintenance; aggregate metrics may be retained longer.
+      personal data. Beta and production are separate analytics zones. Because this telemetry is not linked to a
+      Firebase account, Firebase account deletion does not identify a matching telemetry record. A fixed event-level
+      telemetry retention period has not yet been adopted; we will publish and implement one before representing a
+      fixed deletion schedule. For a telemetry access or deletion request, or any privacy question, contact us at the
+      address in section 9 with the approximate date, browser/device, and route or event details you want us to locate.
     </p>
     <p>
       On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture

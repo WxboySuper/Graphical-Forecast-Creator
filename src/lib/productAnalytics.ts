@@ -137,6 +137,8 @@ const createTrackerScript = ({ host, websiteId }: TrackerConfiguration): HTMLScr
   script.dataset.hostUrl = host;
   script.dataset.autoTrack = 'false';
   script.dataset.doNotTrack = 'true';
+  script.dataset.excludeSearch = 'true';
+  script.dataset.excludeHash = 'true';
   script.dataset.gfcUmami = 'true';
   script.addEventListener('load', () => { if (isProductAnalyticsEnabled()) flushPendingTelemetry(); });
   script.addEventListener('error', () => { initializedZone = null; });

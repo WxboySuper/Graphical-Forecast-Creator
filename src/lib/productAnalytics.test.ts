@@ -38,6 +38,18 @@ test('does not load a tracker until the visitor explicitly enables analytics', (
   expect(isProductAnalyticsEnabled()).toBe(false);
 });
 
+test('loads a privacy-minimized tracker only after explicit opt-in', () => {
+  setProductAnalyticsEnabled(true);
+  initProductAnalytics('gfc.weatherboysuper.com');
+
+  const script = document.querySelector<HTMLScriptElement>('script[data-gfc-umami="true"]');
+  expect(script).not.toBeNull();
+  expect(script?.dataset.autoTrack).toBe('false');
+  expect(script?.dataset.doNotTrack).toBe('true');
+  expect(script?.dataset.excludeSearch).toBe('true');
+  expect(script?.dataset.excludeHash).toBe('true');
+});
+
 test('preserves a prior explicit workflow opt-in until the unified preference is set', () => {
   localStorage.setItem('gfc-workflow-analytics-enabled', 'true');
   expect(isProductAnalyticsEnabled()).toBe(true);
@@ -68,7 +80,7 @@ test('flushes a queued route as a native Umami page view after the tracker loads
   expect(track).not.toHaveBeenCalledWith('page_view', expect.anything());
 });
 
-test('discards queued events when analytics is explicitly disabled', () => {
+test('withdrawal removes the tracker and discards queued telemetry', () => {
   setProductAnalyticsEnabled(true);
   initProductAnalytics('gfc.weatherboysuper.com');
   trackProductEvent('cloud_save_completed');
