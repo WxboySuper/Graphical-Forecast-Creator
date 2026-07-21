@@ -32,7 +32,11 @@ const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNe
     ]);
 
     if (eventSnapshot.exists) {
-      return { applied: false, reason: 'duplicate' };
+      return {
+        applied: false,
+        reason: 'duplicate',
+        priorOutcome: eventSnapshot.data()?.outcome || 'unknown',
+      };
     }
 
     const existingData = entitlementSnapshot.exists ? entitlementSnapshot.data() || {} : {};

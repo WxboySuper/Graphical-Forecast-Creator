@@ -56,6 +56,7 @@ describe('applyEntitlementWebhookEvent', () => {
     const results = await Promise.all([applyStatus(db, event, 'active'), applyStatus(db, event, 'past_due')]);
 
     assert.deepEqual(results.map((result) => result.reason).sort(), ['applied', 'duplicate']);
+    assert.equal(results.find((result) => result.reason === 'duplicate').priorOutcome, 'applied');
     assert.equal(db.documents.get('userEntitlements/user-1').billingStatus, 'active');
     assert.equal(db.documents.get('processedStripeWebhookEvents/evt_once').outcome, 'applied');
   });

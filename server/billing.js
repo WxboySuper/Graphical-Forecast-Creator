@@ -377,17 +377,22 @@ const createSubscriptionEntitlementWrite = (subscription) => {
   };
 };
 
-/** Applies the checkout-complete event to the entitlement document. */
-const recordBillingMetricEventSafely = async (eventType, webhookEventId) => {
+/** Records billing metrics while preserving webhook retry behavior on a transient failure. */
+const recordBillingMetricEventWithLogging = async (eventType, webhookEventId) => {
   try {
     await recordBillingMetricEvent(eventType, webhookEventId);
   } catch (error) {
-    console.warn('[billing] metrics:nonfatal', {
+    console.error('[billing] metrics:error', {
       eventType,
       error: error instanceof Error ? error.message : 'Unknown billing metrics failure',
     });
+    throw error;
   }
 };
+
+/** True when an applied event, including its retry, is allowed to affect business metrics. */
+const shouldRecordBillingMetric = (result) =>
+  Boolean(result?.applied || (result?.reason === 'duplicate' && result?.priorOutcome === 'applied'));
 
 /** Applies the checkout-complete event to the entitlement document. */
 const getInvoiceSubscription = (invoice) =>
@@ -411,10 +416,20 @@ const resolveAuthoritativeSubscription = async (stripe, event) => {
   if (!subscription) {
     return null;
   }
-  if (typeof subscription === 'object') {
-    return subscription;
+  const subscriptionId = typeof subscription === 'string' ? subscription : subscription.id;
+  if (!subscriptionId) {
+    return typeof subscription === 'object' ? subscription : null;
   }
-  return stripe.subscriptions.retrieve(subscription);
+
+  try {
+    return await stripe.subscriptions.retrieve(subscriptionId);
+  } catch (error) {
+    if (event.type === 'customer.subscription.deleted' && typeof subscription === 'object') {
+      console.warn('[billing] subscription:using-deleted-event-state', { eventId: event.id });
+      return subscription;
+    }
+    throw error;
+  }
 };
 
 /** Preserves the checkout UID if Stripe has not copied metadata onto the subscription yet. */
@@ -433,15 +448,18 @@ const handleCheckoutSessionCompleted = async (event, stripe) => {
   const entitlementWrite = subscription
     ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
     : createCheckoutEntitlementWrite(session);
-  await writeEntitlement(entitlementWrite, event);
-  await recordBillingMetricEventSafely('premium_upgrade', event.id);
+  const result = await writeEntitlement(entitlementWrite, event);
+  if (shouldRecordBillingMetric(result)) {
+    await recordBillingMetricEventWithLogging('premium_upgrade', event.id);
+  }
 };
 
 /** Applies the subscription lifecycle event to the entitlement document. */
-const handleSubscriptionEvent = async (event) => {
-  await writeEntitlement(createSubscriptionEntitlementWrite(event.data.object), event);
-  if (event.type === 'customer.subscription.deleted') {
-    await recordBillingMetricEventSafely('premium_cancellation', event.id);
+const handleSubscriptionEvent = async (event, stripe) => {
+  const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
+  if (event.type === 'customer.subscription.deleted' && shouldRecordBillingMetric(result)) {
+    await recordBillingMetricEventWithLogging('premium_cancellation', event.id);
   }
 };
 
