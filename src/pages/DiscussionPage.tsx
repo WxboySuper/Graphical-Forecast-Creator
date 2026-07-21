@@ -368,7 +368,7 @@ const useDiscussionEditorState = ({
   addToast,
   user,
   onSaved,
-}: DiscussionEditorStateOptions): DiscussionEditorState => {
+}: DiscussionEditorStateOptions) => {
   const form = useDiscussionFormState({
     existingDiscussion,
     defaultForecasterName,

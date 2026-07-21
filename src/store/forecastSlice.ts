@@ -489,7 +489,7 @@ const invalidateCompletionAcknowledgement = (state: ForecastState) => {
 
 interface ApplyRolloverArgs {
   sourceCycle: ForecastState['savedCycles'][number];
-  sourceDayData: ReturnType<typeof normalizeForecastCycle>['days'][DayType];
+  sourceDayData: NonNullable<ReturnType<typeof normalizeForecastCycle>['days'][DayType]>;
   sourceDayNumber: DayType;
   targetDay: DayType;
   targetDate: string;
@@ -1353,7 +1353,7 @@ export const forecastSlice = createSlice({
       // the currently selected day.
       const snapshotDays: typeof state.forecastCycle.days = {};
       let hasSnapshot = false;
-      (Object.entries(state.forecastCycle.days) as [DayType, typeof state.forecastCycle.days[DayType]][]).forEach(
+      (Object.entries(state.forecastCycle.days) as unknown as [DayType, typeof state.forecastCycle.days[DayType]][]).forEach(
         ([day, dayData]) => {
           if (!dayData) return;
           snapshotDays[day] = {

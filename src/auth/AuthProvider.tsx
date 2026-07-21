@@ -312,7 +312,7 @@ interface PersistHostedSettingsContext {
   monitorSettings: MonitorSettings;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<'synced' | 'syncing' | 'error'>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 

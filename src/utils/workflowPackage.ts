@@ -56,7 +56,8 @@ const restrictCycleMetadataToDays = (cycle: NonNullable<GFCForecastSaveData['for
         ? grouping.discussionDay
         : grouping.days.find((day) => allowedDays.has(day)),
     }))
-    .filter((grouping) => grouping.days.length > 0 && grouping.discussionDay !== undefined),
+    .filter((grouping): grouping is typeof grouping & { discussionDay: DayType } =>
+      grouping.days.length > 0 && grouping.discussionDay !== undefined),
   omittedDayReasons: cycle.omittedDayReasons
     ? Object.fromEntries(Object.entries(cycle.omittedDayReasons).filter(([day]) => allowedDays.has(Number(day) as DayType)))
     : undefined,

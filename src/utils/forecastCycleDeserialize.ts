@@ -35,7 +35,7 @@ const deserializeOutlookMap = <K extends string, V>(
   }
 
   const coerced = coerceOutlookProbabilityMap(value);
-  return coerced ?? new Map<K, V>();
+  return (coerced as Map<K, V> | null) ?? new Map<K, V>();
 };
 
 /** Rehydrates one saved outlook day from serialized forecast JSON. */

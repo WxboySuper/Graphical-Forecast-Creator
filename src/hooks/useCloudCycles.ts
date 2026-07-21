@@ -289,12 +289,12 @@ function canSaveCloudCycle({ userId, canWrite, localFixtureActive }: CloudAccess
 }
 
 /** Handles a failed cloud save and updates the active sync state. */
-function handleCloudSaveFailure({
+function handleCloudSaveFailure<T>({
   result,
   setError,
   updateSyncState,
 }: {
-  result: CloudOperationResult;
+  result: CloudOperationResult<T>;
   setError: Dispatch<SetStateAction<string | null>>;
   updateSyncState: (state: CloudSyncState, error?: string) => void;
 }): false {
@@ -330,6 +330,7 @@ function useCloudSaveCycle({
         setError(getCloudWriteBlockedMessage({ userId, canWrite, localFixtureActive }));
         return false;
       }
+      if (!userId) return false;
 
       setError(null);
       if (currentCloudRef.current) {
@@ -421,6 +422,7 @@ function useCloudLoadCycle({
 function useCloudDeleteCycle({
   userId,
   canWrite,
+  localFixtureActive,
   currentCloudRef,
   setCurrentCloud,
   setError,
@@ -428,6 +430,7 @@ function useCloudDeleteCycle({
   return useCloudCycleMutation<[string]>({
     userId,
     canWrite,
+    localFixtureActive,
     setError,
     fallbackError: 'Failed to delete cloud cycle',
     action: (cycleId) => {
@@ -447,6 +450,7 @@ function useCloudDeleteCycle({
 function useCloudRenameCycle({
   userId,
   canWrite,
+  localFixtureActive,
   currentCloudRef,
   setCurrentCloud,
   setError,
@@ -454,6 +458,7 @@ function useCloudRenameCycle({
   return useCloudCycleMutation<[string, string]>({
     userId,
     canWrite,
+    localFixtureActive,
     setError,
     fallbackError: 'Failed to rename cloud cycle',
     action: (cycleId, newLabel) => {

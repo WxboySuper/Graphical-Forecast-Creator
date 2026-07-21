@@ -203,7 +203,7 @@ describe('cycleHistoryPersistence', () => {
 
   test('setupCycleHistoryListener persists on store updates', async () => {
     const mod = await import('./cycleHistoryPersistence');
-    const spy = jest.spyOn(mod, 'saveCycleHistoryToStorage').mockImplementation(() => undefined);
+    const spy = jest.spyOn(Storage.prototype, 'setItem');
 
     const listeners: Array<() => void> = [];
     let state = { forecast: { savedCycles: [] as SavedCycle[] } };
@@ -227,7 +227,10 @@ describe('cycleHistoryPersistence', () => {
 
     state = { forecast: { savedCycles: [{ id: 'a', timestamp: 't', cycleDate: 'd', forecastCycle: {}, stats: {} }] } };
     listeners.forEach((cb) => cb());
-    expect(spy).toHaveBeenCalledWith(state.forecast.savedCycles);
+    expect(spy).toHaveBeenCalledWith(
+      'gfc-cycle-history',
+      expect.stringContaining('"id":"a"'),
+    );
 
     spy.mockClear();
     listeners.forEach((cb) => cb());

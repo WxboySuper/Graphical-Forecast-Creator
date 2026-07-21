@@ -38,7 +38,7 @@ const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): b
   Object.keys(value).every((key) => keys.includes(key));
 
 /** Validates trimmed non-empty text against a bounded length. */
-const isBoundedText = (value: unknown, max = CUSTOM_PRODUCT_LIMITS.labelLength): value is string =>
+const isBoundedText = (value: unknown, max: number = CUSTOM_PRODUCT_LIMITS.labelLength): value is string =>
   typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= max;
 
 /** Validates a canonical UTC ISO timestamp. */
@@ -66,17 +66,20 @@ const hasValidChronology = (createdAt: unknown, updatedAt: unknown): boolean =>
 const areAllValid = (checks: readonly boolean[]): boolean => checks.every(Boolean);
 
 /** Validates the scalar, category, snapshot, and timestamp fields on a one-off layer. */
-const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => areAllValid([
+const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => {
+  const features = value.features;
+  return areAllValid([
   value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
   isBoundedText(value.id),
   isBoundedText(value.label),
   isNonNegativeInteger(value.order),
   isCustomCategoryList(value.categories),
-  Array.isArray(value.features),
-  value.features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer,
+  Array.isArray(features),
+  Array.isArray(features) && features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer,
   hasValidChronology(value.createdAt, value.updatedAt),
   value.productSnapshot === undefined || isEmbeddedCustomProductSnapshot(value.productSnapshot),
-]);
+  ]);
+};
 
 /** Validates a complete self-contained one-off layer. */
 export const isOneOffCustomLayer = (value: unknown): value is OneOffCustomLayer => {

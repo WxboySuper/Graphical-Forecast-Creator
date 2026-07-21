@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react';
-import type { Event, EventHint } from '@sentry/react';
+import type { ErrorEvent, Event, EventHint } from '@sentry/react';
 import React from 'react';
 import {
   useLocation,
@@ -104,7 +104,7 @@ function isKnownBrowserNoise(event: Event): boolean {
 }
 
 /** Drops known no-stack browser noise while preserving actionable stacked errors. */
-export function beforeSend(event: Event, _hint: EventHint): Event | null {
+export function beforeSend(event: ErrorEvent, _hint: EventHint): ErrorEvent | null {
   return isKnownBrowserNoise(event) ? null : event;
 }
 

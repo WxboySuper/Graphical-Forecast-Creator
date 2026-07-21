@@ -246,7 +246,7 @@ const getCompatibleWorkflowMetadata = (workflowMetadata: unknown, cycleDate: str
   if (!isPlainObject(workflowMetadata)) return undefined;
   if (workflowMetadata.cycleDate !== cycleDate) return undefined;
 
-  const bounded = boundWorkflowMetadataForPersistence(workflowMetadata as CycleMetadata);
+  const bounded = boundWorkflowMetadataForPersistence(workflowMetadata as unknown as CycleMetadata);
   return isValidWorkflowMetadata(bounded) ? bounded : undefined;
 };
 
