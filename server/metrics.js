@@ -591,12 +591,20 @@ const recordMetricEvent = async ({ eventType, installationId, uid }) => {
 const normalizeBillingWebhookEventId = (value) =>
   typeof value === 'string' && value.trim() ? value.trim().slice(0, 256) : null;
 
+/** True when a trusted webhook provides all data needed for one billing metric write. */
+const hasBillingMetricWriteInput = ({ db, eventType, webhookEventId }) =>
+  [db, eventType, webhookEventId].every(Boolean);
+
 /** Records admin-only billing metric events once per trusted Stripe webhook event. */
 const recordBillingMetricEvent = async (eventType, webhookEventId) => {
   const normalizedEventType = normalizeBillingMetricEventType(eventType);
   const normalizedWebhookEventId = normalizeBillingWebhookEventId(webhookEventId);
   const db = getAdminDb();
-  if (!db || !normalizedEventType || !normalizedWebhookEventId) {
+  if (!hasBillingMetricWriteInput({
+    db,
+    eventType: normalizedEventType,
+    webhookEventId: normalizedWebhookEventId,
+  })) {
     return false;
   }
 
