@@ -143,6 +143,19 @@ describe('billing webhook state', () => {
     assert.equal(documents.get('processedStripeWebhookEvents/evt_delayed').outcome, 'stale');
   });
 
+  it('uses verified deletion state when Stripe no longer returns the subscription', async () => {
+    const stripe = { subscriptions: { retrieve: async () => { throw new Error('resource missing'); } } };
+    await __testing.handleWebhookEvent({
+      id: 'evt_deleted_missing',
+      type: 'customer.subscription.deleted',
+      created: 350,
+      data: { object: subscription('canceled') },
+    }, stripe);
+
+    assert.equal(documents.get('userEntitlements/user-1').billingStatus, 'canceled');
+    assert.equal(documents.get('userEntitlements/user-1').lastStripeEventId, 'evt_deleted_missing');
+  });
+
   it('applies a replayed event id once', async () => {
     const stripe = { subscriptions: { retrieve: async () => subscription('active') } };
     const event = {

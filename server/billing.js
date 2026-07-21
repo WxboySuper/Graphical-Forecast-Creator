@@ -411,25 +411,37 @@ const getWebhookSubscription = (event) => {
 };
 
 /** Retrieves current Stripe lifecycle state for convenience events such as invoices. */
-const resolveAuthoritativeSubscription = async (stripe, event) => {
-  const subscription = getWebhookSubscription(event);
-  if (!subscription) {
-    return null;
-  }
-  const subscriptionId = typeof subscription === 'string' ? subscription : subscription.id;
-  if (!subscriptionId) {
-    return typeof subscription === 'object' ? subscription : null;
-  }
+const getWebhookSubscriptionId = (subscription) =>
+  typeof subscription === 'string' ? subscription : subscription?.id || null;
 
+/** True when Stripe deletion state remains authoritative after the object is no longer retrievable. */
+const canUseDeletedEventState = (event, subscription) =>
+  [event.type === 'customer.subscription.deleted', typeof subscription === 'object'].every(Boolean);
+
+/** Retrieves current state and falls back only to a verified deletion event object. */
+const retrieveSubscriptionState = async (stripe, event, subscription, subscriptionId) => {
   try {
     return await stripe.subscriptions.retrieve(subscriptionId);
   } catch (error) {
-    if (event.type === 'customer.subscription.deleted' && typeof subscription === 'object') {
+    if (canUseDeletedEventState(event, subscription)) {
       console.warn('[billing] subscription:using-deleted-event-state', { eventId: event.id });
       return subscription;
     }
     throw error;
   }
+};
+
+/** Retrieves current Stripe lifecycle state for supported webhook events. */
+const resolveAuthoritativeSubscription = async (stripe, event) => {
+  const subscription = getWebhookSubscription(event);
+  if (!subscription) {
+    return null;
+  }
+  const subscriptionId = getWebhookSubscriptionId(subscription);
+  if (!subscriptionId) {
+    return typeof subscription === 'object' ? subscription : null;
+  }
+  return retrieveSubscriptionState(stripe, event, subscription, subscriptionId);
 };
 
 /** Preserves the checkout UID if Stripe has not copied metadata onto the subscription yet. */
