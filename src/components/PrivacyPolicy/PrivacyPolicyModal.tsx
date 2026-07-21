@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './PrivacyPolicyModal.css';
-import { isProductAnalyticsEnabled, setProductAnalyticsEnabled } from '../../lib/productAnalytics';
+import { isProductAnalyticsEnabled, setProductAnalyticsEnabled, trackProductPageView } from '../../lib/productAnalytics';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
@@ -110,6 +110,9 @@ const ProductAnalyticsPreference: React.FC = () => {
   const handleChange = () => {
     const nextEnabled = !enabled;
     setProductAnalyticsEnabled(nextEnabled);
+    // A consent action is the earliest permitted point to initialize analytics.
+    // Record the page the person explicitly chose from; nothing is injected or queued beforehand.
+    if (nextEnabled) trackProductPageView();
     setEnabled(nextEnabled);
   };
 
