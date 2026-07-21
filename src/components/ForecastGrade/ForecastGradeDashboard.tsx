@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Eye, EyeOff } from 'lucide-react';
 import VerificationMap, { type VerificationMapHandle } from '../Map/VerificationMap';
@@ -7,13 +7,17 @@ import { useCloudCycles } from '../../hooks/useCloudCycles';
 import { deserializeForecast } from '../../utils/fileUtils';
 import { setVisibility } from '../../store/stormReportsSlice';
 import type { RootState } from '../../store';
-import type { ProductKind } from '../../utils/verificationV2';
+import type { StormReport } from '../../types/stormReports';
+import type { ComponentKey, ProductKind } from '../../utils/verificationV2';
 import { availablePackageSources } from '../../utils/verificationV2/sources';
 import { useForecastGrade } from './useForecastGrade';
 import SourcePanel from './SourcePanel';
 import RunProgress from './RunProgress';
 import GradeHeadline from './GradeHeadline';
+import ScoreBreakdown from './ScoreBreakdown';
 import DataQualityPanel from './DataQualityPanel';
+import ReportTable from './ReportTable';
+import GradeTrendChart from './GradeTrendChart';
 import { formatGrade, letterColorClass } from './gradeFormat';
 import { METHODOLOGY_DOC_PATH } from './methodology';
 import './ForecastGradeDashboard.css';
@@ -63,14 +67,13 @@ const CloudSourcePicker: React.FC<{ onLoad: (id: string, label: string) => void 
 };
 
 /**
- * Forecast Grade dashboard shell (PR 06 — dashboard-shell).
+ * Forecast Grade result workspace (PR 07 — result-workspace).
  *
- * Map-first evidence surface with an equal-weight results dashboard on desktop
- * and a map-first compact overlay on mobile/landscape. Owns explicit source
- * selection, staged run progress, the learn-fast grade headline, and the data
- * quality gate. The detailed result workspace (breakdown, report table, trend,
- * share) is layered on top in later PRs. Only mounts when verificationRelaunch
- * is exposed; classic VerificationMode remains the default when the flag is off.
+ * Extends the shell with the full learn-fast result view: grade headline with
+ * per-product chips, the exactly-titled Score breakdown and Data quality
+ * sections, a selectable report table that mirrors map emphasis, a
+ * hazard-filterable history trend, and always-reachable hazard/day/evidence map
+ * controls. Selecting a product or component re-centers the map's active hazard.
  */
 const ForecastGradeDashboard: React.FC = () => {
   const { addToast } = useAppLayout();
@@ -78,12 +81,15 @@ const ForecastGradeDashboard: React.FC = () => {
   const grade = useForecastGrade(addToast);
   const { loadCycle } = useCloudCycles();
 
+  const [activeComponent, setActiveComponent] = useState<ComponentKey | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const mapRef = useRef<VerificationMapHandle>(null);
   const mapPaneRef = useRef<HTMLDivElement>(null);
   const cloudLoadSeqRef = useRef(0);
   const reportsVisible = useSelector((state: RootState) => state.stormReports.visible);
 
   const availableSources = availablePackageSources(grade.tier);
+  const activeProductGrade = grade.result?.products.find((product) => product.product === grade.activeProduct);
 
   const handleCloudLoad = useCallback(
     async (id: string, label: string) => {
@@ -105,6 +111,18 @@ const ForecastGradeDashboard: React.FC = () => {
     },
     [addToast, grade, loadCycle]
   );
+
+  const handleSelectProduct = useCallback(
+    (product: ProductKind) => {
+      grade.setActiveProduct(product);
+      setActiveComponent(null);
+    },
+    [grade]
+  );
+
+  const handleSelectReport = useCallback((report: StormReport | null) => {
+    setSelectedReportId(report?.id ?? null);
+  }, []);
 
   const showMap = Boolean(grade.forecast);
 
@@ -133,7 +151,7 @@ const ForecastGradeDashboard: React.FC = () => {
               />
               <MapControls
                 activeProduct={grade.activeProduct}
-                onSelectProduct={grade.setActiveProduct}
+                onSelectProduct={handleSelectProduct}
                 availableDays={grade.availableDays}
                 selectedDay={grade.selectedDay}
                 onSelectDay={grade.setSelectedDay}
@@ -190,9 +208,28 @@ const ForecastGradeDashboard: React.FC = () => {
               <GradeHeadline
                 pkg={grade.result}
                 activeProduct={grade.activeProduct}
-                onSelectProduct={grade.setActiveProduct}
+                onSelectProduct={handleSelectProduct}
               />
+              {activeProductGrade && (
+                <ScoreBreakdown
+                  product={activeProductGrade}
+                  activeComponent={activeComponent}
+                  onSelectComponent={setActiveComponent}
+                />
+              )}
               <DataQualityPanel pkg={grade.result} />
+              <ReportTable
+                reports={grade.reports}
+                product={grade.activeProduct}
+                selectedId={selectedReportId}
+                onSelect={handleSelectReport}
+              />
+            </div>
+          )}
+
+          {grade.tier !== 'signed-out' && (
+            <div className="mt-3">
+              <GradeTrendChart cards={grade.cards} />
             </div>
           )}
         </div>
