@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #766
+
+- Add the map-first Forecast Grade (Verification v2) dashboard and the pure `gfc-ver-1` grading engine behind the `verificationRelaunch` flag (local dogfood only; classic `/verification` stays the default when the flag is off). Includes SPC 25-mile neighborhood math, probability skill / spatial contingency / false-alarm / event-yield / severity components, capability-aware grade history, an anonymous grade-plus-map share card, and a public methodology page. Beta/staging/production remain disabled.
+
 ### PR #760
 
 - Restore native Umami page views for accurate traffic metrics, make non-essential telemetry an explicit opt-in, minimize tracker URL data, and clarify GFC's cookie-free pseudonymous telemetry disclosure.
