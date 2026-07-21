@@ -100,6 +100,12 @@ const withTstmRouteResponse = async ({
   }
 };
 
+/** Exercises one TSTM route and asserts only its HTTP status. */
+const assertTstmRouteStatus = (options, expectedStatus) =>
+  withTstmRouteResponse(options, async (response) => {
+    assert.equal(response.status, expectedStatus);
+  });
+
 describe('Auto-TSTM server foundation', () => {
   it('stays disabled unless registry exposure and deployment env are both enabled', () => {
     assert.equal(isTstmGenerationEnabled({}), false);
@@ -257,27 +263,23 @@ describe('GET /api/tstm/latest', () => {
   });
 
   it('returns 400 for invalid day parameter', async () => {
-    await withTstmRouteResponse({
+    await assertTstmRouteStatus({
       tmpDir,
       env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
       routePath: '/api/tstm/latest',
       query: '?day=3',
-    }, async (res) => {
-      assert.equal(res.status, 400);
-    });
+    }, 400);
   });
 
   it('returns 404 when capability is disabled', async () => {
-    await withTstmRouteResponse({
+    await assertTstmRouteStatus({
       tmpDir,
       env: { TSTM_CACHE_DIR: tmpDir },
       cache: SAMPLE_CACHED_ROUTE,
       routeOptions: {},
       routePath: '/api/tstm/latest',
       query: '?day=1',
-    }, async (res) => {
-      assert.equal(res.status, 404);
-    });
+    }, 404);
   });
 
   it('returns 404 when cached data has expired', async () => {
@@ -367,14 +369,12 @@ describe('GET /api/tstm/status', () => {
   });
 
   it('returns 404 when capability is disabled without reading cache', async () => {
-    await withTstmRouteResponse({
+    await assertTstmRouteStatus({
       tmpDir,
       env: { TSTM_CACHE_DIR: tmpDir },
       cache: SAMPLE_CACHED_ROUTE,
       routeOptions: {},
       routePath: '/api/tstm/status',
-    }, async (res) => {
-      assert.equal(res.status, 404);
-    });
+    }, 404);
   });
 });
