@@ -4,7 +4,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
-### Pending
+### PR #763
 
 - Route Auto-TSTM previews exclusively through scheduled cached guidance and retire the direct generation API.
 
