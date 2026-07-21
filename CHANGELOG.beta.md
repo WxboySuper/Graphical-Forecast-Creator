@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #765
+
+- Upgrade the compiler to TypeScript 7, replace the incompatible `ts-jest` bridge with Babel/Jest tooling, and enforce standalone typechecking in CI.
+
 ### PR #759
 
 - Replace GA4 and the legacy collector with privacy-gated, self-hosted Umami telemetry that keeps beta and production reporting separate.
