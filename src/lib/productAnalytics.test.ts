@@ -45,7 +45,19 @@ test('loads the matching zone and normalizes page paths before tracking', () => 
   initProductAnalytics('gfc.weatherboysuper.com');
   expect(document.querySelector('script[data-website-id="prod-zone"]')).not.toBeNull();
   trackProductPageView('/forecast?name=not-for-analytics', 'gfc.weatherboysuper.com');
-  expect(track).toHaveBeenCalledWith('page_view', { path: '/forecast' });
+  expect(track).toHaveBeenCalledWith({ url: '/forecast' });
+});
+
+test('flushes a queued route as a native Umami page view after the tracker loads', () => {
+  initProductAnalytics('beta-gfc.weatherboysuper.com');
+  trackProductPageView('/cloud-library#private', 'beta-gfc.weatherboysuper.com');
+
+  const track = jest.fn();
+  window.umami = { track };
+  document.querySelector<HTMLScriptElement>('script[data-gfc-umami="true"]')?.dispatchEvent(new Event('load'));
+
+  expect(track).toHaveBeenCalledWith({ url: '/cloud-library' });
+  expect(track).not.toHaveBeenCalledWith('page_view', expect.anything());
 });
 
 test('discards queued events when analytics is explicitly disabled', () => {

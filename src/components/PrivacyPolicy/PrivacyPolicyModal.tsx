@@ -4,8 +4,8 @@ import { isProductAnalyticsEnabled, setProductAnalyticsEnabled } from '../../lib
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.4.0';
-const PRIVACY_POLICY_LAST_UPDATED = 'July 20, 2026';
+const PRIVACY_POLICY_VERSION = '1.5.0';
+const PRIVACY_POLICY_LAST_UPDATED = 'July 21, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 // Changelog of material privacy-policy changes, keyed by the version that introduced them.
@@ -23,6 +23,10 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
   '1.4.0': [
     'We replaced Google Analytics and the previous hosted metrics collector with self-hosted Umami product analytics.',
     'Production and beta analytics are kept in separate reporting zones, and the same local preference can disable non-essential analytics for both.',
+  ],
+  '1.5.0': [
+    'We clarified that cookie-free product analytics use a pseudonymous visitor/session identifier, not account identity.',
+    'We added a clearer description of the coarse technical and IP-derived location information visible in our self-hosted analytics.',
   ],
 };
 
@@ -104,7 +108,7 @@ const ProductAnalyticsPreference: React.FC = () => {
   return (
     <button type="button" role="switch" aria-checked={enabled} className="privacy-analytics-preference" onClick={handleChange}>
       <strong>Non-essential product analytics: {enabled ? 'Enabled' : 'Disabled'}</strong>
-      <span>{enabled ? 'Disable local anonymous telemetry' : 'Enable local anonymous telemetry'}</span>
+      <span>{enabled ? 'Disable local pseudonymous telemetry' : 'Enable local pseudonymous telemetry'}</span>
     </button>
   );
 };
@@ -153,11 +157,14 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
 
     <h3>5. Product Analytics &amp; Progress Metrics</h3>
     <p>
-      To understand which hosted GFC workflows need improvement, we use self-hosted Umami product analytics on the
-      production and beta deployments in separate reporting zones. We collect page views, coarse browser/device
-      information, and selected milestone events such as completed exports, cloud-save outcomes, workflow outcomes,
-      and custom-layer creation. <strong>We do not use account identity, Firebase UID, email address, forecast
-      contents, coordinates, layer text, filenames, or export contents for product analytics.</strong>
+      To understand which hosted GFC workflows need improvement, we use self-hosted, cookie-free Umami product
+      analytics on the production and beta deployments in separate reporting zones. It uses a pseudonymous
+      visitor/session identifier to group activity from the same browser without attaching it to your GFC account. We
+      collect page views, selected milestone events such as completed exports, cloud-save outcomes, workflow outcomes,
+      and custom-layer creation, plus coarse technical information (browser, operating system, device type, and time)
+      and IP-derived approximate location (country, region, and city). <strong>We do not use account identity,
+      Firebase UID, email address, forecast contents, coordinates, layer text, filenames, or export contents for
+      product analytics.</strong>
     </p>
     <p>
       If you are signed in, we also store limited progress metrics tied to your account so we can show you your own
@@ -168,7 +175,8 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
     <p>
       You can disable non-essential product analytics from your local telemetry preference. When disabled, GFC does
       not load the Umami tracker or send product-analytics events. Analytics are hosted by GFC on our VPS and are not
-      used for advertising, cross-site tracking, or sale of personal data.
+      used for advertising, cross-site tracking, or sale of personal data. Event-level telemetry is retained only for
+      product operations and may be deleted during routine maintenance; aggregate metrics may be retained longer.
     </p>
     <ProductAnalyticsPreference />
     <p>

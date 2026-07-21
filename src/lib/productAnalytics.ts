@@ -14,10 +14,11 @@ export type ProductAnalyticsEvent = (typeof PRODUCT_ANALYTICS_EVENTS)[number];
 export type ProductAnalyticsProperties = Record<string, string | number | boolean>;
 type AnalyticsZone = 'production' | 'beta';
 type TrackerConfiguration = { zone: AnalyticsZone; host: string; websiteId: string };
+type UmamiPageView = { url: string };
 
 declare global {
   interface Window {
-    umami?: { track: (event: string, data?: ProductAnalyticsProperties) => void };
+    umami?: { track: (event: string | UmamiPageView, data?: ProductAnalyticsProperties) => void };
   }
 }
 
@@ -107,8 +108,17 @@ const trackSafely = ({ event, properties }: { event: string; properties?: Produc
   } catch { return false; }
 };
 
+/** Sends a native Umami page view, keeping user-provided query/hash data out of the URL. */
+const trackPageViewSafely = (path: string): boolean => {
+  try {
+    if (!window.umami) return false;
+    window.umami.track({ url: path });
+    return true;
+  } catch { return false; }
+};
+
 const flushPendingTelemetry = (): void => {
-  if (pendingPagePath) trackSafely({ event: 'page_view', properties: { path: pendingPagePath } });
+  if (pendingPagePath) trackPageViewSafely(pendingPagePath);
   pendingPagePath = null;
   const queuedEvents = pendingEvents;
   pendingEvents = [];
@@ -161,7 +171,7 @@ export const trackProductPageView = (pathname?: string, hostname?: string): void
   if (!getProductAnalyticsZone(hostname)) return;
   const path = (pathname ?? window.location.pathname).split(/[?#]/, 1)[0];
   initProductAnalytics(hostname);
-  if (!trackSafely({ event: 'page_view', properties: { path } })) pendingPagePath = path;
+  if (!trackPageViewSafely(path)) pendingPagePath = path;
 };
 
 /** Sends only registry-backed, coarse event properties. */
