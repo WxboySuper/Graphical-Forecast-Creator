@@ -143,7 +143,7 @@ Services (standard commands are in `README.md` / `package.json`):
 Non-obvious notes:
 
 - **Lint:** there is no ESLint setup (no eslint dependency, no `lint` script). CI only runs build + tests. Do not expect a lint command; the closest static check is the Vite build plus `pnpm test`.
-- **Run `pnpm typecheck` for standalone type validation.** The TypeScript 7 configuration covers production source and Vite configuration; Jest validates test-only TypeScript through Babel.
+- **Run `pnpm typecheck` for production type validation and `pnpm typecheck:test` for test-type regressions.** Jest executes TypeScript through Babel; the separate test check rejects diagnostics beyond the checked-in legacy baseline.
 - **Checks that mirror CI:** `pnpm run build` (frontend), `pnpm test` (Jest), and `cd server && npm test` (`node --test`). Run `pnpm test` from the repo root - running it from `server/` invokes the backend's test script instead.
 - pnpm reports "Ignored build scripts" for `esbuild`/`@sentry/cli`/etc.; the dev server and build still work fine via prebuilt platform binaries, so this warning is safe to ignore.
 - Firebase, Stripe, and Sentry are all optional and degrade gracefully when their env vars are absent; the app and backend boot without any secrets.

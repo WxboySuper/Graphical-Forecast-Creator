@@ -56,6 +56,7 @@
     "start": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "typecheck:test": "node scripts/check-test-types.mjs",
     "test": "jest",
     "test:firestore-rules": "pnpm exec firebase emulators:exec --only firestore --project gfc-rules-test \"node --test tests/firestore.rules.test.mjs\"",
     "test:e2e": "playwright test",
@@ -102,7 +103,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
-    "@babel/parser": "^8.0.0",
+    "@babel/parser": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
     "@babel/preset-react": "^7.29.7",
     "@babel/preset-typescript": "^7.29.7",

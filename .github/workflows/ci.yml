@@ -214,6 +214,9 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      - name: Type check tests
+        run: pnpm typecheck:test
+
       - name: Run tests
         run: pnpm test --silent
         env:

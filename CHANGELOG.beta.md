@@ -6,7 +6,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ### PR #765
 
-- Upgrade the compiler to TypeScript 7, replace the incompatible `ts-jest` bridge with Babel/Jest tooling, and enforce standalone typechecking in CI.
+- Upgrade the compiler to TypeScript 7, replace the incompatible `ts-jest` bridge with Babel/Jest tooling, and enforce production plus test-regression typechecking in CI.
 
 ### PR #759
 
