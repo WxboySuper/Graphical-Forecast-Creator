@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### Pending
+
+- Route Auto-TSTM previews exclusively through scheduled cached guidance and retire the direct generation API.
+
 ### PR #759
 
 - Replace GA4 and the legacy collector with privacy-gated, self-hosted Umami telemetry that keeps beta and production reporting separate.

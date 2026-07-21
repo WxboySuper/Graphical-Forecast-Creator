@@ -79,15 +79,13 @@ From a shell with access to the beta site:
 
 ```bash
 curl -s https://beta-gfc.weatherboysuper.com/api/capabilities/status
-curl -s -X POST https://beta-gfc.weatherboysuper.com/api/tstm/generate \
-  -H 'content-type: application/json' \
-  -d '{"day":1,"cycleDate":"2026-06-13"}'
+curl -s 'https://beta-gfc.weatherboysuper.com/api/tstm/latest?day=1&period=full'
 ```
 
 Expected results:
 
 - Status endpoint reports `"available": false` with `"reason": "emergency_disabled"`.
-- Generate endpoint returns `404` with `{ "error": "Auto-TSTM is not enabled on this deployment." }`.
+- Direct generation remains unavailable; cached guidance routes return `404` with `{ "error": "Auto-TSTM is not enabled on this deployment." }`.
 - Server logs include lines like:
   - `[capabilities] emergency_disabled=["TSTM_GENERATION_ENABLED"] target=beta`
   - `[capabilities] rejected capability=TSTM_GENERATION_ENABLED reason=emergency_disabled`
@@ -136,12 +134,10 @@ node server/analytics.js
 
 ```powershell
 curl http://127.0.0.1:3006/api/capabilities/status
-curl -X POST http://127.0.0.1:3006/api/tstm/generate `
-  -H 'content-type: application/json' `
-  -d '{"day":1,"cycleDate":"2026-06-13"}'
+curl 'http://127.0.0.1:3006/api/tstm/latest?day=1&period=full'
 ```
 
-4. Confirm the status payload includes `TSTM_GENERATION_ENABLED` with reason `emergency_disabled`, `/api/tstm/status` reports `"ingestionEnabled": false`, the generate route returns `404`, and no Python worker starts.
+4. Confirm the status payload includes `TSTM_GENERATION_ENABLED` with reason `emergency_disabled`, `/api/tstm/status` reports `"ingestionEnabled": false`, cached guidance routes return `404`, and no Python worker starts.
 5. Remove the emergency env var, restore `TSTM_INGESTION_ENABLED=true` if needed, restart the server, and confirm normal disabled/enabled behavior resumes according to the registry matrix.
 
 ## Public status endpoint security

@@ -9,12 +9,10 @@ const os = require('os');
 const path = require('path');
 const express = require('express');
 const {
-  createGenerationPayload,
   isTstmGenerationEnabled,
   registerTstmIngestion,
   registerTstmRoutes,
   runTstmGenerator,
-  validatePayload,
 } = require('./tstm');
 const { allTargetsEnabledRouteOptions } = require('./testing/featureExposureTargetMatrix');
 
@@ -41,10 +39,10 @@ const createFakeChild = () => {
   return child;
 };
 
-const postGenerateRequest = (server) =>
+const postGenerateRequest = (server, headers = {}) =>
   fetch(getUrl(server), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
   });
 
@@ -102,30 +100,6 @@ const withTstmRouteResponse = async ({
   }
 };
 
-/** Asserts a disabled generate route returns 404 without invoking the generator. */
-const assertGenerateRouteRejectsWithoutWork = async ({ env, routeOptions = {}, expectedBody }) => {
-  let calls = 0;
-  const server = await startServer(
-    env,
-    async () => {
-      calls += 1;
-      return {};
-    },
-    routeOptions
-  );
-
-  try {
-    const response = await postGenerateRequest(server);
-    assert.equal(response.status, 404);
-    if (expectedBody) {
-      assert.deepEqual(await response.json(), expectedBody);
-    }
-    assert.equal(calls, 0);
-  } finally {
-    server.close();
-  }
-};
-
 describe('Auto-TSTM server foundation', () => {
   it('stays disabled unless registry exposure and deployment env are both enabled', () => {
     assert.equal(isTstmGenerationEnabled({}), false);
@@ -137,63 +111,20 @@ describe('Auto-TSTM server foundation', () => {
     );
   });
 
-  it('normalizes and validates request payloads', () => {
-    const payload = createGenerationPayload({ day: '2', cycleDate: '2026-06-13', ignored: true });
-    assert.deepEqual(payload, {
-      day: 2,
-      cycleDate: '2026-06-13',
-      issueDate: undefined,
-      validDate: undefined,
-      issuanceTime: undefined,
-    });
-    assert.equal(validatePayload(payload), null);
-    assert.match(validatePayload({ ...payload, day: 3 }), /Day 1 and Day 2/);
-    assert.match(validatePayload({ ...payload, cycleDate: 'bad' }), /cycleDate/);
-  });
-
-  it('does not invoke the generator while disabled', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: {},
-      expectedBody: {
-        error: 'Auto-TSTM is not enabled on this deployment.',
-      },
-    });
-  });
-
-  it('does not invoke the generator when only the deployment env is enabled', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: { TSTM_GENERATION_ENABLED: 'true' },
-    });
-  });
-
-  it('does not invoke the generator when emergency disable is active', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: {
-        TSTM_GENERATION_ENABLED: 'true',
-        EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
-      },
-      routeOptions: allTargetsEnabledRouteOptions(),
-      expectedBody: {
-        error: 'Auto-TSTM is not enabled on this deployment.',
-      },
-    });
-  });
-
-  it('returns sanitized errors when enabled work fails', async () => {
+  it('never exposes direct generation, even when the capability is enabled', async () => {
+    let calls = 0;
     const server = await startServer(
       { TSTM_GENERATION_ENABLED: 'true' },
       async () => {
-        throw new Error('internal path and stderr');
+        calls += 1;
+        return {};
       },
       allTargetsEnabledRouteOptions()
     );
     try {
-      const response = await postGenerateRequest(server);
-      assert.equal(response.status, 503);
-      assert.deepEqual(await response.json(), {
-        error: 'Auto-TSTM guidance is temporarily unavailable.',
-        reason: 'unavailable',
-      });
+      const response = await postGenerateRequest(server, { authorization: 'Bearer any-token' });
+      assert.equal(response.status, 404);
+      assert.equal(calls, 0);
     } finally {
       server.close();
     }

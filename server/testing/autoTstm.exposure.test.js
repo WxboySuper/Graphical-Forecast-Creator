@@ -7,8 +7,6 @@ const {
   assertCapabilityRouteRejectsWithoutWork,
   disabledCapabilityStatusFixtures,
 } = require('./featureExposureHarness');
-const { allTargetsEnabledRouteOptions } = require('./featureExposureTargetMatrix');
-
 const startServer = (env, runGenerator, routeOptions = {}) => {
   const app = express();
   registerTstmRoutes(app, express, { env, runGenerator, ...routeOptions });
@@ -18,46 +16,9 @@ const startServer = (env, runGenerator, routeOptions = {}) => {
   });
 };
 
-const getGenerateUrl = (server) => {
-  const address = server.address();
-  return `http://127.0.0.1:${address.port}/api/tstm/generate`;
-};
-
 const getLatestUrl = (server, query = '') => {
   const address = server.address();
   return `http://127.0.0.1:${address.port}/api/tstm/latest${query}`;
-};
-
-const postGenerateRequest = (server) =>
-  fetch(getGenerateUrl(server), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
-  });
-
-/** Asserts the generate route rejects without invoking the generator. */
-const assertGenerateRouteRejectsWithoutWork = async ({ env, routeOptions = {}, expectedBody }) => {
-  let calls = 0;
-  const server = await startServer(
-    env,
-    async () => {
-      calls += 1;
-      return {};
-    },
-    routeOptions
-  );
-
-  try {
-    const response = await postGenerateRequest(server);
-    const assert = require('node:assert/strict');
-    assert.equal(response.status, 404);
-    if (expectedBody) {
-      assert.deepEqual(await response.json(), expectedBody);
-    }
-    assert.equal(calls, 0);
-  } finally {
-    server.close();
-  }
 };
 
 /** Asserts the latest route rejects without invoking the generator. */
@@ -86,16 +47,6 @@ const assertLatestRouteRejectsWithoutWork = async ({ env, routeOptions = {}, exp
 };
 
 describe('autoTstm exposure contract', () => {
-  it('rejects generate requests for registry-disabled fixtures', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: disabledCapabilityStatusFixtures.registry_disabled.env,
-      routeOptions: disabledCapabilityStatusFixtures.registry_disabled.routeOptions,
-      expectedBody: {
-        error: 'Auto-TSTM is not enabled on this deployment.',
-      },
-    });
-  });
-
   it('rejects latest requests for registry-disabled fixtures', async () => {
     await assertLatestRouteRejectsWithoutWork({
       env: disabledCapabilityStatusFixtures.registry_disabled.env,
@@ -106,25 +57,9 @@ describe('autoTstm exposure contract', () => {
     });
   });
 
-  it('rejects generate requests when only deployment env is enabled', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: { TSTM_GENERATION_ENABLED: 'true', SERVER_TARGET: 'local' },
-    });
-  });
-
   it('rejects latest requests when only deployment env is enabled', async () => {
     await assertLatestRouteRejectsWithoutWork({
       env: { TSTM_GENERATION_ENABLED: 'true', SERVER_TARGET: 'local' },
-    });
-  });
-
-  it('rejects generate requests for emergency-disabled fixtures', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: disabledCapabilityStatusFixtures.emergency_disabled.env,
-      routeOptions: disabledCapabilityStatusFixtures.emergency_disabled.routeOptions,
-      expectedBody: {
-        error: 'Auto-TSTM is not enabled on this deployment.',
-      },
     });
   });
 
@@ -146,28 +81,5 @@ describe('autoTstm exposure contract', () => {
         error: 'Auto-TSTM is not enabled on this deployment.',
       },
     });
-  });
-
-  it('allows work only when registry exposure and deployment env are both enabled', async () => {
-    let calls = 0;
-    const server = await startServer(
-      {
-        TSTM_GENERATION_ENABLED: 'true',
-      },
-      async () => {
-        calls += 1;
-        return { ok: true };
-      },
-      allTargetsEnabledRouteOptions()
-    );
-
-    try {
-      const response = await postGenerateRequest(server);
-      const assert = require('node:assert/strict');
-      assert.equal(response.status, 200);
-      assert.equal(calls, 1);
-    } finally {
-      server.close();
-    }
   });
 });
