@@ -110,6 +110,14 @@ describe('PrivacyPolicyModal component', () => {
     expect(screen.getByText('Accept & Continue')).toBeEnabled();
   });
 
+  test('shows the optional analytics choice before the policy sections', () => {
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
+    const choice = screen.getByRole('region', { name: 'Optional product analytics' });
+    expect(choice).toBeInTheDocument();
+    expect(choice).toHaveTextContent(/disabled by default/u);
+    expect(choice).toHaveTextContent(/never affects access to GFC/u);
+  });
+
   test('calls onAccept and updates localStorage when accepted', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
     const checkbox = screen.getByRole('checkbox');

@@ -126,6 +126,17 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       collect what is strictly necessary to sync your work and securely manage your subscription.
     </p>
 
+    <section className="privacy-analytics-choice" aria-labelledby="privacy-analytics-choice-title">
+      <div>
+        <h3 id="privacy-analytics-choice-title">Optional product analytics</h3>
+        <p>
+          Help us understand which parts of GFC are useful. This is disabled by default, never affects access to GFC,
+          and can be changed here at any time.
+        </p>
+      </div>
+      <ProductAnalyticsPreference />
+    </section>
+
     <h3>1. Local-First by Default</h3>
     <p>
       If you use Graphical Forecast Creator (GFC) without creating an account, all of your forecast data, preferences,
@@ -178,13 +189,12 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
     </p>
     <p>
       Non-essential product analytics are disabled by default. You may optionally enable them using the local telemetry
-      preference below; choosing not to enable them does not affect access to GFC. You can withdraw that permission at
+      preference at the top of this policy; choosing not to enable them does not affect access to GFC. You can withdraw that permission at
       any time from the same control. When disabled, GFC does not load the Umami tracker or send product-analytics
       events. Analytics are hosted by GFC on our VPS and are not used for advertising, cross-site tracking, or sale of
       personal data. Event-level telemetry is retained only for product operations and may be deleted during routine
       maintenance; aggregate metrics may be retained longer.
     </p>
-    <ProductAnalyticsPreference />
     <p>
       On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
       application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics
