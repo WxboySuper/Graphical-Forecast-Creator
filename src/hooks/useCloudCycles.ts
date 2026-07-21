@@ -15,6 +15,7 @@ import type { CycleMetadata } from '../types/workflow';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
 import { readLocalTestAccount } from '../lib/localTestAccount';
+import { trackProductEvent } from '../lib/productAnalytics';
 
 export interface UseCloudCyclesResult {
   cycles: CloudCycleMetadata[];
@@ -353,6 +354,7 @@ function useCloudSaveCycle({
         setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
       }
       queueProductMetric({ event: 'cloud_cycle_saved', user });
+      trackProductEvent('cloud_save_completed');
       updateSyncState('saved');
       return true;
     },

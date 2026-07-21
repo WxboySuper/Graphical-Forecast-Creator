@@ -189,9 +189,9 @@ Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the analytics
 
 After the next `main` deploy, verify in Sentry with a test error from the browser console on production (not from DevTools while paused — use a one-off button or `throw new Error('Sentry test')` in the console on the live site).
 
-### Google Analytics (production web)
+### Product analytics (production and beta web)
 
-Production builds set `VITE_GA_MEASUREMENT_ID` to the GFC-only GA4 property (`G-44J5RQTQDB`), separate from other Weatherboy Super sites. The tag loads only on hosted production (not localhost). SPA route changes send `page_path` updates via `GoogleAnalyticsRouteTracker`. First-party page metrics (`/api/collect`) remain unchanged.
+GFC uses self-hosted Umami with separate website records for production and beta. The tracker starts only after the current Privacy Policy is accepted and can be disabled with the local telemetry preference. It records normalized SPA paths and a small allowlisted set of product milestones; it never receives Firebase identities or forecast content. See [Umami telemetry operations](docs/operations/umami-telemetry.md) for deployment, privacy, and verification steps.
 
 ---
 

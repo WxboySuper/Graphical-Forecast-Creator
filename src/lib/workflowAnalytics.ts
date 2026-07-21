@@ -1,4 +1,4 @@
-import { shouldTrack } from '../utils/analyticsUtils';
+import { isProductAnalyticsEnabled, trackProductEvent } from './productAnalytics';
 import {
   WORKFLOW_ANALYTICS_EVENTS,
   type WorkflowAnalyticsDimensions,
@@ -16,7 +16,7 @@ const DIMENSION_VALUES: Record<string, readonly string[]> = {
   packageScope: ['workflow', 'cycle'],
   action: ['keep', 'save-and-start-new', 'replace-without-saving'],
 };
-export const WORKFLOW_ANALYTICS_CONSENT_KEY = 'gfc-workflow-analytics-enabled';
+export const WORKFLOW_ANALYTICS_CONSENT_KEY = 'gfc-analytics-enabled';
 
 /** Returns true for a plain object-like record, excluding arrays and null. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -40,23 +40,23 @@ export const validateWorkflowAnalyticsPayload = (value: unknown): value is Workf
 
 /** Reads the local analytics preference; absence preserves the existing hosted tracking default. */
 export const readWorkflowAnalyticsPreference = (): boolean => {
-  try {
-    return typeof localStorage === 'undefined' || localStorage.getItem(WORKFLOW_ANALYTICS_CONSENT_KEY) !== 'false';
-  } catch {
-    return false;
-  }
+  return isProductAnalyticsEnabled();
 };
 
 /** Delivers an already validated payload, falling back when Beacon declines the queue. */
 export const sendWorkflowAnalyticsPayload = (payload: WorkflowAnalyticsPayload): void => {
-  try {
-    const body = JSON.stringify(payload);
-    const queued = typeof navigator.sendBeacon === 'function'
-      && navigator.sendBeacon('/api/collect', new Blob([body], { type: 'application/json' }));
-    if (!queued) {
-      fetch('/api/collect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
-    }
-  } catch { /* analytics is best effort */ }
+  const eventMap: Record<WorkflowAnalyticsEvent, Parameters<typeof trackProductEvent>[0]> = {
+    start: 'workflow_start',
+    continue: 'workflow_continue',
+    derive: 'workflow_derive',
+    revise: 'workflow_revise',
+    complete: 'workflow_complete',
+    'complete-with-omissions': 'workflow_complete_with_omissions',
+    export: 'forecast_exported',
+    'rollover-action': 'workflow_rollover_action',
+  };
+  const event = eventMap[payload.event];
+  trackProductEvent(event, payload.dimensions);
 };
 
 /** Sends a consent-gated event without ever allowing analytics failures into workflow code. */
@@ -71,7 +71,6 @@ export const trackWorkflowEvent = (
     try { options.transport(payload); } catch { /* analytics must never block forecasting */ }
     return;
   }
-  if (!shouldTrack()) return;
   sendWorkflowAnalyticsPayload(payload);
 };
 

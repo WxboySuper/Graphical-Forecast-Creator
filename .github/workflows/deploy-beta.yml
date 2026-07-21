@@ -94,6 +94,9 @@ jobs:
           VITE_BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_ENVIRONMENT: beta
+          VITE_UMAMI_HOST: ${{ secrets.VITE_UMAMI_HOST }}
+          VITE_UMAMI_PRODUCTION_WEBSITE_ID: ${{ secrets.VITE_UMAMI_PRODUCTION_WEBSITE_ID }}
+          VITE_UMAMI_BETA_WEBSITE_ID: ${{ secrets.VITE_UMAMI_BETA_WEBSITE_ID }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}

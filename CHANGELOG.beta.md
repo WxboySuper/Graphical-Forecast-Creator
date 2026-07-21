@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #759
+
+- Replace GA4 and the legacy collector with privacy-gated, self-hosted Umami telemetry that keeps beta and production reporting separate.
+
 ### PR #758
 
 - Dependency: @radix-ui/react-dialog ^1.1.19 → ^1.1.20
