@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forecast Grade Methodology — gfc-ver-1</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+        line-height: 1.55;
+      }
+      h1 { margin-bottom: 0.25rem; }
+      .version { color: #64748b; font-size: 0.9rem; margin-bottom: 1.5rem; }
+      h2 { margin-top: 2rem; border-bottom: 1px solid rgba(148,163,184,0.35); padding-bottom: 0.25rem; }
+      table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+      th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(148,163,184,0.25); vertical-align: top; }
+      code { background: rgba(148,163,184,0.18); padding: 0.1rem 0.3rem; border-radius: 4px; }
+      .note { background: rgba(59,130,246,0.1); border-left: 3px solid #3b82f6; padding: 0.6rem 0.9rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Forecast Grade Methodology</h1>
+    <div class="version">Formula version <strong>gfc-ver-1</strong> · tracker #430</div>
+
+    <p>
+      The Forecast Grade measures how well a severe-weather outlook captured what actually happened.
+      It combines the SPC occurrence definition with an intent layer that rewards well-calibrated,
+      concentrated high-probability forecasts. Scores and metrics speak for themselves — the dashboard
+      never adds coaching prose.
+    </p>
+
+    <h2>SPC spatial contract</h2>
+    <p>
+      Probabilities are the chance of severe weather <strong>within 25 miles of any point</strong> in a
+      contour (SPC "About the Convective Outlooks"). Each storm report is buffered by 25 miles (~40 km).
+      Where contours are nested, the effective claim at a location is the <strong>highest</strong>
+      probability whose neighborhood reaches it. There is no distance-from-polygon decay inside the
+      25-mile halo — a location is either within the neighborhood or it is not.
+    </p>
+    <p class="note">
+      One report only supports the area within ~25 miles of that report; a single report does not verify
+      an entire large probability blob.
+    </p>
+
+    <h2>Composite components (per product)</h2>
+    <p>Weights are dropped and renormalized when a component is Not evaluated.</p>
+    <table>
+      <thead><tr><th>Component</th><th>Weight</th><th>What it measures</th></tr></thead>
+      <tbody>
+        <tr><td>Probability skill</td><td>25%</td><td>Spatial Brier Skill Score over a ~10&nbsp;km grid of the forecast envelope + 25&nbsp;mi buffer. Higher-probability empty cells hurt more; quiet overforecast days still score.</td></tr>
+        <tr><td>Spatial contingency</td><td>25%</td><td>Armchair-style area hit/miss/false-alarm CSI computed per probability tier, then combined across tiers.</td></tr>
+        <tr><td>False-alarm discipline</td><td>15%</td><td>Probability-weighted areal FAR, so empty high-probability paint is penalized more than an empty 2% skirt.</td></tr>
+        <tr><td>Event yield / concentration</td><td>25%</td><td>Intent layer (see below).</td></tr>
+        <tr><td>Severity</td><td>10%</td><td>Significant contours vs significant reports in the 25-mi neighborhood. Not evaluated when neither exists; soft ~70 penalty when sig is drawn but nothing significant verifies.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Event yield / concentration (intent)</h2>
+    <p>
+      For each drawn core (<code>f ≥ 0.15</code>, <code>0.30</code>, <code>0.45</code>):
+      <code>expected = baseline(f) + area(core) × density_factor(f)</code> and
+      <code>yield = min(1, reports_near(core) / max(expected, ε))</code>. Higher probability implies a
+      more concentrated claim, so the density factor rises with <code>f</code>. This makes a huge 30% core
+      with a single report fail on yield while softening a tiny 45% core with a single report — neither is
+      a free "full verify". Present cores are averaged.
+    </p>
+
+    <h2>Package rollup &amp; data quality</h2>
+    <p>
+      Present products (categorical, tornado, wind, hail) are combined with equal weight; absent products
+      are marked <strong>Not evaluated</strong>. Data quality is a gate, not a score weight:
+    </p>
+    <table>
+      <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>Good</td><td>Enough geometry and reports to trust every applicable component (including a clean quiet-day overforecast path labeled <em>No reports</em>).</td></tr>
+        <tr><td>Limited</td><td>Sparse non-quiet reports; components are shown but the package grade is withheld.</td></tr>
+        <tr><td>Blocked</td><td>Missing forecast geometry or unreadable reports — no run.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Letter bands</h2>
+    <p>A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F &lt; 60. Grades display one decimal (e.g. 82.4 / B).</p>
+
+    <h2>Categorical → probability map</h2>
+    <p>
+      For the categorical product's probability field only:
+      TSTM 0.05, MRGL 0.10, SLGT 0.15, ENH 0.30, MDT 0.40, HIGH 0.45. Significant contours feed the
+      severity component, not the main Brier field.
+    </p>
+
+    <h2>Caveats</h2>
+    <ul>
+      <li>Grades are an educational tool, not an official verification product.</li>
+      <li>Official grades change only via versioned GFC releases; there are no per-user weight sliders.</li>
+      <li>Hit/miss diagnostics are informational and do not by themselves determine the grade.</li>
+    </ul>
+
+    <h2>Version history</h2>
+    <table>
+      <thead><tr><th>Version</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>gfc-ver-1</td><td>Initial release: SPC 25-mi neighborhood + Armchair-style area method, probability skill, FAR discipline, event-yield and severity intent layers.</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:2rem">
+      Reference inspiration (area method, not gamed for contests):
+      <a href="https://armchairforecaster.com/pages/library/#verification">Armchair Forecaster — Verification</a>.
+    </p>
+  </body>
+</html>

@@ -18,6 +18,7 @@ import ScoreBreakdown from './ScoreBreakdown';
 import DataQualityPanel from './DataQualityPanel';
 import ReportTable from './ReportTable';
 import GradeTrendChart from './GradeTrendChart';
+import ShareCard from './ShareCard';
 import { formatGrade, letterColorClass } from './gradeFormat';
 import { METHODOLOGY_DOC_PATH } from './methodology';
 import './ForecastGradeDashboard.css';
@@ -110,6 +111,24 @@ const ForecastGradeDashboard: React.FC = () => {
 
   const handleSelectReport = useCallback((report: StormReport | null) => {
     setSelectedReportId(report?.id ?? null);
+  }, []);
+
+  const captureMap = useCallback(async (): Promise<HTMLImageElement | null> => {
+    if (!mapPaneRef.current) {
+      return null;
+    }
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(mapPaneRef.current, { useCORS: true, logging: false });
+      const image = new Image();
+      image.src = canvas.toDataURL('image/png');
+      if (image.decode) {
+        await image.decode().catch(() => undefined);
+      }
+      return image;
+    } catch {
+      return null;
+    }
   }, []);
 
   const showMap = Boolean(grade.forecast);
@@ -212,6 +231,7 @@ const ForecastGradeDashboard: React.FC = () => {
                 selectedId={selectedReportId}
                 onSelect={handleSelectReport}
               />
+              <ShareCard pkg={grade.result} captureMap={captureMap} addToast={addToast} />
             </div>
           )}
 
