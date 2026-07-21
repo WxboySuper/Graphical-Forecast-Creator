@@ -1,5 +1,6 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
@@ -479,12 +480,40 @@ const handleBillingWebhook = async (req, res) => {
   await processWebhookRequest(req, res, stripe, webhookSecret);
 };
 
-/** Generic wrapper for billing JSON routes with shared error handling. */
-const wrapBillingJsonRoute = ({ handler, fallbackMessage }) => async (req, res) => {
+/** Bounds diagnostic strings before they are written to operational logs. */
+const normalizeBillingDiagnostic = (value, fallback) =>
+  typeof value === 'string' && value.trim()
+    ? value.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 500)
+    : fallback;
+
+/** Logs an unexpected billing route failure without request bodies or credentials. */
+const logBillingRouteError = ({ error, req, requestId, failureCode }) => {
+  console.error('[billing] route:error', {
+    requestId,
+    failureCode,
+    method: req.method || null,
+    path: req.path || null,
+    errorName: error instanceof Error ? normalizeBillingDiagnostic(error.name, 'Error') : 'UnknownError',
+    errorMessage: error instanceof Error
+      ? normalizeBillingDiagnostic(error.message, 'Unknown billing failure')
+      : 'Unknown billing failure',
+    providerCode: normalizeBillingDiagnostic(error?.code, null),
+  });
+};
+
+/** Generic wrapper for billing JSON routes with shared, non-sensitive error handling. */
+const wrapBillingJsonRoute = ({ handler, fallbackMessage, failureCode }) => async (req, res) => {
   try {
     await handler(req, res);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : fallbackMessage });
+    const requestId = randomUUID();
+    logBillingRouteError({ error, req, requestId, failureCode });
+    res.set('X-Request-ID', requestId);
+    res.status(500).json({
+      error: fallbackMessage,
+      code: failureCode,
+      requestId,
+    });
   }
 };
 
@@ -504,6 +533,7 @@ const registerBillingRoutes = (app, express) => {
     wrapBillingJsonRoute({
       handler: handleCheckout,
       fallbackMessage: 'Unable to create checkout session.',
+      failureCode: 'billing_checkout_failed',
     })
   );
   app.post(
@@ -513,10 +543,12 @@ const registerBillingRoutes = (app, express) => {
     wrapBillingJsonRoute({
       handler: handleBillingPortal,
       fallbackMessage: 'Unable to open the billing portal.',
+      failureCode: 'billing_portal_failed',
     })
   );
 };
 
 module.exports = {
   registerBillingRoutes,
+  wrapBillingJsonRoute,
 };
