@@ -591,20 +591,28 @@ const recordMetricEvent = async ({ eventType, installationId, uid }) => {
 const normalizeBillingWebhookEventId = (value) =>
   typeof value === 'string' && value.trim() ? value.trim().slice(0, 256) : null;
 
+<<<<<<< HEAD
 /** True when a trusted webhook provides all data needed for one billable metric write. */
 const hasBillingMetricWriteInput = ({ db, eventType, webhookEventId }) =>
   Boolean(db && eventType && webhookEventId);
 
 /** Records admin-only billing metric events once per trusted Stripe webhook delivery id. */
+=======
+/** Records admin-only billing metric events once per trusted Stripe webhook event. */
+>>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
 const recordBillingMetricEvent = async (eventType, webhookEventId) => {
   const normalizedEventType = normalizeBillingMetricEventType(eventType);
   const normalizedWebhookEventId = normalizeBillingWebhookEventId(webhookEventId);
   const db = getAdminDb();
+<<<<<<< HEAD
   if (!hasBillingMetricWriteInput({
     db,
     eventType: normalizedEventType,
     webhookEventId: normalizedWebhookEventId,
   })) {
+=======
+  if (!db || !normalizedEventType || !normalizedWebhookEventId) {
+>>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
     return false;
   }
 
@@ -622,9 +630,17 @@ const recordBillingMetricEvent = async (eventType, webhookEventId) => {
       return false;
     }
 
+<<<<<<< HEAD
     transaction.set(processedEventRef, {
       eventType: normalizedEventType,
       processedAt: new Date(),
+=======
+    const processedAt = new Date();
+    transaction.set(processedEventRef, {
+      eventType: normalizedEventType,
+      processedAt,
+      expiresAt: new Date(processedAt.getTime() + 30 * 24 * 60 * 60 * 1000),
+>>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
     });
     transaction.set(
       dailyRef,
