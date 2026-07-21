@@ -109,11 +109,11 @@ const ProductAnalyticsPreference: React.FC = () => {
   const [enabled, setEnabled] = useState(() => isProductAnalyticsEnabled());
   const handleChange = () => {
     const nextEnabled = !enabled;
-    setProductAnalyticsEnabled(nextEnabled);
+    const effectiveEnabled = setProductAnalyticsEnabled(nextEnabled);
     // A consent action is the earliest permitted point to initialize analytics.
     // Record the page the person explicitly chose from; nothing is injected or queued beforehand.
-    if (nextEnabled) trackProductPageView();
-    setEnabled(nextEnabled);
+    if (effectiveEnabled) trackProductPageView();
+    setEnabled(effectiveEnabled);
   };
 
   return (

@@ -76,11 +76,13 @@ export const isProductAnalyticsEnabled = (): boolean => {
 };
 
 /** Stores the local opt-out and removes the injected tracker immediately when it is disabled. */
-export const setProductAnalyticsEnabled = (enabled: boolean): void => {
+export const setProductAnalyticsEnabled = (enabled: boolean): boolean => {
+  let persisted = false;
   try {
     localStorage.setItem(PRODUCT_ANALYTICS_PREFERENCE_KEY, String(enabled));
+    persisted = true;
   } catch {
-    return;
+    // localStorage unavailable — effective state cannot match the requested value
   }
   if (!enabled && typeof document !== 'undefined') {
     document.querySelector('script[data-gfc-umami="true"]')?.remove();
@@ -88,6 +90,8 @@ export const setProductAnalyticsEnabled = (enabled: boolean): void => {
     pendingPagePath = null;
     pendingEvents = [];
   }
+  // Disable always succeeds (teardown happened); enable requires persistence.
+  return enabled ? persisted : false;
 };
 
 const getWebsiteId = (zone: AnalyticsZone): string => {

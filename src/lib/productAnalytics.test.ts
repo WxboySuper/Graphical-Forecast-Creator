@@ -80,6 +80,26 @@ test('flushes a queued route as a native Umami page view after the tracker loads
   expect(track).not.toHaveBeenCalledWith('page_view', expect.anything());
 });
 
+test('tears down tracker even when localStorage.setItem throws on disable', () => {
+  setProductAnalyticsEnabled(true);
+  initProductAnalytics('gfc.weatherboysuper.com');
+  expect(document.querySelector('script[data-gfc-umami="true"]')).not.toBeNull();
+
+  jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage full'); });
+
+  const effective = setProductAnalyticsEnabled(false);
+  expect(effective).toBe(false);
+  expect(document.querySelector('script[data-gfc-umami="true"]')).toBeNull();
+});
+
+test('returns false when enabling analytics but localStorage.setItem throws', () => {
+  jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage full'); });
+
+  const effective = setProductAnalyticsEnabled(true);
+  expect(effective).toBe(false);
+  expect(isProductAnalyticsEnabled()).toBe(false);
+});
+
 test('withdrawal removes the tracker and discards queued telemetry', () => {
   setProductAnalyticsEnabled(true);
   initProductAnalytics('gfc.weatherboysuper.com');

@@ -155,7 +155,29 @@ describe('PrivacyPolicyModal component', () => {
     expect(onCloseMock).toHaveBeenCalled();
   });
 
-  test('handles localStorage.setItem throwing in handleAccept', () => {
+  test('reflects storage failure when enabling analytics — UI stays disabled', () => {
+  jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage error'); });
+
+  render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
+  const toggle = screen.getByRole('switch');
+  expect(toggle).toHaveAttribute('aria-checked', 'false');
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-checked', 'false');
+});
+
+test('reflects storage failure when disabling analytics — UI shows disabled after teardown', () => {
+  localStorage.setItem('gfc-analytics-enabled', 'true');
+  render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
+
+  jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage error'); });
+
+  const toggle = screen.getByRole('switch');
+  expect(toggle).toHaveAttribute('aria-checked', 'true');
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-checked', 'false');
+});
+
+test('handles localStorage.setItem throwing in handleAccept', () => {
     jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('Storage error');
     });
