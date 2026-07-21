@@ -83,6 +83,33 @@ export const scoreEventYield = (
 };
 
 /**
+ * Both a significant contour and significant reports exist: reward when at least
+ * one sig report lands inside the sig neighborhood, otherwise a partial credit for
+ * getting the significance right but the placement wrong.
+ */
+const scoreSigDrawnAndObserved = (
+  sigContours: ProductContour[],
+  sigReports: StormReport[]
+): ComponentScore => {
+  const sigUnion = unionAll(sigContours.map((contour) => contour.polygon));
+  const inArea = reportsNearRegion(sigUnion, sigReports);
+  if (inArea > 0) {
+    return scoredComponent(
+      'severity',
+      SEVERITY_SIG_HIT,
+      `${inArea} significant report(s) within the significant contour.`,
+      { sigReports: sigReports.length, sigInArea: inArea }
+    );
+  }
+  return scoredComponent(
+    'severity',
+    SEVERITY_SIG_OUT_OF_AREA,
+    `${sigReports.length} significant report(s), none inside the significant contour.`,
+    { sigReports: sigReports.length, sigInArea: 0 }
+  );
+};
+
+/**
  * Severity. Compares significant contours to significant reports within the
  * 25-mile neighborhood. Not evaluated when neither a sig contour nor a sig report
  * exists; a soft ~70 penalty applies when sig is drawn but nothing sig verifies.
@@ -97,35 +124,14 @@ export const scoreSeverity = (
   }
 
   const sigContours = contours.filter((contour) => contour.isSignificant);
-  const sigDrawn = sigContours.length > 0;
   const sigReports = reports.filter(isSignificantReport);
+  const sigDrawn = sigContours.length > 0;
   const sigObserved = sigReports.length > 0;
 
-  if (!sigDrawn && !sigObserved) {
-    return notEvaluatedComponent('severity', 'No significant contour drawn and no significant report observed.');
-  }
-
-  const sigUnion = unionAll(sigContours.map((contour) => contour.polygon));
-
   if (sigDrawn && sigObserved) {
-    const inArea = reportsNearRegion(sigUnion, sigReports);
-    if (inArea > 0) {
-      return scoredComponent(
-        'severity',
-        SEVERITY_SIG_HIT,
-        `${inArea} significant report(s) within the significant contour.`,
-        { sigReports: sigReports.length, sigInArea: inArea }
-      );
-    }
-    return scoredComponent(
-      'severity',
-      SEVERITY_SIG_OUT_OF_AREA,
-      `${sigReports.length} significant report(s), none inside the significant contour.`,
-      { sigReports: sigReports.length, sigInArea: 0 }
-    );
+    return scoreSigDrawnAndObserved(sigContours, sigReports);
   }
-
-  if (sigDrawn && !sigObserved) {
+  if (sigDrawn) {
     return scoredComponent(
       'severity',
       SEVERITY_SIG_DRAWN_NONE_OBSERVED,
@@ -133,11 +139,13 @@ export const scoreSeverity = (
       { sigReports: 0, sigInArea: 0 }
     );
   }
-
-  return scoredComponent(
-    'severity',
-    SEVERITY_SIG_MISSED,
-    `${sigReports.length} significant report(s) with no significant contour drawn.`,
-    { sigReports: sigReports.length, sigInArea: 0 }
-  );
+  if (sigObserved) {
+    return scoredComponent(
+      'severity',
+      SEVERITY_SIG_MISSED,
+      `${sigReports.length} significant report(s) with no significant contour drawn.`,
+      { sigReports: sigReports.length, sigInArea: 0 }
+    );
+  }
+  return notEvaluatedComponent('severity', 'No significant contour drawn and no significant report observed.');
 };

@@ -69,6 +69,16 @@ const roundTo = (value: number, digits = 3): number => {
   return Math.round(value * factor) / factor;
 };
 
+/** Mean squared error of the forecast vs observed fields over the grid. */
+const brierScore = (forecast: number[], observed: number[], cellCount: number): number => {
+  let squaredError = 0;
+  for (let index = 0; index < cellCount; index += 1) {
+    const diff = forecast[index] - observed[index];
+    squaredError += diff * diff;
+  }
+  return squaredError / cellCount;
+};
+
 /**
  * Probability skill via the spatial Brier Skill Score over the grid. Higher-`f`
  * empty cells hurt more (larger squared error). Quiet overforecast days still
@@ -76,18 +86,13 @@ const roundTo = (value: number, digits = 3): number => {
  */
 export const scoreProbabilitySkill = (evaluation: GridEvaluation): ComponentScore => {
   const { forecast, observed, observedFrequency, cellCount } = evaluation;
-  const hasForecast = evaluation.forecastCellCount > 0;
+  const gradable = cellCount > 0 && (evaluation.forecastCellCount > 0 || observedFrequency > 0);
 
-  if (cellCount === 0 || (!hasForecast && observedFrequency === 0)) {
+  if (!gradable) {
     return notEvaluatedComponent('probabilitySkill', 'No forecast probability field and no reports on the grid.');
   }
 
-  let squaredError = 0;
-  for (let index = 0; index < cellCount; index += 1) {
-    const diff = forecast[index] - observed[index];
-    squaredError += diff * diff;
-  }
-  const brier = squaredError / cellCount;
+  const brier = brierScore(forecast, observed, cellCount);
 
   if (observedFrequency === 0) {
     return scoredComponent(
@@ -99,20 +104,13 @@ export const scoreProbabilitySkill = (evaluation: GridEvaluation): ComponentScor
   }
 
   const referenceBrier = observedFrequency * (1 - observedFrequency);
-  const skill = referenceBrier > 0 ? clamp(1 - brier / referenceBrier) : 0;
+  const bss = referenceBrier > 0 ? 1 - brier / referenceBrier : 0;
 
   return scoredComponent(
     'probabilitySkill',
-    skill,
-    `Brier ${roundTo(brier)}, BSS ${roundTo(1 - brier / referenceBrier)} vs climatology ${roundTo(
-      observedFrequency
-    )}.`,
-    {
-      brier: roundTo(brier),
-      bss: roundTo(1 - brier / referenceBrier),
-      observedFrequency: roundTo(observedFrequency),
-      cells: cellCount,
-    }
+    clamp(bss),
+    `Brier ${roundTo(brier)}, BSS ${roundTo(bss)} vs climatology ${roundTo(observedFrequency)}.`,
+    { brier: roundTo(brier), bss: roundTo(bss), observedFrequency: roundTo(observedFrequency), cells: cellCount }
   );
 };
 
