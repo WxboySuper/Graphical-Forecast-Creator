@@ -303,6 +303,14 @@ function handleCloudSaveFailure<T>({
   return false;
 }
 
+/** Marks an existing cloud cycle as saving without adding branching to the save callback. */
+function markExistingCloudCycleSaving(
+  currentCloudRef: CloudStateContext['currentCloudRef'],
+  updateSyncState: CloudStateContext['updateSyncState'],
+): void {
+  if (currentCloudRef.current) updateSyncState('saving');
+}
+
 /** Returns the save callback for hosted cloud cycles. */
 function useCloudSaveCycle({
   userId,
@@ -333,9 +341,7 @@ function useCloudSaveCycle({
       const authenticatedUserId = userId as string;
 
       setError(null);
-      if (currentCloudRef.current) {
-        updateSyncState('saving');
-      }
+      markExistingCloudCycleSaving(currentCloudRef, updateSyncState);
 
       const result = await saveCloudCycle({
         userId: authenticatedUserId,

@@ -69,6 +69,10 @@ const areAllValid = (checks: readonly boolean[]): boolean => checks.every(Boolea
 const hasValidFeatureCount = (features: unknown): boolean =>
   Array.isArray(features) && features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer;
 
+/** Validates an optional embedded product snapshot. */
+const hasValidProductSnapshot = (snapshot: unknown): boolean =>
+  snapshot === undefined || isEmbeddedCustomProductSnapshot(snapshot);
+
 /** Validates the scalar, category, snapshot, and timestamp fields on a one-off layer. */
 const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => areAllValid([
   value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
@@ -78,7 +82,7 @@ const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => a
   isCustomCategoryList(value.categories),
   hasValidFeatureCount(value.features),
   hasValidChronology(value.createdAt, value.updatedAt),
-  value.productSnapshot === undefined || isEmbeddedCustomProductSnapshot(value.productSnapshot),
+  hasValidProductSnapshot(value.productSnapshot),
 ]);
 
 /** Validates a complete self-contained one-off layer. */

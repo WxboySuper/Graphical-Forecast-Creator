@@ -138,11 +138,14 @@ const LITERAL_READERS = {
   ObjectExpression: evaluateObject,
 };
 
+function rejectUnsupportedLiteral(expression) {
+  throw new Error(`Unsupported non-literal expression: ${nodeText(expression)}`);
+}
+
 /** Safely evaluates the limited literal syntax used by policy configuration. */
-function evaluateLiteral(node, constants, resolving = new Set()) {
+function evaluateLiteral(node, constants, resolving) {
   const expression = unwrapExpression(node);
-  const reader = LITERAL_READERS[expression.type];
-  if (!reader) throw new Error(`Unsupported non-literal expression: ${nodeText(expression)}`);
+  const reader = LITERAL_READERS[expression.type] ?? rejectUnsupportedLiteral;
   return reader(expression, constants, resolving);
 }
 
@@ -152,7 +155,7 @@ export function extractConst(source, fileName, name) {
   const constants = collectConstants(program);
   const initializer = constants.get(name);
   if (!initializer) throw new Error(`Could not find ${name} in ${fileName}`);
-  return evaluateLiteral(initializer, constants);
+  return evaluateLiteral(initializer, constants, new Set());
 }
 
 /** Reads and validates a string field from an extracted object. */
