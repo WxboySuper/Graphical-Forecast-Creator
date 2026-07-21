@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #760
+
+- Restore native Umami page views for accurate traffic metrics and clarify GFC's cookie-free pseudonymous telemetry disclosure.
+
 ### PR #759
 
 - Replace GA4 and the legacy collector with privacy-gated, self-hosted Umami telemetry that keeps beta and production reporting separate.
