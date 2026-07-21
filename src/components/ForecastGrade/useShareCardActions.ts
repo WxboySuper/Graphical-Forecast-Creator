@@ -51,15 +51,19 @@ const copyBlob = async (
   addToast: AddToast
 ): Promise<void> => {
   const clip = navigator.clipboard as Clipboard & { write?: (items: ClipboardItem[]) => Promise<void> };
-  if (blob && typeof ClipboardItem !== 'undefined' && clip.write) {
-    await clip.write([new ClipboardItem({ 'image/png': blob })]);
+  const canWriteImage = Boolean(blob) && typeof ClipboardItem !== 'undefined' && Boolean(clip.write);
+
+  if (canWriteImage) {
+    await clip.write!([new ClipboardItem({ 'image/png': blob as Blob })]);
     addToast('Share card copied to clipboard.', 'success');
-  } else if (clip.writeText) {
+    return;
+  }
+  if (clip.writeText) {
     await clip.writeText(shareSummaryText(pkg));
     addToast('Grade summary copied to clipboard.', 'success');
-  } else {
-    addToast('Copy is not supported here; try download.', 'info');
+    return;
   }
+  addToast('Copy is not supported here; try download.', 'info');
 };
 
 /**
