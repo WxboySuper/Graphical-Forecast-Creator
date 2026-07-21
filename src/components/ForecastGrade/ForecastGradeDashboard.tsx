@@ -8,6 +8,7 @@ import { deserializeForecast } from '../../utils/fileUtils';
 import { setVisibility } from '../../store/stormReportsSlice';
 import type { RootState } from '../../store';
 import type { StormReport } from '../../types/stormReports';
+import type { PackageSourceKind } from '../../types/forecastGrade';
 import type { ComponentKey, ProductKind } from '../../utils/verificationV2';
 import { availablePackageSources } from '../../utils/verificationV2/sources';
 import { useForecastGrade } from './useForecastGrade';
@@ -24,6 +25,8 @@ import { METHODOLOGY_DOC_PATH } from './methodology';
 import './ForecastGradeDashboard.css';
 
 const MAP_PRODUCTS: ProductKind[] = ['categorical', 'tornado', 'wind', 'hail'];
+
+type GradeState = ReturnType<typeof useForecastGrade>;
 
 /** Premium cloud package picker rendered inside the source panel. */
 const CloudSourcePicker: React.FC<{ onLoad: (id: string, label: string) => void }> = ({ onLoad }) => {
@@ -57,192 +60,6 @@ const CloudSourcePicker: React.FC<{ onLoad: (id: string, label: string) => void 
         ))}
       </select>
     </label>
-  );
-};
-
-/**
- * Forecast Grade result workspace (PR 07 — result-workspace).
- *
- * Extends the shell with the full learn-fast result view: grade headline with
- * per-product chips, the exactly-titled Score breakdown and Data quality
- * sections, a selectable report table that mirrors map emphasis, a
- * hazard-filterable history trend, and always-reachable hazard/day/evidence map
- * controls. Selecting a product or component re-centers the map's active hazard.
- */
-const ForecastGradeDashboard: React.FC = () => {
-  const { addToast } = useAppLayout();
-  const dispatch = useDispatch();
-  const grade = useForecastGrade(addToast);
-  const { loadCycle } = useCloudCycles();
-
-  const [activeComponent, setActiveComponent] = useState<ComponentKey | null>(null);
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const mapRef = useRef<VerificationMapHandle>(null);
-  const mapPaneRef = useRef<HTMLDivElement>(null);
-  const reportsVisible = useSelector((state: RootState) => state.stormReports.visible);
-
-  const availableSources = availablePackageSources(grade.tier);
-  const activeProductGrade = grade.result?.products.find((product) => product.product === grade.activeProduct);
-
-  const handleCloudLoad = useCallback(
-    async (id: string, label: string) => {
-      const payload = await loadCycle(id);
-      if (!payload) {
-        addToast('That cloud package could not be loaded.', 'error');
-        return;
-      }
-      try {
-        grade.setForecastPackage(deserializeForecast(payload), 'cloud', `${label} (cloud)`);
-        addToast('Cloud package loaded. Choose a report date and grade.', 'success');
-      } catch {
-        addToast('That cloud package could not be parsed.', 'error');
-      }
-    },
-    [addToast, grade, loadCycle]
-  );
-
-  const handleSelectProduct = useCallback(
-    (product: ProductKind) => {
-      grade.setActiveProduct(product);
-      setActiveComponent(null);
-    },
-    [grade]
-  );
-
-  const handleSelectReport = useCallback((report: StormReport | null) => {
-    setSelectedReportId(report?.id ?? null);
-  }, []);
-
-  const captureMap = useCallback(async (): Promise<HTMLImageElement | null> => {
-    if (!mapPaneRef.current) {
-      return null;
-    }
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(mapPaneRef.current, { useCORS: true, logging: false });
-      const image = new Image();
-      image.src = canvas.toDataURL('image/png');
-      if (image.decode) {
-        await image.decode().catch(() => undefined);
-      }
-      return image;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const showMap = Boolean(grade.forecast);
-
-  return (
-    <div className="fg-dashboard">
-      <div className="fg-topbar">
-        <div>
-          <h2 className="text-lg font-semibold">Forecast Grade</h2>
-          <p className="text-xs text-slate-500">
-            Map-first verification · formula gfc-ver-1 ·{' '}
-            <a className="text-blue-500 hover:underline" href={METHODOLOGY_DOC_PATH} target="_blank" rel="noreferrer">
-              Methodology
-            </a>
-          </p>
-        </div>
-      </div>
-
-      <div className="fg-workspace">
-        <div className="fg-map-pane" ref={mapPaneRef}>
-          {showMap ? (
-            <>
-              <VerificationMap
-                ref={mapRef}
-                activeOutlookType={grade.activeProduct as 'categorical' | 'tornado' | 'wind' | 'hail'}
-                selectedDay={grade.selectedDay}
-              />
-              <MapControls
-                activeProduct={grade.activeProduct}
-                onSelectProduct={handleSelectProduct}
-                availableDays={grade.availableDays}
-                selectedDay={grade.selectedDay}
-                onSelectDay={grade.setSelectedDay}
-                reportsVisible={reportsVisible}
-                onToggleEvidence={() => dispatch(setVisibility(!reportsVisible))}
-              />
-              {grade.result && (
-                <div className="fg-grade-overlay">
-                  <span className="text-2xl font-bold tabular-nums">{formatGrade(grade.result.grade)}</span>
-                  <span className={`text-xl font-bold ${letterColorClass(grade.result.letter)}`}>
-                    {grade.result.letter ?? '—'}
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-500">
-              The map becomes the evidence surface once you load a package and grade a date.
-            </div>
-          )}
-        </div>
-
-        <div className="fg-results-pane">
-          <SourcePanel
-            tier={grade.tier}
-            availableSources={availableSources}
-            hasForecast={Boolean(grade.forecast)}
-            sourceLabel={grade.sourceLabel}
-            useToday={grade.useToday}
-            reportDate={grade.reportDate}
-            canRun={grade.canRun}
-            isRunning={grade.phase === 'running'}
-            error={grade.error}
-            onFile={grade.loadFromFile}
-            onUseTodayChange={grade.setUseToday}
-            onReportDateChange={grade.setReportDate}
-            onRun={grade.run}
-            onReset={grade.reset}
-            renderCloudSource={
-              availableSources.includes('cloud')
-                ? () => <CloudSourcePicker onLoad={handleCloudLoad} />
-                : undefined
-            }
-          />
-
-          {grade.phase === 'running' && (
-            <div className="mt-3">
-              <RunProgress progress={grade.progress} />
-            </div>
-          )}
-
-          {grade.result && (
-            <div className="mt-3">
-              <GradeHeadline
-                pkg={grade.result}
-                activeProduct={grade.activeProduct}
-                onSelectProduct={handleSelectProduct}
-              />
-              {activeProductGrade && (
-                <ScoreBreakdown
-                  product={activeProductGrade}
-                  activeComponent={activeComponent}
-                  onSelectComponent={setActiveComponent}
-                />
-              )}
-              <DataQualityPanel pkg={grade.result} />
-              <ReportTable
-                reports={grade.reports}
-                product={grade.activeProduct}
-                selectedId={selectedReportId}
-                onSelect={handleSelectReport}
-              />
-              <ShareCard pkg={grade.result} captureMap={captureMap} addToast={addToast} />
-            </div>
-          )}
-
-          {grade.tier !== 'signed-out' && (
-            <div className="mt-3">
-              <GradeTrendChart cards={grade.cards} />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 };
 
@@ -306,5 +123,263 @@ const MapControls: React.FC<MapControlsProps> = ({
     </button>
   </div>
 );
+
+interface MapPaneProps {
+  grade: GradeState;
+  mapRef: React.RefObject<VerificationMapHandle>;
+  reportsVisible: boolean;
+  onSelectProduct: (product: ProductKind) => void;
+  onToggleEvidence: () => void;
+}
+
+/** Evidence surface: the map, its controls, and the compact grade overlay. */
+const MapPane: React.FC<MapPaneProps> = ({ grade, mapRef, reportsVisible, onSelectProduct, onToggleEvidence }) => {
+  if (!grade.forecast) {
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-500">
+        The map becomes the evidence surface once you load a package and grade a date.
+      </div>
+    );
+  }
+  return (
+    <>
+      <VerificationMap
+        ref={mapRef}
+        activeOutlookType={grade.activeProduct as 'categorical' | 'tornado' | 'wind' | 'hail'}
+        selectedDay={grade.selectedDay}
+      />
+      <MapControls
+        activeProduct={grade.activeProduct}
+        onSelectProduct={onSelectProduct}
+        availableDays={grade.availableDays}
+        selectedDay={grade.selectedDay}
+        onSelectDay={grade.setSelectedDay}
+        reportsVisible={reportsVisible}
+        onToggleEvidence={onToggleEvidence}
+      />
+      {grade.result && (
+        <div className="fg-grade-overlay">
+          <span className="text-2xl font-bold tabular-nums">{formatGrade(grade.result.grade)}</span>
+          <span className={`text-xl font-bold ${letterColorClass(grade.result.letter)}`}>
+            {grade.result.letter ?? '—'}
+          </span>
+        </div>
+      )}
+    </>
+  );
+};
+
+interface ResultDetailProps {
+  grade: GradeState;
+  activeComponent: ComponentKey | null;
+  onSelectComponent: (component: ComponentKey | null) => void;
+  selectedReportId: string | null;
+  onSelectReport: (report: StormReport | null) => void;
+  onSelectProduct: (product: ProductKind) => void;
+  captureMap: () => Promise<HTMLImageElement | null>;
+  addToast: ReturnType<typeof useAppLayout>['addToast'];
+}
+
+/** Grade headline, breakdown, data quality, report table, and share card. */
+const ResultDetail: React.FC<ResultDetailProps> = ({
+  grade,
+  activeComponent,
+  onSelectComponent,
+  selectedReportId,
+  onSelectReport,
+  onSelectProduct,
+  captureMap,
+  addToast,
+}) => {
+  if (!grade.result) {
+    return null;
+  }
+  const activeProductGrade = grade.result.products.find((product) => product.product === grade.activeProduct);
+  return (
+    <div className="mt-3">
+      <GradeHeadline pkg={grade.result} activeProduct={grade.activeProduct} onSelectProduct={onSelectProduct} />
+      {activeProductGrade && (
+        <ScoreBreakdown
+          product={activeProductGrade}
+          activeComponent={activeComponent}
+          onSelectComponent={onSelectComponent}
+        />
+      )}
+      <DataQualityPanel pkg={grade.result} />
+      <ReportTable
+        reports={grade.reports}
+        product={grade.activeProduct}
+        selectedId={selectedReportId}
+        onSelect={onSelectReport}
+      />
+      <ShareCard pkg={grade.result} captureMap={captureMap} addToast={addToast} />
+    </div>
+  );
+};
+
+interface ResultsPaneProps extends ResultDetailProps {
+  availableSources: PackageSourceKind[];
+  renderCloudSource?: () => React.ReactNode;
+}
+
+/** Source picker, run progress, the result detail, and the history trend. */
+const ResultsPane: React.FC<ResultsPaneProps> = ({ availableSources, renderCloudSource, ...detail }) => {
+  const { grade } = detail;
+  return (
+    <div className="fg-results-pane">
+      <SourcePanel
+        tier={grade.tier}
+        availableSources={availableSources}
+        hasForecast={Boolean(grade.forecast)}
+        sourceLabel={grade.sourceLabel}
+        useToday={grade.useToday}
+        reportDate={grade.reportDate}
+        canRun={grade.canRun}
+        isRunning={grade.phase === 'running'}
+        error={grade.error}
+        onFile={grade.loadFromFile}
+        onUseTodayChange={grade.setUseToday}
+        onReportDateChange={grade.setReportDate}
+        onRun={grade.run}
+        onReset={grade.reset}
+        renderCloudSource={renderCloudSource}
+      />
+
+      {grade.phase === 'running' && (
+        <div className="mt-3">
+          <RunProgress progress={grade.progress} />
+        </div>
+      )}
+
+      <ResultDetail {...detail} />
+
+      {grade.tier !== 'signed-out' && (
+        <div className="mt-3">
+          <GradeTrendChart cards={grade.cards} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Forecast Grade result workspace (PR 07 — result-workspace).
+ *
+ * Extends the shell with the full learn-fast result view: grade headline with
+ * per-product chips, the exactly-titled Score breakdown and Data quality
+ * sections, a selectable report table that mirrors map emphasis, a
+ * hazard-filterable history trend, and always-reachable hazard/day/evidence map
+ * controls. Selecting a product or component re-centers the map's active hazard.
+ */
+const ForecastGradeDashboard: React.FC = () => {
+  const { addToast } = useAppLayout();
+  const dispatch = useDispatch();
+  const grade = useForecastGrade(addToast);
+  const { loadCycle } = useCloudCycles();
+
+  const [activeComponent, setActiveComponent] = useState<ComponentKey | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const mapRef = useRef<VerificationMapHandle>(null);
+  const mapPaneRef = useRef<HTMLDivElement>(null);
+  const reportsVisible = useSelector((state: RootState) => state.stormReports.visible);
+
+  const availableSources = availablePackageSources(grade.tier);
+
+  const handleCloudLoad = useCallback(
+    async (id: string, label: string) => {
+      const payload = await loadCycle(id);
+      if (!payload) {
+        addToast('That cloud package could not be loaded.', 'error');
+        return;
+      }
+      try {
+        grade.setForecastPackage(deserializeForecast(payload), 'cloud', `${label} (cloud)`);
+        addToast('Cloud package loaded. Choose a report date and grade.', 'success');
+      } catch {
+        addToast('That cloud package could not be parsed.', 'error');
+      }
+    },
+    [addToast, grade, loadCycle]
+  );
+
+  const handleSelectProduct = useCallback(
+    (product: ProductKind) => {
+      grade.setActiveProduct(product);
+      setActiveComponent(null);
+    },
+    [grade]
+  );
+
+  const handleSelectReport = useCallback((report: StormReport | null) => {
+    setSelectedReportId(report?.id ?? null);
+  }, []);
+
+  const handleToggleEvidence = useCallback(() => {
+    dispatch(setVisibility(!reportsVisible));
+  }, [dispatch, reportsVisible]);
+
+  const captureMap = useCallback(async (): Promise<HTMLImageElement | null> => {
+    if (!mapPaneRef.current) {
+      return null;
+    }
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(mapPaneRef.current, { useCORS: true, logging: false });
+      const image = new Image();
+      image.src = canvas.toDataURL('image/png');
+      if (image.decode) {
+        await image.decode().catch(() => undefined);
+      }
+      return image;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const renderCloudSource = availableSources.includes('cloud')
+    ? () => <CloudSourcePicker onLoad={handleCloudLoad} />
+    : undefined;
+
+  return (
+    <div className="fg-dashboard">
+      <div className="fg-topbar">
+        <div>
+          <h2 className="text-lg font-semibold">Forecast Grade</h2>
+          <p className="text-xs text-slate-500">
+            Map-first verification · formula gfc-ver-1 ·{' '}
+            <a className="text-blue-500 hover:underline" href={METHODOLOGY_DOC_PATH} target="_blank" rel="noreferrer">
+              Methodology
+            </a>
+          </p>
+        </div>
+      </div>
+
+      <div className="fg-workspace">
+        <div className="fg-map-pane" ref={mapPaneRef}>
+          <MapPane
+            grade={grade}
+            mapRef={mapRef}
+            reportsVisible={reportsVisible}
+            onSelectProduct={handleSelectProduct}
+            onToggleEvidence={handleToggleEvidence}
+          />
+        </div>
+
+        <ResultsPane
+          grade={grade}
+          availableSources={availableSources}
+          renderCloudSource={renderCloudSource}
+          activeComponent={activeComponent}
+          onSelectComponent={setActiveComponent}
+          selectedReportId={selectedReportId}
+          onSelectReport={handleSelectReport}
+          onSelectProduct={handleSelectProduct}
+          captureMap={captureMap}
+          addToast={addToast}
+        />
+      </div>
+    </div>
+  );
+};
 
 export default ForecastGradeDashboard;
