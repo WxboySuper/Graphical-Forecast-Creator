@@ -6,7 +6,7 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ### PR #760
 
-- Restore native Umami page views for accurate traffic metrics and clarify GFC's cookie-free pseudonymous telemetry disclosure.
+- Restore native Umami page views for accurate traffic metrics, make non-essential telemetry an explicit opt-in, and clarify GFC's cookie-free pseudonymous telemetry disclosure.
 
 ### PR #759
 

@@ -32,9 +32,15 @@ test('does not load a tracker when the unified preference is disabled', () => {
   expect(isProductAnalyticsEnabled()).toBe(false);
 });
 
-test('preserves the prior workflow-only opt-out until the unified preference is set', () => {
-  localStorage.setItem('gfc-workflow-analytics-enabled', 'false');
+test('does not load a tracker until the visitor explicitly enables analytics', () => {
+  initProductAnalytics('gfc.weatherboysuper.com');
+  expect(document.querySelector('script[data-website-id]')).toBeNull();
   expect(isProductAnalyticsEnabled()).toBe(false);
+});
+
+test('preserves a prior explicit workflow opt-in until the unified preference is set', () => {
+  localStorage.setItem('gfc-workflow-analytics-enabled', 'true');
+  expect(isProductAnalyticsEnabled()).toBe(true);
   setProductAnalyticsEnabled(true);
   expect(isProductAnalyticsEnabled()).toBe(true);
 });
@@ -42,6 +48,7 @@ test('preserves the prior workflow-only opt-out until the unified preference is 
 test('loads the matching zone and normalizes page paths before tracking', () => {
   const track = jest.fn();
   window.umami = { track };
+  setProductAnalyticsEnabled(true);
   initProductAnalytics('gfc.weatherboysuper.com');
   expect(document.querySelector('script[data-website-id="prod-zone"]')).not.toBeNull();
   trackProductPageView('/forecast?name=not-for-analytics', 'gfc.weatherboysuper.com');
@@ -49,6 +56,7 @@ test('loads the matching zone and normalizes page paths before tracking', () => 
 });
 
 test('flushes a queued route as a native Umami page view after the tracker loads', () => {
+  setProductAnalyticsEnabled(true);
   initProductAnalytics('beta-gfc.weatherboysuper.com');
   trackProductPageView('/cloud-library#private', 'beta-gfc.weatherboysuper.com');
 
@@ -61,6 +69,7 @@ test('flushes a queued route as a native Umami page view after the tracker loads
 });
 
 test('discards queued events when analytics is explicitly disabled', () => {
+  setProductAnalyticsEnabled(true);
   initProductAnalytics('gfc.weatherboysuper.com');
   trackProductEvent('cloud_save_completed');
   setProductAnalyticsEnabled(false);

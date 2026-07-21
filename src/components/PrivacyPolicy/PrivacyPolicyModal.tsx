@@ -4,7 +4,7 @@ import { isProductAnalyticsEnabled, setProductAnalyticsEnabled } from '../../lib
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.5.0';
+const PRIVACY_POLICY_VERSION = '1.6.0';
 const PRIVACY_POLICY_LAST_UPDATED = 'July 21, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
@@ -27,6 +27,10 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
   '1.5.0': [
     'We clarified that cookie-free product analytics use a pseudonymous visitor/session identifier, not account identity.',
     'We added a clearer description of the coarse technical and IP-derived location information visible in our self-hosted analytics.',
+  ],
+  '1.6.0': [
+    'Non-essential product analytics are now disabled by default and require a separate, optional opt-in.',
+    'You can withdraw that telemetry permission at any time without affecting access to GFC.',
   ],
 };
 
@@ -108,7 +112,7 @@ const ProductAnalyticsPreference: React.FC = () => {
   return (
     <button type="button" role="switch" aria-checked={enabled} className="privacy-analytics-preference" onClick={handleChange}>
       <strong>Non-essential product analytics: {enabled ? 'Enabled' : 'Disabled'}</strong>
-      <span>{enabled ? 'Disable local pseudonymous telemetry' : 'Enable local pseudonymous telemetry'}</span>
+      <span>{enabled ? 'Withdraw telemetry permission' : 'Enable optional pseudonymous telemetry'}</span>
     </button>
   );
 };
@@ -173,10 +177,12 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       your account view.
     </p>
     <p>
-      You can disable non-essential product analytics from your local telemetry preference. When disabled, GFC does
-      not load the Umami tracker or send product-analytics events. Analytics are hosted by GFC on our VPS and are not
-      used for advertising, cross-site tracking, or sale of personal data. Event-level telemetry is retained only for
-      product operations and may be deleted during routine maintenance; aggregate metrics may be retained longer.
+      Non-essential product analytics are disabled by default. You may optionally enable them using the local telemetry
+      preference below; choosing not to enable them does not affect access to GFC. You can withdraw that permission at
+      any time from the same control. When disabled, GFC does not load the Umami tracker or send product-analytics
+      events. Analytics are hosted by GFC on our VPS and are not used for advertising, cross-site tracking, or sale of
+      personal data. Event-level telemetry is retained only for product operations and may be deleted during routine
+      maintenance; aggregate metrics may be retained longer.
     </p>
     <ProductAnalyticsPreference />
     <p>

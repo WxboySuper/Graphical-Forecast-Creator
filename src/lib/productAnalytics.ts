@@ -62,14 +62,14 @@ export const getProductAnalyticsZone = (hostname?: string): AnalyticsZone | null
   return null;
 };
 
-/** False is an explicit opt-out; absence preserves the product default. */
+/** Analytics are non-essential and remain off until the visitor explicitly enables them. */
 export const isProductAnalyticsEnabled = (): boolean => {
   try {
-    if (typeof localStorage === 'undefined') return true;
+    if (typeof localStorage === 'undefined') return false;
     const preference = localStorage.getItem(PRODUCT_ANALYTICS_PREFERENCE_KEY);
-    if (preference !== null) return preference !== 'false';
-    // Preserve an existing workflow-only opt-out when moving to the unified preference.
-    return localStorage.getItem(LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY) !== 'false';
+    if (preference !== null) return preference === 'true';
+    // A prior explicit workflow opt-in remains valid; absence never enables new telemetry.
+    return localStorage.getItem(LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY) === 'true';
   } catch {
     return false;
   }
