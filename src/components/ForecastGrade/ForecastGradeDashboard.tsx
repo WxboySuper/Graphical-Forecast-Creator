@@ -14,6 +14,7 @@ import { useForecastGrade } from './useForecastGrade';
 import CloudSourcePicker from './CloudSourcePicker';
 import ForecastGradeMapPane from './ForecastGradeMapPane';
 import ForecastGradeResultsPane from './ForecastGradeResultsPane';
+import ShareCard from './ShareCard';
 import { METHODOLOGY_DOC_PATH } from './methodology';
 import './ForecastGradeDashboard.css';
 
@@ -81,6 +82,24 @@ const ForecastGradeDashboard: React.FC = () => {
     [addToast, grade]
   );
 
+  const captureMap = useCallback(async (): Promise<HTMLImageElement | null> => {
+    if (!mapPaneRef.current) {
+      return null;
+    }
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(mapPaneRef.current, { useCORS: true, logging: false });
+      const image = new Image();
+      image.src = canvas.toDataURL('image/png');
+      if (image.decode) {
+        await image.decode().catch(() => undefined);
+      }
+      return image;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const renderCloudSource = availableSources.includes('cloud')
     ? () => <CloudSourcePicker onLoad={handleCloudLoad} />
     : undefined;
@@ -130,6 +149,9 @@ const ForecastGradeDashboard: React.FC = () => {
           onSelectProduct={handleSelectProduct}
           onSelectHistoryCard={handleSelectHistoryCard}
           result={grade.result}
+          afterResult={
+            grade.result ? <ShareCard pkg={grade.result} captureMap={captureMap} addToast={addToast} /> : null
+          }
         />
       </div>
     </div>

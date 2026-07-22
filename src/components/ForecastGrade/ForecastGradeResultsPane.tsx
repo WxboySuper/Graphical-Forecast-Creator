@@ -25,6 +25,7 @@ interface ForecastGradeResultsPaneProps {
   onSelectProduct: (product: ProductKind) => void;
   onSelectHistoryCard: (card: GradeCard) => void;
   result?: PackageGrade | null;
+  afterResult?: React.ReactNode;
 }
 
 const ForecastGradeResultsPane: React.FC<ForecastGradeResultsPaneProps> = ({
@@ -39,6 +40,7 @@ const ForecastGradeResultsPane: React.FC<ForecastGradeResultsPaneProps> = ({
   onSelectProduct,
   onSelectHistoryCard,
   result,
+  afterResult,
 }) => (
   <div className="fg-results-pane">
     <SourcePanel
@@ -82,6 +84,7 @@ const ForecastGradeResultsPane: React.FC<ForecastGradeResultsPaneProps> = ({
           selectedId={selectedReportId}
           onSelect={onSelectReport}
         />
+        {afterResult}
       </div>
     )}
 
