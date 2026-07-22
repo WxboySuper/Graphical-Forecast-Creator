@@ -8,26 +8,17 @@ import { deserializeForecast } from '../../utils/fileUtils';
 import { setVisibility } from '../../store/stormReportsSlice';
 import type { RootState } from '../../store';
 import type { StormReport } from '../../types/stormReports';
-import type { GradeCard, PackageSourceKind } from '../../types/forecastGrade';
+import type { GradeCard } from '../../types/forecastGrade';
 import type { ComponentKey, ProductKind } from '../../utils/verificationV2';
 import { availablePackageSources } from '../../utils/verificationV2/sources';
 import { useForecastGrade } from './useForecastGrade';
-import SourcePanel from './SourcePanel';
-import RunProgress from './RunProgress';
-import GradeHeadline from './GradeHeadline';
-import ScoreBreakdown from './ScoreBreakdown';
-import DataQualityPanel from './DataQualityPanel';
-import ReportTable from './ReportTable';
-import GradeTrendChart from './GradeTrendChart';
 import CloudSourcePicker from './CloudSourcePicker';
 import ForecastGradeMapControls from './ForecastGradeMapControls';
+import ForecastGradeResultsPane from './ForecastGradeResultsPane';
 import { formatGrade, letterColorClass } from './gradeFormat';
 import { METHODOLOGY_DOC_PATH } from './methodology';
 import './ForecastGradeDashboard.css';
 
-/**
- * Forecast Grade result workspace (PR 07 — result-workspace).
- */
 const ForecastGradeDashboard: React.FC = () => {
   const { addToast } = useAppLayout();
   const dispatch = useDispatch();
@@ -102,7 +93,9 @@ const ForecastGradeDashboard: React.FC = () => {
     [addToast, grade]
   );
 
-  const showMap = Boolean(grade.forecast);
+  const renderCloudSource = availableSources.includes('cloud')
+    ? () => <CloudSourcePicker onLoad={handleCloudLoad} />
+    : undefined;
 
   return (
     <div className="fg-dashboard">
@@ -120,7 +113,7 @@ const ForecastGradeDashboard: React.FC = () => {
 
       <div className="fg-workspace">
         <div className="fg-map-pane" ref={mapPaneRef} data-emphasis-component={activeComponent ?? undefined}>
-          {showMap ? (
+          {grade.forecast ? (
             <>
               <VerificationMap
                 ref={mapRef}
@@ -154,65 +147,19 @@ const ForecastGradeDashboard: React.FC = () => {
           )}
         </div>
 
-        <div className="fg-results-pane">
-          <SourcePanel
-            tier={grade.tier}
-            availableSources={availableSources}
-            hasForecast={Boolean(grade.forecast)}
-            sourceLabel={grade.sourceLabel}
-            useToday={grade.useToday}
-            reportDate={grade.reportDate}
-            canRun={grade.canRun}
-            isRunning={grade.phase === 'running'}
-            error={grade.error}
-            onFile={grade.loadFromFile}
-            onUseTodayChange={grade.setUseToday}
-            onReportDateChange={grade.setReportDate}
-            onRun={grade.run}
-            onReset={grade.reset}
-            renderCloudSource={
-              availableSources.includes('cloud')
-                ? () => <CloudSourcePicker onLoad={handleCloudLoad} />
-                : undefined
-            }
-          />
-
-          {grade.phase === 'running' && (
-            <div className="mt-3">
-              <RunProgress progress={grade.progress} />
-            </div>
-          )}
-
-          {grade.result && (
-            <div className="mt-3">
-              <GradeHeadline
-                pkg={grade.result}
-                activeProduct={grade.activeProduct}
-                onSelectProduct={handleSelectProduct}
-              />
-              {activeProductGrade && (
-                <ScoreBreakdown
-                  product={activeProductGrade}
-                  activeComponent={activeComponent}
-                  onSelectComponent={setActiveComponent}
-                />
-              )}
-              <DataQualityPanel pkg={grade.result} />
-              <ReportTable
-                reports={grade.reports}
-                product={grade.activeProduct}
-                selectedId={selectedReportId}
-                onSelect={handleSelectReport}
-              />
-            </div>
-          )}
-
-          {grade.tier !== 'signed-out' && (
-            <div className="mt-3">
-              <GradeTrendChart cards={grade.cards} onSelectCard={handleSelectHistoryCard} />
-            </div>
-          )}
-        </div>
+        <ForecastGradeResultsPane
+          grade={grade}
+          availableSources={availableSources}
+          renderCloudSource={renderCloudSource}
+          activeProductGrade={activeProductGrade}
+          activeComponent={activeComponent}
+          onSelectComponent={setActiveComponent}
+          selectedReportId={selectedReportId}
+          onSelectReport={handleSelectReport}
+          onSelectProduct={handleSelectProduct}
+          onSelectHistoryCard={handleSelectHistoryCard}
+          result={grade.result}
+        />
       </div>
     </div>
   );
