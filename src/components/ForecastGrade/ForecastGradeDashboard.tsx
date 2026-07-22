@@ -1,5 +1,6 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { fromLonLat } from 'ol/proj';
 import { Eye, EyeOff } from 'lucide-react';
 import VerificationMap, { type VerificationMapHandle } from '../Map/VerificationMap';
 import { useAppLayout } from '../Layout/AppLayout';
@@ -8,6 +9,7 @@ import { deserializeForecast } from '../../utils/fileUtils';
 import { setVisibility } from '../../store/stormReportsSlice';
 import type { RootState } from '../../store';
 import type { StormReport } from '../../types/stormReports';
+import type { GradeCard, PackageSourceKind } from '../../types/forecastGrade';
 import type { ComponentKey, ProductKind } from '../../utils/verificationV2';
 import { availablePackageSources } from '../../utils/verificationV2/sources';
 import { useForecastGrade } from './useForecastGrade';
@@ -124,6 +126,31 @@ const ForecastGradeDashboard: React.FC = () => {
     setSelectedReportId(report?.id ?? null);
   }, []);
 
+  useEffect(() => {
+    if (!selectedReportId) {
+      return;
+    }
+    const report = grade.reports.find((entry) => entry.id === selectedReportId);
+    const map = mapRef.current?.getMap();
+    if (!report || !map) {
+      return;
+    }
+    map.getView().animate({
+      center: fromLonLat([report.longitude, report.latitude]),
+      duration: 250,
+    });
+  }, [grade.reports, selectedReportId]);
+
+  const handleSelectHistoryCard = useCallback(
+    (card: GradeCard) => {
+      const snapshot = grade.restoreCard(card);
+      if (snapshot) {
+        addToast('Full package restore is available for this grade card.', 'info');
+      }
+    },
+    [addToast, grade]
+  );
+
   const showMap = Boolean(grade.forecast);
 
   return (
@@ -148,6 +175,7 @@ const ForecastGradeDashboard: React.FC = () => {
                 ref={mapRef}
                 activeOutlookType={grade.activeProduct as 'categorical' | 'tornado' | 'wind' | 'hail'}
                 selectedDay={grade.selectedDay}
+                highlightedReportId={selectedReportId}
               />
               <MapControls
                 activeProduct={grade.activeProduct}
@@ -158,6 +186,11 @@ const ForecastGradeDashboard: React.FC = () => {
                 reportsVisible={reportsVisible}
                 onToggleEvidence={() => dispatch(setVisibility(!reportsVisible))}
               />
+              {activeComponent && (
+                <div className="absolute bottom-2 left-2 z-[5] rounded bg-slate-900/80 px-2 py-1 text-xs text-white">
+                  Component: {activeComponent.replace(/([A-Z])/g, ' $1').trim()}
+                </div>
+              )}
               {grade.result && (
                 <div className="fg-grade-overlay">
                   <span className="text-2xl font-bold tabular-nums">{formatGrade(grade.result.grade)}</span>
@@ -229,7 +262,7 @@ const ForecastGradeDashboard: React.FC = () => {
 
           {grade.tier !== 'signed-out' && (
             <div className="mt-3">
-              <GradeTrendChart cards={grade.cards} />
+              <GradeTrendChart cards={grade.cards} onSelectCard={handleSelectHistoryCard} />
             </div>
           )}
         </div>

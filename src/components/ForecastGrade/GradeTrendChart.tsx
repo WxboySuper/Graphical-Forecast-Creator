@@ -24,7 +24,10 @@ const GradeTrendChart: React.FC<GradeTrendChartProps> = ({ cards, onSelectCard }
   const ordered = useMemo(() => [...cards].reverse(), [cards]);
   const points = ordered
     .map((card) => ({ card, value: valueForFilter(card, filter) }))
-    .filter((entry): entry is { card: GradeCard; value: number } => entry.value !== null);
+    .filter(
+      (entry): entry is { card: GradeCard; value: number } =>
+        entry.value !== null && Number.isFinite(entry.value)
+    );
 
   if (cards.length === 0) {
     return (

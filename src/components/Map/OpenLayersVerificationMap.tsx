@@ -50,6 +50,7 @@ import { ReportType } from "../../types/stormReports";
 interface OpenLayersVerificationMapProps {
   activeOutlookType?: "categorical" | "tornado" | "wind" | "hail";
   selectedDay?: DayType;
+  highlightedReportId?: string | null;
 }
 
 type VerificationOutlookType = NonNullable<
@@ -102,16 +103,16 @@ const reportColors = {
 const FALLBACK_REPORT_COLOR = "#888888";
 
 // Style function for storm reports
-const buildReportStyle = (type: ReportType) => {
+const buildReportStyle = (type: ReportType, highlighted = false) => {
   return new OlStyle({
     image: new Circle({
-      radius: 6,
+      radius: highlighted ? 8 : 6,
       fill: new StyleFill({
         color: reportColors[type] || FALLBACK_REPORT_COLOR, // Fallback to grey
       }),
       stroke: new StyleStroke({
-        color: "#FFFFFF", // White border
-        width: 1,
+        color: highlighted ? "#FBBF24" : "#FFFFFF",
+        width: highlighted ? 2 : 1,
       }),
     }),
   });
@@ -468,7 +469,7 @@ const VerifMapStylePickerButton: React.FC<{
 const OpenLayersVerificationMap = forwardRef<
   MapAdapterHandle<OLMap> | null,
   OpenLayersVerificationMapProps
->(({ activeOutlookType = CATEGORICAL_OUTLOOK, selectedDay = 1 }, ref) => {
+>(({ activeOutlookType = CATEGORICAL_OUTLOOK, selectedDay = 1, highlightedReportId = null }, ref) => {
   const dispatch = useDispatch();
   const [showStylePicker, setShowStylePicker] = useState(false);
   const mapElementRef = useRef<HTMLDivElement>(null);
@@ -901,11 +902,11 @@ const OpenLayersVerificationMap = forwardRef<
           type: report.type, // Store type for styling
           reportId: report.id, // Store ID for potential future interactions
         });
-        feature.setStyle(buildReportStyle(report.type));
+        feature.setStyle(buildReportStyle(report.type, report.id === highlightedReportId));
         source.addFeature(feature);
       });
     }
-  }, [reports, reportsVisible, filterByType, activeOutlookType]);
+  }, [reports, reportsVisible, filterByType, activeOutlookType, highlightedReportId]);
 
   // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
   const handleToggleStylePicker = () => {
