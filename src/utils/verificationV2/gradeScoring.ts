@@ -30,12 +30,15 @@ export const scoreToLetter = (grade: number | null): LetterGrade | null => {
 };
 
 /** Combines component scores into a 0–100 product grade. */
+const isScorableComponent = (component: ComponentScore): component is ComponentScore & { score: number } =>
+  component.applicable && component.score !== null && Number.isFinite(component.score);
+
 export const composeComponents = (components: ComponentScore[]): number | null => {
   let weightSum = 0;
   let weighted = 0;
 
   for (const component of components) {
-    if (!component.applicable || component.score === null || !Number.isFinite(component.score)) {
+    if (!isScorableComponent(component)) {
       continue;
     }
     weightSum += component.weight;
@@ -64,6 +67,9 @@ export const scoredComponent = (
   detail: string,
   metrics?: Record<string, number>
 ): ComponentScore => {
+  if (!Number.isFinite(score)) {
+    return notEvaluatedComponent(key, detail);
+  }
   const normalized = clamp(score);
   return {
     key,
