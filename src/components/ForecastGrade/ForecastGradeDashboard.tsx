@@ -83,12 +83,13 @@ const ForecastGradeDashboard: React.FC = () => {
   );
 
   const captureMap = useCallback(async (): Promise<HTMLImageElement | null> => {
-    if (!mapPaneRef.current) {
+    const mapElement = mapRef.current?.getMap()?.getTargetElement() as HTMLElement | undefined;
+    if (!mapElement) {
       return null;
     }
     try {
       const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(mapPaneRef.current, { useCORS: true, logging: false });
+      const canvas = await html2canvas(mapElement, { useCORS: true, logging: false });
       const image = new Image();
       image.src = canvas.toDataURL('image/png');
       if (image.decode) {

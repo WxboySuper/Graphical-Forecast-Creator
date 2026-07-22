@@ -62,9 +62,14 @@ export const composeShareCard = (
   ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
   // Map-led hero.
-  if (mapImage) {
+  if (mapImage && mapImage.width > 0 && mapImage.height > 0) {
     try {
-      ctx.drawImage(mapImage, 0, 0, CARD_WIDTH, CARD_HEIGHT);
+      const scale = Math.max(CARD_WIDTH / mapImage.width, CARD_HEIGHT / mapImage.height);
+      const drawWidth = mapImage.width * scale;
+      const drawHeight = mapImage.height * scale;
+      const offsetX = (CARD_WIDTH - drawWidth) / 2;
+      const offsetY = (CARD_HEIGHT - drawHeight) / 2;
+      ctx.drawImage(mapImage, offsetX, offsetY, drawWidth, drawHeight);
       ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
       ctx.fillRect(0, CARD_HEIGHT - 210, CARD_WIDTH, 210);
     } catch {

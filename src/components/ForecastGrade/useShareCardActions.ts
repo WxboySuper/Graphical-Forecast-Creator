@@ -72,7 +72,15 @@ export const useShareCardActions = (
     try {
       const canvas = await build();
       const blob = canvas ? await canvasToBlob(canvas) : null;
-      const clip = navigator.clipboard as Clipboard & { write?: (items: ClipboardItem[]) => Promise<void> };
+      const clip = navigator.clipboard;
+      if (!clip) {
+        addToast('Copy is not supported here; try download.', 'info');
+        return;
+      }
+      if (navigator.userActivation && !navigator.userActivation.isActive) {
+        addToast('Copy timed out while preparing the card; try download.', 'info');
+        return;
+      }
       if (blob && typeof ClipboardItem !== 'undefined' && clip.write) {
         await clip.write([new ClipboardItem({ 'image/png': blob })]);
         addToast('Share card copied to clipboard.', 'success');
