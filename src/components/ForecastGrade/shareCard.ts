@@ -47,7 +47,13 @@ const drawMapHero = (
   width: number,
   height: number
 ): void => {
-  if (!mapImage || mapImage.width <= 0 || mapImage.height <= 0) {
+  if (!mapImage) {
+    return;
+  }
+  if (mapImage.width <= 0) {
+    return;
+  }
+  if (mapImage.height <= 0) {
     return;
   }
   try {

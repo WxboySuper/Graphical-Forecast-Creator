@@ -82,9 +82,15 @@ export const useShareCardActions = (
         return;
       }
       if (blob && typeof ClipboardItem !== 'undefined' && clip.write) {
-        await clip.write([new ClipboardItem({ 'image/png': blob })]);
-        addToast('Share card copied to clipboard.', 'success');
-      } else if (clip.writeText) {
+        try {
+          await clip.write([new ClipboardItem({ 'image/png': blob })]);
+          addToast('Share card copied to clipboard.', 'success');
+          return;
+        } catch {
+          // Fall back to text when image clipboard is unsupported.
+        }
+      }
+      if (clip.writeText) {
         await clip.writeText(shareSummaryText(pkg));
         addToast('Grade summary copied to clipboard.', 'success');
       } else {
