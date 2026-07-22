@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useAuth } from '../../auth/AuthProvider';
 import { useEntitlement } from '../../billing/EntitlementProvider';
@@ -103,6 +103,7 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
   const [error, setError] = useState<string | null>(null);
   const [cards, setCards] = useState<GradeCard[]>([]);
   const [reports, setReportsState] = useState<StormReport[]>([]);
+  const restoreSeqRef = useRef(0);
 
   useEffect(() => {
     setCards(loadGradeCards(scope));
@@ -246,6 +247,7 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
 
   const applyGradeSnapshot = useCallback(
     (snapshot: GradeSnapshot) => {
+      const restoreSeq = ++restoreSeqRef.current;
       const restoredForecast = deserializeForecast(snapshot.forecast);
       const days = daysWithData(restoredForecast);
       setForecast(restoredForecast);
@@ -270,11 +272,17 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
       dispatch(loadVerificationForecast(restoredForecast));
       void loadReportsForDate(snapshot.reportDate)
         .then((loadedReports) => {
+          if (restoreSeq !== restoreSeqRef.current) {
+            return;
+          }
           setReportsState(loadedReports);
           dispatch(setReports(loadedReports));
           dispatch(setDate(snapshot.reportDate ?? 'today'));
         })
         .catch(() => {
+          if (restoreSeq !== restoreSeqRef.current) {
+            return;
+          }
           setReportsState([]);
           dispatch(clearReports());
         });
