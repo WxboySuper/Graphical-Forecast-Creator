@@ -74,20 +74,25 @@ export const COMPONENT_ORDER: readonly ComponentKey[] = [
 ];
 
 /** One scored (or N/A) composite component for a single hazard product. */
-export interface ComponentScore {
-  key: ComponentKey;
-  label: string;
-  /** Nominal composite weight (percent) before renormalization. */
-  weight: number;
-  /** Normalized component score in [0, 1], or null when Not evaluated. */
-  score: number | null;
-  /** False when the component is Not evaluated (renormalized out). */
-  applicable: boolean;
-  /** Short factual metrics sentence — never coaching prose. */
-  detail: string;
-  /** Raw metrics for the breakdown drawer and share/export payloads. */
-  metrics?: Record<string, number>;
-}
+export type ComponentScore =
+  | {
+      key: ComponentKey;
+      label: string;
+      weight: number;
+      applicable: true;
+      score: number;
+      detail: string;
+      metrics?: Record<string, number>;
+    }
+  | {
+      key: ComponentKey;
+      label: string;
+      weight: number;
+      applicable: false;
+      score: null;
+      detail: string;
+      metrics?: Record<string, number>;
+    };
 
 /** Grade for a single product (categorical, tornado, wind, or hail). */
 export interface ProductGrade {
