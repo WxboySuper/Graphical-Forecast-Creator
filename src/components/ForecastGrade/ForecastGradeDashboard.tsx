@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fromLonLat } from 'ol/proj';
-import VerificationMap, { type VerificationMapHandle } from '../Map/VerificationMap';
+import type { VerificationMapHandle } from '../Map/VerificationMap';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useCloudCycles } from '../../hooks/useCloudCycles';
 import { deserializeForecast } from '../../utils/fileUtils';
@@ -13,9 +12,8 @@ import type { ComponentKey, ProductKind } from '../../utils/verificationV2';
 import { availablePackageSources } from '../../utils/verificationV2/sources';
 import { useForecastGrade } from './useForecastGrade';
 import CloudSourcePicker from './CloudSourcePicker';
-import ForecastGradeMapControls from './ForecastGradeMapControls';
+import ForecastGradeMapPane from './ForecastGradeMapPane';
 import ForecastGradeResultsPane from './ForecastGradeResultsPane';
-import { formatGrade, letterColorClass } from './gradeFormat';
 import { METHODOLOGY_DOC_PATH } from './methodology';
 import './ForecastGradeDashboard.css';
 
@@ -68,21 +66,6 @@ const ForecastGradeDashboard: React.FC = () => {
     setSelectedReportId(report?.id ?? null);
   }, []);
 
-  useEffect(() => {
-    if (!selectedReportId) {
-      return;
-    }
-    const report = grade.reports.find((entry) => entry.id === selectedReportId);
-    const map = mapRef.current?.getMap();
-    if (!report || !map) {
-      return;
-    }
-    map.getView().animate({
-      center: fromLonLat([report.longitude, report.latitude]),
-      duration: 250,
-    });
-  }, [grade.reports, selectedReportId]);
-
   const handleSelectHistoryCard = useCallback(
     (card: GradeCard) => {
       const snapshot = grade.restoreCard(card);
@@ -112,40 +95,22 @@ const ForecastGradeDashboard: React.FC = () => {
       </div>
 
       <div className="fg-workspace">
-        <div className="fg-map-pane" ref={mapPaneRef} data-emphasis-component={activeComponent ?? undefined}>
-          {grade.forecast ? (
-            <>
-              <VerificationMap
-                ref={mapRef}
-                activeOutlookType={grade.activeProduct as 'categorical' | 'tornado' | 'wind' | 'hail'}
-                selectedDay={grade.selectedDay}
-                highlightedReportId={selectedReportId}
-                emphasisComponent={activeComponent}
-              />
-              <ForecastGradeMapControls
-                activeProduct={grade.activeProduct}
-                onSelectProduct={handleSelectProduct}
-                availableDays={grade.availableDays}
-                selectedDay={grade.selectedDay}
-                onSelectDay={grade.setSelectedDay}
-                reportsVisible={reportsVisible}
-                onToggleEvidence={() => dispatch(setVisibility(!reportsVisible))}
-              />
-              {grade.result && (
-                <div className="fg-grade-overlay">
-                  <span className="text-2xl font-bold tabular-nums">{formatGrade(grade.result.grade)}</span>
-                  <span className={`text-xl font-bold ${letterColorClass(grade.result.letter)}`}>
-                    {grade.result.letter ?? '—'}
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-500">
-              The map becomes the evidence surface once you load a package and grade a date.
-            </div>
-          )}
-        </div>
+        <ForecastGradeMapPane
+          forecastLoaded={Boolean(grade.forecast)}
+          activeProduct={grade.activeProduct}
+          selectedDay={grade.selectedDay}
+          availableDays={grade.availableDays}
+          reports={grade.reports}
+          selectedReportId={selectedReportId}
+          activeComponent={activeComponent}
+          result={grade.result}
+          reportsVisible={reportsVisible}
+          onSelectProduct={handleSelectProduct}
+          onSelectDay={grade.setSelectedDay}
+          onToggleEvidence={() => dispatch(setVisibility(!reportsVisible))}
+          mapPaneRef={mapPaneRef}
+          mapRef={mapRef}
+        />
 
         <ForecastGradeResultsPane
           grade={grade}
