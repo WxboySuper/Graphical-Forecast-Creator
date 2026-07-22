@@ -52,6 +52,7 @@ interface OpenLayersVerificationMapProps {
   selectedDay?: DayType;
   highlightedReportId?: string | null;
   emphasisComponent?: string | null;
+  onSelectReportId?: (reportId: string | null) => void;
 }
 
 type VerificationOutlookType = NonNullable<
@@ -100,24 +101,23 @@ const reportColors = {
   hail: "#00FF00", // Green for hail
 };
 
-const REPORT_EMPHASIS_COMPONENTS = new Set(['eventYield', 'severity']);
-const GEOMETRY_EMPHASIS_COMPONENTS = new Set(['probabilitySkill', 'spatialContingency', 'farDiscipline']);
+const EMPHASIS_BY_COMPONENT: Record<string, { outlookOpacity: number; emphasizeReports: boolean }> = {
+  probabilitySkill: { outlookOpacity: 0.5, emphasizeReports: false },
+  spatialContingency: { outlookOpacity: 0.38, emphasizeReports: false },
+  farDiscipline: { outlookOpacity: 0.55, emphasizeReports: false },
+  eventYield: { outlookOpacity: 0.9, emphasizeReports: true },
+  severity: { outlookOpacity: 0.82, emphasizeReports: true },
+};
 
 const outlookOpacityForEmphasis = (component: string | null): number => {
   if (!component) {
     return 1;
   }
-  if (REPORT_EMPHASIS_COMPONENTS.has(component)) {
-    return 0.88;
-  }
-  if (GEOMETRY_EMPHASIS_COMPONENTS.has(component)) {
-    return 0.42;
-  }
-  return 0.65;
+  return EMPHASIS_BY_COMPONENT[component]?.outlookOpacity ?? 0.65;
 };
 
 const reportsEmphasizedForComponent = (component: string | null): boolean =>
-  Boolean(component && REPORT_EMPHASIS_COMPONENTS.has(component));
+  Boolean(component && EMPHASIS_BY_COMPONENT[component]?.emphasizeReports);
 
 // Fallback color for report dots when the report type is not found in reportColors
 const FALLBACK_REPORT_COLOR = '#888888';
@@ -491,7 +491,7 @@ const VerifMapStylePickerButton: React.FC<{
 const OpenLayersVerificationMap = forwardRef<
   MapAdapterHandle<OLMap> | null,
   OpenLayersVerificationMapProps
->(({ activeOutlookType = CATEGORICAL_OUTLOOK, selectedDay = 1, highlightedReportId = null, emphasisComponent = null }, ref) => {
+>(({ activeOutlookType = CATEGORICAL_OUTLOOK, selectedDay = 1, highlightedReportId = null, emphasisComponent = null, onSelectReportId }, ref) => {
   const dispatch = useDispatch();
   const [showStylePicker, setShowStylePicker] = useState(false);
   const mapElementRef = useRef<HTMLDivElement>(null);
@@ -845,6 +845,31 @@ const OpenLayersVerificationMap = forwardRef<
 
     outlookLayer.setOpacity(outlookOpacityForEmphasis(emphasisComponent));
   }, [activeOutlookType, emphasisComponent]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onSelectReportId) {
+      return undefined;
+    }
+
+    const handleClick = (event: import('ol/MapBrowserEvent').default<UIEvent>) => {
+      let selectedId: string | null = null;
+      map.forEachFeatureAtPixel(event.pixel, (feature) => {
+        const reportId = feature.get('reportId');
+        if (typeof reportId === 'string') {
+          selectedId = reportId;
+          return true;
+        }
+        return false;
+      });
+      onSelectReportId(selectedId);
+    };
+
+    map.on('singleclick', handleClick);
+    return () => {
+      map.un('singleclick', handleClick);
+    };
+  }, [onSelectReportId]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;

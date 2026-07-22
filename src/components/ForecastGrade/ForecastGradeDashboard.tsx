@@ -66,6 +66,10 @@ const ForecastGradeDashboard: React.FC = () => {
     setSelectedReportId(report?.id ?? null);
   }, []);
 
+  const handleSelectReportId = useCallback((reportId: string | null) => {
+    setSelectedReportId(reportId);
+  }, []);
+
   const handleSelectHistoryCard = useCallback(
     (card: GradeCard) => {
       const snapshot = grade.restoreCard(card);
@@ -109,6 +113,7 @@ const ForecastGradeDashboard: React.FC = () => {
           onSelectProduct={handleSelectProduct}
           onSelectDay={grade.setSelectedDay}
           onToggleEvidence={() => dispatch(setVisibility(!reportsVisible))}
+          onSelectReportId={handleSelectReportId}
           mapPaneRef={mapPaneRef}
           mapRef={mapRef}
         />

@@ -19,6 +19,7 @@ interface ForecastGradeMapPaneProps {
   onSelectProduct: (product: ProductKind) => void;
   onSelectDay: (day: never) => void;
   onToggleEvidence: () => void;
+  onSelectReportId?: (reportId: string | null) => void;
   mapPaneRef: React.RefObject<HTMLDivElement>;
   mapRef: React.RefObject<VerificationMapHandle>;
 }
@@ -36,6 +37,7 @@ const ForecastGradeMapPane: React.FC<ForecastGradeMapPaneProps> = ({
   onSelectProduct,
   onSelectDay,
   onToggleEvidence,
+  onSelectReportId,
   mapPaneRef,
   mapRef,
 }) => {
@@ -64,6 +66,7 @@ const ForecastGradeMapPane: React.FC<ForecastGradeMapPaneProps> = ({
             selectedDay={selectedDay}
             highlightedReportId={selectedReportId}
             emphasisComponent={activeComponent}
+            onSelectReportId={onSelectReportId}
           />
           <ForecastGradeMapControls
             activeProduct={activeProduct}
