@@ -100,8 +100,27 @@ const reportColors = {
   hail: "#00FF00", // Green for hail
 };
 
+const REPORT_EMPHASIS_COMPONENTS = new Set(['eventYield', 'severity']);
+const GEOMETRY_EMPHASIS_COMPONENTS = new Set(['probabilitySkill', 'spatialContingency', 'farDiscipline']);
+
+const outlookOpacityForEmphasis = (component: string | null): number => {
+  if (!component) {
+    return 1;
+  }
+  if (REPORT_EMPHASIS_COMPONENTS.has(component)) {
+    return 0.88;
+  }
+  if (GEOMETRY_EMPHASIS_COMPONENTS.has(component)) {
+    return 0.42;
+  }
+  return 0.65;
+};
+
+const reportsEmphasizedForComponent = (component: string | null): boolean =>
+  Boolean(component && REPORT_EMPHASIS_COMPONENTS.has(component));
+
 // Fallback color for report dots when the report type is not found in reportColors
-const FALLBACK_REPORT_COLOR = "#888888";
+const FALLBACK_REPORT_COLOR = '#888888';
 
 // Style function for storm reports
 const buildReportStyle = (type: ReportType, highlighted = false, emphasizeReports = false) => {
@@ -824,7 +843,7 @@ const OpenLayersVerificationMap = forwardRef<
       return;
     }
 
-    outlookLayer.setOpacity(emphasisComponent ? 0.42 : 1);
+    outlookLayer.setOpacity(outlookOpacityForEmphasis(emphasisComponent));
   }, [activeOutlookType, emphasisComponent]);
 
   useEffect(() => {
@@ -909,7 +928,7 @@ const OpenLayersVerificationMap = forwardRef<
           buildReportStyle(
             report.type,
             report.id === highlightedReportId,
-            Boolean(emphasisComponent)
+            reportsEmphasizedForComponent(emphasisComponent)
           )
         );
         source.addFeature(feature);
