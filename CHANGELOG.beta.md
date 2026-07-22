@@ -4,6 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #768
+
+- Start Verification v2 / Forecast Grade (`gfc-ver-1`) with the versioned formula contract (constants, bands, and component weight scaffolding) behind upcoming `verificationRelaunch` work. Follow-up stacked PRs add the engine, sources, gated dashboard, share card, and docs (#769–#780; umbrella index #766).
 ### PR #760
 
 - Restore native Umami page views for accurate traffic metrics, make non-essential telemetry an explicit opt-in, minimize tracker URL data, and clarify GFC's cookie-free pseudonymous telemetry disclosure.
@@ -402,3 +405,4 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 ### PR #525
 
 - Preserve the Auto-TSTM Python GRIB2 generator and server adapter behind a default-off deployment capability with focused tests; retire the obsolete generic HREF inventory probe.
+
