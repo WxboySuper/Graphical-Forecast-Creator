@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fromLonLat } from 'ol/proj';
-import { Eye, EyeOff } from 'lucide-react';
 import VerificationMap, { type VerificationMapHandle } from '../Map/VerificationMap';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useCloudCycles } from '../../hooks/useCloudCycles';
@@ -20,62 +19,14 @@ import ScoreBreakdown from './ScoreBreakdown';
 import DataQualityPanel from './DataQualityPanel';
 import ReportTable from './ReportTable';
 import GradeTrendChart from './GradeTrendChart';
+import CloudSourcePicker from './CloudSourcePicker';
+import ForecastGradeMapControls from './ForecastGradeMapControls';
 import { formatGrade, letterColorClass } from './gradeFormat';
 import { METHODOLOGY_DOC_PATH } from './methodology';
 import './ForecastGradeDashboard.css';
 
-const MAP_PRODUCTS: ProductKind[] = ['categorical', 'tornado', 'wind', 'hail'];
-
-/** Premium cloud package picker rendered inside the source panel. */
-const CloudSourcePicker: React.FC<{ onLoad: (id: string, label: string) => void }> = ({ onLoad }) => {
-  const { addToast } = useAppLayout();
-  const { cycles, loading } = useCloudCycles();
-  if (loading) {
-    return <p className="text-sm text-slate-500">Loading cloud packages…</p>;
-  }
-  if (cycles.length === 0) {
-    return <p className="text-sm text-slate-500">No cloud packages saved yet.</p>;
-  }
-  return (
-    <label className="block text-sm">
-      <span className="font-medium">Cloud package</span>
-      <select
-        className="fg-touch mt-1 w-full rounded border border-slate-300/40 bg-transparent px-2 py-1"
-        defaultValue=""
-        onChange={(event) => {
-          const value = event.target.value;
-          const cycle = cycles.find((item) => item.id === value);
-          if (cycle) {
-            onLoad(cycle.id, cycle.label ?? 'Cloud package');
-            return;
-          }
-          if (value) {
-            addToast('That cloud package is no longer available. Choose another package.', 'error');
-            event.target.value = '';
-          }
-        }}
-      >
-        <option value="" disabled>
-          Choose a saved package…
-        </option>
-        {cycles.map((cycle) => (
-          <option key={cycle.id} value={cycle.id}>
-            {cycle.label ?? cycle.id}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-};
-
 /**
  * Forecast Grade result workspace (PR 07 — result-workspace).
- *
- * Extends the shell with the full learn-fast result view: grade headline with
- * per-product chips, the exactly-titled Score breakdown and Data quality
- * sections, a selectable report table that mirrors map emphasis, a
- * hazard-filterable history trend, and always-reachable hazard/day/evidence map
- * controls. Selecting a product or component re-centers the map's active hazard.
  */
 const ForecastGradeDashboard: React.FC = () => {
   const { addToast } = useAppLayout();
@@ -168,7 +119,7 @@ const ForecastGradeDashboard: React.FC = () => {
       </div>
 
       <div className="fg-workspace">
-        <div className="fg-map-pane" ref={mapPaneRef}>
+        <div className="fg-map-pane" ref={mapPaneRef} data-emphasis-component={activeComponent ?? undefined}>
           {showMap ? (
             <>
               <VerificationMap
@@ -176,8 +127,9 @@ const ForecastGradeDashboard: React.FC = () => {
                 activeOutlookType={grade.activeProduct as 'categorical' | 'tornado' | 'wind' | 'hail'}
                 selectedDay={grade.selectedDay}
                 highlightedReportId={selectedReportId}
+                emphasisComponent={activeComponent}
               />
-              <MapControls
+              <ForecastGradeMapControls
                 activeProduct={grade.activeProduct}
                 onSelectProduct={handleSelectProduct}
                 availableDays={grade.availableDays}
@@ -186,11 +138,6 @@ const ForecastGradeDashboard: React.FC = () => {
                 reportsVisible={reportsVisible}
                 onToggleEvidence={() => dispatch(setVisibility(!reportsVisible))}
               />
-              {activeComponent && (
-                <div className="absolute bottom-2 left-2 z-[5] rounded bg-slate-900/80 px-2 py-1 text-xs text-white">
-                  Component: {activeComponent.replace(/([A-Z])/g, ' $1').trim()}
-                </div>
-              )}
               {grade.result && (
                 <div className="fg-grade-overlay">
                   <span className="text-2xl font-bold tabular-nums">{formatGrade(grade.result.grade)}</span>
@@ -270,66 +217,5 @@ const ForecastGradeDashboard: React.FC = () => {
     </div>
   );
 };
-
-interface MapControlsProps {
-  activeProduct: ProductKind;
-  onSelectProduct: (product: ProductKind) => void;
-  availableDays: number[];
-  selectedDay: number;
-  onSelectDay: (day: never) => void;
-  reportsVisible: boolean;
-  onToggleEvidence: () => void;
-}
-
-/** Always-reachable map controls: hazard, day, and evidence. */
-const MapControls: React.FC<MapControlsProps> = ({
-  activeProduct,
-  onSelectProduct,
-  availableDays,
-  selectedDay,
-  onSelectDay,
-  reportsVisible,
-  onToggleEvidence,
-}) => (
-  <div className="absolute left-2 top-2 z-[5] flex flex-wrap items-center gap-1 rounded-lg bg-slate-900/75 p-1 text-xs text-white">
-    <div className="flex gap-1" role="group" aria-label="Hazard">
-      {MAP_PRODUCTS.map((product) => (
-        <button
-          key={product}
-          type="button"
-          className={`fg-touch rounded px-2 py-1 capitalize ${
-            activeProduct === product ? 'bg-blue-500' : 'bg-white/10'
-          }`}
-          onClick={() => onSelectProduct(product)}
-        >
-          {product === 'categorical' ? 'Cat' : product}
-        </button>
-      ))}
-    </div>
-    {availableDays.length > 1 && (
-      <select
-        className="fg-touch rounded bg-white/10 px-2 py-1"
-        value={selectedDay}
-        aria-label="Forecast day"
-        onChange={(event) => onSelectDay(Number(event.target.value) as never)}
-      >
-        {availableDays.map((day) => (
-          <option key={day} value={day} className="text-black">
-            Day {day}
-          </option>
-        ))}
-      </select>
-    )}
-    <button
-      type="button"
-      className="fg-touch inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1"
-      onClick={onToggleEvidence}
-      aria-pressed={reportsVisible}
-    >
-      {reportsVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-      Evidence
-    </button>
-  </div>
-);
 
 export default ForecastGradeDashboard;

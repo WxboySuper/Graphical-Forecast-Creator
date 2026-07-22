@@ -51,6 +51,7 @@ interface OpenLayersVerificationMapProps {
   activeOutlookType?: "categorical" | "tornado" | "wind" | "hail";
   selectedDay?: DayType;
   highlightedReportId?: string | null;
+  emphasisComponent?: string | null;
 }
 
 type VerificationOutlookType = NonNullable<
@@ -469,7 +470,7 @@ const VerifMapStylePickerButton: React.FC<{
 const OpenLayersVerificationMap = forwardRef<
   MapAdapterHandle<OLMap> | null,
   OpenLayersVerificationMapProps
->(({ activeOutlookType = CATEGORICAL_OUTLOOK, selectedDay = 1, highlightedReportId = null }, ref) => {
+>(({ activeOutlookType = CATEGORICAL_OUTLOOK, selectedDay = 1, highlightedReportId = null, emphasisComponent = null }, ref) => {
   const dispatch = useDispatch();
   const [showStylePicker, setShowStylePicker] = useState(false);
   const mapElementRef = useRef<HTMLDivElement>(null);
@@ -925,7 +926,12 @@ const OpenLayersVerificationMap = forwardRef<
   };
 
   return (
-    <div className="forecast-map-container" translate="no">
+    <div
+      className="forecast-map-container"
+      translate="no"
+      data-highlighted-report={highlightedReportId ?? undefined}
+      data-emphasis-component={emphasisComponent ?? undefined}
+    >
       <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
       <div className="map-toolbar-bottom-right">
         <div className="flex items-center gap-1 rounded-md bg-white dark:bg-gray-800 p-1 shadow-md border border-gray-300 dark:border-gray-600">
