@@ -70,7 +70,8 @@ const ForecastGradeDashboard: React.FC = () => {
     (card: GradeCard) => {
       const snapshot = grade.restoreCard(card);
       if (snapshot) {
-        addToast('Full package restore is available for this grade card.', 'info');
+        grade.applyGradeSnapshot(snapshot);
+        addToast('Restored grade package from history.', 'success');
       }
     },
     [addToast, grade]

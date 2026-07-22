@@ -104,15 +104,17 @@ const reportColors = {
 const FALLBACK_REPORT_COLOR = "#888888";
 
 // Style function for storm reports
-const buildReportStyle = (type: ReportType, highlighted = false) => {
+const buildReportStyle = (type: ReportType, highlighted = false, emphasizeReports = false) => {
+  const radius = highlighted ? 8 : emphasizeReports ? 7 : 6;
+  const fillColor = reportColors[type] || FALLBACK_REPORT_COLOR;
   return new OlStyle({
     image: new Circle({
-      radius: highlighted ? 8 : 6,
+      radius,
       fill: new StyleFill({
-        color: reportColors[type] || FALLBACK_REPORT_COLOR, // Fallback to grey
+        color: highlighted || !emphasizeReports ? fillColor : `${fillColor}99`,
       }),
       stroke: new StyleStroke({
-        color: highlighted ? "#FBBF24" : "#FFFFFF",
+        color: highlighted ? '#FBBF24' : '#FFFFFF',
         width: highlighted ? 2 : 1,
       }),
     }),
@@ -822,8 +824,8 @@ const OpenLayersVerificationMap = forwardRef<
       return;
     }
 
-    outlookLayer.setOpacity(1);
-  }, [activeOutlookType]);
+    outlookLayer.setOpacity(emphasisComponent ? 0.42 : 1);
+  }, [activeOutlookType, emphasisComponent]);
 
   useEffect(() => {
     const source = vectorSourceRef.current;
@@ -903,11 +905,17 @@ const OpenLayersVerificationMap = forwardRef<
           type: report.type, // Store type for styling
           reportId: report.id, // Store ID for potential future interactions
         });
-        feature.setStyle(buildReportStyle(report.type, report.id === highlightedReportId));
+        feature.setStyle(
+          buildReportStyle(
+            report.type,
+            report.id === highlightedReportId,
+            Boolean(emphasisComponent)
+          )
+        );
         source.addFeature(feature);
       });
     }
-  }, [reports, reportsVisible, filterByType, activeOutlookType, highlightedReportId]);
+  }, [reports, reportsVisible, filterByType, activeOutlookType, highlightedReportId, emphasisComponent]);
 
   // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
   const handleToggleStylePicker = () => {

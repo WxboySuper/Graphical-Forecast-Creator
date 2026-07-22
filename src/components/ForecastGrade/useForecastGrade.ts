@@ -7,7 +7,7 @@ import { setReports, clearReports, setDate } from '../../store/stormReportsSlice
 import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
 import type { GradeAccountTier, GradeCard, GradeSnapshot, PackageSourceKind } from '../../types/forecastGrade';
-import { serializeForecast } from '../../utils/fileUtils';
+import { serializeForecast, deserializeForecast } from '../../utils/fileUtils';
 import {
   FORECAST_GRADE_FORMULA_VERSION,
   runForecastGrade,
@@ -77,6 +77,7 @@ export interface UseForecastGrade extends ForecastGradeState {
   run: () => Promise<void>;
   reset: () => void;
   restoreCard: (card: GradeCard) => GradeSnapshot | null;
+  applyGradeSnapshot: (snapshot: GradeSnapshot) => void;
   canRun: boolean;
 }
 
@@ -243,6 +244,44 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
     [addToast, scope]
   );
 
+  const applyGradeSnapshot = useCallback(
+    (snapshot: GradeSnapshot) => {
+      const restoredForecast = deserializeForecast(snapshot.forecast);
+      const days = daysWithData(restoredForecast);
+      setForecast(restoredForecast);
+      setPackageSource('file');
+      setSourceLabel(snapshot.card.sourceLabel);
+      setAvailableDays(days);
+      setSelectedDayState(days[0] ?? 1);
+      setResult(snapshot.package);
+      setPhase('complete');
+      setError(null);
+      setProgress(null);
+      if (snapshot.reportDate) {
+        setUseToday(false);
+        setReportDateState(snapshot.reportDate);
+      } else {
+        setUseToday(true);
+        setReportDateState('');
+      }
+      const firstProduct =
+        snapshot.package.products.find((product) => product.applicable)?.product ?? 'categorical';
+      setActiveProduct(firstProduct);
+      dispatch(loadVerificationForecast(restoredForecast));
+      void loadReportsForDate(snapshot.reportDate)
+        .then((loadedReports) => {
+          setReportsState(loadedReports);
+          dispatch(setReports(loadedReports));
+          dispatch(setDate(snapshot.reportDate ?? 'today'));
+        })
+        .catch(() => {
+          setReportsState([]);
+          dispatch(clearReports());
+        });
+    },
+    [dispatch]
+  );
+
   return {
     tier,
     forecast,
@@ -268,6 +307,7 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
     run,
     reset,
     restoreCard,
+    applyGradeSnapshot,
     canRun,
   };
 };
