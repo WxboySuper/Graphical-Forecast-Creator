@@ -104,7 +104,7 @@ export interface ProductGrade {
 
 /** Package grade across every present hazard product. */
 export interface PackageGrade {
-  formulaVersion: string;
+  formulaVersion: typeof FORECAST_GRADE_FORMULA_VERSION;
   /** Equal-weight mean of present product grades; null when Blocked. */
   grade: number | null;
   letter: LetterGrade | null;
@@ -116,9 +116,13 @@ export interface PackageGrade {
   generatedAt: string;
 }
 
-/** Clamps a value into the inclusive [min, max] range. */
-export const clamp = (value: number, min = 0, max = 1): number =>
-  Math.min(max, Math.max(min, value));
+/** Clamps a finite value into the inclusive [min, max] range; non-finite input becomes min. */
+export const clamp = (value: number, min = 0, max = 1): number => {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+};
 
 /** Rounds a 0–100 grade to a single decimal place. */
 export const roundGrade = (grade: number): number => Math.round(grade * 10) / 10;
@@ -145,7 +149,7 @@ export const composeComponents = (components: ComponentScore[]): number | null =
   let weighted = 0;
 
   for (const component of components) {
-    if (!component.applicable || component.score === null) {
+    if (!component.applicable || component.score === null || !Number.isFinite(component.score)) {
       continue;
     }
     weightSum += component.weight;
@@ -175,14 +179,17 @@ export const scoredComponent = (
   score: number,
   detail: string,
   metrics?: Record<string, number>
-): ComponentScore => ({
-  key,
-  label: COMPONENT_LABELS[key],
-  weight: COMPONENT_WEIGHTS[key],
-  score: clamp(score),
-  applicable: true,
-  detail,
-  metrics,
-});
+): ComponentScore => {
+  const normalized = clamp(score);
+  return {
+    key,
+    label: COMPONENT_LABELS[key],
+    weight: COMPONENT_WEIGHTS[key],
+    score: normalized,
+    applicable: true,
+    detail,
+    metrics,
+  };
+};
 
 export { FORECAST_GRADE_FORMULA_VERSION };
