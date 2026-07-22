@@ -41,6 +41,29 @@ const letterColor = (letter: string | null): string => {
   }
 };
 
+const drawMapHero = (
+  ctx: CanvasRenderingContext2D,
+  mapImage: HTMLImageElement | null,
+  width: number,
+  height: number
+): void => {
+  if (!mapImage || mapImage.width <= 0 || mapImage.height <= 0) {
+    return;
+  }
+  try {
+    const scale = Math.max(width / mapImage.width, height / mapImage.height);
+    const drawWidth = mapImage.width * scale;
+    const drawHeight = mapImage.height * scale;
+    const offsetX = (width - drawWidth) / 2;
+    const offsetY = (height - drawHeight) / 2;
+    ctx.drawImage(mapImage, offsetX, offsetY, drawWidth, drawHeight);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+    ctx.fillRect(0, height - 210, width, 210);
+  } catch {
+    // Fall through to text-only layout.
+  }
+};
+
 /**
  * Composes the map-led share card onto a canvas. The captured map image (when
  * available) fills the hero; the grade and letter are overlaid. Returns null
@@ -61,21 +84,7 @@ export const composeShareCard = (
   ctx.fillStyle = '#0f172a';
   ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
-  // Map-led hero.
-  if (mapImage && mapImage.width > 0 && mapImage.height > 0) {
-    try {
-      const scale = Math.max(CARD_WIDTH / mapImage.width, CARD_HEIGHT / mapImage.height);
-      const drawWidth = mapImage.width * scale;
-      const drawHeight = mapImage.height * scale;
-      const offsetX = (CARD_WIDTH - drawWidth) / 2;
-      const offsetY = (CARD_HEIGHT - drawHeight) / 2;
-      ctx.drawImage(mapImage, offsetX, offsetY, drawWidth, drawHeight);
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
-      ctx.fillRect(0, CARD_HEIGHT - 210, CARD_WIDTH, 210);
-    } catch {
-      // Fall through to text-only layout.
-    }
-  }
+  drawMapHero(ctx, mapImage, CARD_WIDTH, CARD_HEIGHT);
 
   ctx.fillStyle = '#e2e8f0';
   ctx.font = '600 34px system-ui, sans-serif';
