@@ -30,6 +30,7 @@ function createCollectHandler(fs, LOG_FILE) {
 function configureApp(app, express, fs, LOG_FILE) {
   const rateLimit = require('express-rate-limit');
   const { registerBetaRoutes } = require('./beta');
+  const { registerAccountLifecycleRoutes } = require('./account-lifecycle');
   const { registerBillingRoutes } = require('./billing');
   const { registerMetricsRoutes } = require('./metrics');
   const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
@@ -47,6 +48,7 @@ function configureApp(app, express, fs, LOG_FILE) {
   registerBillingRoutes(app, express);
   registerMetricsRoutes(app, express);
   registerBetaRoutes(app, express);
+  registerAccountLifecycleRoutes(app, express);
 
   app.post('/collect', express.json({ limit: '1kb' }), collectRateLimit, createCollectHandler(fs, LOG_FILE));
 

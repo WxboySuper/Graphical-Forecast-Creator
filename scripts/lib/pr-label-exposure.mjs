@@ -17,6 +17,7 @@ const SERVER_EXPOSURE_FILE_PATTERNS = [
   'firestore.rules',
   'server/lib/serverFeatureExposure.js',
   'server/lib/featureCapabilities.js',
+  'server/account-lifecycle.js',
 ];
 
 // Client-side feature gating and surface configuration.
