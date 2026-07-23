@@ -4,6 +4,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #784
+
+- Replace `public/favicon.ico` with the cloud icon so apps that request `/favicon.ico` directly show the correct branding instead of the React logo.
+
 ### PR #763
 
 - Route Auto-TSTM previews exclusively through scheduled cached guidance and retire the direct generation API.
