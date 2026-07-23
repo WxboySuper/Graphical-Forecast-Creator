@@ -139,6 +139,11 @@
   border-radius: 1.75rem;
 }
 
+.account-danger-card {
+  border-color: color-mix(in srgb, var(--error-text) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--error-text) 3%, var(--bg-primary));
+}
+
 .account-section-header {
   display: flex;
   flex-direction: column;

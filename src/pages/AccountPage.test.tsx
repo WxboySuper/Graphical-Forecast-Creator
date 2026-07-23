@@ -496,4 +496,46 @@ describe("AccountPage", () => {
     );
     expect(await screen.findByText(/Google unavailable/i)).toBeInTheDocument();
   });
+
+  test("requires password reauthentication and exact confirmation before account deletion", async () => {
+    const user = userEvent.setup();
+    const deleteAccount = jest.fn().mockRejectedValue(new Error("Deletion unavailable"));
+    mockUseAuth.mockReturnValue({
+      hostedAuthEnabled: true,
+      status: "signed_in",
+      settingsSyncStatus: "synced",
+      betaAccess: false,
+      user: {
+        email: "alex@example.com",
+        displayName: "Alex",
+        providerData: [{ providerId: "password" }],
+      },
+      syncedSettings: { defaultForecasterName: "Alex" },
+      error: null,
+      signInWithGoogle: jest.fn(),
+      signInWithEmail: jest.fn(),
+      signUpWithEmail: jest.fn(),
+      signOutUser: jest.fn(),
+      deleteAccount,
+      updateSyncedSettings: jest.fn(),
+    });
+
+    render(
+      <BrowserRouter>
+        <Provider store={store}>
+          <AccountPage />
+        </Provider>
+      </BrowserRouter>,
+    );
+
+    const deleteButton = screen.getByRole("button", { name: /Permanently delete account/i });
+    expect(deleteButton).toBeDisabled();
+    await user.type(screen.getByLabelText(/Current password/i), "secret123");
+    await user.type(screen.getByLabelText(/Type DELETE to confirm/i), "DELETE");
+    expect(deleteButton).toBeEnabled();
+    await user.click(deleteButton);
+
+    expect(deleteAccount).toHaveBeenCalledWith("secret123");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Deletion unavailable");
+  });
 });
