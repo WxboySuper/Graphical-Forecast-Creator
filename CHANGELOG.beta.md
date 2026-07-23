@@ -7,6 +7,15 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 ### PR #768
 
 - Start Verification v2 / Forecast Grade (`gfc-ver-1`) with the versioned formula contract (constants, bands, and component weight scaffolding) behind upcoming `verificationRelaunch` work. Follow-up stacked PRs add the engine, sources, gated dashboard, share card, and docs (#769–#780; umbrella index #766).
+
+### PR #784
+
+- Replace `public/favicon.ico` with the cloud icon so apps that request `/favicon.ico` directly show the correct branding instead of the React logo.
+
+### PR #763
+
+- Route Auto-TSTM previews exclusively through scheduled cached guidance and retire the direct generation API.
+
 ### PR #760
 
 - Restore native Umami page views for accurate traffic metrics, make non-essential telemetry an explicit opt-in, minimize tracker URL data, and clarify GFC's cookie-free pseudonymous telemetry disclosure.

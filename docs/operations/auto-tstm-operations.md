@@ -4,16 +4,15 @@ Operational notes for the cached Auto-TSTM server API introduced in TSTM-03 (#47
 
 ## Public read policy
 
-Auto-TSTM routes are **unauthenticated** and intended for public read once the deployment exposes the capability:
+Auto-TSTM exposes only cached, read-only guidance routes once the deployment enables the capability:
 
 | Route | Method | Auth | Work when disabled |
 | --- | --- | --- | --- |
 | `/api/tstm/latest` | GET | None | Capability gate returns `404` before cache reads |
 | `/api/tstm/status` | GET | None | Capability gate returns `404` before cache reads |
-| `/api/tstm/generate` | POST | None | Capability gate returns `404` before Python worker spawn |
 | `/api/capabilities/status` | GET | None | Always available; lists exposed server capabilities |
 
-Disabled routes perform **no expensive work** (no generator spawn, no cache reads beyond the gate).
+Interactive requests cannot start generator workers. Generation runs only through the process-owned scheduled ingestion loop. Disabled routes perform **no expensive work** (no cache reads beyond the gate).
 
 Registry exposure (`autoTstm.exposure.*`) and deployment env (`TSTM_GENERATION_ENABLED=true`) must both be enabled before routes accept traffic. Emergency disable overrides are documented in [emergency-feature-disable.md](./emergency-feature-disable.md).
 
@@ -23,10 +22,7 @@ Registry exposure (`autoTstm.exposure.*`) and deployment env (`TSTM_GENERATION_E
 | --- | --- |
 | `GET /api/tstm/latest` | 120 requests / minute / client |
 | `GET /api/tstm/status` | 120 requests / minute / client |
-| `POST /api/tstm/generate` | 2 requests / minute / client |
 | `GET /api/capabilities/status` | 120 requests / minute / client |
-
-Generate requests also accept at most **4 KB** JSON bodies.
 
 ## Structured errors
 

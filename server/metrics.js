@@ -622,9 +622,11 @@ const recordBillingMetricEvent = async (eventType, webhookEventId) => {
       return false;
     }
 
+    const processedAt = new Date();
     transaction.set(processedEventRef, {
       eventType: normalizedEventType,
-      processedAt: new Date(),
+      processedAt,
+      expiresAt: new Date(processedAt.getTime() + 30 * 24 * 60 * 60 * 1000),
     });
     transaction.set(
       dailyRef,
