@@ -8,6 +8,10 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Upgrade the compiler to TypeScript 7, replace the incompatible `ts-jest` bridge with Babel/Jest tooling, and enforce production plus test-regression typechecking in CI.
 
+### PR #760
+
+- Restore native Umami page views for accurate traffic metrics, make non-essential telemetry an explicit opt-in, minimize tracker URL data, and clarify GFC's cookie-free pseudonymous telemetry disclosure.
+
 ### PR #759
 
 - Replace GA4 and the legacy collector with privacy-gated, self-hosted Umami telemetry that keeps beta and production reporting separate.

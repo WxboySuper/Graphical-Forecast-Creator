@@ -14,10 +14,11 @@ export type ProductAnalyticsEvent = (typeof PRODUCT_ANALYTICS_EVENTS)[number];
 export type ProductAnalyticsProperties = Record<string, string | number | boolean>;
 type AnalyticsZone = 'production' | 'beta';
 type TrackerConfiguration = { zone: AnalyticsZone; host: string; websiteId: string };
+type UmamiPageView = { url: string };
 
 declare global {
   interface Window {
-    umami?: { track: (event: string, data?: ProductAnalyticsProperties) => void };
+    umami?: { track: (event: string | UmamiPageView, data?: ProductAnalyticsProperties) => void };
   }
 }
 
@@ -67,25 +68,27 @@ export const getProductAnalyticsZone = (hostname?: string): AnalyticsZone | null
   return null;
 };
 
-/** False is an explicit opt-out; absence preserves the product default. */
+/** Analytics are non-essential and remain off until the visitor explicitly enables them. */
 export const isProductAnalyticsEnabled = (): boolean => {
   try {
-    if (typeof localStorage === 'undefined') return true;
+    if (typeof localStorage === 'undefined') return false;
     const preference = localStorage.getItem(PRODUCT_ANALYTICS_PREFERENCE_KEY);
-    if (preference !== null) return preference !== 'false';
-    // Preserve an existing workflow-only opt-out when moving to the unified preference.
-    return localStorage.getItem(LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY) !== 'false';
+    if (preference !== null) return preference === 'true';
+    // A prior explicit workflow opt-in remains valid; absence never enables new telemetry.
+    return localStorage.getItem(LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY) === 'true';
   } catch {
     return false;
   }
 };
 
 /** Stores the local opt-out and removes the injected tracker immediately when it is disabled. */
-export const setProductAnalyticsEnabled = (enabled: boolean): void => {
+export const setProductAnalyticsEnabled = (enabled: boolean): boolean => {
+  let persisted = false;
   try {
     localStorage.setItem(PRODUCT_ANALYTICS_PREFERENCE_KEY, String(enabled));
+    persisted = true;
   } catch {
-    return;
+    // localStorage unavailable — effective state cannot match the requested value
   }
   if (!enabled && typeof document !== 'undefined') {
     document.querySelector('script[data-gfc-umami="true"]')?.remove();
@@ -93,6 +96,8 @@ export const setProductAnalyticsEnabled = (enabled: boolean): void => {
     pendingPagePath = null;
     pendingEvents = [];
   }
+  // Disable always succeeds (teardown happened); enable requires persistence.
+  return enabled ? persisted : false;
 };
 
 const getWebsiteId = (zone: AnalyticsZone): string => {
@@ -113,8 +118,17 @@ const trackSafely = ({ event, properties }: { event: string; properties?: Produc
   } catch { return false; }
 };
 
+/** Sends a native Umami page view, keeping user-provided query/hash data out of the URL. */
+const trackPageViewSafely = (path: string): boolean => {
+  try {
+    if (!window.umami) return false;
+    window.umami.track({ url: path });
+    return true;
+  } catch { return false; }
+};
+
 const flushPendingTelemetry = (): void => {
-  if (pendingPagePath) trackSafely({ event: 'page_view', properties: { path: pendingPagePath } });
+  if (pendingPagePath) trackPageViewSafely(pendingPagePath);
   pendingPagePath = null;
   const queuedEvents = pendingEvents;
   pendingEvents = [];
@@ -133,6 +147,8 @@ const createTrackerScript = ({ host, websiteId }: TrackerConfiguration): HTMLScr
   script.dataset.hostUrl = host;
   script.dataset.autoTrack = 'false';
   script.dataset.doNotTrack = 'true';
+  script.dataset.excludeSearch = 'true';
+  script.dataset.excludeHash = 'true';
   script.dataset.gfcUmami = 'true';
   script.addEventListener('load', () => { if (isProductAnalyticsEnabled()) flushPendingTelemetry(); });
   script.addEventListener('error', () => { initializedZone = null; });
@@ -167,7 +183,7 @@ export const trackProductPageView = (pathname?: string, hostname?: string): void
   if (!getProductAnalyticsZone(hostname)) return;
   const path = (pathname ?? window.location.pathname).split(/[?#]/, 1)[0];
   initProductAnalytics(hostname);
-  if (!trackSafely({ event: 'page_view', properties: { path } })) pendingPagePath = path;
+  if (!trackPageViewSafely(path)) pendingPagePath = path;
 };
 
 /** Sends only registry-backed, coarse event properties. */
