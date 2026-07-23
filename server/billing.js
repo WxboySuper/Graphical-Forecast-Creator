@@ -381,14 +381,10 @@ const createSubscriptionEntitlementWrite = (subscription) => {
 /** Applies the checkout-complete event to the entitlement document. */
 const recordBillingMetricEventSafely = async (eventType, webhookEventId) => {
   try {
-<<<<<<< HEAD
     const recorded = await recordBillingMetricEvent(eventType, webhookEventId);
     if (!recorded) {
       console.log('[billing] metrics:duplicate-or-skipped', { eventType, webhookEventId });
     }
-=======
-    await recordBillingMetricEvent(eventType, webhookEventId);
->>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
   } catch (error) {
     console.warn('[billing] metrics:nonfatal', {
       eventType,
@@ -397,12 +393,7 @@ const recordBillingMetricEventSafely = async (eventType, webhookEventId) => {
   }
 };
 
-/** Applies the checkout-complete event to the entitlement document. */
-<<<<<<< HEAD
-const handleCheckoutSessionCompleted = async (event) => {
-  const session = event.data.object;
-  await writeEntitlement(createCheckoutEntitlementWrite(session));
-=======
+/** Resolves a subscription id or expanded object from a supported webhook payload. */
 const getInvoiceSubscription = (invoice) =>
   invoice.subscription || invoice.parent?.subscription_details?.subscription || null;
 
@@ -447,18 +438,12 @@ const handleCheckoutSessionCompleted = async (event, stripe) => {
     ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
     : createCheckoutEntitlementWrite(session);
   await writeEntitlement(entitlementWrite, event);
->>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
   await recordBillingMetricEventSafely('premium_upgrade', event.id);
 };
 
 /** Applies the subscription lifecycle event to the entitlement document. */
 const handleSubscriptionEvent = async (event) => {
-<<<<<<< HEAD
-  const subscription = event.data.object;
-  await writeEntitlement(createSubscriptionEntitlementWrite(subscription));
-=======
   await writeEntitlement(createSubscriptionEntitlementWrite(event.data.object), event);
->>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
   if (event.type === 'customer.subscription.deleted') {
     await recordBillingMetricEventSafely('premium_cancellation', event.id);
   }
@@ -478,13 +463,8 @@ const webhookHandlers = {
   'checkout.session.completed': handleCheckoutSessionCompleted,
   'customer.subscription.updated': handleSubscriptionEvent,
   'customer.subscription.deleted': handleSubscriptionEvent,
-<<<<<<< HEAD
-  'invoice.paid': (event) => handleInvoiceEvent(event.type, event.data.object),
-  'invoice.payment_failed': (event) => handleInvoiceEvent(event.type, event.data.object),
-=======
   'invoice.paid': handleInvoiceEvent,
   'invoice.payment_failed': handleInvoiceEvent,
->>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
 };
 
 /** Returns the event handler for a Stripe webhook type, if the app cares about it. */

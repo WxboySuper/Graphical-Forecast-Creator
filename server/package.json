@@ -6,11 +6,7 @@
   "main": "analytics.js",
   "scripts": {
     "start": "node analytics.js",
-<<<<<<< HEAD
-    "test": "node --test billing-stripe-period.test.js metrics.test.js qs-dos.test.js lib/serverTarget.test.js lib/featureCapabilities.test.js server-stack.test.js tstm.test.js tstm-ingestion.test.js testing/featureExposureHarness.test.js testing/autoTstm.exposure.test.js lib/capabilityStatus.test.js"
-=======
-    "test": "node --test billing-stripe-period.test.js billing-webhook-state.test.js billing-webhook.test.js metrics.test.js qs-dos.test.js server-stack.test.js"
->>>>>>> 7feb9ce (fix: harden billing webhook state transitions)
+    "test": "node --test billing-stripe-period.test.js billing-webhook-state.test.js billing-webhook.test.js metrics.test.js qs-dos.test.js lib/serverTarget.test.js lib/featureCapabilities.test.js server-stack.test.js tstm.test.js tstm-ingestion.test.js testing/featureExposureHarness.test.js testing/autoTstm.exposure.test.js lib/capabilityStatus.test.js"
   },
   "dependencies": {
     "@sentry/node": "^10.67.0",
