@@ -65,7 +65,7 @@ const deserializeOutlookMap = <K extends string, V>(
   }
 
   const coerced = coerceOutlookProbabilityMap(value);
-  return coerced ?? new Map<K, V>();
+  return (coerced as Map<K, V> | null) ?? new Map<K, V>();
 };
 
 /** Creates a safe, deterministic, collision-free discussion filename for a ZIP archive. */
@@ -205,8 +205,9 @@ const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => 
 export const deserializeForecast = (data: GFCForecastSaveData | unknown): ForecastCycle => {
   if (isWorkflowExportPackage(data)) return deserializeForecast(data.forecast);
   if (!data || typeof data !== 'object') return deserializeLegacyForecast({} as GFCForecastSaveData);
-  if (!data.forecastCycle) return deserializeLegacyForecast(data);
-  const cycle = data.forecastCycle;
+  const forecastData = data as GFCForecastSaveData;
+  if (!forecastData.forecastCycle) return deserializeLegacyForecast(forecastData);
+  const cycle = forecastData.forecastCycle;
   return {
     days: deserializeForecastCycleDays(cycle),
     currentDay: cycle.currentDay,

@@ -245,8 +245,9 @@ const normalizeCloudCycleMetadataRecord = ({
 const getCompatibleWorkflowMetadata = (workflowMetadata: unknown, cycleDate: string): CycleMetadata | undefined => {
   if (!isPlainObject(workflowMetadata)) return undefined;
   if (workflowMetadata.cycleDate !== cycleDate) return undefined;
+  if (!isValidWorkflowMetadata(workflowMetadata)) return undefined;
 
-  const bounded = boundWorkflowMetadataForPersistence(workflowMetadata as CycleMetadata);
+  const bounded = boundWorkflowMetadataForPersistence(workflowMetadata);
   return isValidWorkflowMetadata(bounded) ? bounded : undefined;
 };
 

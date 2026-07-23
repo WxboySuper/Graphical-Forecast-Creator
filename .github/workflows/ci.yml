@@ -165,6 +165,9 @@ jobs:
       - name: Validate feature exposure policy
         run: pnpm validate:feature-exposure
 
+      - name: Run feature exposure parser tests
+        run: node --test scripts/lib/feature-exposure-source-parser.test.mjs
+
       - name: Run feature exposure test suite
         run: pnpm test:exposure
 
@@ -207,6 +210,12 @@ jobs:
         env:
           CI: false
           VITE_BUILD_TARGET: local
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Type check tests
+        run: pnpm typecheck:test
 
       - name: Run tests
         run: pnpm test --silent

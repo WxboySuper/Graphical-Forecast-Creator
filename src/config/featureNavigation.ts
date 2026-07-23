@@ -13,7 +13,7 @@ export type AppNavigationItem = {
 };
 
 /** Primary navbar destinations. Items with a feature key render only when that feature is exposed. */
-export const APP_NAVIGATION_ITEMS = [
+const RAW_APP_NAVIGATION_ITEMS = [
   { id: 'home', to: '/', label: 'Home', shortcutKey: 'h', shortcutLabel: '⌃H', end: true },
   { id: 'forecast', to: '/forecast', label: 'Forecast', shortcutKey: '1', shortcutLabel: '⌃1' },
   { id: 'discussion', to: '/discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
@@ -37,15 +37,18 @@ export const APP_NAVIGATION_ITEMS = [
   },
 ] as const satisfies readonly AppNavigationItem[];
 
-export type AppNavigationItemId = (typeof APP_NAVIGATION_ITEMS)[number]['id'];
+export const APP_NAVIGATION_ITEMS: readonly AppNavigationItem[] = RAW_APP_NAVIGATION_ITEMS;
+export type AppNavigationItemId = (typeof RAW_APP_NAVIGATION_ITEMS)[number]['id'];
+
+export type AppNavigationItemWithId = AppNavigationItem & { id: AppNavigationItemId };
 
 /** Returns navbar items visible for the given deployment target. */
 export const getVisibleNavigationItems = (
   target: BuildTarget = getBuildTarget()
-): (typeof APP_NAVIGATION_ITEMS)[number][] =>
+): AppNavigationItemWithId[] =>
   APP_NAVIGATION_ITEMS.filter(
     (item) => !item.feature || isFeatureExposedOnTarget(item.feature, target)
-  );
+  ) as AppNavigationItemWithId[];
 
 /** Builds Ctrl/Cmd navigation shortcuts for visible navbar destinations. */
 export const getNavigationKeyboardShortcuts = (

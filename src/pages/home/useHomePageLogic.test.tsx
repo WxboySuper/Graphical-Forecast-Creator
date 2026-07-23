@@ -6,16 +6,16 @@ import forecastReducer from '../../store/forecastSlice';
 import useHomePageLogic from './useHomePageLogic';
 import type { SavedCycle } from '../../store/forecastSlice';
 
-const navigate = jest.fn();
-const addToast = jest.fn();
-const handleFileSelect = jest.fn();
-const handleOpenFilePicker = jest.fn();
-const handleSave = jest.fn();
+const mockNavigate = jest.fn();
+const mockAddToast = jest.fn();
+const mockHandleFileSelect = jest.fn();
+const mockHandleOpenFilePicker = jest.fn();
+const mockHandleSave = jest.fn();
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
-  useNavigate: () => navigate,
-  useOutletContext: () => ({ addToast }),
+  useNavigate: () => mockNavigate,
+  useOutletContext: () => ({ addToast: mockAddToast }),
 }));
 
 jest.mock('../../auth/AuthProvider', () => ({
@@ -25,9 +25,9 @@ jest.mock('../../auth/AuthProvider', () => ({
 jest.mock('../../hooks/useFileLoader', () => ({
   createFileHandlers: jest.fn(() => ({
     fileInputRef: { current: null },
-    handleFileSelect,
-    handleOpenFilePicker,
-    handleSave,
+    handleFileSelect: mockHandleFileSelect,
+    handleOpenFilePicker: mockHandleOpenFilePicker,
+    handleSave: mockHandleSave,
   })),
 }));
 
@@ -118,14 +118,14 @@ describe('useHomePageLogic', () => {
       localStorage.setItem('forecastData:user-user-1', JSON.stringify({ stale: true }));
       result.current.handleQuickStartClick({ currentTarget: { dataset: { day: '5' } } } as React.MouseEvent<HTMLButtonElement>);
     });
-    expect(navigate).toHaveBeenCalledWith('/forecast');
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(5);
     expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
 
     act(() => {
       result.current.handleLoadRecentCycleClick({ currentTarget: { dataset: { cycleId: 'cycle-1' } } } as React.MouseEvent<HTMLButtonElement>);
     });
-    expect(addToast).toHaveBeenCalledWith('Cycle loaded from history', 'success');
+    expect(mockAddToast).toHaveBeenCalledWith('Cycle loaded from history', 'success');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(8);
     expect(store.getState().forecast.workflowMetadata?.workflowId).toBe('severe-day1');
     expect(store.getState().forecast.isWorkflowActive).toBe(true);
@@ -137,7 +137,7 @@ describe('useHomePageLogic', () => {
     act(() => {
       result.current.handleConfirmNewCycle();
     });
-    expect(addToast).toHaveBeenCalledWith('Started new forecast cycle', 'success');
+    expect(mockAddToast).toHaveBeenCalledWith('Started new forecast cycle', 'success');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(1);
     expect(result.current.confirmNewCycle).toBe(false);
 
@@ -158,9 +158,9 @@ describe('useHomePageLogic', () => {
     });
 
     expect(store.getState().forecast.isSaved).toBe(false);
-    expect(addToast).toHaveBeenCalledWith('Started new forecast cycle', 'success');
+    expect(mockAddToast).toHaveBeenCalledWith('Started new forecast cycle', 'success');
     expect(result.current.confirmNewCycle).toBe(false);
-    expect(handleSave).toHaveBeenCalledTimes(0);
+    expect(mockHandleSave).toHaveBeenCalledTimes(0);
     expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
   });
 
@@ -186,7 +186,7 @@ describe('useHomePageLogic', () => {
       result.current.handleLoadRecentCycleClick({ currentTarget: { dataset: { cycleId: 'missing' } } } as React.MouseEvent<HTMLButtonElement>);
     });
 
-    expect(navigate).not.toHaveBeenCalled();
-    expect(addToast).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockAddToast).not.toHaveBeenCalled();
   });
 });

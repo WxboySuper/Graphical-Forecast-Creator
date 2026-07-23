@@ -2,8 +2,11 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useDispatch, useSelector } from 'react-redux';
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
   getAdditionalUserInfo,
   onAuthStateChanged,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -97,6 +100,7 @@ interface AuthContextValue {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
+  deleteAccount: (password?: string) => Promise<void>;
   updateSyncedSettings: (settings: Partial<UserSettingsDocument>) => Promise<void>;
   refreshBetaAccess: () => Promise<void>;
 }
@@ -115,6 +119,63 @@ export const getDisabledSettingsStatus = (): SettingsSyncStatus => (isHostedAuth
 /** True when the hosted settings sync has everything it needs to run for the current user. */
 export const canSyncHostedUserDocuments = (user: User | null): user is User =>
   Boolean(isHostedAuthEnabled && db && user);
+
+/** Clears local Firebase state after the server has already completed deletion. */
+export const clearDeletedAccountSession = async (
+  signOutAction: () => Promise<void>,
+  clearLocalState: () => void,
+): Promise<void> => {
+  // The server's 204 is authoritative. Clear React state first so the deleted
+  // account view cannot remain mounted if Firebase's local sign-out rejects.
+  clearLocalState();
+  try {
+    await signOutAction();
+  } catch {
+    // Server deletion is authoritative; local cleanup failure must not report
+    // that the permanently completed deletion itself failed.
+  }
+};
+
+/** Reauthenticates the current hosted user and requests the server-side deletion cascade. */
+export const deleteHostedAccount = async (
+  user: User,
+  password?: string,
+  clearLocalState: () => void = () => undefined,
+): Promise<void> => {
+  const hasGoogleProvider = user.providerData.some((provider) => provider.providerId === 'google.com');
+  const hasPasswordProvider = user.providerData.some((provider) => provider.providerId === 'password');
+  if (hasGoogleProvider) {
+    await reauthenticateWithPopup(user, googleAuthProvider);
+  } else if (hasPasswordProvider && user.email) {
+    if (!password) throw new Error('Enter your current password to delete this account.');
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+  } else {
+    throw new Error('This sign-in method cannot be reauthenticated here. Contact support for account deletion.');
+  }
+
+  const token = await user.getIdToken(true);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch('/api/account/delete', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ confirmation: 'DELETE' }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const body = await safeParseJson<{ error?: string }>(response);
+      throw new Error(body?.error || 'Unable to delete your account right now.');
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  await clearDeletedAccountSession(() => signOut(requireAuth()), clearLocalState);
+};
 
 /** Builds the normalized settings document shape from current local state. */
 interface BuildSettingsArgs {
@@ -312,7 +373,7 @@ interface PersistHostedSettingsContext {
   monitorSettings: MonitorSettings;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<'synced' | 'syncing' | 'error'>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
@@ -731,6 +792,7 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   signInWithEmail: disabledAuthAction,
   signUpWithEmail: disabledAuthAction,
   signOutUser: disabledAuthAction,
+  deleteAccount: disabledAuthAction,
   updateSyncedSettings: disabledAuthAction,
   refreshBetaAccess: disabledAuthAction,
 });
@@ -1113,6 +1175,7 @@ const useLocalAuthState = (): AuthContextValue => {
     signInWithEmail,
     signUpWithEmail,
     signOutUser,
+    deleteAccount: disabledAuthAction,
     updateSyncedSettings,
     refreshBetaAccess,
   }), [
@@ -1452,6 +1515,20 @@ const useHostedAuthState = (): AuthContextValue => {
       signOutUser: async () => {
         setError(null);
         await signOut(requireAuth());
+      },
+      deleteAccount: async (password?: string) => {
+        setError(null);
+        if (!user) throw new Error('Sign in before deleting your account.');
+        await deleteHostedAccount(user, password, () => {
+          setUser(null);
+          setStatus('signed_out');
+          setSyncedSettings(null);
+          setSettingsSyncStatus('idle');
+          setBetaAccess(false);
+          setBetaAccessLoading(false);
+          hasInitializedSettingsRef.current = false;
+          lastSyncedSettingsRef.current = null;
+        });
       },
       updateSyncedSettings,
       refreshBetaAccess,

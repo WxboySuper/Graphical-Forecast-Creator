@@ -148,7 +148,7 @@ const DRAWABLE_OUTLOOK_TYPES = new Set<EditableOutlookType>([
 // https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
 // Recheck this workaround whenever `ol` is upgraded; remove it once upstream
 // guarantees that detaching Draw cancels the pending callback.
-type DrawWithPendingPointerMove = Draw & {
+type DrawWithPendingPointerMove = {
   downTimeout_?: ReturnType<typeof setTimeout>;
 };
 
@@ -157,7 +157,7 @@ type DrawWithPendingPointerMove = Draw & {
  * Cancel it before detaching so it cannot read map pixels after map teardown.
  */
 export const removeDrawInteraction = (map: OLMap, interaction: Draw): void => {
-  const draw = interaction as DrawWithPendingPointerMove;
+  const draw = interaction as unknown as DrawWithPendingPointerMove;
   if (draw.downTimeout_ !== undefined) {
     clearTimeout(draw.downTimeout_);
     draw.downTimeout_ = undefined;
@@ -489,7 +489,7 @@ export const toDrawnCustomFeature = (
   return {
     type: "Feature",
     id: uuidv4(),
-    geometry: geometry as Polygon,
+    geometry: geometry as unknown as Polygon,
     properties: {
       customLayerId: layer.id,
       categoryId: category.id,
@@ -1526,7 +1526,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         // Create a new feature object with the drawn geometry and current drawing state properties,
         // then dispatch an action to add it to the Redux store.
         const customFeature = toDrawnCustomFeature(
-          geometry as Geometry,
+          geometry as unknown as Geometry,
           activeCustomLayer,
           activeCustomCategory,
           customMode,

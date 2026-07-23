@@ -63,4 +63,4 @@ export const isCustomPolygonGeometry = (value: unknown): value is Geometry => {
 };
 
 export const getCustomGeometryDimension = (value: Geometry): number =>
-  getGeometryPositions(value as Record<string, unknown>)[0]?.length ?? 0;
+  getGeometryPositions(value as unknown as Record<string, unknown>)[0]?.length ?? 0;

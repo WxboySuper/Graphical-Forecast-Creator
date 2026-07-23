@@ -56,7 +56,7 @@ export const sendWorkflowAnalyticsPayload = (payload: WorkflowAnalyticsPayload):
     'rollover-action': 'workflow_rollover_action',
   };
   const event = eventMap[payload.event];
-  trackProductEvent(event, payload.dimensions);
+  trackProductEvent(event, payload.dimensions ? { ...payload.dimensions } : undefined);
 };
 
 /** Sends a consent-gated event without ever allowing analytics failures into workflow code. */
