@@ -190,11 +190,17 @@ const handleDeletionFailure = async ({ adminAuth, uid, requestRef, error }) => {
   throw error;
 };
 
-/** Runs the idempotent destructive sequence while preserving the auth identity until cleanup succeeds. */
-const deleteAccount = async ({ uid, db, adminAuth, stripe }) => {
+/** Creates the request marker and hashed tombstone references for the deletion lifecycle. */
+const initDeletionRefs = async (db, uid) => {
   const requestRef = db.collection('accountDeletionRequests').doc(uid);
   const tombstoneRef = db.collection('accountDeletionTombstones').doc(getDeletionTombstoneId(uid));
   await requestRef.set({ status: 'in_progress', updatedAt: new Date() }, { merge: true });
+  return { requestRef, tombstoneRef };
+};
+
+/** Runs the idempotent destructive sequence while preserving the auth identity until cleanup succeeds. */
+const deleteAccount = async ({ uid, db, adminAuth, stripe }) => {
+  const { requestRef, tombstoneRef } = await initDeletionRefs(db, uid);
 
   try {
     await deleteLinkedStripeCustomers({ db, uid, stripe });

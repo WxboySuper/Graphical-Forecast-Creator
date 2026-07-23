@@ -197,34 +197,29 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
     return { applied: false, reason: 'deleted-user' };
   }
 
-  try {
-    const result = await applyEntitlementWebhookEvent({
-      db: getAdminDb(),
-      entitlementRef: existing.ref,
-      event,
-      buildNextPayload: (currentData) =>
-        computeEffectiveEntitlement({
-          ...createBaseEntitlementPayload(uid, currentData),
-          ...payload,
-        }),
-    });
-    if (!result.applied) {
-      console.log('[billing] writeEntitlement:skipped', { eventId: event.id, reason: result.reason });
-      return result;
-    }
+  const result = await applyEntitlementWebhookEvent({
+    db: getAdminDb(),
+    entitlementRef: existing.ref,
+    event,
+    buildNextPayload: (currentData) =>
+      computeEffectiveEntitlement({
+        ...createBaseEntitlementPayload(uid, currentData),
+        ...payload,
+      }),
+  });
 
-    const nextPayload = result.nextPayload;
-    console.log('[billing] writeEntitlement:success', {
-      uid: nextPayload.uid,
-      premiumActive: nextPayload.premiumActive,
-      effectiveSource: nextPayload.effectiveSource,
-      billingStatus: nextPayload.billingStatus,
-    });
+  if (!result.applied) {
+    console.log('[billing] writeEntitlement:skipped', { eventId: event.id, reason: result.reason });
     return result;
-  } catch (error) {
-    logEntitlementWriteError({ uid, stripeCustomerId, stripeSubscriptionId, nextPayload: payload, error });
-    throw error;
   }
+
+  console.log('[billing] writeEntitlement:success', {
+    uid: result.nextPayload.uid,
+    premiumActive: result.nextPayload.premiumActive,
+    effectiveSource: result.nextPayload.effectiveSource,
+    billingStatus: result.nextPayload.billingStatus,
+  });
+  return result;
 };
 
 /** Extracts a verified Firebase user from the Authorization header. */
