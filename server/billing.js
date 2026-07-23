@@ -559,14 +559,19 @@ const withFallbackSubscriptionUid = (subscription, fallbackUid) => ({
   },
 });
 
+/** Builds the entitlement write from the checkout session's subscription or session data. */
+const buildCheckoutEntitlementWrite = async (stripe, event, session) => {
+  const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  return subscription
+    ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
+    : createCheckoutEntitlementWrite(session);
+};
+
 /** Applies checkout completion using current subscription state when available. */
 const handleCheckoutSessionCompleted = async (event, stripe) => {
   const session = event.data.object;
   if (await cleanupBlockedCheckoutSession(session)) return;
-  const subscription = await resolveAuthoritativeSubscription(stripe, event);
-  const entitlementWrite = subscription
-    ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
-    : createCheckoutEntitlementWrite(session);
+  const entitlementWrite = await buildCheckoutEntitlementWrite(stripe, event, session);
   const result = await writeEntitlement(entitlementWrite, event);
   if (!result?.applied && await cleanupBlockedCheckoutSession(session)) return;
   if (result?.applied) await recordBillingMetricEventSafely('premium_upgrade');
