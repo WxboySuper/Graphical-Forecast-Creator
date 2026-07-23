@@ -58,13 +58,17 @@ const processEventInTransaction = async (transaction, { eventRef, entitlementRef
   return { applied: true, reason: 'applied', nextPayload };
 };
 
+const WEBHOOK_MISSING_ERROR = 'A verified Stripe event and entitlement target are required.';
+
+/** Returns true when any required webhook processing input is missing. */
+const hasMissingInputs = ({ db, entitlementRef, event, buildNextPayload }) =>
+  !db || !entitlementRef || !event?.id || !event?.type || typeof buildNextPayload !== 'function';
+
 /** Applies one verified Stripe event exactly once without allowing older state to win. */
 const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNextPayload }) => {
-  if (!db) throw new Error('A verified Stripe event and entitlement target are required.');
-  if (!entitlementRef) throw new Error('A verified Stripe event and entitlement target are required.');
-  if (!event?.id) throw new Error('A verified Stripe event and entitlement target are required.');
-  if (!event?.type) throw new Error('A verified Stripe event and entitlement target are required.');
-  if (typeof buildNextPayload !== 'function') throw new Error('A verified Stripe event and entitlement target are required.');
+  if (hasMissingInputs({ db, entitlementRef, event, buildNextPayload })) {
+    throw new Error(WEBHOOK_MISSING_ERROR);
+  }
 
   const eventRef = db.collection(EVENT_LEDGER_COLLECTION).doc(event.id);
   return db.runTransaction((transaction) =>
