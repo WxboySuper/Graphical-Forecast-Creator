@@ -593,29 +593,22 @@ const resolveInvoiceUid = (subscription, invoice) =>
   invoice.subscription_details?.metadata?.uid ||
   '';
 
+/** Finds a payment intent from invoice payments list via the Invoice Payments API. */
+const findPaymentIntentFromInvoicePayments = async (stripe, invoiceId) => {
+  if (!stripe.invoicePayments?.list || !invoiceId) return null;
+  const invoicePayments = await stripe.invoicePayments.list({ invoice: invoiceId, limit: 10 });
+  return getFirstStripeObjectId(invoicePayments.data.map((payment) => payment?.payment?.payment_intent));
+};
+
 /** Resolves a refundable payment intent from an invoice across legacy and current Stripe shapes. */
 const resolveInvoicePaymentIntentId = async (stripe, invoice) => {
   const legacyPaymentIntent = getStripeObjectId(invoice.payment_intent);
   if (legacyPaymentIntent) return legacyPaymentIntent;
 
-  const payments = invoice.payments?.data || [];
   const fromPayments = getFirstStripeObjectId(
-    payments.map((payment) => payment?.payment?.payment_intent),
+    (invoice.payments?.data || []).map((payment) => payment?.payment?.payment_intent),
   );
-  if (fromPayments) return fromPayments;
-
-  if (stripe.invoicePayments?.list) {
-    const invoiceId = getStripeObjectId(invoice.id);
-    if (invoiceId) {
-      const invoicePayments = await stripe.invoicePayments.list({ invoice: invoiceId, limit: 10 });
-      const fromInvoicePayments = getFirstStripeObjectId(
-        invoicePayments.data.map((payment) => payment?.payment?.payment_intent),
-      );
-      if (fromInvoicePayments) return fromInvoicePayments;
-    }
-  }
-
-  return null;
+  return fromPayments || findPaymentIntentFromInvoicePayments(stripe, getStripeObjectId(invoice.id));
 };
 
 /** Refunds a late invoice payment and removes the Stripe customer for a deleted account. */
