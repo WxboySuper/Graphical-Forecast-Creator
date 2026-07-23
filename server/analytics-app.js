@@ -6,6 +6,7 @@ const { setupExpressErrorHandler } = require('./sentry');
 function configureApp(app, express) {
   const rateLimit = require('express-rate-limit');
   const { registerBetaRoutes } = require('./beta');
+  const { registerAccountLifecycleRoutes } = require('./account-lifecycle');
   const { registerBillingRoutes } = require('./billing');
   const { registerCapabilityRoutes } = require('./capabilities');
   const { registerMetricsRoutes } = require('./metrics');
@@ -21,6 +22,7 @@ function configureApp(app, express) {
   registerCapabilityRoutes(app);
   registerTstmRoutes(app, express);
   registerTstmIngestion(app, express);
+  registerAccountLifecycleRoutes(app, express);
 
   setupExpressErrorHandler(app);
 

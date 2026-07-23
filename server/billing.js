@@ -7,6 +7,7 @@ const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
+const { deleteStripeCustomer, isAccountDeletionBlocked } = require('./account-lifecycle');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -157,6 +158,23 @@ const getExistingEntitlementData = async (uid, stripeIds = {}) => {
   return createNewEntitlementTarget(uid);
 };
 
+/** Prevents delayed Stripe events from recreating state for a deleted Firebase identity. */
+const canWriteEntitlementForUid = async (
+  uid,
+  { adminAuth = getAdminAuth(), db = getAdminDb() } = {}
+) => {
+  if (!uid) return true;
+  if (await isAccountDeletionBlocked(db, uid)) return false;
+  if (!adminAuth) return true;
+  try {
+    await adminAuth.getUser(uid);
+    return true;
+  } catch (error) {
+    if (error?.code === 'auth/user-not-found') return false;
+    throw error;
+  }
+};
+
 /** Writes the merged entitlement payload into Firestore once for the verified webhook event. */
 const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, payload }, event) => {
   console.log('[billing] writeEntitlement:start', {
@@ -171,6 +189,12 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
   if (!existing) {
     logSkippedEntitlementWrite({ uid, stripeCustomerId, stripeSubscriptionId });
     return { applied: false, reason: 'missing-target' };
+  }
+
+  const targetUid = uid || existing.data.uid;
+  if (!(await canWriteEntitlementForUid(targetUid))) {
+    console.warn('[billing] writeEntitlement:skipped-deleted-user', { uid: targetUid });
+    return { applied: false, reason: 'deleted-user' };
   }
 
   try {
@@ -260,6 +284,11 @@ const handleCheckout = async (req, res) => {
 
   const decodedToken = await verifyRequestUser(req, res);
   if (!decodedToken) {
+    return;
+  }
+
+  if (await isAccountDeletionBlocked(getAdminDb(), decodedToken.uid)) {
+    res.status(409).json({ error: 'Account deletion is already in progress or complete.' });
     return;
   }
 
@@ -378,13 +407,118 @@ const createSubscriptionEntitlementWrite = (subscription) => {
   };
 };
 
-/** Applies the checkout-complete event to the entitlement document. */
-const recordBillingMetricEventSafely = async (eventType, webhookEventId) => {
+/** Returns the Stripe object ID for either an expanded object or a plain ID. */
+const getStripeObjectId = (value) => (typeof value === 'string' ? value : value?.id || '');
+
+/** Returns the first usable Stripe ID from a list of expanded objects or plain IDs. */
+const getFirstStripeObjectId = (values) => values.map(getStripeObjectId).find(Boolean) || '';
+
+/** Finds the payment intent across Checkout and legacy/current invoice shapes. */
+const getCheckoutPaymentIntentId = (session, invoice, payments) =>
+  getFirstStripeObjectId([
+    session.payment_intent,
+    invoice?.payment_intent,
+    ...payments.map((payment) => payment?.payment?.payment_intent),
+  ]);
+
+/** Finds a charge-only payment across current and legacy invoice shapes. */
+const getCheckoutChargeId = (invoice, payments) =>
+  getFirstStripeObjectId([
+    ...payments.map((payment) => payment?.payment?.charge),
+    invoice?.charge,
+  ]);
+
+/** Finds the initial Checkout payment across Stripe's legacy and current invoice shapes. */
+const getCheckoutRefundTarget = (session, subscription) => {
+  const invoice = subscription?.latest_invoice;
+  const payments = invoice?.payments?.data || [];
+  const paymentIntent = getCheckoutPaymentIntentId(session, invoice, payments);
+  if (paymentIntent) return { payment_intent: paymentIntent };
+
+  const charge = getCheckoutChargeId(invoice, payments);
+  return charge ? { charge } : null;
+};
+
+/** Returns the UID only when this Checkout belongs to an account blocked from writes. */
+const getBlockedCheckoutUid = async (session, canWrite) => {
+  const uid = session.client_reference_id || session.metadata?.uid || '';
+  if (!uid) return null;
+  return (await canWrite(uid)) ? null : uid;
+};
+
+/** Retrieves the expanded first invoice for a subscription-mode Checkout session. */
+const getCheckoutSubscription = async (stripe, session) => {
+  const subscriptionId = getStripeObjectId(session.subscription);
+  if (!subscriptionId) return null;
   try {
-    const recorded = await recordBillingMetricEvent(eventType, webhookEventId);
-    if (!recorded) {
-      console.log('[billing] metrics:duplicate-or-skipped', { eventType, webhookEventId });
-    }
+    return await stripe.subscriptions.retrieve(subscriptionId, { expand: ['latest_invoice'] });
+  } catch (error) {
+    if (error?.code === 'resource_missing') return null;
+    throw error;
+  }
+};
+
+/** Resolves a refundable payment using both legacy invoice fields and the current payments API. */
+const resolveCheckoutRefundTarget = async (stripe, session, subscription) => {
+  const embeddedTarget = getCheckoutRefundTarget(session, subscription);
+  if (embeddedTarget) return embeddedTarget;
+
+  const invoiceId = getStripeObjectId(subscription?.latest_invoice);
+  if (!invoiceId || !stripe.invoicePayments?.list) return null;
+  const invoicePayments = await stripe.invoicePayments.list({ invoice: invoiceId, limit: 10 });
+  return getCheckoutRefundTarget(session, {
+    latest_invoice: { payments: { data: invoicePayments.data || [] } },
+  });
+};
+
+/** Prevents a paid late Checkout from being cleaned up without its required refund. */
+const ensurePaidCheckoutHasRefundTarget = (session, refundTarget) => {
+  if (session.payment_status !== 'paid' || refundTarget) return;
+  throw new Error(`Unable to identify payment for deleted-account Checkout session ${session.id}.`);
+};
+
+/** Creates the refund only when Checkout actually produced a refundable payment. */
+const refundBlockedCheckout = async (stripe, session, refundTarget) => {
+  if (!refundTarget) return;
+  await stripe.refunds.create(refundTarget, {
+    idempotencyKey: `account-deletion-checkout-refund:${session.id}`,
+  });
+};
+
+/**
+ * Refunds a Checkout payment that completed after account deletion, then removes
+ * the newly created Stripe customer. Throwing keeps the webhook retryable.
+ */
+const cleanupBlockedCheckoutSession = async (
+  session,
+  { stripe = getStripeClient(), canWrite = canWriteEntitlementForUid } = {}
+) => {
+  const uid = await getBlockedCheckoutUid(session, canWrite);
+  if (!uid) return false;
+  if (!stripe) throw new Error('Stripe is not configured for late Checkout cleanup.');
+
+  // Wait for async payment methods to settle before cleaning up. If the
+  // payment is still unpaid, the Checkout session may later complete with a
+  // settled payment reference that we need for the refund.
+  if (session.payment_status === 'unpaid') return false;
+
+  const subscription = await getCheckoutSubscription(stripe, session);
+  const refundTarget = await resolveCheckoutRefundTarget(stripe, session, subscription);
+  ensurePaidCheckoutHasRefundTarget(session, refundTarget);
+  await refundBlockedCheckout(stripe, session, refundTarget);
+
+  await deleteStripeCustomer({ stripe, customerId: getStripeObjectId(session.customer) });
+  console.warn('[billing] checkout:refunded-deleted-user', {
+    uid,
+    sessionId: redactIdentifier(session.id),
+  });
+  return true;
+};
+
+/** Records billing metric events with safe error handling. */
+const recordBillingMetricEventSafely = async (eventType) => {
+  try {
+    await recordBillingMetricEvent(eventType);
   } catch (error) {
     console.warn('[billing] metrics:nonfatal', {
       eventType,
@@ -433,19 +567,27 @@ const withFallbackSubscriptionUid = (subscription, fallbackUid) => ({
 /** Applies checkout completion using current subscription state when available. */
 const handleCheckoutSessionCompleted = async (event, stripe) => {
   const session = event.data.object;
+  if (await cleanupBlockedCheckoutSession(session)) return;
   const subscription = await resolveAuthoritativeSubscription(stripe, event);
   const entitlementWrite = subscription
     ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
     : createCheckoutEntitlementWrite(session);
-  await writeEntitlement(entitlementWrite, event);
-  await recordBillingMetricEventSafely('premium_upgrade', event.id);
+  const result = await writeEntitlement(entitlementWrite, event);
+  if (!result?.applied && await cleanupBlockedCheckoutSession(session)) return;
+  await recordBillingMetricEventSafely('premium_upgrade');
 };
 
 /** Applies the subscription lifecycle event to the entitlement document. */
 const handleSubscriptionEvent = async (event) => {
-  await writeEntitlement(createSubscriptionEntitlementWrite(event.data.object), event);
+  const result = await writeEntitlement(createSubscriptionEntitlementWrite(event.data.object), event);
+  if (!result?.applied) {
+    console.warn('[billing] subscription-event:skipped-deleted-user', {
+      subscriptionId: redactIdentifier(event.data.object.id),
+      eventType: event.type,
+    });
+  }
   if (event.type === 'customer.subscription.deleted') {
-    await recordBillingMetricEventSafely('premium_cancellation', event.id);
+    await recordBillingMetricEventSafely('premium_cancellation');
   }
 };
 
@@ -456,7 +598,17 @@ const handleInvoiceEvent = async (event, stripe) => {
     console.warn('[billing] invoice:skipped-no-subscription', { eventId: event.id, eventType: event.type });
     return;
   }
-  await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
+  const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
+  if (!result?.applied && event.data.object.payment_intent) {
+    const stripeClient = getStripeClient();
+    if (stripeClient) {
+      await stripeClient.refunds.create(
+        { payment_intent: getStripeObjectId(event.data.object.payment_intent) },
+        { idempotencyKey: `account-deletion-invoice-refund:${getStripeObjectId(event.data.object.id)}` },
+      );
+      await deleteStripeCustomer({ stripe: stripeClient, customerId: getStripeObjectId(event.data.object.customer) });
+    }
+  }
 };
 
 const webhookHandlers = {
@@ -558,6 +710,9 @@ const registerBillingRoutes = (app, express) => {
 };
 
 module.exports = {
+  canWriteEntitlementForUid,
+  cleanupBlockedCheckoutSession,
+  getCheckoutRefundTarget,
   registerBillingRoutes,
   __testing: {
     handleWebhookEvent,

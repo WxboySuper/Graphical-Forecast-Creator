@@ -10,6 +10,7 @@ import {
   LogOut,
   Mail,
   Palette,
+  Trash2,
 } from "lucide-react";
 import { Badge, type BadgeProps } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -631,6 +632,147 @@ const BillingCard: React.FC = () => {
   );
 };
 
+/** True when password is the account's only supported reauthentication provider. */
+const accountUsesPasswordReauthentication = (
+  user: ReturnType<typeof useAuth>["user"],
+): boolean => {
+  const providerIds = new Set(
+    user?.providerData.map((provider) => provider.providerId) ?? [],
+  );
+  if (!providerIds.has("password")) return false;
+  return !providerIds.has("google.com");
+};
+
+/** True when the destructive form has every provider-specific credential. */
+const canSubmitAccountDeletion = (
+  confirmation: string,
+  usesPassword: boolean,
+  password: string,
+): boolean => {
+  if (confirmation !== "DELETE") return false;
+  if (!usesPassword) return true;
+  return password.length > 0;
+};
+
+/** Owns destructive account state while keeping the card markup declarative. */
+const useAccountDeletionAction = (usesPassword: boolean) => {
+  const { deleteAccount } = useAuth();
+  const [confirmation, setConfirmation] = useState("");
+  const [password, setPassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const canDelete = canSubmitAccountDeletion(confirmation, usesPassword, password);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount(usesPassword ? password : undefined);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Unable to delete your account right now.");
+      setDeleting(false);
+    }
+  };
+
+  return {
+    confirmation,
+    setConfirmation,
+    password,
+    setPassword,
+    deleting,
+    deleteError,
+    canDelete,
+    handleDelete,
+  };
+};
+
+/** Password field shown only for password-only Firebase accounts. */
+const AccountDeletionPasswordField: React.FC<{
+  visible: boolean;
+  password: string;
+  deleting: boolean;
+  onChange: (value: string) => void;
+}> = ({ visible, password, deleting, onChange }) => {
+  if (!visible) return null;
+  return (
+    <div className="account-field-group">
+      <label htmlFor="delete-account-password" className="text-sm font-medium text-foreground">
+        Current password
+      </label>
+      <Input
+        id="delete-account-password"
+        type="password"
+        autoComplete="current-password"
+        value={password}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={deleting}
+      />
+    </div>
+  );
+};
+
+/** Destructive button label isolated from the deletion form's control flow. */
+const AccountDeletionButtonLabel: React.FC<{ deleting: boolean }> = ({ deleting }) => {
+  if (deleting) {
+    return <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Deleting accountΓÇª</>;
+  }
+  return <><Trash2 className="mr-2 h-4 w-4" />Permanently delete account</>;
+};
+
+/** Destructive account lifecycle control with provider reauthentication and explicit confirmation. */
+const AccountDeletionCard: React.FC = () => {
+  const { user } = useAuth();
+  const usesPassword = accountUsesPasswordReauthentication(user);
+  const action = useAccountDeletionAction(usesPassword);
+
+  return (
+    <Card className="account-danger-card">
+      <CardHeader className="account-section-header">
+        <CardTitle className="flex items-center gap-2 text-2xl">
+          <Trash2 className="h-6 w-6" />
+          Delete account
+        </CardTitle>
+        <CardDescription>
+          Permanently remove your hosted profile, settings, progress metrics, cloud cycles, and account sign-in.
+          Local saves on this device are not affected.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="account-section-content">
+        <AccountDeletionPasswordField
+          visible={usesPassword}
+          password={action.password}
+          deleting={action.deleting}
+          onChange={action.setPassword}
+        />
+        <div className="account-field-group">
+          <label htmlFor="delete-account-confirmation" className="text-sm font-medium text-foreground">
+            Type DELETE to confirm
+          </label>
+          <Input
+            id="delete-account-confirmation"
+            value={action.confirmation}
+            onChange={(event) => action.setConfirmation(event.target.value)}
+            autoComplete="off"
+            disabled={action.deleting}
+          />
+        </div>
+        <p className="account-support-copy">
+          You will be asked to authenticate again. Any active premium subscription linked to this account will end.
+          This action cannot be undone.
+        </p>
+        {action.deleteError ? <p className="account-error-box" role="alert">{action.deleteError}</p> : null}
+        <Button
+          variant="destructive"
+          disabled={!action.canDelete || action.deleting}
+          onClick={() => { action.handleDelete().catch(() => undefined); }}
+        >
+          <AccountDeletionButtonLabel deleting={action.deleting} />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
+
 /** Header block for the signed-in user's progress-only account metrics card. */
 const MetricsCardHeader: React.FC = () => (
   <CardHeader className="account-section-header">
@@ -902,6 +1044,7 @@ const SignedInAccountView: React.FC = () => {
         <div className="account-side-stack">
           <MetricsCard />
           <BillingCard />
+          <AccountDeletionCard />
         </div>
       </div>
     </div>

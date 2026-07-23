@@ -8,6 +8,7 @@ import {
   areUserSettingsEqual,
   asRecord,
   canSyncHostedUserDocuments,
+  clearDeletedAccountSession,
   createProfilePayload,
   createSettingsSnapshot,
   disabledAuthAction,
@@ -91,6 +92,16 @@ const waitForAuthEffects = async (delay = 100) => {
 };
 
 describe('AuthProvider Utils', () => {
+  test('local sign-out failure does not turn completed server deletion into a failure', async () => {
+    const clearLocalState = jest.fn();
+    await expect(clearDeletedAccountSession(
+      async () => { throw new Error('local storage unavailable'); },
+      clearLocalState,
+    ))
+      .resolves.toBeUndefined();
+    expect(clearLocalState).toHaveBeenCalledTimes(1);
+  });
+
   test('safeParseJson parses valid JSON', async () => {
     const data = { foo: 'bar' };
     const resp = { ok: true, json: jest.fn().mockResolvedValue(data) } as MockResponse;
