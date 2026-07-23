@@ -6,7 +6,7 @@ import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { coerceOutlookProbabilityMap } from '../utils/outlookMapCoercion';
 import { v4 as uuidv4 } from 'uuid';
 import * as turf from '@turf/turf';
-import { Feature, Polygon, MultiPolygon } from 'geojson';
+import type { Feature, FeatureCollection, Polygon, MultiPolygon } from 'geojson';
 
 /**
  * Builds a stable geometry signature for a list of features so we can detect
@@ -229,7 +229,7 @@ export function processOutlooksToCategorical(outlooks: OutlookData, day: number 
 type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
 
 /** Builds a reusable two-feature collection shell for Turf v7 boolean ops. */
-const createPairFeatureCollection = (): turf.FeatureCollection<Polygon | MultiPolygon> => ({
+const createPairFeatureCollection = (): FeatureCollection<Polygon | MultiPolygon> => ({
   type: 'FeatureCollection',
   features: [
     { type: 'Feature', geometry: { type: 'Polygon', coordinates: [] }, properties: {} },
@@ -239,7 +239,7 @@ const createPairFeatureCollection = (): turf.FeatureCollection<Polygon | MultiPo
 
 /** Assigns two polygon features into a reusable collection before Turf calls. */
 const setPairFeatures = (
-  collection: turf.FeatureCollection<Polygon | MultiPolygon>,
+  collection: FeatureCollection<Polygon | MultiPolygon>,
   first: PolygonOutlookFeature,
   second: PolygonOutlookFeature,
 ): void => {
@@ -256,7 +256,7 @@ const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon
   
   try {
     // Turf v7: union takes a FeatureCollection
-    let fc: turf.FeatureCollection<Polygon | MultiPolygon>;
+    let fc: FeatureCollection<Polygon | MultiPolygon>;
     if (features.length === 2) {
       setPairFeatures(pairFeatureCollection, features[0], features[1]);
       fc = pairFeatureCollection;

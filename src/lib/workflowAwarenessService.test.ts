@@ -1,11 +1,11 @@
-const setDoc = jest.fn(() => Promise.resolve());
-const getDocs = jest.fn();
-const deleteDoc = jest.fn(() => Promise.resolve());
-const collection = jest.fn((...parts: string[]) => ({ parts }));
-const doc = jest.fn((...parts: unknown[]) => ({ parts }));
-const query = jest.fn((value) => value);
-
-jest.mock('firebase/firestore', () => ({ collection, deleteDoc, doc, getDocs, query, setDoc }));
+jest.mock('firebase/firestore', () => ({
+  collection: jest.fn((...parts: string[]) => ({ parts })),
+  deleteDoc: jest.fn(() => Promise.resolve()),
+  doc: jest.fn((...parts: unknown[]) => ({ parts })),
+  getDocs: jest.fn(),
+  query: jest.fn((value) => value),
+  setDoc: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('./firebase', () => ({ db: { name: 'db' } }));
 
 import {
@@ -17,6 +17,13 @@ import {
   saveWorkflowAwareness,
 } from './workflowAwarenessService';
 import { WORKFLOW_AWARENESS_CONSENT_VERSION } from '../types/workflowAwareness';
+
+const {
+  collection: mockCollection,
+  deleteDoc: mockDeleteDoc,
+  getDocs: mockGetDocs,
+  setDoc: mockSetDoc,
+} = jest.requireMock('firebase/firestore') as Record<string, jest.Mock>;
 
 const metadata = {
   cycleId: 'WF-severe-day1-2026-07-13',
@@ -39,8 +46,8 @@ test('writes only the nested user awareness path and allowlisted metadata', asyn
     consent: { enabled: true, version: WORKFLOW_AWARENESS_CONSENT_VERSION },
   });
 
-  expect(collection).toHaveBeenCalledWith({ name: 'db' }, 'users', 'user-a', 'workflowAwareness');
-  expect(setDoc).toHaveBeenCalledWith(
+  expect(mockCollection).toHaveBeenCalledWith({ name: 'db' }, 'users', 'user-a', 'workflowAwareness');
+  expect(mockSetDoc).toHaveBeenCalledWith(
     expect.objectContaining({ parts: [expect.objectContaining({ parts: [{ name: 'db' }, 'users', 'user-a', 'workflowAwareness'] }), metadata.cycleId] }),
     expect.objectContaining({
       consentVersion: WORKFLOW_AWARENESS_CONSENT_VERSION,
@@ -53,7 +60,7 @@ test('writes only the nested user awareness path and allowlisted metadata', asyn
 
 test('rejects stale consent and malformed nested metadata', async () => {
   await saveWorkflowAwareness({ userId: 'user-a', metadata, consent: { enabled: true, version: 0 } });
-  expect(setDoc).not.toHaveBeenCalled();
+  expect(mockSetDoc).not.toHaveBeenCalled();
 
   const malformed = {
     ...metadata,
@@ -65,7 +72,7 @@ test('rejects stale consent and malformed nested metadata', async () => {
 });
 
 test('deletes malformed records while returning only valid records', async () => {
-  getDocs.mockResolvedValue({
+  mockGetDocs.mockResolvedValue({
     docs: [
       { id: 'valid', data: () => ({ consentVersion: 1, schemaVersion: 1, metadata }) },
       { id: 'bad', data: () => ({ cycleId: metadata.cycleId }) },
@@ -78,8 +85,8 @@ test('deletes malformed records while returning only valid records', async () =>
   });
 
   expect(records).toHaveLength(1);
-  expect(deleteDoc).toHaveBeenCalledTimes(1);
-  expect(deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ parts: expect.arrayContaining(['bad']) }));
+  expect(mockDeleteDoc).toHaveBeenCalledTimes(1);
+  expect(mockDeleteDoc).toHaveBeenCalledWith(expect.objectContaining({ parts: expect.arrayContaining(['bad']) }));
 });
 
 test('serializes disable/delete behind an in-flight save', async () => {
@@ -103,5 +110,5 @@ test('serializes disable/delete behind an in-flight save', async () => {
 test('deletes one cleared workflow awareness record', async () => {
   await deleteOneWorkflowAwareness('user-a', metadata.cycleId);
 
-  expect(deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ parts: expect.arrayContaining([metadata.cycleId]) }));
+  expect(mockDeleteDoc).toHaveBeenCalledWith(expect.objectContaining({ parts: expect.arrayContaining([metadata.cycleId]) }));
 });

@@ -38,7 +38,7 @@ const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): b
   Object.keys(value).every((key) => keys.includes(key));
 
 /** Validates trimmed non-empty text against a bounded length. */
-const isBoundedText = (value: unknown, max = CUSTOM_PRODUCT_LIMITS.labelLength): value is string =>
+const isBoundedText = (value: unknown, max: number = CUSTOM_PRODUCT_LIMITS.labelLength): value is string =>
   typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= max;
 
 /** Validates a canonical UTC ISO timestamp. */
@@ -65,6 +65,14 @@ const hasValidChronology = (createdAt: unknown, updatedAt: unknown): boolean =>
 /** Combines field-level checks without a compound validator conditional. */
 const areAllValid = (checks: readonly boolean[]): boolean => checks.every(Boolean);
 
+/** Validates the bounded feature-array portion of a one-off layer. */
+const hasValidFeatureCount = (features: unknown): boolean =>
+  Array.isArray(features) && features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer;
+
+/** Validates an optional embedded product snapshot. */
+const hasValidProductSnapshot = (snapshot: unknown): boolean =>
+  snapshot === undefined || isEmbeddedCustomProductSnapshot(snapshot);
+
 /** Validates the scalar, category, snapshot, and timestamp fields on a one-off layer. */
 const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => areAllValid([
   value.schemaVersion === CUSTOM_PRODUCTS_SCHEMA_VERSION,
@@ -72,10 +80,9 @@ const hasValidOneOffLayerFields = (value: Record<string, unknown>): boolean => a
   isBoundedText(value.label),
   isNonNegativeInteger(value.order),
   isCustomCategoryList(value.categories),
-  Array.isArray(value.features),
-  value.features.length <= CUSTOM_PRODUCT_LIMITS.featuresPerLayer,
+  hasValidFeatureCount(value.features),
   hasValidChronology(value.createdAt, value.updatedAt),
-  value.productSnapshot === undefined || isEmbeddedCustomProductSnapshot(value.productSnapshot),
+  hasValidProductSnapshot(value.productSnapshot),
 ]);
 
 /** Validates a complete self-contained one-off layer. */

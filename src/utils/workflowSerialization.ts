@@ -39,12 +39,12 @@ const makeCycleId = (workflowId: WorkflowId, cycleDate: string): CycleId =>
 /** Returns populated legacy day entries in stable iteration order. */
 const getLegacyDayEntries = (
   legacyData: GFCForecastSaveData,
-): Array<{ day: DayType; savedDay: NonNullable<NonNullable<GFCForecastSaveData['forecastCycle']>['days']>[DayType] }> => {
+): Array<{ day: DayType; savedDay: NonNullable<NonNullable<GFCForecastSaveData['forecastCycle']>['days'][DayType]> }> => {
   if (!legacyData.forecastCycle?.days) {
     return [];
   }
 
-  return (Object.values(legacyData.forecastCycle.days) as Array<NonNullable<NonNullable<GFCForecastSaveData['forecastCycle']>['days']>[DayType]>)
+  return (Object.values(legacyData.forecastCycle.days) as Array<NonNullable<GFCForecastSaveData['forecastCycle']>['days'][DayType]>)
     .filter((savedDay): savedDay is NonNullable<typeof savedDay> => Boolean(savedDay))
     .map((savedDay) => ({ day: savedDay.day, savedDay }));
 };

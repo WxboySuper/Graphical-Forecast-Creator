@@ -37,7 +37,7 @@ interface ToolbarPanelProps {
 }
 
 interface ToolbarActionsProps {
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   isSaved: boolean;
   onSave: () => void;
   onLoadClick: () => void;

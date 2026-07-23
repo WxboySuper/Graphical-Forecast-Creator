@@ -44,8 +44,14 @@ const WORKFLOW_EVENTS = new Set<ProductAnalyticsEvent>([
 const hasAllowedWorkflowProperties = (properties: ProductAnalyticsProperties): boolean =>
   Object.entries(properties).every(([key, value]) => typeof value === 'string' && WORKFLOW_DIMENSION_VALUES[key]?.includes(value));
 
-const hasAllowedCustomLayerProperties = (properties: ProductAnalyticsProperties): boolean =>
-  Object.keys(properties).length === 1 && Number.isInteger(properties.layer_count) && properties.layer_count >= 1 && properties.layer_count <= 50;
+const hasAllowedCustomLayerProperties = (properties: ProductAnalyticsProperties): boolean => {
+  const layerCount = properties.layer_count;
+  return Object.keys(properties).length === 1
+    && typeof layerCount === 'number'
+    && Number.isInteger(layerCount)
+    && layerCount >= 1
+    && layerCount <= 50;
+};
 
 /** Keeps event payloads coarse and prevents future callers from attaching user-created data by accident. */
 const hasAllowedProperties = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): boolean => {

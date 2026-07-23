@@ -166,7 +166,7 @@ const CustomLayerActionRow: React.FC<{
     {activeLayer ? <div className="custom-draw-panel__name-control">
       <CustomLayerTitleInput layer={activeLayer} />
       <MenuPicker label="Select custom layer" testId="custom-layer-picker" value={activeLayer.id} options={layerOptions} compact onChange={(id) => dispatch(selectCustomLayer(id))} />
-    </div> : <MenuPicker label="Select custom layer" testId="custom-layer-picker" value={activeLayer?.id} options={layerOptions} onChange={(id) => dispatch(selectCustomLayer(id))} />}
+    </div> : <MenuPicker label="Select custom layer" testId="custom-layer-picker" value={undefined} options={layerOptions} onChange={(id) => dispatch(selectCustomLayer(id))} />}
     <IconButton label="Add custom layer" disabled={layers.length >= CUSTOM_PRODUCT_LIMITS.layersPerCollection} onClick={() => {
       dispatch(addCustomLayer(makeLayer(layers.length)));
       trackProductEvent('custom_layer_created', { layer_count: layers.length + 1 });
@@ -196,7 +196,7 @@ const CustomCategorySections: React.FC<{
   const dispatch = useDispatch();
   const [labelDraft, setLabelDraft] = useState(activeCategory.label);
   useEffect(() => setLabelDraft(activeCategory.label), [activeCategory.id, activeCategory.label]);
-  const updateCategory = (changes: Partial<CustomCategoryTemplate> & { style?: Partial<CustomCategoryTemplate['style']> }) => dispatch(updateCustomCategory({
+  const updateCategory = (changes: Omit<Partial<CustomCategoryTemplate>, 'style'> & { style?: Partial<CustomCategoryTemplate['style']> }) => dispatch(updateCustomCategory({
     layerId: layer.id,
     category: { ...activeCategory, ...changes, style: { ...activeCategory.style, ...changes.style } },
   }));
