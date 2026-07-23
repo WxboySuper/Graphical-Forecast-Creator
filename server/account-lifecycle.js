@@ -25,9 +25,11 @@ const isAccountDeletionBlocked = async (db, uid) => {
 /** True when a Stripe customer ID belongs to an account with an active or completed deletion. */
 const isStripeCustomerDeletionBlocked = async (db, customerId) => {
   if (!db || !customerId) return false;
-  const query = await db.collection('accountDeletionRequests')
-    .where('stripeCustomerId', '==', customerId).limit(1).get();
-  return !query.empty;
+  const [requestQuery, tombstoneQuery] = await Promise.all([
+    db.collection('accountDeletionRequests').where('stripeCustomerId', '==', customerId).limit(1).get(),
+    db.collection('accountDeletionTombstones').where('stripeCustomerId', '==', customerId).limit(1).get(),
+  ]);
+  return !requestQuery.empty || !tombstoneQuery.empty;
 };
 
 const deletionRateLimit = rateLimit({
@@ -73,7 +75,7 @@ const deleteDocumentRefs = async (db, refs) => {
   }
 };
 
-/** Queries all documents in a user subcollection, recursing if the subcollection has further subcollections. */
+/** Queries all documents in named first-level subcollections of a parent document. */
 const findNestedSubcollectionRefs = async (db, parentDocPath, subcollectionNames) => {
   const refs = [];
   for (const name of subcollectionNames) {
@@ -178,8 +180,8 @@ const reconcilePostSweepBilling = async ({ db, uid, stripe }) => {
 };
 
 /** Writes the tombstone, removes the Firebase identity, and cleans up the request marker. */
-const finalizeDeletion = async ({ uid, db, adminAuth, requestRef, tombstoneRef }) => {
-  await tombstoneRef.set({ completedAt: new Date() });
+const finalizeDeletion = async ({ uid, db, adminAuth, requestRef, tombstoneRef, stripeCustomerId }) => {
+  await tombstoneRef.set({ completedAt: new Date(), stripeCustomerId });
 
   try {
     await adminAuth.deleteUser(uid);
@@ -207,18 +209,18 @@ const initDeletionRefs = async (db, uid) => {
   const stripeCustomerId = entitlementSnapshot.data()?.stripeCustomerId || null;
 
   await requestRef.set({ status: 'in_progress', stripeCustomerId, updatedAt: new Date() }, { merge: true });
-  return { requestRef, tombstoneRef };
+  return { requestRef, tombstoneRef, stripeCustomerId };
 };
 
 /** Runs the idempotent destructive sequence while preserving the auth identity until cleanup succeeds. */
 const deleteAccount = async ({ uid, db, adminAuth, stripe }) => {
-  const { requestRef, tombstoneRef } = await initDeletionRefs(db, uid);
+  const { requestRef, tombstoneRef, stripeCustomerId } = await initDeletionRefs(db, uid);
 
   try {
     await deleteLinkedStripeCustomers({ db, uid, stripe });
     await deleteAccountFirestoreData(db, uid);
     await reconcilePostSweepBilling({ db, uid, stripe });
-    await finalizeDeletion({ uid, db, adminAuth, requestRef, tombstoneRef });
+    await finalizeDeletion({ uid, db, adminAuth, requestRef, tombstoneRef, stripeCustomerId });
   } catch (error) {
     await handleDeletionFailure({ adminAuth, uid, requestRef, error });
   }

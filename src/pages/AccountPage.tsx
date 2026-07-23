@@ -714,7 +714,7 @@ const AccountDeletionPasswordField: React.FC<{
 /** Destructive button label isolated from the deletion form's control flow. */
 const AccountDeletionButtonLabel: React.FC<{ deleting: boolean }> = ({ deleting }) => {
   if (deleting) {
-    return <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Deleting accountΓÇª</>;
+    return <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Deleting account…</>;
   }
   return <><Trash2 className="mr-2 h-4 w-4" />Permanently delete account</>;
 };

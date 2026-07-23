@@ -569,7 +569,7 @@ const handleCheckoutSessionCompleted = async (event, stripe) => {
     : createCheckoutEntitlementWrite(session);
   const result = await writeEntitlement(entitlementWrite, event);
   if (!result?.applied && await cleanupBlockedCheckoutSession(session)) return;
-  await recordBillingMetricEventSafely('premium_upgrade');
+  if (result?.applied) await recordBillingMetricEventSafely('premium_upgrade');
 };
 
 /** Applies the subscription lifecycle event to the entitlement document. */
@@ -593,12 +593,39 @@ const resolveInvoiceUid = (subscription, invoice) =>
   invoice.subscription_details?.metadata?.uid ||
   '';
 
+/** Resolves a refundable payment intent from an invoice across legacy and current Stripe shapes. */
+const resolveInvoicePaymentIntentId = async (stripe, invoice) => {
+  const legacyPaymentIntent = getStripeObjectId(invoice.payment_intent);
+  if (legacyPaymentIntent) return legacyPaymentIntent;
+
+  const payments = invoice.payments?.data || [];
+  const fromPayments = getFirstStripeObjectId(
+    payments.map((payment) => payment?.payment?.payment_intent),
+  );
+  if (fromPayments) return fromPayments;
+
+  if (stripe.invoicePayments?.list) {
+    const invoiceId = getStripeObjectId(invoice.id);
+    if (invoiceId) {
+      const invoicePayments = await stripe.invoicePayments.list({ invoice: invoiceId, limit: 10 });
+      const fromInvoicePayments = getFirstStripeObjectId(
+        invoicePayments.data.map((payment) => payment?.payment?.payment_intent),
+      );
+      if (fromInvoicePayments) return fromInvoicePayments;
+    }
+  }
+
+  return null;
+};
+
 /** Refunds a late invoice payment and removes the Stripe customer for a deleted account. */
 const refundDeletedAccountInvoice = async (invoice) => {
   const stripeClient = getStripeClient();
-  if (!stripeClient || !invoice.payment_intent) return;
+  if (!stripeClient) return;
+  const paymentIntentId = await resolveInvoicePaymentIntentId(stripeClient, invoice);
+  if (!paymentIntentId) return;
   await stripeClient.refunds.create(
-    { payment_intent: getStripeObjectId(invoice.payment_intent) },
+    { payment_intent: paymentIntentId },
     { idempotencyKey: `account-deletion-invoice-refund:${getStripeObjectId(invoice.id)}` },
   );
   await deleteStripeCustomer({ stripe: stripeClient, customerId: getStripeObjectId(invoice.customer) });
