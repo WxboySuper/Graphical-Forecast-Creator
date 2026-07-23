@@ -586,6 +586,24 @@ const handleSubscriptionEvent = async (event) => {
   }
 };
 
+/** Returns the UID from the subscription or invoice metadata. */
+const resolveInvoiceUid = (subscription, invoice) =>
+  getSubscriptionUid(subscription) ||
+  invoice.parent?.subscription_details?.metadata?.uid ||
+  invoice.subscription_details?.metadata?.uid ||
+  '';
+
+/** Refunds a late invoice payment and removes the Stripe customer for a deleted account. */
+const refundDeletedAccountInvoice = async (invoice) => {
+  const stripeClient = getStripeClient();
+  if (!stripeClient || !invoice.payment_intent) return;
+  await stripeClient.refunds.create(
+    { payment_intent: getStripeObjectId(invoice.payment_intent) },
+    { idempotencyKey: `account-deletion-invoice-refund:${getStripeObjectId(invoice.id)}` },
+  );
+  await deleteStripeCustomer({ stripe: stripeClient, customerId: getStripeObjectId(invoice.customer) });
+};
+
 /** Applies invoice notifications from the current authoritative subscription state. */
 const handleInvoiceEvent = async (event, stripe) => {
   const subscription = await resolveAuthoritativeSubscription(stripe, event);
@@ -594,19 +612,15 @@ const handleInvoiceEvent = async (event, stripe) => {
     return;
   }
   const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
-  const isDeletedUser = result?.reason === 'deleted-user';
-  const isMissingTargetForDeletedAccount =
-    result?.reason === 'missing-target' &&
-    getSubscriptionUid(subscription) &&
-    (await isAccountDeletionBlocked(getAdminDb(), getSubscriptionUid(subscription)));
-  if ((isDeletedUser || isMissingTargetForDeletedAccount) && event.data.object.payment_intent) {
-    const stripeClient = getStripeClient();
-    if (stripeClient) {
-      await stripeClient.refunds.create(
-        { payment_intent: getStripeObjectId(event.data.object.payment_intent) },
-        { idempotencyKey: `account-deletion-invoice-refund:${getStripeObjectId(event.data.object.id)}` },
-      );
-      await deleteStripeCustomer({ stripe: stripeClient, customerId: getStripeObjectId(event.data.object.customer) });
+  const invoice = event.data.object;
+  if (result?.reason === 'deleted-user') {
+    await refundDeletedAccountInvoice(invoice);
+    return;
+  }
+  if (result?.reason === 'missing-target') {
+    const uid = resolveInvoiceUid(subscription, invoice);
+    if (uid && (await isAccountDeletionBlocked(getAdminDb(), uid))) {
+      await refundDeletedAccountInvoice(invoice);
     }
   }
 };
