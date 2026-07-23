@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verification v2 — Forecast Grade Plan (gfc-ver-1)</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; line-height: 1.55; }
+      h1 { margin-bottom: 0.25rem; }
+      .sub { color: #64748b; margin-bottom: 1.5rem; }
+      h2 { margin-top: 2rem; border-bottom: 1px solid rgba(148,163,184,0.35); padding-bottom: 0.25rem; }
+      h3 { margin-top: 1.25rem; }
+      table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+      th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(148,163,184,0.25); vertical-align: top; }
+      code { background: rgba(148,163,184,0.18); padding: 0.1rem 0.3rem; border-radius: 4px; }
+      .note { background: rgba(59,130,246,0.1); border-left: 3px solid #3b82f6; padding: 0.6rem 0.9rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Verification v2 — Forecast Grade</h1>
+    <div class="sub">Formula version <strong>gfc-ver-1</strong> · gate <code>verificationRelaunch</code> · tracker #430</div>
+
+    <p>
+      Relaunch Verification as a map-first evidence dashboard with a versioned Forecast Grade, explicit
+      sources, grade history, and one shareable grade-plus-map card — behind <code>verificationRelaunch</code>,
+      without removing classic Verification. Primary job: learn fast whether the forecast captured what
+      happened. Audience: forecasters learning the craft — clear for beginners, not bogged down for
+      experts. Progressive disclosure via labeled expandable sections, never a Basic/Advanced switch, and
+      no coaching / AI prose.
+    </p>
+
+    <h2>1. Coexistence &amp; feature gate</h2>
+    <ul>
+      <li>Classic <code>/verification</code> (VerificationMode) stays the live default when the flag is off.</li>
+      <li>V2 mounts only when <code>verificationRelaunch</code> is exposed. Dogfood: <code>exposure.local: true</code> only; beta/staging/production stay false.</li>
+      <li>Disabled-side-effect tests ensure a flag-off build cannot boot the v2 dashboard or gfc-ver-1 engine as a side effect (lazy route + side-effect module registry).</li>
+      <li>Deleting classic Verification is out of scope for this effort.</li>
+    </ul>
+
+    <h2>2. Sources &amp; history (capability-first)</h2>
+    <table>
+      <thead><tr><th>Tier</th><th>Package input</th><th>History</th></tr></thead>
+      <tbody>
+        <tr><td>Signed-out</td><td>File + SPC reports</td><td>None</td></tr>
+        <tr><td>Signed-in free</td><td>File only + SPC</td><td>Grade cards (latest 25) for trend; cards do not reopen full packages</td></tr>
+        <tr><td>Premium</td><td>File or cloud package + SPC</td><td>Full immutable snapshot auto-save; cloud restore</td></tr>
+      </tbody>
+    </table>
+    <p>Source selection is always explicit — there is no automatic handoff from the Forecast Editor. Completed runs auto-save an immutable snapshot (formula version + source snapshot); re-runs create new results and never rewrite history.</p>
+
+    <h2>3. UI / dashboard</h2>
+    <h3>Layout</h3>
+    <ul>
+      <li>Desktop: equal-weight map and results dashboard; the map is the evidence surface.</li>
+      <li>Mobile: map-first with a compact Forecast Grade overlay/drawer; details reachable without overflow.</li>
+      <li>Landscape phone: keep the mobile interaction model when height is constrained.</li>
+      <li>Map controls always reachable: hazard, day, evidence.</li>
+      <li>Selecting a grade component/product emphasizes related geometry on the map.</li>
+      <li>Selectable report table is the keyboard/screen-reader equivalent of map highlights; the map stays primary.</li>
+    </ul>
+    <h3>Result view</h3>
+    <ul>
+      <li>Headline: Forecast Grade (0–100 + letter, one decimal) + component scores.</li>
+      <li>Expandable sections titled exactly <strong>Score breakdown</strong> and <strong>Data quality</strong>.</li>
+      <li>Data quality: Good / Limited / Blocked; quiet day says <em>No reports</em>.</li>
+      <li>Missing products: <em>Not evaluated</em> row with classic warning treatment (no coaching).</li>
+      <li>History trend filterable by hazard. Comparison mode is out of scope.</li>
+    </ul>
+    <h3>Run UX</h3>
+    <ul>
+      <li>Accuracy over a fixed latency budget; long runs show staged foreground progress and complete automatically.</li>
+      <li>Invalid inputs block the run. Sparse-but-valid may withhold the package grade while showing components (Limited).</li>
+    </ul>
+    <h3>Share</h3>
+    <ul>
+      <li>One anonymous grade-plus-map card (map-led). Offer download, native share (when available), and copy (when supported).</li>
+      <li>No identity by default.</li>
+    </ul>
+    <h3>Methodology</h3>
+    <p>Public methodology page linked from the dashboard documents the formulas, caveats, version history, SPC 25-mile citation, and intent/yield rationale. The formula version is embedded in the UI, docs, and exports.</p>
+
+    <h2>4. Math gfc-ver-1</h2>
+    <p>Two layers: the SPC occurrence definition (25-mile neighborhood + Armchair-style area buffers / per-tier contingency) and the GFC intent layer (event yield/concentration + severity). No distance-from-polygon decay inside the halo.</p>
+    <table>
+      <thead><tr><th>Component</th><th>Weight</th><th>Definition</th></tr></thead>
+      <tbody>
+        <tr><td>Probability skill</td><td>25%</td><td>Spatial Brier / BSS over a ~10&nbsp;km grid; higher-f empty cells hurt more; quiet overforecast still scores.</td></tr>
+        <tr><td>Spatial contingency</td><td>25%</td><td>Area hit/miss/FA CSI per probability tier, combined across tiers.</td></tr>
+        <tr><td>False-alarm discipline</td><td>15%</td><td>Probability-weighted areal FAR.</td></tr>
+        <tr><td>Event yield</td><td>25%</td><td>expected = baseline(f) + area × density(f); yield = min(1, reports/expected). Fails huge 30%+1; softens tiny 45%+1.</td></tr>
+        <tr><td>Severity</td><td>10%</td><td>Sig reports vs sig contours in the 25-mi neighborhood; N/A if neither; soft ~70 penalty if sig drawn and none observed.</td></tr>
+      </tbody>
+    </table>
+    <p>Package rollup: equal weight among present products (categorical / tornado / wind / hail); absent → Not evaluated. Data quality Blocked / Limited / Good as above. Geometry quality is a gate, not a weight. Letter bands: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F &lt; 60. Categorical → probability: TSTM 0.05, MRGL 0.10, SLGT 0.15, ENH 0.30, MDT 0.40, HIGH 0.45.</p>
+    <p class="note">Reference inspiration (area method, not gamed for contests): <a href="https://armchairforecaster.com/pages/library/#verification">Armchair Forecaster — Verification</a>. See also the in-app <a href="/docs/forecast-grade-methodology.html">Forecast Grade methodology</a> page.</p>
+
+    <h2>5. Architecture</h2>
+    <ol>
+      <li>Pure engine (no React): neighborhood/buffers, area metrics, Brier, yield, severity, composite, snapshots — <code>src/utils/verificationV2/</code>.</li>
+      <li>Source adapters: file + premium cloud; SPC reports; validate or block — <code>sources.ts</code>.</li>
+      <li>Snapshot store: auto-save; free grade cards; premium full restore — <code>gradeHistory.ts</code>.</li>
+      <li>Feature-gated UI: V2 shell on <code>/verification</code> when flag on; else classic — <code>src/components/ForecastGrade/</code>.</li>
+      <li>Share + docs: PNG card; methodology page for gfc-ver-1.</li>
+    </ol>
+
+    <h2>6. Stacked PRs</h2>
+    <ol>
+      <li><code>ver2/01-formula-contract</code></li>
+      <li><code>ver2/02-neighborhood-area</code></li>
+      <li><code>ver2/03-prob-spatial</code></li>
+      <li><code>ver2/04-yield-composite</code></li>
+      <li><code>ver2/05-sources-history</code></li>
+      <li><code>ver2/06-dashboard-shell</code> (local:true + side-effect tests + classic coexistence)</li>
+      <li><code>ver2/07-result-workspace</code> (grade UI, breakdown, map↔table, controls)</li>
+      <li><code>ver2/08-share-docs</code></li>
+      <li><code>ver2/09-hardening</code> (fixtures, browser e2e, responsive)</li>
+    </ol>
+    <p>Draft PRs target <code>beta</code>. No merge; no beta/prod flag enable during dogfood.</p>
+
+    <h2>7. Testing</h2>
+    <p>Static: unit tests + fixtures (dense congestion, sparse, quiet, tiny high-prob 1 vs many) asserting yield/FAR behaviors, plus flag-off side-effect tests. <code>pnpm test</code>, <code>pnpm run build</code>. Dynamic: browser with the local flag; file + SPC scenarios; Score breakdown; map↔table; share smoke; phone viewports; Playwright as needed.</p>
+
+    <h2>8. Out of scope</h2>
+    <p>Beta/prod flag enable; deleting classic; comparison mode; DAT/tracks; Cloud Library redesign; coaching copy; leaderboards; merging PRs.</p>
+  </body>
+</html>
