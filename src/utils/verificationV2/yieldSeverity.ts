@@ -133,10 +133,6 @@ export const scoreSeverity = (
   contours: ProductContour[],
   reports: StormReport[]
 ): ComponentScore => {
-  if (product === 'categorical') {
-    return notEvaluatedComponent('severity', 'Significant contours are hazard-specific; not scored for categorical.');
-  }
-
   const sigContours = contours.filter((contour) => contour.isSignificant);
   const sigReports = reportsForProduct(product, reports).filter(isSignificantReport);
   const sigDrawn = sigContours.length > 0;
