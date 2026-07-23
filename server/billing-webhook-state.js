@@ -18,23 +18,6 @@ const isStaleStripeEvent = (existingData, event) => {
   );
 };
 
-/** Throws when any required webhook processing input is missing. */
-const validateWebhookInputs = ({ db, entitlementRef, event, buildNextPayload }) => {
-  if (!db || !entitlementRef) {
-    throw new Error('A verified Stripe event and entitlement target are required.');
-  }
-  if (!event?.id || !event?.type) {
-    throw new Error('A verified Stripe event and entitlement target are required.');
-  }
-  if (typeof buildNextPayload !== 'function') {
-    throw new Error('A verified Stripe event and entitlement target are required.');
-  }
-};
-
-/** Reads the existing entitlement data or returns an empty object. */
-const resolveExistingEntitlementData = (entitlementSnapshot) =>
-  entitlementSnapshot.exists ? entitlementSnapshot.data() || {} : {};
-
 /** Builds the ledger entry that records how this event was processed. */
 const buildEventLedgerEntry = ({ event, entitlementRef, stale, processedAt }) => ({
   eventType: event.type,
@@ -47,7 +30,11 @@ const buildEventLedgerEntry = ({ event, entitlementRef, stale, processedAt }) =>
 
 /** Applies one verified Stripe event exactly once without allowing older state to win. */
 const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNextPayload }) => {
-  validateWebhookInputs({ db, entitlementRef, event, buildNextPayload });
+  if (!db) throw new Error('A verified Stripe event and entitlement target are required.');
+  if (!entitlementRef) throw new Error('A verified Stripe event and entitlement target are required.');
+  if (!event?.id) throw new Error('A verified Stripe event and entitlement target are required.');
+  if (!event?.type) throw new Error('A verified Stripe event and entitlement target are required.');
+  if (typeof buildNextPayload !== 'function') throw new Error('A verified Stripe event and entitlement target are required.');
 
   const eventRef = db.collection(EVENT_LEDGER_COLLECTION).doc(event.id);
   return db.runTransaction(async (transaction) => {
@@ -60,7 +47,7 @@ const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNe
       return { applied: false, reason: 'duplicate' };
     }
 
-    const existingData = resolveExistingEntitlementData(entitlementSnapshot);
+    const existingData = entitlementSnapshot.exists ? entitlementSnapshot.data() || {} : {};
     const stale = isStaleStripeEvent(existingData, event);
     const processedAt = new Date();
     transaction.set(eventRef, buildEventLedgerEntry({ event, entitlementRef, stale, processedAt }));
