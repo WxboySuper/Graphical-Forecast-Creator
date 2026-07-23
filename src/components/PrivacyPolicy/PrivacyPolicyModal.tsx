@@ -134,10 +134,14 @@ const PrivacyPolicyContent: React.FC<{ showWhatsNew?: boolean }> = ({ showWhatsN
 
     <h3>6. Data Retention &amp; Deletion</h3>
     <p>
-      You own your data. You have the right to delete your account and associated cloud data at any time. Upon account
-      deletion, your cloud-hosted cycles, profile data, synced settings, and user-linked progress metrics will be
-      permanently removed from our Firebase servers. Your local, offline saves will remain completely untouched on your
-      device.
+      You own your data. You can delete your account from the Account page after confirming the request and
+      authenticating again. The deletion process ends any subscription linked to the account, then permanently removes
+      your cloud-hosted cycles, profile data, synced settings, user-linked progress metrics, billing linkage, and
+      Firebase sign-in. Your local, offline saves remain untouched on your device. If cleanup cannot finish, the
+      sign-in is kept available so you can retry. We retain a one-way hash of the deleted Firebase identifier as a
+      deletion-safety marker so delayed billing events cannot recreate the account; it contains no email, profile,
+      settings, metrics, or forecast content. Stripe may retain transaction records it is independently required to
+      keep for payment, fraud-prevention, tax, or legal purposes.
     </p>
     <p>
       Aggregate admin metrics may be retained in a non-user-specific form for product operations. Short-lived dedupe
