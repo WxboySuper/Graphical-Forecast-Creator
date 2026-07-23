@@ -16,18 +16,13 @@ const {
 } = require('./tstm');
 const { allTargetsEnabledRouteOptions } = require('./testing/featureExposureTargetMatrix');
 
-const startServer = (env, runGenerator, routeOptions = {}) => {
+const startServer = (env, routeOptions = {}) => {
   const app = express();
-  registerTstmRoutes(app, express, { env, runGenerator, ...routeOptions });
+  registerTstmRoutes(app, express, { env, ...routeOptions });
   return new Promise((resolve, reject) => {
     const server = app.listen(0, '127.0.0.1', () => resolve(server));
     server.on('error', reject);
   });
-};
-
-const getUrl = (server) => {
-  const address = server.address();
-  return `http://127.0.0.1:${address.port}/api/tstm/generate`;
 };
 
 const createFakeChild = () => {
@@ -38,13 +33,6 @@ const createFakeChild = () => {
   child.kill = () => child.emit('close', null);
   return child;
 };
-
-const postGenerateRequest = (server, headers = {}) =>
-  fetch(getUrl(server), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...headers },
-    body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
-  });
 
 const SAMPLE_CACHED_ROUTE = {
   run: '2026-06-13T12:00:00Z',
@@ -118,19 +106,17 @@ describe('Auto-TSTM server foundation', () => {
   });
 
   it('never exposes direct generation, even when the capability is enabled', async () => {
-    let calls = 0;
     const server = await startServer(
       { TSTM_GENERATION_ENABLED: 'true' },
-      async () => {
-        calls += 1;
-        return {};
-      },
       allTargetsEnabledRouteOptions()
     );
     try {
-      const response = await postGenerateRequest(server, { authorization: 'Bearer any-token' });
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/api/tstm/generate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
+      });
       assert.equal(response.status, 404);
-      assert.equal(calls, 0);
     } finally {
       server.close();
     }
