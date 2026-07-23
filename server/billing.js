@@ -4,6 +4,7 @@ const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
+const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
@@ -157,8 +158,8 @@ const getExistingEntitlementData = async (uid, stripeIds = {}) => {
   return createNewEntitlementTarget(uid);
 };
 
-/** Writes the merged entitlement payload into Firestore. */
-const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, payload }) => {
+/** Writes the merged entitlement payload into Firestore once for the verified webhook event. */
+const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, payload }, event) => {
   console.log('[billing] writeEntitlement:start', {
     uid,
     stripeCustomerId: redactIdentifier(stripeCustomerId),
@@ -170,27 +171,37 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
   const existing = await getExistingEntitlementData(uid, { stripeCustomerId, stripeSubscriptionId });
   if (!existing) {
     logSkippedEntitlementWrite({ uid, stripeCustomerId, stripeSubscriptionId });
-    return;
+    return { applied: false, reason: 'missing-target' };
   }
-
-  const nextPayload = computeEffectiveEntitlement({
-    ...createBaseEntitlementPayload(uid, existing.data),
-    ...payload,
-  });
 
   try {
-    await existing.ref.set(nextPayload, { merge: true });
+    const result = await applyEntitlementWebhookEvent({
+      db: getAdminDb(),
+      entitlementRef: existing.ref,
+      event,
+      buildNextPayload: (currentData) =>
+        computeEffectiveEntitlement({
+          ...createBaseEntitlementPayload(uid, currentData),
+          ...payload,
+        }),
+    });
+    if (!result.applied) {
+      console.log('[billing] writeEntitlement:skipped', { eventId: event.id, reason: result.reason });
+      return result;
+    }
+
+    const nextPayload = result.nextPayload;
+    console.log('[billing] writeEntitlement:success', {
+      uid: nextPayload.uid,
+      premiumActive: nextPayload.premiumActive,
+      effectiveSource: nextPayload.effectiveSource,
+      billingStatus: nextPayload.billingStatus,
+    });
+    return result;
   } catch (error) {
-    logEntitlementWriteError({ uid, stripeCustomerId, stripeSubscriptionId, nextPayload, error });
+    logEntitlementWriteError({ uid, stripeCustomerId, stripeSubscriptionId, nextPayload: payload, error });
     throw error;
   }
-
-  console.log('[billing] writeEntitlement:success', {
-    uid: nextPayload.uid,
-    premiumActive: nextPayload.premiumActive,
-    effectiveSource: nextPayload.effectiveSource,
-    billingStatus: nextPayload.billingStatus,
-  });
 };
 
 /** Extracts a verified Firebase user from the Authorization header. */
@@ -309,10 +320,6 @@ const handleBillingPortal = async (req, res) => {
 /** Maps Stripe recurring intervals into the entitlement interval shape. */
 const getPlanInterval = (interval) => (interval === 'year' ? 'annual' : 'monthly');
 
-/** Extracts the most reliable UID from an invoice payload. */
-const getInvoiceUid = (invoice) =>
-  invoice.parent?.subscription_details?.metadata?.uid || invoice.subscription_details?.metadata?.uid || '';
-
 /** Normalizes a Stripe API customer id into a nullable string. */
 const getStripeCustomerId = (value) => (typeof value === 'string' ? value : null);
 
@@ -371,68 +378,127 @@ const createSubscriptionEntitlementWrite = (subscription) => {
   };
 };
 
-/** Builds the entitlement payload for invoice payment events. */
-const createInvoiceEntitlementWrite = (eventType, invoice) => {
-  const uid = getInvoiceUid(invoice);
-  const stripeCustomerId = getStripeCustomerId(invoice.customer);
-  const stripeSubscriptionId = getStripeSubscriptionId(invoice.subscription);
-
-  return {
-    uid,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    payload: {
-      uid,
-      planInterval: getPlanInterval(invoice.lines?.data?.[0]?.price?.recurring?.interval),
-      billingStatus: eventType === 'invoice.paid' ? 'active' : 'past_due',
-      stripeCustomerId,
-      stripeSubscriptionId,
-    },
-  };
-};
-
-/** Applies the checkout-complete event to the entitlement document. */
-const recordBillingMetricEventSafely = async (eventType) => {
+/** Records billing metrics while preserving webhook retry behavior on a transient failure. */
+const recordBillingMetricEventWithLogging = async (eventType, webhookEventId) => {
   try {
-    await recordBillingMetricEvent(eventType);
+    await recordBillingMetricEvent(eventType, webhookEventId);
   } catch (error) {
-    console.warn('[billing] metrics:nonfatal', {
+    console.error('[billing] metrics:error', {
       eventType,
       error: error instanceof Error ? error.message : 'Unknown billing metrics failure',
     });
+    throw error;
   }
 };
 
+/** True when an applied event, including its retry, is allowed to affect business metrics. */
+const shouldRecordBillingMetric = (result) =>
+  Boolean(result?.applied || (result?.reason === 'duplicate' && result?.priorOutcome === 'applied'));
+
 /** Applies the checkout-complete event to the entitlement document. */
-const handleCheckoutSessionCompleted = async (session) => {
-  await writeEntitlement(createCheckoutEntitlementWrite(session));
-  await recordBillingMetricEventSafely('premium_upgrade');
+const getInvoiceSubscription = (invoice) =>
+  invoice.subscription || invoice.parent?.subscription_details?.subscription || null;
+
+/** Resolves a subscription id or expanded object from a supported webhook payload. */
+const getWebhookSubscription = (event) => {
+  const object = event.data.object;
+  if (event.type.startsWith('customer.subscription.')) {
+    return object;
+  }
+  if (event.type === 'checkout.session.completed') {
+    return object.subscription || null;
+  }
+  return getInvoiceSubscription(object);
+};
+
+/** Retrieves current Stripe lifecycle state for convenience events such as invoices. */
+const getWebhookSubscriptionId = (subscription) =>
+  typeof subscription === 'string' ? subscription : subscription?.id || null;
+
+/** True when Stripe deletion state remains authoritative after the object is no longer retrievable. */
+const canUseDeletedEventState = (event, subscription) =>
+  [event.type === 'customer.subscription.deleted', typeof subscription === 'object'].every(Boolean);
+
+/** Retrieves current state and falls back only to a verified deletion event object. */
+const retrieveSubscriptionState = async (stripe, event, subscription, subscriptionId) => {
+  try {
+    return await stripe.subscriptions.retrieve(subscriptionId);
+  } catch (error) {
+    if (canUseDeletedEventState(event, subscription)) {
+      console.warn('[billing] subscription:using-deleted-event-state', { eventId: event.id });
+      return subscription;
+    }
+    throw error;
+  }
+};
+
+/** Retrieves current Stripe lifecycle state for supported webhook events. */
+const resolveAuthoritativeSubscription = async (stripe, event) => {
+  const subscription = getWebhookSubscription(event);
+  if (!subscription) {
+    return null;
+  }
+  const subscriptionId = getWebhookSubscriptionId(subscription);
+  if (!subscriptionId) {
+    return typeof subscription === 'object' ? subscription : null;
+  }
+  return retrieveSubscriptionState(stripe, event, subscription, subscriptionId);
+};
+
+/** Preserves the checkout UID if Stripe has not copied metadata onto the subscription yet. */
+const withFallbackSubscriptionUid = (subscription, fallbackUid) => ({
+  ...subscription,
+  metadata: {
+    ...(subscription.metadata || {}),
+    ...(subscription.metadata?.uid || !fallbackUid ? {} : { uid: fallbackUid }),
+  },
+});
+
+/** Applies checkout completion using current subscription state when available. */
+const handleCheckoutSessionCompleted = async (event, stripe) => {
+  const session = event.data.object;
+  const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  const entitlementWrite = subscription
+    ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
+    : createCheckoutEntitlementWrite(session);
+  const result = await writeEntitlement(entitlementWrite, event);
+  if (shouldRecordBillingMetric(result)) {
+    await recordBillingMetricEventWithLogging('premium_upgrade', event.id);
+  }
 };
 
 /** Applies the subscription lifecycle event to the entitlement document. */
-const handleSubscriptionEvent = async (subscription, eventType) => {
-  await writeEntitlement(createSubscriptionEntitlementWrite(subscription));
-  if (eventType === 'customer.subscription.deleted') {
-    await recordBillingMetricEventSafely('premium_cancellation');
+const handleSubscriptionEvent = async (event, stripe) => {
+  const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
+  if (event.type === 'customer.subscription.deleted' && shouldRecordBillingMetric(result)) {
+    await recordBillingMetricEventWithLogging('premium_cancellation', event.id);
   }
 };
 
-/** Applies invoice payment results to the entitlement document. */
-const handleInvoiceEvent = (eventType, invoice) => writeEntitlement(createInvoiceEntitlementWrite(eventType, invoice));
+/** Applies invoice notifications from the current authoritative subscription state. */
+const handleInvoiceEvent = async (event, stripe) => {
+  const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  if (!subscription) {
+    console.warn('[billing] invoice:skipped-no-subscription', { eventId: event.id, eventType: event.type });
+    return;
+  }
+  await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
+};
 
 const webhookHandlers = {
-  'checkout.session.completed': (event) => handleCheckoutSessionCompleted(event.data.object),
-  'customer.subscription.updated': (event) => handleSubscriptionEvent(event.data.object, event.type),
-  'customer.subscription.deleted': (event) => handleSubscriptionEvent(event.data.object, event.type),
-  'invoice.paid': (event) => handleInvoiceEvent(event.type, event.data.object),
-  'invoice.payment_failed': (event) => handleInvoiceEvent(event.type, event.data.object),
+  'checkout.session.completed': handleCheckoutSessionCompleted,
+  'customer.subscription.updated': handleSubscriptionEvent,
+  'customer.subscription.deleted': handleSubscriptionEvent,
+  'invoice.paid': handleInvoiceEvent,
+  'invoice.payment_failed': handleInvoiceEvent,
 };
 
 /** Returns the event handler for a Stripe webhook type, if the app cares about it. */
 const getWebhookHandler = (eventType) => webhookHandlers[eventType] || null;
 
 /** Handles checkout completion and subscription lifecycle events from Stripe. */
-const handleWebhookEvent = async (event) => {
+const handleWebhookEvent = async (event, stripe) => {
   console.log('[billing] webhook:event', event.type);
 
   const handler = getWebhookHandler(event.type);
@@ -441,7 +507,7 @@ const handleWebhookEvent = async (event) => {
     return;
   }
 
-  await handler(event);
+  await handler(event, stripe);
 };
 
 /** Writes the public billing config response used by the client. */
@@ -460,7 +526,7 @@ const handleBillingConfig = (_req, res) => {
 const processWebhookRequest = async (req, res, stripe, webhookSecret) => {
   try {
     const event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], webhookSecret);
-    await handleWebhookEvent(event);
+    await handleWebhookEvent(event, stripe);
     res.status(200).json({ received: true });
   } catch (error) {
     console.error('[billing] webhook:error', error);
@@ -551,4 +617,8 @@ const registerBillingRoutes = (app, express) => {
 module.exports = {
   registerBillingRoutes,
   wrapBillingJsonRoute,
+  __testing: {
+    handleWebhookEvent,
+    resolveAuthoritativeSubscription,
+  },
 };
