@@ -28,6 +28,36 @@ const buildEventLedgerEntry = ({ event, entitlementRef, stale, processedAt }) =>
   expiresAt: new Date(processedAt.getTime() + EVENT_LEDGER_RETENTION_MS),
 });
 
+/** Executes the transactional deduplication and stale-event guard. */
+const processEventInTransaction = async (transaction, { eventRef, entitlementRef, event, buildNextPayload }) => {
+  const [eventSnapshot, entitlementSnapshot] = await Promise.all([
+    transaction.get(eventRef),
+    transaction.get(entitlementRef),
+  ]);
+
+  if (eventSnapshot.exists) {
+    return { applied: false, reason: 'duplicate' };
+  }
+
+  const existingData = entitlementSnapshot.exists ? entitlementSnapshot.data() || {} : {};
+  const stale = isStaleStripeEvent(existingData, event);
+  const processedAt = new Date();
+  transaction.set(eventRef, buildEventLedgerEntry({ event, entitlementRef, stale, processedAt }));
+
+  if (stale) {
+    return { applied: false, reason: 'stale' };
+  }
+
+  const nextPayload = {
+    ...buildNextPayload(existingData),
+    lastStripeEventId: event.id,
+    lastStripeEventType: event.type,
+    lastStripeEventCreated: Number(event.created) || 0,
+  };
+  transaction.set(entitlementRef, nextPayload, { merge: true });
+  return { applied: true, reason: 'applied', nextPayload };
+};
+
 /** Applies one verified Stripe event exactly once without allowing older state to win. */
 const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNextPayload }) => {
   if (!db) throw new Error('A verified Stripe event and entitlement target are required.');
@@ -37,34 +67,9 @@ const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNe
   if (typeof buildNextPayload !== 'function') throw new Error('A verified Stripe event and entitlement target are required.');
 
   const eventRef = db.collection(EVENT_LEDGER_COLLECTION).doc(event.id);
-  return db.runTransaction(async (transaction) => {
-    const [eventSnapshot, entitlementSnapshot] = await Promise.all([
-      transaction.get(eventRef),
-      transaction.get(entitlementRef),
-    ]);
-
-    if (eventSnapshot.exists) {
-      return { applied: false, reason: 'duplicate' };
-    }
-
-    const existingData = entitlementSnapshot.exists ? entitlementSnapshot.data() || {} : {};
-    const stale = isStaleStripeEvent(existingData, event);
-    const processedAt = new Date();
-    transaction.set(eventRef, buildEventLedgerEntry({ event, entitlementRef, stale, processedAt }));
-
-    if (stale) {
-      return { applied: false, reason: 'stale' };
-    }
-
-    const nextPayload = {
-      ...buildNextPayload(existingData),
-      lastStripeEventId: event.id,
-      lastStripeEventType: event.type,
-      lastStripeEventCreated: Number(event.created) || 0,
-    };
-    transaction.set(entitlementRef, nextPayload, { merge: true });
-    return { applied: true, reason: 'applied', nextPayload };
-  });
+  return db.runTransaction((transaction) =>
+    processEventInTransaction(transaction, { eventRef, entitlementRef, event, buildNextPayload })
+  );
 };
 
 module.exports = {
