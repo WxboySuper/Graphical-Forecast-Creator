@@ -21,19 +21,6 @@ export const GRID_SPACING_KM = 10;
 /** Hard ceiling on grid cells; spacing coarsens past this to keep runs bounded. */
 export const MAX_GRID_CELLS = 16000;
 
-/**
- * Categorical risk → representative probability used only for the categorical
- * product's Brier/spatial fields. Significant contours never feed this field.
- */
-export const CATEGORICAL_PROBABILITY: Record<string, number> = {
-  TSTM: 0.05,
-  MRGL: 0.1,
-  SLGT: 0.15,
-  ENH: 0.3,
-  MDT: 0.4,
-  HIGH: 0.45,
-};
-
 /** Probability core thresholds (fractions) used by the event-yield component. */
 export const YIELD_CORE_THRESHOLDS = [0.15, 0.3, 0.45] as const;
 

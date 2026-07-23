@@ -14,20 +14,28 @@ export type HazardKind = 'tornado' | 'wind' | 'hail';
 export const HAZARD_KINDS: readonly HazardKind[] = ['tornado', 'wind', 'hail'] as const;
 
 /**
- * Products graded and rolled up into the package. Categorical is derived from the
- * hazard contours and verified against every relevant report; severity is Not
- * evaluated for categorical because significant contours are hazard-specific.
+ * Severe hazard products graded and rolled up into the package. Categorical and
+ * TSTM are composite/sub-severe display layers only — they are not scored.
  */
-export type ProductKind = 'categorical' | HazardKind;
+export type ProductKind = HazardKind;
 
-export const PRODUCT_KINDS: readonly ProductKind[] = ['categorical', 'tornado', 'wind', 'hail'] as const;
+export const PRODUCT_KINDS: readonly ProductKind[] = HAZARD_KINDS;
 
 export const PRODUCT_LABELS: Record<ProductKind, string> = {
-  categorical: 'Categorical',
   tornado: 'Tornado',
   wind: 'Wind',
   hail: 'Hail',
 };
+
+/** Map display layers include the composite categorical outlook (not graded). */
+export type MapOutlookLayer = 'categorical' | HazardKind;
+
+export const MAP_OUTLOOK_LAYERS: readonly MapOutlookLayer[] = [
+  'categorical',
+  'tornado',
+  'wind',
+  'hail',
+] as const;
 
 /** The five composite components of a single-product Forecast Grade. */
 export type ComponentKey =
@@ -74,27 +82,22 @@ export const COMPONENT_ORDER: readonly ComponentKey[] = [
 ];
 
 /** One scored (or N/A) composite component for a single hazard product. */
-export type ComponentScore =
-  | {
-      key: ComponentKey;
-      label: string;
-      weight: number;
-      applicable: true;
-      score: number;
-      detail: string;
-      metrics?: Record<string, number>;
-    }
-  | {
-      key: ComponentKey;
-      label: string;
-      weight: number;
-      applicable: false;
-      score: null;
-      detail: string;
-      metrics?: Record<string, number>;
-    };
+export interface ComponentScore {
+  key: ComponentKey;
+  label: string;
+  /** Nominal composite weight (percent) before renormalization. */
+  weight: number;
+  /** Normalized component score in [0, 1], or null when Not evaluated. */
+  score: number | null;
+  /** False when the component is Not evaluated (renormalized out). */
+  applicable: boolean;
+  /** Short factual metrics sentence — never coaching prose. */
+  detail: string;
+  /** Raw metrics for the breakdown drawer and share/export payloads. */
+  metrics?: Record<string, number>;
+}
 
-/** Grade for a single product (categorical, tornado, wind, or hail). */
+/** Grade for a single severe hazard product (tornado, wind, or hail). */
 export interface ProductGrade {
   product: ProductKind;
   label: string;
