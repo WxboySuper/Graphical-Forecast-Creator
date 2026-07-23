@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - **Deploy triggers:** Run **Deploy Beta** on beta prerelease publish and **Deploy Production** on stable release publish (one deploy per version bump; merge pushes no longer trigger VPS deploys).
 
 ### Fixed
+- **Favicon branding:** Replace `public/favicon.ico` with the cloud icon so apps that request `/favicon.ico` directly show the correct branding instead of the React logo.
 - **Deploy reliability:** Harden beta and production VPS deploy workflows against flaky `ssh-keyscan` host-key discovery with pinned known-host secrets, retries, deploy concurrency, and explicit `StrictHostKeyChecking` on SSH/rsync.
 - **GFC-WEB-H/J Sentry noise:** Filter the known OpenLayers canvas renderer `requestAnimationFrame` noise before it reaches Sentry while preserving actionable application TypeErrors.
 - **GFC-WEB-K/F/E Sentry noise:** Filter no-stack browser `NetworkError`/`AbortError` promise-rejection noise before it reaches Sentry while preserving actionable exceptions.
