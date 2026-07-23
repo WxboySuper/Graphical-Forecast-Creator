@@ -229,8 +229,12 @@ describe('cycleHistoryPersistence', () => {
     listeners.forEach((cb) => cb());
     expect(spy).toHaveBeenCalledWith(
       'gfc-cycle-history',
-      expect.stringContaining('"id":"a"'),
+      expect.any(String),
     );
+    const stored = JSON.parse(spy.mock.calls[0][1] as string);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ id: 'a', timestamp: 't', cycleDate: 'd', stats: {} });
+    expect(stored[0]).toHaveProperty('forecastData');
 
     spy.mockClear();
     listeners.forEach((cb) => cb());

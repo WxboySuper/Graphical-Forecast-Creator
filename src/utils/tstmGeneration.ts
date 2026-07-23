@@ -6,7 +6,6 @@ import type {
 } from '../types/tstmGeneration';
 import { markServerCapabilityUnavailable } from '../config/serverCapabilityStatus';
 
-const TSTM_GENERATION_ENDPOINT = '/api/tstm/generate';
 const TSTM_CAPABILITY_KEY = 'TSTM_GENERATION_ENABLED';
 const DISABLED_CAPABILITY_MESSAGE = 'Auto-TSTM is not enabled on this deployment.';
 
@@ -19,10 +18,6 @@ const readTstmGenerationErrorMessage = (payload: unknown): string | null => {
   const error = (payload as { error?: unknown }).error;
   return typeof error === 'string' ? error : null;
 };
-
-/** Returns the error message for a failed Auto-TSTM generation request. */
-const getTstmGenerationErrorMessage = (payload: unknown): string =>
-  readTstmGenerationErrorMessage(payload) ?? 'Auto-TSTM guidance is temporarily unavailable.';
 
 /** Marks the server capability unavailable when the API returns the standard disabled response. */
 const handleDisabledTstmCapability = (response: Response, error: string): void => {
@@ -142,29 +137,6 @@ export const parseTstmGenerationResponse = (payload: unknown): TstmGenerationRes
     generatedAt: typeof response.generatedAt === 'string' ? response.generatedAt : '',
     features: normalizeGeneratedTstmFeatures(response.features),
   } as TstmGenerationResponse;
-};
-
-/** Requests cached guidance. No UI calls this function while the capability remains disabled. */
-export const requestTstmGeneration = async (
-  request: TstmGenerationRequest,
-  signal?: AbortSignal
-): Promise<TstmGenerationResponse> => {
-  if (!canGenerateTstmForDay(request.day)) {
-    throw new Error('SPC calibrated thunder generation is only available for Day 1 and Day 2.');
-  }
-  const response = await fetch(TSTM_GENERATION_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-    signal,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = getTstmGenerationErrorMessage(payload);
-    handleDisabledTstmCapability(response, error);
-    throw new Error(error);
-  }
-  return parseTstmGenerationResponse(payload);
 };
 
 const TSTM_LATEST_ENDPOINT = '/api/tstm/latest';

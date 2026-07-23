@@ -8,6 +8,14 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 - Upgrade the compiler to TypeScript 7, replace the incompatible `ts-jest` bridge with Babel/Jest tooling, and enforce production plus test-regression typechecking in CI.
 
+### PR #784
+
+- Replace `public/favicon.ico` with the cloud icon so apps that request `/favicon.ico` directly show the correct branding instead of the React logo.
+
+### PR #763
+
+- Route Auto-TSTM previews exclusively through scheduled cached guidance and retire the direct generation API.
+
 ### PR #760
 
 - Restore native Umami page views for accurate traffic metrics, make non-essential telemetry an explicit opt-in, minimize tracker URL data, and clarify GFC's cookie-free pseudonymous telemetry disclosure.

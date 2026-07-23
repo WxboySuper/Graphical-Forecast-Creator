@@ -10,10 +10,15 @@ const tscPath = path.join(root, 'node_modules', 'typescript', 'lib', 'tsc.js');
 /** Reduces diagnostics to stable per-file error-code counts so line movement does not churn the baseline. */
 function collectDiagnostics(output) {
   const diagnostics = {};
-  const pattern = /^(.*?)\(\d+,\d+\): error (TS\d+):/gm;
-  for (const match of output.matchAll(pattern)) {
+  const filePattern = /^(.*?)\(\d+,\d+\): error (TS\d+):/gm;
+  for (const match of output.matchAll(filePattern)) {
     const file = path.relative(root, path.resolve(root, match[1])).replaceAll('\\', '/');
     const key = `${file}:${match[2]}`;
+    diagnostics[key] = (diagnostics[key] ?? 0) + 1;
+  }
+  const compilerPattern = /^error (TS\d+):/gm;
+  for (const match of output.matchAll(compilerPattern)) {
+    const key = `__compiler:${match[1]}`;
     diagnostics[key] = (diagnostics[key] ?? 0) + 1;
   }
   return Object.fromEntries(Object.entries(diagnostics).sort(([left], [right]) => left.localeCompare(right)));

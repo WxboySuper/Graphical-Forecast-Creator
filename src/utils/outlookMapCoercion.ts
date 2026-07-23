@@ -57,7 +57,11 @@ export const normalizeOutlookData = (data: OutlookData): OutlookData => {
     }
 
     if (Array.isArray(raw as unknown)) {
-      normalized[key] = coerceOutlookProbabilityMap(raw) ?? new Map();
+      const arr = raw as unknown[];
+      const coerced = coerceOutlookProbabilityMap(arr);
+      if (coerced && (arr.length === 0 || coerced.size > 0)) {
+        normalized[key] = coerced;
+      }
       return;
     }
 

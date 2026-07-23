@@ -40,13 +40,15 @@ const RAW_APP_NAVIGATION_ITEMS = [
 export const APP_NAVIGATION_ITEMS: readonly AppNavigationItem[] = RAW_APP_NAVIGATION_ITEMS;
 export type AppNavigationItemId = (typeof RAW_APP_NAVIGATION_ITEMS)[number]['id'];
 
+export type AppNavigationItemWithId = AppNavigationItem & { id: AppNavigationItemId };
+
 /** Returns navbar items visible for the given deployment target. */
 export const getVisibleNavigationItems = (
   target: BuildTarget = getBuildTarget()
-): AppNavigationItem[] =>
+): AppNavigationItemWithId[] =>
   APP_NAVIGATION_ITEMS.filter(
     (item) => !item.feature || isFeatureExposedOnTarget(item.feature, target)
-  );
+  ) as AppNavigationItemWithId[];
 
 /** Builds Ctrl/Cmd navigation shortcuts for visible navbar destinations. */
 export const getNavigationKeyboardShortcuts = (

@@ -122,7 +122,7 @@ export const MainTabs: FC = () => {
   const { pathname } = useLocation();
   const navItems = getVisibleNavigationItems().map((item) => ({
     ...item,
-    icon: NAV_ITEM_ICONS[item.id as keyof typeof NAV_ITEM_ICONS],
+    icon: NAV_ITEM_ICONS[item.id],
   }));
 
   return (

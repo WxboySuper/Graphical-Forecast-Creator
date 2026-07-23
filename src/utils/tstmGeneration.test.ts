@@ -7,7 +7,6 @@ import {
   parseTstmGenerationResponse,
   readTstmLatestFailureReason,
   requestLatestTstmData,
-  requestTstmGeneration,
 } from './tstmGeneration';
 import {
   isServerCapabilityAvailable,
@@ -138,46 +137,6 @@ describe('tstmGeneration utilities', () => {
       calibratedThunderSupportProbability: 0.1,
     });
     expect(() => parseTstmGenerationResponse({ features: [] })).toThrow(/invalid response/);
-  });
-
-  test('requests guidance and surfaces structured server errors', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = jest.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          features: [],
-          run: '2026-06-13T12:00:00Z',
-          forecastHours: [24],
-          effectiveStart: '2026-06-13T12:00:00Z',
-          effectiveEnd: '2026-06-14T12:00:00Z',
-          warnings: [],
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({ error: 'Auto-TSTM is not enabled on this deployment.' }),
-      }) as jest.Mock;
-    try {
-      await expect(requestTstmGeneration({ day: 1, cycleDate: '2026-06-13' }))
-        .resolves.toMatchObject({ features: [] });
-      await expect(requestTstmGeneration({ day: 1, cycleDate: '2026-06-13' }))
-        .rejects.toThrow(/not enabled/);
-      expect(
-        isServerCapabilityAvailable('TSTM_GENERATION_ENABLED', {
-          loaded: true,
-          capabilities: {
-            TSTM_GENERATION_ENABLED: {
-              available: true,
-              reason: 'available',
-            },
-          },
-        })
-      ).toBe(false);
-    } finally {
-      global.fetch = originalFetch;
-    }
   });
 
   test('reads structured latest failure reasons from API payloads', () => {

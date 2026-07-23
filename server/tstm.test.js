@@ -9,27 +9,20 @@ const os = require('os');
 const path = require('path');
 const express = require('express');
 const {
-  createGenerationPayload,
   isTstmGenerationEnabled,
   registerTstmIngestion,
   registerTstmRoutes,
   runTstmGenerator,
-  validatePayload,
 } = require('./tstm');
 const { allTargetsEnabledRouteOptions } = require('./testing/featureExposureTargetMatrix');
 
-const startServer = (env, runGenerator, routeOptions = {}) => {
+const startServer = (env, routeOptions = {}) => {
   const app = express();
-  registerTstmRoutes(app, express, { env, runGenerator, ...routeOptions });
+  registerTstmRoutes(app, express, { env, ...routeOptions });
   return new Promise((resolve, reject) => {
     const server = app.listen(0, '127.0.0.1', () => resolve(server));
     server.on('error', reject);
   });
-};
-
-const getUrl = (server) => {
-  const address = server.address();
-  return `http://127.0.0.1:${address.port}/api/tstm/generate`;
 };
 
 const createFakeChild = () => {
@@ -40,13 +33,6 @@ const createFakeChild = () => {
   child.kill = () => child.emit('close', null);
   return child;
 };
-
-const postGenerateRequest = (server) =>
-  fetch(getUrl(server), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
-  });
 
 const SAMPLE_CACHED_ROUTE = {
   run: '2026-06-13T12:00:00Z',
@@ -102,29 +88,11 @@ const withTstmRouteResponse = async ({
   }
 };
 
-/** Asserts a disabled generate route returns 404 without invoking the generator. */
-const assertGenerateRouteRejectsWithoutWork = async ({ env, routeOptions = {}, expectedBody }) => {
-  let calls = 0;
-  const server = await startServer(
-    env,
-    async () => {
-      calls += 1;
-      return {};
-    },
-    routeOptions
-  );
-
-  try {
-    const response = await postGenerateRequest(server);
-    assert.equal(response.status, 404);
-    if (expectedBody) {
-      assert.deepEqual(await response.json(), expectedBody);
-    }
-    assert.equal(calls, 0);
-  } finally {
-    server.close();
-  }
-};
+/** Exercises one TSTM route and asserts only its HTTP status. */
+const assertTstmRouteStatus = (options, expectedStatus) =>
+  withTstmRouteResponse(options, async (response) => {
+    assert.equal(response.status, expectedStatus);
+  });
 
 describe('Auto-TSTM server foundation', () => {
   it('stays disabled unless registry exposure and deployment env are both enabled', () => {
@@ -137,63 +105,18 @@ describe('Auto-TSTM server foundation', () => {
     );
   });
 
-  it('normalizes and validates request payloads', () => {
-    const payload = createGenerationPayload({ day: '2', cycleDate: '2026-06-13', ignored: true });
-    assert.deepEqual(payload, {
-      day: 2,
-      cycleDate: '2026-06-13',
-      issueDate: undefined,
-      validDate: undefined,
-      issuanceTime: undefined,
-    });
-    assert.equal(validatePayload(payload), null);
-    assert.match(validatePayload({ ...payload, day: 3 }), /Day 1 and Day 2/);
-    assert.match(validatePayload({ ...payload, cycleDate: 'bad' }), /cycleDate/);
-  });
-
-  it('does not invoke the generator while disabled', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: {},
-      expectedBody: {
-        error: 'Auto-TSTM is not enabled on this deployment.',
-      },
-    });
-  });
-
-  it('does not invoke the generator when only the deployment env is enabled', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: { TSTM_GENERATION_ENABLED: 'true' },
-    });
-  });
-
-  it('does not invoke the generator when emergency disable is active', async () => {
-    await assertGenerateRouteRejectsWithoutWork({
-      env: {
-        TSTM_GENERATION_ENABLED: 'true',
-        EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
-      },
-      routeOptions: allTargetsEnabledRouteOptions(),
-      expectedBody: {
-        error: 'Auto-TSTM is not enabled on this deployment.',
-      },
-    });
-  });
-
-  it('returns sanitized errors when enabled work fails', async () => {
+  it('never exposes direct generation, even when the capability is enabled', async () => {
     const server = await startServer(
       { TSTM_GENERATION_ENABLED: 'true' },
-      async () => {
-        throw new Error('internal path and stderr');
-      },
       allTargetsEnabledRouteOptions()
     );
     try {
-      const response = await postGenerateRequest(server);
-      assert.equal(response.status, 503);
-      assert.deepEqual(await response.json(), {
-        error: 'Auto-TSTM guidance is temporarily unavailable.',
-        reason: 'unavailable',
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/api/tstm/generate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ day: 1, cycleDate: '2026-06-13' }),
       });
+      assert.equal(response.status, 404);
     } finally {
       server.close();
     }
@@ -326,27 +249,23 @@ describe('GET /api/tstm/latest', () => {
   });
 
   it('returns 400 for invalid day parameter', async () => {
-    await withTstmRouteResponse({
+    await assertTstmRouteStatus({
       tmpDir,
       env: { TSTM_GENERATION_ENABLED: 'true', TSTM_CACHE_DIR: tmpDir },
       routePath: '/api/tstm/latest',
       query: '?day=3',
-    }, async (res) => {
-      assert.equal(res.status, 400);
-    });
+    }, 400);
   });
 
   it('returns 404 when capability is disabled', async () => {
-    await withTstmRouteResponse({
+    await assertTstmRouteStatus({
       tmpDir,
       env: { TSTM_CACHE_DIR: tmpDir },
       cache: SAMPLE_CACHED_ROUTE,
       routeOptions: {},
       routePath: '/api/tstm/latest',
       query: '?day=1',
-    }, async (res) => {
-      assert.equal(res.status, 404);
-    });
+    }, 404);
   });
 
   it('returns 404 when cached data has expired', async () => {
@@ -436,14 +355,12 @@ describe('GET /api/tstm/status', () => {
   });
 
   it('returns 404 when capability is disabled without reading cache', async () => {
-    await withTstmRouteResponse({
+    await assertTstmRouteStatus({
       tmpDir,
       env: { TSTM_CACHE_DIR: tmpDir },
       cache: SAMPLE_CACHED_ROUTE,
       routeOptions: {},
       routePath: '/api/tstm/status',
-    }, async (res) => {
-      assert.equal(res.status, 404);
-    });
+    }, 404);
   });
 });
