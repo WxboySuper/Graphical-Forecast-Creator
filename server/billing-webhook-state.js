@@ -29,7 +29,7 @@ const buildEventLedgerEntry = ({ event, entitlementRef, stale, processedAt }) =>
 });
 
 /** Executes the transactional deduplication and stale-event guard. */
-const processEventInTransaction = async (transaction, { eventRef, entitlementRef, event, buildNextPayload }) => {
+const processEventInTransaction = async (transaction, { eventRef, entitlementRef, event, buildNextPayload, canWrite }) => {
   const [eventSnapshot, entitlementSnapshot] = await Promise.all([
     transaction.get(eventRef),
     transaction.get(entitlementRef),
@@ -46,6 +46,10 @@ const processEventInTransaction = async (transaction, { eventRef, entitlementRef
 
   if (stale) {
     return { applied: false, reason: 'stale' };
+  }
+
+  if (canWrite && !(await canWrite(existingData.uid || entitlementRef.id))) {
+    return { applied: false, reason: 'deleted-user' };
   }
 
   const nextPayload = {
@@ -65,14 +69,14 @@ const hasMissingInputs = ({ db, entitlementRef, event, buildNextPayload }) =>
   !db || !entitlementRef || !event?.id || !event?.type || typeof buildNextPayload !== 'function';
 
 /** Applies one verified Stripe event exactly once without allowing older state to win. */
-const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNextPayload }) => {
+const applyEntitlementWebhookEvent = async ({ db, entitlementRef, event, buildNextPayload, canWrite }) => {
   if (hasMissingInputs({ db, entitlementRef, event, buildNextPayload })) {
     throw new Error(WEBHOOK_MISSING_ERROR);
   }
 
   const eventRef = db.collection(EVENT_LEDGER_COLLECTION).doc(event.id);
   return db.runTransaction((transaction) =>
-    processEventInTransaction(transaction, { eventRef, entitlementRef, event, buildNextPayload })
+    processEventInTransaction(transaction, { eventRef, entitlementRef, event, buildNextPayload, canWrite })
   );
 };
 

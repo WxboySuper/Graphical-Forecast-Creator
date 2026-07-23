@@ -7,7 +7,7 @@ const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
-const { deleteStripeCustomer, isAccountDeletionBlocked } = require('./account-lifecycle');
+const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -206,6 +206,10 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
         ...createBaseEntitlementPayload(uid, currentData),
         ...payload,
       }),
+    canWrite: async (writeUid) => {
+      if (!writeUid) return true;
+      return canWriteEntitlementForUid(writeUid);
+    },
   });
 
   if (!result.applied) {
@@ -619,7 +623,10 @@ const handleInvoiceEvent = async (event, stripe) => {
   }
   if (result?.reason === 'missing-target') {
     const uid = resolveInvoiceUid(subscription, invoice);
-    if (uid && (await isAccountDeletionBlocked(getAdminDb(), uid))) {
+    const isDeleted = uid
+      ? await isAccountDeletionBlocked(getAdminDb(), uid)
+      : await isStripeCustomerDeletionBlocked(getAdminDb(), getStripeObjectId(invoice.customer));
+    if (isDeleted) {
       await refundDeletedAccountInvoice(invoice);
     }
   }

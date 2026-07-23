@@ -22,6 +22,14 @@ const isAccountDeletionBlocked = async (db, uid) => {
   return requestSnapshot.exists || tombstoneSnapshot.exists;
 };
 
+/** True when a Stripe customer ID belongs to an account with an active or completed deletion. */
+const isStripeCustomerDeletionBlocked = async (db, customerId) => {
+  if (!db || !customerId) return false;
+  const query = await db.collection('accountDeletionRequests')
+    .where('stripeCustomerId', '==', customerId).limit(1).get();
+  return !query.empty;
+};
+
 const deletionRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -194,7 +202,11 @@ const handleDeletionFailure = async ({ adminAuth, uid, requestRef, error }) => {
 const initDeletionRefs = async (db, uid) => {
   const requestRef = db.collection('accountDeletionRequests').doc(uid);
   const tombstoneRef = db.collection('accountDeletionTombstones').doc(getDeletionTombstoneId(uid));
-  await requestRef.set({ status: 'in_progress', updatedAt: new Date() }, { merge: true });
+
+  const entitlementSnapshot = await db.collection('userEntitlements').doc(uid).get();
+  const stripeCustomerId = entitlementSnapshot.data()?.stripeCustomerId || null;
+
+  await requestRef.set({ status: 'in_progress', stripeCustomerId, updatedAt: new Date() }, { merge: true });
   return { requestRef, tombstoneRef };
 };
 
@@ -305,5 +317,6 @@ module.exports = {
   getDeletionTombstoneId,
   hasRecentAuthentication,
   isAccountDeletionBlocked,
+  isStripeCustomerDeletionBlocked,
   registerAccountLifecycleRoutes,
 };
