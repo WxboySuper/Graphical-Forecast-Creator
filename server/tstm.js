@@ -40,18 +40,6 @@ const isTstmGenerationEnabled = (env = process.env, options = {}) =>
  */
 const isSupportedDay = (day) => day === 1 || day === 2;
 
-/** Normalizes the request payload passed to the Python process. */
-const createGenerationPayload = (body = {}) => ({
-  day: Number(body.day),
-  cycleDate: typeof body.cycleDate === 'string' ? body.cycleDate : '',
-  issueDate: typeof body.issueDate === 'string' ? body.issueDate : undefined,
-  validDate: typeof body.validDate === 'string' ? body.validDate : undefined,
-  issuanceTime: typeof body.issuanceTime === 'string' ? body.issuanceTime : undefined,
-});
-// Thresholds are not accepted from the client; the Python generator uses its
-// own DEFAULT_THRESHOLDS (core=0.30, support=0.10) and echoes them in the
-// response so the client can display the exact values used.
-
 /** Finds a common local Conda Python on Windows. */
 const getDefaultCondaPython = () => {
   if (process.platform !== 'win32') return null;
@@ -127,17 +115,6 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
   child.stdin.end(JSON.stringify(payload));
 });
 
-/** Validates a request before any process can be started. */
-const validatePayload = (payload) => {
-  if (!isSupportedDay(payload.day)) {
-    return 'SPC calibrated thunder generation is only available for Day 1 and Day 2.';
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.cycleDate)) {
-    return 'A valid cycleDate in YYYY-MM-DD format is required.';
-  }
-  return null;
-};
-
 /** Handles GET /api/tstm/latest — serves pre-cached ingestion data. */
 const handleLatestRequest = (env, target) => (req, res) => {
   const day = Number(req.query.day);
@@ -187,48 +164,16 @@ const handleStatusRequest = (env, target) => (_req, res) => {
   res.json(getTstmCacheHealth(target, env));
 };
 
-/** Registers the preserved endpoint in a fail-closed, default-off state. */
+/** Registers public cached-read routes in a fail-closed, default-off state. */
 const registerTstmRoutes = (app, express, options = {}) => {
   const env = options.env || process.env;
-  const runGenerator = options.runGenerator || runTstmGenerator;
   const rateLimit = options.rateLimit || require('express-rate-limit');
-  const generationLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    limit: 2,
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
   const readLimiter = options.readRateLimit || createTstmReadRateLimit(rateLimit, options.readRateLimitOptions);
   const capabilityOptions = {
     env,
     exposureOverride: options.exposureOverride,
     target: options.target,
   };
-  app.post(
-    '/api/tstm/generate',
-    createServerCapabilityGate(TSTM_CAPABILITY_KEY, capabilityOptions),
-    generationLimiter,
-    express.json({ limit: '4kb' }),
-    async (req, res) => {
-      const payload = createGenerationPayload(req.body);
-      const validationError = validatePayload(payload);
-      if (validationError) {
-        res.status(400).json({ error: validationError });
-        return;
-      }
-      try {
-        res.json(await runGenerator(payload));
-      } catch {
-        sendTstmApiError(
-          res,
-          503,
-          'Auto-TSTM guidance is temporarily unavailable.',
-          TSTM_ERROR_REASON.UNAVAILABLE,
-        );
-      }
-    },
-  );
-
   const { getServerTarget: getTarget } = require('./lib/serverTarget');
   const target = options.target || getTarget(env);
   app.get(
@@ -260,7 +205,6 @@ const registerTstmIngestion = (app, express, options = {}) => {
 };
 
 module.exports = {
-  createGenerationPayload,
   createTstmReadRateLimit,
   handleLatestRequest,
   handleStatusRequest,
@@ -270,5 +214,4 @@ module.exports = {
   registerTstmRoutes,
   runTstmGenerator,
   TSTM_READ_RATE_LIMIT_MAX,
-  validatePayload,
 };
