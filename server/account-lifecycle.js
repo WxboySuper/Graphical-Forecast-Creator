@@ -171,29 +171,33 @@ const deleteLinkedStripeCustomers = ({ db, uid, stripe }) => {
 const isIdentityGone = async (adminAuth, uid) =>
   adminAuth.getUser(uid).then(() => false).catch((e) => e?.code === 'auth/user-not-found');
 
+/** Deletes the current linked Stripe customer if it differs from the known set. */
+const reconcileCurrentCustomer = async ({ db, uid, stripe, seenCustomerIds }) => {
+  const entitlement = await db.collection('userEntitlements').doc(uid).get();
+  const customerId = entitlement.data()?.stripeCustomerId;
+  if (customerId && !seenCustomerIds.has(customerId)) {
+    seenCustomerIds.add(customerId);
+    await deleteStripeCustomer({ stripe, customerId });
+  }
+};
+
+/** Sweeps any late entitlement document that appeared during reconciliation. */
+const sweepLateEntitlement = async (db, uid, seenCustomerIds) => {
+  const lateRef = db.collection('userEntitlements').doc(uid);
+  const lateSnapshot = await lateRef.get();
+  if (!lateSnapshot.exists) return;
+  const lateCustomerId = lateSnapshot.data()?.stripeCustomerId;
+  if (lateCustomerId) seenCustomerIds.add(lateCustomerId);
+  await lateRef.delete();
+};
+
 /** Reconciles billing linkage that changed during the Firestore data sweep. */
 const reconcilePostSweepBilling = async ({ db, uid, stripe, tombstoneRef, stripeCustomerId }) => {
   const seenCustomerIds = new Set(stripeCustomerId ? [stripeCustomerId] : []);
 
-  const reconcile = async () => {
-    const currentEntitlement = await db.collection('userEntitlements').doc(uid).get();
-    const currentCustomerId = currentEntitlement.data()?.stripeCustomerId;
-    if (currentCustomerId && !seenCustomerIds.has(currentCustomerId)) {
-      seenCustomerIds.add(currentCustomerId);
-      await deleteStripeCustomer({ stripe, customerId: currentCustomerId });
-    }
-  };
-
-  await reconcile();
-  await reconcile();
-
-  const lateEntitlementRef = db.collection('userEntitlements').doc(uid);
-  const lateEntitlementSnapshot = await lateEntitlementRef.get();
-  if (lateEntitlementSnapshot.exists) {
-    const lateCustomerId = lateEntitlementSnapshot.data()?.stripeCustomerId;
-    if (lateCustomerId) seenCustomerIds.add(lateCustomerId);
-    await lateEntitlementRef.delete();
-  }
+  await reconcileCurrentCustomer({ db, uid, stripe, seenCustomerIds });
+  await reconcileCurrentCustomer({ db, uid, stripe, seenCustomerIds });
+  await sweepLateEntitlement(db, uid, seenCustomerIds);
 
   if (tombstoneRef && seenCustomerIds.size > 1) {
     await tombstoneRef.set({ stripeCustomerIds: [...seenCustomerIds] }, { merge: true });
@@ -201,8 +205,8 @@ const reconcilePostSweepBilling = async ({ db, uid, stripe, tombstoneRef, stripe
 };
 
 /** Writes the tombstone, removes the Firebase identity, and cleans up the request marker. */
-const finalizeDeletion = async ({ uid, db, adminAuth, requestRef, tombstoneRef, stripeCustomerId }) => {
-  await tombstoneRef.set({ completedAt: new Date(), stripeCustomerId });
+const finalizeDeletion = async ({ uid, db, adminAuth, requestRef, tombstoneRef }) => {
+  await tombstoneRef.set({ completedAt: new Date() }, { merge: true });
 
   try {
     await adminAuth.deleteUser(uid);
@@ -241,7 +245,7 @@ const deleteAccount = async ({ uid, db, adminAuth, stripe }) => {
     await deleteLinkedStripeCustomers({ db, uid, stripe });
     await deleteAccountFirestoreData(db, uid);
     await reconcilePostSweepBilling({ db, uid, stripe, tombstoneRef, stripeCustomerId });
-    await finalizeDeletion({ uid, db, adminAuth, requestRef, tombstoneRef, stripeCustomerId });
+    await finalizeDeletion({ uid, db, adminAuth, requestRef, tombstoneRef });
   } catch (error) {
     await handleDeletionFailure({ adminAuth, uid, requestRef, error });
   }
