@@ -206,10 +206,6 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
         ...createBaseEntitlementPayload(uid, currentData),
         ...payload,
       }),
-    canWrite: async (writeUid) => {
-      if (!writeUid) return true;
-      return canWriteEntitlementForUid(writeUid);
-    },
   });
 
   if (!result.applied) {
