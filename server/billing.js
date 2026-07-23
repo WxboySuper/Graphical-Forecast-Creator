@@ -599,7 +599,7 @@ const handleInvoiceEvent = async (event, stripe) => {
     return;
   }
   const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
-  if (!result?.applied && event.data.object.payment_intent) {
+  if (result?.reason === 'deleted-user' && event.data.object.payment_intent) {
     const stripeClient = getStripeClient();
     if (stripeClient) {
       await stripeClient.refunds.create(
