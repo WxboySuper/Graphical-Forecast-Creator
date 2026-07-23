@@ -594,7 +594,12 @@ const handleInvoiceEvent = async (event, stripe) => {
     return;
   }
   const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
-  if (result?.reason === 'deleted-user' && event.data.object.payment_intent) {
+  const isDeletedUser = result?.reason === 'deleted-user';
+  const isMissingTargetForDeletedAccount =
+    result?.reason === 'missing-target' &&
+    getSubscriptionUid(subscription) &&
+    (await isAccountDeletionBlocked(getAdminDb(), getSubscriptionUid(subscription)));
+  if ((isDeletedUser || isMissingTargetForDeletedAccount) && event.data.object.payment_intent) {
     const stripeClient = getStripeClient();
     if (stripeClient) {
       await stripeClient.refunds.create(
