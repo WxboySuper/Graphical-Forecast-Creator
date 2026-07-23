@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Security
+- **Billing API error boundary:** Return stable checkout and portal failure codes with correlation IDs while keeping bounded provider diagnostics in server logs.
 - **Hosted authorization boundaries:** Add source-controlled Firestore rules, hostile-client emulator coverage, reserved profile-field protection, trusted premium enforcement for cloud writes, and bounded cloud-cycle documents while retaining owner export/delete access after downgrade.
 - **CI shell injection:** Pass PR branch refs through `env` in `ci.yml` and `pr-governance.yml` `git fetch` steps so branch names cannot break out of the shell command.
 - **Dependabot changelog workflow:** Require Dependabot PR provenance before checking out PR head code with `GH_PAT`; pass base ref through env in shell steps; pin `actions/checkout` to an immutable SHA.

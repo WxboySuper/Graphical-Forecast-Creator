@@ -6,7 +6,7 @@
   "main": "analytics.js",
   "scripts": {
     "start": "node analytics.js",
-    "test": "node --test billing-stripe-period.test.js billing-webhook-state.test.js billing-webhook.test.js metrics.test.js qs-dos.test.js server-stack.test.js"
+    "test": "node --test billing-error-boundary.test.js billing-stripe-period.test.js billing-webhook-state.test.js billing-webhook.test.js metrics.test.js qs-dos.test.js server-stack.test.js"
   },
   "dependencies": {
     "@sentry/node": "^10.56.0",
