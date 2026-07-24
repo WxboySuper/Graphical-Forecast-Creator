@@ -19,7 +19,7 @@ export const roundGrade = (grade: number): number => Math.round(grade * 10) / 10
 
 /** Maps a 0–100 grade to a letter. A≥90 B≥80 C≥70 D≥60 F<60. */
 export const scoreToLetter = (grade: number | null): LetterGrade | null => {
-  if (grade === null || Number.isNaN(grade)) {
+  if (grade === null || !Number.isFinite(grade)) {
     return null;
   }
   if (grade >= 90) return 'A';
@@ -39,7 +39,11 @@ export const composeComponents = (components: ComponentScore[]): number | null =
   let weighted = 0;
 
   for (const component of components) {
-    if (!isScorableComponent(component)) {
+    if (
+      !isScorableComponent(component) ||
+      !Number.isFinite(component.score) ||
+      !Number.isFinite(component.weight)
+    ) {
       continue;
     }
     weightSum += component.weight;
