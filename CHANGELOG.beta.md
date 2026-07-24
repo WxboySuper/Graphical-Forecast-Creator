@@ -4,6 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #780
+
+- Harden Forecast Grade with scenario fixtures, integration tests, and e2e coverage.
 ### PR #779
 
 - Publish Forecast Grade methodology HTML and verification v2 plan documentation.
