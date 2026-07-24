@@ -4,6 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #775
+
+- Add Forecast Grade dashboard supporting components and the grade run hook.
 ### PR #774
 
 - Wire `verificationRelaunch` local-only gate, surfaces, and classic verification coexistence routing.
