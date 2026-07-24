@@ -4,6 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #779
+
+- Publish Forecast Grade methodology HTML and verification v2 plan documentation.
 ### PR #778
 
 - Add anonymous Forecast Grade share card with download, share, and copy actions.
