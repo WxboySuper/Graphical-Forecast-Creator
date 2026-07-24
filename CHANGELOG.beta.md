@@ -4,6 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #772
+
+- Add composite rollup, the `runForecastGrade` orchestrator, and the public `verificationV2` engine entry point.
 ### PR #771
 
 - Add event yield and severity intent-layer component scorers for Forecast Grade.
