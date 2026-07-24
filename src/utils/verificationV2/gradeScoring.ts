@@ -29,21 +29,22 @@ export const scoreToLetter = (grade: number | null): LetterGrade | null => {
   return 'F';
 };
 
-/** Combines component scores into a 0–100 product grade. */
-const isScorableComponent = (
-  component: ComponentScore
-): component is ComponentScore & { applicable: true; score: number } => component.applicable;
+type ScorableComponent = Extract<ComponentScore, { applicable: true }>;
 
+const isScorableComponent = (component: ComponentScore): component is ScorableComponent => {
+  if (!component.applicable) {
+    return false;
+  }
+  return Number.isFinite(component.score) && Number.isFinite(component.weight);
+};
+
+/** Combines component scores into a 0–100 product grade. */
 export const composeComponents = (components: ComponentScore[]): number | null => {
   let weightSum = 0;
   let weighted = 0;
 
   for (const component of components) {
-    if (
-      !isScorableComponent(component) ||
-      !Number.isFinite(component.score) ||
-      !Number.isFinite(component.weight)
-    ) {
+    if (!isScorableComponent(component)) {
       continue;
     }
     weightSum += component.weight;

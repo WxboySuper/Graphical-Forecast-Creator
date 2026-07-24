@@ -81,21 +81,23 @@ export const COMPONENT_ORDER: readonly ComponentKey[] = [
   'severity',
 ];
 
-/** One scored (or N/A) composite component for a single hazard product. */
-export interface ComponentScore {
+interface ComponentScoreBase {
   key: ComponentKey;
   label: string;
   /** Nominal composite weight (percent) before renormalization. */
   weight: number;
-  /** Normalized component score in [0, 1], or null when Not evaluated. */
-  score: number | null;
-  /** False when the component is Not evaluated (renormalized out). */
-  applicable: boolean;
   /** Short factual metrics sentence — never coaching prose. */
   detail: string;
   /** Raw metrics for the breakdown drawer and share/export payloads. */
   metrics?: Record<string, number>;
 }
+
+/** One scored (or N/A) composite component for a single hazard product. */
+export type ComponentScore = ComponentScoreBase &
+  (
+    | { applicable: true; score: number }
+    | { applicable: false; score: null }
+  );
 
 /** Grade for a single severe hazard product (tornado, wind, or hail). */
 export interface ProductGrade {
