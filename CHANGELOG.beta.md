@@ -4,6 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #773
+
+- Add explicit package sources (file and cloud) and capability-aware grade history (25 free cards).
 ### PR #772
 
 - Add composite rollup, the `runForecastGrade` orchestrator, and the public `verificationV2` engine entry point.
