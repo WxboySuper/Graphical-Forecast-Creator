@@ -4,6 +4,9 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #774
+
+- Wire `verificationRelaunch` local-only gate, surfaces, and classic verification coexistence routing.
 ### PR #773
 
 - Add explicit package sources (file and cloud) and capability-aware grade history (25 free cards).
