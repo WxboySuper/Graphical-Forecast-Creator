@@ -200,6 +200,7 @@ src/
 
 ## Documentation
 
+- [Repository Map and Architecture Overview](docs/architecture.md) - current-state repo map, entry points, data flow, and build/deploy story
 - [Outlook Information](docs/Outlook_Info.md) - risk levels, probability values, categorical conversion rules
 - [Roadmap](ROADMAP.md) - versioning plan and feature milestones
 - [Changelog](CHANGELOG.md) - release history
