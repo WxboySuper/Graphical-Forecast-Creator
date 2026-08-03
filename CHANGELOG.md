@@ -6,6 +6,49 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Next major / beta
+#### Dependencies
+<!-- dependabot-automation -->
+
+- **@radix-ui/react-dialog:** ^1.1.15 → ^1.1.23
+- **@radix-ui/react-dropdown-menu:** ^2.1.16 → ^2.1.24
+- **@radix-ui/react-popover:** ^1.1.15 → ^1.1.23
+- **@radix-ui/react-slot:** ^1.2.4 → ^1.3.3
+- **@radix-ui/react-tabs:** ^1.1.13 → ^1.1.21
+- **@radix-ui/react-tooltip:** ^1.2.8 → ^1.2.16
+- **@sentry/react:** ^10.56.0 → ^10.69.0
+- **@testing-library/jest-dom:** ^6.6.3 → ^7.0.0
+- **@types/node:** ^25.9.1 → ^26.1.2
+- **@types/react:** 19.2.16 → 19.2.18
+- **@types/react-dom:** 19.2.3 → 19.2.4
+- **firebase:** ^12.14.0 → ^12.17.0
+- **immer:** ^11.1.8 → ^11.1.15
+- **lucide-react:** ^1.17.0 → ^1.28.0
+- **ol:** ^10.9.0 → ^10.10.0
+- **ol-mapbox-style:** ^13.4.1 → ^13.4.2
+- **react:** ^19.2.7 → ^19.2.8
+- **react-dom:** ^19.2.7 → ^19.2.8
+- **react-router-dom:** ^7.16.0 → ^7.18.2
+- **rollup:** >=4.61.0 → >=4.62.3
+- **typescript:** ^6.0.3 → ^7.0.2
+- **web-vitals:** ^5.3.0 → ^6.0.1
+- **@babel/core:** ^7.29.7 → ^8.0.1
+- **@babel/preset-env:** ^7.29.7 → ^8.0.2
+- **@babel/preset-react:** ^7.29.7 → ^8.0.1
+- **@babel/preset-typescript:** ^7.29.7 → ^8.0.1
+- **@playwright/test:** ^1.59.1 → ^1.62.1
+- **@sentry/vite-plugin:** ^5.3.0 → ^5.4.0
+- **@tailwindcss/postcss:** ^4.2.4 → ^4.3.3
+- **@vitejs/plugin-react:** ^6.0.2 → ^6.0.5
+- **autoprefixer:** ^10.4.27 → ^10.5.4
+- **firebase-tools:** 15.24.0 → 15.25.1
+- **tailwindcss:** ^4.2.2 → ^4.3.3
+- **ts-jest:** ^29.4.11 → ^29.4.12
+- **vite:** ^8.0.16 → ^8.2.0
+- **@sentry/node:** ^10.56.0 → ^10.69.0 (`server`)
+- **express-rate-limit:** ^8.5.2 → ^8.6.1 (`server`)
+- **firebase-admin:** ^13.8.0 → ^14.2.0 (`server`)
+- **stripe:** ^22.2.0 → ^22.4.0 (`server`)
+
 
 #### Security
 - **Hosted authorization boundaries:** Add source-controlled Firestore rules, hostile-client emulator coverage, reserved profile-field protection, trusted premium enforcement for cloud writes, and bounded cloud-cycle documents while retaining owner export/delete access after downgrade.
@@ -30,7 +73,6 @@ All notable changes to this project will be documented in this file.
 - **OpenCode GitHub Actions workflow:** Trigger `/oc` or `/opencode` comments on issues and PR review threads to run the pinned OpenCode GitHub action with repository `GITHUB_TOKEN` auth.
 - **Explicit build targets:** Define and validate local, beta, staging, and production frontend build targets while preserving the existing beta access gate.
 - **PR governance:** Add feature exposure labels (`exposure:production`, `exposure:server-backed`, `exposure:registry-change`) to automatically tag PRs that change feature exposure configuration.
-
 ### Stable 1.6.x hotfixes
 
 <!-- Production hotfix entries only. Do not put next-major work in this lane. -->
