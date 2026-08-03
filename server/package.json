@@ -9,11 +9,11 @@
     "test": "node --test account-lifecycle.test.js billing-account-lifecycle.test.js billing-stripe-period.test.js qs-dos.test.js server-stack.test.js"
   },
   "dependencies": {
-    "@sentry/node": "^10.56.0",
+    "@sentry/node": "^10.69.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.5.2",
-    "firebase-admin": "^13.8.0",
-    "stripe": "^22.2.0"
+    "express-rate-limit": "^8.6.1",
+    "firebase-admin": "^14.2.0",
+    "stripe": "^22.4.0"
   },
   "overrides": {
     "http-proxy-agent": "^7.0.2",
