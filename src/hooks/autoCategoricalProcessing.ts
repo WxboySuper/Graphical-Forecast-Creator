@@ -17,14 +17,16 @@ export class CategoricalDerivationError extends Error {
   }
 }
 
+/** Caps a message so raw library internals cannot bloat the editor banner. */
+const capErrorMessage = (message: string): string => (message.length > 160 ? `${message.slice(0, 157)}...` : message);
+
 /** Returns a stable, actionable message for an unknown derivation failure. */
 export const toDerivationErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof CategoricalDerivationError) {
-    return error.message;
+    return capErrorMessage(error.message);
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
+  // Unknown errors may carry raw Turf/library internals; prefer the friendly
+  // fallback copy over surfacing technical details to the user.
   return fallback;
 };
 
