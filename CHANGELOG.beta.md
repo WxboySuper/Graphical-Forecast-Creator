@@ -4,6 +4,12 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #878
+
+#### Changed
+
+- Reduce recursive forecast feature clone allocations used by history snapshots while preserving deep-copy behavior.
+
 ### PR #806
 
 #### Changed
