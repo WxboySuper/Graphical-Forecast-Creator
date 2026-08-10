@@ -6,6 +6,37 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Next major / beta
+#### Dependencies
+<!-- dependabot-automation -->
+
+- **@testing-library/user-event:** ^14.6.1 → ^14.6.3
+- **@turf/difference:** ^7.3.4 → ^7.4.0
+- **@turf/helpers:** ^7.3.5 → ^7.4.0
+- **@turf/turf:** ^7.3.4 → ^7.4.0
+- **@types/leaflet:** ^1.9.16 → ^1.9.22
+- **@types/node:** ^26.1.1 → ^26.1.2
+- **@types/react:** 19.2.17 → 19.2.18
+- **@types/react-dom:** 19.2.3 → 19.2.4
+- **firebase:** ^12.16.0 → ^12.17.1
+- **immer:** ^11.1.15 → ^11.1.16
+- **lucide-react:** ^1.27.0 → ^1.30.0
+- **ol:** ^10.9.0 → ^10.10.0
+- **rollup:** >=4.62.3 → >=4.62.4
+- **web-vitals:** ^6.0.1 → ^6.1.0
+- **@babel/core:** ^7.29.7 → ^8.0.1
+- **@babel/parser:** ^7.29.7 → ^8.0.4
+- **@babel/preset-env:** ^7.29.7 → ^8.0.2
+- **@babel/preset-react:** ^7.29.7 → ^8.0.1
+- **@babel/preset-typescript:** ^7.29.7 → ^8.0.1
+- **@eslint/js:** ^9.39.5 → ^10.0.1
+- **@playwright/test:** ^1.62.0 → ^1.62.1
+- **@vitejs/plugin-react:** ^6.0.4 → ^6.0.5
+- **eslint:** ^9.39.5 → ^10.8.0
+- **firebase-tools:** 15.25.1 → 15.26.0
+- **vite:** ^8.1.5 → ^8.2.1
+- **express-rate-limit:** ^8.6.1 → ^8.6.2 (`server`)
+- **stripe:** ^22.3.2 → ^22.4.0 (`server`)
+
 
 Work toward the next major release continues in the beta channel while the final stable release is prepared.
 
@@ -74,7 +105,6 @@ Work toward the next major release continues in the beta channel while the final
 - **Forecast map synchronization:** Reconcile OpenLayers forecast layers incrementally by stable feature ID, preserving unchanged feature identity and avoiding full rehydration.
 - **SPC storm report parsing:** Reduce allocations in shared SPC storm-report CSV tokenization and traverse `today.csv` sections in a single pass.
 - **Cloud library efficiency:** Store forecast payloads in a dedicated `cloudCycles/{id}/payload` subcollection so library listings and realtime subscriptions never download payload content, and replace the tenancy-wide Firestore storage scan with bounded server-side aggregate queries.
-
 ### Stable 1.6.x hotfixes
 
 <!-- Production hotfix entries only. Do not put next-major work in this lane. -->
