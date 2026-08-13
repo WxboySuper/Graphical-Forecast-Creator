@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo, type MutableRefObject } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState, type MutableRefObject } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { serializeForecast } from '../utils/fileUtils';
@@ -97,6 +97,7 @@ export const useCloudSync = (
 
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncStateRef = useRef<string | null>(null);
+  const [lastSyncedHash, setLastSyncedHashState] = useState<string | null>(null);
 
   const canSync = Boolean(currentCloud) && premiumActive;
   const serializedPayload = useMemo(
@@ -120,6 +121,7 @@ export const useCloudSync = (
       workflowMetadata,
       setLastSyncedHash: (hash) => {
         lastSyncStateRef.current = hash;
+        setLastSyncedHashState(hash);
       },
       currentHash,
     });
@@ -154,10 +156,11 @@ export const useCloudSync = (
 
   const markCurrentStateSynced = useCallback(() => {
     lastSyncStateRef.current = currentHash;
+    setLastSyncedHashState(currentHash);
   }, [currentHash]);
 
   return {
-    isSynced: isCurrentStateSynced(lastSyncStateRef.current, currentHash),
+    isSynced: isCurrentStateSynced(lastSyncedHash, currentHash),
     currentCloud,
     syncNow,
     markCurrentStateSynced,
