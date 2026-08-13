@@ -113,7 +113,11 @@ export function formatReportDate(date: Date): string {
  * Parses YYMMDD format to Date object
  */
 export function parseReportDate(dateStr: string): Date {
-  const year = 2000 + parseInt(dateStr.slice(0, 2), 10);
+  const shortYear = parseInt(dateStr.slice(0, 2), 10);
+  const currentYear = new Date().getFullYear();
+  const currentCentury = Math.floor(currentYear / 100) * 100;
+  let year = currentCentury + shortYear;
+  if (year > currentYear + 1) year -= 100;
   const month = parseInt(dateStr.slice(2, 4), 10) - 1;
   const day = parseInt(dateStr.slice(4, 6), 10);
   return new Date(year, month, day);
