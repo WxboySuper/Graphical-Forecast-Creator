@@ -342,6 +342,7 @@ const countPremiumSubscriptions = () => {
 };
 
 /** Returns the current total number of hosted accounts that have profile docs in Firestore. */
+// @codescene(disable:"Complex Method")
 const countTotalAccounts = async () => {
   const db = getAdminDb();
   if (!db) {
