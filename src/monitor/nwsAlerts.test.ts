@@ -1,6 +1,7 @@
 import {
   classifyNwsAlert,
   filterNwsAlertCollection,
+  snapshotCollectionKey,
 } from './nwsAlerts';
 
 describe('nwsAlerts', () => {
@@ -56,5 +57,21 @@ describe('nwsAlerts', () => {
     });
 
     expect(filtered.features).toHaveLength(1);
+  });
+
+  test('snapshotCollectionKey returns a bounded digest instead of feature IDs', () => {
+    const collection = {
+      type: 'FeatureCollection' as const,
+      features: Array.from({ length: 500 }, (_, index) => ({
+        type: 'Feature' as const,
+        id: `alert-${index}`,
+        properties: { updated: '2026-08-13T00:00:00Z' },
+        geometry: null,
+      })),
+    };
+
+    const key = snapshotCollectionKey(collection);
+    expect(key).toMatch(/^500:\d+$/);
+    expect(key.length).toBeLessThan(20);
   });
 });

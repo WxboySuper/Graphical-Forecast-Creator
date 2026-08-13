@@ -1,8 +1,9 @@
 import type { FeatureCollection } from 'geojson';
 import { Fill, Stroke, Style } from 'ol/style';
 
-export const NWS_ACTIVE_ALERTS_URL = 'https://api.weather.gov/alerts/active?status=actual';
+export const NWS_ACTIVE_ALERTS_URL = 'https://api.weather.gov/alerts/active?status=actual&limit=500';
 export const NWS_API_USER_AGENT = 'GraphicalForecastCreator/1.6 (monitor)';
+export const MAX_ACTIVE_ALERTS = 500;
 
 export type NwsAlertCategory = 'watch' | 'warning' | 'advisory' | 'statement' | 'other';
 
@@ -98,16 +99,20 @@ export const fetchActiveNwsAlerts = async (): Promise<NwsAlertFeatureCollection>
   const payload = await response.json() as NwsAlertFeatureCollection;
   return {
     type: 'FeatureCollection',
-    features: Array.isArray(payload.features) ? payload.features : [],
+    features: Array.isArray(payload.features) ? payload.features.slice(0, MAX_ACTIVE_ALERTS) : [],
   };
 };
 
-export const snapshotCollectionKey = (collection: NwsAlertFeatureCollection): string =>
-  collection.features
-    .map((feature) => {
+/** Hash alert identities so frame comparisons do not retain a second full ID string. */
+export const snapshotCollectionKey = (collection: NwsAlertFeatureCollection): string => {
+  let hash = 2166136261;
+  collection.features.forEach((feature) => {
       const id = feature.id ?? feature.properties?.id ?? '';
       const updated = feature.properties?.updated ?? '';
-      return `${String(id)}:${String(updated)}`;
-    })
-    .sort()
-    .join('|');
+      for (const character of `${String(id)}:${String(updated)}|`) {
+        hash ^= character.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+      }
+    });
+  return `${collection.features.length}:${hash >>> 0}`;
+};
