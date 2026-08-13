@@ -1010,7 +1010,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 category.id,
                 category.label,
                 category.order,
-                JSON.stringify(category.style),
+                category.style.fillColor,
+                category.style.fillOpacity,
+                category.style.strokeColor,
+                category.style.strokeOpacity,
+                category.style.strokeWidth,
+                category.style.hatch,
                 zIndex === highestCustomZIndex,
               ].join("|"),
               read: () => format.readFeature(feature, {
