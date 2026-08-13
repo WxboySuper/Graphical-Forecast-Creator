@@ -107,6 +107,7 @@ interface CopyFeatureRule {
 }
 
 const HISTORY_LIMIT = 50;
+export const SAVED_CYCLES_LIMIT = 50;
 /** Storage key for the workflow-active flag; persisted by the store subscription, not by reducers. */
 export const WORKFLOW_ACTIVE_STORAGE_KEY = 'gfc-active-forecast-workflow';
 /** Deterministic timestamp used for the module-level initial state so no clock read happens at import time. */
@@ -1080,6 +1081,9 @@ export const forecastSlice = createSlice({
         workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
+      if (state.savedCycles.length > SAVED_CYCLES_LIMIT) {
+        state.savedCycles.splice(0, state.savedCycles.length - SAVED_CYCLES_LIMIT);
+      }
       state.isSaved = true;
     },
 
