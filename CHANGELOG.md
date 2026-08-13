@@ -104,6 +104,14 @@ Work toward the next major release continues in the beta channel while the final
 - **Unreleased foundations:** Tropical workspace and Collaboration room remain disabled on all deployment targets until their release criteria are complete.
 - **Prototype evidence:** NOAA DAT damage points supplement official verification evidence and do not replace the primary verification sources.
 
+### Stable 1.7.x hotfixes
+
+<!-- Production hotfix entries only. Do not put next-major work in this lane. -->
+
+#### Fixed
+
+- **Auto-TSTM production runtime:** Start the versioned analytics release with the verified Python worker runtime, restore the production capability endpoint, and fail deploys when Auto-TSTM is unavailable.
+
 ### Stable 1.6.x hotfixes
 
 <!-- Production hotfix entries only. Do not put next-major work in this lane. -->
