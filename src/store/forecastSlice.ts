@@ -400,6 +400,15 @@ const getCurrentOutlook = (state: ForecastState): OutlookData => {
 
 /** Clones one GeoJSON feature without JSON serialization so history snapshots are cheaper. */
 const cloneFeature = (feature: Feature): Feature => cloneJsonValue(feature);
+const featureCloneCache = new WeakMap<object, Feature>();
+
+const cloneFeatureCached = (feature: Feature): Feature => {
+  const cached = featureCloneCache.get(feature);
+  if (cached) return cached;
+  const cloned = cloneFeature(feature);
+  featureCloneCache.set(feature, cloned);
+  return cloned;
+};
 
 /** Returns the history stacks for one day, creating empty stacks when needed. */
 const getOrCreateDayHistory = (
@@ -421,7 +430,7 @@ const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | un
   if (!map) return undefined;
   return new Map(Array.from(map.entries(), ([probability, features]) => [
     probability,
-    features.map(cloneFeature),
+    features.map(cloneFeatureCached),
   ]));
 };
 
