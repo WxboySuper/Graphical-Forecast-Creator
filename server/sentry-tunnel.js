@@ -2,6 +2,7 @@
 
 const SENTRY_DSN_PATTERN =
   /^https:\/\/(?:[^@/]+@)?(o\d+\.ingest(?:\.[a-z]{2})?\.sentry\.io)\/(\d+)\/?$/iu;
+const SENTRY_UPSTREAM_TIMEOUT_MS = 5000;
 
 /** @returns {{ host: string, projectId: string } | null} Parsed ingest target from a Sentry DSN string. */
 function parseSentryDsnString(dsnString) {
@@ -101,15 +102,34 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
           return;
         }
 
-        const upstream = await fetch(targetUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-sentry-envelope',
-          },
-          body: envelopeBody,
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), SENTRY_UPSTREAM_TIMEOUT_MS);
+        const abortUpstream = () => controller.abort();
+        req.once('aborted', abortUpstream);
+        res.once('close', abortUpstream);
 
-        res.status(upstream.status).end();
+        try {
+          const upstream = await fetch(targetUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-sentry-envelope',
+            },
+            body: envelopeBody,
+            signal: controller.signal,
+          });
+
+          res.status(upstream.status).end();
+        } catch (error) {
+          if (error?.name === 'AbortError') {
+            if (!res.headersSent) res.status(504).end();
+            return;
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
+          req.removeListener('aborted', abortUpstream);
+          res.removeListener('close', abortUpstream);
+        }
       } catch (err) {
         console.error('[analytics] sentry tunnel failed:', err);
         res.status(500).end();
