@@ -96,7 +96,7 @@ function analyzeOutlookType(
             || reportPointCoords[1] < minY || reportPointCoords[1] > maxY) {
             continue;
           }
-          if (booleanPointInPolygon(point(reportPointCoords), polygon.polygon)) {
+          if (booleanPointInPolygon(point(reportPointCoords), polygon)) {
             riskLevelsContainingReport.add(riskLevel);
           }
         }
