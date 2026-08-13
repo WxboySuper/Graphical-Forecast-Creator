@@ -19,12 +19,13 @@ const clearSyncTimeout = (syncTimeoutRef: MutableRefObject<ReturnType<typeof set
 };
 
 /** Builds the current sync hash from all persisted forecast state, excluding volatile timestamp fields. */
-const buildCloudSyncHash = (serializedPayload: ReturnType<typeof serializeForecast>) =>
+const buildCloudSyncHash = (serializedPayload: ReturnType<typeof serializeForecast> | null) =>
+  serializedPayload ?
   JSON.stringify({
     forecastCycle: serializedPayload.forecastCycle,
     mapView: serializedPayload.mapView,
     cycleMetadata: serializedPayload.cycleMetadata,
-  });
+  }) : '';
 
 /** Runs one hosted cloud save for the active cloud cycle and updates sync state around the request. */
 const syncCurrentCloudCycle = async ({
@@ -100,8 +101,8 @@ export const useCloudSync = (
 
   const canSync = Boolean(currentCloud) && premiumActive;
   const serializedPayload = useMemo(
-    () => serializeForecast(forecastCycle, mapView, workflowMetadata),
-    [forecastCycle, mapView, workflowMetadata]
+    () => canSync ? serializeForecast(forecastCycle, mapView, workflowMetadata) : null,
+    [canSync, forecastCycle, mapView, workflowMetadata]
   );
   const currentHash = useMemo(
     () => buildCloudSyncHash(serializedPayload),
@@ -114,7 +115,7 @@ export const useCloudSync = (
       currentCloud,
       saveCycle,
       updateSyncState,
-      payload: serializedPayload,
+      payload: serializedPayload as ReturnType<typeof serializeForecast>,
       cycleDate: forecastCycle.cycleDate,
       forecastCycle,
       workflowMetadata,
