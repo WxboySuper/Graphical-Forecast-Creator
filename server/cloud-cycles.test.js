@@ -64,6 +64,20 @@ describe('cloud-cycle server contract', () => {
     assert.equal(cycle.payloadBytes, getPayloadBytes(payloadJson));
   });
 
+  it('rejects unknown and oversized metadata fields', () => {
+    const base = {
+      id: 'cycle-1',
+      userId: 'user-1',
+      label: 'Cycle 1',
+      cycleDate: '2026-08-09',
+      payloadJson: '{}',
+    };
+
+    assert.equal(readCloudCycleRequest({ ...base, metadata: { id: 'cycle-1', unexpected: true } }, 'user-1'), null);
+    assert.equal(readCloudCycleRequest({ ...base, metadata: { label: 'x'.repeat(257) } }, 'user-1'), null);
+    assert.equal(readCloudCycleRequest({ ...base, metadata: { totalFeatures: -1 } }, 'user-1'), null);
+  });
+
   it('bounds the new-cycle quota query and writes metadata and payload separately', async () => {
     const db = createDb({ existingCount: MAX_CLOUD_CYCLES - 1 });
     const payloadJson = '{"forecast":true}';

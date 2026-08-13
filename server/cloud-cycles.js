@@ -3,6 +3,14 @@
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const MAX_CLOUD_CYCLES = 100;
 const MAX_PAYLOAD_BYTES = 750000;
+const MAX_METADATA_BYTES = 16 * 1024;
+const MAX_METADATA_TEXT_LENGTH = 256;
+const MAX_METADATA_COUNT = 10000;
+const ALLOWED_METADATA_KEYS = new Set([
+  'id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt',
+  'forecastDays', 'totalOutlooks', 'totalFeatures', 'isReadOnly', 'payloadHash',
+  'workflowMetadata',
+]);
 
 const verifyUser = async (req) => {
   const token = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '';
@@ -17,13 +25,40 @@ const hasValidCyclePayload = ({ cycleDate, payloadJson }) => {
   const bytes = typeof payloadJson === 'string' ? getPayloadBytes(payloadJson) : -1;
   return typeof cycleDate === 'string' && cycleDate.length <= 32 && typeof payloadJson === 'string' && bytes <= MAX_PAYLOAD_BYTES;
 };
-const hasValidMetadata = (metadata) => Boolean(metadata) && typeof metadata === 'object' && !Array.isArray(metadata);
+const normalizeMetadata = (metadata) => {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+  const keys = Object.keys(metadata);
+  if (keys.some((key) => !ALLOWED_METADATA_KEYS.has(key))) return null;
+
+  let serializedBytes;
+  try {
+    serializedBytes = Buffer.byteLength(JSON.stringify(metadata), 'utf8');
+  } catch {
+    return null;
+  }
+  if (serializedBytes > MAX_METADATA_BYTES) return null;
+
+  for (const [key, value] of Object.entries(metadata)) {
+    if (['id', 'userId', 'label', 'cycleDate', 'createdAt', 'updatedAt', 'payloadHash'].includes(key)) {
+      if (typeof value !== 'string' || value.length > MAX_METADATA_TEXT_LENGTH) return null;
+    } else if (['forecastDays', 'totalOutlooks', 'totalFeatures'].includes(key)) {
+      if (!Number.isInteger(value) || value < 0 || value > MAX_METADATA_COUNT) return null;
+    } else if (key === 'isReadOnly') {
+      if (typeof value !== 'boolean') return null;
+    } else if (key === 'workflowMetadata') {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    }
+  }
+
+  return Object.fromEntries(keys.map((key) => [key, metadata[key]]));
+};
 const readCloudCycleRequest = (body, uid) => {
   const { id, userId, label, cycleDate, payloadJson, metadata } = body || {};
   if (!hasValidCycleIdentity({ userId, id, label }, uid)) return null;
   if (!hasValidCyclePayload({ cycleDate, payloadJson })) return null;
-  if (!hasValidMetadata(metadata)) return null;
-  return { id, label, cycleDate, payloadJson, payloadBytes: getPayloadBytes(payloadJson), metadata };
+  const normalizedMetadata = normalizeMetadata(metadata);
+  if (!normalizedMetadata) return null;
+  return { id, label, cycleDate, payloadJson, payloadBytes: getPayloadBytes(payloadJson), metadata: normalizedMetadata };
 };
 
 const saveCloudCycle = async (db, uid, cycle) => {
