@@ -160,7 +160,7 @@ export function captureExpectedMonitorReferenceFailure(
     data: {
       sourceId,
       expectedUpstreamFailure: true,
-      error: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error ? error.name : typeof error,
     },
   });
 }
