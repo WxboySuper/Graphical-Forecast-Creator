@@ -32,7 +32,7 @@ require.cache[firebaseAdminPath] = {
   exports: { getAdminDb: () => db, getAdminAuth: () => null, hasFirebaseAdminConfig: () => true },
 };
 delete require.cache[metricsPath];
-const { recordBillingMetricEvent } = require('./metrics');
+const { recordBillingMetricEvent, requiresAuthenticatedMetricEvent } = require('./metrics');
 
 beforeEach(() => documents.clear());
 after(() => {
@@ -53,5 +53,25 @@ describe('recordBillingMetricEvent', () => {
   it('ignores billing metrics without a valid event type', async () => {
     await recordBillingMetricEvent('');
     assert.equal([...documents.keys()].some((key) => key.startsWith('adminDailyMetrics/')), false);
+  });
+});
+
+describe('product metric authentication contract', () => {
+  it('requires authentication for every event that changes metrics', () => {
+    for (const eventType of [
+      'account_signup',
+      'account_signin',
+      'cycle_saved',
+      'discussion_saved',
+      'verification_run',
+      'cloud_cycle_saved',
+      'cloud_cycle_loaded',
+    ]) {
+      assert.equal(requiresAuthenticatedMetricEvent(eventType), true, eventType);
+    }
+  });
+
+  it('does not classify unsupported events as trusted metric writes', () => {
+    assert.equal(requiresAuthenticatedMetricEvent('unknown'), false);
   });
 });
