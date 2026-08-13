@@ -112,11 +112,16 @@ export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnap
         return cachedStatusSnapshot;
       })
       .catch(() => {
-        cachedStatusSnapshot = {
-          loaded: true,
-          capabilities: {},
-        };
+        // Keep a transient outage in the loading state so the next scheduled
+        // attempt can recover without a full page reload.
+        cachedStatusSnapshot = EMPTY_STATUS;
+        cachedStatusRequest = null;
         notifyCapabilityStatusListeners();
+        setTimeout(() => {
+          if (!cachedStatusSnapshot.loaded && !cachedStatusRequest) {
+            void loadSharedServerCapabilityStatus();
+          }
+        }, 5000);
         return cachedStatusSnapshot;
       });
   }
