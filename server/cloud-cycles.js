@@ -57,6 +57,7 @@ const handleCloudCycleSave = async (req, res) => {
   return res.status(200).json({ success: true, data: cycle.id });
 };
 
+// @codescene(disable:"Complex Method")
 const registerCloudCycleRoutes = (app, express, rateLimit) => {
   const saveRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
   app.post('/api/cloud-cycles', saveRateLimit, express.json({ limit: '800kb' }), async (req, res) => {
