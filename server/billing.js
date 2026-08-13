@@ -673,7 +673,8 @@ const wrapBillingJsonRoute = ({ handler, fallbackMessage }) => async (req, res) 
   try {
     await handler(req, res);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : fallbackMessage });
+    console.error('[billing] route:error', error);
+    res.status(500).json({ error: fallbackMessage });
   }
 };
 
