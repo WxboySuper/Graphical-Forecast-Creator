@@ -102,7 +102,7 @@ describe('useCloudSync', () => {
       },
     } as RootState));
 
-    const { result } = renderHook(() => useCloudSync(cloud()));
+    const { result, rerender } = renderHook(() => useCloudSync(cloud()));
     await act(async () => {
       await result.current.syncNow();
     });
