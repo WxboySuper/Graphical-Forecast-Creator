@@ -474,6 +474,21 @@ describe('AuthProvider Utils', () => {
       { merge: true }
     );
 
+    getDocSpy.mockResolvedValueOnce({
+      exists: () => true,
+    } as never);
+    await syncProfileDocument({ path: 'profile' } as never, {
+      email: 'user@example.com',
+      displayName: 'User',
+      photoURL: '',
+      providerData: [],
+    } as never);
+    expect(setDocSpy).toHaveBeenLastCalledWith(
+      { path: 'profile' },
+      expect.not.objectContaining({ createdAt: expect.anything() }),
+      { merge: true }
+    );
+
     const applyRemoteSettings = jest.fn();
     const setSyncedSettings = jest.fn();
     const lastSyncedSettingsRef = { current: null };
