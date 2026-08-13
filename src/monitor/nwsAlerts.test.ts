@@ -2,6 +2,7 @@ import {
   classifyNwsAlert,
   filterNwsAlertCollection,
   snapshotCollectionKey,
+  type NwsAlertFeatureCollection,
 } from './nwsAlerts';
 
 describe('nwsAlerts', () => {
@@ -68,7 +69,7 @@ describe('nwsAlerts', () => {
         properties: { updated: '2026-08-13T00:00:00Z' },
         geometry: null,
       })),
-    };
+    } as NwsAlertFeatureCollection;
 
     const key = snapshotCollectionKey(collection);
     expect(key).toMatch(/^500:\d+$/);
