@@ -128,8 +128,10 @@ const useAutoCategorical = () => {
       hasChanges = outlooks.totalSevere instanceof Map ? outlooks.totalSevere.size > 0 : false;
     }
 
-    // Fast path: same probabilistic state and no changes worth processing.
-    if (currentHash === lastProcessedRef.current && !hasChanges) {
+    // A successful derivation already handled this probabilistic state. The
+    // generated categorical map changes Redux state, so checking hasChanges
+    // here would start the same derivation again.
+    if (currentHash === lastProcessedRef.current) {
       return;
     }
 
