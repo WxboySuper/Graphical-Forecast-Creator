@@ -31,7 +31,9 @@ const parseAndValidateForecast = async (file: File) => {
     throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB); the maximum supported size is ${MAX_IMPORT_BYTES / 1024 / 1024} MB.`);
   }
 
-  const json = await readForecastImportFile(file);
+  const json = typeof readForecastImportFile === 'function'
+    ? await readForecastImportFile(file)
+    : JSON.parse(await file.text());
 
   const validationError = validateForecastDataReason(json);
   if (validationError) {
