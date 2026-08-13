@@ -75,7 +75,9 @@ export const parseLoadedForecast = async (
 
   let data: unknown;
   try {
-    data = await readForecastImportFile(file);
+    data = typeof readForecastImportFile === 'function'
+      ? await readForecastImportFile(file)
+      : JSON.parse(await file.text());
   } catch (error) {
     addToast(error instanceof SyntaxError ? 'File is not valid JSON.' : 'File is not a valid forecast or workflow package.', 'error');
     return null;

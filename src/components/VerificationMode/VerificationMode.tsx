@@ -33,7 +33,12 @@ const parseAndValidateForecast = async (file: File) => {
 
   const json = typeof readForecastImportFile === 'function'
     ? await readForecastImportFile(file)
-    : JSON.parse(await file.text());
+    : JSON.parse(await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(new Error('Failed to read file.'));
+      reader.readAsText(file);
+    }));
 
   const validationError = validateForecastDataReason(json);
   if (validationError) {
