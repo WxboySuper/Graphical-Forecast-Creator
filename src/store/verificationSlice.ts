@@ -10,6 +10,8 @@ const initialState: VerificationState = {
   loadedForecast: null,
 };
 
+const EMPTY_VERIFICATION_OUTLOOKS = {} as OutlookData;
+
 const verificationSlice = createSlice({
   name: 'verification',
   initialState,
@@ -31,7 +33,7 @@ export const selectVerificationForecast = (state: RootState) => state.verificati
 export const selectVerificationOutlooksForDay = (state: RootState, day: DayType) => {
   const forecast = state.verification.loadedForecast;
   if (!forecast || !forecast.days[day]) {
-    return {} as OutlookData;
+    return EMPTY_VERIFICATION_OUTLOOKS;
   }
   return forecast.days[day]!.data;
 };
