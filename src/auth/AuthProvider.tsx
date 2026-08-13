@@ -1329,6 +1329,10 @@ const useHostedAuthState = (): AuthContextValue => {
       setError,
       hasInitializedSettingsRef,
     }).then((nextUnsubscribe) => {
+      if (!isActive) {
+        nextUnsubscribe?.();
+        return;
+      }
       if (nextUnsubscribe) {
         unsubscribeSettings = nextUnsubscribe;
       }
