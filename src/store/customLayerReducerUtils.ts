@@ -2,7 +2,8 @@ import type { OneOffCustomLayer } from '../types/customProducts';
 import type { ForecastState } from './forecastSlice';
 import { DIRECT_REDUCER_TIMESTAMP } from './timestampMiddleware';
 
-export const cloneCustomValue = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+/** Clone custom-layer payloads without dropping valid values through JSON coercion. */
+export const cloneCustomValue = <T>(value: T): T => structuredClone(value);
 
 export const getCurrentCustomLayers = (state: ForecastState) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.customLayers;
