@@ -4,6 +4,7 @@ import type { Feature, FeatureCollection, Polygon, MultiPolygon, Position } from
 import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevereToCategorical } from '../utils/outlookUtils';
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { coerceOutlookProbabilityMap } from '../utils/outlookMapCoercion';
+import { CategoricalDerivationError } from './categoricalErrors';
 export { CategoricalDerivationError, toDerivationErrorMessage } from './categoricalErrors';
 
 /**

@@ -4,6 +4,8 @@ import { applyAutoCategoricalSync, selectCurrentOutlooks, selectCurrentDay, setA
 import { OutlookData } from '../types/outlooks';
 import { createDerivationController } from './categoricalWorker';
 import { toDerivationErrorMessage } from './categoricalErrors';
+export { processDay12OutlooksToCategorical, processDay3OutlooksToCategorical, processOutlooksToCategorical } from './autoCategoricalProcessing';
+export { CategoricalDerivationError } from './categoricalErrors';
 
 /**
  * Serializes one probabilistic outlook map into a stable string that includes
