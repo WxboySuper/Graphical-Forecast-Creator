@@ -444,6 +444,7 @@ describe('AuthProvider Utils', () => {
     expect(errorDeps.setError).toHaveBeenCalledWith('offline');
   });
 
+  // @codescene(disable:"Large Method")
   test('hosted sync helpers seed, apply, subscribe, and normalize errors', async () => {
     const settings = {
       darkMode: false,
