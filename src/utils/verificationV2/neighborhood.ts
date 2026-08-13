@@ -37,6 +37,8 @@ export interface ProductContour {
   probability: number;
   isSignificant: boolean;
   polygon: AreaPolygon;
+  /** Optional for callers constructing test or legacy contours directly. */
+  bounds?: [number, number, number, number];
 }
 
 /** Returns true when an outlook map key is a legacy significant marker. */
@@ -118,7 +120,16 @@ export const extractProductContours = (
         const isSignificant = isSignificantKey(key)
           || isCigKey(key)
           || feature.properties?.isSignificant === true;
-        contours.push({ probability, isSignificant, polygon });
+        try {
+          contours.push({
+            probability,
+            isSignificant,
+            polygon,
+            bounds: bbox(polygon) as [number, number, number, number],
+          });
+        } catch {
+          // Skip malformed geometry that cannot produce a bounding box.
+        }
       }
     }
   }
@@ -210,6 +221,16 @@ export const forecastProbabilityAt = (
     if (contour.probability <= best) {
       continue;
     }
+    let bounds: [number, number, number, number];
+    try {
+      bounds = contour.bounds ?? (bbox(contour.polygon) as [number, number, number, number]);
+    } catch {
+      continue;
+    }
+    const [minX, minY, maxX, maxY] = bounds;
+    if (position[0] < minX || position[0] > maxX || position[1] < minY || position[1] > maxY) {
+      continue;
+    }
     try {
       if (booleanPointInPolygon(turfPoint, contour.polygon)) {
         best = contour.probability;
@@ -224,7 +245,13 @@ export const forecastProbabilityAt = (
 /** True when a point lies within 25 miles of any of the supplied reports. */
 export const isWithinNeighborhood = (position: Position, reports: StormReport[]): boolean => {
   const turfPoint = point(position);
+  const latitudeRadius = SPC_NEIGHBORHOOD_MILES / 69;
+  const longitudeRadius = SPC_NEIGHBORHOOD_MILES / 45;
   for (const report of reports) {
+    if (Math.abs(position[1] - report.latitude) > latitudeRadius
+      || Math.abs(position[0] - report.longitude) > longitudeRadius) {
+      continue;
+    }
     try {
       const reportDistance = distance(turfPoint, point([report.longitude, report.latitude]), {
         units: 'miles',
