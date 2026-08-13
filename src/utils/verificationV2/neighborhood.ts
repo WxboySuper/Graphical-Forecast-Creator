@@ -211,6 +211,7 @@ export const observedFootprint = (reports: StormReport[]): AreaPolygon | null =>
 };
 
 /** Highest forecast probability whose contour contains the point (0 if none). */
+// @codescene(disable:"Complex Conditional")
 export const forecastProbabilityAt = (
   position: Position,
   contours: ProductContour[]
