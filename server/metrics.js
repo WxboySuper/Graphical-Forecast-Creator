@@ -71,6 +71,8 @@ let premiumSubscriptionsCache = {
   expiresAt: 0,
 };
 let pendingPremiumCount = null;
+let totalAccountsCache = { value: null, expiresAt: 0 };
+let pendingTotalAccounts = null;
 
 /** Returns true when the premium subscriptions cache has a fresh value. */
 const hasFreshPremiumCache = () =>
@@ -346,8 +348,26 @@ const countTotalAccounts = async () => {
     return 0;
   }
 
-  const snapshot = await db.collection('userProfiles').get();
-  return snapshot.size;
+  if (typeof totalAccountsCache.value === 'number' && Date.now() < totalAccountsCache.expiresAt) {
+    return totalAccountsCache.value;
+  }
+  if (pendingTotalAccounts) return pendingTotalAccounts;
+
+  pendingTotalAccounts = db.collection('userProfiles').count().get()
+    .then((snapshot) => {
+      const count = Number(snapshot.data?.()?.count) || 0;
+      totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
+      pendingTotalAccounts = null;
+      return count;
+    })
+    .catch(async () => {
+      pendingTotalAccounts = null;
+      const count = await countCollectionDocuments(db, 'userProfiles');
+      totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
+      return count;
+    });
+
+  return pendingTotalAccounts;
 };
 
 /** Average per-document overhead (id + path + metadata) used for storage estimates. */
