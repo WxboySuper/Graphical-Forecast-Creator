@@ -1,4 +1,4 @@
-import { collection, deleteField, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { auth, db } from './firebase';
 import { CloudCycleMetadata, CloudCycle, CloudOperationResult } from '../types/cloudCycles';
@@ -18,12 +18,6 @@ interface CloudCycleDocument extends CloudCycleMetadata {
   payloadBytes: number;
   /** v2 workflow metadata serialized as JSON in the Firestore document. */
   workflowMetadata?: CycleMetadata;
-}
-
-/** Firestore shape for the single payload document stored per cloud cycle. */
-interface CloudCyclePayloadDocument {
-  payloadJson: string;
-  payloadBytes: number;
 }
 
 interface NormalizeMetadataParams {
@@ -302,10 +296,6 @@ const serializeCloudCycleDocument = (cycle: CloudCycle): CloudCycleDocument => {
   };
 };
 
-/** Serializes a runtime cloud cycle payload into its subcollection document. */
-const serializeCloudCyclePayloadDocument = (payload: GFCForecastSaveData): CloudCyclePayloadDocument =>
-  createCloudCyclePayloadStorage(payload);
-
 /** Strips the saved payload from a cloud cycle so library APIs can expose metadata-only objects. */
 const toCloudCycleMetadata = ({ payload: _payload, workflowMetadata: _wm, ...cycleMetadata }: CloudCycle): CloudCycleMetadata => cycleMetadata;
 
@@ -395,29 +385,7 @@ const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
   }
 };
 
-/** Migrates legacy cloud cycles into the dedicated `cloudCycles` collection and clears the old field. */
-const migrateLegacyCloudCycles = async (userId: string, cycles: CloudCycle[]): Promise<void> => {
-  if (!cycles.length) {
-    return;
-  }
-
-  const migrationBatch = writeBatch(getCloudCyclesCollectionRef().firestore);
-  cycles.forEach((cycle) => {
-    migrationBatch.set(getCloudCycleDocRef(cycle.id), serializeCloudCycleDocument(cycle));
-    migrationBatch.set(getCloudCyclePayloadDocRef(cycle.id), serializeCloudCyclePayloadDocument(cycle.payload));
-  });
-  await migrationBatch.commit();
-
-  await setDoc(
-    getLegacyUserSettingsRef(userId),
-    {
-      cloudCycles: deleteField(),
-    },
-    { merge: true }
-  );
-};
-
-/** Reads all cloud cycles for a user, transparently migrating legacy records when needed. */
+/** Reads all cloud cycles for a user, retaining legacy records without mutating them. */
 const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => {
   const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
   const cycles = readCloudCyclesFromQuery({ snapshot, fallbackUserId: userId });
@@ -427,10 +395,6 @@ const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => 
   }
 
   const legacyCycles = await readLegacyCloudCycles(userId);
-  if (legacyCycles.length > 0) {
-    await migrateLegacyCloudCycles(userId, legacyCycles);
-  }
-
   return legacyCycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 };
 
@@ -462,10 +426,6 @@ const fetchCloudCycleById = async ({ userId, cycleId }: UserCycleLookupParams): 
 
   const legacyCycles = await readLegacyCloudCycles(userId);
   const legacyMatch = legacyCycles.find((cycle) => cycle.id === cycleId) ?? null;
-  if (legacyMatch) {
-    await migrateLegacyCloudCycles(userId, legacyCycles);
-  }
-
   return legacyMatch;
 };
 
