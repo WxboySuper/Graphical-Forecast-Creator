@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import {
   fetchServerCapabilityStatus,
+  isServerCapabilityStatusResponse,
   isServerCapabilityAvailable,
   loadSharedServerCapabilityStatus,
   markServerCapabilityUnavailable,
@@ -81,6 +82,19 @@ describe('serverCapabilityStatus', () => {
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  test('rejects capability entries with invalid fields', () => {
+    expect(isServerCapabilityStatusResponse({
+      capabilities: {
+        TSTM_GENERATION_ENABLED: { available: 'yes', reason: 'available' },
+      },
+    })).toBe(false);
+    expect(isServerCapabilityStatusResponse({
+      capabilities: {
+        TSTM_GENERATION_ENABLED: { available: true, reason: 'not-a-reason' },
+      },
+    })).toBe(false);
   });
 
   test('useServerCapabilityAvailable fails closed when status fetch fails', async () => {

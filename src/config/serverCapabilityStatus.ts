@@ -77,7 +77,26 @@ export const isServerCapabilityStatusResponse = (
     return false;
   }
 
-  return typeof (payload as ServerCapabilityStatusResponse).capabilities === 'object';
+  const capabilities = (payload as { capabilities?: unknown }).capabilities;
+  if (!capabilities || typeof capabilities !== 'object' || Array.isArray(capabilities)) {
+    return false;
+  }
+
+  const validReasons = new Set<CapabilityAvailabilityReason>([
+    'available',
+    'registry_disabled',
+    'deployment_disabled',
+    'emergency_disabled',
+    'unknown',
+  ]);
+
+  return Object.values(capabilities).every((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const candidate = entry as { available?: unknown; reason?: unknown };
+    return typeof candidate.available === 'boolean'
+      && typeof candidate.reason === 'string'
+      && validReasons.has(candidate.reason as CapabilityAvailabilityReason);
+  });
 };
 
 /** Reads the public server capability status document. */
