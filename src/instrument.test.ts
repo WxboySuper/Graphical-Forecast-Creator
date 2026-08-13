@@ -296,7 +296,7 @@ describe('instrument', () => {
         data: {
           sourceId: 'spc-mesoscale-discussion',
           expectedUpstreamFailure: true,
-          error: 'SPC unavailable',
+          error: 'Error',
         },
       });
     });
