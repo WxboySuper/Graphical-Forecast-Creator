@@ -137,6 +137,21 @@ const HAIL_RULES: readonly CategoricalRule[] = [
   { probabilities: ['60%'], cigs: CIG_12, risk: 'MDT' },
 ];
 
+// Day-3 total-severe probabilities use the published combined-risk scale.
+// They are not hail probabilities, so keep their conversion separate.
+const TOTAL_SEVERE_RULES: readonly CategoricalRule[] = [
+  { probabilities: ['5%'], cigs: CIG_01, risk: 'MRGL' },
+  { probabilities: ['15%'], cigs: CIG_01, risk: 'SLGT' },
+  { probabilities: ['30%'], cigs: CIG_01, risk: 'ENH' },
+  { probabilities: ['45%'], cigs: CIG_01, risk: 'MDT' },
+  { probabilities: ['60%'], cigs: CIG_01, risk: 'HIGH' },
+  { probabilities: ['5%', '15%'], cigs: CIG_12, risk: 'SLGT' },
+  { probabilities: ['30%'], cigs: CIG_12, risk: 'MDT' },
+  { probabilities: ['45%', '60%'], cigs: CIG_12, risk: 'HIGH' },
+  { probabilities: ['5%', '15%', '30%'], cigs: CIG_23, risk: 'MDT' },
+  { probabilities: ['45%', '60%'], cigs: CIG_23, risk: 'HIGH' },
+];
+
 /** Convert tornado probability to categorical risk level. */
 export function tornadoToCategorical({ probability, cig = 'CIG0' }: CategoricalInput): CategoricalRiskLevel {
   return categorizeProbability({ probability, cig, rules: TORNADO_RULES });
@@ -154,7 +169,7 @@ export function hailToCategorical({ probability, cig = 'CIG0' }: CategoricalInpu
 
 /** Convert Day 3 total severe probability to categorical risk level. */
 export function totalSevereToCategorical({ probability, cig = 'CIG0' }: CategoricalInput): CategoricalRiskLevel {
-  return categorizeProbability({ probability, cig, rules: HAIL_RULES });
+  return categorizeProbability({ probability, cig, rules: TOTAL_SEVERE_RULES });
 }
 
 /**

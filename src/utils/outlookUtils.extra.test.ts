@@ -52,8 +52,8 @@ describe('outlookUtils extra', () => {
   test('totalSevereToCategorical maps probabilities for day3', () => {
     expect(totalSevereToCategorical({ probability: '5%', cig: 'CIG0' })).toBe('MRGL');
     expect(totalSevereToCategorical({ probability: '5%', cig: 'CIG2' })).toBe('SLGT');
-    expect(totalSevereToCategorical({ probability: '15%', cig: 'CIG2' })).toBe('ENH');
-    expect(totalSevereToCategorical({ probability: '45%', cig: 'CIG2' })).toBe('MDT');
+    expect(totalSevereToCategorical({ probability: '15%', cig: 'CIG2' })).toBe('SLGT');
+    expect(totalSevereToCategorical({ probability: '45%', cig: 'CIG2' })).toBe('HIGH');
   });
 
   test('isSignificantThreat detects # marker', () => {
