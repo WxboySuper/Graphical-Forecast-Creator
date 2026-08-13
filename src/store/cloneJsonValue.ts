@@ -15,7 +15,12 @@ export const cloneJsonValue = <T>(value: T): T => {
     const clonedObject: Record<string, unknown> = {};
     for (const key in objectValue) {
       if (Object.prototype.hasOwnProperty.call(objectValue, key)) {
-        clonedObject[key] = cloneJsonValue(objectValue[key]);
+        Object.defineProperty(clonedObject, key, {
+          value: cloneJsonValue(objectValue[key]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
       }
     }
     return clonedObject as T;
