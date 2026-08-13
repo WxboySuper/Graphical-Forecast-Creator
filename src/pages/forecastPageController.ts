@@ -16,7 +16,7 @@ import {
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
 import type { GFCForecastSaveData } from '../types/outlooks';
-import { deserializeForecast, exportForecastToJson, MAX_IMPORT_BYTES, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecast, exportForecastToJson, MAX_IMPORT_BYTES, readForecastImportFile, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
 import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
   DAY_ROLLOVER_CHECK_INTERVAL_MS,
@@ -73,12 +73,11 @@ export const parseLoadedForecast = async (
     return null;
   }
 
-  const text = await file.text();
   let data: unknown;
   try {
-    data = JSON.parse(text);
+    data = await readForecastImportFile(file);
   } catch {
-    addToast('File is not valid JSON.', 'error');
+    addToast('File is not a valid forecast or workflow package.', 'error');
     return null;
   }
 
