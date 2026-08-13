@@ -81,4 +81,21 @@ describe('cloud-cycle server contract', () => {
     assert.equal(db.writes.get('cloudCycles/cycle-1').payloadBytes, getPayloadBytes(payloadJson));
     assert.equal(db.writes.get('cloudCycles/cycle-1/payload/payload').payloadJson, payloadJson);
   });
+
+  it('rejects an existing cycle owned by another account before writing', async () => {
+    const db = createDb({ existingCycle: { userId: 'other-user' } });
+
+    await assert.rejects(
+      () => saveCloudCycle(db, 'user-1', {
+        id: 'cycle-1',
+        label: 'Cycle 1',
+        cycleDate: '2026-08-09',
+        payloadJson: '{}',
+        payloadBytes: 2,
+        metadata: { id: 'cycle-1', userId: 'user-1' },
+      }),
+      (error) => error.code === 'CLOUD_CYCLE_OWNERSHIP_CONFLICT',
+    );
+    assert.equal(db.writes.size, 0);
+  });
 });
