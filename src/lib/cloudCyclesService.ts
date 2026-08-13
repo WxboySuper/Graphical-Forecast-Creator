@@ -20,6 +20,12 @@ interface CloudCycleDocument extends CloudCycleMetadata {
   workflowMetadata?: CycleMetadata;
 }
 
+/** Firestore shape for the single payload document stored per cloud cycle. */
+interface CloudCyclePayloadDocument {
+  payloadJson: string;
+  payloadBytes: number;
+}
+
 interface NormalizeMetadataParams {
   cycleId: string;
   rawMetadata: Record<string, unknown> | undefined;
