@@ -2,8 +2,28 @@ import type { OneOffCustomLayer } from '../types/customProducts';
 import type { ForecastState } from './forecastSlice';
 import { DIRECT_REDUCER_TIMESTAMP } from './timestampMiddleware';
 
-/** Clone custom-layer payloads without dropping valid values through JSON coercion. */
-export const cloneCustomValue = <T>(value: T): T => structuredClone(value);
+/** Clone custom-layer payloads without JSON coercion or browser-only APIs. */
+export const cloneCustomValue = <T>(value: T): T => {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneCustomValue(item)) as T;
+  }
+
+  if (value && typeof value === 'object') {
+    const source = value as Record<string, unknown>;
+    const clone: Record<string, unknown> = {};
+    Object.keys(source).forEach((key) => {
+      Object.defineProperty(clone, key, {
+        configurable: true,
+        enumerable: true,
+        value: cloneCustomValue(source[key]),
+        writable: true,
+      });
+    });
+    return clone as T;
+  }
+
+  return value;
+};
 
 export const getCurrentCustomLayers = (state: ForecastState) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.customLayers;
