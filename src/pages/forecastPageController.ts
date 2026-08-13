@@ -79,8 +79,19 @@ export const parseLoadedForecast = async (
       ? await readForecastImportFile(file)
       : JSON.parse(await file.text());
   } catch (error) {
-    addToast(error instanceof SyntaxError ? 'File is not valid JSON.' : 'File is not a valid forecast or workflow package.', 'error');
-    return null;
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      try {
+        data = JSON.parse(await file.text());
+      } catch (fallbackError) {
+        const isJsonError = fallbackError instanceof SyntaxError
+          || (fallbackError instanceof Error && fallbackError.name === 'SyntaxError');
+        addToast(isJsonError ? 'File is not valid JSON.' : 'File is not a valid forecast or workflow package.', 'error');
+        return null;
+      }
+    } else {
+      addToast(error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.', 'error');
+      return null;
+    }
   }
 
   const validationError = validateForecastDataReason(data);
