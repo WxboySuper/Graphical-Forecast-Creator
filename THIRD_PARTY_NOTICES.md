@@ -26,8 +26,6 @@ to each.
 - **@testing-library/jest-dom** ^7.0.0 (root (pnpm)) — MIT — allowed
 - **@testing-library/react** ^16.2.0 (root (pnpm)) — MIT — allowed
 - **@testing-library/user-event** ^14.6.3 (root (pnpm)) — MIT — allowed
-- **@turf/difference** ^7.4.0 (root (pnpm)) — MIT — allowed
-- **@turf/helpers** ^7.4.0 (root (pnpm)) — MIT — allowed
 - **@turf/turf** ^7.4.0 (root (pnpm)) — MIT — allowed
 - **@types/geojson** ^7946.0.16 (root (pnpm)) — MIT — allowed
 - **@types/jest** ^30.0.0 (root (pnpm)) — MIT — allowed
@@ -80,11 +78,11 @@ to each.
 - **vite** ^8.2.1 (root (pnpm)) — MIT — allowed
 - **web-vitals** ^6.1.0 (root (pnpm)) — Apache-2.0 — allowed
 - **xml2js** ^0.6.2 (root (pnpm)) — MIT — allowed
-- **@sentry/node** ^10.69.0 (server (npm)) — MIT — allowed
-- **express** ^5.2.1 (server (npm)) — MIT — allowed
-- **express-rate-limit** ^8.6.2 (server (npm)) — MIT — allowed
-- **firebase-admin** ^14.2.0 (server (npm)) — Apache-2.0 — allowed
-- **stripe** ^22.4.0 (server (npm)) — MIT — allowed
+- **@sentry/node** ^10.69.0 (server (npm)) — unknown — unknown
+- **express** ^5.2.1 (server (npm)) — unknown — unknown
+- **express-rate-limit** ^8.6.2 (server (npm)) — unknown — unknown
+- **firebase-admin** ^14.2.0 (server (npm)) — unknown — unknown
+- **stripe** ^22.4.0 (server (npm)) — unknown — unknown
 - **cfgrib** 0.9.15.1 (server (python)) — Apache-2.0 — allowed
 - **numpy** 2.4.1 (server (python)) — BSD-3-Clause — allowed
 - **scikit-image** 0.26.0 (server (python)) — BSD-3-Clause — allowed
