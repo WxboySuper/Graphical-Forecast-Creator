@@ -1101,6 +1101,11 @@ describe('forecastSlice undo/redo', () => {
       expect(selectOutlooksForDay(state, 4)).toBe(selectOutlooksForDay(state, 4));
     });
 
+    it('selectOutlooksForDay returns a safe fallback for an unknown day', () => {
+      const state = withForecast(reducer(undefined, setForecastDay(1)));
+      expect(selectOutlooksForDay(state, 99 as DayType)).toBe(selectOutlooksForDay(state, 99 as DayType));
+    });
+
     it('does not expose the shared fallback as the current day data for a real day', () => {
       const forecastState = reducer(undefined, setForecastDay(1));
       const real = forecastState.forecastCycle.days[1]?.data;
