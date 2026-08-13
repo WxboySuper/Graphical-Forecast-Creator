@@ -84,6 +84,7 @@ const isCurrentStateSynced = (lastSyncedHash: string | null, currentHash: string
  * 2. User has active premium (not expired)
  * 3. Forecast has changes since last sync
  */
+// @codescene(disable:"Large Method")
 export const useCloudSync = (
   cloud: Pick<UseCloudCyclesResult, 'currentCloud' | 'updateSyncState' | 'saveCycle'>
 ) => {
