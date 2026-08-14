@@ -80,7 +80,8 @@ export const parseLoadedForecast = async (
       ? await readForecastImportFile(file)
       : JSON.parse(await file.text());
   } catch (error) {
-    if (!file.name.toLowerCase().endsWith('.zip')) {
+    const fileName = typeof file.name === 'string' ? file.name : '';
+    if (!fileName.toLowerCase().endsWith('.zip')) {
       try {
         data = JSON.parse(await file.text());
       } catch (fallbackError) {

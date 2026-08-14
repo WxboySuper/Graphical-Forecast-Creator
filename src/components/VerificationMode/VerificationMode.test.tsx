@@ -22,6 +22,7 @@ jest.mock('../../utils/productMetrics', () => ({
 }));
 
 jest.mock('../../utils/fileUtils', () => ({
+  readForecastImportFile: jest.fn(),
   validateForecastData: jest.fn(),
   validateForecastDataReason: jest.fn(),
   deserializeForecast: jest.fn(),
@@ -50,6 +51,7 @@ const mockUseAuth = jest.requireMock('../../auth/AuthProvider').useAuth as jest.
 const mockValidateForecastData = jest.requireMock('../../utils/fileUtils').validateForecastData as jest.Mock;
 const mockValidateForecastDataReason = jest.requireMock('../../utils/fileUtils').validateForecastDataReason as jest.Mock;
 const mockDeserializeForecast = jest.requireMock('../../utils/fileUtils').deserializeForecast as jest.Mock;
+const mockReadForecastImportFile = jest.requireMock('../../utils/fileUtils').readForecastImportFile as jest.Mock;
 
 class MockFileReader {
   onload: ((event: { target: { result: string } }) => void) | null = null;
@@ -80,6 +82,7 @@ describe('VerificationMode', () => {
     mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, status: 'signed_in' });
     mockValidateForecastData.mockReturnValue(true);
     mockValidateForecastDataReason.mockReturnValue(null);
+    mockReadForecastImportFile.mockResolvedValue({ ok: true });
     mockDeserializeForecast.mockReturnValue({
       currentDay: 1,
       cycleDate: '2026-04-20',
