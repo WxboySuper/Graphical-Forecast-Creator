@@ -64,6 +64,7 @@ export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => 
 };
 
 /** Reads and validates one forecast JSON file. */
+// @codescene(disable:"Complex Method")
 export const parseLoadedForecast = async (
   file: File,
   addToast: AddToastFn,
