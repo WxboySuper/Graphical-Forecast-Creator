@@ -111,6 +111,7 @@ Work toward the next major release continues in the beta channel while the final
 #### Fixed
 
 - **Auto-TSTM production runtime:** Start the versioned analytics release with the verified Python worker runtime, restore the production capability endpoint, and fail deploys when Auto-TSTM is unavailable.
+- **Hosted Firebase writes:** Reconcile the server-owned Custom Products capability at analytics-server startup so authorized reusable-product saves do not fail because the capability document is missing.
 
 ### Stable 1.6.x hotfixes
 
