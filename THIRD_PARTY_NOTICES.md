@@ -90,4 +90,3 @@ to each.
 - **xarray** 2026.2.0 (server (python)) — Apache-2.0 — allowed
 
 License categories: allowed, review-required, prohibited, unknown.
-
