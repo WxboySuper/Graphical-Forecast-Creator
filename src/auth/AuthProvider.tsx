@@ -491,10 +491,12 @@ export const syncProfileDocument = async (
   user: User
 ): Promise<void> => {
   const profileSnapshot = await getDoc(profileRef);
+  const needsCreatedAt =
+    !profileSnapshot.exists() || profileSnapshot.data()?.createdAt === undefined;
   await setDoc(
     profileRef,
     {
-      ...createProfilePayload(user, { includeCreatedAt: !profileSnapshot.exists() }),
+      ...createProfilePayload(user, { includeCreatedAt: needsCreatedAt }),
     },
     { merge: true }
   );
