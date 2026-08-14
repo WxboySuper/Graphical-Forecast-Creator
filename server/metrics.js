@@ -839,6 +839,7 @@ const registerMetricsRoutes = (app, express) => {
 };
 
 module.exports = {
+  handleMetricEvent,
   recordBillingMetricEvent,
   registerMetricsRoutes,
   countCollectionDocuments,

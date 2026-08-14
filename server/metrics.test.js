@@ -32,7 +32,29 @@ require.cache[firebaseAdminPath] = {
   exports: { getAdminDb: () => db, getAdminAuth: () => null, hasFirebaseAdminConfig: () => true },
 };
 delete require.cache[metricsPath];
-const { recordBillingMetricEvent, requiresAuthenticatedMetricEvent } = require('./metrics');
+const { handleMetricEvent, recordBillingMetricEvent, requiresAuthenticatedMetricEvent } = require('./metrics');
+
+const createResponse = () => {
+  const response = {
+    statusCode: null,
+    body: null,
+    status(code) {
+      response.statusCode = code;
+      return response;
+    },
+    json(payload) {
+      response.body = payload;
+      return response;
+    },
+    end() {},
+  };
+  return response;
+};
+
+const createUnauthenticatedRequest = (event) => ({
+  headers: {},
+  body: { event, installationId: 'test-installation' },
+});
 
 beforeEach(() => documents.clear());
 after(() => {
@@ -57,7 +79,7 @@ describe('recordBillingMetricEvent', () => {
 });
 
 describe('product metric authentication contract', () => {
-  it('requires authentication for every event that changes metrics', () => {
+  it('rejects every allowlisted product event without a verified identity', async () => {
     for (const eventType of [
       'account_signup',
       'account_signin',
@@ -67,8 +89,27 @@ describe('product metric authentication contract', () => {
       'cloud_cycle_saved',
       'cloud_cycle_loaded',
     ]) {
-      assert.equal(requiresAuthenticatedMetricEvent(eventType), true, eventType);
+      const response = createResponse();
+
+      await handleMetricEvent(createUnauthenticatedRequest(eventType), response);
+
+      assert.equal(response.statusCode, 401, `${eventType} must require authentication`);
     }
+  });
+
+  it('performs no Firestore write for an unauthenticated event', async () => {
+    const response = createResponse();
+
+    await handleMetricEvent(createUnauthenticatedRequest('cycle_saved'), response);
+
+    assert.equal(response.statusCode, 401);
+    assert.deepEqual(response.body, { error: 'Authentication required for product metrics.' });
+    assert.equal(documents.size, 0);
+  });
+
+  it('leaves billing webhook events out of the client-authenticated allowlist', () => {
+    assert.equal(requiresAuthenticatedMetricEvent('premium_upgrade'), false);
+    assert.equal(requiresAuthenticatedMetricEvent('premium_cancellation'), false);
   });
 
   it('does not classify unsupported events as trusted metric writes', () => {
