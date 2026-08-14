@@ -213,6 +213,7 @@ service cloud.firestore {
     }
 
     function isValidMonitorSettings(value) {
+      // Keep this shape in sync with the client MonitorSettings type.
       return value is map && value.keys().hasOnly([
           'radarMode', 'radarProduct', 'radarSite', 'radarOpacity',
           'satelliteProduct', 'satelliteOpacity', 'outlookSource', 'outlookType',
