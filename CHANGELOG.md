@@ -6,11 +6,32 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Next major / beta
+#### Dependencies
+<!-- dependabot-automation -->
+
+- **@sentry/react:** ^10.69.0 → ^10.70.0
+- **@testing-library/jest-dom:** ^7.0.0 → ^7.0.1
+- **@testing-library/user-event:** ^14.6.3 → ^14.6.4
+- **@types/node:** ^26.1.2 → ^26.2.0
+- **lucide-react:** ^1.30.0 → ^1.31.0
+- **@babel/core:** ^7.29.7 → ^8.0.1
+- **@babel/parser:** ^7.29.7 → ^8.0.4
+- **@babel/preset-env:** ^7.29.7 → ^8.0.2
+- **@babel/preset-react:** ^7.29.7 → ^8.0.1
+- **@babel/preset-typescript:** ^7.29.7 → ^8.0.1
+- **@eslint/js:** ^9.39.5 → ^10.0.1
+- **esbuild:** ^0.28.1 → ^0.28.2
+- **eslint:** ^9.39.5 → ^10.8.1
+- **eslint-plugin-jest:** ^29.16.0 → ^29.16.1
+- **firebase-tools:** 15.26.0 → 15.27.0
+- **globals:** ^17.9.0 → ^17.11.0
+- **typescript-eslint:** ^8.66.0 → ^8.67.0
+- **@sentry/node:** ^10.69.0 → ^10.70.0 (`server`)
+
 
 #### Added
 
 <!-- Continue next-major work here after this stable line is cut. -->
-
 ## v1.7.0
 
 #### Dependencies
