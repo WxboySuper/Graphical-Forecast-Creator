@@ -18,6 +18,9 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
+import { getCachedLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
+import { trimOutlookDataInPlace } from '../utils/outlookPolygonMasking/trimOutlookData';
+import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -825,6 +828,26 @@ export const forecastSlice = createSlice({
       }
     },
 
+    trimCurrentDayOutlooksToLand: (
+      state,
+      action: PayloadAction<{ strategy: LandMaskStrategy }>,
+    ) => {
+      const landMask = getCachedLandMask(action.payload.strategy);
+      if (!landMask) {
+        return;
+      }
+
+      const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
+      if (!dayData) {
+        return;
+      }
+
+      pushUndoSnapshot(state);
+      trimOutlookDataInPlace(dayData.data, landMask, action.payload.strategy);
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
     resetCategorical: (state) => {
       const outlooks = getCurrentOutlook(state);
       if (!outlooks.categorical) {
@@ -1496,6 +1519,7 @@ export const {
   addFeature,
   updateFeature,
   removeFeature,
+  trimCurrentDayOutlooksToLand,
   resetCategorical,
   setOutlookMap,
   applyAutoCategoricalSync,

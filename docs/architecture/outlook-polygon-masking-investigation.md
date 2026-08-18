@@ -143,7 +143,21 @@ Checksums and update process: `docs/geo-boundary-datasets.md`.
 **Maintenance:** Follow existing vendoring workflow (pin SHA-256 in
 `geoBoundarySources.ts`, `validate-geo-assets.mjs` in CI). No mutable upstream URLs.
 
-## Prototype implementations in repo (for testing)
+## Implemented prototype (branch `cursor/outlook-masking-investigation-2d35`)
+
+Shipped for hands-on evaluation in the forecast editor:
+
+| Mode | UI control | Behavior |
+|------|------------|----------|
+| **On-demand trim** | Layers → `Trim day now` or Tools → `Trim land` | Mutates all outlook polygons on the current day |
+| **Auto on draw** | Layers → `Auto on draw` | Clips geometry when draw/modify completes |
+| **Preview only** | Layers → `Preview only` | Cyan dashed overlay; Redux geometry unchanged |
+| **Mask strategy** | Layers → `Mask` dropdown | `Coast + lakes`, `Coast only`, `State union` |
+
+All modes default **off**. Controls live under **Layers → Trim prototype (Issue #619)**.
+
+Run locally: `pnpm dev` → Forecast workspace → Layers tab.
+
 
 Code under `src/utils/outlookPolygonMasking/` implements **three land-mask
 strategies** and two application styles:

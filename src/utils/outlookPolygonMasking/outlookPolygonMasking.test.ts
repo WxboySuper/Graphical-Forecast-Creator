@@ -2,7 +2,7 @@ import * as turf from '@turf/turf';
 import { buildLandMask } from './buildLandMask';
 import { clipOutlookToLandMask } from './clipOutlookPolygon';
 import { findGreatLakes } from './geoBoundaryFeatures';
-import { loadVendoredBoundaryGeoBundle } from './loadBoundaryGeoBundle';
+import { loadVendoredBoundaryGeoBundle } from './loadVendoredBoundaryGeoBundle';
 import { benchmarkLandMaskStrategies } from './benchmarkLandMaskStrategies';
 
 describe('outlookPolygonMasking prototype', () => {

@@ -1,7 +1,7 @@
 import * as turf from '@turf/turf';
 import { buildLandMask } from './buildLandMask';
 import { clipOutlookToLandMask } from './clipOutlookPolygon';
-import { loadVendoredBoundaryGeoBundle } from './loadBoundaryGeoBundle';
+import { loadVendoredBoundaryGeoBundle } from './loadVendoredBoundaryGeoBundle';
 import type { LandMaskStrategy } from './types';
 
 export interface StrategyBenchmark {

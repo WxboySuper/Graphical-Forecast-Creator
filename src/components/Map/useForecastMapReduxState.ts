@@ -29,6 +29,9 @@ const useForecastMapSelections = () => {
   const outlookOpacity = useSelector((state: RootState) => selectCurrentOutlookOpacity(state, drawingState.activeOutlookType));
   const baseMapStyle = useSelector((state: RootState) => state.overlays.baseMapStyle);
   const ghostOutlooks = useSelector((state: RootState) => state.overlays.ghostOutlooks);
+  const outlookTrimStrategy = useSelector((state: RootState) => state.overlays.outlookTrimStrategy);
+  const outlookTrimAutoOnDraw = useSelector((state: RootState) => state.overlays.outlookTrimAutoOnDraw);
+  const outlookTrimPreviewOnly = useSelector((state: RootState) => state.overlays.outlookTrimPreviewOnly);
 
   return {
     dispatch,
@@ -45,6 +48,9 @@ const useForecastMapSelections = () => {
     outlookOpacity,
     baseMapStyle,
     ghostOutlooks,
+    outlookTrimStrategy,
+    outlookTrimAutoOnDraw,
+    outlookTrimPreviewOnly,
   };
 };
 
