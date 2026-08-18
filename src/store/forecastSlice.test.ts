@@ -114,6 +114,7 @@ describe('toggleSignificant', () => {
     state = reducer(state, toggleSignificant());
     expect(state.drawingState.isSignificant).toBe(false);
   });
+});
 
 describe('setOutlookMap', () => {
   test('rejects an outlook type unsupported by the current day', () => {
