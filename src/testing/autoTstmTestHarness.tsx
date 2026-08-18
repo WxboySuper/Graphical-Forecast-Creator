@@ -39,6 +39,7 @@ export const cachedResponse = {
   generatedAt: '2026-06-13T12:00:00Z',
 };
 
+/** Documents createAutoTstmTestStore. */
 export const createAutoTstmTestStore = () => configureStore({
   reducer: { forecast: forecastReducer },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware({
@@ -47,8 +48,10 @@ export const createAutoTstmTestStore = () => configureStore({
   }),
 });
 
+/** Documents renderAutoTstm. */
 export const renderAutoTstm = () => {
   const store = createAutoTstmTestStore();
+  /** Documents wrapper. */
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <Provider store={store}>{children}</Provider>
   );
@@ -56,6 +59,7 @@ export const renderAutoTstm = () => {
   return { store, ...hook };
 };
 
+/** Documents openPanelAndWaitForPreview. */
 export const openPanelAndWaitForPreview = async (
   result: ReturnType<typeof renderAutoTstm>['result'],
 ) => {
@@ -67,6 +71,7 @@ export const openPanelAndWaitForPreview = async (
   });
 };
 
+/** Documents openPanelAndWaitForError. */
 export const openPanelAndWaitForError = async (
   result: ReturnType<typeof renderAutoTstm>['result'],
 ) => {

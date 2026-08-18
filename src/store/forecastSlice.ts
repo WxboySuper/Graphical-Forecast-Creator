@@ -344,6 +344,7 @@ const initialState: ForecastState = {
 };
 
 // Helpers to keep reducers small and testable
+/** Documents computeOutlookType. */
 const computeOutlookType = (feature: Feature, state: ForecastState): OutlookType => {
   return (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
 };
@@ -389,6 +390,7 @@ const buildFeatureWithProps = (
 };
 
 // Helper to get current outlook data safely
+/** Documents getCurrentOutlook. */
 const getCurrentOutlook = (state: ForecastState): OutlookData => {
   const day = state.forecastCycle.days[state.forecastCycle.currentDay];
   if (!day) {
@@ -454,6 +456,7 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
   };
 };
 
+/** Documents cloneCustomLayers. */
 const cloneCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
   customLayers ? cloneJsonValue(customLayers) : undefined;
 
@@ -1559,6 +1562,7 @@ const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
   layers: [],
 };
+/** Documents selectCurrentCustomLayers. */
 export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollection => {
   const cycle = state.forecast.forecastCycle;
   return cycle?.days?.[cycle.currentDay]?.customLayers || EMPTY_CUSTOM_LAYERS;
@@ -1589,6 +1593,7 @@ export const selectIsLowProbability = (state: RootState) => {
   return day?.metadata?.lowProbabilityOutlooks?.includes(activeType) || false;
 };
 
+/** Documents selectCurrentOutlookOpacity. */
 export const selectCurrentOutlookOpacity = (state: RootState, outlookType: OutlookType): number => {
   const day = state.forecast.forecastCycle.days[state.forecast.forecastCycle.currentDay];
   const value = day?.metadata.outlookOpacities?.[outlookType];

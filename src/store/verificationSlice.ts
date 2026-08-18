@@ -26,8 +26,10 @@ const verificationSlice = createSlice({
 export const { loadVerificationForecast, clearVerificationForecast } = verificationSlice.actions;
 
 // Selectors
+/** Documents selectVerificationForecast. */
 export const selectVerificationForecast = (state: RootState) => state.verification.loadedForecast;
 
+/** Documents selectVerificationOutlooksForDay. */
 export const selectVerificationOutlooksForDay = (state: RootState, day: DayType) => {
   const forecast = state.verification.loadedForecast;
   if (!forecast || !forecast.days[day]) {
