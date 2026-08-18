@@ -20,6 +20,7 @@ const startTestServer = (app) =>
     server.on('error', reject);
   });
 
+/** Documents getServerUrl. */
 const getServerUrl = (server, path = '/api/test') => {
   const address = server.address();
   return `http://127.0.0.1:${address.port}${path}`;
