@@ -18,6 +18,10 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
+import {
+  applyPaintBucketStrategy,
+  type PaintBucketStrategy,
+} from '../utils/paintBucket';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -825,6 +829,42 @@ export const forecastSlice = createSlice({
       }
     },
 
+    applyPaintBucketEdit: (state, action: PayloadAction<{
+      outlookType: OutlookType;
+      featureId: string;
+      fromProbability: string;
+      strategy: PaintBucketStrategy;
+      probabilityList: readonly string[];
+    }>) => {
+      const { outlookType, featureId, fromProbability, strategy, probabilityList } = action.payload;
+      const outlookData = getCurrentOutlook(state);
+      const outlookMap = outlookData[outlookType];
+      if (!outlookMap) {
+        return;
+      }
+
+      const result = applyPaintBucketStrategy(outlookMap, {
+        outlookType,
+        featureId,
+        fromProbability,
+        strategy,
+        activeProbability: state.drawingState.activeProbability,
+        probabilityList,
+      });
+
+      if (!result.changed) {
+        return;
+      }
+
+      pushUndoSnapshot(state);
+      outlookMap.clear();
+      result.map.forEach((features, key) => {
+        outlookMap.set(key, features);
+      });
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
     resetCategorical: (state) => {
       const outlooks = getCurrentOutlook(state);
       if (!outlooks.categorical) {
@@ -1496,6 +1536,7 @@ export const {
   addFeature,
   updateFeature,
   removeFeature,
+  applyPaintBucketEdit,
   resetCategorical,
   setOutlookMap,
   applyAutoCategoricalSync,
