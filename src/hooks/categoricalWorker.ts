@@ -61,44 +61,82 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
   const pending = new Map<number, { resolve: (r: DerivationResult) => void }>();
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  worker.onmessage = (event: MessageEvent<AutoCategoricalWorkerResponse>) => {
-    const { requestId, ok, features, error } = event.data;
-    const timer = timers.get(requestId);
-    if (timer) {
-      clearTimeout(timer);
-      timers.delete(requestId);
-    }
-    const entry = pending.get(requestId);
-    if (entry) {
-      pending.delete(requestId);
-      entry.resolve({ ok, features, error });
-    }
+  const attachWorkerHandlers = (nextWorker: WorkerLike): void => {
+    nextWorker.onmessage = (event: MessageEvent<AutoCategoricalWorkerResponse>) => {
+      const { requestId, ok, features, error } = event.data;
+      const timer = timers.get(requestId);
+      if (timer) {
+        clearTimeout(timer);
+        timers.delete(requestId);
+      }
+      const entry = pending.get(requestId);
+      if (entry) {
+        pending.delete(requestId);
+        entry.resolve({ ok, features, error });
+      }
+    };
+
+    nextWorker.onerror = () => {
+      // Fail all pending requests so the caller preserves the last known-good result.
+      pending.forEach(({ resolve }) => resolve({ ok: false, error: 'Auto-categorical worker failed.' }));
+      pending.clear();
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+      if (worker === nextWorker) {
+        worker = null;
+      }
+    };
   };
 
-  worker.onerror = () => {
-    // Fail all pending requests so the caller preserves the last known-good result.
-    pending.forEach(({ resolve }) => resolve({ ok: false, error: 'Auto-categorical worker failed.' }));
-    pending.clear();
-  };
+  attachWorkerHandlers(worker);
 
   return {
     derive: (requestId, day, outlooks) =>
       new Promise<DerivationResult>((resolve) => {
+        const activeWorker = worker;
+        if (!activeWorker) {
+          resolve({ ok: false, error: 'Auto-categorical worker unavailable.' });
+          return;
+        }
         pending.set(requestId, { resolve });
         const timer = setTimeout(() => {
           pending.delete(requestId);
           timers.delete(requestId);
+          // A Web Worker cannot be interrupted from the outside. Terminate it
+          // on timeout so an expensive derivation cannot block every later
+          // request, then create a clean worker for the next edit.
+          const timedOutWorker = worker;
+          if (timedOutWorker) {
+            timedOutWorker.terminate();
+            worker = null;
+            pending.forEach(({ resolve }, pendingRequestId) => {
+              if (pendingRequestId !== requestId) {
+                resolve({ ok: false, error: 'Auto-categorical worker reset after timeout.' });
+              }
+            });
+            pending.clear();
+            timers.forEach((pendingTimer) => clearTimeout(pendingTimer));
+            timers.clear();
+            try {
+              const replacement = workerFactory();
+              worker = replacement;
+              attachWorkerHandlers(replacement);
+            } catch {
+              worker = null;
+            }
+          }
           resolve({ ok: false, error: 'Auto-categorical derivation timed out.' });
         }, DERIVATION_TIMEOUT_MS);
         timers.set(requestId, timer);
-        worker.postMessage({ requestId, day, outlooks });
+        activeWorker.postMessage({ requestId, day, outlooks });
       }),
     dispose: () => {
       pending.forEach(({ resolve }) => resolve({ ok: false, error: 'Auto-categorical worker disposed.' }));
       pending.clear();
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
-      worker.terminate();
+      worker?.terminate();
+      worker = null;
     },
   };
 };

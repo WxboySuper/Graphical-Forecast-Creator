@@ -100,8 +100,10 @@ const useAutoCategorical = () => {
   const currentDay = useSelector(selectCurrentDay);
   const processingRef = useRef(false);
   const lastProcessedRef = useRef<string>('');
+  const latestHashRef = useRef<string>('');
   const requestIdRef = useRef(0);
   const [controller] = useState(() => createDerivationController());
+  const [processingRevision, setProcessingRevision] = useState(0);
 
   // Process probabilistic outlooks to generate categorical outlooks
   useEffect(() => {
@@ -109,13 +111,14 @@ const useAutoCategorical = () => {
     if (currentDay >= 4) {
       return;
     }
+
+    const currentHash = signatureFromProbabilisticOutlooks(outlooks, currentDay);
+    latestHashRef.current = currentHash;
     
     // Prevent recursive updates
     if (processingRef.current) {
       return;
     }
-
-    const currentHash = signatureFromProbabilisticOutlooks(outlooks, currentDay);
 
     // A successful derivation already handled this probabilistic state. The
     // generated categorical map changes Redux state, so checking hasChanges
@@ -161,6 +164,10 @@ const useAutoCategorical = () => {
             result.error,
             'Automatic categorical generation failed. Previous categorical geometry was preserved.'
           );
+          // Do not retry the same broken geometry on every unrelated Redux
+          // update. A new probabilistic edit produces a new hash and remains
+          // eligible for derivation.
+          lastProcessedRef.current = currentHash;
           dispatch(setAutoCategoricalError(message));
           return;
         }
@@ -174,9 +181,12 @@ const useAutoCategorical = () => {
       .finally(() => {
         if (requestId === requestIdRef.current) {
           processingRef.current = false;
+          if (latestHashRef.current !== lastProcessedRef.current) {
+            setProcessingRevision((revision) => revision + 1);
+          }
         }
       });
-  }, [controller, dispatch, outlooks, currentDay]);
+  }, [controller, dispatch, outlooks, currentDay, processingRevision]);
 
   useEffect(() => () => controller.dispose(), [controller]);
 

@@ -57,6 +57,26 @@ describe('createDerivationController worker path', () => {
     jest.useRealTimers();
   });
 
+  it('terminates the timed-out worker and uses a replacement for the next request', async () => {
+    jest.useFakeTimers();
+    const workers = [createFakeWorkerController().worker, createFakeWorkerController().worker];
+    let factoryCalls = 0;
+    const controller = createDerivationController(() => workers[factoryCalls++]);
+
+    const timedOut = controller.derive(7, 1, emptyOutlooks());
+    jest.advanceTimersByTime(15_000);
+    await expect(timedOut).resolves.toMatchObject({ ok: false, error: expect.stringContaining('timed out') });
+    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+
+    const replacementRequest = controller.derive(8, 1, emptyOutlooks());
+    expect(workers[1].postMessage).toHaveBeenCalledTimes(1);
+    workers[1].onmessage?.({ data: { requestId: 8, ok: true, features: [] } } as MessageEvent);
+    await expect(replacementRequest).resolves.toMatchObject({ ok: true, features: [] });
+
+    controller.dispose();
+    jest.useRealTimers();
+  });
+
   it('rejects pending requests when the worker errors', async () => {
     const { controller, worker } = createFakeWorkerController();
 
