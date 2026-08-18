@@ -76,21 +76,28 @@ const isCapabilityStatusReason = (reason: unknown): reason is CapabilityAvailabi
   typeof reason === 'string'
   && CAPABILITY_AVAILABILITY_REASONS.includes(reason as CapabilityAvailabilityReason);
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+
+  return !Array.isArray(value);
+};
+
 const isCapabilityStatusEntry = (entry: unknown): entry is CapabilityStatusEntry => {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+  if (!isRecord(entry)) {
     return false;
   }
 
-  const candidate = entry as { available?: unknown; reason?: unknown };
-  if (!Object.keys(candidate).every((key) => key === 'available' || key === 'reason')) {
+  if (Object.keys(entry).some((key) => key !== 'available' && key !== 'reason')) {
     return false;
   }
 
-  if (typeof candidate.available !== 'boolean') {
+  if (typeof entry.available !== 'boolean') {
     return false;
   }
 
-  return isCapabilityStatusReason(candidate.reason);
+  return isCapabilityStatusReason(entry.reason);
 };
 
 /** Returns true when the payload matches the public capability status shape. */
@@ -103,9 +110,7 @@ export const isServerCapabilityStatusResponse = (
 
   const capabilities = (payload as { capabilities?: unknown }).capabilities;
   return Boolean(
-    capabilities
-      && typeof capabilities === 'object'
-      && !Array.isArray(capabilities)
+    isRecord(capabilities)
       && Object.values(capabilities).every(isCapabilityStatusEntry)
   );
 };

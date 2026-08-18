@@ -119,6 +119,26 @@ describe('serverCapabilityStatus', () => {
     })).toBe(true);
   });
 
+  test('rejects malformed payloads at the fetch boundary', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        capabilities: {
+          TSTM_GENERATION_ENABLED: { available: 'yes', reason: 'available' },
+        },
+      }),
+    }) as jest.Mock;
+
+    try {
+      await expect(fetchServerCapabilityStatus()).rejects.toThrow(
+        'Server capability status response was malformed.'
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   test('useServerCapabilityAvailable fails closed when status fetch fails', async () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockRejectedValue(new Error('network')) as jest.Mock;
