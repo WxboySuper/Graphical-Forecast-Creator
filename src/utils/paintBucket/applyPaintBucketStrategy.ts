@@ -1,53 +1,22 @@
 import type { Feature } from 'geojson';
 import type { OutlookType } from '../../types/outlooks';
 import {
-  DEFAULT_PAINT_BUCKET_STRATEGY,
-  PAINT_BUCKET_STRATEGY_STORAGE_KEY,
+  type PaintBucketEditAction,
   type PaintBucketEditRequest,
   type PaintBucketEditResult,
-  type PaintBucketStrategy,
 } from './types';
-import { polygonsOverlap, subtractPolygon, toPolygonFeature } from './paintBucketGeometry';
 
-/** Reads the persisted prototype strategy, falling back to recategorize. */
-export const readPaintBucketStrategy = (): PaintBucketStrategy => {
-  if (typeof window === 'undefined') {
-    return DEFAULT_PAINT_BUCKET_STRATEGY;
-  }
-
-  const stored = window.localStorage.getItem(PAINT_BUCKET_STRATEGY_STORAGE_KEY);
-  if (
-    stored === 'recategorize'
-    || stored === 'step-up'
-    || stored === 'step-down'
-    || stored === 'subtract-overlap'
-  ) {
-    return stored;
-  }
-
-  return DEFAULT_PAINT_BUCKET_STRATEGY;
-};
-
-/** Persists the prototype strategy for local comparison testing. */
-export const writePaintBucketStrategy = (strategy: PaintBucketStrategy): void => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  window.localStorage.setItem(PAINT_BUCKET_STRATEGY_STORAGE_KEY, strategy);
-};
-
-/** Computes the destination probability for a bucket action. */
+/** Computes the destination probability for a paint-bucket action. */
 export const resolveTargetProbability = (
-  strategy: PaintBucketStrategy,
+  action: PaintBucketEditAction,
   fromProbability: string,
   activeProbability: string,
   probabilityList: readonly string[],
 ): string | null => {
   const currentIndex = probabilityList.indexOf(fromProbability);
 
-  switch (strategy) {
+  switch (action) {
     case 'recategorize':
-    case 'subtract-overlap':
       return fromProbability === activeProbability ? null : activeProbability;
     case 'step-up':
       if (currentIndex === -1) return null;
@@ -104,49 +73,7 @@ const findFeatureLocation = (
   return null;
 };
 
-/** Subtracts `moved` geometry from every other feature except the moved id and target bucket. */
-const subtractMovedGeometryFromOtherKeys = (
-  outlookMap: Map<string, Feature[]>,
-  moved: Feature,
-  movedFeatureId: string,
-  targetProbability: string,
-): void => {
-  const movedPolygon = toPolygonFeature(moved);
-  if (!movedPolygon) {
-    return;
-  }
-
-  outlookMap.forEach((features, probabilityKey) => {
-    if (probabilityKey === targetProbability) {
-      return;
-    }
-
-    const nextFeatures: Feature[] = [];
-    features.forEach((feature) => {
-      if (feature.id === movedFeatureId) {
-        return;
-      }
-
-      const featurePolygon = toPolygonFeature(feature);
-      if (!featurePolygon || !polygonsOverlap(featurePolygon, movedPolygon)) {
-        nextFeatures.push(feature);
-        return;
-      }
-
-      const remainder = subtractPolygon(featurePolygon, movedPolygon);
-      if (remainder) {
-        nextFeatures.push({
-          ...feature,
-          geometry: remainder.geometry,
-        });
-      }
-    });
-
-    setMapEntry(outlookMap, probabilityKey, nextFeatures);
-  });
-};
-
-/** Applies a paint-bucket strategy to one feature within an outlook probability map. */
+/** Applies a paint-bucket action to one feature within an outlook probability map. */
 export const applyPaintBucketStrategy = (
   outlookMap: Map<string, Feature[]>,
   request: PaintBucketEditRequest,
@@ -162,7 +89,7 @@ export const applyPaintBucketStrategy = (
 
   const { fromProbability, feature } = located;
   const targetProbability = resolveTargetProbability(
-    request.strategy,
+    request.action,
     fromProbability,
     request.activeProbability,
     request.probabilityList,
@@ -187,15 +114,6 @@ export const applyPaintBucketStrategy = (
       probability: targetProbability,
     },
   };
-
-  if (request.strategy === 'subtract-overlap') {
-    subtractMovedGeometryFromOtherKeys(
-      nextMap,
-      movedFeature,
-      request.featureId,
-      targetProbability,
-    );
-  }
 
   const targetFeatures = nextMap.get(targetProbability) ?? [];
   nextMap.set(targetProbability, [...targetFeatures, movedFeature]);

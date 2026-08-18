@@ -304,7 +304,7 @@ describe('forecastSlice undo/redo', () => {
       outlookType: 'tornado',
       featureId: 'bucket-feature',
       fromProbability: '5%',
-      strategy: 'recategorize',
+      action: 'recategorize',
       probabilityList: ['2%', '5%', '10%', '15%'],
     }));
 
@@ -339,7 +339,7 @@ describe('forecastSlice undo/redo', () => {
       outlookType: 'tornado',
       featureId,
       fromProbability: '2%',
-      strategy: 'recategorize',
+      action: 'recategorize',
       probabilityList: ['2%', '5%', '10%', '15%', 'CIG1', 'CIG2', 'CIG3'],
     }));
 

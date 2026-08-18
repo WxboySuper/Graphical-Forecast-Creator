@@ -317,12 +317,27 @@
   background-color: #047857;
 }
 
-.map-toolbar-button.mode-fill.active {
+.map-toolbar-button.mode-fill.active,
+.map-toolbar-button.mode-step.active {
   background-color: #2563eb;
 }
 
-.map-toolbar-button.mode-fill.active:hover {
+.map-toolbar-button.mode-fill.active:hover,
+.map-toolbar-button.mode-step.active:hover {
   background-color: #1d4ed8;
+}
+
+.map-toolbar-button.mode-assign.active {
+  background-color: #7c3aed;
+}
+
+.map-toolbar-button.mode-assign.active:hover {
+  background-color: #6d28d9;
+}
+
+.map-toolbar-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .map-toolbar-strategy select {

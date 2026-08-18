@@ -76,9 +76,9 @@ GFC stores outlook geometry as independent GeoJSON `Feature` polygons grouped in
 
 ## Recommended rollout
 
-1. **Prototype (this branch):** Options A, B, and C behind `paintBucketTool` feature flag (local only), selectable via toolbar strategy dropdown.
-2. **Beta candidate:** Ship Option A only after user testing; label tool "Fill" not "SPC outlook".
-3. **Defer:** Option D and combined prob+CIG bucket actions until product rules are defined.
+1. **Prototype (this branch):** Step + Assign modes behind `paintBucketTool` (local only).
+2. **Beta candidate:** Ship both modes after user testing.
+3. **Defer:** True region flood-fill and combined prob+CIG bucket actions until product rules are defined.
 
 ## Test plan
 
@@ -96,6 +96,21 @@ Manual QA:
 - Undo/redo restores geometry and keys
 - Auto-generated categorical remains read-only in fill mode
 - CIG layer: draw CIG2 hatch, bucket to CIG3
+
+## Prototype UX (local builds)
+
+Two first-class map toolbar modes replace the earlier strategy dropdown:
+
+| Mode | Purpose |
+|------|---------|
+| **Step** | Click to raise risk one level; Shift+click to lower. Core upgrade/downgrade workflow. |
+| **Assign** | Click to apply the **active** probability from the outlook panel / arrow keys. |
+
+Both modes are limited to **probabilistic outlook layers** (tornado, wind, hail, totalSevere, day4-8). Categorical outlooks disable the tools.
+
+Overlapping polygons: hit-testing selects the **highest-risk** feature at the click pixel so the top layer is edited.
+
+This is not a flood-fill tool — it only changes polygons that are already drawn.
 
 ## Prototype files
 

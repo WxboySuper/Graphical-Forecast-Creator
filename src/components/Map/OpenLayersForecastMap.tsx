@@ -87,12 +87,7 @@ import {
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { isFeatureExposed } from "../../config/featureExposure";
-import {
-  PAINT_BUCKET_STRATEGIES,
-  readPaintBucketStrategy,
-  writePaintBucketStrategy,
-  type PaintBucketStrategy,
-} from "../../utils/paintBucket";
+import { isPaintBucketOutlookType } from "../../utils/paintBucket";
 import { handlePaintBucketMapClick } from "./paintBucketMapInteraction";
 
 // OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
@@ -181,12 +176,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       serializedCustomFeatures,
     } = useForecastMapReduxState();
     const paintBucketEnabled = isFeatureExposed("paintBucketTool");
+    const paintBucketAvailable = paintBucketEnabled
+      && !customMode
+      && isPaintBucketOutlookType(drawingState.activeOutlookType);
     const [interactionMode, setInteractionMode] = useState<
-      "pan" | "draw" | "delete" | "fill"
+      "pan" | "draw" | "delete" | "step" | "assign"
     >("pan");
-    const [paintBucketStrategy, setPaintBucketStrategy] = useState<PaintBucketStrategy>(
-      () => readPaintBucketStrategy(),
-    );
 
     const [popupInfo, setPopupInfo] = useState<{
       outlookType: string;
@@ -203,7 +198,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const customModeRef = useRef(customMode);
     const drawingStateRef = useRef(drawingState);
     const currentDayRef = useRef(currentDay);
-    const paintBucketStrategyRef = useRef(paintBucketStrategy);
 
     useEffect(() => {
       interactionModeRef.current = interactionMode;
@@ -212,7 +206,15 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => { customModeRef.current = customMode; }, [customMode]);
     useEffect(() => { drawingStateRef.current = drawingState; }, [drawingState]);
     useEffect(() => { currentDayRef.current = currentDay; }, [currentDay]);
-    useEffect(() => { paintBucketStrategyRef.current = paintBucketStrategy; }, [paintBucketStrategy]);
+
+    useEffect(() => {
+      if (
+        (interactionMode === "step" || interactionMode === "assign")
+        && (!isPaintBucketOutlookType(drawingState.activeOutlookType) || customMode)
+      ) {
+        setInteractionMode("pan");
+      }
+    }, [customMode, drawingState.activeOutlookType, interactionMode]);
 
     useEffect(() => {
       currentMapViewRef.current = currentMapView;
@@ -446,19 +448,21 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       map.addOverlay(overlay);
       overlayRef.current = overlay;
 
-      // Add click handler for pan and fill modes.
+      // Add click handler for pan and paint-bucket modes.
       map.on("click", (evt) => {
         const mode = interactionModeRef.current;
-        if (mode === "fill" && paintBucketEnabled) {
+        if (
+          paintBucketEnabled
+          && (mode === "step" || mode === "assign")
+        ) {
           handlePaintBucketMapClick({
             map,
             pixel: evt.pixel,
             vectorLayer: vectorLayerRef.current,
-            catLayer: catLayerRef.current,
             dispatch,
             outlookType: drawingStateRef.current.activeOutlookType,
             currentDay: currentDayRef.current,
-            strategy: paintBucketStrategyRef.current,
+            mode,
             shiftKey: Boolean(evt.originalEvent.shiftKey),
           });
           return;
@@ -652,7 +656,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         selectRef.current.getFeatures().clear();
       }
 
-      const disableModify = interactionMode === "delete" || interactionMode === "fill";
+      const disableModify = interactionMode === "delete"
+        || interactionMode === "step"
+        || interactionMode === "assign";
       modifyRef.current?.setActive(!disableModify);
       catModifyRef.current?.setActive(!disableModify);
 
@@ -667,7 +673,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
     useEffect(() => {
       // Keep snapping enabled outside delete/fill modes for draw/modify workflows.
-      const enableSnap = interactionMode !== "delete" && interactionMode !== "fill";
+      const enableSnap = interactionMode !== "delete"
+        && interactionMode !== "step"
+        && interactionMode !== "assign";
       if (snapRef.current) {
         snapRef.current.setActive(enableSnap);
       }
@@ -1161,13 +1169,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       setInteractionMode("delete");
     };
 
-    const handleSetModeFill = () => {
-      setInteractionMode("fill");
+    const handleSetModeStep = () => {
+      setInteractionMode("step");
     };
 
-    const handlePaintBucketStrategyChange = (strategy: PaintBucketStrategy) => {
-      setPaintBucketStrategy(strategy);
-      writePaintBucketStrategy(strategy);
+    const handleSetModeAssign = () => {
+      setInteractionMode("assign");
     };
 
     return (
@@ -1203,31 +1210,32 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               Delete
             </button>
             {paintBucketEnabled && (
-              <button
-                type="button"
-                onClick={handleSetModeFill}
-                className={`map-toolbar-button mode-fill ${interactionMode === "fill" ? "active" : ""}`}
-                title="Fill polygons to active risk level"
-                aria-label="Fill polygons to active risk level"
-              >
-                Fill
-              </button>
-            )}
-            {paintBucketEnabled && interactionMode === "fill" && (
-              <label className="map-toolbar-strategy">
-                <span className="sr-only">Paint bucket strategy</span>
-                <select
-                  value={paintBucketStrategy}
-                  onChange={(event) => handlePaintBucketStrategyChange(event.target.value as PaintBucketStrategy)}
-                  aria-label="Paint bucket strategy"
+              <>
+                <button
+                  type="button"
+                  onClick={handleSetModeStep}
+                  disabled={!paintBucketAvailable}
+                  className={`map-toolbar-button mode-step ${interactionMode === "step" ? "active" : ""}`}
+                  title={paintBucketAvailable
+                    ? "Step risk up or down on existing polygons"
+                    : "Switch to a probabilistic outlook (tornado, wind, hail) to use Step"}
+                  aria-label="Step polygon risk"
                 >
-                  {PAINT_BUCKET_STRATEGIES.map((strategy) => (
-                    <option key={strategy} value={strategy}>
-                      {strategy}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  Step
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSetModeAssign}
+                  disabled={!paintBucketAvailable}
+                  className={`map-toolbar-button mode-assign ${interactionMode === "assign" ? "active" : ""}`}
+                  title={paintBucketAvailable
+                    ? "Apply the active risk level to a clicked polygon"
+                    : "Switch to a probabilistic outlook (tornado, wind, hail) to use Assign"}
+                  aria-label="Assign active risk to polygon"
+                >
+                  Assign
+                </button>
+              </>
             )}
             <span className="map-toolbar-divider" aria-hidden="true" />
             <button
@@ -1271,8 +1279,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               "Draw mode: click to place points, double-click to finish polygon."}
             {interactionMode === "delete" &&
               "Delete mode: click any polygon to remove it."}
-            {interactionMode === "fill" &&
-              `Fill mode (${paintBucketStrategy}): click a polygon to apply. Shift+click steps down. Active risk: ${drawingState.activeProbability}.`}
+            {interactionMode === "step" &&
+              "Step mode: click a polygon to raise its risk one level. Shift+click to lower."}
+            {interactionMode === "assign" &&
+              `Assign mode: click a polygon to apply the active risk (${drawingState.activeProbability}).`}
             {interactionMode === "pan" &&
               "Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details."}
           </div>

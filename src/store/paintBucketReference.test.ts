@@ -30,7 +30,7 @@ describe('paint bucket redux reference updates', () => {
       outlookType: 'tornado',
       featureId: 'test-id',
       fromProbability: '2%',
-      strategy: 'recategorize',
+      action: 'recategorize',
       probabilityList: ['2%', '5%', '10%', '15%'],
     }));
 

@@ -1,9 +1,13 @@
-import { resolveFillClickStrategy } from './paintBucketMapInteraction';
+import { resolvePaintBucketEditAction } from '../../utils/paintBucket/outlookScope';
 
-describe('paintBucketMapInteraction', () => {
-  test('shift-click forces step-down regardless of selected strategy', () => {
-    expect(resolveFillClickStrategy('recategorize', true)).toBe('step-down');
-    expect(resolveFillClickStrategy('subtract-overlap', true)).toBe('step-down');
-    expect(resolveFillClickStrategy('step-up', false)).toBe('step-up');
+describe('paintBucketMapInteraction helpers', () => {
+  test('assign mode ignores shift and always recategorizes', () => {
+    expect(resolvePaintBucketEditAction('assign', true)).toBe('recategorize');
+    expect(resolvePaintBucketEditAction('assign', false)).toBe('recategorize');
+  });
+
+  test('step mode uses shift for step-down', () => {
+    expect(resolvePaintBucketEditAction('step', false)).toBe('step-up');
+    expect(resolvePaintBucketEditAction('step', true)).toBe('step-down');
   });
 });

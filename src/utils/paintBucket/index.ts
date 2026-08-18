@@ -1,14 +1,12 @@
+export { applyPaintBucketStrategy, resolveTargetProbability } from './applyPaintBucketStrategy';
 export {
-  applyPaintBucketStrategy,
-  readPaintBucketStrategy,
-  resolveTargetProbability,
-  writePaintBucketStrategy,
-} from './applyPaintBucketStrategy';
+  isPaintBucketOutlookType,
+  resolvePaintBucketEditAction,
+} from './outlookScope';
 export {
-  PAINT_BUCKET_STRATEGIES,
-  PAINT_BUCKET_STRATEGY_STORAGE_KEY,
-  DEFAULT_PAINT_BUCKET_STRATEGY,
+  PAINT_BUCKET_MODES,
+  type PaintBucketEditAction,
   type PaintBucketEditRequest,
   type PaintBucketEditResult,
-  type PaintBucketStrategy,
+  type PaintBucketMode,
 } from './types';

@@ -1,14 +1,14 @@
-import type { Feature, Polygon } from 'geojson';
 import {
   applyPaintBucketStrategy,
   resolveTargetProbability,
 } from './applyPaintBucketStrategy';
+import { isPaintBucketOutlookType, resolvePaintBucketEditAction } from './outlookScope';
 
-const square = (id: string, probability: string, minX: number, minY: number, size: number): Feature<Polygon> => ({
-  type: 'Feature',
+const square = (id: string, probability: string, minX: number, minY: number, size: number) => ({
+  type: 'Feature' as const,
   id,
   geometry: {
-    type: 'Polygon',
+    type: 'Polygon' as const,
     coordinates: [[
       [minX, minY],
       [minX + size, minY],
@@ -23,7 +23,27 @@ const square = (id: string, probability: string, minX: number, minY: number, siz
   },
 });
 
-const buildMap = (entries: Array<[string, Feature[]]>) => new Map(entries);
+const buildMap = (entries: Array<[string, ReturnType<typeof square>[]]>) => new Map(entries);
+
+describe('resolvePaintBucketEditAction', () => {
+  test('step mode uses shift for step-down', () => {
+    expect(resolvePaintBucketEditAction('step', false)).toBe('step-up');
+    expect(resolvePaintBucketEditAction('step', true)).toBe('step-down');
+  });
+
+  test('assign mode always recategorizes', () => {
+    expect(resolvePaintBucketEditAction('assign', false)).toBe('recategorize');
+    expect(resolvePaintBucketEditAction('assign', true)).toBe('recategorize');
+  });
+});
+
+describe('isPaintBucketOutlookType', () => {
+  test('allows probabilistic outlook types only', () => {
+    expect(isPaintBucketOutlookType('tornado')).toBe(true);
+    expect(isPaintBucketOutlookType('wind')).toBe(true);
+    expect(isPaintBucketOutlookType('categorical')).toBe(false);
+  });
+});
 
 describe('resolveTargetProbability', () => {
   const list = ['2%', '5%', '10%', '15%'] as const;
@@ -52,7 +72,7 @@ describe('applyPaintBucketStrategy', () => {
       outlookType: 'tornado',
       featureId: 'a',
       fromProbability: '5%',
-      strategy: 'recategorize',
+      action: 'recategorize',
       activeProbability: '15%',
       probabilityList,
     });
@@ -71,38 +91,13 @@ describe('applyPaintBucketStrategy', () => {
       outlookType: 'tornado',
       featureId: 'a',
       fromProbability: '10%',
-      strategy: 'step-up',
+      action: 'step-up',
       activeProbability: '2%',
       probabilityList,
     });
 
     expect(result.map.get('15%')).toHaveLength(1);
     expect(result.map.get('10%')).toBeUndefined();
-  });
-
-  test('subtract-overlap clips overlapping lower-risk geometry', () => {
-    const lower = square('lower', '5%', 0, 0, 2);
-    const upper = square('upper', '10%', 0.5, 0.5, 1);
-    const map = buildMap([
-      ['5%', [lower]],
-      ['10%', [upper]],
-    ]);
-
-    const result = applyPaintBucketStrategy(map, {
-      outlookType: 'tornado',
-      featureId: 'upper',
-      fromProbability: '10%',
-      strategy: 'subtract-overlap',
-      activeProbability: '15%',
-      probabilityList,
-    });
-
-    expect(result.map.get('15%')).toHaveLength(1);
-    expect(result.map.get('10%')).toBeUndefined();
-
-    const remainingLower = result.map.get('5%')?.[0];
-    expect(remainingLower).toBeDefined();
-    expect(remainingLower?.geometry.type).toBe('Polygon');
   });
 
   test('returns unchanged map when target equals source', () => {
@@ -113,7 +108,7 @@ describe('applyPaintBucketStrategy', () => {
       outlookType: 'tornado',
       featureId: 'a',
       fromProbability: '10%',
-      strategy: 'recategorize',
+      action: 'recategorize',
       activeProbability: '10%',
       probabilityList,
     });

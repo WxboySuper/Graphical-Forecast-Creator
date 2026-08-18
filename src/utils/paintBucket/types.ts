@@ -1,28 +1,18 @@
 import type { OutlookType } from '../../types/outlooks';
 
-/** Prototype strategies for issue #623 — selectable in local builds for comparison. */
-export type PaintBucketStrategy =
-  | 'recategorize'
-  | 'step-up'
-  | 'step-down'
-  | 'subtract-overlap';
+/** First-class paint-bucket interaction modes exposed in the map toolbar. */
+export type PaintBucketMode = 'step' | 'assign';
 
-export const PAINT_BUCKET_STRATEGIES: readonly PaintBucketStrategy[] = [
-  'recategorize',
-  'step-up',
-  'step-down',
-  'subtract-overlap',
-] as const;
+export const PAINT_BUCKET_MODES: readonly PaintBucketMode[] = ['step', 'assign'] as const;
 
-export const PAINT_BUCKET_STRATEGY_STORAGE_KEY = 'gfc_paint_bucket_strategy';
-
-export const DEFAULT_PAINT_BUCKET_STRATEGY: PaintBucketStrategy = 'recategorize';
+/** Internal edit actions applied to one polygon feature. */
+export type PaintBucketEditAction = 'recategorize' | 'step-up' | 'step-down';
 
 export interface PaintBucketEditRequest {
   outlookType: OutlookType;
   featureId: string;
   fromProbability: string;
-  strategy: PaintBucketStrategy;
+  action: PaintBucketEditAction;
   activeProbability: string;
   probabilityList: readonly string[];
 }

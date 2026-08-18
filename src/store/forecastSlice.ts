@@ -20,7 +20,7 @@ import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionG
 import { cloneJsonValue } from './cloneJsonValue';
 import {
   applyPaintBucketStrategy,
-  type PaintBucketStrategy,
+  type PaintBucketEditAction,
 } from '../utils/paintBucket';
 
 export interface SavedCycleStats {
@@ -833,10 +833,10 @@ export const forecastSlice = createSlice({
       outlookType: OutlookType;
       featureId: string;
       fromProbability: string;
-      strategy: PaintBucketStrategy;
+      action: PaintBucketEditAction;
       probabilityList: readonly string[];
     }>) => {
-      const { outlookType, featureId, fromProbability, strategy, probabilityList } = action.payload;
+      const { outlookType, featureId, fromProbability, action: editAction, probabilityList } = action.payload;
       const outlookData = getCurrentOutlook(state);
       const outlookMap = outlookData[outlookType];
       if (!outlookMap) {
@@ -847,7 +847,7 @@ export const forecastSlice = createSlice({
         outlookType,
         featureId,
         fromProbability,
-        strategy,
+        action: editAction,
         activeProbability: state.drawingState.activeProbability,
         probabilityList,
       });
