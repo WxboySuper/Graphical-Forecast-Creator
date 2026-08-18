@@ -154,7 +154,7 @@ Shipped for hands-on evaluation in the forecast editor:
 | **Preview only** | Layers → `Preview only` | Cyan dashed overlay; Redux geometry unchanged |
 | **Mask strategy** | Layers → `Mask` dropdown | `Coast + lakes`, `Coast only`, `State union` |
 
-All modes default **off**. Controls live in **Layers → Base Map → Trim** (popover; toolbar height unchanged).
+All modes default **off**. Controls live in **Layers → Trim to land** (popover trigger; toolbar height unchanged).
 
 
 

@@ -817,8 +817,15 @@ const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController
             </button>
           );
         })}
-        <OutlookTrimPopover controller={controller} />
       </div>
+    </TabbedToolbarStripSection>
+
+    <TabbedToolbarStripSection
+      label="Trim to land"
+      hint="Optional"
+      className="tabbed-integrated-toolbar__section--trim w-[132px]"
+    >
+      <OutlookTrimPopover controller={controller} />
     </TabbedToolbarStripSection>
 
     <TabbedToolbarStripSection label="Layer Status" className="tabbed-integrated-toolbar__section--layer-status w-[250px]">
