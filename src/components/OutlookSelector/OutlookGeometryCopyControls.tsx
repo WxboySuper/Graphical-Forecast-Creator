@@ -3,6 +3,17 @@ import { Copy } from 'lucide-react';
 import type { ProbabilisticHazardType } from '../../utils/outlookGeometryCopy';
 import { Button } from '../ui/button';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -23,7 +34,6 @@ interface OutlookGeometryCopyControlsProps {
   canCopyProbabilityFrom: (sourceType: ProbabilisticHazardType) => boolean;
   onCopyAllFrom: (sourceType: ProbabilisticHazardType) => void;
   onCopyProbabilityFrom: (sourceType: ProbabilisticHazardType) => void;
-  compact?: boolean;
 }
 
 export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsProps> = memo(({
@@ -34,87 +44,71 @@ export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsPr
   canCopyProbabilityFrom,
   onCopyAllFrom,
   onCopyProbabilityFrom,
-  compact = false,
 }) => {
-  if (otherHazards.length === 0) {
+  const availableSources = otherHazards.filter(
+    (sourceType) => canCopyAllFrom(sourceType) || canCopyProbabilityFrom(sourceType),
+  );
+
+  if (availableSources.length === 0) {
     return null;
   }
 
   return (
     <TooltipProvider>
-      <div className={compact ? 'flex flex-col gap-2' : 'flex min-w-[220px] flex-col gap-2'}>
-        {!compact && (
-          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Match Geometry
-          </label>
-        )}
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="tabbed-integrated-toolbar__selection-toggle h-10 w-10 shrink-0 rounded-xl"
+                aria-label="Match geometry from another hazard"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Match geometry from another hazard</p>
+          </TooltipContent>
+        </Tooltip>
 
-        <div className={compact
-          ? 'flex flex-col gap-2'
-          : 'flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-2'}>
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              All levels
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="font-normal">
+            <span className="block text-sm font-semibold text-foreground">
+              Match to {hazardLabels[activeHazard]}
             </span>
-            <div className="flex flex-wrap gap-1">
-              {otherHazards.map((sourceType) => (
-                <Tooltip key={`all-${sourceType}`}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      disabled={!canCopyAllFrom(sourceType)}
-                      onClick={() => onCopyAllFrom(sourceType)}
-                      aria-label={`Copy all geometry from ${hazardLabels[sourceType]}`}
-                    >
-                      <Copy className="mr-1 h-3 w-3" />
-                      {hazardLabels[sourceType]}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      Replace all {hazardLabels[activeHazard]} polygons with geometry from {hazardLabels[sourceType]}.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-          </div>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Copy shapes from another hazard ({activeProbability} selected)
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {activeProbability} only
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {otherHazards.map((sourceType) => (
-                <Tooltip key={`prob-${sourceType}`}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      disabled={!canCopyProbabilityFrom(sourceType)}
-                      onClick={() => onCopyProbabilityFrom(sourceType)}
-                      aria-label={`Copy ${activeProbability} geometry from ${hazardLabels[sourceType]}`}
-                    >
-                      <Copy className="mr-1 h-3 w-3" />
-                      {hazardLabels[sourceType]}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      Copy only the {activeProbability} polygon from {hazardLabels[sourceType]} into {hazardLabels[activeHazard]}.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+          {availableSources.map((sourceType) => (
+            <DropdownMenuSub key={sourceType}>
+              <DropdownMenuSubTrigger>
+                From {hazardLabels[sourceType]}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  disabled={!canCopyAllFrom(sourceType)}
+                  onSelect={() => onCopyAllFrom(sourceType)}
+                >
+                  All levels
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!canCopyProbabilityFrom(sourceType)}
+                  onSelect={() => onCopyProbabilityFrom(sourceType)}
+                >
+                  {activeProbability} only
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </TooltipProvider>
   );
 });

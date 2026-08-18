@@ -170,24 +170,12 @@ export const OutlookSelectorPanel: React.FC = memo(() => {
             </div>
           </div>
 
-          {activeProbabilisticHazard && (
-            <OutlookGeometryCopyControls
-              activeHazard={activeProbabilisticHazard}
-              activeProbability={activeProbability}
-              otherHazards={otherProbabilisticHazards}
-              canCopyAllFrom={canCopyAllFrom}
-              canCopyProbabilityFrom={canCopyProbabilityFrom}
-              onCopyAllFrom={handleCopyAllGeometryFrom}
-              onCopyProbabilityFrom={handleCopyProbabilityGeometryFrom}
-            />
-          )}
-
           {/* Current Selection Preview + Shortcuts */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
               Current
             </label>
-            <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
               <div 
                 className="flex items-center justify-center px-4 py-2 rounded-md w-[240px] h-[36px]"
                 style={{ backgroundColor: currentColor }}
@@ -205,6 +193,17 @@ export const OutlookSelectorPanel: React.FC = memo(() => {
                   {isSignificant && significantThreatsEnabled && ' (Sig)'}
                 </span>
               </div>
+              {activeProbabilisticHazard && (
+                <OutlookGeometryCopyControls
+                  activeHazard={activeProbabilisticHazard}
+                  activeProbability={activeProbability}
+                  otherHazards={otherProbabilisticHazards}
+                  canCopyAllFrom={canCopyAllFrom}
+                  canCopyProbabilityFrom={canCopyProbabilityFrom}
+                  onCopyAllFrom={handleCopyAllGeometryFrom}
+                  onCopyProbabilityFrom={handleCopyProbabilityGeometryFrom}
+                />
+              )}
               <div className="text-[10px] text-center text-muted-foreground/70">
                 T/W/L/C • ↑↓
               </div>
