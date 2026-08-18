@@ -8,6 +8,7 @@ interface PackageChooserProps {
   renderCloudSource?: () => React.ReactNode;
 }
 
+/** Documents PackageChooser. */
 export const PackageChooser: React.FC<PackageChooserProps> = ({ availableSources, onFile, renderCloudSource }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const showCloud = availableSources.includes('cloud') && Boolean(renderCloudSource);
@@ -46,6 +47,7 @@ interface ReportDatePickerProps {
   onReportDateChange: (value: string) => void;
 }
 
+/** Documents ReportDatePicker. */
 export const ReportDatePicker: React.FC<ReportDatePickerProps> = ({
   useToday,
   reportDate,
@@ -83,6 +85,7 @@ interface GradeRunFooterProps {
   onRun: () => void;
 }
 
+/** Documents GradeRunFooter. */
 export const GradeRunFooter: React.FC<GradeRunFooterProps> = ({ tier, canRun, isRunning, error, onRun }) => (
   <div className="fg-grade-footer" aria-live="polite">
     <div className={`fg-run-status ${error ? 'fg-run-status--error' : ''}`}>

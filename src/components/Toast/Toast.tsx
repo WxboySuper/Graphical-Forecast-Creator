@@ -7,6 +7,7 @@ export interface ToastProps {
   onClose: () => void;
 }
 
+/** Documents Toast. */
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -29,6 +30,7 @@ export interface ToastManagerProps {
 }
 
 // Small wrapper to avoid inline arrow functions in parent JSX
+/** Documents ToastItem. */
 const ToastItem: React.FC<{ toast: { id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }; onDismiss: (id: string) => void }> = ({ toast, onDismiss }) => {
   const handleClose = useCallback(() => {
     onDismiss(toast.id);
@@ -37,6 +39,7 @@ const ToastItem: React.FC<{ toast: { id: string; message: string; type?: 'info' 
   return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
 };
 
+/** Documents ToastManager. */
 export const ToastManager: React.FC<ToastManagerProps> = ({ toasts, onDismiss }) => {
   return (
     <div className="toast-container" role="status" aria-live="polite" aria-atomic="false">

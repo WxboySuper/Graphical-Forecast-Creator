@@ -391,6 +391,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       // and may not render until updateSize() is called after layout stabilizes.
       const targetEl = mapElementRef.current;
       // Safely update the map size when flex/layout timing occurs incorrectly
+      /** Documents updateSizeSafely. */
       const updateSizeSafely = () => {
         try {
           map.updateSize();
@@ -1108,16 +1109,19 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     }, [tstmPreviewFeatures]);
 
     // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
+    /** Documents handleSetModePan. */
     const handleSetModePan = () => {
       setInteractionMode("pan");
     };
 
     // Draw mode allows users to draw new polygons on the map, which are then added to the Redux store and rendered on the map.
+    /** Documents handleSetModeDraw. */
     const handleSetModeDraw = () => {
       setInteractionMode("draw");
     };
 
     // Delete mode allows users to click on existing polygons to remove them from the map and the Redux store.
+    /** Documents handleSetModeDelete. */
     const handleSetModeDelete = () => {
       setInteractionMode("delete");
     };

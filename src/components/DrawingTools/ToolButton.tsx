@@ -11,6 +11,7 @@ interface ToolButtonProps {
   tooltipText?: React.ReactNode;
 }
 
+/** Documents ToolButton. */
 const ToolButton: React.FC<ToolButtonProps> = ({
   onClick,
   disabled,

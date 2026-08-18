@@ -14,6 +14,7 @@ interface DeleteConfirmationProps {
   onCancel: () => void;
 }
 
+/** Documents DeleteConfirmation. */
 const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ modalState, onConfirm, onCancel }) => {
   const { isOpen, outlookType, probability } = modalState;
   

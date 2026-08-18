@@ -3,6 +3,7 @@ import type { PackageGrade } from '../../utils/verificationV2';
 import { downloadDataUrl } from '../../utils/exportUtils';
 import { composeShareCard, shareCardFilename, shareSummaryText } from './shareCard';
 
+/** Documents canvasToBlob. */
 const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
   new Promise((resolve) => {
     if (canvas.toBlob) {
@@ -14,6 +15,7 @@ const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
 
 type ToastFn = (message: string, type?: 'info' | 'success' | 'error') => void;
 
+/** Documents buildShareCard. */
 const buildShareCard = async (
   pkg: PackageGrade,
   captureMap: () => Promise<HTMLImageElement | null>
@@ -24,6 +26,7 @@ const buildShareCard = async (
   return { canvas, blob: await canvasToBlob(canvas) };
 };
 
+/** Documents shareWithImage. */
 const shareWithImage = async (
   blob: Blob,
   pkg: PackageGrade,
@@ -37,6 +40,7 @@ const shareWithImage = async (
   return true;
 };
 
+/** Documents shareWithText. */
 const shareWithText = async (
   nav: Navigator & { canShare?: (data?: ShareData) => boolean },
   summary: string,
@@ -48,6 +52,7 @@ const shareWithText = async (
   return true;
 };
 
+/** Documents copyImageToClipboard. */
 const copyImageToClipboard = async (
   blob: Blob,
   clip: Clipboard,
@@ -65,6 +70,7 @@ const copyImageToClipboard = async (
   }
 };
 
+/** Documents download. */
 const download = async (
   pkg: PackageGrade,
   captureMap: () => Promise<HTMLImageElement | null>,
@@ -78,6 +84,7 @@ const download = async (
   downloadDataUrl(result.canvas.toDataURL('image/png'), shareCardFilename(pkg));
 };
 
+/** Documents share. */
 const share = async (
   pkg: PackageGrade,
   captureMap: () => Promise<HTMLImageElement | null>,
@@ -98,6 +105,7 @@ const share = async (
   addToast('Sharing is unavailable; try download.', 'info');
 };
 
+/** Documents copy. */
 const copy = async (
   pkg: PackageGrade,
   captureMap: () => Promise<HTMLImageElement | null>,
@@ -122,6 +130,7 @@ const copy = async (
   }
 };
 
+/** Documents withBusy. */
 const withBusy = async (
   setBusy: (v: boolean) => void,
   fn: () => Promise<void>,
@@ -139,6 +148,7 @@ const withBusy = async (
   }
 };
 
+/** Documents useShareCardActions. */
 export const useShareCardActions = (
   pkg: PackageGrade,
   captureMap: () => Promise<HTMLImageElement | null>,

@@ -109,20 +109,24 @@ const datColors = {
   EFU: '#f8fafc',
 };
 
+/** Documents datColorFor. */
 const datColorFor = (efScale: string | null | undefined): string => {
   const key = (efScale ?? '').toUpperCase() as keyof typeof datColors;
   return datColors[key] ?? '#fbbf24';
 };
 
+/** Documents buildDatTrackStyle. */
 const buildDatTrackStyle = () => new OlStyle({
   stroke: new StyleStroke({ color: '#fbbf24', width: 3 }),
 });
 
+/** Documents buildDatPolygonStyle. */
 const buildDatPolygonStyle = (efScale: string | null | undefined) => new OlStyle({
   fill: new StyleFill({ color: 'rgba(245, 158, 11, 0.16)' }),
   stroke: new StyleStroke({ color: datColorFor(efScale), width: 1.5 }),
 });
 
+/** Documents buildDatPointStyle. */
 const buildDatPointStyle = (efScale: string | null | undefined) => new OlStyle({
   image: new Circle({
     radius: 4,
@@ -132,6 +136,7 @@ const buildDatPointStyle = (efScale: string | null | undefined) => new OlStyle({
 });
 
 // Style function for storm reports
+/** Documents buildReportStyle. */
 const buildReportStyle = (type: ReportType) => {
   return new OlStyle({
     image: new Circle({
@@ -207,6 +212,7 @@ const createVerificationLabelOverlaySource = (
 };
 
 // Function to create tile source based on selected base map style for verification map
+/** Documents createVerifTileSource. */
 export const createVerifTileSource = (
   style: Exclude<BaseMapStyle, "blank">,
 ): OSM | XYZ => {
@@ -249,6 +255,7 @@ export const createVerifTileSource = (
 };
 
 // Function to create a hatch pattern for CIG overlays based on the CIG level
+/** Documents createHatchPattern. */
 export const createHatchPattern = (cigLevel: string): CanvasPattern | null => {
   const canvas = document.createElement("canvas");
   const size = 10;
@@ -362,6 +369,7 @@ export const buildCigStyleParts = (probability: string) => {
 };
 
 // Utility function to convert hex or named colors to RGBA format with specified alpha for OpenLayers styles
+/** Documents toRgbaColor. */
 export const toRgbaColor = ({ color, alpha }: ColorWithOpacity): string => {
   if (!color) {
     return `rgba(255,255,255,${alpha})`;
@@ -411,6 +419,7 @@ export const createStandardStroke = ({
 };
 
 // Function to build OpenLayers style for a given feature based on its outlook type and probability,
+/** Documents buildStyle. */
 export const buildStyle = ({
   outlookType,
   probability,
@@ -445,6 +454,7 @@ export const buildStyle = ({
 };
 
 // Sub-component for the base map style-picker dropdown in the verification map.
+/** Documents VerifMapStylePicker. */
 const VerifMapStylePicker: React.FC<{
   baseMapStyle: BaseMapStyle;
   onSelect: (e: React.MouseEvent<HTMLButtonElement>) => void;
@@ -495,6 +505,7 @@ const VerifMapStylePickerButton: React.FC<{
   </div>
 );
 
+/** Documents VerifMapLegendToggleButton. */
 export const VerifMapLegendToggleButton: React.FC<{
   mobileOpen: boolean;
   onToggle: () => void;
@@ -662,6 +673,7 @@ const OpenLayersVerificationMap = forwardRef<
     // As with the forecast map, ensure we recover if the target container is 0x0 at mount.
     const targetEl = mapElementRef.current;
     // Same with the forecast map, update the map safely when timing occurs incorrectly
+    /** Documents updateSizeSafely. */
     const updateSizeSafely = () => {
       try {
         map.updateSize();
@@ -1015,11 +1027,13 @@ const OpenLayersVerificationMap = forwardRef<
   }, [activeOutlookType, datEvidence, datVisible]);
 
   // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
+  /** Documents handleToggleStylePicker. */
   const handleToggleStylePicker = () => {
     setShowStylePicker((v) => !v);
   };
 
   // Handle selection of a base map style from the style picker, updating the Redux store and hiding the picker.
+  /** Documents handleBaseMapStyleSelect. */
   const handleBaseMapStyleSelect = (e: React.MouseEvent<HTMLButtonElement>) => {
     const style = e.currentTarget.dataset.style as BaseMapStyle | undefined;
     if (!style) {

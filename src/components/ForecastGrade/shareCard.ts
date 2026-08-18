@@ -24,6 +24,7 @@ export const shareSummaryText = (pkg: PackageGrade): string => {
 const CARD_WIDTH = 1200;
 const CARD_HEIGHT = 630;
 
+/** Documents letterColor. */
 const letterColor = (letter: string | null): string => {
   switch (letter) {
     case 'A':
@@ -41,6 +42,7 @@ const letterColor = (letter: string | null): string => {
   }
 };
 
+/** Documents drawMapHero. */
 const drawMapHero = (
   ctx: CanvasRenderingContext2D,
   mapImage: HTMLImageElement | null,
@@ -70,6 +72,7 @@ const drawMapHero = (
   }
 };
 
+/** Documents drawGradeOverlay. */
 const drawGradeOverlay = (
   ctx: CanvasRenderingContext2D,
   pkg: PackageGrade,

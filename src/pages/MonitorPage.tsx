@@ -51,6 +51,7 @@ interface PageContext {
   addToast: AddToastFn;
 }
 
+/** Documents buildMonitorReferenceAttributions. */
 export const buildMonitorReferenceAttributions = ({
   enabled,
   meta,
@@ -98,6 +99,7 @@ const resolveHandoffSource = (
   return undefined;
 };
 
+/** Documents useMonitorPageSources. */
 const useMonitorPageSources = ({
   dispatch,
   searchParams,
@@ -151,6 +153,7 @@ const useMonitorPageSources = ({
   };
 };
 
+/** Documents useMonitorPageLayers. */
 const useMonitorPageLayers = ({ settings, addToast }: {
   settings: MonitorSettings;
   addToast: AddToastFn;
@@ -228,6 +231,7 @@ interface MonitorPageWorkspaceProps {
   dispatch: AppDispatch;
 }
 
+/** Documents MonitorPageWorkspace. */
 const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
   settings,
   outlookOptions,

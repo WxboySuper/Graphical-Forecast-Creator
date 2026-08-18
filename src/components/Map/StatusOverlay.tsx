@@ -4,6 +4,7 @@ import { RootState } from '../../store';
 import { selectIsLowProbability } from '../../store/forecastSlice';
 import './StatusOverlay.css';
 
+/** Documents StatusOverlay. */
 const StatusOverlay: React.FC = () => {
   const isLow = useSelector(selectIsLowProbability);
   const activeOutlook = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);

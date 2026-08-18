@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import { OutlookType } from '../../types/outlooks';
 import { removeFeature } from '../../store/forecastSlice';
 
+/** Documents useOutlookLayersState. */
 export const useOutlookLayersState = () => {
   const dispatch = useDispatch();
   const [deleteModal, setDeleteModal] = React.useState<{

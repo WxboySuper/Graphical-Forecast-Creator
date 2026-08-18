@@ -8,6 +8,7 @@ interface ExportFormProps {
   onCancel: () => void;
 }
 
+/** Documents ExportForm. */
 const ExportForm: React.FC<ExportFormProps> = ({ title, onTitleChange, onCancel }) => (
   <>
     <label htmlFor="export-filename" className="sr-only">Image Title (optional)</label>
@@ -43,6 +44,7 @@ interface ExportModalProps {
   onCancel: () => void;
 }
 
+/** Documents ExportModal. */
 const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onConfirm, onCancel }) => {
   const [title, setTitle] = useState('');
   const { setModalRef } = useModalFocusTrap({ active: isOpen, onClose: onCancel });

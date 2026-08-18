@@ -162,6 +162,7 @@ const DropdownMenuSeparator = React.forwardRef<
 ));
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
+/** Documents DropdownMenuShortcut. */
 const DropdownMenuShortcut = ({
   className,
   ...props

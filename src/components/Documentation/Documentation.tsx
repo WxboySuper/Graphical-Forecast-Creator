@@ -10,6 +10,7 @@ interface DocumentationProps {
   onClose?: () => void;
 }
 
+/** Documents Documentation. */
 const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
   return (
     <div className="documentation">

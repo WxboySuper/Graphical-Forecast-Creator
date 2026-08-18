@@ -23,19 +23,23 @@ import { trackProductEvent } from '../../lib/productAnalytics';
 
 const colors = ['#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#3b82f6'];
 const colorChoices = ['#22c55e', '#0ea5e9', '#2563eb', '#a855f7', '#ef4444', '#f97316', '#eab308', '#64748b'];
+/** Documents isHexColor. */
 const isHexColor = (value: string): boolean => /^#[0-9a-f]{6}$/i.test(value);
+/** Documents hexToHsv. */
 const hexToHsv = (hex: string) => {
   const rgb = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
   const [r, g, b] = rgb; const max = Math.max(r, g, b); const min = Math.min(r, g, b); const delta = max - min;
   const hue = delta === 0 ? 0 : ((max === r ? (g - b) / delta : max === g ? 2 + (b - r) / delta : 4 + (r - g) / delta) * 60 + 360) % 360;
   return { hue, saturation: max === 0 ? 0 : delta / max, value: max };
 };
+/** Documents hsvToHex. */
 const hsvToHex = (hue: number, saturation: number, value: number) => {
   const chroma = value * saturation; const segment = hue / 60; const x = chroma * (1 - Math.abs(segment % 2 - 1));
   const [r, g, b] = segment < 1 ? [chroma, x, 0] : segment < 2 ? [x, chroma, 0] : segment < 3 ? [0, chroma, x] : segment < 4 ? [0, x, chroma] : segment < 5 ? [x, 0, chroma] : [chroma, 0, x];
   return `#${[r, g, b].map((channel) => Math.round((channel + value - chroma) * 255).toString(16).padStart(2, '0')).join('')}`;
 };
 
+/** Documents makeCategory. */
 const makeCategory = (order: number): CustomCategoryTemplate => ({
   id: `category-${uuidv4()}` as CustomCategoryTemplate['id'],
   label: `Category ${order + 1}`,
@@ -50,6 +54,7 @@ const makeCategory = (order: number): CustomCategoryTemplate => ({
   },
 });
 
+/** Documents makeLayer. */
 const makeLayer = (order: number): OneOffCustomLayer => {
   const now = new Date().toISOString();
   return {
@@ -64,10 +69,12 @@ const makeLayer = (order: number): OneOffCustomLayer => {
   };
 };
 
+/** Documents IconButton. */
 const IconButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string }> = ({ label, children, ...props }) => (
   <button type="button" aria-label={label} title={label} className="custom-draw-panel__icon-button" {...props}>{children}</button>
 );
 
+/** Documents MenuPicker. */
 const MenuPicker = ({
   label,
   options,
@@ -103,6 +110,7 @@ const MenuPicker = ({
   );
 };
 
+/** Documents FillColorPicker. */
 const FillColorPicker = ({
   color,
   onChange,
@@ -114,12 +122,15 @@ const FillColorPicker = ({
   const [draft, setDraft] = useState(color);
   const [hsv, setHsv] = useState(() => hexToHsv(color));
   useEffect(() => { setDraft(color); setHsv(hexToHsv(color)); }, [color]);
+  /** Documents commit. */
   const commit = (value: string) => {
     if (!isHexColor(value)) return;
     onChange(value.toLowerCase());
     setOpen(false);
   };
+  /** Documents updateHsv. */
   const updateHsv = (next: typeof hsv) => { setHsv(next); const nextColor = hsvToHex(next.hue, next.saturation, next.value); setDraft(nextColor); onChange(nextColor); };
+  /** Documents updatePlane. */
   const updatePlane = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     updateHsv({ ...hsv, saturation: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)), value: 1 - Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)) });
@@ -145,6 +156,7 @@ const FillColorPicker = ({
   </Popover>;
 };
 
+/** Documents CustomLayerTitleInput. */
 const CustomLayerTitleInput: React.FC<{ layer: OneOffCustomLayer }> = ({ layer }) => {
   const dispatch = useDispatch();
   const [draft, setDraft] = useState(layer.label);
@@ -156,12 +168,14 @@ const CustomLayerTitleInput: React.FC<{ layer: OneOffCustomLayer }> = ({ layer }
   }} />;
 };
 
+/** Documents CustomLayerActionRow. */
 const CustomLayerActionRow: React.FC<{
   layers: OneOffCustomLayer[];
   activeLayer?: OneOffCustomLayer;
 }> = ({ layers, activeLayer }) => {
   const dispatch = useDispatch();
   const layerOptions = layers.map((layer) => ({ id: layer.id, label: layer.label }));
+  /** Documents addLayer. */
   const addLayer = () => {
     dispatch(addCustomLayer(makeLayer(layers.length)));
     trackProductEvent('custom_layer_created', { layer_count: layers.length + 1 });
@@ -178,6 +192,7 @@ const CustomLayerActionRow: React.FC<{
   </div>;
 };
 
+/** Documents CustomLayerSection. */
 const CustomLayerSection: React.FC<{
   layers: OneOffCustomLayer[];
   activeLayer?: OneOffCustomLayer;
@@ -189,6 +204,7 @@ const CustomLayerSection: React.FC<{
   );
 };
 
+/** Documents CustomCategorySections. */
 const CustomCategorySections: React.FC<{
   layer: OneOffCustomLayer;
   categories: CustomCategoryTemplate[];
@@ -197,6 +213,7 @@ const CustomCategorySections: React.FC<{
   const dispatch = useDispatch();
   const [labelDraft, setLabelDraft] = useState(activeCategory.label);
   useEffect(() => setLabelDraft(activeCategory.label), [activeCategory.id, activeCategory.label]);
+  /** Documents updateCategory. */
   const updateCategory = (changes: Omit<Partial<CustomCategoryTemplate>, 'style'> & { style?: Partial<CustomCategoryTemplate['style']> }) => dispatch(updateCustomCategory({
     layerId: layer.id,
     category: { ...activeCategory, ...changes, style: { ...activeCategory.style, ...changes.style } },
@@ -228,6 +245,7 @@ const CustomCategorySections: React.FC<{
   </>;
 };
 
+/** Documents CustomDrawPanel. */
 const CustomDrawPanel: React.FC = () => {
   const collection = useSelector(selectCurrentCustomLayers);
   const editor = useSelector((state: RootState) => state.forecast.customEditor);

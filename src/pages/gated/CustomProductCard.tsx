@@ -17,6 +17,7 @@ interface Props {
   onUse(): void;
 }
 
+/** Documents DeleteAction. */
 const DeleteAction = ({ pending, onDelete }: { pending: boolean; onDelete(): void }) => {
   const [confirming, setConfirming] = useState(false);
   if (!confirming) {
@@ -31,6 +32,7 @@ const DeleteAction = ({ pending, onDelete }: { pending: boolean; onDelete(): voi
   );
 };
 
+/** Documents ProductActions. */
 const ProductActions = ({ product, premiumActive, pending, onEdit, onDuplicate, onStatus, onDelete, onUse }: Props) => {
   const active = product.status === 'active';
   if (isBuiltInCustomProduct(product)) {
@@ -53,6 +55,7 @@ const ProductActions = ({ product, premiumActive, pending, onEdit, onDuplicate, 
   );
 };
 
+/** Documents CustomProductCard. */
 const CustomProductCard = (props: Props) => {
   const { product } = props;
   const builtIn = isBuiltInCustomProduct(product);

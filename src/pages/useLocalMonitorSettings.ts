@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { readStoredMonitorSettings, writeStoredMonitorSettings } from '../monitor/storage';
 import type { MonitorSettings } from '../monitor/types';
 
+/** Documents useLocalMonitorSettings. */
 export const useLocalMonitorSettings = (settings: MonitorSettings) => {
   const dispatch = useDispatch<AppDispatch>();
   const { syncedSettings } = useAuth();

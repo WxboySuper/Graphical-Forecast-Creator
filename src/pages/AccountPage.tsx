@@ -664,6 +664,7 @@ const useAccountDeletionAction = (usesPassword: boolean) => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const canDelete = canSubmitAccountDeletion(confirmation, usesPassword, password);
 
+  /** Documents handleDelete. */
   const handleDelete = async () => {
     setDeleting(true);
     setDeleteError(null);

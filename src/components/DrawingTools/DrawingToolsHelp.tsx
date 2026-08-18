@@ -6,6 +6,7 @@ interface DrawingToolsHelpProps {
   isSaved: boolean;
 }
 
+/** Documents DrawingToolsHelp. */
 const DrawingToolsHelp: React.FC<DrawingToolsHelpProps> = ({
   isExportDisabled,
   isSaveLoadDisabled,
