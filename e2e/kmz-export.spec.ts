@@ -87,24 +87,29 @@ const seedForecastSession = async (page: import('@playwright/test').Page) => {
   }, { payload: forecastData });
 };
 
-const openToolsTab = async (page: import('@playwright/test').Page) => {
+const openTransferExport = async (page: import('@playwright/test').Page) => {
   await page.getByRole('tab', { name: 'Tools' }).click();
-  await expect(page.getByRole('button', { name: 'KMZ day', exact: true })).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: 'Import / Export', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import / Export Forecast' })).toBeVisible({ timeout: 10000 });
+  await page.getByRole('tab', { name: 'Export' }).click();
 };
 
-test.describe('KMZ export prototype', () => {
+test.describe('Forecast transfer modal', () => {
   test.beforeEach(async ({ page }) => {
     await prepareAppState(page);
     await seedForecastSession(page);
     await page.goto('/forecast?localBetaBypass=true');
     await acceptAgreementsIfPresent(page);
     await expect(page.locator('.map-container')).toBeVisible({ timeout: 15000 });
-    await openToolsTab(page);
+    await openTransferExport(page);
   });
 
   test('downloads a current-day KMZ with outlook placemarks', async ({ page }) => {
+    await page.locator('#transfer-format').selectOption('kmz');
+    await page.locator('#transfer-scope').selectOption('current-day');
+
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'KMZ day', exact: true }).click();
+    await page.getByRole('button', { name: 'Download' }).click();
     const download = await downloadPromise;
 
     expect(download.suggestedFilename()).toMatch(/gfc-day-1-.*\.kmz$/);
@@ -126,8 +131,11 @@ test.describe('KMZ export prototype', () => {
   });
 
   test('downloads a full-cycle KMZ containing every populated day', async ({ page }) => {
+    await page.locator('#transfer-format').selectOption('kmz');
+    await page.locator('#transfer-scope').selectOption('cycle');
+
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'KMZ cycle', exact: true }).click();
+    await page.getByRole('button', { name: 'Download' }).click();
     const download = await downloadPromise;
 
     expect(download.suggestedFilename()).toMatch(/gfc-cycle-.*\.kmz$/);
@@ -142,13 +150,13 @@ test.describe('KMZ export prototype', () => {
     expect(docKml).toContain('<name>Wind 30%</name>');
   });
 
-  test('supports the split-kmz strategy via localStorage override', async ({ page }) => {
-    await page.evaluate(() => {
-      localStorage.setItem('gfc-kmz-export-strategy', 'split-kmz');
-    });
+  test('supports the split-kmz layout strategy in the transfer modal', async ({ page }) => {
+    await page.locator('#transfer-format').selectOption('kmz');
+    await page.locator('#transfer-scope').selectOption('cycle');
+    await page.locator('#transfer-kml-strategy').selectOption('split');
 
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'KMZ cycle', exact: true }).click();
+    await page.getByRole('button', { name: 'Download' }).click();
     const download = await downloadPromise;
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
