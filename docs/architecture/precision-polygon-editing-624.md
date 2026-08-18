@@ -15,7 +15,7 @@ Vertex editing uses the existing Pan mode and outlook-panel tier selection — n
 
 ## Implementation
 
-- `OpenLayersForecastMap.tsx` — `Modify` filter matches `drawingState.activeProbability` or active custom category; vertex `deleteCondition`; help text in map toolbar
+- `OpenLayersForecastMap.tsx` — `Modify` filter matches `drawingState.activeProbability` or active custom category; vertex `deleteCondition`; one-line Pan help on map toolbar
 - `precisionPolygonEditHandler.ts` — `modifyend` dispatches `updateFeaturesBatch` for one undo step per gesture
 - `forecastSlice.ts` — `updateFeaturesBatch` reducer
 
