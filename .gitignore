@@ -75,4 +75,3 @@ night-watch.config.json
 /server/local-auth.js
 /server/local-users.json
 /server/pnpm-lock.yaml
-*.mp4
