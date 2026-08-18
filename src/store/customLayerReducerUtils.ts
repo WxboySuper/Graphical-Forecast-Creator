@@ -4,7 +4,7 @@ import { cloneJsonValue } from './cloneJsonValue';
 import { DIRECT_REDUCER_TIMESTAMP } from './timestampMiddleware';
 
 /** Clone custom-layer payloads without JSON coercion or browser-only APIs. */
-export const cloneCustomValue = cloneJsonValue;
+export const cloneCustomValue = <T>(value: T): T => cloneJsonValue(value, true);
 
 export const getCurrentCustomLayers = (state: ForecastState) =>
   state.forecastCycle.days[state.forecastCycle.currentDay]?.customLayers;

@@ -12,6 +12,8 @@ describe('cloneCustomValue', () => {
 
     expect(clone).toEqual(value);
     expect(clone).not.toBe(value);
+    expect('optional' in clone).toBe(true);
+    expect(Number.isNaN(clone.numbers[0])).toBe(true);
     expect(clone.nested).not.toBe(value.nested);
   });
 

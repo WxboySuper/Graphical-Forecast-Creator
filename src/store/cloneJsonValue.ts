@@ -5,21 +5,26 @@
  *
  * @internal Shared by forecast history code and its opt-in performance test.
  */
-export const cloneJsonValue = <T>(value: T): T => {
+export const cloneJsonValue = <T>(value: T, preserveDangerousKeys = false): T => {
   if (Array.isArray(value)) {
-    return value.map((item) => cloneJsonValue(item)) as T;
+    return value.map((item) => cloneJsonValue(item, preserveDangerousKeys)) as T;
   }
 
   if (value && typeof value === 'object') {
     const objectValue = value as Record<string, unknown>;
     const clonedObject: Record<string, unknown> = {};
     Object.keys(objectValue).forEach((key) => {
-      Object.defineProperty(clonedObject, key, {
-        configurable: true,
-        enumerable: true,
-        value: cloneJsonValue(objectValue[key]),
-        writable: true,
-      });
+      const clonedValue = cloneJsonValue(objectValue[key], preserveDangerousKeys);
+      if (preserveDangerousKeys) {
+        Object.defineProperty(clonedObject, key, {
+          configurable: true,
+          enumerable: true,
+          value: clonedValue,
+          writable: true,
+        });
+      } else {
+        clonedObject[key] = clonedValue;
+      }
     });
     return clonedObject as T;
   }
