@@ -141,12 +141,21 @@ describe('EntitlementProvider', () => {
     });
   });
 
-  test('openCheckout rejects when hosted auth is disabled', async () => {
+  const expectCheckoutBlocked = async ({
+    hostedAuthEnabled,
+    localTestAccount,
+    expectedMessage,
+  }: {
+    hostedAuthEnabled: boolean;
+    localTestAccount: 'premium' | null;
+    expectedMessage: string;
+  }) => {
     (useAuth as jest.Mock).mockReturnValue({
-      hostedAuthEnabled: false,
+      hostedAuthEnabled,
       status: 'signed_in',
       user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
     });
+    (readLocalTestAccount as jest.Mock).mockReturnValue(localTestAccount);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ billingEnabled: true, checkoutEnabled: true }),
@@ -157,34 +166,27 @@ describe('EntitlementProvider', () => {
     });
 
     await act(async () => {
-      await expect(result.current.openCheckout('monthly')).rejects.toThrow(
-        'Billing is not available on this deployment yet.'
-      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
+    await expect(result.current.openCheckout('monthly')).rejects.toThrow(expectedMessage);
     expect(global.fetch).not.toHaveBeenCalledWith('/api/billing/checkout', expect.any(Object));
+  };
+
+  test('openCheckout rejects when hosted auth is disabled', async () => {
+    await expectCheckoutBlocked({
+      hostedAuthEnabled: false,
+      localTestAccount: null,
+      expectedMessage: 'Billing is not available on this deployment yet.',
+    });
+    expect(global.fetch).toHaveBeenCalledWith('/api/billing/config');
   });
 
   test('openCheckout rejects for local test accounts', async () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    await expectCheckoutBlocked({
       hostedAuthEnabled: true,
-      status: 'signed_in',
-      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
+      localTestAccount: 'premium',
+      expectedMessage: 'Billing is unavailable for local test accounts.',
     });
-    (readLocalTestAccount as jest.Mock).mockReturnValue('premium');
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ billingEnabled: true, checkoutEnabled: true }),
-    });
-
-    const { result } = renderHook(() => useEntitlement(), {
-      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
-    });
-
-    await act(async () => {
-      await expect(result.current.openCheckout('monthly')).rejects.toThrow(
-        'Billing is unavailable for local test accounts.'
-      );
-    });
-    expect(global.fetch).not.toHaveBeenCalledWith('/api/billing/checkout', expect.any(Object));
+    expect(global.fetch).toHaveBeenCalledWith('/api/billing/config');
   });
 });
