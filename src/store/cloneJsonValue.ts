@@ -15,7 +15,7 @@ export const cloneJsonValue = <T>(value: T, preserveDangerousKeys = false): T =>
     const clonedObject: Record<string, unknown> = {};
     Object.keys(objectValue).forEach((key) => {
       const clonedValue = cloneJsonValue(objectValue[key], preserveDangerousKeys);
-      if (preserveDangerousKeys) {
+      if (preserveDangerousKeys || key === '__proto__') {
         Object.defineProperty(clonedObject, key, {
           configurable: true,
           enumerable: true,
