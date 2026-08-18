@@ -19,7 +19,6 @@ import {
   Upload,
   Wrench,
   PackageOpen,
-  Scissors,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -49,8 +48,7 @@ const getGhostLayerColor = (type: OutlookType) => getOutlookColor({ outlookType:
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
 import CustomProductsDialog from './CustomProductsDialog';
-import { OUTLOOK_TRIM_STRATEGY_OPTIONS } from '../../utils/outlookPolygonMasking/outlookTrimStrategyLabels';
-import type { LandMaskStrategy } from '../../utils/outlookPolygonMasking/types';
+import OutlookTrimPopover from './OutlookTrimPopover';
 import type { RootState } from '../../store';
 import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
@@ -819,57 +817,7 @@ const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController
             </button>
           );
         })}
-      </div>
-    </TabbedToolbarStripSection>
-
-    <TabbedToolbarStripSection
-      label="Trim prototype"
-      hint="Issue #619"
-      className="tabbed-integrated-toolbar__section--trim-prototype min-w-[520px] flex-1"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
-          <span>Mask</span>
-          <select
-            className="h-10 rounded-xl border border-border/80 bg-background px-2 text-xs"
-            value={controller.outlookTrimStrategy}
-            onChange={(event) =>
-              controller.onOutlookTrimStrategyChange(event.target.value as LandMaskStrategy)
-            }
-            aria-label="Land mask strategy"
-          >
-            {OUTLOOK_TRIM_STRATEGY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="flex h-10 items-center gap-2 rounded-xl border border-border/80 bg-background px-3 text-xs font-semibold">
-          <input
-            type="checkbox"
-            checked={controller.outlookTrimAutoOnDraw}
-            onChange={controller.onToggleOutlookTrimAutoOnDraw}
-            aria-label="Auto-trim on draw"
-          />
-          Auto on draw
-        </label>
-        <label className="flex h-10 items-center gap-2 rounded-xl border border-border/80 bg-background px-3 text-xs font-semibold">
-          <input
-            type="checkbox"
-            checked={controller.outlookTrimPreviewOnly}
-            onChange={controller.onToggleOutlookTrimPreviewOnly}
-            aria-label="Preview trim only"
-          />
-          Preview only
-        </label>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 rounded-xl text-xs font-semibold"
-          onClick={() => void controller.onTrimCurrentDayOutlooks()}
-          disabled={controller.isTrimmingOutlooks}
-        >
-          Trim day now
-        </Button>
+        <OutlookTrimPopover controller={controller} />
       </div>
     </TabbedToolbarStripSection>
 
@@ -974,16 +922,6 @@ const getTabbedToolbarActionItems = (
     description: 'Reopen saved sessions',
     icon: <History className="h-4 w-4" />,
     onClick: controller.onOpenHistoryModal,
-    tone: 'utility',
-    accentClass: 'bg-cyan-500/15 text-cyan-700',
-  },
-  {
-    key: 'trim-land',
-    label: 'Trim land',
-    description: 'Trim current day outlooks to land (prototype)',
-    icon: <Scissors className="h-4 w-4" />,
-    onClick: () => void controller.onTrimCurrentDayOutlooks(),
-    disabled: controller.isTrimmingOutlooks,
     tone: 'utility',
     accentClass: 'bg-cyan-500/15 text-cyan-700',
   },
