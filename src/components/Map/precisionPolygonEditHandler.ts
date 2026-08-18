@@ -5,23 +5,17 @@ import type { Feature as GeoJsonFeature } from 'geojson';
 import type { AppDispatch } from '../../store';
 import {
   updateCustomFeature,
-  updateFeature,
   updateFeaturesBatch,
 } from '../../store/forecastSlice';
 import {
   toUpdatedCustomFeature,
   toUpdatedGeoJsonFeature,
 } from './openLayersMapStyles';
-import {
-  shouldBatchModifyUndo,
-  type PrecisionEditPrototype,
-} from './precisionPolygonEditing';
 
 interface DispatchModifyUpdatesInput {
   features: OLFeature<Geometry>[];
   format: GeoJSON;
   isCategorical: boolean;
-  prototype: PrecisionEditPrototype;
   dispatch: AppDispatch;
 }
 
@@ -30,7 +24,6 @@ export const dispatchModifyUpdates = ({
   features,
   format,
   isCategorical,
-  prototype,
   dispatch,
 }: DispatchModifyUpdatesInput): void => {
   const updatedOutlookFeatures: GeoJsonFeature[] = [];
@@ -57,12 +50,5 @@ export const dispatchModifyUpdates = ({
     return;
   }
 
-  if (shouldBatchModifyUndo(prototype)) {
-    dispatch(updateFeaturesBatch({ features: updatedOutlookFeatures }));
-    return;
-  }
-
-  for (const outlookFeature of updatedOutlookFeatures) {
-    dispatch(updateFeature({ feature: outlookFeature }));
-  }
+  dispatch(updateFeaturesBatch({ features: updatedOutlookFeatures }));
 };

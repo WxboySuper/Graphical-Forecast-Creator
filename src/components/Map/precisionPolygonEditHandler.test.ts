@@ -26,7 +26,7 @@ describe('precisionPolygonEditHandler', () => {
     mockedToOutlook.mockReset();
   });
 
-  it('batches outlook updates when the combined prototype is active', () => {
+  it('batches outlook geometry updates into one undo step', () => {
     mockedToCustom.mockReturnValue(null);
     mockedToOutlook.mockReturnValue({
       type: 'Feature',
@@ -40,7 +40,6 @@ describe('precisionPolygonEditHandler', () => {
       features: [createFeatureStub(), createFeatureStub()],
       format: {} as never,
       isCategorical: false,
-      prototype: 'combined',
       dispatch,
     });
 
@@ -48,29 +47,6 @@ describe('precisionPolygonEditHandler', () => {
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       type: 'forecast/updateFeaturesBatch',
     });
-  });
-
-  it('dispatches separate updateFeature actions in baseline mode', () => {
-    mockedToCustom.mockReturnValue(null);
-    mockedToOutlook.mockReturnValue({
-      type: 'Feature',
-      id: 'feature-1',
-      geometry: { type: 'Polygon', coordinates: [] },
-      properties: { outlookType: 'tornado', probability: '2%' },
-    });
-
-    const dispatch = jest.fn();
-    dispatchModifyUpdates({
-      features: [createFeatureStub(), createFeatureStub()],
-      format: {} as never,
-      isCategorical: false,
-      prototype: 'baseline',
-      dispatch,
-    });
-
-    expect(dispatch).toHaveBeenCalledTimes(2);
-    expect(dispatch.mock.calls[0][0]).toMatchObject({ type: 'forecast/updateFeature' });
-    expect(dispatch.mock.calls[1][0]).toMatchObject({ type: 'forecast/updateFeature' });
   });
 
   it('skips auto-generated categorical features', () => {
@@ -87,7 +63,6 @@ describe('precisionPolygonEditHandler', () => {
       features: [createFeatureStub({ derivedFrom: 'auto-generated' })],
       format: {} as never,
       isCategorical: true,
-      prototype: 'baseline',
       dispatch,
     });
 
