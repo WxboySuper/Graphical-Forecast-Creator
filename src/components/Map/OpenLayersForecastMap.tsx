@@ -1176,7 +1176,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       <div className="map-container" translate="no">
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
         <div className="map-toolbar-bottom-right">
-          <div className="map-toolbar-surface">
+          <div
+            className={`map-toolbar-surface${
+              interactionMode === "edit" && paintBucketAvailable ? " map-toolbar-surface--edit-active" : ""
+            }`}
+          >
             <button
               type="button"
               className={`map-toolbar-button mode-pan ${interactionMode === "pan" ? "active" : ""}`}

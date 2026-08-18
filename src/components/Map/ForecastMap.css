@@ -196,6 +196,10 @@
   padding: 6px;
 }
 
+.map-toolbar-surface.map-toolbar-surface--edit-active {
+  width: min(520px, calc(100vw - 16px));
+}
+
 .map-toolbar-help-surface {
   width: 100%;
   max-width: none;
@@ -327,6 +331,7 @@
 
 .map-toolbar-edit-toggle {
   display: inline-flex;
+  flex: 0 0 auto;
   align-self: stretch;
   border: 1px solid var(--border-color, #d1d5db);
   border-radius: 6px;
