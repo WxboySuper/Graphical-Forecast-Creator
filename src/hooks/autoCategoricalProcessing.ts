@@ -31,7 +31,7 @@ export const toDerivationErrorMessage = (error: unknown, fallback: string): stri
   return fallback;
 };
 
-export function processOutlooksToCategorical(outlooks: OutlookData, day: number = 1): GeoJSON.Feature[] {
+export function processOutlooksToCategorical(outlooks: OutlookData, day = 1): GeoJSON.Feature[] {
   if (day === 1 || day === 2) {
     return processDay12OutlooksToCategorical(outlooks);
   } else if (day === 3) {
