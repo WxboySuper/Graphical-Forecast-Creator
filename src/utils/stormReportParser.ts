@@ -11,6 +11,9 @@ export const SPC_YESTERDAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/r
 const archiveUrlForDate = (date: string): string =>
   `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
 
+const isValidCalendarDate = (date: Date, year: number, month: number, day: number): boolean =>
+  [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
+
 /**
  * Parses archived *_rpts_raw.csv storm report text.
  */
@@ -125,7 +128,7 @@ export function parseReportDate(dateStr: string, referenceDate = new Date()): Da
   const month = parseInt(dateStr.slice(2, 4), 10) - 1;
   const day = parseInt(dateStr.slice(4, 6), 10);
   const parsedDate = new Date(year, month, day);
-  if (parsedDate.getFullYear() !== year || parsedDate.getMonth() !== month || parsedDate.getDate() !== day) {
+  if (!isValidCalendarDate(parsedDate, year, month, day)) {
     return new Date(Number.NaN);
   }
 
