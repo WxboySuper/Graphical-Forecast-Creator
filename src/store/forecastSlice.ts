@@ -788,6 +788,69 @@ export const forecastSlice = createSlice({
       }
     },
 
+    /** Applies multiple geometry updates from one map gesture with a single undo step. */
+    updateFeaturesBatch: (state, action: PayloadAction<{ features: Feature[] }>) => {
+      const incoming = action.payload.features;
+      if (incoming.length === 0) {
+        return;
+      }
+
+      const outlookData = getCurrentOutlook(state);
+      const pendingUpdates: Array<{
+        outlookType: OutlookType;
+        probability: string;
+        index: number;
+        feature: Feature;
+      }> = [];
+
+      for (const feature of incoming) {
+        const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
+        const probability = (feature.properties?.probability as string) || state.drawingState.activeProbability;
+        const outlookMap = outlookData[outlookType];
+        if (!outlookMap) {
+          continue;
+        }
+
+        const features = outlookMap.get(probability);
+        if (!features) {
+          continue;
+        }
+
+        const index = features.findIndex((entry) => entry.id === feature.id);
+        if (index === -1) {
+          continue;
+        }
+
+        pendingUpdates.push({ outlookType, probability, index, feature });
+      }
+
+      if (pendingUpdates.length === 0) {
+        return;
+      }
+
+      pushUndoSnapshot(state);
+
+      for (const update of pendingUpdates) {
+        const outlookMap = outlookData[update.outlookType];
+        const features = outlookMap?.get(update.probability);
+        if (!features) {
+          continue;
+        }
+
+        features[update.index] = {
+          ...features[update.index],
+          geometry: update.feature.geometry,
+          properties: {
+            ...features[update.index].properties,
+            ...update.feature.properties,
+          },
+        };
+      }
+
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
     removeFeature: (state, action: PayloadAction<{
       outlookType: OutlookType,
       probability: string,
@@ -1495,6 +1558,7 @@ export const {
   removeCustomFeature,
   addFeature,
   updateFeature,
+  updateFeaturesBatch,
   removeFeature,
   resetCategorical,
   setOutlookMap,

@@ -15,13 +15,15 @@ import VectorSource from "ol/source/Vector";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import GeoJSON from "ol/format/GeoJSON";
+import Collection from "ol/Collection";
 import { Draw, Modify, Select, Snap } from "ol/interaction";
 import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
+import type MapBrowserEvent from "ol/MapBrowserEvent";
 import type { FeatureLike } from "ol/Feature";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
-import { click } from "ol/events/condition";
+import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { v4 as uuidv4 } from "uuid";
 import { Redo2, Undo2 } from "lucide-react";
 import {
@@ -32,7 +34,6 @@ import {
   redoLastEdit,
   setMapView,
   undoLastEdit,
-  updateFeature,
   updateCustomFeature,
 } from "../../store/forecastSlice";
 
@@ -86,6 +87,17 @@ import {
   type FeatureSyncDescriptor,
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
+import { dispatchModifyUpdates } from "./precisionPolygonEditHandler";
+import PrecisionEditPrototypePicker, {
+  usePrecisionEditPrototype,
+} from "./PrecisionEditPrototypePicker";
+import {
+  getActiveTierFilterHelpSuffix,
+  getPanModeHelpText,
+  shouldFilterModifyByActiveTier,
+  shouldShowVertexDeletionHints,
+  shouldUseHoverTargetCollection,
+} from "./precisionPolygonEditing";
 
 // OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
 // https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
@@ -171,6 +183,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       serializedFeatures,
       serializedCustomFeatures,
     } = useForecastMapReduxState();
+    const { prototype: precisionEditPrototype, setPrototype: setPrecisionEditPrototype } =
+      usePrecisionEditPrototype();
     const [interactionMode, setInteractionMode] = useState<
       "pan" | "draw" | "delete"
     >("pan");
@@ -188,12 +202,23 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const overlayRef = useRef<Overlay | null>(null);
     const interactionModeRef = useRef(interactionMode);
     const customModeRef = useRef(customMode);
+    const activeProbabilityRef = useRef(drawingState.activeProbability);
+    const precisionEditPrototypeRef = useRef(precisionEditPrototype);
+    const hoverModifyCollectionRef = useRef(new Collection<OLFeature<Geometry>>());
 
     useEffect(() => {
       interactionModeRef.current = interactionMode;
     }, [interactionMode]);
 
     useEffect(() => { customModeRef.current = customMode; }, [customMode]);
+
+    useEffect(() => {
+      activeProbabilityRef.current = drawingState.activeProbability;
+    }, [drawingState.activeProbability]);
+
+    useEffect(() => {
+      precisionEditPrototypeRef.current = precisionEditPrototype;
+    }, [precisionEditPrototype]);
 
     useEffect(() => {
       currentMapViewRef.current = currentMapView;
@@ -455,46 +480,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         }
       });
 
-      const modify = new Modify({ source: vectorSourceRef.current });
-
-      modify.on("modifyend", (event) => {
-        const format = new GeoJSON();
-        event.features.forEach((feature) => {
-          const customFeature = toUpdatedCustomFeature(feature, format);
-          if (customFeature) {
-            dispatch(updateCustomFeature(customFeature));
-            return;
-          }
-          const updatedFeature = toUpdatedGeoJsonFeature(
-            feature,
-            format,
-            false,
-          );
-          if (updatedFeature) {
-            dispatch(updateFeature({ feature: updatedFeature }));
-          }
-        });
-      });
-      map.addInteraction(modify);
-      modifyRef.current = modify;
-
-      // Separate modify interaction for categorical layer to handle its unique properties
+      // Probabilistic modify interaction is attached in a dedicated effect so research
+      // prototypes (#624) can swap between source-wide and hover-target editing.
       // and to prevent accidental edits of auto-generated categorical features.
       const catModify = new Modify({ source: catSourceRef.current });
       catModify.on("modifyend", (event) => {
-        const format = new GeoJSON();
-        event.features.forEach((feature) => {
-          const derivedFrom = feature.get("derivedFrom") as string | undefined;
-          if (derivedFrom !== "auto-generated") {
-            const updatedFeature = toUpdatedGeoJsonFeature(
-              feature,
-              format,
-              true,
-            );
-            if (updatedFeature) {
-              dispatch(updateFeature({ feature: updatedFeature }));
-            }
-          }
+        dispatchModifyUpdates({
+          features: event.features.getArray() as OLFeature<Geometry>[],
+          format: new GeoJSON(),
+          isCategorical: true,
+          prototype: precisionEditPrototypeRef.current,
+          dispatch,
         });
       });
       map.addInteraction(catModify);
@@ -606,6 +602,104 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         vectorLayerRef.current = null;
       };
     }, [dispatch]);
+
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map) {
+        return undefined;
+      }
+
+      const format = new GeoJSON();
+      const prototype = precisionEditPrototype;
+      const hoverCollection = hoverModifyCollectionRef.current;
+      hoverCollection.clear();
+
+      let pointerMoveHandler: ((event: MapBrowserEvent<PointerEvent>) => void) | undefined;
+
+      if (shouldUseHoverTargetCollection(prototype)) {
+        pointerMoveHandler = (event) => {
+          if (event.dragging || interactionModeRef.current !== "pan") {
+            return;
+          }
+
+          const vectorLayer = vectorLayerRef.current;
+          if (!vectorLayer) {
+            return;
+          }
+
+          const features = map.getFeaturesAtPixel(event.pixel, {
+            layerFilter: (layer) => layer === vectorLayer,
+          });
+          const topFeature = features[0] as OLFeature<Geometry> | undefined;
+          if (
+            topFeature &&
+            (hoverCollection.getLength() === 0 || hoverCollection.item(0) !== topFeature)
+          ) {
+            hoverCollection.clear();
+            hoverCollection.push(topFeature);
+          }
+        };
+
+        // OpenLayers Map typings omit `pointermove` even though it is supported at runtime.
+        // @ts-expect-error pointermove is valid on OL Map but missing from the typed event union.
+        map.on("pointermove", pointerMoveHandler);
+      }
+
+      const modifyOptions: ConstructorParameters<typeof Modify>[0] =
+        shouldUseHoverTargetCollection(prototype)
+          ? {
+              features: hoverCollection,
+              ...(shouldShowVertexDeletionHints(prototype)
+                ? {
+                    deleteCondition: (event) =>
+                      singleClick(event) &&
+                      (altKeyOnly(event) || shiftKeyOnly(event)),
+                  }
+                : {}),
+            }
+          : {
+              source: vectorSourceRef.current,
+              ...(shouldFilterModifyByActiveTier(prototype)
+                ? {
+                    filter: (feature) =>
+                      feature.get("probability") === activeProbabilityRef.current,
+                  }
+                : {}),
+              ...(shouldShowVertexDeletionHints(prototype)
+                ? {
+                    deleteCondition: (event) =>
+                      singleClick(event) &&
+                      (altKeyOnly(event) || shiftKeyOnly(event)),
+                  }
+                : {}),
+            };
+
+      const modify = new Modify(modifyOptions);
+      modify.on("modifyend", (event) => {
+        dispatchModifyUpdates({
+          features: event.features.getArray() as OLFeature<Geometry>[],
+          format,
+          isCategorical: false,
+          prototype: precisionEditPrototypeRef.current,
+          dispatch,
+        });
+      });
+
+      map.addInteraction(modify);
+      modifyRef.current = modify;
+
+      return () => {
+        if (pointerMoveHandler) {
+          // @ts-expect-error pointermove is valid on OL Map but missing from the typed event union.
+          map.un("pointermove", pointerMoveHandler);
+        }
+        map.removeInteraction(modify);
+        if (modifyRef.current === modify) {
+          modifyRef.current = null;
+        }
+        hoverCollection.clear();
+      };
+    }, [dispatch, precisionEditPrototype]);
 
     useEffect(() => {
       if (!selectRef.current) {
@@ -1196,9 +1290,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               "Draw mode: click to place points, double-click to finish polygon."}
             {interactionMode === "delete" &&
               "Delete mode: click any polygon to remove it."}
-            {interactionMode === "pan" &&
-              "Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details."}
+            {interactionMode === "pan" && (
+              <>
+                {getPanModeHelpText(precisionEditPrototype)}
+                {getActiveTierFilterHelpSuffix(precisionEditPrototype)}
+              </>
+            )}
           </div>
+          <PrecisionEditPrototypePicker
+            value={precisionEditPrototype}
+            onChange={setPrecisionEditPrototype}
+          />
         </div>
         <Legend desktopOpen={showDesktopLegend} mobileOpen={showMobileLegend} showReportLegend={false} />
         <button
