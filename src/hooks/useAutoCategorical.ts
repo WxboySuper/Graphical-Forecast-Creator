@@ -20,11 +20,11 @@ const getGeometryId = (geometry: GeoJSON.Geometry | null): number => {
 };
 
 /**
- * Builds a signature without serializing or sorting every polygon geometry.
+ * Builds a signature without serializing every polygon geometry.
  * Redux replaces changed features, so object identity is enough to detect an
- * edit while preserving the map's existing iteration order.
+ * edit. Sorting the small identity-token strings preserves order independence.
  */
-const signatureFromOutlookMap = (
+export const signatureFromOutlookMap = (
   outlookType: string,
   outlookMap?: Map<string, GeoJSON.Feature[]>
 ): string => {
@@ -52,6 +52,7 @@ const signatureFromOutlookMap = (
       const probability = String(feature.properties?.probability || '');
       return `${sourceType}:${probability}:${getGeometryId(feature.geometry)}`;
     })
+    .sort()
     .join('|');
 };
 
