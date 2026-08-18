@@ -9,6 +9,7 @@ import {
   getCategoricalRiskDisplayName,
   getOutlookColor,
 } from './outlookUtils';
+import type { CIGLevel } from '../types/outlooks';
 
 describe('outlookUtils extra', () => {
   test('getOutlookConstraints returns correct sets for days', () => {
@@ -59,7 +60,7 @@ describe('outlookUtils extra', () => {
     };
 
     for (const [probability, risks] of Object.entries(expected)) {
-      for (const [index, cig] of ['CIG0', 'CIG1', 'CIG2'].entries()) {
+      for (const [index, cig] of (['CIG0', 'CIG1', 'CIG2'] as CIGLevel[]).entries()) {
         expect(totalSevereToCategorical({ probability, cig })).toBe(risks[index]);
       }
     }
