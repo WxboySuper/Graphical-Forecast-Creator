@@ -17,7 +17,7 @@ import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 const EMPTY_LOW_PROBABILITY_OUTLOOKS: OutlookType[] = [];
 const EMPTY_OUTLOOKS = {} as OutlookData;
-const EMPTY_OUTLOOK_OPACITIES = {} as Record<OutlookType, number>;
+const EMPTY_OUTLOOK_OPACITIES: Partial<Record<OutlookType, number>> = {};
 
 /** Helper to create ghost outlook handlers outside the hook to reduce hook length. */
 function createGhostOutlookHandlers(
