@@ -12,6 +12,7 @@ export interface NwsAlertFeatureCollection extends FeatureCollection {
   }>;
 }
 
+/** Documents classifyNwsAlert. */
 export const classifyNwsAlert = (event: string): NwsAlertCategory => {
   const normalized = event.trim().toLowerCase();
   if (normalized.includes('watch')) {
@@ -29,6 +30,7 @@ export const classifyNwsAlert = (event: string): NwsAlertCategory => {
   return 'other';
 };
 
+/** Documents filterNwsAlertCollection. */
 export const filterNwsAlertCollection = (
   collection: NwsAlertFeatureCollection,
   options: {
@@ -73,6 +75,7 @@ const alertColors: Record<NwsAlertCategory, { fill: string; stroke: string }> = 
   other: { fill: 'rgba(148, 163, 184, 0.18)', stroke: 'rgba(71, 85, 105, 0.85)' },
 };
 
+/** Documents buildNwsAlertStyle. */
 export const buildNwsAlertStyle = (event: string): Style => {
   const category = classifyNwsAlert(event);
   const colors = alertColors[category];
@@ -83,6 +86,7 @@ export const buildNwsAlertStyle = (event: string): Style => {
   });
 };
 
+/** Documents fetchActiveNwsAlerts. */
 export const fetchActiveNwsAlerts = async (): Promise<NwsAlertFeatureCollection> => {
   const response = await fetch(NWS_ACTIVE_ALERTS_URL, {
     headers: {
@@ -102,6 +106,7 @@ export const fetchActiveNwsAlerts = async (): Promise<NwsAlertFeatureCollection>
   };
 };
 
+/** Documents snapshotCollectionKey. */
 export const snapshotCollectionKey = (collection: NwsAlertFeatureCollection): string =>
   collection.features
     .map((feature) => {

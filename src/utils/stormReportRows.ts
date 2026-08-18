@@ -36,6 +36,7 @@ export const TODAY_SECTION_HEADERS: ReadonlyArray<TodaySectionHeader> = (
   type,
 }));
 
+/** Documents parseStormReportRow. */
 const parseStormReportRow = (
   line: string,
   type: ReportType,
@@ -64,6 +65,7 @@ const parseStormReportRow = (
   };
 };
 
+/** Documents parseTodayCsvRow. */
 export const parseTodayCsvRow = (line: string, type: ReportType): StormReport | null => {
   const { rowHeaders } = TODAY_SECTION_DESCRIPTORS[type];
 
@@ -77,6 +79,7 @@ export const parseTodayCsvRow = (line: string, type: ReportType): StormReport | 
   });
 };
 
+/** Documents parseArchiveCsvRow. */
 export const parseArchiveCsvRow = (
   line: string,
   type: ReportType,

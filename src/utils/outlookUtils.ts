@@ -77,6 +77,7 @@ type CategoricalConversion = {
   rules: readonly CategoricalRule[];
 };
 
+/** Documents categorizeProbability. */
 const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
   const normalizedProbability = probability.replace(/[#]/g, '%');
   return rules.find((rule) =>
@@ -177,6 +178,7 @@ type AvailableProbabilities = {
   hail?: HailProbability;
 };
 
+/** Documents getHighestCategoricalRisk. */
 export function getHighestCategoricalRisk({
   tornado: tornadoProb,
   wind: windProb,
@@ -237,6 +239,7 @@ type OutlookColorInput = {
   probability: string;
 };
 
+/** Documents getOutlookColor. */
 export function getOutlookColor({ outlookType, probability }: OutlookColorInput): string {
   if (outlookType in colorMappings) {
     const typeColors = colorMappings[outlookType as keyof typeof colorMappings];

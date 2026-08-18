@@ -10,6 +10,7 @@ export interface GridEvaluation {
   cellCount: number;
 }
 
+/** Documents roundTo. */
 export const roundTo = (value: number, digits = 3): number => {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -47,6 +48,7 @@ export const evaluateGrid = (
   };
 };
 
+/** Documents isGradableEvaluation. */
 export const isGradableEvaluation = (evaluation: GridEvaluation): boolean => {
   if (evaluation.cellCount <= 0) {
     return false;

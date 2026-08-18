@@ -11,6 +11,7 @@ import type { RootState } from '../store';
 import { addCustomLayer, setCustomEditorMode } from '../store/forecastSlice';
 import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
 
+/** Documents restoreWithError. */
 const restoreWithError = (message: string, addToast: AddToastFn, layer: Parameters<typeof restoreCustomProductForecastHandoff>[0]) => {
   restoreCustomProductForecastHandoff(layer);
   addToast(message, 'error');

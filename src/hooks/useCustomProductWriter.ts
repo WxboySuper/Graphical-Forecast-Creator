@@ -9,6 +9,7 @@ export type RunCustomProductWrite = (
   requiresPremium?: boolean,
 ) => Promise<boolean>;
 
+/** Documents mutationError. */
 const mutationError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to update custom products.';
 

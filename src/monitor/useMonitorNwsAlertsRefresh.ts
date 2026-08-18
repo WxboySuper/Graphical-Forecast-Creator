@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { fetchActiveNwsAlerts, snapshotCollectionKey, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
 
+/** Documents appendSnapshotFrame. */
 const appendSnapshotFrame = (
   current: NwsAlertFeatureCollection[],
   collection: NwsAlertFeatureCollection,
@@ -23,6 +24,7 @@ interface MonitorNwsAlertsRefreshOptions {
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
 }
 
+/** Documents useMonitorNwsAlertsRefresh. */
 export const useMonitorNwsAlertsRefresh = ({
   enabled,
   animationEnabled,

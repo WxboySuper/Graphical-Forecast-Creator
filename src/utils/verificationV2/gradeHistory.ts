@@ -22,10 +22,13 @@ export const accountScope = (tier: GradeAccountTier, userId?: string): string | 
   return `user:${userId}`;
 };
 
+/** Documents cardsKey. */
 const cardsKey = (scope: string): string => `${CARDS_PREFIX}:${scope}`;
+/** Documents snapshotKey. */
 const snapshotKey = (scope: string, cardId: string): string =>
   `${SNAPSHOT_PREFIX}:${scope}:${cardId}`;
 
+/** Documents safeStorage. */
 const safeStorage = (): Storage | null => {
   try {
     return typeof window !== 'undefined' ? window.localStorage : null;

@@ -13,6 +13,7 @@ export interface NwsAlertDetails {
   detailUrl: string | null;
 }
 
+/** Documents readString. */
 const readString = (value: unknown): string | null => {
   if (typeof value !== 'string') {
     return null;
@@ -21,6 +22,7 @@ const readString = (value: unknown): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+/** Documents resolveNwsAlertDetailUrl. */
 export const resolveNwsAlertDetailUrl = (properties: Record<string, unknown>): string | null => {
   const candidates = ['@id', 'id', 'uri'];
   for (const key of candidates) {
@@ -32,6 +34,7 @@ export const resolveNwsAlertDetailUrl = (properties: Record<string, unknown>): s
   return null;
 };
 
+/** Documents formatNwsAlertTime. */
 export const formatNwsAlertTime = (value: string | null): string | null => {
   if (!value) {
     return null;
@@ -51,6 +54,7 @@ export const formatNwsAlertTime = (value: string | null): string | null => {
   });
 };
 
+/** Documents parseNwsAlertProperties. */
 export const parseNwsAlertProperties = (
   properties: Record<string, unknown>,
 ): NwsAlertDetails => {
@@ -75,6 +79,7 @@ export const parseNwsAlertProperties = (
   };
 };
 
+/** Documents parseNwsAlertFromOlProperties. */
 export const parseNwsAlertFromOlProperties = (
   properties: Record<string, unknown>,
 ): NwsAlertDetails | null => {

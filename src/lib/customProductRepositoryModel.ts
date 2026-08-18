@@ -11,6 +11,7 @@ import {
 } from './customProducts';
 import type { CustomProductDraft } from './customProductsRepository';
 
+/** Documents normalizeCustomProductCategories. */
 export const normalizeCustomProductCategories = (
   categories: CustomCategoryTemplate[],
 ): CustomCategoryTemplate[] => categories.map((category, order) => ({
@@ -19,11 +20,13 @@ export const normalizeCustomProductCategories = (
   style: { ...category.style },
 }));
 
+/** Documents descriptionFields. */
 const descriptionFields = (description?: string) => {
   const trimmed = description?.trim();
   return trimmed ? { description: trimmed } : {};
 };
 
+/** Documents assertValidProduct. */
 const assertValidProduct = (product: HostedCustomProduct): HostedCustomProduct => {
   if (!isHostedCustomProduct(product)) {
     throw new Error('Product name, description, or categories are invalid.');
@@ -31,6 +34,7 @@ const assertValidProduct = (product: HostedCustomProduct): HostedCustomProduct =
   return product;
 };
 
+/** Documents createHostedProduct. */
 export const createHostedProduct = ({
   id,
   userId,
@@ -54,6 +58,7 @@ export const createHostedProduct = ({
   updatedAt: now,
 });
 
+/** Documents reviseProduct. */
 export const reviseProduct = (
   product: HostedCustomProduct,
   draft: CustomProductDraft,
@@ -69,11 +74,13 @@ export const reviseProduct = (
   return assertValidProduct(revised);
 };
 
+/** Documents sortProducts. */
 export const sortProducts = (products: HostedCustomProduct[]) => [...products].sort((left, right) => {
   if (left.status !== right.status) return left.status === 'active' ? -1 : 1;
   return left.label.localeCompare(right.label);
 });
 
+/** Documents assertExpectedVersion. */
 export const assertExpectedVersion = (
   current: HostedCustomProduct,
   expected: HostedCustomProduct,

@@ -7,30 +7,38 @@ import {
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const HATCH_PATTERNS = new Set(['none', 'diagonal', 'reverse-diagonal', 'crosshatch']);
 
+/** Documents isRecord. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+/** Documents hasOnlyKeys. */
 const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
   Object.keys(value).every((key) => keys.includes(key));
 
+/** Documents isBoundedText. */
 const isBoundedText = (value: unknown): value is string =>
   typeof value === 'string'
   && value.trim() === value
   && value.length > 0
   && value.length <= CUSTOM_PRODUCT_LIMITS.labelLength;
 
+/** Documents isUnitInterval. */
 const isUnitInterval = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 
+/** Documents isNonNegativeInteger. */
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 
+/** Documents isHexColor. */
 const isHexColor = (value: unknown): value is string =>
   typeof value === 'string' && HEX_COLOR.test(value);
 
+/** Documents isStrokeWidth. */
 const isStrokeWidth = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8;
 
+/** Documents isHatchPattern. */
 const isHatchPattern = (value: unknown): boolean =>
   typeof value === 'string' && HATCH_PATTERNS.has(value);
 

@@ -16,6 +16,7 @@ interface UseMonitorStormReportsArgs {
   addToast: AddToastFn;
 }
 
+/** Documents useMonitorStormReports. */
 export const useMonitorStormReports = ({
   enabled,
   filterTornado,

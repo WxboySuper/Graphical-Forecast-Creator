@@ -7,6 +7,7 @@ interface StormReportFilters {
   filterHail: boolean;
 }
 
+/** Documents isTypeEnabled. */
 const isTypeEnabled = (type: ReportType, filters: StormReportFilters): boolean => {
   if (type === 'tornado') {
     return filters.filterTornado;
@@ -17,6 +18,7 @@ const isTypeEnabled = (type: ReportType, filters: StormReportFilters): boolean =
   return filters.filterHail;
 };
 
+/** Documents filterVisibleStormReports. */
 export const filterVisibleStormReports = (
   reports: StormReport[],
   filters: StormReportFilters,

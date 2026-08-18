@@ -12,8 +12,10 @@ import {
 const LOCAL_LIBRARY_PREFIX = 'gfc-local-custom-products';
 const localSubscribers = new Map<string, Set<(products: HostedCustomProduct[]) => void>>();
 const localMutationQueues = new Map<string, Promise<void>>();
+/** Documents localKey. */
 const localKey = (userId: string) => `${LOCAL_LIBRARY_PREFIX}:${userId}`;
 
+/** Documents readProducts. */
 const readProducts = (userId: string): HostedCustomProduct[] => {
   try {
     const parsed = JSON.parse(localStorage.getItem(localKey(userId)) ?? '[]') as unknown;
@@ -24,10 +26,12 @@ const readProducts = (userId: string): HostedCustomProduct[] => {
   }
 };
 
+/** Documents writeProducts. */
 const writeProducts = (userId: string, products: HostedCustomProduct[]): void => {
   localStorage.setItem(localKey(userId), JSON.stringify(sortProducts(products)));
 };
 
+/** Documents withFallbackLock. */
 const withFallbackLock = async <T>(lockName: string, operation: () => T | Promise<T>): Promise<T> => {
   const previous = localMutationQueues.get(lockName) ?? Promise.resolve();
   let release!: () => void;
@@ -43,6 +47,7 @@ const withFallbackLock = async <T>(lockName: string, operation: () => T | Promis
   }
 };
 
+/** Documents withMutationLock. */
 const withMutationLock = <T>(userId: string, operation: () => T | Promise<T>): Promise<T> => {
   const lockName = `${LOCAL_LIBRARY_PREFIX}:${userId}:mutation`;
   return globalThis.navigator?.locks
@@ -55,11 +60,13 @@ interface MutationResult<T> {
   value: T;
 }
 
+/** Documents emitProducts. */
 function emitProducts(userId: string): void {
   const products = readProducts(userId);
   localSubscribers.get(userId)?.forEach((subscriber) => subscriber(products));
 }
 
+/** Documents mutateProducts. */
 const mutateProducts = <T>(
   userId: string,
   mutation: (products: HostedCustomProduct[]) => MutationResult<T>,
@@ -72,6 +79,7 @@ const mutateProducts = <T>(
   return result.value;
 });
 
+/** Documents expectedProduct. */
 const expectedProduct = (
   products: HostedCustomProduct[],
   expected: HostedCustomProduct,
@@ -82,16 +90,19 @@ const expectedProduct = (
   return current;
 };
 
+/** Documents replaceProduct. */
 const replaceProduct = (
   products: HostedCustomProduct[],
   replacement: HostedCustomProduct,
 ): HostedCustomProduct[] => products.map((product) => product.id === replacement.id ? replacement : product);
 
+/** Documents subscribeToLocalProducts. */
 const subscribeToLocalProducts: CustomProductsRepository['subscribe'] = (userId, onUpdate) => {
   const subscribers = localSubscribers.get(userId) ?? new Set();
   subscribers.add(onUpdate);
   localSubscribers.set(userId, subscribers);
   onUpdate(readProducts(userId));
+  /** Documents handleStorage. */
   const handleStorage = (event: StorageEvent) => {
     if (event.key === localKey(userId)) onUpdate(readProducts(userId));
   };

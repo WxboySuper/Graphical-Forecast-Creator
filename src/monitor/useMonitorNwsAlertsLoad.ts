@@ -4,6 +4,7 @@ import type { AddToastFn } from '../components/Layout';
 import { fetchActiveNwsAlerts, snapshotCollectionKey, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
 
+/** Documents appendSnapshotFrame. */
 const appendSnapshotFrame = (
   current: NwsAlertFeatureCollection[],
   collection: NwsAlertFeatureCollection,
@@ -28,6 +29,7 @@ interface UseMonitorNwsAlertsLoadOptions {
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
 }
 
+/** Documents useMonitorNwsAlertsLoad. */
 export const useMonitorNwsAlertsLoad = ({
   enabled,
   refreshToken,

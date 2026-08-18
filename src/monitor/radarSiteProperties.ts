@@ -1,6 +1,8 @@
+/** Documents readRadarProperty. */
 const readRadarProperty = (properties: Record<string, unknown>, key: string): string =>
   typeof properties[key] === 'string' ? String(properties[key]).trim() : '';
 
+/** Documents readRadarSiteProperties. */
 export const readRadarSiteProperties = (
   feature: unknown,
 ): { id: string; name: string; wfoId?: string } | null => {

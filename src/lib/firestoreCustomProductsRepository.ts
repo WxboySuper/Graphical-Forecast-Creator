@@ -29,12 +29,16 @@ interface FirestoreProductRecord {
   product: HostedCustomProduct;
 }
 
+/** Documents collectionRef. */
 const collectionRef = (userId: string) => collection(requireDb(), 'users', userId, 'customProducts');
+/** Documents productRef. */
 const productRef = (userId: string, slotId: string) => doc(requireDb(), 'users', userId, 'customProducts', slotId);
 
+/** Documents ownedProduct. */
 const ownedProduct = (value: unknown, userId: string): value is HostedCustomProduct =>
   isHostedCustomProduct(value) && value.userId === userId && !value.builtIn;
 
+/** Documents readRecords. */
 const readRecords = async (userId: string): Promise<FirestoreProductRecord[]> => {
   const snapshot = await getDocs(collectionRef(userId));
   return snapshot.docs.flatMap((item) => {
@@ -43,12 +47,14 @@ const readRecords = async (userId: string): Promise<FirestoreProductRecord[]> =>
   });
 };
 
+/** Documents findRecord. */
 const findRecord = async (userId: string, productId: string): Promise<FirestoreProductRecord> => {
   const record = (await readRecords(userId)).find(({ product }) => product.id === productId);
   if (!record) throw new Error('Custom product not found.');
   return record;
 };
 
+/** Documents requireCurrentProduct. */
 const requireCurrentProduct = (value: unknown, userId: string, productId: string): HostedCustomProduct => {
   if (!isHostedCustomProduct(value)) throw new Error('Custom product not found.');
   if (value.userId !== userId) throw new Error('Custom product not found.');
@@ -56,6 +62,7 @@ const requireCurrentProduct = (value: unknown, userId: string, productId: string
   return value;
 };
 
+/** Documents withStoredProduct. */
 const withStoredProduct = async <T>(
   userId: string,
   expected: HostedCustomProduct,
@@ -70,6 +77,7 @@ const withStoredProduct = async <T>(
   });
 };
 
+/** Documents writeRevision. */
 const writeRevision = (
   userId: string,
   expected: HostedCustomProduct,
@@ -81,6 +89,7 @@ const writeRevision = (
   return revised;
 });
 
+/** Documents findOpenSlot. */
 const findOpenSlot = (records: FirestoreProductRecord[]): string => {
   const occupied = new Set(records.map(({ slotId }) => slotId));
   const slot = CUSTOM_PRODUCT_DOCUMENT_SLOTS.find((candidate) => !occupied.has(candidate));

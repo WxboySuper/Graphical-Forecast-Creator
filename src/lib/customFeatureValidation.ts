@@ -2,17 +2,21 @@ import type { CustomPolygonFeature } from '../types/customProducts';
 import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
 import { hasValidCustomFeatureShape } from './customFeatureShape';
 
+/** Documents isRecord. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+/** Documents hasOnlyKeys. */
 const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
   Object.keys(value).every((key) => keys.includes(key));
 
+/** Documents isBoundedText. */
 const isBoundedText = (value: unknown): value is string => {
   if (typeof value !== 'string' || value.trim() !== value) return false;
   return value.length > 0 && value.length <= CUSTOM_PRODUCT_LIMITS.labelLength;
 };
 
+/** Documents hasValidProperties. */
 const hasValidProperties = (properties: Record<string, unknown>): boolean => {
   if (!hasOnlyKeys(properties, ['customLayerId', 'categoryId', 'title'])) return false;
   return isBoundedText(properties.customLayerId)
@@ -20,6 +24,7 @@ const hasValidProperties = (properties: Record<string, unknown>): boolean => {
     && isBoundedText(properties.title);
 };
 
+/** Documents matchesOwner. */
 const matchesOwner = (
   properties: Record<string, unknown>,
   layerId?: string,

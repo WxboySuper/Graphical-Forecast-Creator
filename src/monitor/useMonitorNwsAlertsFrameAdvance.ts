@@ -9,6 +9,7 @@ interface MonitorNwsAlertsFrameAdvanceOptions {
   setFrameIndex: Dispatch<SetStateAction<number>>;
 }
 
+/** Documents useMonitorNwsAlertsFrameAdvance. */
 export const useMonitorNwsAlertsFrameAdvance = ({
   enabled,
   animationEnabled,

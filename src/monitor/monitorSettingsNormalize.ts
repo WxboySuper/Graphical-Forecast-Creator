@@ -17,12 +17,15 @@ const SATELLITE_PRODUCTS: MonitorSatelliteProduct[] = ['none', 'goes-visible', '
 const OUTLOOK_KINDS: MonitorOutlookSourceKind[] = ['current', 'local-cycle', 'cloud-cycle'];
 const OUTLOOK_LAYER_TYPES: readonly MonitorOutlookLayerType[] = MONITOR_OUTLOOK_LAYER_TYPES;
 
+/** Documents isRecord. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+/** Documents readEnum. */
 const readEnum = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
   typeof value === 'string' && allowed.includes(value as T) ? (value as T) : fallback;
 
+/** Documents readNumber. */
 const readNumber = (value: unknown, fallback: number, min: number, max: number): number => {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     return fallback;
@@ -31,6 +34,7 @@ const readNumber = (value: unknown, fallback: number, min: number, max: number):
   return Math.min(max, Math.max(min, value));
 };
 
+/** Documents readSite. */
 const readSite = (value: unknown, fallback: string): string => {
   if (typeof value !== 'string') {
     return fallback;
@@ -40,12 +44,14 @@ const readSite = (value: unknown, fallback: string): string => {
   return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
 };
 
+/** Documents isLatLonPair. */
 const isLatLonPair = (center: unknown): center is [number, number] =>
   Array.isArray(center) &&
   center.length === 2 &&
   typeof center[0] === 'number' &&
   typeof center[1] === 'number';
 
+/** Documents readMapViewCenter. */
 const readMapViewCenter = (center: unknown, zoom: unknown): MonitorMapView | null => {
   if (!isLatLonPair(center) || typeof zoom !== 'number') {
     return null;
@@ -60,6 +66,7 @@ const readMapViewCenter = (center: unknown, zoom: unknown): MonitorMapView | nul
   };
 };
 
+/** Documents readMapView. */
 const readMapView = (value: unknown): MonitorMapView => {
   if (!isRecord(value)) {
     return DEFAULT_MONITOR_SETTINGS.mapView;
@@ -68,6 +75,7 @@ const readMapView = (value: unknown): MonitorMapView => {
   return readMapViewCenter(value.center, value.zoom) ?? DEFAULT_MONITOR_SETTINGS.mapView;
 };
 
+/** Documents readOutlookSource. */
 const readOutlookSource = (value: unknown): MonitorOutlookSourceSelection => {
   if (!isRecord(value)) {
     return DEFAULT_MONITOR_SETTINGS.outlookSource;
@@ -78,9 +86,11 @@ const readOutlookSource = (value: unknown): MonitorOutlookSourceSelection => {
   return { kind, id };
 };
 
+/** Documents readBooleanSetting. */
 const readBooleanSetting = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback;
 
+/** Documents readReferenceLayers. */
 const readReferenceLayers = (value: unknown): MonitorSettings['referenceLayers'] => {
   if (!isRecord(value)) {
     return DEFAULT_MONITOR_SETTINGS.referenceLayers;
@@ -94,6 +104,7 @@ const readReferenceLayers = (value: unknown): MonitorSettings['referenceLayers']
   };
 };
 
+/** Documents normalizeMonitorSettings. */
 export const normalizeMonitorSettings = (value: unknown): MonitorSettings => {
   if (!isRecord(value)) {
     return DEFAULT_MONITOR_SETTINGS;

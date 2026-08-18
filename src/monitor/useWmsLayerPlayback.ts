@@ -7,11 +7,13 @@ export interface LayerPlaybackState {
   frameIndex: number;
 }
 
+/** Documents emptyPlayback. */
 export const emptyPlayback = (): LayerPlaybackState => ({
   frameTimes: [],
   frameIndex: 0,
 });
 
+/** Documents resolveDisplayTime. */
 export const resolveDisplayTime = (playback: LayerPlaybackState): string | undefined => {
   if (playback.frameTimes.length === 0) {
     return undefined;
@@ -20,6 +22,7 @@ export const resolveDisplayTime = (playback: LayerPlaybackState): string | undef
   return playback.frameTimes[playback.frameIndex];
 };
 
+/** Documents snapToLatestFrame. */
 export const snapToLatestFrame = (current: LayerPlaybackState): LayerPlaybackState => {
   if (current.frameTimes.length === 0) {
     return current;
@@ -29,6 +32,7 @@ export const snapToLatestFrame = (current: LayerPlaybackState): LayerPlaybackSta
   return current.frameIndex === frameIndex ? current : { ...current, frameIndex };
 };
 
+/** Documents advancePlaybackFrame. */
 export const advancePlaybackFrame = (current: LayerPlaybackState): LayerPlaybackState => {
   if (current.frameTimes.length < 2) {
     return current;
@@ -48,6 +52,7 @@ interface LoadWmsLayerFramesOptions {
   unavailableMessage: string;
 }
 
+/** Documents useLoadWmsLayerFrames. */
 export const useLoadWmsLayerFrames = ({
   config,
   setPlayback,

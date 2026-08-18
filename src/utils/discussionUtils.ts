@@ -31,6 +31,7 @@ export const compileDiscussionToText = (
   // Valid time range
   const validStart = new Date(discussion.validStart);
   const validEnd = new Date(discussion.validEnd);
+  /** Documents formatValidTime. */
   const formatValidTime = (date: Date) => {
     return date.toLocaleString('en-US', {
       weekday: 'short',
