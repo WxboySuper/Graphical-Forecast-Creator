@@ -18,6 +18,12 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
+import {
+  copyOutlookGeometry,
+  countCopyableSourceFeatures,
+  isProbabilisticHazardType,
+  type CopyOutlookGeometryOptions,
+} from '../utils/outlookGeometryCopy';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -1190,6 +1196,57 @@ export const forecastSlice = createSlice({
       }
     },
 
+    copyOutlookGeometryBetweenHazards: (state, action: PayloadAction<CopyOutlookGeometryOptions>) => {
+      const day = state.forecastCycle.currentDay;
+      if (day !== 1 && day !== 2) {
+        return;
+      }
+
+      const { sourceType, targetType } = action.payload;
+      if (sourceType === targetType) {
+        return;
+      }
+
+      const dayData = state.forecastCycle.days[day];
+      if (!dayData) {
+        return;
+      }
+
+      const sourceMap = dayData.data[sourceType];
+      const targetMap = dayData.data[targetType];
+      if (!sourceMap || !targetMap) {
+        return;
+      }
+
+      const copyableCount = countCopyableSourceFeatures(
+        sourceMap,
+        sourceType,
+        targetType,
+        day,
+        action.payload.probabilityFilter,
+      );
+      if (copyableCount === 0) {
+        return;
+      }
+
+      pushUndoSnapshot(state);
+
+      const result = copyOutlookGeometry(sourceMap, targetMap, action.payload, day);
+      if (result.copiedFeatureCount === 0) {
+        return;
+      }
+
+      if (dayData.metadata.lowProbabilityOutlooks) {
+        dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
+          (type) => type !== targetType,
+        );
+      }
+
+      dayData.metadata.lastModified = readActionTimestamp(action);
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
     undoLastEdit: (state, action: UnknownAction) => {
       const dayHistory = getOrCreateDayHistory(state);
       restoreHistoryEntry(dayHistory.undoStack, dayHistory.redoStack, state, readActionTimestamp(action));
@@ -1518,6 +1575,7 @@ export const {
   loadSavedCycle,
   deleteSavedCycle,
   copyFeaturesFromPrevious,
+  copyOutlookGeometryBetweenHazards,
   loadCycleHistory,
   setLowProbability,
   setOutlookOpacity,
