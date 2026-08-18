@@ -166,6 +166,12 @@ describe('AuthProvider Utils', () => {
       monitorSettings: DEFAULT_MONITOR_SETTINGS,
     };
     expect(readRemoteSettings(validSettings)).toEqual(validSettings);
+    expect(
+      readRemoteSettings({ ...validSettings, defaultForecasterName: 'a'.repeat(100) })
+    ).not.toBeNull();
+    expect(
+      readRemoteSettings({ ...validSettings, defaultForecasterName: 'a'.repeat(101) })
+    ).toBeNull();
     expect(readRemoteSettings({ darkMode: 'not boolean' } as Record<string, unknown>)).toBeNull();
     expect(readRemoteSettings()).toBeNull();
   });
