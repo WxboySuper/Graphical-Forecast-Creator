@@ -10,7 +10,8 @@ const initialState: VerificationState = {
   loadedForecast: null,
 };
 
-const EMPTY_VERIFICATION_OUTLOOKS = {} as OutlookData;
+// Keep the empty result stable so useSelector can bail out when no outlook exists.
+const EMPTY_VERIFICATION_OUTLOOKS = Object.freeze({}) as OutlookData;
 
 const verificationSlice = createSlice({
   name: 'verification',
