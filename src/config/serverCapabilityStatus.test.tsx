@@ -95,6 +95,28 @@ describe('serverCapabilityStatus', () => {
         TSTM_GENERATION_ENABLED: { available: true, reason: 'not-a-reason' },
       },
     })).toBe(false);
+    expect(isServerCapabilityStatusResponse({
+      capabilities: {
+        TSTM_GENERATION_ENABLED: {
+          available: true,
+          reason: 'available',
+          extra: true,
+        },
+      },
+    })).toBe(false);
+  });
+
+  test('accepts every documented reason and empty capability maps', () => {
+    expect(isServerCapabilityStatusResponse({ capabilities: {} })).toBe(true);
+    expect(isServerCapabilityStatusResponse({
+      capabilities: {
+        available: { available: true, reason: 'available' },
+        registry: { available: false, reason: 'registry_disabled' },
+        deployment: { available: false, reason: 'deployment_disabled' },
+        emergency: { available: false, reason: 'emergency_disabled' },
+        unknown: { available: false, reason: 'unknown' },
+      },
+    })).toBe(true);
   });
 
   test('useServerCapabilityAvailable fails closed when status fetch fails', async () => {

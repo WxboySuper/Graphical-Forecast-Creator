@@ -3,12 +3,15 @@ import { getFeatureExposure, type FeatureKey } from './featureExposure';
 
 export const CAPABILITY_STATUS_ENDPOINT = '/api/capabilities/status';
 
-export type CapabilityAvailabilityReason =
-  | 'available'
-  | 'registry_disabled'
-  | 'deployment_disabled'
-  | 'emergency_disabled'
-  | 'unknown';
+export const CAPABILITY_AVAILABILITY_REASONS = [
+  'available',
+  'registry_disabled',
+  'deployment_disabled',
+  'emergency_disabled',
+  'unknown',
+] as const;
+
+export type CapabilityAvailabilityReason = typeof CAPABILITY_AVAILABILITY_REASONS[number];
 
 export type CapabilityStatusEntry = {
   available: boolean;
@@ -69,6 +72,20 @@ export const getServerCapabilityKeyForFeature = (feature: FeatureKey): string | 
   return definition.serverCapabilityKey;
 };
 
+const isCapabilityStatusEntry = (entry: unknown): entry is CapabilityStatusEntry => {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    return false;
+  }
+
+  const candidate = entry as { available?: unknown; reason?: unknown };
+  return Object.keys(candidate).every((key) => key === 'available' || key === 'reason')
+    && typeof candidate.available === 'boolean'
+    && typeof candidate.reason === 'string'
+    && CAPABILITY_AVAILABILITY_REASONS.includes(
+      candidate.reason as CapabilityAvailabilityReason
+    );
+};
+
 /** Returns true when the payload matches the public capability status shape. */
 export const isServerCapabilityStatusResponse = (
   payload: unknown
@@ -78,25 +95,12 @@ export const isServerCapabilityStatusResponse = (
   }
 
   const capabilities = (payload as { capabilities?: unknown }).capabilities;
-  if (!capabilities || typeof capabilities !== 'object' || Array.isArray(capabilities)) {
-    return false;
-  }
-
-  const validReasons = new Set<CapabilityAvailabilityReason>([
-    'available',
-    'registry_disabled',
-    'deployment_disabled',
-    'emergency_disabled',
-    'unknown',
-  ]);
-
-  return Object.values(capabilities).every((entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-    const candidate = entry as { available?: unknown; reason?: unknown };
-    return typeof candidate.available === 'boolean'
-      && typeof candidate.reason === 'string'
-      && validReasons.has(candidate.reason as CapabilityAvailabilityReason);
-  });
+  return Boolean(
+    capabilities
+      && typeof capabilities === 'object'
+      && !Array.isArray(capabilities)
+      && Object.values(capabilities).every(isCapabilityStatusEntry)
+  );
 };
 
 /** Reads the public server capability status document. */
