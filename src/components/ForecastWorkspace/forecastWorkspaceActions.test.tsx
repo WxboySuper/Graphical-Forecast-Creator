@@ -2,10 +2,15 @@ import React from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 import { downloadGfcPackage } from '../../utils/fileUtils';
+import { downloadKmzExport } from '../../utils/kmzExport';
 import type { ForecastCycle } from '../../types/outlooks';
 
 jest.mock('../../utils/fileUtils', () => ({
   downloadGfcPackage: jest.fn(),
+}));
+
+jest.mock('../../utils/kmzExport', () => ({
+  downloadKmzExport: jest.fn(),
 }));
 
 const forecastCycle = {
@@ -21,6 +26,7 @@ const setup = (overrides: Partial<Parameters<typeof useForecastWorkspaceActionHa
   const addToast = jest.fn();
   const setIsEditingDate = jest.fn();
   const setIsPackageDownloading = jest.fn();
+  const setIsKmzExporting = jest.fn();
   const handleCancelReset = jest.fn();
   const input = document.createElement('input');
   input.click = jest.fn();
@@ -38,19 +44,21 @@ const setup = (overrides: Partial<Parameters<typeof useForecastWorkspaceActionHa
     tempDate: '2026-04-25',
     setIsEditingDate,
     setIsPackageDownloading,
+    setIsKmzExporting,
     fileInputRef: { current: input },
     handleCancelReset,
     ...overrides,
   } as Parameters<typeof useForecastWorkspaceActionHandlers>[0];
 
   const { result } = renderHook(() => useForecastWorkspaceActionHandlers(params));
-  return { result, dispatch, onLoad, addToast, setIsEditingDate, setIsPackageDownloading, handleCancelReset, input };
+  return { result, dispatch, onLoad, addToast, setIsEditingDate, setIsPackageDownloading, setIsKmzExporting, handleCancelReset, input };
 };
 
 describe('useForecastWorkspaceActionHandlers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (downloadGfcPackage as jest.Mock).mockResolvedValue();
+    (downloadKmzExport as jest.Mock).mockResolvedValue(undefined);
   });
 
   test('dispatches core workspace actions and respects history availability', () => {
@@ -119,5 +127,33 @@ describe('useForecastWorkspaceActionHandlers', () => {
       await Promise.resolve();
     });
     expect(downloadGfcPackage).toHaveBeenCalledWith(forecastCycle, { center: [1, 2], zoom: 7 }, undefined, 'workflow');
+  });
+
+  test('downloads KMZ exports for the current day and full cycle', async () => {
+    const { result, addToast, setIsKmzExporting } = setup();
+
+    await act(async () => {
+      result.current.onKmzCurrentDayDownload();
+      await Promise.resolve();
+    });
+
+    expect(downloadKmzExport).toHaveBeenCalledWith(
+      forecastCycle,
+      expect.objectContaining({ scope: 'current-day', day: 3 }),
+      'structured-kml',
+    );
+    expect(addToast).toHaveBeenCalledWith('Current day KMZ downloaded!', 'success');
+    expect(setIsKmzExporting).toHaveBeenLastCalledWith(false);
+
+    await act(async () => {
+      result.current.onKmzCycleDownload();
+      await Promise.resolve();
+    });
+
+    expect(downloadKmzExport).toHaveBeenLastCalledWith(
+      forecastCycle,
+      expect.objectContaining({ scope: 'cycle' }),
+      'structured-kml',
+    );
   });
 });

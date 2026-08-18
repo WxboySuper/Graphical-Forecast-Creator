@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { downloadGfcPackage } from '../../utils/fileUtils';
+import { downloadKmzExport, type KmzExportScope, type KmzExportStrategy } from '../../utils/kmzExport';
 import type { WorkflowExportScope } from '../../utils/workflowPackage';
 import {
   redoLastEdit,
@@ -29,6 +30,7 @@ export interface ForecastWorkspaceActionParams {
   tempDate: string;
   setIsEditingDate: React.Dispatch<React.SetStateAction<boolean>>;
   setIsPackageDownloading: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsKmzExporting: React.Dispatch<React.SetStateAction<boolean>>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   handleCancelReset: () => void;
 }
@@ -62,7 +64,51 @@ const dispatchHistoryAction = (
   }
 };
 
-/** Downloads one package scope and reports success or failure without leaking errors to the caller. */
+/** Reads the prototype KMZ strategy override used for side-by-side testing. */
+const readKmzExportStrategy = (): KmzExportStrategy => {
+  if (typeof window === 'undefined') {
+    return 'structured-kml';
+  }
+
+  const stored = window.localStorage.getItem('gfc-kmz-export-strategy');
+  return stored === 'split-kmz' ? 'split-kmz' : 'structured-kml';
+};
+
+/** Downloads a KMZ export for the requested scope and reports success or failure. */
+const downloadKmzForScope = async ({
+  scope,
+  forecastCycle,
+  currentDay,
+  addToast,
+  setIsKmzExporting,
+}: {
+  scope: KmzExportScope;
+  forecastCycle: ForecastCycle;
+  currentDay: DayType;
+  addToast: AddToastFn;
+  setIsKmzExporting: React.Dispatch<React.SetStateAction<boolean>>;
+}): Promise<boolean> => {
+  setIsKmzExporting(true);
+  try {
+    await downloadKmzExport(
+      forecastCycle,
+      {
+        scope,
+        day: scope === 'current-day' ? currentDay : undefined,
+        strategy: readKmzExportStrategy(),
+      },
+      readKmzExportStrategy(),
+    );
+    addToast(scope === 'cycle' ? 'Forecast cycle KMZ downloaded!' : 'Current day KMZ downloaded!', 'success');
+    return true;
+  } catch {
+    addToast('Failed to create KMZ export.', 'error');
+    return false;
+  } finally {
+    setIsKmzExporting(false);
+  }
+};
+
 const downloadPackageForScope = async ({ scope, forecastCycle, cycleMetadata, mapRef, addToast, setIsPackageDownloading }: {
   scope: WorkflowExportScope;
   forecastCycle: ForecastCycle;
@@ -99,6 +145,7 @@ export const useForecastWorkspaceActionHandlers = ({
   tempDate,
   setIsEditingDate,
   setIsPackageDownloading,
+  setIsKmzExporting,
   fileInputRef,
   handleCancelReset,
 }: ForecastWorkspaceActionParams) => {
@@ -112,6 +159,21 @@ export const useForecastWorkspaceActionHandlers = ({
       packageScope: scope,
     });
   }, [mapRef, forecastCycle, cycleMetadata, addToast, setIsPackageDownloading]);
+
+  const handleKmzExport = useCallback(async (scope: KmzExportScope) => {
+    const succeeded = await downloadKmzForScope({
+      scope,
+      forecastCycle,
+      currentDay,
+      addToast,
+      setIsKmzExporting,
+    });
+    trackWorkflowEvent('export', {
+      result: succeeded ? 'success' : 'failure',
+      entryPath: 'forecast-workspace',
+      packageScope: scope === 'cycle' ? 'cycle' : 'workflow',
+    });
+  }, [forecastCycle, currentDay, addToast, setIsKmzExporting]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = getSelectedFile(e);
@@ -168,6 +230,8 @@ export const useForecastWorkspaceActionHandlers = ({
     onPackageDownload: () => { handlePackageDownload('cycle'); },
     onWorkflowPackageDownload: () => { handlePackageDownload('workflow'); },
     onCyclePackageDownload: () => { handlePackageDownload('cycle'); },
+    onKmzCurrentDayDownload: () => { void handleKmzExport('current-day'); },
+    onKmzCycleDownload: () => { void handleKmzExport('cycle'); },
     onDateSave: handleDateSave,
     onDayButtonClick: handleDayButtonClick,
     onPrevDay: handlePrevDay,

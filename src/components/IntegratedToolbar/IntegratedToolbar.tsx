@@ -19,6 +19,7 @@ import {
   Upload,
   Wrench,
   PackageOpen,
+  Globe,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -914,6 +915,30 @@ const getTabbedToolbarActionItems = (
     tone: 'primary',
     accentClass: 'bg-violet-500/15 text-violet-700',
   },
+  ...(isFeatureExposed('kmzExport')
+    ? [
+        {
+          key: 'kmz-day',
+          label: 'KMZ day',
+          description: 'Export the active day as KMZ (prototype)',
+          icon: <Globe className="h-4 w-4" />,
+          onClick: controller.onKmzCurrentDayDownload,
+          disabled: controller.isKmzExporting,
+          tone: 'primary' as const,
+          accentClass: 'bg-sky-500/15 text-sky-700',
+        },
+        {
+          key: 'kmz-cycle',
+          label: 'KMZ cycle',
+          description: 'Export the full cycle as KMZ (prototype)',
+          icon: <Globe className="h-4 w-4" />,
+          onClick: controller.onKmzCycleDownload,
+          disabled: controller.isKmzExporting,
+          tone: 'primary' as const,
+          accentClass: 'bg-sky-500/15 text-sky-700',
+        },
+      ]
+    : []),
   {
     key: 'history',
     label: 'History',
@@ -1015,7 +1040,7 @@ const TabbedToolbarToolsTab: React.FC<{
 }> = ({ controller, autoTstmTools = null }) => {
   const actionItems = getTabbedToolbarActionItems(controller);
   const historyItems = actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key));
-  const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package', 'workflow-package'].includes(item.key));
+  const fileItems = actionItems.filter((item) => ['save', 'load', 'export', 'package', 'workflow-package', 'kmz-day', 'kmz-cycle'].includes(item.key));
   const completionItems = actionItems.filter((item) => item.key === 'complete');
   const destructiveItems = actionItems.filter((item) => item.key === 'reset');
 

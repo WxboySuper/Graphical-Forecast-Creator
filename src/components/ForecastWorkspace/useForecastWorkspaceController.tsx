@@ -94,6 +94,8 @@ export interface ForecastWorkspaceController {
   onPackageDownload: () => void;
   onWorkflowPackageDownload: () => void;
   onCyclePackageDownload: () => void;
+  onKmzCurrentDayDownload: () => void;
+  onKmzCycleDownload: () => void;
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
   onOpenResetConfirm: () => void;
@@ -121,6 +123,7 @@ export interface ForecastWorkspaceController {
   onConfirmExport: (title: string) => Promise<void>;
   onCancelExport: () => void;
   isPackageDownloading: boolean;
+  isKmzExporting: boolean;
   showHistoryModal: boolean;
   showCopyModal: boolean;
   showResetConfirm: boolean;
@@ -183,6 +186,7 @@ interface BuildForecastWorkspaceControllerArgs {
   confirmExport: (title: string) => Promise<void>;
   cancelExport: () => void;
   isPackageDownloading: boolean;
+  isKmzExporting: boolean;
   showHistoryModal: boolean;
   showCopyModal: boolean;
   showResetConfirm: boolean;
@@ -236,6 +240,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     confirmExport,
     cancelExport,
     isPackageDownloading,
+    isKmzExporting,
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
@@ -287,6 +292,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     onConfirmExport: confirmExport,
     onCancelExport: cancelExport,
     isPackageDownloading,
+    isKmzExporting,
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
@@ -340,6 +346,7 @@ function useForecastWorkspaceModalState(cycleDate: string, dispatch: ReturnType<
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
+  const [isKmzExporting, setIsKmzExporting] = useState(false);
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState('');
 
@@ -373,6 +380,8 @@ function useForecastWorkspaceModalState(cycleDate: string, dispatch: ReturnType<
     showResetConfirm,
     isPackageDownloading,
     setIsPackageDownloading,
+    isKmzExporting,
+    setIsKmzExporting,
     isEditingDate,
     setIsEditingDate,
     tempDate,
@@ -492,6 +501,7 @@ function useForecastWorkspaceControllerArgs({
     tempDate: modalState.tempDate,
     setIsEditingDate: modalState.setIsEditingDate,
     setIsPackageDownloading: modalState.setIsPackageDownloading,
+    setIsKmzExporting: modalState.setIsKmzExporting,
     fileInputRef,
     handleCancelReset: modalState.handleCancelReset,
   });
@@ -509,6 +519,7 @@ function useForecastWorkspaceControllerArgs({
     confirmExport: core.confirmExport,
     cancelExport: core.cancelExport,
     isPackageDownloading: modalState.isPackageDownloading,
+    isKmzExporting: modalState.isKmzExporting,
     showHistoryModal: modalState.showHistoryModal,
     showCopyModal: modalState.showCopyModal,
     showResetConfirm: modalState.showResetConfirm,
