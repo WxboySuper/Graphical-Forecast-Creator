@@ -39,13 +39,12 @@ jobs:
           STAGING_REF: ${{ inputs.ref }}
         run: |
           set -euo pipefail
-          case "$STAGING_REF" in
-            main|stable/[0-9]*.[0-9]*.x) ;;
-            *)
-              echo "::error::Staging deploys must target main or a stable/* release line." >&2
-              exit 1
-              ;;
-          esac
+          if [ "$STAGING_REF" = "main" ] || printf '%s' "$STAGING_REF" | grep -Eq '^stable/[0-9]+\.[0-9]+\.x$'; then
+            exit 0
+          fi
+
+          echo "::error::Staging deploys must target main or a stable/* release line." >&2
+          exit 1
 
       - name: Checkout selected ref
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
