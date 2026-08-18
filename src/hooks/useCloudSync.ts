@@ -84,7 +84,6 @@ const isCurrentStateSynced = (lastSyncedHash: string | null, currentHash: string
  * 2. User has active premium (not expired)
  * 3. Forecast has changes since last sync
  */
-// @codescene(disable:"Large Method")
 export const useCloudSync = (
   cloud: Pick<UseCloudCyclesResult, 'currentCloud' | 'updateSyncState' | 'saveCycle'>
 ) => {
@@ -97,7 +96,6 @@ export const useCloudSync = (
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
 
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSyncStateRef = useRef<string | null>(null);
   const [lastSyncedHash, setLastSyncedHashState] = useState<string | null>(null);
 
   const canSync = Boolean(currentCloud) && premiumActive;
@@ -121,7 +119,6 @@ export const useCloudSync = (
       forecastCycle,
       workflowMetadata,
       setLastSyncedHash: (hash) => {
-        lastSyncStateRef.current = hash;
         setLastSyncedHashState(hash);
       },
       currentHash,
@@ -134,7 +131,7 @@ export const useCloudSync = (
       return;
     }
 
-    if (isCurrentStateSynced(lastSyncStateRef.current, currentHash)) {
+    if (isCurrentStateSynced(lastSyncedHash, currentHash)) {
       return;
     }
 
@@ -148,7 +145,7 @@ export const useCloudSync = (
     return function cleanupPendingCloudSync() {
       clearSyncTimeout(syncTimeoutRef);
     };
-  }, [canSync, currentHash, performSync]);
+  }, [canSync, currentHash, lastSyncedHash, performSync]);
 
   const syncNow = useCallback(async () => {
     clearSyncTimeout(syncTimeoutRef);
@@ -156,7 +153,6 @@ export const useCloudSync = (
   }, [performSync]);
 
   const markCurrentStateSynced = useCallback(() => {
-    lastSyncStateRef.current = currentHash;
     setLastSyncedHashState(currentHash);
   }, [currentHash]);
 
