@@ -48,6 +48,7 @@ const getGhostLayerColor = (type: OutlookType) => getOutlookColor({ outlookType:
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
 import CustomProductsDialog from './CustomProductsDialog';
+import OutlookGeometryCopyControls from '../OutlookSelector/OutlookGeometryCopyControls';
 import type { RootState } from '../../store';
 import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
@@ -580,6 +581,21 @@ const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> 
     <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection w-[360px]">
       <TabbedToolbarSelectionStrip controller={controller} showShortcuts={false} />
     </TabbedToolbarStripSection>
+
+    {controller.activeProbabilisticHazard && (
+      <TabbedToolbarStripSection label="Match Geometry" className="tabbed-integrated-toolbar__section--geometry-copy w-[240px]">
+        <OutlookGeometryCopyControls
+          activeHazard={controller.activeProbabilisticHazard}
+          activeProbability={controller.activeProbability}
+          otherHazards={controller.otherProbabilisticHazards}
+          canCopyAllFrom={controller.canCopyAllFrom}
+          canCopyProbabilityFrom={controller.canCopyProbabilityFrom}
+          onCopyAllFrom={controller.onCopyAllGeometryFrom}
+          onCopyProbabilityFrom={controller.onCopyProbabilityGeometryFrom}
+          compact
+        />
+      </TabbedToolbarStripSection>
+    )}
   </>
 );
 

@@ -23,6 +23,7 @@ interface OutlookGeometryCopyControlsProps {
   canCopyProbabilityFrom: (sourceType: ProbabilisticHazardType) => boolean;
   onCopyAllFrom: (sourceType: ProbabilisticHazardType) => void;
   onCopyProbabilityFrom: (sourceType: ProbabilisticHazardType) => void;
+  compact?: boolean;
 }
 
 export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsProps> = memo(({
@@ -33,6 +34,7 @@ export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsPr
   canCopyProbabilityFrom,
   onCopyAllFrom,
   onCopyProbabilityFrom,
+  compact = false,
 }) => {
   if (otherHazards.length === 0) {
     return null;
@@ -40,12 +42,16 @@ export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsPr
 
   return (
     <TooltipProvider>
-      <div className="flex min-w-[220px] flex-col gap-2">
-        <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Match Geometry
-        </label>
+      <div className={compact ? 'flex flex-col gap-2' : 'flex min-w-[220px] flex-col gap-2'}>
+        {!compact && (
+          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Match Geometry
+          </label>
+        )}
 
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-2">
+        <div className={compact
+          ? 'flex flex-col gap-2'
+          : 'flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-2'}>
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               All levels
@@ -61,6 +67,7 @@ export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsPr
                       className="h-8 px-2 text-xs"
                       disabled={!canCopyAllFrom(sourceType)}
                       onClick={() => onCopyAllFrom(sourceType)}
+                      aria-label={`Copy all geometry from ${hazardLabels[sourceType]}`}
                     >
                       <Copy className="mr-1 h-3 w-3" />
                       {hazardLabels[sourceType]}
@@ -91,6 +98,7 @@ export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsPr
                       className="h-8 px-2 text-xs"
                       disabled={!canCopyProbabilityFrom(sourceType)}
                       onClick={() => onCopyProbabilityFrom(sourceType)}
+                      aria-label={`Copy ${activeProbability} geometry from ${hazardLabels[sourceType]}`}
                     >
                       <Copy className="mr-1 h-3 w-3" />
                       {hazardLabels[sourceType]}
