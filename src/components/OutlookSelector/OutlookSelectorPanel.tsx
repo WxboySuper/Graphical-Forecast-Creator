@@ -17,6 +17,7 @@ import {
 import { OutlookType, CategoricalRiskLevel } from '../../types/outlooks';
 import { getCategoricalRiskDisplayName, getOutlookColor } from '../../utils/outlookUtils';
 import useOutlookPanelLogic from '../OutlookPanel/useOutlookPanelLogic';
+import OutlookGeometryCopyControls from './OutlookGeometryCopyControls';
 import { cn } from '../../lib/utils';
 
 const outlookIcons: Record<OutlookType, React.ReactNode> = {
@@ -59,6 +60,12 @@ export const OutlookSelectorPanel: React.FC = memo(() => {
     probabilityHandlers,
     outlookOpacity,
     handleOutlookOpacityChange,
+    activeProbabilisticHazard,
+    otherProbabilisticHazards,
+    canCopyAllFrom,
+    canCopyProbabilityFrom,
+    handleCopyAllGeometryFrom,
+    handleCopyProbabilityGeometryFrom,
   } = useOutlookPanelLogic();
 
   // Get available outlook types
@@ -162,6 +169,18 @@ export const OutlookSelectorPanel: React.FC = memo(() => {
               })}
             </div>
           </div>
+
+          {activeProbabilisticHazard && (
+            <OutlookGeometryCopyControls
+              activeHazard={activeProbabilisticHazard}
+              activeProbability={activeProbability}
+              otherHazards={otherProbabilisticHazards}
+              canCopyAllFrom={canCopyAllFrom}
+              canCopyProbabilityFrom={canCopyProbabilityFrom}
+              onCopyAllFrom={handleCopyAllGeometryFrom}
+              onCopyProbabilityFrom={handleCopyProbabilityGeometryFrom}
+            />
+          )}
 
           {/* Current Selection Preview + Shortcuts */}
           <div className="flex flex-col gap-2">
