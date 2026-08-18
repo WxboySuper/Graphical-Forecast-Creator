@@ -66,6 +66,7 @@ export function runExposureReport({ json = false } = {}) {
   return { ok: policyResult.ok, report, policyResult };
 }
 
+/** Documents main. */
 function main() {
   const json = process.argv.includes('--json');
 

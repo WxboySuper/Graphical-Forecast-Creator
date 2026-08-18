@@ -141,6 +141,7 @@ export async function runStaleBranchReport(options = {}) {
   return { report, body, dryRun: config.dryRun };
 }
 
+/** Documents main. */
 async function main() {
   try {
     await runStaleBranchReport();

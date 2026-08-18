@@ -82,6 +82,7 @@ export function runExposureDiagnostics(argv = process.argv.slice(2)) {
   return report;
 }
 
+/** Documents main. */
 function main() {
   try {
     runExposureDiagnostics();

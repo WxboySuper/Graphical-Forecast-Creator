@@ -138,6 +138,7 @@ const LITERAL_READERS = {
   ObjectExpression: evaluateObject,
 };
 
+/** Documents rejectUnsupportedLiteral. */
 function rejectUnsupportedLiteral(expression) {
   throw new Error(`Unsupported non-literal expression: ${nodeText(expression)}`);
 }
