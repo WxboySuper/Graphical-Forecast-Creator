@@ -72,18 +72,25 @@ export const getServerCapabilityKeyForFeature = (feature: FeatureKey): string | 
   return definition.serverCapabilityKey;
 };
 
+const isCapabilityStatusReason = (reason: unknown): reason is CapabilityAvailabilityReason =>
+  typeof reason === 'string'
+  && CAPABILITY_AVAILABILITY_REASONS.includes(reason as CapabilityAvailabilityReason);
+
 const isCapabilityStatusEntry = (entry: unknown): entry is CapabilityStatusEntry => {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
     return false;
   }
 
   const candidate = entry as { available?: unknown; reason?: unknown };
-  return Object.keys(candidate).every((key) => key === 'available' || key === 'reason')
-    && typeof candidate.available === 'boolean'
-    && typeof candidate.reason === 'string'
-    && CAPABILITY_AVAILABILITY_REASONS.includes(
-      candidate.reason as CapabilityAvailabilityReason
-    );
+  if (!Object.keys(candidate).every((key) => key === 'available' || key === 'reason')) {
+    return false;
+  }
+
+  if (typeof candidate.available !== 'boolean') {
+    return false;
+  }
+
+  return isCapabilityStatusReason(candidate.reason);
 };
 
 /** Returns true when the payload matches the public capability status shape. */
