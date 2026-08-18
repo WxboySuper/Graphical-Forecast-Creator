@@ -30,10 +30,11 @@ export const selectVerificationForecast = (state: RootState) => state.verificati
 
 export const selectVerificationOutlooksForDay = (state: RootState, day: DayType) => {
   const forecast = state.verification.loadedForecast;
-  if (!forecast || !forecast.days[day]) {
+  const dayForecast = forecast?.days[day];
+  if (!dayForecast) {
     return {} as OutlookData;
   }
-  return forecast.days[day]!.data;
+  return dayForecast.data;
 };
 
 export default verificationSlice.reducer;
