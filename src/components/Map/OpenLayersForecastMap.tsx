@@ -87,7 +87,7 @@ import {
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { isFeatureExposed } from "../../config/featureExposure";
-import { isPaintBucketOutlookType } from "../../utils/paintBucket";
+import { isPaintBucketOutlookType, type PaintBucketMode } from "../../utils/paintBucket";
 import { handlePaintBucketMapClick } from "./paintBucketMapInteraction";
 
 // OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
@@ -180,8 +180,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       && !customMode
       && isPaintBucketOutlookType(drawingState.activeOutlookType);
     const [interactionMode, setInteractionMode] = useState<
-      "pan" | "draw" | "delete" | "step" | "assign"
+      "pan" | "draw" | "delete" | "edit"
     >("pan");
+    const [editBehavior, setEditBehavior] = useState<PaintBucketMode>("step");
 
     const [popupInfo, setPopupInfo] = useState<{
       outlookType: string;
@@ -198,6 +199,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const customModeRef = useRef(customMode);
     const drawingStateRef = useRef(drawingState);
     const currentDayRef = useRef(currentDay);
+    const editBehaviorRef = useRef(editBehavior);
 
     useEffect(() => {
       interactionModeRef.current = interactionMode;
@@ -206,10 +208,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => { customModeRef.current = customMode; }, [customMode]);
     useEffect(() => { drawingStateRef.current = drawingState; }, [drawingState]);
     useEffect(() => { currentDayRef.current = currentDay; }, [currentDay]);
+    useEffect(() => { editBehaviorRef.current = editBehavior; }, [editBehavior]);
 
     useEffect(() => {
       if (
-        (interactionMode === "step" || interactionMode === "assign")
+        interactionMode === "edit"
         && (!isPaintBucketOutlookType(drawingState.activeOutlookType) || customMode)
       ) {
         setInteractionMode("pan");
@@ -453,7 +456,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         const mode = interactionModeRef.current;
         if (
           paintBucketEnabled
-          && (mode === "step" || mode === "assign")
+          && mode === "edit"
         ) {
           handlePaintBucketMapClick({
             map,
@@ -462,7 +465,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             dispatch,
             outlookType: drawingStateRef.current.activeOutlookType,
             currentDay: currentDayRef.current,
-            mode,
+            mode: editBehaviorRef.current,
             shiftKey: Boolean(evt.originalEvent.shiftKey),
           });
           return;
@@ -656,9 +659,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         selectRef.current.getFeatures().clear();
       }
 
-      const disableModify = interactionMode === "delete"
-        || interactionMode === "step"
-        || interactionMode === "assign";
+      const disableModify = interactionMode === "delete" || interactionMode === "edit";
       modifyRef.current?.setActive(!disableModify);
       catModifyRef.current?.setActive(!disableModify);
 
@@ -673,9 +674,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
     useEffect(() => {
       // Keep snapping enabled outside delete/fill modes for draw/modify workflows.
-      const enableSnap = interactionMode !== "delete"
-        && interactionMode !== "step"
-        && interactionMode !== "assign";
+      const enableSnap = interactionMode !== "delete" && interactionMode !== "edit";
       if (snapRef.current) {
         snapRef.current.setActive(enableSnap);
       }
@@ -1169,12 +1168,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       setInteractionMode("delete");
     };
 
-    const handleSetModeStep = () => {
-      setInteractionMode("step");
-    };
-
-    const handleSetModeAssign = () => {
-      setInteractionMode("assign");
+    const handleSetModeEdit = () => {
+      setInteractionMode("edit");
     };
 
     return (
@@ -1213,28 +1208,42 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               <>
                 <button
                   type="button"
-                  onClick={handleSetModeStep}
+                  onClick={handleSetModeEdit}
                   disabled={!paintBucketAvailable}
-                  className={`map-toolbar-button mode-step ${interactionMode === "step" ? "active" : ""}`}
+                  className={`map-toolbar-button mode-edit ${interactionMode === "edit" ? "active" : ""}`}
                   title={paintBucketAvailable
-                    ? "Step risk up or down on existing polygons"
-                    : "Switch to a probabilistic outlook (tornado, wind, hail) to use Step"}
-                  aria-label="Step polygon risk"
+                    ? "Edit existing polygon risk levels"
+                    : "Switch to a probabilistic outlook (tornado, wind, hail) to use Edit"}
+                  aria-label="Edit polygon risk"
                 >
-                  Step
+                  Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSetModeAssign}
-                  disabled={!paintBucketAvailable}
-                  className={`map-toolbar-button mode-assign ${interactionMode === "assign" ? "active" : ""}`}
-                  title={paintBucketAvailable
-                    ? "Apply the active risk level to a clicked polygon"
-                    : "Switch to a probabilistic outlook (tornado, wind, hail) to use Assign"}
-                  aria-label="Assign active risk to polygon"
-                >
-                  Assign
-                </button>
+                {interactionMode === "edit" && paintBucketAvailable && (
+                  <div
+                    className="map-toolbar-edit-toggle"
+                    role="group"
+                    aria-label="Edit behavior"
+                  >
+                    <button
+                      type="button"
+                      className={editBehavior === "step" ? "active" : ""}
+                      onClick={() => setEditBehavior("step")}
+                      title="Click to raise risk; Shift+click to lower"
+                      aria-pressed={editBehavior === "step"}
+                    >
+                      Step
+                    </button>
+                    <button
+                      type="button"
+                      className={editBehavior === "assign" ? "active" : ""}
+                      onClick={() => setEditBehavior("assign")}
+                      title="Click to apply the active risk level"
+                      aria-pressed={editBehavior === "assign"}
+                    >
+                      Set
+                    </button>
+                  </div>
+                )}
               </>
             )}
             <span className="map-toolbar-divider" aria-hidden="true" />
@@ -1279,10 +1288,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               "Draw mode: click to place points, double-click to finish polygon."}
             {interactionMode === "delete" &&
               "Delete mode: click any polygon to remove it."}
-            {interactionMode === "step" &&
-              "Step mode: click a polygon to raise its risk one level. Shift+click to lower."}
-            {interactionMode === "assign" &&
-              `Assign mode: click a polygon to apply the active risk (${drawingState.activeProbability}).`}
+            {interactionMode === "edit" && editBehavior === "step" &&
+              "Edit (Step): click to raise risk one level. Shift+click to lower."}
+            {interactionMode === "edit" && editBehavior === "assign" &&
+              `Edit (Set): click a polygon to apply the active risk (${drawingState.activeProbability}).`}
             {interactionMode === "pan" &&
               "Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details."}
           </div>

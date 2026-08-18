@@ -317,22 +317,40 @@
   background-color: #047857;
 }
 
-.map-toolbar-button.mode-fill.active,
-.map-toolbar-button.mode-step.active {
-  background-color: #2563eb;
+.map-toolbar-button.mode-edit.active {
+  background-color: #4f46e5;
 }
 
-.map-toolbar-button.mode-fill.active:hover,
-.map-toolbar-button.mode-step.active:hover {
-  background-color: #1d4ed8;
+.map-toolbar-button.mode-edit.active:hover {
+  background-color: #4338ca;
 }
 
-.map-toolbar-button.mode-assign.active {
-  background-color: #7c3aed;
+.map-toolbar-edit-toggle {
+  display: inline-flex;
+  align-self: stretch;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 11px;
 }
 
-.map-toolbar-button.mode-assign.active:hover {
-  background-color: #6d28d9;
+.map-toolbar-edit-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #111827);
+  padding: 0 8px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.map-toolbar-edit-toggle button.active {
+  background: color-mix(in srgb, #4f46e5 18%, var(--bg-primary, #fff));
+  color: #312e81;
+  font-weight: 600;
+}
+
+.map-toolbar-edit-toggle button:hover:not(.active) {
+  background: color-mix(in srgb, var(--text-secondary, #6b7280) 12%, transparent);
 }
 
 .map-toolbar-button:disabled {

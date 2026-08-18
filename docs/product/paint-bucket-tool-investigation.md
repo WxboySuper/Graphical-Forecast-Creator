@@ -99,16 +99,16 @@ Manual QA:
 
 ## Prototype UX (local builds)
 
-Two first-class map toolbar modes replace the earlier strategy dropdown:
+One **Edit** toolbar button keeps the map chrome minimal. When Edit is active, a compact **Step | Set** toggle appears inline:
 
-| Mode | Purpose |
-|------|---------|
+| Sub-mode | Purpose |
+|----------|---------|
 | **Step** | Click to raise risk one level; Shift+click to lower. Core upgrade/downgrade workflow. |
-| **Assign** | Click to apply the **active** probability from the outlook panel / arrow keys. |
+| **Set** | Click to apply the **active** probability from the outlook panel / arrow keys. |
 
-Both modes are limited to **probabilistic outlook layers** (tornado, wind, hail, totalSevere, day4-8). Categorical outlooks disable the tools.
+Both sub-modes are limited to **probabilistic outlook layers** (tornado, wind, hail, totalSevere, day4-8). Categorical outlooks disable Edit.
 
-Overlapping polygons: hit-testing selects the **highest-risk** feature at the click pixel so the top layer is edited.
+Overlapping polygons: hit-testing selects the **highest-risk** feature at the click pixel.
 
 This is not a flood-fill tool — it only changes polygons that are already drawn.
 
