@@ -331,9 +331,10 @@ describe('forecastSlice undo/redo', () => {
         },
       },
     }));
+    state = reducer(state, setOutlookOpacity({ outlookType: 'tornado', opacity: 0.9 }));
     const firstSnapshotFeature = getLatestUndoEntry(state, 1)?.snapshot.data.tornado?.get('2%')?.[0];
 
-    state = reducer(state, addFeature({ feature: createFeature('feature-2', 2) }));
+    state = reducer(state, setOutlookOpacity({ outlookType: 'tornado', opacity: 0.8 }));
     const secondSnapshotFeature = getLatestUndoEntry(state, 1)?.snapshot.data.tornado?.get('2%')?.[0];
 
     expect(secondSnapshotFeature).toBe(firstSnapshotFeature);
