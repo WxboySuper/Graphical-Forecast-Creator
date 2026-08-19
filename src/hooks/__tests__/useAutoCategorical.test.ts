@@ -7,6 +7,7 @@ import useAutoCategorical, {
   processDay3OutlooksToCategorical,
   processOutlooksToCategorical,
   CategoricalDerivationError,
+  signatureFromOutlookMap,
 } from '../useAutoCategorical';
 import { OutlookData } from '../../types/outlooks';
 import { Feature, Polygon } from 'geojson';
@@ -55,6 +56,19 @@ const makeProbabilisticFeature = (id: string, offset: number): Feature<Polygon> 
     probability: '30%',
     isSignificant: false
   }
+});
+
+test('signature tokens are stable for reordering and change for replacement geometry', () => {
+  const first = makeProbabilisticFeature('first', 0);
+  const second = makeProbabilisticFeature('second', 3);
+  const ordered = new Map([['30%', [first]], ['45%', [second]]]);
+  const reordered = new Map([['45%', [second]], ['30%', [first]]]);
+  const replacement = { ...first, geometry: { ...first.geometry, coordinates: [[[9, 9], [10, 9], [10, 10], [9, 9]]] } };
+
+  expect(signatureFromOutlookMap('tornado', ordered)).toBe(signatureFromOutlookMap('tornado', reordered));
+  expect(signatureFromOutlookMap('tornado', ordered)).not.toBe(
+    signatureFromOutlookMap('tornado', new Map([['30%', [replacement]], ['45%', [second]]] ))
+  );
 });
 
 const makeSquare = (id: string, offset: number, size = 2): Feature<Polygon> => ({
@@ -315,6 +329,36 @@ describe('processOutlooksToCategorical', () => {
     await waitFor(() => {
       expect((getCategoricalFeatures(store)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
     });
+  });
+
+  test('does not re-derive after publishing the same categorical output', async () => {
+    const store = createStore();
+    let categoricalUpdates = 0;
+    let previousCategorical = store.getState().forecast.forecastCycle.days[1]?.data.categorical;
+    const unsubscribe = store.subscribe(() => {
+      const categorical = store.getState().forecast.forecastCycle.days[1]?.data.categorical;
+      if (categorical !== previousCategorical) {
+        categoricalUpdates += 1;
+        previousCategorical = categorical;
+      }
+    });
+
+    type ProviderProps = { store: ReturnType<typeof createStore>; children?: React.ReactNode };
+    const ProviderComponent = Provider as unknown as React.ComponentType<ProviderProps>;
+    render(React.createElement(ProviderComponent, { store }, React.createElement(HookHarness)));
+
+    act(() => {
+      store.dispatch(addFeature({ feature: makeProbabilisticFeature('feature-1', 0) }));
+    });
+
+    await waitFor(() => {
+      expect(getCategoricalFeatures(store).length).toBeGreaterThan(0);
+      expect(categoricalUpdates).toBe(1);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(categoricalUpdates).toBe(1);
+    unsubscribe();
   });
 
   test('preserves manual TSTM geometry when regenerating categorical output', async () => {

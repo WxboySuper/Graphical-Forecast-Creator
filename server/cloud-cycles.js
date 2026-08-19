@@ -1,6 +1,7 @@
 'use strict';
 
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { normalizeMetadata } = require('./cloud-cycle-metadata');
 const MAX_CLOUD_CYCLES = 100;
 const MAX_PAYLOAD_BYTES = 750000;
 
@@ -17,13 +18,13 @@ const hasValidCyclePayload = ({ cycleDate, payloadJson }) => {
   const bytes = typeof payloadJson === 'string' ? getPayloadBytes(payloadJson) : -1;
   return typeof cycleDate === 'string' && cycleDate.length <= 32 && typeof payloadJson === 'string' && bytes <= MAX_PAYLOAD_BYTES;
 };
-const hasValidMetadata = (metadata) => Boolean(metadata) && typeof metadata === 'object' && !Array.isArray(metadata);
 const readCloudCycleRequest = (body, uid) => {
   const { id, userId, label, cycleDate, payloadJson, metadata } = body || {};
   if (!hasValidCycleIdentity({ userId, id, label }, uid)) return null;
   if (!hasValidCyclePayload({ cycleDate, payloadJson })) return null;
-  if (!hasValidMetadata(metadata)) return null;
-  return { id, label, cycleDate, payloadJson, payloadBytes: getPayloadBytes(payloadJson), metadata };
+  const normalizedMetadata = normalizeMetadata(metadata);
+  if (!normalizedMetadata) return null;
+  return { id, label, cycleDate, payloadJson, payloadBytes: getPayloadBytes(payloadJson), metadata: normalizedMetadata };
 };
 
 const saveCloudCycle = async (db, uid, cycle) => {
@@ -31,6 +32,11 @@ const saveCloudCycle = async (db, uid, cycle) => {
   const payloadRef = cycleRef.collection('payload').doc('payload');
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(cycleRef);
+    if (existing.exists && existing.data()?.userId !== uid) {
+      throw Object.assign(new Error('CLOUD_CYCLE_OWNERSHIP_CONFLICT'), {
+        code: 'CLOUD_CYCLE_OWNERSHIP_CONFLICT',
+      });
+    }
     if (!existing.exists) {
       // The quota is hard-capped at MAX_CLOUD_CYCLES, so never read an
       // unbounded set of unrelated metadata documents during one save.
@@ -57,15 +63,24 @@ const handleCloudCycleSave = async (req, res) => {
   return res.status(200).json({ success: true, data: cycle.id });
 };
 
+const sendCloudCycleSaveError = (res, error) => {
+  if (error?.code === 'CLOUD_QUOTA_EXCEEDED' || error?.message === 'CLOUD_QUOTA_EXCEEDED') {
+    return res.status(409).json({ error: 'Cloud storage quota reached.' });
+  }
+  if (error?.code === 'CLOUD_CYCLE_OWNERSHIP_CONFLICT' || error?.message === 'CLOUD_CYCLE_OWNERSHIP_CONFLICT') {
+    return res.status(409).json({ error: 'Cloud cycle belongs to another account.' });
+  }
+  console.error('[cloud-cycles] save:error', error);
+  return res.status(500).json({ error: 'Unable to save cloud cycle.' });
+};
+
 const registerCloudCycleRoutes = (app, express, rateLimit) => {
   const saveRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
   app.post('/api/cloud-cycles', saveRateLimit, express.json({ limit: '800kb' }), async (req, res) => {
     try {
       return await handleCloudCycleSave(req, res);
     } catch (error) {
-      if (error?.code === 'CLOUD_QUOTA_EXCEEDED' || error?.message === 'CLOUD_QUOTA_EXCEEDED') return res.status(409).json({ error: 'Cloud storage quota reached.' });
-      console.error('[cloud-cycles] save:error', error);
-      return res.status(500).json({ error: 'Unable to save cloud cycle.' });
+      return sendCloudCycleSaveError(res, error);
     }
   });
 };

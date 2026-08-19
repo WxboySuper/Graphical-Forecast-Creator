@@ -106,6 +106,9 @@ const settings = (overrides = {}) => ({
     stormReportsFilterWind: true, stormReportsFilterHail: true,
     stormReportsMatchOutlookType: false, alertsEnabled: true, alertsOpacity: 0.55,
     alertsShowWatches: true, alertsShowWarnings: true, alertsShowAdvisories: false,
+    referenceLayers: {
+      spcMesoscaleDiscussionEnabled: true,
+    },
   },
   ...overrides,
 });
@@ -218,6 +221,42 @@ describe('userProfiles authorization', () => {
     );
   });
 
+  test('rejects owner attempts to rewrite createdAt on an existing profile', async () => {
+    await seed((db) => setDoc(doc(db, 'userProfiles', ALICE), profile()));
+
+    await assertFails(
+      updateDoc(doc(dbFor(ALICE), 'userProfiles', ALICE), {
+        createdAt: UPDATED_TEST_TIMESTAMP,
+        updatedAt: UPDATED_TEST_TIMESTAMP,
+      })
+    );
+  });
+
+  test('allows backfilling createdAt on a legacy profile that predates it', async () => {
+    await seed((db) =>
+      setDoc(doc(db, 'userProfiles', ALICE), {
+        email: 'alice@example.test',
+        displayName: 'Alice',
+        photoURL: '',
+        providers: ['password'],
+        updatedAt: TEST_TIMESTAMP,
+      })
+    );
+
+    await assertSucceeds(
+      updateDoc(doc(dbFor(ALICE), 'userProfiles', ALICE), {
+        email: 'alice@example.test',
+        displayName: 'Alice',
+        photoURL: '',
+        providers: ['password'],
+        createdAt: UPDATED_TEST_TIMESTAMP,
+        updatedAt: UPDATED_TEST_TIMESTAMP,
+      })
+    );
+    const snapshot = await getDoc(doc(dbFor(ALICE), 'userProfiles', ALICE));
+    assert.ok(snapshot.data().createdAt);
+  });
+
   test('rejects cross-account profile reads and writes', async () => {
     await seed((db) => setDoc(doc(db, 'userProfiles', ALICE), profile()));
     await assertFails(getDoc(doc(dbFor(BOB), 'userProfiles', ALICE)));
@@ -235,6 +274,9 @@ describe('userSettings schema boundary', () => {
     await assertFails(setDoc(ref, settings({ baseMapStyle: 'x'.repeat(5000) })));
     await assertFails(setDoc(ref, settings({ forecastUiVariant: 'unknown' })));
     await assertFails(setDoc(ref, settings({ monitorSettings: { arbitrary: { nested: true } } })));
+    await assertFails(setDoc(ref, settings({
+      monitorSettings: { ...settings().monitorSettings, referenceLayers: { unsupported: true } },
+    })));
     await assertFails(setDoc(ref, settings({ ghostOutlooks: { tornado: true } })));
   });
 });
