@@ -46,10 +46,10 @@ const createFeature = (index: number): Feature => ({
 });
 
 const getLatestSnapshotFeatures = (state: ReturnType<typeof forecastReducer>) => {
-  const undoStack = state.historyByDay[1]?.undoStack ?? [];
-  const previousSnapshot = undoStack[undoStack.length - 2]?.snapshot.data.tornado?.get('2%')?.[0];
-  const latestSnapshot = undoStack[undoStack.length - 1]?.snapshot.data.tornado?.get('2%')?.[0];
-  const liveFeature = state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
+  const undoStack = state.historyByDay[1]!.undoStack;
+  const previousSnapshot = undoStack[undoStack.length - 2]!.snapshot.data.tornado!.get('2%')![0];
+  const latestSnapshot = undoStack[undoStack.length - 1]!.snapshot.data.tornado!.get('2%')![0];
+  const liveFeature = state.forecastCycle.days[1]!.data.tornado!.get('2%')![0];
 
   return { previousSnapshot, latestSnapshot, liveFeature };
 };
