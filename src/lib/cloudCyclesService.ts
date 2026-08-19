@@ -588,9 +588,15 @@ export async function listCloudCycles(
   try {
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
     const metadata = readCloudCycleMetadataFromQuery({ snapshot, fallbackUserId: userId });
+    const legacyCycles = await readLegacyCloudCycles(userId);
+    const visibleMetadata = [
+      ...metadata,
+      ...legacyCycles.map(toCloudCycleMetadata),
+    ].filter((cycle, index, cycles) => cycles.findIndex((candidate) => candidate.id === cycle.id) === index);
 
-    if (metadata.length > 0) {
-      return { success: true, data: sortCloudCycleMetadata(metadata) };
+    if (visibleMetadata.length > 0) {
+      // Read-time migration is intentionally absent: retain legacy records in the list even after hosted records exist.
+      return { success: true, data: sortCloudCycleMetadata(visibleMetadata) };
     }
 
     const cycles = await readCloudCyclesForUser(userId);
