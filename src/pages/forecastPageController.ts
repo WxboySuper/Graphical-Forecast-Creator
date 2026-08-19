@@ -63,6 +63,13 @@ export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => 
   };
 };
 
+const getForecastImportErrorMessage = (file: File, error: unknown): string => {
+  if (error instanceof SyntaxError && !file.name.toLowerCase().endsWith('.zip')) {
+    return 'File is not valid JSON.';
+  }
+  return error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.';
+};
+
 /** Reads and validates one forecast JSON file. */
 export const parseLoadedForecast = async (
   file: File,
@@ -72,12 +79,7 @@ export const parseLoadedForecast = async (
   try {
     data = await readForecastImportFile(file);
   } catch (error) {
-    const fileName = typeof file.name === 'string' ? file.name : '';
-    const isJsonError = error instanceof SyntaxError
-      || (error instanceof Error && error.name === 'SyntaxError');
-    addToast(isJsonError && !fileName.toLowerCase().endsWith('.zip')
-      ? 'File is not valid JSON.'
-      : error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.', 'error');
+    addToast(getForecastImportErrorMessage(file, error), 'error');
     return null;
   }
 
