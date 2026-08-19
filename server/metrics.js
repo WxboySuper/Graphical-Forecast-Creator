@@ -71,6 +71,8 @@ let premiumSubscriptionsCache = {
   expiresAt: 0,
 };
 let pendingPremiumCount = null;
+let totalAccountsCache = { value: null, expiresAt: 0 };
+let pendingTotalAccounts = null;
 
 /** Returns true when the premium subscriptions cache has a fresh value. */
 const hasFreshPremiumCache = () =>
@@ -340,14 +342,39 @@ const countPremiumSubscriptions = () => {
 };
 
 /** Returns the current total number of hosted accounts that have profile docs in Firestore. */
+const readTotalAccounts = async (db) => {
+  try {
+    const snapshot = await db.collection('userProfiles').count().get();
+    const count = snapshot.data?.()?.count;
+    if (typeof count === 'number') {
+      return count;
+    }
+  } catch {
+    // Fall through to the bounded scan when aggregate support is unavailable.
+  }
+
+  return countCollectionDocuments(db, 'userProfiles');
+};
+
 const countTotalAccounts = async () => {
   const db = getAdminDb();
   if (!db) {
     return 0;
   }
 
-  const snapshot = await db.collection('userProfiles').get();
-  return snapshot.size;
+  if (typeof totalAccountsCache.value === 'number' && Date.now() < totalAccountsCache.expiresAt) {
+    return totalAccountsCache.value;
+  }
+  if (pendingTotalAccounts) return pendingTotalAccounts;
+
+  pendingTotalAccounts = readTotalAccounts(db).then((count) => {
+    totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
+    return count;
+  }).finally(() => {
+    pendingTotalAccounts = null;
+  });
+
+  return pendingTotalAccounts;
 };
 
 /** Average per-document overhead (id + path + metadata) used for storage estimates. */
@@ -733,11 +760,14 @@ const createAdminMetricsSummary = (dailyMetrics, liveSummary = {}) => {
   };
 };
 
-/** Returns true when the event requires authentication but the token is missing, sending a 401 if so. */
-const requireAuthForExpensiveEvents = (eventType, decodedToken, res) => {
-  if (eventType === 'cloud_cycle_saved' && !decodedToken) {
-    console.warn('[metrics] cloud_cycle_saved:unauthenticated');
-    res.status(401).json({ error: 'Authentication required for cloud save metrics.' });
+/** Returns true when a metric event would write trusted admin or account data. */
+const requiresAuthenticatedMetricEvent = (eventType) => METRIC_EVENT_TYPES.has(eventType);
+
+/** Rejects metric events without a verified Firebase identity. */
+const requireAuthForMetricEvent = (eventType, decodedToken, res) => {
+  if (requiresAuthenticatedMetricEvent(eventType) && !decodedToken) {
+    console.warn(`[metrics] ${eventType}:unauthenticated`);
+    res.status(401).json({ error: 'Authentication required for product metrics.' });
     return true;
   }
   return false;
@@ -759,7 +789,7 @@ const handleMetricEvent = async (req, res) => {
   const installationId = readInstallationId(req.body?.installationId);
   const decodedToken = await verifyRequestUser(req);
 
-  if (requireAuthForExpensiveEvents(eventType, decodedToken, res)) return;
+  if (requireAuthForMetricEvent(eventType, decodedToken, res)) return;
 
   await recordMetricEvent({
     eventType,
@@ -836,9 +866,12 @@ const registerMetricsRoutes = (app, express) => {
 };
 
 module.exports = {
+  handleMetricEvent,
   recordBillingMetricEvent,
   registerMetricsRoutes,
   countCollectionDocuments,
+  countTotalAccounts,
   readCloudCyclePayloadBytes,
   getCurrentStorageBytes,
+  requiresAuthenticatedMetricEvent,
 };

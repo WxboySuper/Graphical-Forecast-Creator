@@ -1,4 +1,5 @@
 import '../immerSetup';
+import { isDraft, original } from 'immer';
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping, Probability } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
@@ -400,6 +401,27 @@ const getCurrentOutlook = (state: ForecastState): OutlookData => {
 
 /** Clones one GeoJSON feature without JSON serialization so history snapshots are cheaper. */
 const cloneFeature = (feature: Feature): Feature => cloneJsonValue(feature);
+const featureCloneCache = new WeakMap<object, Feature>();
+
+/**
+ * Immer creates a fresh draft wrapper for each reducer invocation. Use the
+ * stable base object as the cache key while snapshots are captured before the
+ * enclosing reducer mutates that feature. Plain snapshots keep their own
+ * identity, so restore operations remain isolated from one another.
+ */
+const getFeatureCacheKey = (feature: Feature): object => {
+  if (!isDraft(feature)) return feature;
+  return original(feature) ?? feature;
+};
+
+const cloneFeatureCached = (feature: Feature): Feature => {
+  const cacheKey = getFeatureCacheKey(feature);
+  const cached = featureCloneCache.get(cacheKey);
+  if (cached) return cached;
+  const cloned = cloneFeature(feature);
+  featureCloneCache.set(cacheKey, cloned);
+  return cloned;
+};
 
 /** Returns the history stacks for one day, creating empty stacks when needed. */
 const getOrCreateDayHistory = (
@@ -421,7 +443,7 @@ const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | un
   if (!map) return undefined;
   return new Map(Array.from(map.entries(), ([probability, features]) => [
     probability,
-    features.map(cloneFeature),
+    features.map(cloneFeatureCached),
   ]));
 };
 
@@ -713,7 +735,8 @@ export const forecastSlice = createSlice({
     },
 
     toggleSignificant: (state) => {
-      state.drawingState.isSignificant = false;
+      state.drawingState.isSignificant = !state.drawingState.isSignificant;
+      state.isSaved = false;
     },
 
     ...createCustomLayerReducers(pushUndoSnapshot),
@@ -853,10 +876,8 @@ export const forecastSlice = createSlice({
       const outlookData = getCurrentOutlook(state);
 
       // Check if outlook type is supported for current day
-      if (outlookData[outlookType] !== undefined || outlookType === 'categorical' ||
-          outlookType === 'tornado' || outlookType === 'wind' || outlookType === 'hail' ||
-          outlookType === 'totalSevere' || outlookType === 'day4-8') {
-        if (outlookData[outlookType] === map) {
+      if (outlookData[outlookType] !== undefined) {
+        if (outlookData[outlookType] === map || original(outlookData[outlookType]) === map) {
           return;
         }
 
@@ -1553,7 +1574,7 @@ export const selectDiscussionDraftForScope = (state: RootState, scopeId: string)
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay)!;
+  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
   };
 const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
@@ -1566,7 +1587,7 @@ export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollecti
 /** Selects the outlook maps for a specific day, falling back to a shared empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[day]?.data || sharedEmptyOutlookData(day)!;
+  return cycle.days[day]?.data || sharedEmptyOutlookData(day) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
   };
 /** Selects the saved forecast cycle snapshots shown in cycle history. */
 export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;
