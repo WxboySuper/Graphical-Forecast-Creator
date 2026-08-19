@@ -85,5 +85,6 @@ describe('forecast snapshot clone performance', () => {
       `forecast history snapshots (256 features, 16 unchanged edits): `
         + `${cachedHistory.medianMs.toFixed(2)} ms`,
     );
+    expect(cachedHistory.medianMs).toBeGreaterThan(0);
   });
 });
