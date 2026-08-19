@@ -1,11 +1,32 @@
+jest.mock('firebase/firestore', () => ({
+  collection: jest.fn((...args: unknown[]) => ({ firestore: {}, args })),
+  deleteField: jest.fn(() => 'delete-field'),
+  deleteDoc: jest.fn(),
+  doc: jest.fn((...args: unknown[]) => ({ args })),
+  getDoc: jest.fn(),
+  getDocs: jest.fn(),
+  onSnapshot: jest.fn(),
+  query: jest.fn((...args: unknown[]) => ({ args })),
+  setDoc: jest.fn(),
+  where: jest.fn((...args: unknown[]) => ({ args })),
+  writeBatch: jest.fn(() => ({ commit: jest.fn(), set: jest.fn() })),
+}));
+jest.mock('./firebase', () => ({ auth: null, db: {} }));
+
 import type { GFCForecastSaveData } from '../types/outlooks';
-import { createCloudCyclePayloadStorage, parseCloudCyclePayload } from './cloudCyclesService';
+import { getDoc, onSnapshot } from 'firebase/firestore';
+import {
+  createCloudCyclePayloadStorage,
+  parseCloudCyclePayload,
+  subscribeToCloudCycles,
+} from './cloudCyclesService';
 
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((...parts: unknown[]) => ({ parts })),
   doc: jest.fn((...parts: unknown[]) => ({ parts })),
   getDoc: jest.fn(),
   getDocs: jest.fn(),
+  onSnapshot: jest.fn(),
   query: jest.fn((value) => value),
   setDoc: jest.fn(),
   where: jest.fn(),
@@ -70,4 +91,24 @@ test('legacy reads return data without Firestore writes and remain visible with 
   expect(result.success).toBe(true);
   expect(result.data?.map((cycle) => cycle.id)).toEqual(['legacy', 'hosted']);
   expect(mockSetDoc).not.toHaveBeenCalled();
+});
+
+test('subscription checks the legacy store when the initial collection is empty', async () => {
+  const onUpdate = jest.fn();
+  const onError = jest.fn();
+  const unsubscribe = jest.fn();
+  (getDoc as jest.Mock).mockResolvedValue({ data: () => ({}) });
+  (onSnapshot as jest.Mock).mockImplementation((_query, next) => {
+    void next({ docs: [] });
+    return unsubscribe;
+  });
+
+  const stop = subscribeToCloudCycles({ userId: 'user-1', onUpdate, onError });
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+  expect(getDoc).toHaveBeenCalled();
+  expect(onUpdate).toHaveBeenCalledWith([]);
+  expect(onError).not.toHaveBeenCalled();
+  stop();
+  expect(unsubscribe).toHaveBeenCalled();
 });
