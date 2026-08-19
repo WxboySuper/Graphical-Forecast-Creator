@@ -59,7 +59,7 @@ describe('verificationUtils', () => {
       hail: new Map(),
     };
     const reports = [{
-      id: 'r-outside', type: 'tornado' as const, latitude: 33.505, longitude: -97.195,
+      id: 'r-outside', type: 'tornado' as const, latitude: 33.495, longitude: -97.19,
       time: '1234Z', magnitude: 'EF1', location: 'TestTown', county: 'TestCo', state: 'TX', comments: '',
     }];
 
