@@ -1,7 +1,6 @@
 import '../immerSetup';
-import { original } from 'immer';
-import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
 import { isDraft, original } from 'immer';
+import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping, Probability } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
