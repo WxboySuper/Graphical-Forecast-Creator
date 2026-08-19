@@ -5,7 +5,6 @@ import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevere
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { coerceOutlookProbabilityMap } from '../utils/outlookMapCoercion';
 import { CategoricalDerivationError } from './categoricalErrors';
-export { CategoricalDerivationError, toDerivationErrorMessage } from './categoricalErrors';
 
 /**
  * Raised when automatic categorical derivation cannot produce a complete,
