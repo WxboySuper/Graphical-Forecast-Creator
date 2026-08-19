@@ -210,8 +210,12 @@ export const observedFootprint = (reports: StormReport[]): AreaPolygon | null =>
   return unionAll(halos);
 };
 
+const isWithinBounds = (position: Position, bounds: [number, number, number, number]): boolean => {
+  const [minX, minY, maxX, maxY] = bounds;
+  return position[0] >= minX && position[0] <= maxX && position[1] >= minY && position[1] <= maxY;
+};
+
 /** Highest forecast probability whose contour contains the point (0 if none). */
-// @codescene(disable:"Complex Conditional")
 export const forecastProbabilityAt = (
   position: Position,
   contours: ProductContour[]
@@ -228,8 +232,7 @@ export const forecastProbabilityAt = (
     } catch {
       continue;
     }
-    const [minX, minY, maxX, maxY] = bounds;
-    if (position[0] < minX || position[0] > maxX || position[1] < minY || position[1] > maxY) {
+    if (!isWithinBounds(position, bounds)) {
       continue;
     }
     try {
@@ -247,8 +250,8 @@ export const forecastProbabilityAt = (
 export const isWithinNeighborhood = (position: Position, reports: StormReport[]): boolean => {
   const turfPoint = point(position);
   const latitudeRadius = SPC_NEIGHBORHOOD_MILES / 69;
-  const longitudeRadius = SPC_NEIGHBORHOOD_MILES / 45;
   for (const report of reports) {
+    const longitudeRadius = SPC_NEIGHBORHOOD_MILES / (69 * Math.max(Math.cos(report.latitude * Math.PI / 180), 0.01));
     if (Math.abs(position[1] - report.latitude) > latitudeRadius
       || Math.abs(position[0] - report.longitude) > longitudeRadius) {
       continue;
