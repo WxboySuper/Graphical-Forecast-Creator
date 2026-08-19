@@ -85,6 +85,12 @@ describe('forecast snapshot clone performance', () => {
       `forecast history snapshots (256 features, 16 unchanged edits): `
         + `${cachedHistory.medianMs.toFixed(2)} ms`,
     );
-    expect(cachedHistory.medianMs).toBeGreaterThan(0);
+    const undoStack = state.historyByDay[1]?.undoStack ?? [];
+    const previousSnapshot = undoStack[undoStack.length - 2]?.snapshot.data.tornado?.get('2%')?.[0];
+    const latestSnapshot = undoStack[undoStack.length - 1]?.snapshot.data.tornado?.get('2%')?.[0];
+    const liveFeature = state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
+
+    expect(latestSnapshot).toBe(previousSnapshot);
+    expect(latestSnapshot).not.toBe(liveFeature);
   });
 });
