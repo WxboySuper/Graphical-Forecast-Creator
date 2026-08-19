@@ -154,8 +154,11 @@ export const useCloudSync = (
   }, [performSync]);
 
   const markCurrentStateSynced = useCallback(() => {
+    if (!canSync) {
+      return;
+    }
     lastSyncStateRef.current = currentHash;
-  }, [currentHash]);
+  }, [canSync, currentHash]);
 
   return {
     isSynced: isCurrentStateSynced(lastSyncStateRef.current, currentHash),
