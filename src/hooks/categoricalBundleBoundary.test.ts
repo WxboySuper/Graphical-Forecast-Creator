@@ -10,13 +10,15 @@ describe('categorical Turf bundle boundary', () => {
     expect(workerSource).toMatch(/await import\(['"]\.\/autoCategoricalProcessing['"]\)/);
     expect(appSource).not.toMatch(/from ['"]\.\/pages['"]/);
 
-    const assetsDirectory = resolve(process.cwd(), 'dist/assets');
+    const assetsDirectory = resolve(process.cwd(), 'build/assets');
     try {
       const assetNames = readdirSync(assetsDirectory);
       const mainAsset = assetNames.find((name) => /^index-.*\.js$/.test(name));
       if (mainAsset) {
         const mainBundle = readFileSync(resolve(assetsDirectory, mainAsset), 'utf8');
-        expect(mainBundle).not.toMatch(/(?:from|import\()\s*['"].*turf.*['"]|turf-[A-Za-z0-9_-]+\.js/);
+        // Vite's __vite__mapDeps table legitimately names the lazy Turf chunk.
+        // Only reject an eager module edge from the main entry itself.
+        expect(mainBundle).not.toMatch(/(?:from|import\()\s*['"][^'"]*turf[^'"]*['"]/);
       }
     } catch {
       // Unit-only runs do not build dist; CI's production build supplies the graph check.
