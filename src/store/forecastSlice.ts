@@ -38,7 +38,14 @@ export interface SavedCycle {
 
 export interface CycleHistoryLoad {
   cycles: SavedCycle[];
-  lifetimeCycleStats: { totalCyclesMade: number; totalForecastsMade: number };
+  lifetimeCycleStats: LifetimeCycleStats;
+}
+
+export interface LifetimeCycleStats {
+  totalCyclesMade: number;
+  totalForecastsMade: number;
+  forecastStreak?: number;
+  lastSavedCycleDate?: string;
 }
 
 export interface ForecastState {
@@ -56,7 +63,7 @@ export interface ForecastState {
   isSaved: boolean;
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
-  lifetimeCycleStats?: { totalCyclesMade: number; totalForecastsMade: number };
+  lifetimeCycleStats?: LifetimeCycleStats;
   historyByDay: Partial<Record<DayType, ForecastHistoryStacks>>;
   /** Unsaved discussion editor drafts, keyed by grouping id so shared owner days cannot collide. */
   discussionDraftsByScope: Record<string, DiscussionData>;
@@ -1091,6 +1098,18 @@ export const forecastSlice = createSlice({
       state.lifetimeCycleStats ??= { totalCyclesMade: 0, totalForecastsMade: 0 };
       state.lifetimeCycleStats.totalCyclesMade += 1;
       state.lifetimeCycleStats.totalForecastsMade += savedCycle.stats.forecastDays;
+      const lastSavedCycleDate = state.lifetimeCycleStats.lastSavedCycleDate;
+      if (!lastSavedCycleDate || savedCycle.cycleDate > lastSavedCycleDate) {
+        const previousDate = lastSavedCycleDate ? new Date(lastSavedCycleDate).getTime() : 0;
+        const currentDate = new Date(savedCycle.cycleDate).getTime();
+        const isConsecutiveDay = currentDate - previousDate === 86400000;
+        state.lifetimeCycleStats.forecastStreak = isConsecutiveDay
+          ? (state.lifetimeCycleStats.forecastStreak ?? 0) + 1
+          : 1;
+        state.lifetimeCycleStats.lastSavedCycleDate = savedCycle.cycleDate;
+      } else if (!state.lifetimeCycleStats.forecastStreak) {
+        state.lifetimeCycleStats.forecastStreak = 1;
+      }
       if (state.savedCycles.length > SAVED_CYCLES_LIMIT) {
         state.savedCycles.splice(0, state.savedCycles.length - SAVED_CYCLES_LIMIT);
       }

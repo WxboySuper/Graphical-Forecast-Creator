@@ -1,5 +1,5 @@
 import type { ForecastCycle, OutlookDay, DayType } from '../types/outlooks';
-import type { SavedCycle } from '../store/forecastSlice';
+import type { LifetimeCycleStats, SavedCycle } from '../store/forecastSlice';
 import type { Feature } from 'geojson';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 
@@ -39,7 +39,7 @@ const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
 const getTotalForecastsMade = (
   currentForecastDays: number,
   savedCycles: SavedCycle[],
-  lifetimeStats?: { totalCyclesMade: number; totalForecastsMade: number },
+  lifetimeStats?: LifetimeCycleStats,
 ): number => lifetimeStats
   ? lifetimeStats.totalForecastsMade + currentForecastDays
   : savedCycles.reduce((runningTotal, cycle) => runningTotal + cycle.stats.forecastDays, currentForecastDays);
@@ -72,7 +72,7 @@ const summarizeCurrentCycle = (forecastCycle: ForecastCycle) => Object.entries(f
 export function computeHomeStats(
   forecastCycle: ForecastCycle,
   savedCycles: SavedCycle[],
-  lifetimeStats?: { totalCyclesMade: number; totalForecastsMade: number },
+  lifetimeStats?: LifetimeCycleStats,
 ) {
   const currentCycleMetrics = countForecastMetrics(forecastCycle);
   const currentCycleStats = summarizeCurrentCycle(forecastCycle);
@@ -84,8 +84,7 @@ export function computeHomeStats(
     savedCyclesCount: savedCycles.length,
     totalForecastsMade: getTotalForecastsMade(currentCycleMetrics.forecastDays, savedCycles, lifetimeStats),
     totalCyclesMade: lifetimeStats?.totalCyclesMade ?? savedCycles.length,
-    // Streaks intentionally use the retained, capped window; lifetime totals are separate.
-    forecastStreak: computeSavedCycleStreak(savedCycles),
+    forecastStreak: lifetimeStats?.forecastStreak ?? computeSavedCycleStreak(savedCycles),
   };
 }
 

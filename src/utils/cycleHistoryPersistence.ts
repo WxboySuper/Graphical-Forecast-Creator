@@ -3,7 +3,7 @@ import { useDispatch } from 'react-redux';
 import type { Store } from 'redux';
 import type { RootState } from '../store';
 import { loadCycleHistory } from '../store/forecastSlice';
-import type { SavedCycle, SavedCycleStats } from '../store/forecastSlice';
+import type { LifetimeCycleStats, SavedCycle, SavedCycleStats } from '../store/forecastSlice';
 import { deserializeForecast, serializeForecast } from './fileUtils';
 import { countForecastMetrics } from './forecastMetrics';
 import { normalizeForecastCycle } from './outlookMapCoercion';
@@ -28,7 +28,7 @@ interface PersistedSavedCycle {
 
 export interface CycleHistorySnapshot {
   cycles: SavedCycle[];
-  lifetimeCycleStats: { totalCyclesMade: number; totalForecastsMade: number };
+  lifetimeCycleStats: LifetimeCycleStats;
 }
 
 /** Converts an in-memory saved cycle into a JSON-safe storage shape that preserves map data. */
@@ -113,15 +113,37 @@ const emptyCycleHistorySnapshot = (): CycleHistorySnapshot => ({
   lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
 });
 
-const deriveLifetimeCycleStats = (cycles: SavedCycle[]) => ({
+const getCycleDayIndex = (cycleDate: string): number => {
+  const [year, month, day] = cycleDate.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+const deriveForecastStreak = (cycles: SavedCycle[]): Pick<LifetimeCycleStats, 'forecastStreak' | 'lastSavedCycleDate'> => {
+  const uniqueDates = Array.from(new Set(cycles.map((cycle) => cycle.cycleDate))).sort();
+  if (uniqueDates.length === 0) return {};
+
+  let forecastStreak = 1;
+  for (let index = uniqueDates.length - 1; index > 0; index -= 1) {
+    if (getCycleDayIndex(uniqueDates[index]) - getCycleDayIndex(uniqueDates[index - 1]) !== 1) break;
+    forecastStreak += 1;
+  }
+
+  return { forecastStreak, lastSavedCycleDate: uniqueDates[uniqueDates.length - 1] };
+};
+
+const deriveLifetimeCycleStats = (cycles: SavedCycle[]): LifetimeCycleStats => ({
   totalCyclesMade: cycles.length,
   totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
+  ...deriveForecastStreak(cycles),
 });
 
-const isLifetimeCycleStats = (value: unknown): value is { totalCyclesMade: number; totalForecastsMade: number } => {
+const isLifetimeCycleStats = (value: unknown): value is LifetimeCycleStats => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const stats = value as Record<string, unknown>;
-  return typeof stats.totalCyclesMade === 'number' && typeof stats.totalForecastsMade === 'number';
+  return typeof stats.totalCyclesMade === 'number'
+    && typeof stats.totalForecastsMade === 'number'
+    && (stats.forecastStreak === undefined || typeof stats.forecastStreak === 'number')
+    && (stats.lastSavedCycleDate === undefined || typeof stats.lastSavedCycleDate === 'string');
 };
 
 const getStoredLifetimeStats = (parsed: unknown) => {
@@ -130,7 +152,16 @@ const getStoredLifetimeStats = (parsed: unknown) => {
 };
 
 const readStoredLifetimeStats = (parsed: unknown, cycles: SavedCycle[]) => {
-  return getStoredLifetimeStats(parsed) ?? deriveLifetimeCycleStats(cycles);
+  const derived = deriveLifetimeCycleStats(cycles);
+  const stored = getStoredLifetimeStats(parsed);
+  return stored
+    ? {
+        ...derived,
+        ...stored,
+        forecastStreak: stored.forecastStreak ?? derived.forecastStreak,
+        lastSavedCycleDate: stored.lastSavedCycleDate ?? derived.lastSavedCycleDate,
+      }
+    : derived;
 };
 
 const parseStoredCycleHistorySnapshot = (serialized: string | null): CycleHistorySnapshot => {
@@ -192,7 +223,7 @@ export const migrateLegacyCycleHistory = (userId?: string | null): void => {
 export const saveCycleHistoryToStorage = (
   cycles: SavedCycle[],
   userId?: string | null,
-  lifetimeCycleStats?: { totalCyclesMade: number; totalForecastsMade: number },
+  lifetimeCycleStats?: LifetimeCycleStats,
 ): void => {
   try {
     const serialized = JSON.stringify({

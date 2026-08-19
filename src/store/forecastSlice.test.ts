@@ -14,6 +14,7 @@ import reducer, {
   selectCanRedo,
   selectCanUndo,
   setForecastDay,
+  setCycleDate,
   toggleLowProbability,
   undoLastEdit,
   updateFeature,
@@ -251,16 +252,27 @@ describe('forecastSlice undo/redo', () => {
 
     expect(state.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
     expect(state.savedCycles[0]?.label).toBe('Cycle 1');
-    expect(state.lifetimeCycleStats).toEqual({
-      totalCyclesMade: SAVED_CYCLES_LIMIT + 1,
-      totalForecastsMade: 0,
-    });
+    expect(state.lifetimeCycleStats?.totalCyclesMade).toBe(SAVED_CYCLES_LIMIT + 1);
+    expect(state.lifetimeCycleStats?.totalForecastsMade).toBe(0);
 
     const hydrated = reducer(state, loadCycleHistory([
       ...state.savedCycles,
       state.savedCycles[state.savedCycles.length - 1],
     ]));
     expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+  });
+
+  test('continues streak tracking beyond the retained cycle window', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    for (let index = 0; index < SAVED_CYCLES_LIMIT + 10; index += 1) {
+      const cycleDate = new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10);
+      state = reducer(state, setCycleDate(cycleDate));
+      state = reducer(state, saveCurrentCycle({ label: `Cycle ${index}` }));
+    }
+
+    expect(state.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+    expect(state.lifetimeCycleStats?.forecastStreak).toBe(SAVED_CYCLES_LIMIT + 10);
+    expect(state.lifetimeCycleStats?.lastSavedCycleDate).toBe('2026-03-01');
   });
 
   test('replaces lifetime stats on scope hydration and preserves them when a cycle is deleted', () => {
