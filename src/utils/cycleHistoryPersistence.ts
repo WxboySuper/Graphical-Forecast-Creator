@@ -118,14 +118,17 @@ const deriveLifetimeCycleStats = (cycles: SavedCycle[]) => ({
   totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
 });
 
-const readStoredLifetimeStats = (parsed: unknown, cycles: SavedCycle[]) => {
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return deriveLifetimeCycleStats(cycles);
+const getStoredLifetimeStats = (parsed: unknown) => {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
   const stats = (parsed as { lifetimeCycleStats?: unknown }).lifetimeCycleStats;
-  if (!stats || typeof stats !== 'object') return deriveLifetimeCycleStats(cycles);
+  if (!stats || typeof stats !== 'object') return undefined;
   const { totalCyclesMade, totalForecastsMade } = stats as Record<string, unknown>;
   return typeof totalCyclesMade === 'number' && typeof totalForecastsMade === 'number'
-    ? { totalCyclesMade, totalForecastsMade }
-    : deriveLifetimeCycleStats(cycles);
+    ? { totalCyclesMade, totalForecastsMade } : undefined;
+};
+
+const readStoredLifetimeStats = (parsed: unknown, cycles: SavedCycle[]) => {
+  return getStoredLifetimeStats(parsed) ?? deriveLifetimeCycleStats(cycles);
 };
 
 const parseStoredCycleHistorySnapshot = (serialized: string | null): CycleHistorySnapshot => {
