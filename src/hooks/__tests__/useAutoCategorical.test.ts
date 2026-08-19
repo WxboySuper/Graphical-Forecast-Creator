@@ -8,10 +8,8 @@ import {
   processDay3OutlooksToCategorical,
   processOutlooksToCategorical,
 } from '../autoCategoricalProcessing';
-import {
-  CategoricalDerivationError,
-  signatureFromOutlookMap,
-} from '../useAutoCategorical';
+import { signatureFromOutlookMap } from '../useAutoCategorical';
+import { CategoricalDerivationError } from '../categoricalErrors';
 import { OutlookData } from '../../types/outlooks';
 import { Feature, Polygon } from 'geojson';
 import * as turf from '@turf/turf';
