@@ -50,6 +50,12 @@ const createDb = ({ existingCount = 0, existingCycle = null } = {}) => {
 };
 
 describe('cloud-cycle server contract', () => {
+  const validWorkflowMetadata = {
+    id: 'workflow-1', workflowId: 'workflow-1', cycleDate: '2026-08-09', status: 'in-progress',
+    outlookVersions: [{ version: 1, status: 'in-progress', createdAt: '2026-08-09T00:00:00Z' }],
+    createdAt: '2026-08-09T00:00:00Z', updatedAt: '2026-08-09T00:00:00Z',
+  };
+
   it('derives UTF-8 payload bytes on the server request boundary', () => {
     const payloadJson = '{"label":"café"}';
     const cycle = readCloudCycleRequest({
@@ -94,5 +100,20 @@ describe('cloud-cycle server contract', () => {
     assert.equal(db.queries[0].limit, MAX_CLOUD_CYCLES + 1);
     assert.equal(db.writes.get('cloudCycles/cycle-1').payloadBytes, getPayloadBytes(payloadJson));
     assert.equal(db.writes.get('cloudCycles/cycle-1/payload/payload').payloadJson, payloadJson);
+  });
+
+  it('rejects oversized metadata, invalid workflow metadata, and non-boolean flags', () => {
+    const base = { id: 'cycle-1', userId: 'user-1', label: 'Cycle 1', cycleDate: '2026-08-09', payloadJson: '{}', metadata: { id: 'cycle-1', userId: 'user-1' } };
+    assert.equal(readCloudCycleRequest({ ...base, metadata: { ...base.metadata, label: 'x'.repeat(16 * 1024) } }, 'user-1'), null);
+    assert.equal(readCloudCycleRequest({ ...base, metadata: { ...base.metadata, workflowMetadata: { ...validWorkflowMetadata, outlookVersions: [{ version: 1, status: 'invalid', createdAt: 'now' }] } } }, 'user-1'), null);
+    assert.equal(readCloudCycleRequest({ ...base, metadata: { ...base.metadata, isReadOnly: 'false' } }, 'user-1'), null);
+  });
+
+  it('accepts a complete valid workflow metadata contract', () => {
+    const cycle = readCloudCycleRequest({
+      id: 'cycle-1', userId: 'user-1', label: 'Cycle 1', cycleDate: '2026-08-09', payloadJson: '{}',
+      metadata: { id: 'cycle-1', userId: 'user-1', isReadOnly: false, workflowMetadata: validWorkflowMetadata },
+    }, 'user-1');
+    assert.deepEqual(cycle.metadata.workflowMetadata, validWorkflowMetadata);
   });
 });
