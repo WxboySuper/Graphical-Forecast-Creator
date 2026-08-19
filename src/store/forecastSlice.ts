@@ -1128,6 +1128,7 @@ export const forecastSlice = createSlice({
     deleteSavedCycle: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
       state.savedCycles = state.savedCycles.filter(c => c.id !== cycleId);
+      // lifetimeCycleStats intentionally tracks historical saves, not the retained/deletable window.
     },
 
     // Copy features from one cycle/day to current cycle/day
@@ -1172,7 +1173,7 @@ export const forecastSlice = createSlice({
       state.lifetimeCycleStats = Array.isArray(action.payload)
         ? {
             totalCyclesMade: cycles.length,
-            totalForecastsMade: cycles.reduce((total, cycle) => total + cycle.stats.forecastDays, 0),
+            totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
           }
         : action.payload.lifetimeCycleStats;
     },

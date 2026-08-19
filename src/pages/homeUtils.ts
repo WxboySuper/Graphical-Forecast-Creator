@@ -36,6 +36,14 @@ const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
   return streak;
 };
 
+const getTotalForecastsMade = (
+  currentForecastDays: number,
+  savedCycles: SavedCycle[],
+  lifetimeStats?: { totalCyclesMade: number; totalForecastsMade: number },
+): number => lifetimeStats
+  ? lifetimeStats.totalForecastsMade + currentForecastDays
+  : savedCycles.reduce((runningTotal, cycle) => runningTotal + cycle.stats.forecastDays, currentForecastDays);
+
 /** Aggregates outlook statistics from a forecast cycle for dashboard display. */
 export function computeHomeStats(
   forecastCycle: ForecastCycle,
@@ -77,10 +85,9 @@ export function computeHomeStats(
     totalOutlooks,
     totalFeatures,
     savedCyclesCount: savedCycles.length,
-    totalForecastsMade: lifetimeStats
-      ? lifetimeStats.totalForecastsMade + currentCycleMetrics.forecastDays
-      : savedCycles.reduce((runningTotal, cycle) => runningTotal + cycle.stats.forecastDays, currentCycleMetrics.forecastDays),
+    totalForecastsMade: getTotalForecastsMade(currentCycleMetrics.forecastDays, savedCycles, lifetimeStats),
     totalCyclesMade: lifetimeStats?.totalCyclesMade ?? savedCycles.length,
+    // Streaks intentionally use the retained, capped window; lifetime totals are separate.
     forecastStreak: computeSavedCycleStreak(savedCycles),
   };
 }

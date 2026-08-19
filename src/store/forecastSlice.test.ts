@@ -29,6 +29,7 @@ import reducer, {
   createOutlookUpdate,
   startFromPreviousCycle,
   saveCurrentCycle,
+  deleteSavedCycle,
   loadCycleHistory,
   SAVED_CYCLES_LIMIT,
   updateDiscussion,
@@ -260,6 +261,23 @@ describe('forecastSlice undo/redo', () => {
       state.savedCycles[state.savedCycles.length - 1],
     ]));
     expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+  });
+
+  test('replaces lifetime stats on scope hydration and preserves them when a cycle is deleted', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    state = reducer(state, loadCycleHistory({
+      cycles: [],
+      lifetimeCycleStats: { totalCyclesMade: 12, totalForecastsMade: 24 },
+    }));
+    expect(state.lifetimeCycleStats).toEqual({ totalCyclesMade: 12, totalForecastsMade: 24 });
+
+    state = reducer(state, loadCycleHistory({
+      cycles: [],
+      lifetimeCycleStats: { totalCyclesMade: 3, totalForecastsMade: 5 },
+    }));
+    expect(state.lifetimeCycleStats).toEqual({ totalCyclesMade: 3, totalForecastsMade: 5 });
+    state = reducer(state, deleteSavedCycle('missing'));
+    expect(state.lifetimeCycleStats).toEqual({ totalCyclesMade: 3, totalForecastsMade: 5 });
   });
 
   test('stores per-outlook opacity with a legacy-compatible default', () => {
