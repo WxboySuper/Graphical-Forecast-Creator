@@ -146,10 +146,11 @@ const isOptionalString = (value: unknown): value is string | undefined =>
 const isLifetimeCycleStats = (value: unknown): value is LifetimeCycleStats => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const stats = value as Record<string, unknown>;
-  return typeof stats.totalCyclesMade === 'number'
-    && typeof stats.totalForecastsMade === 'number'
-    && isOptionalNumber(stats.forecastStreak)
-    && isOptionalString(stats.lastSavedCycleDate);
+  if (typeof stats.totalCyclesMade !== 'number') return false;
+  if (typeof stats.totalForecastsMade !== 'number') return false;
+  if (!isOptionalNumber(stats.forecastStreak)) return false;
+  if (!isOptionalString(stats.lastSavedCycleDate)) return false;
+  return true;
 };
 
 const getStoredLifetimeStats = (parsed: unknown) => {
