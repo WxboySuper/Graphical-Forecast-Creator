@@ -22,10 +22,10 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 
 // New UI components
 import { AppLayout } from './components/Layout';
-import { HomePage } from './pages/HomePage';
+import HomePage from './pages/HomePage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
-import { AccountPage } from './pages/AccountPage';
-import { PricingPage } from './pages/PricingPage';
+import AccountPage from './pages/AccountPage';
+import PricingPage from './pages/PricingPage';
 import { UpdatesPage } from './pages/UpdatesPage';
 import BetaLandingPage from './pages/BetaLandingPage';
 import BetaInvitePage from './pages/BetaInvitePage';
