@@ -51,6 +51,7 @@ export interface ForecastState {
   isSaved: boolean;
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
+  lifetimeCycleStats?: { totalCyclesMade: number; totalForecastsMade: number };
   historyByDay: Partial<Record<DayType, ForecastHistoryStacks>>;
   /** Unsaved discussion editor drafts, keyed by grouping id so shared owner days cannot collide. */
   discussionDraftsByScope: Record<string, DiscussionData>;
@@ -332,6 +333,7 @@ const initialState: ForecastState = {
   isSaved: true,
   emergencyMode: false,
   savedCycles: [],
+  lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
   historyByDay: {},
   discussionDraftsByScope: {},
   completionValidation: {
@@ -1081,6 +1083,9 @@ export const forecastSlice = createSlice({
         workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
+      state.lifetimeCycleStats ??= { totalCyclesMade: 0, totalForecastsMade: 0 };
+      state.lifetimeCycleStats.totalCyclesMade += 1;
+      state.lifetimeCycleStats.totalForecastsMade += savedCycle.stats.forecastDays;
       if (state.savedCycles.length > SAVED_CYCLES_LIMIT) {
         state.savedCycles.splice(0, state.savedCycles.length - SAVED_CYCLES_LIMIT);
       }
@@ -1157,7 +1162,13 @@ export const forecastSlice = createSlice({
 
     // Load cycles from storage (for hydration)
     loadCycleHistory: (state, action: PayloadAction<SavedCycle[]>) => {
-      state.savedCycles = action.payload;
+      state.savedCycles = action.payload.slice(-SAVED_CYCLES_LIMIT);
+      if (!state.lifetimeCycleStats || state.lifetimeCycleStats.totalCyclesMade === 0) {
+        state.lifetimeCycleStats = {
+          totalCyclesMade: action.payload.length,
+          totalForecastsMade: action.payload.reduce((total, cycle) => total + cycle.stats.forecastDays, 0),
+        };
+      }
     },
 
     setLowProbability: (state, action: PayloadAction<{ outlookType: OutlookType, isLow: boolean }>) => {

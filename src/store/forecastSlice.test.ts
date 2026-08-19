@@ -29,6 +29,8 @@ import reducer, {
   createOutlookUpdate,
   startFromPreviousCycle,
   saveCurrentCycle,
+  loadCycleHistory,
+  SAVED_CYCLES_LIMIT,
   updateDiscussion,
   updateDiscussionDraft,
   migrateDiscussionDrafts,
@@ -240,6 +242,26 @@ const getRedoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
   state.historyByDay[day]?.redoStack || [];
 
 describe('forecastSlice undo/redo', () => {
+  test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {
+      state = reducer(state, saveCurrentCycle({ label: `Cycle ${index}` }));
+    }
+
+    expect(state.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+    expect(state.savedCycles[0]?.label).toBe('Cycle 1');
+    expect(state.lifetimeCycleStats).toEqual({
+      totalCyclesMade: SAVED_CYCLES_LIMIT + 1,
+      totalForecastsMade: 0,
+    });
+
+    const hydrated = reducer(state, loadCycleHistory([
+      ...state.savedCycles,
+      state.savedCycles[state.savedCycles.length - 1],
+    ]));
+    expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+  });
+
   test('stores per-outlook opacity with a legacy-compatible default', () => {
     const base = reducer(undefined, setForecastDay(1));
     const state = (forecastState: ReturnType<typeof reducer>) => ({ forecast: forecastState } as Parameters<typeof selectCurrentOutlookOpacity>[0]);

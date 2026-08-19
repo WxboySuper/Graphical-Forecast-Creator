@@ -37,7 +37,11 @@ const computeSavedCycleStreak = (savedCycles: SavedCycle[]): number => {
 };
 
 /** Aggregates outlook statistics from a forecast cycle for dashboard display. */
-export function computeHomeStats(forecastCycle: ForecastCycle, savedCycles: SavedCycle[]) {
+export function computeHomeStats(
+  forecastCycle: ForecastCycle,
+  savedCycles: SavedCycle[],
+  lifetimeStats?: { totalCyclesMade: number; totalForecastsMade: number },
+) {
   const currentCycleMetrics = countForecastMetrics(forecastCycle);
   const daysWithData: DayType[] = [];
   let totalOutlooks = 0;
@@ -73,11 +77,9 @@ export function computeHomeStats(forecastCycle: ForecastCycle, savedCycles: Save
     totalOutlooks,
     totalFeatures,
     savedCyclesCount: savedCycles.length,
-    totalForecastsMade: savedCycles.reduce(
-      (runningTotal, cycle) => runningTotal + cycle.stats.forecastDays,
-      currentCycleMetrics.forecastDays
-    ),
-    totalCyclesMade: savedCycles.length,
+    totalForecastsMade: lifetimeStats?.totalForecastsMade
+      ?? savedCycles.reduce((runningTotal, cycle) => runningTotal + cycle.stats.forecastDays, currentCycleMetrics.forecastDays),
+    totalCyclesMade: lifetimeStats?.totalCyclesMade ?? savedCycles.length,
     forecastStreak: computeSavedCycleStreak(savedCycles),
   };
 }
