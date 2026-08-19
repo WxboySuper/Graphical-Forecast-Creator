@@ -35,6 +35,10 @@ const unavailableCapabilityKeys = new Set<string>();
 const statusListeners = new Set<() => void>();
 let cachedStatusSnapshot: CapabilityStatusSnapshot = EMPTY_STATUS;
 let cachedStatusRequest: Promise<CapabilityStatusSnapshot> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryAttempts = 0;
+const RETRY_DELAY_MS = 5000;
+const MAX_RETRY_ATTEMPTS = 3;
 
 /** Notifies runtime hooks when a capability becomes unavailable after page load. */
 const notifyCapabilityStatusListeners = (): void => {
@@ -54,9 +58,27 @@ export const markServerCapabilityUnavailable = (capabilityKey: string): void => 
 /** Resets local unavailable markers and the shared status cache. Intended for tests. */
 export const resetServerCapabilityStatusState = (): void => {
   unavailableCapabilityKeys.clear();
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  retryAttempts = 0;
   cachedStatusSnapshot = EMPTY_STATUS;
   cachedStatusRequest = null;
   notifyCapabilityStatusListeners();
+};
+
+const scheduleCapabilityStatusRetry = (): void => {
+  if (retryTimer || retryAttempts >= MAX_RETRY_ATTEMPTS) {
+    return;
+  }
+
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    if (!cachedStatusSnapshot.loaded && !cachedStatusRequest) {
+      void loadSharedServerCapabilityStatus();
+    }
+  }, RETRY_DELAY_MS);
 };
 
 /** Returns the server capability key for a registry feature when server-backed. */
@@ -104,6 +126,11 @@ export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnap
   if (!cachedStatusRequest) {
     cachedStatusRequest = fetchServerCapabilityStatus()
       .then((response) => {
+        retryAttempts = 0;
+        if (retryTimer) {
+          clearTimeout(retryTimer);
+          retryTimer = null;
+        }
         cachedStatusSnapshot = {
           loaded: true,
           capabilities: response.capabilities,
@@ -112,16 +139,13 @@ export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnap
         return cachedStatusSnapshot;
       })
       .catch(() => {
-        // Keep a transient outage in the loading state so the next scheduled
-        // attempt can recover without a full page reload.
-        cachedStatusSnapshot = EMPTY_STATUS;
+        retryAttempts += 1;
         cachedStatusRequest = null;
+        cachedStatusSnapshot = retryAttempts >= MAX_RETRY_ATTEMPTS
+          ? { loaded: true, capabilities: {} }
+          : EMPTY_STATUS;
         notifyCapabilityStatusListeners();
-        setTimeout(() => {
-          if (!cachedStatusSnapshot.loaded && !cachedStatusRequest) {
-            void loadSharedServerCapabilityStatus();
-          }
-        }, 5000);
+        scheduleCapabilityStatusRetry();
         return cachedStatusSnapshot;
       });
   }
