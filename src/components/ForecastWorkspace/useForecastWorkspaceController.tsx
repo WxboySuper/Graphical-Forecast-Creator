@@ -13,6 +13,8 @@ import { useExportMap } from '../DrawingTools/useExportMap';
 import { DayType, OutlookData, OutlookType } from '../../types/outlooks';
 import { getOutlookColor } from '../../utils/outlookUtils';
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
+import type { ForecastTransferDirection } from './ForecastTransferModal';
+import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../../utils/forecastTransfer';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 const EMPTY_LOW_PROBABILITY_OUTLOOKS: OutlookType[] = [];
@@ -92,11 +94,19 @@ function createDateAndModalHandlers(opts: {
 }
 
 export interface ForecastWorkspaceController {
-  onSave: () => void;
-  onLoadClick: () => void;
-  onPackageDownload: () => void;
-  onWorkflowPackageDownload: () => void;
-  onCyclePackageDownload: () => void;
+  onOpenTransferModal: (direction?: ForecastTransferDirection) => void;
+  onCloseTransferModal: () => void;
+  onTransferDirectionChange: (direction: ForecastTransferDirection) => void;
+  onTransferImported: (result: ForecastImportResult) => void;
+  onTransferExported: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
+  showTransferModal: boolean;
+  transferDirection: ForecastTransferDirection;
+  isTransferBusy: boolean;
+  onTransferBusyChange: (busy: boolean) => void;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  cycleMetadata?: import('../../types/workflow').CycleMetadata;
+  isWorkflowActive: boolean;
+  getMapView: () => { center: [number, number]; zoom: number };
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
   onOpenResetConfirm: () => void;
@@ -113,8 +123,6 @@ export interface ForecastWorkspaceController {
   onCloseCopyModal: () => void;
   onCancelReset: () => void;
   onReset: () => void;
-  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
   isSaved: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -123,7 +131,6 @@ export interface ForecastWorkspaceController {
   onInitiateExport: () => void;
   onConfirmExport: (title: string) => Promise<void>;
   onCancelExport: () => void;
-  isPackageDownloading: boolean;
   showHistoryModal: boolean;
   showCopyModal: boolean;
   showResetConfirm: boolean;
@@ -162,21 +169,18 @@ export interface ForecastWorkspaceController {
 }
 
 interface UseForecastWorkspaceControllerOptions {
-  onSave: () => void;
-  onLoad: (file: File) => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
   addToast: AddToastFn;
   cloudTools?: React.ReactNode;
+  onImportResult: (result: ForecastImportResult) => void;
+  onExportComplete?: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
 }
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
 
 /** Arguments required to assemble the public ForecastWorkspaceController returned by the hook. */
 interface BuildForecastWorkspaceControllerArgs {
-  onSave: () => void;
   cloudTools: React.ReactNode;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
   isSaved: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -185,7 +189,18 @@ interface BuildForecastWorkspaceControllerArgs {
   initiateExport: () => void;
   confirmExport: (title: string) => Promise<void>;
   cancelExport: () => void;
-  isPackageDownloading: boolean;
+  showTransferModal: boolean;
+  transferDirection: ForecastTransferDirection;
+  isTransferBusy: boolean;
+  onTransferBusyChange: (busy: boolean) => void;
+  onCloseTransferModal: () => void;
+  onTransferDirectionChange: (direction: ForecastTransferDirection) => void;
+  onTransferImported: (result: ForecastImportResult) => void;
+  onTransferExported: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  cycleMetadata?: import('../../types/workflow').CycleMetadata;
+  isWorkflowActive: boolean;
+  getMapView: () => { center: [number, number]; zoom: number };
   showHistoryModal: boolean;
   showCopyModal: boolean;
   showResetConfirm: boolean;
@@ -227,9 +242,7 @@ interface BuildForecastWorkspaceControllerArgs {
  */
 function buildForecastWorkspaceController(args: BuildForecastWorkspaceControllerArgs): ForecastWorkspaceController {
   const {
-    onSave,
     cloudTools,
-    fileInputRef,
     isSaved,
     canUndo,
     canRedo,
@@ -238,7 +251,18 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     initiateExport,
     confirmExport,
     cancelExport,
-    isPackageDownloading,
+    showTransferModal,
+    transferDirection,
+    isTransferBusy,
+    onTransferBusyChange,
+    onCloseTransferModal,
+    onTransferDirectionChange,
+    onTransferImported,
+    onTransferExported,
+    forecastCycle,
+    cycleMetadata,
+    isWorkflowActive,
+    getMapView,
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
@@ -278,9 +302,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
   const isLowProb = lowProbabilityOutlooks.includes(panel.activeOutlookType);
 
   return {
-    onSave,
     cloudTools,
-    fileInputRef,
     isSaved,
     canUndo,
     canRedo,
@@ -289,7 +311,19 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     onInitiateExport: initiateExport,
     onConfirmExport: confirmExport,
     onCancelExport: cancelExport,
-    isPackageDownloading,
+    onOpenTransferModal: handlers.onOpenTransferModal,
+    onCloseTransferModal,
+    onTransferDirectionChange,
+    onTransferImported,
+    onTransferExported,
+    showTransferModal,
+    transferDirection,
+    isTransferBusy,
+    onTransferBusyChange,
+    forecastCycle,
+    cycleMetadata,
+    isWorkflowActive,
+    getMapView,
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
@@ -342,7 +376,9 @@ function useForecastWorkspaceModalState(cycleDate: string, dispatch: ReturnType<
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [isPackageDownloading, setIsPackageDownloading] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferDirection, setTransferDirection] = useState<ForecastTransferDirection>('export');
+  const [isTransferBusy, setIsTransferBusy] = useState(false);
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [tempDate, setTempDate] = useState('');
 
@@ -374,8 +410,12 @@ function useForecastWorkspaceModalState(cycleDate: string, dispatch: ReturnType<
     showHistoryModal,
     showCopyModal,
     showResetConfirm,
-    isPackageDownloading,
-    setIsPackageDownloading,
+    showTransferModal,
+    setShowTransferModal,
+    transferDirection,
+    setTransferDirection,
+    isTransferBusy,
+    setIsTransferBusy,
     isEditingDate,
     setIsEditingDate,
     tempDate,
@@ -434,6 +474,7 @@ function useForecastWorkspaceCoreState(
   const outlookOpacities = useSelector((state: RootState) =>
     state.forecast.forecastCycle.days[currentDay]?.metadata?.outlookOpacities || EMPTY_OUTLOOK_OPACITIES
   );
+  const isWorkflowActive = useSelector((state: RootState) => state.forecast.isWorkflowActive);
   const panel = useOutlookPanelLogic();
   const exportState = useExportMap({
     mapRef,
@@ -453,6 +494,7 @@ function useForecastWorkspaceCoreState(
     dispatch,
     forecastCycle,
     cycleMetadata,
+    isWorkflowActive,
     currentDay,
     days,
     cycleDate,
@@ -472,37 +514,33 @@ function useForecastWorkspaceCoreState(
 
 /** Shared controller for all Forecast workspace layouts. */
 function useForecastWorkspaceControllerArgs({
-  onSave,
-  onLoad,
   mapRef,
-  fileInputRef,
   addToast,
   cloudTools = null,
+  onImportResult,
+  onExportComplete,
 }: UseForecastWorkspaceControllerOptions): BuildForecastWorkspaceControllerArgs {
   const core = useForecastWorkspaceCoreState(mapRef, addToast);
   const modalState = useForecastWorkspaceModalState(core.cycleDate, core.dispatch);
   const completionState = useCompletionValidationController(core.dispatch, addToast);
   const handlers = useForecastWorkspaceActionHandlers({
     dispatch: core.dispatch,
-    onLoad,
     mapRef,
     addToast,
-    forecastCycle: core.forecastCycle,
-    cycleMetadata: core.cycleMetadata,
     currentDay: core.currentDay,
     canUndo: core.canUndo,
     canRedo: core.canRedo,
     tempDate: modalState.tempDate,
     setIsEditingDate: modalState.setIsEditingDate,
-    setIsPackageDownloading: modalState.setIsPackageDownloading,
-    fileInputRef,
+    setShowTransferModal: modalState.setShowTransferModal,
+    setTransferDirection: modalState.setTransferDirection,
     handleCancelReset: modalState.handleCancelReset,
   });
 
+  const getMapView = () => mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
+
   return {
-    onSave,
     cloudTools,
-    fileInputRef,
     isSaved: core.isSaved,
     canUndo: core.canUndo,
     canRedo: core.canRedo,
@@ -511,7 +549,18 @@ function useForecastWorkspaceControllerArgs({
     initiateExport: core.initiateExport,
     confirmExport: core.confirmExport,
     cancelExport: core.cancelExport,
-    isPackageDownloading: modalState.isPackageDownloading,
+    showTransferModal: modalState.showTransferModal,
+    transferDirection: modalState.transferDirection,
+    isTransferBusy: modalState.isTransferBusy,
+    onTransferBusyChange: modalState.setIsTransferBusy,
+    onCloseTransferModal: () => modalState.setShowTransferModal(false),
+    onTransferDirectionChange: modalState.setTransferDirection,
+    onTransferImported: onImportResult,
+    onTransferExported: onExportComplete ?? (() => undefined),
+    forecastCycle: core.forecastCycle,
+    cycleMetadata: core.cycleMetadata,
+    isWorkflowActive: core.isWorkflowActive,
+    getMapView,
     showHistoryModal: modalState.showHistoryModal,
     showCopyModal: modalState.showCopyModal,
     showResetConfirm: modalState.showResetConfirm,

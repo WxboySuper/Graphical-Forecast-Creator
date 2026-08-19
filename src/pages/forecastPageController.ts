@@ -17,6 +17,7 @@ import {
 import type { RootState } from '../store';
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { deserializeForecast, exportForecastToJson, MAX_IMPORT_BYTES, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
+import { importForecastTransfer, type ForecastImportResult } from '../utils/forecastTransfer';
 import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
   DAY_ROLLOVER_CHECK_INTERVAL_MS,
@@ -106,17 +107,32 @@ const applyLoadedForecast = (
   dispatch: ShortcutDispatch,
   mapRef: React.RefObject<ForecastMapHandle | null>,
 ) => {
-  dispatch(importForecastCycle(payload.deserializedCycle));
-  if (payload.rawData.cycleMetadata) dispatch(setWorkflowMetadata(payload.rawData.cycleMetadata));
-  else if (payload.rawData.cycleMetadata === null) dispatch(clearWorkflowMetadata());
+  applyForecastImportResult({
+    forecastCycle: payload.deserializedCycle,
+    mapView: payload.rawData.mapView,
+    cycleMetadata: payload.rawData.cycleMetadata,
+    warnings: [],
+    format: 'json',
+  }, dispatch, mapRef);
+};
 
-  if (payload.rawData.mapView) {
-    dispatch(setMapView(payload.rawData.mapView));
+/** Applies any supported forecast import result to the active workspace session. */
+export const applyForecastImportResult = (
+  result: ForecastImportResult,
+  dispatch: ShortcutDispatch,
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+) => {
+  dispatch(importForecastCycle(result.forecastCycle));
+  if (result.cycleMetadata) dispatch(setWorkflowMetadata(result.cycleMetadata));
+  else if (result.cycleMetadata === null) dispatch(clearWorkflowMetadata());
+
+  if (result.mapView) {
+    dispatch(setMapView(result.mapView));
     return;
   }
 
   const map = mapRef.current?.getMap();
-  const currentDayData = payload.deserializedCycle.days[payload.deserializedCycle.currentDay]?.data;
+  const currentDayData = result.forecastCycle.days[result.forecastCycle.currentDay]?.data;
   if (map && dayHasAnyFeatures(currentDayData)) {
     dispatch(setMapView({ center: [39.8283, -98.5795], zoom: 4 }));
   }
@@ -144,16 +160,20 @@ const useForecastLoadAction = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
   mapRef: React.RefObject<ForecastMapHandle | null>,
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
 ) => useCallback(async (file: File) => {
   try {
-    const payload = await parseLoadedForecast(file, addToast);
-    if (!payload) return;
-    applyLoadedForecast(payload, dispatch, mapRef);
-    addToast('Forecast loaded successfully!', 'success');
-  } catch {
-    addToast('Error reading file.', 'error');
+    const result = await importForecastTransfer(file, {
+      baseCycle: forecastCycle,
+      defaultDay: forecastCycle.currentDay,
+    });
+    applyForecastImportResult(result, dispatch, mapRef);
+    const warningSuffix = result.warnings.length > 0 ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})` : '';
+    addToast(`Forecast imported from ${result.format.toUpperCase()}!${warningSuffix}`, 'success');
+  } catch (error) {
+    addToast(error instanceof Error ? error.message : 'Error reading file.', 'error');
   }
-}, [addToast, dispatch, mapRef]);
+}, [addToast, dispatch, mapRef, forecastCycle]);
 
 /** Composes the save and load actions owned by the forecast session controller. */
 export const useForecastFileActions = (
@@ -165,7 +185,7 @@ export const useForecastFileActions = (
   workflowMetadata?: import('../types/workflow').CycleMetadata,
 ) => ({
   handleSave: useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user, workflowMetadata),
-  handleLoad: useForecastLoadAction(dispatch, addToast, mapRef),
+  handleLoad: useForecastLoadAction(dispatch, addToast, mapRef, forecastCycle),
 });
 
 /** Returns true when a cycle has at least one forecast day or discussion. */
