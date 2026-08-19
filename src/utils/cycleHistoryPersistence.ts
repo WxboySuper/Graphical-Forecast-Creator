@@ -125,8 +125,7 @@ const isLifetimeCycleStats = (value: unknown): value is { totalCyclesMade: numbe
 };
 
 const getStoredLifetimeStats = (parsed: unknown) => {
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
-  const stats = (parsed as { lifetimeCycleStats?: unknown }).lifetimeCycleStats;
+  const stats = (parsed as { lifetimeCycleStats?: unknown } | null)?.lifetimeCycleStats;
   return isLifetimeCycleStats(stats) ? stats : undefined;
 };
 
