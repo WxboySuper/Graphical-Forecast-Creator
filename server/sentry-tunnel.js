@@ -86,6 +86,30 @@ const endResponseIfWritable = (res, status) => {
   }
 };
 
+const forwardSentryEnvelope = async (targetUrl, req, res, envelopeBody) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SENTRY_UPSTREAM_TIMEOUT_MS);
+  const removeAbortHandlers = attachUpstreamAbortHandlers(req, res, controller);
+
+  try {
+    const upstream = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-sentry-envelope' },
+      body: envelopeBody,
+      signal: controller.signal,
+    });
+    endResponseIfWritable(res, upstream.status);
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      throw error;
+    }
+    endResponseIfWritable(res, 504);
+  } finally {
+    clearTimeout(timeoutId);
+    removeAbortHandlers();
+  }
+};
+
 const createSentryTunnelHandler = (targetUrl, configuredEndpoint) => async (req, res) => {
   try {
     const envelopeBody = req.body;
@@ -100,29 +124,7 @@ const createSentryTunnelHandler = (targetUrl, configuredEndpoint) => async (req,
       return;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), SENTRY_UPSTREAM_TIMEOUT_MS);
-    const removeAbortHandlers = attachUpstreamAbortHandlers(req, res, controller);
-
-    try {
-      const upstream = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-sentry-envelope' },
-        body: envelopeBody,
-        signal: controller.signal,
-      });
-
-      endResponseIfWritable(res, upstream.status);
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        endResponseIfWritable(res, 504);
-        return;
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-      removeAbortHandlers();
-    }
+    await forwardSentryEnvelope(targetUrl, req, res, envelopeBody);
   } catch (err) {
     console.error('[analytics] sentry tunnel failed:', err);
     endResponseIfWritable(res, 500);
