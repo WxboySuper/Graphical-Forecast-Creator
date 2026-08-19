@@ -1,7 +1,10 @@
 import {
   classifyNwsAlert,
   filterNwsAlertCollection,
+  fetchActiveNwsAlerts,
+  MAX_ACTIVE_ALERTS,
   snapshotCollectionKey,
+  snapshotCollectionsEqual,
   type NwsAlertFeatureCollection,
 } from './nwsAlerts';
 
@@ -72,7 +75,53 @@ describe('nwsAlerts', () => {
     } as unknown as NwsAlertFeatureCollection;
 
     const key = snapshotCollectionKey(collection);
-    expect(key).toMatch(/^500:\d+$/);
-    expect(key.length).toBeLessThan(20);
+    expect(key).toMatch(/^500:\d+:\d+$/);
+    expect(key.length).toBeLessThan(32);
+    expect(snapshotCollectionKey(collection)).toBe(key);
+  });
+
+  test('compares snapshots independent of alert ordering', () => {
+    const makeCollection = (ids: string[]): NwsAlertFeatureCollection => ({
+      type: 'FeatureCollection',
+      features: ids.map((id) => ({
+        type: 'Feature' as const,
+        id,
+        properties: { updated: '2026-08-13T00:00:00Z' },
+        geometry: null,
+      })),
+    } as unknown as NwsAlertFeatureCollection);
+
+    expect(snapshotCollectionsEqual(makeCollection(['a', 'b']), makeCollection(['b', 'a'])))
+      .toBe(true);
+    expect(snapshotCollectionsEqual(makeCollection(['a', 'b']), makeCollection(['a', 'c'])))
+      .toBe(false);
+  });
+
+  test('bounds fetched alerts even when the API returns more than the limit', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        type: 'FeatureCollection',
+        features: Array.from({ length: MAX_ACTIVE_ALERTS + 1 }, (_, index) => ({
+          type: 'Feature',
+          id: `alert-${index}`,
+          properties: {},
+          geometry: null,
+        })),
+      }),
+    }) as jest.Mock;
+
+    try {
+      await expect(fetchActiveNwsAlerts()).resolves.toMatchObject({
+        features: { length: MAX_ACTIVE_ALERTS },
+      });
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`limit=${MAX_ACTIVE_ALERTS}`),
+        expect.any(Object)
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });
