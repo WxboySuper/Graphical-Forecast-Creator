@@ -36,6 +36,11 @@ export interface SavedCycle {
   workflowMetadata?: CycleMetadata;
 }
 
+export interface CycleHistoryLoad {
+  cycles: SavedCycle[];
+  lifetimeCycleStats: { totalCyclesMade: number; totalForecastsMade: number };
+}
+
 export interface ForecastState {
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
@@ -1161,14 +1166,15 @@ export const forecastSlice = createSlice({
     },
 
     // Load cycles from storage (for hydration)
-    loadCycleHistory: (state, action: PayloadAction<SavedCycle[]>) => {
-      state.savedCycles = action.payload.slice(-SAVED_CYCLES_LIMIT);
-      if (!state.lifetimeCycleStats || state.lifetimeCycleStats.totalCyclesMade === 0) {
-        state.lifetimeCycleStats = {
-          totalCyclesMade: action.payload.length,
-          totalForecastsMade: action.payload.reduce((total, cycle) => total + cycle.stats.forecastDays, 0),
-        };
-      }
+    loadCycleHistory: (state, action: PayloadAction<SavedCycle[] | CycleHistoryLoad>) => {
+      const cycles = Array.isArray(action.payload) ? action.payload : action.payload.cycles;
+      state.savedCycles = cycles.slice(-SAVED_CYCLES_LIMIT);
+      state.lifetimeCycleStats = Array.isArray(action.payload)
+        ? {
+            totalCyclesMade: cycles.length,
+            totalForecastsMade: cycles.reduce((total, cycle) => total + cycle.stats.forecastDays, 0),
+          }
+        : action.payload.lifetimeCycleStats;
     },
 
     setLowProbability: (state, action: PayloadAction<{ outlookType: OutlookType, isLow: boolean }>) => {

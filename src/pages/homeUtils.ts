@@ -77,8 +77,9 @@ export function computeHomeStats(
     totalOutlooks,
     totalFeatures,
     savedCyclesCount: savedCycles.length,
-    totalForecastsMade: lifetimeStats?.totalForecastsMade
-      ?? savedCycles.reduce((runningTotal, cycle) => runningTotal + cycle.stats.forecastDays, currentCycleMetrics.forecastDays),
+    totalForecastsMade: lifetimeStats
+      ? lifetimeStats.totalForecastsMade + currentCycleMetrics.forecastDays
+      : savedCycles.reduce((runningTotal, cycle) => runningTotal + cycle.stats.forecastDays, currentCycleMetrics.forecastDays),
     totalCyclesMade: lifetimeStats?.totalCyclesMade ?? savedCycles.length,
     forecastStreak: computeSavedCycleStreak(savedCycles),
   };

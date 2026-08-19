@@ -26,6 +26,11 @@ interface PersistedSavedCycle {
   workflowMetadata?: CycleMetadata;
 }
 
+export interface CycleHistorySnapshot {
+  cycles: SavedCycle[];
+  lifetimeCycleStats: { totalCyclesMade: number; totalForecastsMade: number };
+}
+
 /** Converts an in-memory saved cycle into a JSON-safe storage shape that preserves map data. */
 const toPersistedSavedCycle = (cycle: SavedCycle): PersistedSavedCycle => ({
   id: cycle.id,
@@ -103,6 +108,29 @@ const parseStoredCycleHistory = (serialized: string | null): SavedCycle[] => {
   }
 };
 
+const parseStoredCycleHistorySnapshot = (serialized: string | null): CycleHistorySnapshot => {
+  if (!serialized) return { cycles: [], lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 } };
+
+  try {
+    const parsed = JSON.parse(serialized);
+    const cycles = Array.isArray(parsed)
+      ? parseStoredCycleHistory(serialized)
+      : parseStoredCycleHistory(JSON.stringify(parsed?.cycles));
+    const storedStats = !Array.isArray(parsed) && parsed?.lifetimeCycleStats;
+    return {
+      cycles,
+      lifetimeCycleStats: storedStats && typeof storedStats.totalCyclesMade === 'number' && typeof storedStats.totalForecastsMade === 'number'
+        ? storedStats
+        : {
+            totalCyclesMade: cycles.length,
+            totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
+          },
+    };
+  } catch {
+    return { cycles: [], lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 } };
+  }
+};
+
 /** Returns the account that claimed the legacy cycle-history copy, if any. */
 const readLegacyCycleHistoryClaim = (): string | null => localStorage.getItem(CYCLE_HISTORY_CLAIM_KEY);
 
@@ -145,9 +173,19 @@ export const migrateLegacyCycleHistory = (userId?: string | null): void => {
 };
 
 /** Persists saved cycles in the anonymous or account-scoped localStorage key. */
-export const saveCycleHistoryToStorage = (cycles: SavedCycle[], userId?: string | null): void => {
+export const saveCycleHistoryToStorage = (
+  cycles: SavedCycle[],
+  userId?: string | null,
+  lifetimeCycleStats?: { totalCyclesMade: number; totalForecastsMade: number },
+): void => {
   try {
-    const serialized = JSON.stringify(cycles.map(toPersistedSavedCycle));
+    const serialized = JSON.stringify({
+      cycles: cycles.map(toPersistedSavedCycle),
+      lifetimeCycleStats: lifetimeCycleStats ?? {
+        totalCyclesMade: cycles.length,
+        totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
+      },
+    });
     localStorage.setItem(getCycleHistoryStorageKey(userId), serialized);
   } catch {
     // Silently ignore localStorage write failures
@@ -158,31 +196,35 @@ export const saveCycleHistoryToStorage = (cycles: SavedCycle[], userId?: string 
  * Load cycle history from localStorage
  */
 export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[] => {
+  return loadCycleHistorySnapshotFromStorage(userId).cycles;
+};
+
+export const loadCycleHistorySnapshotFromStorage = (userId?: string | null): CycleHistorySnapshot => {
   try {
     const scopedKey = getCycleHistoryStorageKey(userId);
     const scopedSerialized = localStorage.getItem(scopedKey);
-    const scopedCycles = parseStoredCycleHistory(scopedSerialized);
-    if (scopedCycles.length > 0 || !userId) {
+    const scopedSnapshot = parseStoredCycleHistorySnapshot(scopedSerialized);
+    if (scopedSnapshot.cycles.length > 0 || !userId) {
       if (!userId && scopedSerialized === null) {
         const legacySerialized = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
         if (legacySerialized) {
           localStorage.setItem(scopedKey, legacySerialized);
-          return parseStoredCycleHistory(legacySerialized);
+          return parseStoredCycleHistorySnapshot(legacySerialized);
         }
       }
-      return scopedCycles;
+      return scopedSnapshot;
     }
 
     // During rollout, signed-in users may still have only the pre-scope history.
     const legacySerialized = localStorage.getItem(LEGACY_CYCLE_HISTORY_KEY);
-    const legacyCycles = parseStoredCycleHistory(legacySerialized);
-    if (legacyCycles.length > 0 && canImportLegacyCycleHistory(userId)) {
+    const legacySnapshot = parseStoredCycleHistorySnapshot(legacySerialized);
+    if (legacySnapshot.cycles.length > 0 && canImportLegacyCycleHistory(userId)) {
       importLegacyCycleHistoryToScope(userId, legacySerialized as string);
-      return legacyCycles;
+      return legacySnapshot;
     }
-    return scopedCycles;
+    return scopedSnapshot;
   } catch {
-    return [];
+    return { cycles: [], lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 } };
   }
 };
 
@@ -196,9 +238,9 @@ export const useCycleHistoryPersistence = (userId?: string | null): void => {
     // Clear the previous account's history before hydrating the new scope.
     dispatch(loadCycleHistory([]));
     migrateLegacyCycleHistory(userId);
-    const savedCycles = loadCycleHistoryFromStorage(userId);
-    if (savedCycles.length > 0) {
-      dispatch(loadCycleHistory(savedCycles));
+    const snapshot = loadCycleHistorySnapshotFromStorage(userId);
+    if (snapshot.cycles.length > 0) {
+      dispatch(loadCycleHistory(snapshot));
     }
   }, [dispatch, userId]);
 };
@@ -216,9 +258,9 @@ export const setupCycleHistoryListener = (store: Store<RootState>, userId?: stri
 
     if (currentCycles !== previousCycles) {
       if (userId) {
-        saveCycleHistoryToStorage(currentCycles, userId);
+        saveCycleHistoryToStorage(currentCycles, userId, state.forecast.lifetimeCycleStats);
       } else {
-        saveCycleHistoryToStorage(currentCycles);
+        saveCycleHistoryToStorage(currentCycles, undefined, state.forecast.lifetimeCycleStats);
       }
       previousCycles = currentCycles;
     }
