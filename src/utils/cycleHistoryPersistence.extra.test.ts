@@ -10,7 +10,7 @@ type SavedCycle = {
 
 type StoreLike = {
   subscribe: (cb: () => void) => () => void;
-  getState: () => { forecast: { savedCycles: SavedCycle[]; lifetimeCycleStats?: { totalCyclesMade: number; totalForecastsMade: number } } };
+  getState: () => { forecast: { savedCycles: SavedCycle[]; lifetimeCycleStats?: { totalCyclesMade: number; totalForecastsMade: number; forecastStreak?: number; lastSavedCycleDate?: string } } };
 };
 
 describe('cycleHistoryPersistence', () => {
@@ -67,6 +67,30 @@ describe('cycleHistoryPersistence', () => {
     expect(mod.loadCycleHistorySnapshotFromStorage('user-1').lifetimeCycleStats).toEqual({
       totalCyclesMade: 61,
       totalForecastsMade: 123,
+      forecastStreak: 1,
+      lastSavedCycleDate: '2026-04-22',
+    });
+  });
+
+  test('preserves persisted streak continuity across snapshot hydration', async () => {
+    const mod = await import('./cycleHistoryPersistence');
+    const savedCycle: SavedCycle = {
+      id: 'streak-1', timestamp: 'ts', cycleDate: '2026-04-22', forecastCycle: {},
+      stats: { forecastDays: 1 },
+    };
+
+    mod.saveCycleHistoryToStorage([savedCycle as never], 'user-1', {
+      totalCyclesMade: 60,
+      totalForecastsMade: 60,
+      forecastStreak: 60,
+      lastSavedCycleDate: '2026-04-22',
+    });
+
+    expect(mod.loadCycleHistorySnapshotFromStorage('user-1').lifetimeCycleStats).toEqual({
+      totalCyclesMade: 60,
+      totalForecastsMade: 60,
+      forecastStreak: 60,
+      lastSavedCycleDate: '2026-04-22',
     });
   });
 
