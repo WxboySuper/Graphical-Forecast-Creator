@@ -108,26 +108,37 @@ const parseStoredCycleHistory = (serialized: string | null): SavedCycle[] => {
   }
 };
 
+const emptyCycleHistorySnapshot = (): CycleHistorySnapshot => ({
+  cycles: [],
+  lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
+});
+
+const deriveLifetimeCycleStats = (cycles: SavedCycle[]) => ({
+  totalCyclesMade: cycles.length,
+  totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
+});
+
+const readStoredLifetimeStats = (parsed: unknown, cycles: SavedCycle[]) => {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return deriveLifetimeCycleStats(cycles);
+  const stats = (parsed as { lifetimeCycleStats?: unknown }).lifetimeCycleStats;
+  if (!stats || typeof stats !== 'object') return deriveLifetimeCycleStats(cycles);
+  const { totalCyclesMade, totalForecastsMade } = stats as Record<string, unknown>;
+  return typeof totalCyclesMade === 'number' && typeof totalForecastsMade === 'number'
+    ? { totalCyclesMade, totalForecastsMade }
+    : deriveLifetimeCycleStats(cycles);
+};
+
 const parseStoredCycleHistorySnapshot = (serialized: string | null): CycleHistorySnapshot => {
-  if (!serialized) return { cycles: [], lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 } };
+  if (!serialized) return emptyCycleHistorySnapshot();
 
   try {
-    const parsed = JSON.parse(serialized);
+    const parsed = JSON.parse(serialized) as { cycles?: unknown } | unknown[];
     const cycles = Array.isArray(parsed)
       ? parseStoredCycleHistory(serialized)
-      : parseStoredCycleHistory(JSON.stringify(parsed?.cycles));
-    const storedStats = !Array.isArray(parsed) && parsed?.lifetimeCycleStats;
-    return {
-      cycles,
-      lifetimeCycleStats: storedStats && typeof storedStats.totalCyclesMade === 'number' && typeof storedStats.totalForecastsMade === 'number'
-        ? storedStats
-        : {
-            totalCyclesMade: cycles.length,
-            totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
-          },
-    };
+      : parseStoredCycleHistory(JSON.stringify(parsed.cycles));
+    return { cycles, lifetimeCycleStats: readStoredLifetimeStats(parsed, cycles) };
   } catch {
-    return { cycles: [], lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 } };
+    return emptyCycleHistorySnapshot();
   }
 };
 
