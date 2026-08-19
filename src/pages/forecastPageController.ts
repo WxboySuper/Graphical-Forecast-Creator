@@ -16,7 +16,7 @@ import {
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
 import type { GFCForecastSaveData } from '../types/outlooks';
-import { deserializeForecast, exportForecastToJson, MAX_IMPORT_BYTES, readForecastImportFile, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecast, exportForecastToJson, readForecastImportFile, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
 import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
   DAY_ROLLOVER_CHECK_INTERVAL_MS,
@@ -64,36 +64,21 @@ export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => 
 };
 
 /** Reads and validates one forecast JSON file. */
-// @codescene(disable:"Complex Method")
 export const parseLoadedForecast = async (
   file: File,
   addToast: AddToastFn,
 ): Promise<LoadedForecastPayload | null> => {
-  if (file.size > MAX_IMPORT_BYTES) {
-    addToast(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB); the maximum supported size is ${MAX_IMPORT_BYTES / 1024 / 1024} MB.`, 'error');
-    return null;
-  }
-
   let data: unknown;
   try {
-    data = typeof readForecastImportFile === 'function'
-      ? await readForecastImportFile(file)
-      : JSON.parse(await file.text());
+    data = await readForecastImportFile(file);
   } catch (error) {
     const fileName = typeof file.name === 'string' ? file.name : '';
-    if (!fileName.toLowerCase().endsWith('.zip')) {
-      try {
-        data = JSON.parse(await file.text());
-      } catch (fallbackError) {
-        const isJsonError = fallbackError instanceof SyntaxError
-          || (fallbackError instanceof Error && fallbackError.name === 'SyntaxError');
-        addToast(isJsonError ? 'File is not valid JSON.' : 'File is not a valid forecast or workflow package.', 'error');
-        return null;
-      }
-    } else {
-      addToast(error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.', 'error');
-      return null;
-    }
+    const isJsonError = error instanceof SyntaxError
+      || (error instanceof Error && error.name === 'SyntaxError');
+    addToast(isJsonError && !fileName.toLowerCase().endsWith('.zip')
+      ? 'File is not valid JSON.'
+      : error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.', 'error');
+    return null;
   }
 
   const validationError = validateForecastDataReason(data);

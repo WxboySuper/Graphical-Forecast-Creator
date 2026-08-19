@@ -4,7 +4,7 @@ import { Eye, FileUp, Layers3 } from 'lucide-react';
 import VerificationMap, { VerificationMapHandle } from '../Map/VerificationMap';
 import VerificationPanel from '../Verification/VerificationPanel';
 import { loadVerificationForecast, clearVerificationForecast } from '../../store/verificationSlice';
-import { deserializeForecast, readForecastImportFile, validateForecastDataReason, MAX_IMPORT_BYTES } from '../../utils/fileUtils';
+import { deserializeForecast, readForecastImportFile, validateForecastDataReason } from '../../utils/fileUtils';
 import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useAuth } from '../../auth/AuthProvider';
@@ -27,18 +27,7 @@ const getAvailableDays = (days: Record<string, unknown> | undefined): DayType[] 
 
 // Parses and validates through the shared JSON and workflow-package import pipeline.
 const parseAndValidateForecast = async (file: File) => {
-  if (file.size > MAX_IMPORT_BYTES) {
-    throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB); the maximum supported size is ${MAX_IMPORT_BYTES / 1024 / 1024} MB.`);
-  }
-
-  const json = typeof readForecastImportFile === 'function'
-    ? await readForecastImportFile(file)
-    : JSON.parse(await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ''));
-      reader.onerror = () => reject(new Error('Failed to read file.'));
-      reader.readAsText(file);
-    }));
+  const json = await readForecastImportFile(file);
 
   const validationError = validateForecastDataReason(json);
   if (validationError) {

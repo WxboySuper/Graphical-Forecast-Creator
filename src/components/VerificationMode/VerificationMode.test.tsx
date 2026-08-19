@@ -26,7 +26,6 @@ jest.mock('../../utils/fileUtils', () => ({
   validateForecastData: jest.fn(),
   validateForecastDataReason: jest.fn(),
   deserializeForecast: jest.fn(),
-  MAX_IMPORT_BYTES: 25 * 1024 * 1024,
 }));
 
 jest.mock('../Map/VerificationMap', () => {
@@ -53,15 +52,6 @@ const mockValidateForecastDataReason = jest.requireMock('../../utils/fileUtils')
 const mockDeserializeForecast = jest.requireMock('../../utils/fileUtils').deserializeForecast as jest.Mock;
 const mockReadForecastImportFile = jest.requireMock('../../utils/fileUtils').readForecastImportFile as jest.Mock;
 
-class MockFileReader {
-  onload: ((event: { target: { result: string } }) => void) | null = null;
-  onerror: (() => void) | null = null;
-
-  readAsText() {
-    this.onload?.({ target: { result: '{"ok":true}' } });
-  }
-}
-
 const renderWithStore = () => {
   const store = configureStore({
     reducer: { verification: verificationReducer },
@@ -82,7 +72,7 @@ describe('VerificationMode', () => {
     mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, status: 'signed_in' });
     mockValidateForecastData.mockReturnValue(true);
     mockValidateForecastDataReason.mockReturnValue(null);
-    mockReadForecastImportFile.mockResolvedValue({ ok: true });
+    mockReadForecastImportFile.mockResolvedValue({ forecastCycle: {}, outlooks: {} });
     mockDeserializeForecast.mockReturnValue({
       currentDay: 1,
       cycleDate: '2026-04-20',
@@ -112,11 +102,6 @@ describe('VerificationMode', () => {
           },
         },
       },
-    });
-    Object.defineProperty(globalThis, 'FileReader', {
-      configurable: true,
-      writable: true,
-      value: MockFileReader,
     });
   });
 
