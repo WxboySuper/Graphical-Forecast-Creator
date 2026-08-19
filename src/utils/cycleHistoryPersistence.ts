@@ -143,14 +143,17 @@ const isOptionalNumber = (value: unknown): value is number | undefined =>
 const isOptionalString = (value: unknown): value is string | undefined =>
   value === undefined || typeof value === 'string';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Object.prototype.toString.call(value) === '[object Object]';
+
 const isLifetimeCycleStats = (value: unknown): value is LifetimeCycleStats => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const stats = value as Record<string, unknown>;
-  if (typeof stats.totalCyclesMade !== 'number') return false;
-  if (typeof stats.totalForecastsMade !== 'number') return false;
-  if (!isOptionalNumber(stats.forecastStreak)) return false;
-  if (!isOptionalString(stats.lastSavedCycleDate)) return false;
-  return true;
+  if (!isRecord(value)) return false;
+  return [
+    typeof value.totalCyclesMade === 'number',
+    typeof value.totalForecastsMade === 'number',
+    isOptionalNumber(value.forecastStreak),
+    isOptionalString(value.lastSavedCycleDate),
+  ].every(Boolean);
 };
 
 const getStoredLifetimeStats = (parsed: unknown) => {
