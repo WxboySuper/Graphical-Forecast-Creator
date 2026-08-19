@@ -17,6 +17,9 @@ export interface SerializedMonitorOutlookFeature {
   feature: object;
 }
 
+// These caches are valid because each source is exclusively reconciled by its
+// corresponding sync function; callers must use a new input reference after
+// mutating or externally clearing a source.
 const lastOutlookInput = new WeakMap<VectorSource, SerializedMonitorOutlookFeature[]>();
 const lastAlertInput = new WeakMap<VectorSource, NwsAlertFeatureCollection>();
 const lastReportInput = new WeakMap<VectorSource, StormReport[]>();

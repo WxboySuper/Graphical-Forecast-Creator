@@ -33,4 +33,29 @@ describe('syncMesoscaleDiscussionFeatures', () => {
 
     expect(source.getFeatures()).toHaveLength(0);
   });
+
+  test('skips rebuilding for the same collection reference', () => {
+    const source = new VectorSource();
+    const collection = makeCollection('Stable discussion');
+    const clearSpy = jest.spyOn(source, 'clear');
+
+    syncMesoscaleDiscussionFeatures(source, collection);
+    const firstFeature = source.getFeatures()[0];
+    syncMesoscaleDiscussionFeatures(source, collection);
+
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    expect(source.getFeatures()[0]).toBe(firstFeature);
+  });
+
+  test('keeps the same collection reference independent per source', () => {
+    const firstSource = new VectorSource();
+    const secondSource = new VectorSource();
+    const collection = makeCollection('Shared collection');
+
+    syncMesoscaleDiscussionFeatures(firstSource, collection);
+    syncMesoscaleDiscussionFeatures(secondSource, collection);
+
+    expect(firstSource.getFeatures()).toHaveLength(1);
+    expect(secondSource.getFeatures()).toHaveLength(1);
+  });
 });
