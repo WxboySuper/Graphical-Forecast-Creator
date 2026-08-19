@@ -6,11 +6,25 @@ import { createDerivationController } from './categoricalWorker';
 import { toDerivationErrorMessage } from './autoCategoricalProcessing';
 export { processDay12OutlooksToCategorical, processDay3OutlooksToCategorical, processOutlooksToCategorical, CategoricalDerivationError } from './autoCategoricalProcessing';
 
+const geometryIds = new WeakMap<object, number>();
+let nextGeometryId = 1;
+
+/** Returns a cheap identity token for an immutable geometry object. */
+const getGeometryId = (geometry: GeoJSON.Geometry | null): number => {
+  if (!geometry || typeof geometry !== 'object') return 0;
+  const existingId = geometryIds.get(geometry);
+  if (existingId) return existingId;
+  const id = nextGeometryId++;
+  geometryIds.set(geometry, id);
+  return id;
+};
+
 /**
- * Serializes one probabilistic outlook map into a stable string that includes
- * both the source outlook type and the polygon geometry.
+ * Builds a signature without serializing every polygon geometry.
+ * Redux replaces changed features, so object identity is enough to detect an
+ * edit. Sorting the small identity-token strings preserves order independence.
  */
-const signatureFromOutlookMap = (
+export const signatureFromOutlookMap = (
   outlookType: string,
   outlookMap?: Map<string, GeoJSON.Feature[]>
 ): string => {
@@ -36,7 +50,7 @@ const signatureFromOutlookMap = (
     .map((feature) => {
       const sourceType = String(feature.properties?.outlookType || '');
       const probability = String(feature.properties?.probability || '');
-      return `${sourceType}:${probability}:${JSON.stringify(feature.geometry)}`;
+      return `${sourceType}:${probability}:${getGeometryId(feature.geometry)}`;
     })
     .sort()
     .join('|');
@@ -117,6 +131,13 @@ const useAutoCategorical = () => {
 
     const currentHash = signatureFromProbabilisticOutlooks(outlooks, currentDay);
 
+    // A successful derivation already handled this probabilistic state. The
+    // generated categorical map changes Redux state, so checking hasChanges
+    // here would start the same derivation again.
+    if (currentHash === lastProcessedRef.current) {
+      return;
+    }
+
     // Skip if there are no changes to process
     let hasChanges = false;
     if (currentDay === 1 || currentDay === 2) {
@@ -126,11 +147,6 @@ const useAutoCategorical = () => {
       });
     } else if (currentDay === 3) {
       hasChanges = outlooks.totalSevere instanceof Map ? outlooks.totalSevere.size > 0 : false;
-    }
-
-    // Fast path: same probabilistic state and no changes worth processing.
-    if (currentHash === lastProcessedRef.current && !hasChanges) {
-      return;
     }
 
     // With nothing to process, record the baseline and skip derivation so an

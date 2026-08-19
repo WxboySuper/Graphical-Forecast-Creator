@@ -1,4 +1,5 @@
 import '../immerSetup';
+import { original } from 'immer';
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
 import { isDraft, original } from 'immer';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping, Probability } from '../types/outlooks';
@@ -735,7 +736,8 @@ export const forecastSlice = createSlice({
     },
 
     toggleSignificant: (state) => {
-      state.drawingState.isSignificant = false;
+      state.drawingState.isSignificant = !state.drawingState.isSignificant;
+      state.isSaved = false;
     },
 
     ...createCustomLayerReducers(pushUndoSnapshot),
@@ -875,10 +877,8 @@ export const forecastSlice = createSlice({
       const outlookData = getCurrentOutlook(state);
 
       // Check if outlook type is supported for current day
-      if (outlookData[outlookType] !== undefined || outlookType === 'categorical' ||
-          outlookType === 'tornado' || outlookType === 'wind' || outlookType === 'hail' ||
-          outlookType === 'totalSevere' || outlookType === 'day4-8') {
-        if (outlookData[outlookType] === map) {
+      if (outlookData[outlookType] !== undefined) {
+        if (outlookData[outlookType] === map || original(outlookData[outlookType]) === map) {
           return;
         }
 
@@ -1575,7 +1575,7 @@ export const selectDiscussionDraftForScope = (state: RootState, scopeId: string)
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay)!;
+  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
   };
 const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
@@ -1588,7 +1588,7 @@ export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollecti
 /** Selects the outlook maps for a specific day, falling back to a shared empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[day]?.data || sharedEmptyOutlookData(day)!;
+  return cycle.days[day]?.data || sharedEmptyOutlookData(day) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
   };
 /** Selects the saved forecast cycle snapshots shown in cycle history. */
 export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;

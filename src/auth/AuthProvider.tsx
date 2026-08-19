@@ -225,7 +225,7 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
     return null;
   }
 
-  if (typeof defaultForecasterName !== 'string') {
+  if (typeof defaultForecasterName !== 'string' || defaultForecasterName.length > 100) {
     return null;
   }
 
@@ -246,13 +246,13 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
 };
 
 /** Creates the user profile payload written to Firestore on hosted sign-in. */
-export const createProfilePayload = (user: User) => ({
+export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boolean }) => ({
   email: user.email ?? '',
   displayName: user.displayName ?? '',
   photoURL: user.photoURL ?? '',
   providers: (user.providerData ?? []).map((provider) => provider.providerId),
   updatedAt: serverTimestamp(),
-  createdAt: serverTimestamp(),
+  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
 
 /** Reads the current beta-access flag from one hosted profile document snapshot. */
@@ -491,11 +491,12 @@ export const syncProfileDocument = async (
   user: User
 ): Promise<void> => {
   const profileSnapshot = await getDoc(profileRef);
+  const needsCreatedAt =
+    !profileSnapshot.exists() || profileSnapshot.data()?.createdAt === undefined;
   await setDoc(
     profileRef,
     {
-      ...createProfilePayload(user),
-      ...(profileSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
+      ...createProfilePayload(user, { includeCreatedAt: needsCreatedAt }),
     },
     { merge: true }
   );
@@ -625,6 +626,21 @@ export const runInitialHostedSync = async (opts: {
     return undefined;
   }
 };
+
+/** Stores a late-created listener only while its effect is still active. */
+export const attachHostedSettingsSubscription = (
+  subscriptionPromise: Promise<Unsubscribe | undefined>,
+  isActive: () => boolean,
+  setSubscription: (unsubscribe: Unsubscribe) => void,
+): Promise<void> => subscriptionPromise.then((nextUnsubscribe) => {
+  if (!isActive()) {
+    nextUnsubscribe?.();
+    return;
+  }
+  if (nextUnsubscribe) {
+    setSubscription(nextUnsubscribe);
+  }
+});
 
 /**
  * Initializes local-only auth state by probing the dev server's /api/local/profile endpoint.
@@ -1316,7 +1332,7 @@ const useHostedAuthState = (): AuthContextValue => {
     /** Applies validated remote settings into Redux and local auth state. */
     const applyRemoteSettings = (settings: UserSettingsDocument) =>
       applySettingsToState(settings, settingsApplyContext);
-    runInitialHostedSync({
+    const subscriptionPromise = runInitialHostedSync({
       profileRef,
       settingsRef,
       user,
@@ -1328,10 +1344,9 @@ const useHostedAuthState = (): AuthContextValue => {
       setSettingsSyncStatus,
       setError,
       hasInitializedSettingsRef,
-    }).then((nextUnsubscribe) => {
-      if (nextUnsubscribe) {
-        unsubscribeSettings = nextUnsubscribe;
-      }
+    });
+    attachHostedSettingsSubscription(subscriptionPromise, () => isActive, (nextUnsubscribe) => {
+      unsubscribeSettings = nextUnsubscribe;
     });
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
