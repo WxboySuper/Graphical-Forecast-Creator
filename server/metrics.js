@@ -342,7 +342,20 @@ const countPremiumSubscriptions = () => {
 };
 
 /** Returns the current total number of hosted accounts that have profile docs in Firestore. */
-// @codescene(disable:"Complex Method")
+const readTotalAccounts = async (db) => {
+  try {
+    const snapshot = await db.collection('userProfiles').count().get();
+    const count = snapshot.data?.()?.count;
+    if (typeof count === 'number') {
+      return count;
+    }
+  } catch {
+    // Fall through to the bounded scan when aggregate support is unavailable.
+  }
+
+  return countCollectionDocuments(db, 'userProfiles');
+};
+
 const countTotalAccounts = async () => {
   const db = getAdminDb();
   if (!db) {
@@ -354,22 +367,10 @@ const countTotalAccounts = async () => {
   }
   if (pendingTotalAccounts) return pendingTotalAccounts;
 
-  pendingTotalAccounts = (async () => {
-    try {
-      const snapshot = await db.collection('userProfiles').count().get();
-      const count = snapshot.data?.()?.count;
-      if (typeof count === 'number') {
-        totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
-        return count;
-      }
-    } catch {
-      // Fall through to the bounded scan when aggregate support is unavailable.
-    }
-
-    const count = await countCollectionDocuments(db, 'userProfiles');
-      totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
+  pendingTotalAccounts = readTotalAccounts(db).then((count) => {
+    totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
     return count;
-  })().finally(() => {
+  }).finally(() => {
     pendingTotalAccounts = null;
   });
 
