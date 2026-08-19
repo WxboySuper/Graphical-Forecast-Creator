@@ -318,6 +318,28 @@ describe('forecastSlice undo/redo', () => {
     expect(snapshotSource).toEqual({ name: 'SPC', tags: ['initial'] });
   });
 
+  test('reuses unchanged feature clones across sequential history snapshots', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('feature-1', 0) }));
+
+    state = reducer(state, updateFeature({
+      feature: {
+        ...createFeature('feature-1', 1),
+        properties: {
+          outlookType: 'tornado',
+          probability: '2%',
+          isSignificant: false,
+        },
+      },
+    }));
+    const firstSnapshotFeature = getLatestUndoEntry(state, 1)?.snapshot.data.tornado?.get('2%')?.[0];
+
+    state = reducer(state, addFeature({ feature: createFeature('feature-2', 2) }));
+    const secondSnapshotFeature = getLatestUndoEntry(state, 1)?.snapshot.data.tornado?.get('2%')?.[0];
+
+    expect(secondSnapshotFeature).toBe(firstSnapshotFeature);
+    expect(secondSnapshotFeature).not.toBe(getTornadoFeatures(state)[0]);
+  });
+
   test('undo restores deleted features', () => {
     let state = reducer(undefined, addFeature({ feature: createFeature('feature-1', 0) }));
 
