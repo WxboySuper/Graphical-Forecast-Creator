@@ -1,6 +1,12 @@
 import VectorSource from 'ol/source/Vector';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
-import { syncMesoscaleDiscussionFeatures } from './monitorMapFeatureSync';
+import {
+  syncAlertFeatures,
+  syncMesoscaleDiscussionFeatures,
+  syncOutlookFeatures,
+  syncStormReportFeatures,
+} from './monitorMapFeatureSync';
+import type { NwsAlertFeatureCollection } from '../nwsAlerts';
 
 const makeCollection = (label: string): MonitorMesoscaleDiscussionCollection => ({
   type: 'FeatureCollection',
@@ -57,5 +63,19 @@ describe('syncMesoscaleDiscussionFeatures', () => {
 
     expect(firstSource.getFeatures()).toHaveLength(1);
     expect(secondSource.getFeatures()).toHaveLength(1);
+  });
+
+  test.each([
+    ['outlooks', syncOutlookFeatures, []],
+    ['alerts', syncAlertFeatures, { type: 'FeatureCollection', features: [] } as NwsAlertFeatureCollection],
+    ['storm reports', syncStormReportFeatures, []],
+  ])('skips repeated %s reconciliation for the same input reference', (_name, sync, input) => {
+    const source = new VectorSource();
+    const clearSpy = jest.spyOn(source, 'clear');
+
+    (sync as (source: VectorSource, input: never) => void)(source, input as never);
+    (sync as (source: VectorSource, input: never) => void)(source, input as never);
+
+    expect(clearSpy).toHaveBeenCalledTimes(1);
   });
 });
