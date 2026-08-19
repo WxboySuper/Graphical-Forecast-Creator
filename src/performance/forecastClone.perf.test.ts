@@ -45,6 +45,15 @@ const createFeature = (index: number): Feature => ({
   },
 });
 
+const getLatestSnapshotFeatures = (state: ReturnType<typeof forecastReducer>) => {
+  const undoStack = state.historyByDay[1]?.undoStack ?? [];
+  const previousSnapshot = undoStack[undoStack.length - 2]?.snapshot.data.tornado?.get('2%')?.[0];
+  const latestSnapshot = undoStack[undoStack.length - 1]?.snapshot.data.tornado?.get('2%')?.[0];
+  const liveFeature = state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
+
+  return { previousSnapshot, latestSnapshot, liveFeature };
+};
+
 describe('forecast snapshot clone performance', () => {
   test('compares the current clone path with the previous allocation-heavy path', () => {
     if (process.env.GFC_PERF !== '1') return;
@@ -85,10 +94,7 @@ describe('forecast snapshot clone performance', () => {
       `forecast history snapshots (256 features, 16 unchanged edits): `
         + `${cachedHistory.medianMs.toFixed(2)} ms`,
     );
-    const undoStack = state.historyByDay[1]?.undoStack ?? [];
-    const previousSnapshot = undoStack[undoStack.length - 2]?.snapshot.data.tornado?.get('2%')?.[0];
-    const latestSnapshot = undoStack[undoStack.length - 1]?.snapshot.data.tornado?.get('2%')?.[0];
-    const liveFeature = state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
+    const { previousSnapshot, latestSnapshot, liveFeature } = getLatestSnapshotFeatures(state);
 
     expect(latestSnapshot).toBe(previousSnapshot);
     expect(latestSnapshot).not.toBe(liveFeature);
