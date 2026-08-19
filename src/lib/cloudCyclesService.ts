@@ -607,9 +607,6 @@ export const subscribeToCloudCycles = (
             if (!active) {
               return;
             }
-            if (legacyCycles.length > 0) {
-              await migrateLegacyCloudCycles(userId, legacyCycles);
-            }
             if (active) {
               onUpdate(sortCloudCycleMetadata(legacyCycles.map(toCloudCycleMetadata)));
             }

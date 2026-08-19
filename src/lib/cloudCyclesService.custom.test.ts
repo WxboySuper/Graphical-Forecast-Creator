@@ -1,18 +1,3 @@
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ firestore: {}, args })),
-  deleteField: jest.fn(() => 'delete-field'),
-  deleteDoc: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({ args })),
-  getDoc: jest.fn(),
-  getDocs: jest.fn(),
-  onSnapshot: jest.fn(),
-  query: jest.fn((...args: unknown[]) => ({ args })),
-  setDoc: jest.fn(),
-  where: jest.fn((...args: unknown[]) => ({ args })),
-  writeBatch: jest.fn(() => ({ commit: jest.fn(), set: jest.fn() })),
-}));
-jest.mock('./firebase', () => ({ auth: null, db: {} }));
-
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { getDoc, onSnapshot } from 'firebase/firestore';
 import {
@@ -97,7 +82,14 @@ test('subscription checks the legacy store when the initial collection is empty'
   const onUpdate = jest.fn();
   const onError = jest.fn();
   const unsubscribe = jest.fn();
-  (getDoc as jest.Mock).mockResolvedValue({ data: () => ({}) });
+  const payload = {
+    version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-17T00:00:00.000Z',
+    forecastCycle: { currentDay: 1, cycleDate: '2026-07-17', days: {} },
+  } as GFCForecastSaveData;
+  (getDoc as jest.Mock).mockResolvedValue({ data: () => ({ cloudCycles: { legacy: {
+    id: 'legacy', userId: 'user-1', label: 'Legacy', cycleDate: '2026-07-17',
+    createdAt: '2026-07-17T00:00:00.000Z', updatedAt: '2026-07-17T00:00:00.000Z', payload,
+  } } }) });
   (onSnapshot as jest.Mock).mockImplementation((_query, next) => {
     void next({ docs: [] });
     return unsubscribe;
@@ -107,8 +99,11 @@ test('subscription checks the legacy store when the initial collection is empty'
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
   expect(getDoc).toHaveBeenCalled();
-  expect(onUpdate).toHaveBeenCalledWith([]);
+  expect(onUpdate).toHaveBeenCalledWith([expect.objectContaining({
+    id: 'legacy', userId: 'user-1', label: 'Legacy', cycleDate: '2026-07-17',
+  })]);
   expect(onError).not.toHaveBeenCalled();
+  expect(mockSetDoc).not.toHaveBeenCalled();
   stop();
   expect(unsubscribe).toHaveBeenCalled();
 });
