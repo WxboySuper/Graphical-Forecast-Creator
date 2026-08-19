@@ -5,6 +5,7 @@ const {
   parseSentryDsnString,
   buildEnvelopeUrl,
   getConfiguredSentryEndpoint,
+  registerSentryTunnelRoutes,
 } = require('./sentry-tunnel');
 
 describe('sentry-tunnel helpers', () => {
@@ -66,4 +67,67 @@ describe('sentry-tunnel helpers', () => {
     expect(parseSentryDsnString('http://evil.example/1')).toBeNull();
   });
 
+});
+
+describe('sentry-tunnel route', () => {
+  const validEnvelope = Buffer.from(
+    `${JSON.stringify({ dsn: 'https://key@o123.ingest.us.sentry.io/456' })}\n{"type":"session"}`
+  );
+
+  const setupRoute = () => {
+    process.env.SENTRY_BROWSER_DSN = 'https://key@o123.ingest.us.sentry.io/456';
+    const route = {};
+    const app = { post: jest.fn((...args) => { route.handler = args.at(-1); }) };
+    const express = { raw: jest.fn(() => jest.fn()) };
+    registerSentryTunnelRoutes(app, express, jest.fn(() => jest.fn()));
+    return { route: route.handler, app };
+  };
+
+  afterEach(() => {
+    delete process.env.SENTRY_BROWSER_DSN;
+    jest.restoreAllMocks();
+  });
+
+  it('returns 504 when the upstream request times out', async () => {
+    const { route } = setupRoute();
+    jest.useFakeTimers();
+    const response = { destroyed: false, headersSent: false, status: jest.fn().mockReturnThis(), end: jest.fn(), once: jest.fn(), removeListener: jest.fn() };
+    global.fetch = jest.fn((_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    }));
+    const request = { body: validEnvelope, destroyed: false, once: jest.fn(), removeListener: jest.fn() };
+
+    const requestPromise = route(request, response);
+    jest.advanceTimersByTime(5000);
+    await requestPromise;
+    jest.useRealTimers();
+
+    expect(response.status).toHaveBeenCalledWith(504);
+    expect(response.end).toHaveBeenCalled();
+  });
+
+  it('returns 500 for non-timeout upstream failures and removes listeners', async () => {
+    const { route } = setupRoute();
+    const response = { destroyed: false, headersSent: false, status: jest.fn().mockReturnThis(), end: jest.fn(), once: jest.fn(), removeListener: jest.fn() };
+    global.fetch = jest.fn().mockRejectedValue(new Error('upstream down'));
+    const request = { body: validEnvelope, destroyed: false, once: jest.fn(), removeListener: jest.fn() };
+
+    await route(request, response);
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(request.removeListener).toHaveBeenCalledWith('close', expect.any(Function));
+    expect(response.removeListener).toHaveBeenCalledWith('close', expect.any(Function));
+  });
+
+  it('does not write after the client disconnects', async () => {
+    const { route } = setupRoute();
+    const response = { destroyed: true, headersSent: false, status: jest.fn().mockReturnThis(), end: jest.fn(), once: jest.fn(), removeListener: jest.fn() };
+    global.fetch = jest.fn().mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    const request = { body: validEnvelope, destroyed: true, once: jest.fn(), removeListener: jest.fn() };
+
+    await route(request, response);
+
+    expect(response.status).not.toHaveBeenCalled();
+    expect(response.end).not.toHaveBeenCalled();
+  });
 });

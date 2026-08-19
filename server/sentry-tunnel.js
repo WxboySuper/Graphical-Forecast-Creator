@@ -65,6 +65,27 @@ function clientEndpointMatchesConfigured(clientEndpoint, configuredEndpoint) {
   );
 }
 
+const attachUpstreamAbortHandlers = (req, res, controller) => {
+  const abortIfDisconnected = () => {
+    if (req.destroyed || res.destroyed) {
+      controller.abort();
+    }
+  };
+  req.once('close', abortIfDisconnected);
+  res.once('close', abortIfDisconnected);
+
+  return () => {
+    req.removeListener('close', abortIfDisconnected);
+    res.removeListener('close', abortIfDisconnected);
+  };
+};
+
+const endResponseIfWritable = (res, status) => {
+  if (!res.destroyed && !res.headersSent) {
+    res.status(status).end();
+  }
+};
+
 /** Registers POST /api/sentry-tunnel to proxy browser envelopes past ad blockers. */
 function registerSentryTunnelRoutes(app, express, rateLimit) {
   const configuredEndpoint = getConfiguredSentryEndpoint();
@@ -104,9 +125,7 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), SENTRY_UPSTREAM_TIMEOUT_MS);
-        const abortUpstream = () => controller.abort();
-        req.once('aborted', abortUpstream);
-        res.once('close', abortUpstream);
+        const removeAbortHandlers = attachUpstreamAbortHandlers(req, res, controller);
 
         try {
           const upstream = await fetch(targetUrl, {
@@ -118,21 +137,20 @@ function registerSentryTunnelRoutes(app, express, rateLimit) {
             signal: controller.signal,
           });
 
-          res.status(upstream.status).end();
+          endResponseIfWritable(res, upstream.status);
         } catch (error) {
           if (error?.name === 'AbortError') {
-            if (!res.headersSent) res.status(504).end();
+            endResponseIfWritable(res, 504);
             return;
           }
           throw error;
         } finally {
           clearTimeout(timeoutId);
-          req.removeListener('aborted', abortUpstream);
-          res.removeListener('close', abortUpstream);
+          removeAbortHandlers();
         }
       } catch (err) {
         console.error('[analytics] sentry tunnel failed:', err);
-        res.status(500).end();
+        endResponseIfWritable(res, 500);
       }
     }
   );
