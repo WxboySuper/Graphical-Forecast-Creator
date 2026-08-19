@@ -10,6 +10,9 @@ const initialState: VerificationState = {
   loadedForecast: null,
 };
 
+// Keep the empty result stable so useSelector can bail out when no outlook exists.
+const EMPTY_VERIFICATION_OUTLOOKS = Object.freeze({}) as OutlookData;
+
 const verificationSlice = createSlice({
   name: 'verification',
   initialState,
@@ -32,7 +35,7 @@ export const selectVerificationOutlooksForDay = (state: RootState, day: DayType)
   const forecast = state.verification.loadedForecast;
   const dayForecast = forecast?.days[day];
   if (!dayForecast) {
-    return {} as OutlookData;
+    return EMPTY_VERIFICATION_OUTLOOKS;
   }
   return dayForecast.data;
 };
