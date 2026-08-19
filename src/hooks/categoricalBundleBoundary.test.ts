@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('categorical Turf bundle boundary', () => {
@@ -11,17 +11,17 @@ describe('categorical Turf bundle boundary', () => {
     expect(appSource).not.toMatch(/from ['"]\.\/pages['"]/);
 
     const assetsDirectory = resolve(process.cwd(), 'build/assets');
-    try {
+    expect(existsSync(assetsDirectory)).toBe(true);
+    {
       const assetNames = readdirSync(assetsDirectory);
       const mainAsset = assetNames.find((name) => /^index-.*\.js$/.test(name));
+      expect(mainAsset).toBeDefined();
       if (mainAsset) {
         const mainBundle = readFileSync(resolve(assetsDirectory, mainAsset), 'utf8');
         // Vite's __vite__mapDeps table legitimately names the lazy Turf chunk.
         // Only reject an eager module edge from the main entry itself.
         expect(mainBundle).not.toMatch(/(?:from|import\()\s*['"][^'"]*turf[^'"]*['"]/);
       }
-    } catch {
-      // Unit-only runs do not build dist; CI's production build supplies the graph check.
     }
   });
 });
