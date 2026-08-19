@@ -354,19 +354,24 @@ const countTotalAccounts = async () => {
   }
   if (pendingTotalAccounts) return pendingTotalAccounts;
 
-  pendingTotalAccounts = db.collection('userProfiles').count().get()
-    .then((snapshot) => {
-      const count = Number(snapshot.data?.()?.count) || 0;
+  pendingTotalAccounts = (async () => {
+    try {
+      const snapshot = await db.collection('userProfiles').count().get();
+      const count = snapshot.data?.()?.count;
+      if (typeof count === 'number') {
+        totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
+        return count;
+      }
+    } catch {
+      // Fall through to the bounded scan when aggregate support is unavailable.
+    }
+
+    const count = await countCollectionDocuments(db, 'userProfiles');
       totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
-      pendingTotalAccounts = null;
-      return count;
-    })
-    .catch(async () => {
-      pendingTotalAccounts = null;
-      const count = await countCollectionDocuments(db, 'userProfiles');
-      totalAccountsCache = { value: count, expiresAt: Date.now() + STORAGE_CACHE_TTL_MS };
-      return count;
-    });
+    return count;
+  })().finally(() => {
+    pendingTotalAccounts = null;
+  });
 
   return pendingTotalAccounts;
 };
@@ -860,6 +865,7 @@ module.exports = {
   recordBillingMetricEvent,
   registerMetricsRoutes,
   countCollectionDocuments,
+  countTotalAccounts,
   readCloudCyclePayloadBytes,
   getCurrentStorageBytes,
 };
