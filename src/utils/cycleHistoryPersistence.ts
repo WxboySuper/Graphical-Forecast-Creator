@@ -137,13 +137,19 @@ const deriveLifetimeCycleStats = (cycles: SavedCycle[]): LifetimeCycleStats => (
   ...deriveForecastStreak(cycles),
 });
 
+const isOptionalNumber = (value: unknown): value is number | undefined =>
+  value === undefined || typeof value === 'number';
+
+const isOptionalString = (value: unknown): value is string | undefined =>
+  value === undefined || typeof value === 'string';
+
 const isLifetimeCycleStats = (value: unknown): value is LifetimeCycleStats => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const stats = value as Record<string, unknown>;
   return typeof stats.totalCyclesMade === 'number'
     && typeof stats.totalForecastsMade === 'number'
-    && (stats.forecastStreak === undefined || typeof stats.forecastStreak === 'number')
-    && (stats.lastSavedCycleDate === undefined || typeof stats.lastSavedCycleDate === 'string');
+    && isOptionalNumber(stats.forecastStreak)
+    && isOptionalString(stats.lastSavedCycleDate);
 };
 
 const getStoredLifetimeStats = (parsed: unknown) => {
