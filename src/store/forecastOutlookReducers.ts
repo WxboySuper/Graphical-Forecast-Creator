@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Feature } from 'geojson';
+import { original } from 'immer';
 import type {
   DayType,
   OutlookData,
@@ -49,15 +50,6 @@ const DEFAULT_PROBABILITIES: Partial<Record<OutlookType, Probability>> = {
   'day4-8': '15%',
   categorical: 'MRGL',
 };
-
-const SUPPORTED_OUTLOOK_TYPES = new Set<OutlookType>([
-  'categorical',
-  'tornado',
-  'wind',
-  'hail',
-  'totalSevere',
-  'day4-8',
-]);
 
 const applyFeatureUpdates = (
   deps: ForecastOutlookReducerDeps,
@@ -113,7 +105,8 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
   },
 
   toggleSignificant: (state: ForecastState) => {
-    state.drawingState.isSignificant = false;
+    state.drawingState.isSignificant = !state.drawingState.isSignificant;
+    state.isSaved = false;
   },
 
   addFeature: (state: ForecastState, action: PayloadAction<{ feature: Feature }>) => {
@@ -201,10 +194,8 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
   }>) => {
     const { outlookType, map } = action.payload;
     const outlookData = deps.getCurrentOutlook(state);
-    if (!outlookData[outlookType] && !SUPPORTED_OUTLOOK_TYPES.has(outlookType)) {
-      return;
-    }
-    if (outlookData[outlookType] === map) {
+    const currentMap = outlookData[outlookType];
+    if (!currentMap || currentMap === map || original(currentMap) === map) {
       return;
     }
 
