@@ -2,6 +2,10 @@
 export const PAN_MODE_VERTEX_EDIT_HELP =
   'Pan mode: drag map to move, scroll to zoom. Alt or Shift+click a vertex to remove it.';
 
-/** Returns true when an outlook map key is a standalone CIG hatching overlay. */
-export const isCigProbabilityKey = (probability: string): boolean =>
-  probability.trim().toUpperCase().startsWith('CIG');
+/** Returns whether an OpenLayers feature belongs to the selected editable outlook tier. */
+export const matchesPrecisionEditTier = (
+  feature: { get: (key: string) => unknown },
+  outlookType: string,
+  probability: string,
+): boolean =>
+  feature.get('outlookType') === outlookType && feature.get('probability') === probability;

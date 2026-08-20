@@ -1,5 +1,3 @@
-import { jest } from '@jest/globals';
-
 jest.mock('./openLayersMapStyles', () => ({
   toUpdatedCustomFeature: jest.fn(),
   toUpdatedGeoJsonFeature: jest.fn(),

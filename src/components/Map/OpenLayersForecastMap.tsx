@@ -32,7 +32,6 @@ import {
   redoLastEdit,
   setMapView,
   undoLastEdit,
-  updateCustomFeature,
 } from "../../store/forecastSlice";
 
 import type { BaseMapStyle } from "../../store/overlaysSlice";
@@ -54,13 +53,11 @@ import {
 import "./ForecastMap.css";
 import {
   getFeatureIdentity,
-  toUpdatedGeoJsonFeature,
   replaceLayerGroupLayers,
   isDrawableOutlookType,
   toOlStyle,
   toCustomOlStyle,
   getCustomFeatureIdentity,
-  toUpdatedCustomFeature,
   toDrawnCustomFeature,
   toTstmPreviewOlStyle,
   toGhostOlStyle,
@@ -86,7 +83,7 @@ import {
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { dispatchModifyUpdates } from "./precisionPolygonEditHandler";
-import { PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
+import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 
 // OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
 // https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
@@ -190,6 +187,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const interactionModeRef = useRef(interactionMode);
     const customModeRef = useRef(customMode);
     const activeProbabilityRef = useRef(drawingState.activeProbability);
+    const activeOutlookTypeRef = useRef(drawingState.activeOutlookType);
     const activeCustomCategoryRef = useRef(activeCustomCategory);
 
     useEffect(() => {
@@ -201,6 +199,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => {
       activeProbabilityRef.current = drawingState.activeProbability;
     }, [drawingState.activeProbability]);
+
+    useEffect(() => {
+      activeOutlookTypeRef.current = drawingState.activeOutlookType;
+    }, [drawingState.activeOutlookType]);
 
     useEffect(() => {
       activeCustomCategoryRef.current = activeCustomCategory;
@@ -476,7 +478,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             }
             return customIdentity.categoryId === activeCustomCategoryRef.current?.id;
           }
-          return feature.get("probability") === activeProbabilityRef.current;
+          return matchesPrecisionEditTier(
+            feature,
+            activeOutlookTypeRef.current,
+            activeProbabilityRef.current,
+          );
         },
         deleteCondition: (event) =>
           singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
@@ -501,7 +507,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           if (derivedFrom === "auto-generated") {
             return false;
           }
-          return feature.get("probability") === activeProbabilityRef.current;
+          return matchesPrecisionEditTier(
+            feature,
+            "categorical",
+            activeProbabilityRef.current,
+          );
         },
         deleteCondition: (event) =>
           singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),

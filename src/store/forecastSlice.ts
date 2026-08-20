@@ -398,6 +398,56 @@ const getCurrentOutlook = (state: ForecastState): OutlookData => {
   return day.data;
 };
 
+interface PendingFeatureUpdate {
+  outlookType: OutlookType;
+  probability: string;
+  index: number;
+  feature: Feature;
+}
+
+const collectPendingFeatureUpdates = (
+  state: ForecastState,
+  incoming: Feature[],
+): PendingFeatureUpdate[] => {
+  const outlookData = getCurrentOutlook(state);
+
+  return incoming.flatMap((feature) => {
+    const outlookType =
+      (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
+    const probability =
+      (feature.properties?.probability as string) || state.drawingState.activeProbability;
+    const features = outlookData[outlookType]?.get(probability);
+    const index = features?.findIndex((entry) => entry.id === feature.id) ?? -1;
+
+    return features && index !== -1
+      ? [{ outlookType, probability, index, feature }]
+      : [];
+  });
+};
+
+const applyPendingFeatureUpdates = (
+  state: ForecastState,
+  pendingUpdates: PendingFeatureUpdate[],
+): void => {
+  const outlookData = getCurrentOutlook(state);
+
+  for (const update of pendingUpdates) {
+    const features = outlookData[update.outlookType]?.get(update.probability);
+    if (!features) {
+      continue;
+    }
+
+    features[update.index] = {
+      ...features[update.index],
+      geometry: update.feature.geometry,
+      properties: {
+        ...features[update.index].properties,
+        ...update.feature.properties,
+      },
+    };
+  }
+};
+
 /** Clones one GeoJSON feature without JSON serialization so history snapshots are cheaper. */
 const cloneFeature = (feature: Feature): Feature => cloneJsonValue(feature);
 
@@ -790,63 +840,13 @@ export const forecastSlice = createSlice({
 
     /** Applies multiple geometry updates from one map gesture with a single undo step. */
     updateFeaturesBatch: (state, action: PayloadAction<{ features: Feature[] }>) => {
-      const incoming = action.payload.features;
-      if (incoming.length === 0) {
-        return;
-      }
-
-      const outlookData = getCurrentOutlook(state);
-      const pendingUpdates: Array<{
-        outlookType: OutlookType;
-        probability: string;
-        index: number;
-        feature: Feature;
-      }> = [];
-
-      for (const feature of incoming) {
-        const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
-        const probability = (feature.properties?.probability as string) || state.drawingState.activeProbability;
-        const outlookMap = outlookData[outlookType];
-        if (!outlookMap) {
-          continue;
-        }
-
-        const features = outlookMap.get(probability);
-        if (!features) {
-          continue;
-        }
-
-        const index = features.findIndex((entry) => entry.id === feature.id);
-        if (index === -1) {
-          continue;
-        }
-
-        pendingUpdates.push({ outlookType, probability, index, feature });
-      }
-
+      const pendingUpdates = collectPendingFeatureUpdates(state, action.payload.features);
       if (pendingUpdates.length === 0) {
         return;
       }
 
       pushUndoSnapshot(state);
-
-      for (const update of pendingUpdates) {
-        const outlookMap = outlookData[update.outlookType];
-        const features = outlookMap?.get(update.probability);
-        if (!features) {
-          continue;
-        }
-
-        features[update.index] = {
-          ...features[update.index],
-          geometry: update.feature.geometry,
-          properties: {
-            ...features[update.index].properties,
-            ...update.feature.properties,
-          },
-        };
-      }
-
+      applyPendingFeatureUpdates(state, pendingUpdates);
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
