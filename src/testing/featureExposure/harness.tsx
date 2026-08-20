@@ -31,17 +31,14 @@ export {
   singleTargetOn,
 };
 
-/** Documents getRoutePathsForFeature. */
 const getRoutePathsForFeature = (feature: FeatureKey): string[] =>
   GATED_ROUTE_DEFINITIONS.filter((definition) => definition.feature === feature).map(
     (definition) => `/${definition.path}`
   );
 
-/** Documents getNavigationIdsForFeature. */
 const getNavigationIdsForFeature = (feature: FeatureKey): string[] =>
   APP_NAVIGATION_ITEMS.filter((item) => item.feature === feature).map((item) => item.id);
 
-/** Documents getNavigationShortcutKeysForFeature. */
 const getNavigationShortcutKeysForFeature = (feature: FeatureKey): string[] =>
   APP_NAVIGATION_ITEMS.filter((item) => item.feature === feature)
     .map((item) => item.shortcutKey)
@@ -126,7 +123,6 @@ export const assertLazyRouteLoadsWhenEnabled = async ({
 export const createSideEffectProbe = (feature: FeatureKey) => {
   const spy = jest.fn();
 
-  /** Documents Probe. */
   const Probe = () => {
     useFeatureEffect(feature, () => {
       spy();

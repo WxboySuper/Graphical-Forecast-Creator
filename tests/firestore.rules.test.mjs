@@ -547,7 +547,6 @@ describe('cloudCycles entitlement boundary', () => {
 });
 
 describe('customProducts security and lifecycle boundary', () => {
-  /** Documents aliceRef. */
   const aliceRef = () => doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-01');
 
   test('is fail-closed until both server capability and entitlement are active', async () => {
