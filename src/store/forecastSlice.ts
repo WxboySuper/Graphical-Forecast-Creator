@@ -1,6 +1,6 @@
 import '../immerSetup';
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
-import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping, Probability } from '../types/outlooks';
+import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
@@ -18,6 +18,7 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
+import { createForecastOutlookReducers } from './forecastOutlookReducers';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -714,263 +715,23 @@ export const forecastSlice = createSlice({
   name: 'forecast',
   initialState,
   reducers: {
-    // Set active day
-    setForecastDay: (state, action: PayloadAction<DayType>) => {
-      const newDay = action.payload;
-      if (!state.forecastCycle.days[newDay]) {
-        state.forecastCycle.days[newDay] = createEmptyOutlook(newDay, readActionTimestamp(action));
-      }
-      state.forecastCycle.currentDay = newDay;
-      state.isSaved = false;
-    },
-
-    // Update cycle date
-    setCycleDate: (state, action: PayloadAction<string>) => {
-      state.forecastCycle.cycleDate = action.payload;
-      state.isSaved = false;
-    },
-
-    // Set the active outlook type for drawing
-    setActiveOutlookType: (state, action: PayloadAction<OutlookType>) => {
-        state.drawingState.activeOutlookType = action.payload;
-
-        // Set default probability based on outlook type
-        if (action.payload === 'tornado') {
-          state.drawingState.activeProbability = '2%';
-        } else if (action.payload === 'wind' || action.payload === 'hail') {
-          state.drawingState.activeProbability = '5%';
-        } else if (action.payload === 'totalSevere') {
-          state.drawingState.activeProbability = '5%';
-        } else if (action.payload === 'day4-8') {
-          state.drawingState.activeProbability = '15%';
-        } else if (action.payload === 'categorical') {
-          state.drawingState.activeProbability = 'MRGL';
-        }
-
-        state.isSaved = false;
-      },
-
-      setEmergencyMode: (state, action: PayloadAction<boolean>) => {
-        state.emergencyMode = action.payload;
-    },
-
-    setActiveProbability: (state, action: PayloadAction<Probability>) => {
-      state.drawingState.activeProbability = action.payload;
-      if (typeof action.payload === 'string') {
-        state.drawingState.isSignificant = action.payload.includes('#');
-      }
-      state.isSaved = false;
-    },
-
-    toggleSignificant: (state) => {
-      state.drawingState.isSignificant = false;
-    },
+    ...createForecastOutlookReducers({
+      getCurrentOutlook,
+      computeOutlookType,
+      computeProbability,
+      buildFeatureWithProps,
+      collectPendingFeatureUpdates,
+      applyPendingFeatureUpdates,
+      pushUndoSnapshot,
+      invalidateCompletionAcknowledgement,
+      createEmptyDay: createEmptyOutlook,
+      readActionTimestamp,
+      areTstmFeaturesEqual,
+    }),
 
     ...createCustomLayerReducers(pushUndoSnapshot),
     ...createCustomCategoryReducers(pushUndoSnapshot),
     ...createCustomFeatureReducers(pushUndoSnapshot),
-
-    addFeature: (state, action: PayloadAction<{ feature: Feature }>) => {
-      const feature = action.payload.feature;
-      const outlookType = computeOutlookType(feature, state);
-      const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
-      if (!dayData) return;
-
-      const outlookData = dayData.data;
-      const outlookMap = outlookData[outlookType];
-      if (!outlookMap) {
-        return;
-      }
-
-      const probability = computeProbability(feature, state);
-      pushUndoSnapshot(state);
-
-      // If we're adding a feature, this outlook is no longer "Low Probability"
-      if (dayData.metadata.lowProbabilityOutlooks) {
-        dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
-          t => t !== outlookType
-        );
-      }
-
-      const existingFeatures = outlookMap.get(probability) || [];
-
-      const featureWithProps = buildFeatureWithProps(
-        feature,
-        outlookType,
-        probability,
-        state.drawingState.isSignificant
-      );
-
-      outlookMap.set(probability, [...existingFeatures, featureWithProps]);
-      invalidateCompletionAcknowledgement(state);
-      state.isSaved = false;
-    },
-
-    updateFeature: (state, action: PayloadAction<{ feature: Feature }>) => {
-      const feature = action.payload.feature;
-      const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
-      const probability = (feature.properties?.probability as string) || state.drawingState.activeProbability;
-
-      const outlookData = getCurrentOutlook(state);
-      const outlookMap = outlookData[outlookType];
-
-      if (!outlookMap) {
-        return;
-      }
-
-      const features = outlookMap.get(probability);
-
-      if (features) {
-        const index = features.findIndex(f => f.id === feature.id);
-        if (index !== -1) {
-          pushUndoSnapshot(state);
-          features[index] = {
-            ...features[index],
-            geometry: feature.geometry,
-            properties: {
-              ...features[index].properties,
-              ...feature.properties
-            }
-          };
-          invalidateCompletionAcknowledgement(state);
-          state.isSaved = false;
-        }
-      }
-    },
-
-    /** Applies multiple geometry updates from one map gesture with a single undo step. */
-    updateFeaturesBatch: (state, action: PayloadAction<{ features: Feature[] }>) => {
-      const pendingUpdates = collectPendingFeatureUpdates(state, action.payload.features);
-      if (pendingUpdates.length === 0) {
-        return;
-      }
-
-      pushUndoSnapshot(state);
-      applyPendingFeatureUpdates(state, pendingUpdates);
-      invalidateCompletionAcknowledgement(state);
-      state.isSaved = false;
-    },
-
-    removeFeature: (state, action: PayloadAction<{
-      outlookType: OutlookType,
-      probability: string,
-      featureId: string
-    }>) => {
-      const { outlookType, probability, featureId } = action.payload;
-      const outlookData = getCurrentOutlook(state);
-      const outlookMap = outlookData[outlookType];
-
-      if (!outlookMap) {
-        return;
-      }
-
-      const features = outlookMap.get(probability);
-
-      if (features) {
-        const featureIndex = features.findIndex(feature => feature.id === featureId);
-        if (featureIndex === -1) {
-          return;
-        }
-
-        pushUndoSnapshot(state);
-        const updatedFeatures = features.filter(feature =>
-          feature.id !== featureId
-        );
-
-        if (updatedFeatures.length > 0) {
-          outlookMap.set(probability, updatedFeatures);
-        } else {
-          outlookMap.delete(probability);
-        }
-
-        invalidateCompletionAcknowledgement(state);
-        state.isSaved = false;
-      }
-    },
-
-    resetCategorical: (state) => {
-      const outlooks = getCurrentOutlook(state);
-      if (!outlooks.categorical) {
-        return; // No categorical map for this day (e.g., Day 4-8)
-      }
-      const categoricalTypes = Array.from(outlooks.categorical.keys());
-      if (categoricalTypes.every((type) => type === 'TSTM')) {
-        return;
-      }
-
-      const tstmFeatures = outlooks.categorical.get('TSTM') || [];
-      pushUndoSnapshot(state);
-      outlooks.categorical = new Map();
-      if (tstmFeatures.length > 0) {
-        outlooks.categorical.set('TSTM', tstmFeatures);
-      }
-      invalidateCompletionAcknowledgement(state);
-      state.isSaved = false;
-    },
-
-    setOutlookMap: (state, action: PayloadAction<{
-      outlookType: OutlookType,
-      map: Map<string, Feature[]>
-    }>) => {
-      const { outlookType, map } = action.payload;
-      const outlookData = getCurrentOutlook(state);
-
-      // Check if outlook type is supported for current day
-      if (outlookData[outlookType] !== undefined || outlookType === 'categorical' ||
-          outlookType === 'tornado' || outlookType === 'wind' || outlookType === 'hail' ||
-          outlookType === 'totalSevere' || outlookType === 'day4-8') {
-        if (outlookData[outlookType] === map) {
-          return;
-        }
-
-        pushUndoSnapshot(state);
-        outlookData[outlookType] = map;
-        invalidateCompletionAcknowledgement(state);
-        state.isSaved = false;
-      }
-    },
-
-    applyAutoCategoricalSync: (state, action: PayloadAction<{ map: Map<string, Feature[]> }>) => {
-      const outlookData = getCurrentOutlook(state);
-      if (!outlookData.categorical) {
-        return;
-      }
-
-      outlookData.categorical = action.payload.map;
-      invalidateCompletionAcknowledgement(state);
-      state.isSaved = false;
-    },
-
-    replaceTstmFeatures: (state, action: PayloadAction<{ features: Feature[] }>) => {
-      const outlookData = getCurrentOutlook(state);
-      if (!outlookData.categorical) {
-        return;
-      }
-
-      const normalizedFeatures = action.payload.features.map((feature) =>
-        buildFeatureWithProps(feature, 'categorical', 'TSTM', false)
-      );
-      const existingTstm = outlookData.categorical.get('TSTM') || [];
-
-      if (areTstmFeaturesEqual(existingTstm, normalizedFeatures)) {
-        return;
-      }
-
-      pushUndoSnapshot(state);
-
-      if (normalizedFeatures.length > 0) {
-        outlookData.categorical.set('TSTM', normalizedFeatures);
-      } else {
-        outlookData.categorical.delete('TSTM');
-      }
-
-      invalidateCompletionAcknowledgement(state);
-      state.isSaved = false;
-    },
-
-    setMapView: (state, action: PayloadAction<{ center: [number, number], zoom: number }>) => {
-      state.currentMapView = action.payload;
-    },
 
     resetForecasts: (state, action: UnknownAction) => {
       clearHistory(state);
