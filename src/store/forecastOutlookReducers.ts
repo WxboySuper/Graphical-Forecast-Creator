@@ -59,7 +59,21 @@ const SUPPORTED_OUTLOOK_TYPES = new Set<OutlookType>([
   'day4-8',
 ]);
 
+const applyFeatureUpdates = (
+  deps: ForecastOutlookReducerDeps,
+  state: ForecastState,
+  incoming: Feature[],
+) => {
+  const pendingUpdates = deps.collectPendingFeatureUpdates(state, incoming);
+  if (pendingUpdates.length === 0) return;
+  deps.pushUndoSnapshot(state);
+  deps.applyPendingFeatureUpdates(state, pendingUpdates);
+  deps.invalidateCompletionAcknowledgement(state);
+  state.isSaved = false;
+};
+
 export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) => ({
+
   setForecastDay: (state: ForecastState, action: PayloadAction<DayType>) => {
     const newDay = action.payload;
     if (!state.forecastCycle.days[newDay]) {
@@ -129,25 +143,11 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
   },
 
   updateFeature: (state: ForecastState, action: PayloadAction<{ feature: Feature }>) => {
-    const pendingUpdates = deps.collectPendingFeatureUpdates(state, [action.payload.feature]);
-    if (pendingUpdates.length === 0) {
-      return;
-    }
-    deps.pushUndoSnapshot(state);
-    deps.applyPendingFeatureUpdates(state, pendingUpdates);
-    deps.invalidateCompletionAcknowledgement(state);
-    state.isSaved = false;
+    applyFeatureUpdates(deps, state, [action.payload.feature]);
   },
 
   updateFeaturesBatch: (state: ForecastState, action: PayloadAction<{ features: Feature[] }>) => {
-    const pendingUpdates = deps.collectPendingFeatureUpdates(state, action.payload.features);
-    if (pendingUpdates.length === 0) {
-      return;
-    }
-    deps.pushUndoSnapshot(state);
-    deps.applyPendingFeatureUpdates(state, pendingUpdates);
-    deps.invalidateCompletionAcknowledgement(state);
-    state.isSaved = false;
+    applyFeatureUpdates(deps, state, action.payload.features);
   },
 
   removeFeature: (state: ForecastState, action: PayloadAction<{
@@ -159,9 +159,9 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
     const outlookMap = deps.getCurrentOutlook(state)[outlookType];
     const features = outlookMap?.get(probability);
     const featureIndex = features?.findIndex((feature) => feature.id === featureId) ?? -1;
-    if (!outlookMap || !features || featureIndex === -1) {
-      return;
-    }
+    if (!outlookMap) return;
+    if (!features) return;
+    if (featureIndex === -1) return;
 
     deps.pushUndoSnapshot(state);
     const updatedFeatures = features.filter((feature) => feature.id !== featureId);

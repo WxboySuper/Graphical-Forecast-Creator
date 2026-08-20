@@ -413,16 +413,15 @@ const collectPendingFeatureUpdates = (
   const outlookData = getCurrentOutlook(state);
 
   return incoming.flatMap((feature) => {
-    const outlookType =
-      (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
-    const probability =
-      (feature.properties?.probability as string) || state.drawingState.activeProbability;
+    const outlookType = (feature.properties?.outlookType as OutlookType)
+      || state.drawingState.activeOutlookType;
+    const probability = (feature.properties?.probability as string)
+      || state.drawingState.activeProbability;
     const features = outlookData[outlookType]?.get(probability);
-    const index = features?.findIndex((entry) => entry.id === feature.id) ?? -1;
+    if (!features) return [];
 
-    return features && index !== -1
-      ? [{ outlookType, probability, index, feature }]
-      : [];
+    const index = features.findIndex((entry) => entry.id === feature.id);
+    return index === -1 ? [] : [{ outlookType, probability, index, feature }];
   });
 };
 
