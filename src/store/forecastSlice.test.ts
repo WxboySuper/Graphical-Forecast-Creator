@@ -14,6 +14,8 @@ import reducer, {
   selectCanRedo,
   selectCanUndo,
   setForecastDay,
+  setCycleDate,
+  setOutlookMap,
   toggleLowProbability,
   undoLastEdit,
   updateFeature,
@@ -29,6 +31,9 @@ import reducer, {
   createOutlookUpdate,
   startFromPreviousCycle,
   saveCurrentCycle,
+  deleteSavedCycle,
+  loadCycleHistory,
+  SAVED_CYCLES_LIMIT,
   updateDiscussion,
   updateDiscussionDraft,
   migrateDiscussionDrafts,
@@ -37,6 +42,7 @@ import reducer, {
   selectOutlooksForDay,
   setOutlookOpacity,
   selectCurrentOutlookOpacity,
+  toggleSignificant,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -100,6 +106,74 @@ const createStateWithCategoricalFeatures = () => {
   );
   return state;
 };
+
+describe('toggleSignificant', () => {
+  test('toggles the significant flag and marks the forecast unsaved', () => {
+    let state = reducer(undefined, markAsSaved());
+
+    state = reducer(state, toggleSignificant());
+    expect(state.drawingState.isSignificant).toBe(true);
+    expect(state.isSaved).toBe(false);
+
+    state = reducer(state, toggleSignificant());
+    expect(state.drawingState.isSignificant).toBe(false);
+  });
+});
+
+describe('setOutlookMap', () => {
+  test('rejects an outlook type unsupported by the current day', () => {
+    let state = reducer(undefined, setForecastDay(4));
+    state = reducer(state, markAsSaved());
+    const unsupportedMap = new Map<string, Feature[]>();
+
+    const nextState = reducer(
+      state,
+      setOutlookMap({ outlookType: 'tornado', map: unsupportedMap })
+    );
+
+    expect(nextState.forecastCycle.days[4]?.data.tornado).toBeUndefined();
+    expect(nextState.isSaved).toBe(true);
+  });
+
+  test('updates a supported outlook type and marks the forecast unsaved', () => {
+    let state = reducer(undefined, setForecastDay(4));
+    state = reducer(state, markAsSaved());
+    const supportedMap = new Map<string, Feature[]>();
+
+    state = reducer(state, setOutlookMap({ outlookType: 'day4-8', map: supportedMap }));
+
+    expect(state.forecastCycle.days[4]?.data['day4-8']).toBe(supportedMap);
+    expect(state.isSaved).toBe(false);
+  });
+
+  test('keeps day-specific supported outlook maps available', () => {
+    let dayOneState = reducer(undefined, setForecastDay(1));
+    const tornadoMap = new Map<string, Feature[]>();
+    dayOneState = reducer(dayOneState, setOutlookMap({ outlookType: 'tornado', map: tornadoMap }));
+    expect(dayOneState.forecastCycle.days[1]?.data.tornado).toBe(tornadoMap);
+
+    let dayThreeState = reducer(undefined, setForecastDay(3));
+    const totalSevereMap = new Map<string, Feature[]>();
+    dayThreeState = reducer(
+      dayThreeState,
+      setOutlookMap({ outlookType: 'totalSevere', map: totalSevereMap })
+    );
+    expect(dayThreeState.forecastCycle.days[3]?.data.totalSevere).toBe(totalSevereMap);
+  });
+
+  test('does not create an edit when the supported map is already selected', () => {
+    let state = reducer(undefined, setForecastDay(4));
+    const map = new Map<string, Feature[]>();
+    state = reducer(state, setOutlookMap({ outlookType: 'day4-8', map }));
+    state = reducer(state, markAsSaved());
+
+    const nextState = reducer(state, setOutlookMap({ outlookType: 'day4-8', map }));
+
+    expect(nextState).toBe(state);
+    expect(nextState.isSaved).toBe(true);
+  });
+
+});
 
 const getCategoricalFeatureId = (
   state: ReturnType<typeof reducer>,
@@ -240,6 +314,54 @@ const getRedoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
   state.historyByDay[day]?.redoStack || [];
 
 describe('forecastSlice undo/redo', () => {
+  test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {
+      state = reducer(state, saveCurrentCycle({ label: `Cycle ${index}` }));
+    }
+
+    expect(state.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+    expect(state.savedCycles[0]?.label).toBe('Cycle 1');
+    expect(state.lifetimeCycleStats?.totalCyclesMade).toBe(SAVED_CYCLES_LIMIT + 1);
+    expect(state.lifetimeCycleStats?.totalForecastsMade).toBe(0);
+
+    const hydrated = reducer(state, loadCycleHistory([
+      ...state.savedCycles,
+      state.savedCycles[state.savedCycles.length - 1],
+    ]));
+    expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+  });
+
+  test('continues streak tracking beyond the retained cycle window', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    for (let index = 0; index < SAVED_CYCLES_LIMIT + 10; index += 1) {
+      const cycleDate = new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10);
+      state = reducer(state, setCycleDate(cycleDate));
+      state = reducer(state, saveCurrentCycle({ label: `Cycle ${index}` }));
+    }
+
+    expect(state.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+    expect(state.lifetimeCycleStats?.forecastStreak).toBe(SAVED_CYCLES_LIMIT + 10);
+    expect(state.lifetimeCycleStats?.lastSavedCycleDate).toBe('2026-03-01');
+  });
+
+  test('replaces lifetime stats on scope hydration and preserves them when a cycle is deleted', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    state = reducer(state, loadCycleHistory({
+      cycles: [],
+      lifetimeCycleStats: { totalCyclesMade: 12, totalForecastsMade: 24 },
+    }));
+    expect(state.lifetimeCycleStats).toEqual({ totalCyclesMade: 12, totalForecastsMade: 24 });
+
+    state = reducer(state, loadCycleHistory({
+      cycles: [],
+      lifetimeCycleStats: { totalCyclesMade: 3, totalForecastsMade: 5 },
+    }));
+    expect(state.lifetimeCycleStats).toEqual({ totalCyclesMade: 3, totalForecastsMade: 5 });
+    state = reducer(state, deleteSavedCycle('missing'));
+    expect(state.lifetimeCycleStats).toEqual({ totalCyclesMade: 3, totalForecastsMade: 5 });
+  });
+
   test('stores per-outlook opacity with a legacy-compatible default', () => {
     const base = reducer(undefined, setForecastDay(1));
     const state = (forecastState: ReturnType<typeof reducer>) => ({ forecast: forecastState } as Parameters<typeof selectCurrentOutlookOpacity>[0]);
@@ -316,6 +438,29 @@ describe('forecastSlice undo/redo', () => {
     expect(snapshotSource).not.toBe(liveSource);
     expect(snapshotSource.tags).not.toBe(liveSource.tags);
     expect(snapshotSource).toEqual({ name: 'SPC', tags: ['initial'] });
+  });
+
+  test('reuses unchanged feature clones across sequential history snapshots', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('feature-1', 0) }));
+
+    state = reducer(state, updateFeature({
+      feature: {
+        ...createFeature('feature-1', 1),
+        properties: {
+          outlookType: 'tornado',
+          probability: '2%',
+          isSignificant: false,
+        },
+      },
+    }));
+    state = reducer(state, setOutlookOpacity({ outlookType: 'tornado', opacity: 0.9 }));
+    const firstSnapshotFeature = getLatestUndoEntry(state, 1)?.snapshot.data.tornado?.get('2%')?.[0];
+
+    state = reducer(state, setOutlookOpacity({ outlookType: 'tornado', opacity: 0.8 }));
+    const secondSnapshotFeature = getLatestUndoEntry(state, 1)?.snapshot.data.tornado?.get('2%')?.[0];
+
+    expect(secondSnapshotFeature).toBe(firstSnapshotFeature);
+    expect(secondSnapshotFeature).not.toBe(getTornadoFeatures(state)[0]);
   });
 
   test('undo restores deleted features', () => {
@@ -1099,6 +1244,29 @@ describe('forecastSlice undo/redo', () => {
       expect(selectOutlooksForDay(state, 2)).toBe(selectOutlooksForDay(state, 2));
       expect(selectOutlooksForDay(state, 3)).toBe(selectOutlooksForDay(state, 3));
       expect(selectOutlooksForDay(state, 4)).toBe(selectOutlooksForDay(state, 4));
+    });
+
+    it('selectOutlooksForDay returns a safe fallback for an unknown day', () => {
+      const base = reducer(undefined, setForecastDay(1));
+      const state = withForecast(base);
+      const fallback = selectOutlooksForDay(state, 99 as DayType);
+
+      expect(fallback).toBeDefined();
+      expect(fallback['day4-8']).toBeInstanceOf(Map);
+      expect(fallback).toBe(selectOutlooksForDay(state, 99 as DayType));
+    });
+
+    it('selectCurrentOutlooks returns a safe fallback for an unknown current day', () => {
+      const base = reducer(undefined, setForecastDay(1));
+      const state = withForecast({
+        ...base,
+        forecastCycle: { ...base.forecastCycle, currentDay: 99 as DayType },
+      });
+      const fallback = selectCurrentOutlooks(state);
+
+      expect(fallback).toBeDefined();
+      expect(fallback['day4-8']).toBeInstanceOf(Map);
+      expect(fallback).toBe(selectCurrentOutlooks(state));
     });
 
     it('does not expose the shared fallback as the current day data for a real day', () => {

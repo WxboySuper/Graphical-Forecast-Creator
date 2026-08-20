@@ -3,12 +3,15 @@ import { getFeatureExposure, type FeatureKey } from './featureExposure';
 
 export const CAPABILITY_STATUS_ENDPOINT = '/api/capabilities/status';
 
-export type CapabilityAvailabilityReason =
-  | 'available'
-  | 'registry_disabled'
-  | 'deployment_disabled'
-  | 'emergency_disabled'
-  | 'unknown';
+export const CAPABILITY_AVAILABILITY_REASONS = [
+  'available',
+  'registry_disabled',
+  'deployment_disabled',
+  'emergency_disabled',
+  'unknown',
+] as const;
+
+export type CapabilityAvailabilityReason = typeof CAPABILITY_AVAILABILITY_REASONS[number];
 
 export type CapabilityStatusEntry = {
   available: boolean;
@@ -35,6 +38,10 @@ const unavailableCapabilityKeys = new Set<string>();
 const statusListeners = new Set<() => void>();
 let cachedStatusSnapshot: CapabilityStatusSnapshot = EMPTY_STATUS;
 let cachedStatusRequest: Promise<CapabilityStatusSnapshot> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryAttempts = 0;
+const RETRY_DELAY_MS = 5000;
+const MAX_RETRY_ATTEMPTS = 3;
 
 /** Notifies runtime hooks when a capability becomes unavailable after page load. */
 const notifyCapabilityStatusListeners = (): void => {
@@ -54,9 +61,27 @@ export const markServerCapabilityUnavailable = (capabilityKey: string): void => 
 /** Resets local unavailable markers and the shared status cache. Intended for tests. */
 export const resetServerCapabilityStatusState = (): void => {
   unavailableCapabilityKeys.clear();
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  retryAttempts = 0;
   cachedStatusSnapshot = EMPTY_STATUS;
   cachedStatusRequest = null;
   notifyCapabilityStatusListeners();
+};
+
+const scheduleCapabilityStatusRetry = (): void => {
+  if (retryTimer || retryAttempts >= MAX_RETRY_ATTEMPTS) {
+    return;
+  }
+
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    if (!cachedStatusSnapshot.loaded && !cachedStatusRequest) {
+      void loadSharedServerCapabilityStatus();
+    }
+  }, RETRY_DELAY_MS);
 };
 
 /** Returns the server capability key for a registry feature when server-backed. */
@@ -69,6 +94,34 @@ export const getServerCapabilityKeyForFeature = (feature: FeatureKey): string | 
   return definition.serverCapabilityKey;
 };
 
+const isCapabilityStatusReason = (reason: unknown): reason is CapabilityAvailabilityReason =>
+  typeof reason === 'string'
+  && CAPABILITY_AVAILABILITY_REASONS.includes(reason as CapabilityAvailabilityReason);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+
+  return !Array.isArray(value);
+};
+
+const isCapabilityStatusEntry = (entry: unknown): entry is CapabilityStatusEntry => {
+  if (!isRecord(entry)) {
+    return false;
+  }
+
+  if (Object.keys(entry).some((key) => key !== 'available' && key !== 'reason')) {
+    return false;
+  }
+
+  if (typeof entry.available !== 'boolean') {
+    return false;
+  }
+
+  return isCapabilityStatusReason(entry.reason);
+};
+
 /** Returns true when the payload matches the public capability status shape. */
 export const isServerCapabilityStatusResponse = (
   payload: unknown
@@ -77,7 +130,11 @@ export const isServerCapabilityStatusResponse = (
     return false;
   }
 
-  return typeof (payload as ServerCapabilityStatusResponse).capabilities === 'object';
+  const capabilities = (payload as { capabilities?: unknown }).capabilities;
+  return Boolean(
+    isRecord(capabilities)
+      && Object.values(capabilities).every(isCapabilityStatusEntry)
+  );
 };
 
 /** Reads the public server capability status document. */
@@ -104,6 +161,11 @@ export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnap
   if (!cachedStatusRequest) {
     cachedStatusRequest = fetchServerCapabilityStatus()
       .then((response) => {
+        retryAttempts = 0;
+        if (retryTimer) {
+          clearTimeout(retryTimer);
+          retryTimer = null;
+        }
         cachedStatusSnapshot = {
           loaded: true,
           capabilities: response.capabilities,
@@ -112,11 +174,13 @@ export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnap
         return cachedStatusSnapshot;
       })
       .catch(() => {
-        cachedStatusSnapshot = {
-          loaded: true,
-          capabilities: {},
-        };
+        retryAttempts += 1;
+        cachedStatusRequest = null;
+        cachedStatusSnapshot = retryAttempts >= MAX_RETRY_ATTEMPTS
+          ? { loaded: true, capabilities: {} }
+          : EMPTY_STATUS;
         notifyCapabilityStatusListeners();
+        scheduleCapabilityStatusRetry();
         return cachedStatusSnapshot;
       });
   }
