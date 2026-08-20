@@ -22,55 +22,44 @@ interface Props {
   onSave(draft: CustomProductDraft): Promise<boolean>;
 }
 
-/** Documents initialDraft. */
 const initialDraft = (product?: HostedCustomProduct) =>
   product ? productDraft(product) : emptyProductDraft();
 
-/** Documents EditorTitle. */
 const EditorTitle = ({ product }: { product?: HostedCustomProduct }) => (
   <CardTitle>{product ? `Edit ${product.label}` : 'Create reusable product'}</CardTitle>
 );
 
-/** Documents PreviewTitle. */
 const PreviewTitle = ({ label }: { label: string }) => <h3>{label || 'Untitled product'}</h3>;
 
-/** Documents ValidationMessage. */
 const ValidationMessage = ({ validation }: { validation: string | null }) =>
   validation ? <p className="custom-product-error">{validation}</p> : null;
 
-/** Documents SaveLabel. */
 const SaveLabel = ({ saving, product }: { saving: boolean; product?: HostedCustomProduct }) =>
   saving ? 'Saving…' : product ? 'Save changes' : 'Create product';
 
-/** Documents moveCategory. */
 const moveCategory = (categories: CustomCategoryTemplate[], index: number, direction: -1 | 1) => {
   const reordered = [...categories];
   [reordered[index], reordered[index + direction]] = [reordered[index + direction], reordered[index]];
   return normalizeDraftOrder(reordered);
 };
 
-/** Documents CustomProductEditor. */
 const CustomProductEditor = ({ product, onCancel, onSave }: Props) => {
   const [draft, setDraft] = useState(() => initialDraft(product));
   const [saving, setSaving] = useState(false);
   const [validation, setValidation] = useState<string | null>(null);
 
-  /** Documents updateCategory. */
   const updateCategory = (index: number, next: CustomCategoryTemplate) => setDraft((current) => ({
     ...current,
     categories: current.categories.map((category, candidate) => candidate === index ? next : category),
   }));
-  /** Documents removeCategory. */
   const removeCategory = (index: number) => setDraft((current) => ({
     ...current,
     categories: normalizeDraftOrder(current.categories.filter((_, candidate) => candidate !== index)),
   }));
-  /** Documents addCategory. */
   const addCategory = () => setDraft((current) => ({
     ...current,
     categories: [...current.categories, newCategory(current.categories.length)],
   }));
-  /** Documents submit. */
   const submit = async () => {
     const error = validateProductDraft(draft);
     if (error) {

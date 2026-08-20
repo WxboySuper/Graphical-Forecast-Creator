@@ -25,7 +25,6 @@ const CustomProductsDialog = () => {
   const layerCount = useSelector((state: RootState) => state.forecast.forecastCycle.days[state.forecast.forecastCycle.currentDay]?.customLayers?.layers.length ?? 0);
   if (!isFeatureExposed('customProducts')) return null;
 
-  /** Documents useProduct. */
   const useProduct = (layer: OneOffCustomLayer) => {
     if (layerCount >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) return false;
     dispatch(addCustomLayer(layer));

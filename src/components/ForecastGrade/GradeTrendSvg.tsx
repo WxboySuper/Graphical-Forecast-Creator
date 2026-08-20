@@ -15,10 +15,8 @@ interface GradeTrendSvgProps {
 const WIDTH = 320;
 const HEIGHT = 96;
 
-/** Documents GradeTrendSvg. */
 const GradeTrendSvg: React.FC<GradeTrendSvgProps> = ({ points, onSelectCard }) => {
   const step = points.length > 1 ? WIDTH / (points.length - 1) : 0;
-  /** Documents toY. */
   const toY = (value: number) => HEIGHT - (value / 100) * HEIGHT;
   const path = points
     .map((entry, index) => `${index === 0 ? 'M' : 'L'} ${index * step} ${toY(entry.value)}`)

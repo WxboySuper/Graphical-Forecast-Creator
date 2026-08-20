@@ -4,7 +4,6 @@ import type { AddToastFn } from '../components/Layout';
 import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
 import { deserializeForecast } from '../utils/fileUtils';
 
-/** Documents loadCloudOutlookOption. */
 const loadCloudOutlookOption = async (
   loadCycle: ReturnType<typeof useCloudCycles>['loadCycle'],
   selectedOption: MonitorOutlookSourceOption,
@@ -24,7 +23,6 @@ const loadCloudOutlookOption = async (
   };
 };
 
-/** Documents useMonitorCloudOutlook. */
 export const useMonitorCloudOutlook = ({
   selectedOption,
   today,

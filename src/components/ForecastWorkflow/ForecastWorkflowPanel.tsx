@@ -436,7 +436,6 @@ const hasSameDayWorkflowWork = (
   currentDay: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
 ): boolean => cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
 
-/** Documents dayHasCustomContent. */
 const dayHasCustomContent = (
   day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
 ): boolean => Boolean(day?.customLayers?.layers.length);

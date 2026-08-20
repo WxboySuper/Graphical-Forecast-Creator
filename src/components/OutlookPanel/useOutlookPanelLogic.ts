@@ -20,7 +20,6 @@ import {
 } from '../../config/productExposureSelectors';
 
 // @codescene(disable:"Large Method")
-/** Documents useOutlookPanelLogic. */
 export function useOutlookPanelLogic() {
   const dispatch = useDispatch();
   const drawingState = useSelector((s: RootState) => s.forecast.drawingState);

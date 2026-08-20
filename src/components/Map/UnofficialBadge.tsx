@@ -1,7 +1,6 @@
 import React from 'react';
 import './UnofficialBadge.css';
 
-/** Documents UnofficialBadge. */
 const UnofficialBadge: React.FC = () => (
   <div className="unofficial-badge" aria-label="This is an unofficial forecast for educational purposes only">
     <div className="unofficial-badge-inner">

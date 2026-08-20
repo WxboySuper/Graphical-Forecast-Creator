@@ -12,13 +12,11 @@ interface Props {
   onRemove(): void;
 }
 
-/** Documents styleChange. */
 const styleChange = (
   category: CustomCategoryTemplate,
   change: Partial<CustomCategoryTemplate['style']>,
 ): CustomCategoryTemplate => ({ ...category, style: { ...category.style, ...change } });
 
-/** Documents CustomProductCategoryEditor. */
 const CustomProductCategoryEditor = ({ category, index, count, onChange, onMove, onRemove }: Props) => (
   <div className="custom-product-category-editor">
     <div className="custom-product-category-editor__topline">

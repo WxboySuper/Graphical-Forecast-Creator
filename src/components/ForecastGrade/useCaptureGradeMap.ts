@@ -1,7 +1,6 @@
 import { useCallback, type RefObject } from 'react';
 import type { VerificationMapHandle } from '../Map/VerificationMap';
 
-/** Documents useCaptureGradeMap. */
 export const useCaptureGradeMap = (mapRef: RefObject<VerificationMapHandle>) =>
   useCallback(async (): Promise<HTMLImageElement | null> => {
     const mapElement = mapRef.current?.getMap()?.getTargetElement() as HTMLElement | undefined;

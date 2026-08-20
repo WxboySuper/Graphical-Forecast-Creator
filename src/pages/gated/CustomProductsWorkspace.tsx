@@ -11,7 +11,6 @@ import { isBuiltInCustomProduct } from '../../lib/builtInCustomProducts';
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
 
-/** Documents newProductDisabled. */
 const newProductDisabled = (
   customProducts: UseCustomProductsResult,
   editorOpen: boolean,
@@ -22,7 +21,6 @@ const newProductDisabled = (
   || editorOpen
   || (customProducts.userProducts ?? customProducts.products.filter((product) => !isBuiltInCustomProduct(product))).length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount;
 
-/** Documents WorkspaceNotices. */
 const WorkspaceNotices = ({ customProducts, applicationError }: { customProducts: UseCustomProductsResult; applicationError?: string | null }) => (
   <>
     {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Rainfall and Tropical AOI are built-in products available to everyone. Premium is only required to create or manage your own reusable products.</CardContent></Card> : null}
@@ -31,7 +29,6 @@ const WorkspaceNotices = ({ customProducts, applicationError }: { customProducts
   </>
 );
 
-/** Documents WorkspaceEditors. */
 const WorkspaceEditors = ({
   creating,
   editing,
@@ -51,7 +48,6 @@ const WorkspaceEditors = ({
   </>
 );
 
-/** Documents ProductsHero. */
 const ProductsHero = ({
   productCount,
   builtInCount,
@@ -78,7 +74,6 @@ const ProductsHero = ({
   </header>
 );
 
-/** Documents ProductsLibrary. */
 const ProductsLibrary = ({
   customProducts,
   editorOpen,
@@ -120,7 +115,6 @@ interface CustomProductsWorkspaceProps {
   onProductUse?(layer: OneOffCustomLayer): boolean;
 }
 
-/** Documents CustomProductsWorkspace. */
 const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProductsWorkspaceProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -134,12 +128,10 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
   );
 
   const editorOpen = creating || Boolean(editing);
-  /** Documents openEditor. */
   const openEditor = (product: HostedCustomProduct) => {
     setCreating(false);
     setEditing(product);
   };
-  /** Documents useProduct. */
   const useProduct = (product: HostedCustomProduct) => {
     const layer = customProducts.useProduct(product);
     if (!layer) return;

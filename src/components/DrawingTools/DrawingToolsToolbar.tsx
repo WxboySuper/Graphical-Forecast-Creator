@@ -16,7 +16,6 @@ interface DrawingToolsToolbarProps {
   exportTooltip: React.ReactNode;
 }
 
-/** Documents DrawingToolsToolbar. */
 const DrawingToolsToolbar: React.FC<DrawingToolsToolbarProps> = ({
   onSave,
   onLoad,

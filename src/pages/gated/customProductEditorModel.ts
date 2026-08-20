@@ -16,16 +16,13 @@ const DEFAULT_STYLE = {
   hatch: 'none' as CustomHatchPattern,
 };
 
-/** Documents asCategoryId. */
 const asCategoryId = (value: string): CustomCategoryId => value as CustomCategoryId;
 
-/** Documents hexToRgba. */
 const hexToRgba = (hex: string, alpha: number): string => {
   const numeric = Number.parseInt(hex.slice(1), 16);
   return `rgba(${(numeric >> 16) & 255}, ${(numeric >> 8) & 255}, ${numeric & 255}, ${alpha})`;
 };
 
-/** Documents categoryPreviewStyle. */
 export const categoryPreviewStyle = (category: CustomCategoryTemplate): CSSProperties => {
   const stroke = hexToRgba(category.style.strokeColor, category.style.strokeOpacity);
   const diagonal = `repeating-linear-gradient(45deg, transparent 0 5px, ${stroke} 5px 7px)`;
@@ -44,7 +41,6 @@ export const categoryPreviewStyle = (category: CustomCategoryTemplate): CSSPrope
   };
 };
 
-/** Documents newCategory. */
 export const newCategory = (order: number): CustomCategoryTemplate => ({
   id: asCategoryId(`category-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${order}`}`),
   label: `Category ${order + 1}`,
@@ -52,25 +48,21 @@ export const newCategory = (order: number): CustomCategoryTemplate => ({
   style: { ...DEFAULT_STYLE },
 });
 
-/** Documents emptyProductDraft. */
 export const emptyProductDraft = (): CustomProductDraft => ({
   label: '',
   description: '',
   categories: [newCategory(0)],
 });
 
-/** Documents productDraft. */
 export const productDraft = (product: HostedCustomProduct): CustomProductDraft => ({
   label: product.label,
   description: product.description ?? '',
   categories: product.categories.map((category) => ({ ...category, style: { ...category.style } })),
 });
 
-/** Documents normalizeDraftOrder. */
 export const normalizeDraftOrder = (categories: CustomCategoryTemplate[]): CustomCategoryTemplate[] =>
   categories.map((category, order) => ({ ...category, order }));
 
-/** Documents validateProductDraft. */
 export const validateProductDraft = (draft: CustomProductDraft): string | null => {
   if (!draft.label.trim()) return 'Enter a product name.';
   if (draft.categories.some((category) => !category.label.trim())) return 'Every category needs a label.';

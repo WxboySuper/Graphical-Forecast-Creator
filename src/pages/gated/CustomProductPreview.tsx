@@ -1,7 +1,6 @@
 import type { CustomCategoryTemplate } from '../../types/customProducts';
 import { categoryPreviewStyle } from './customProductEditorModel';
 
-/** Documents CustomProductPreview. */
 const CustomProductPreview = ({ categories }: { categories: CustomCategoryTemplate[] }) => (
   <div className="custom-product-preview" aria-label="Product preview">
     {categories.map((category) => (

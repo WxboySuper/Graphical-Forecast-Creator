@@ -3,7 +3,6 @@ import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { areMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
 
-/** Documents shouldSyncPremiumMonitorSettings. */
 const shouldSyncPremiumMonitorSettings = (
   premiumActive: boolean,
   status: string,
@@ -14,7 +13,6 @@ const shouldSyncPremiumMonitorSettings = (
   status === 'signed_in' &&
   (!lastSynced || !areMonitorSettingsEqual(lastSynced, settings));
 
-/** Documents usePremiumMonitorSettingsSync. */
 export const usePremiumMonitorSettingsSync = (settings: MonitorSettings) => {
   const { status, syncedSettings, updateSyncedSettings } = useAuth();
   const { premiumActive } = useEntitlement();

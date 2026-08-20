@@ -4,7 +4,6 @@ import { Cloud, Zap } from 'lucide-react';
 // March 1, 2026 at noon CST (UTC-6) = 18:00 UTC
 const LAUNCH_TIME = new Date('2026-03-01T18:00:00.000Z').getTime();
 
-/** Documents getRemainingMs. */
 function getRemainingMs(): number {
   return Math.max(0, LAUNCH_TIME - Date.now());
 }
@@ -18,7 +17,6 @@ const RISK_BADGES = [
   { label: 'TSTM', color: '#bfe7bc' },
 ];
 
-/** Documents ComingSoonPage. */
 export const ComingSoonPage: React.FC = () => {
   const [remaining, setRemaining] = useState(getRemainingMs);
 

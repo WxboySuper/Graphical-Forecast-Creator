@@ -79,7 +79,6 @@ export function getWhatsNewItems(lastAcceptedVersion: string | null): string[] {
 }
 
 // Records acceptance of the current Privacy Policy version in localStorage.
-/** Documents acceptPrivacyPolicy. */
 function acceptPrivacyPolicy(): void {
   try {
     localStorage.setItem(STORAGE_KEY, PRIVACY_POLICY_VERSION);
@@ -109,7 +108,6 @@ const PrivacyPolicyWhatsNew: React.FC<{ items: string[] }> = ({ items }) => (
 /** Lets people change the local, non-essential telemetry preference without creating an account. */
 const ProductAnalyticsPreference: React.FC = () => {
   const [enabled, setEnabled] = useState(() => isProductAnalyticsEnabled());
-  /** Documents handleChange. */
   const handleChange = () => {
     const nextEnabled = !enabled;
     const effectiveEnabled = setProductAnalyticsEnabled(nextEnabled);
