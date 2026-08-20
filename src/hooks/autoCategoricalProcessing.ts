@@ -31,6 +31,7 @@ export const toDerivationErrorMessage = (error: unknown, fallback: string): stri
   return fallback;
 };
 
+/** Processes outlook maps into categorical geometry for the requested day. */
 export function processOutlooksToCategorical(outlooks: OutlookData, day: number = 1): GeoJSON.Feature[] {
   if (day === 1 || day === 2) {
     return processDay12OutlooksToCategorical(outlooks);
