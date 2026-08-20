@@ -4,32 +4,7 @@ import type { Feature, FeatureCollection, Polygon, MultiPolygon, Position } from
 import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevereToCategorical } from '../utils/outlookUtils';
 import { OutlookData, CIGLevel, CategoricalRiskLevel } from '../types/outlooks';
 import { coerceOutlookProbabilityMap } from '../utils/outlookMapCoercion';
-
-/**
- * Raised when automatic categorical derivation cannot produce a complete,
- * valid result. Callers must preserve the last known-good categorical
- * geometry instead of publishing a partial result.
- */
-export class CategoricalDerivationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CategoricalDerivationError';
-  }
-}
-
-/** Returns a stable, actionable message for an unknown derivation failure. */
-export const toDerivationErrorMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof CategoricalDerivationError) {
-    return error.message;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === 'string' && error.trim().length > 0) {
-    return error;
-  }
-  return fallback;
-};
+import { CategoricalDerivationError } from './categoricalErrors';
 
 export function processOutlooksToCategorical(outlooks: OutlookData, day: number = 1): GeoJSON.Feature[] {
   if (day === 1 || day === 2) {

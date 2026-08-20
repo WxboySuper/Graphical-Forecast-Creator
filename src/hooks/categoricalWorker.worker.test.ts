@@ -57,6 +57,26 @@ describe('createDerivationController worker path', () => {
     jest.useRealTimers();
   });
 
+  it('terminates the timed-out worker and uses a replacement for the next request', async () => {
+    jest.useFakeTimers();
+    const workers = [createFakeWorkerController().worker, createFakeWorkerController().worker];
+    let factoryCalls = 0;
+    const controller = createDerivationController(() => workers[factoryCalls++]);
+
+    const timedOut = controller.derive(7, 1, emptyOutlooks());
+    jest.advanceTimersByTime(15_000);
+    await expect(timedOut).resolves.toMatchObject({ ok: false, error: expect.stringContaining('timed out') });
+    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+
+    const replacementRequest = controller.derive(8, 1, emptyOutlooks());
+    expect(workers[1].postMessage).toHaveBeenCalledTimes(1);
+    workers[1].onmessage?.({ data: { requestId: 8, ok: true, features: [] } } as MessageEvent);
+    await expect(replacementRequest).resolves.toMatchObject({ ok: true, features: [] });
+
+    controller.dispose();
+    jest.useRealTimers();
+  });
+
   it('rejects pending requests when the worker errors', async () => {
     const { controller, worker } = createFakeWorkerController();
 
@@ -65,6 +85,24 @@ describe('createDerivationController worker path', () => {
 
     const result = await pending;
     expect(result.ok).toBe(false);
+    controller.dispose();
+  });
+
+  it('replaces a failed worker so later requests can recover', async () => {
+    const workers = [createFakeWorkerController().worker, createFakeWorkerController().worker];
+    let factoryCalls = 0;
+    const controller = createDerivationController(() => workers[factoryCalls++]);
+
+    const failedRequest = controller.derive(9, 1, emptyOutlooks());
+    workers[0].onerror?.({} as ErrorEvent);
+    await expect(failedRequest).resolves.toMatchObject({ ok: false, error: 'Auto-categorical worker failed.' });
+    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+
+    const recoveredRequest = controller.derive(10, 1, emptyOutlooks());
+    expect(workers[1].postMessage).toHaveBeenCalledTimes(1);
+    workers[1].onmessage?.({ data: { requestId: 10, ok: true, features: [] } } as MessageEvent);
+    await expect(recoveredRequest).resolves.toMatchObject({ ok: true, features: [] });
+
     controller.dispose();
   });
 
