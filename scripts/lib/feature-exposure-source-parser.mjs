@@ -138,7 +138,7 @@ const LITERAL_READERS = {
   ObjectExpression: evaluateObject,
 };
 
-/** Documents rejectUnsupportedLiteral. */
+/** Rejects syntax outside the statically evaluable policy-literal subset. */
 function rejectUnsupportedLiteral(expression) {
   throw new Error(`Unsupported non-literal expression: ${nodeText(expression)}`);
 }

@@ -82,7 +82,7 @@ export function runExposureDiagnostics(argv = process.argv.slice(2)) {
   return report;
 }
 
-/** Documents main. */
+/** Runs the exposure diagnostics CLI and exits non-zero when validation fails. */
 function main() {
   try {
     runExposureDiagnostics();

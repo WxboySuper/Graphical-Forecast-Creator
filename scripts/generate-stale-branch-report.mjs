@@ -141,7 +141,7 @@ export async function runStaleBranchReport(options = {}) {
   return { report, body, dryRun: config.dryRun };
 }
 
-/** Documents main. */
+/** Runs the stale-branch report CLI and publishes its generated report. */
 async function main() {
   try {
     await runStaleBranchReport();
