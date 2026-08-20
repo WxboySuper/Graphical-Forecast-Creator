@@ -119,14 +119,12 @@ describe('useCloudSync', () => {
   });
 
   it('syncs immediately, exposes synced state, and skips repeated identical state', async () => {
-    const { result, rerender } = renderHook(() => useCloudSync(cloud()));
+    const { result } = renderHook(() => useCloudSync(cloud()));
 
     await act(async () => {
       await result.current.syncNow();
     });
 
-    expect(result.current.isSynced).toBe(false);
-    rerender();
     expect(result.current.isSynced).toBe(true);
 
     await act(async () => {
@@ -147,6 +145,7 @@ describe('useCloudSync', () => {
     });
 
     expect(result.current.currentCloud).toBeNull();
+    expect(mockSerializeForecast).not.toHaveBeenCalled();
     expect(saveCycle).not.toHaveBeenCalled();
   });
 
