@@ -1,4 +1,5 @@
 import '../immerSetup';
+import { isDraft, original } from 'immer';
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
@@ -37,6 +38,18 @@ export interface SavedCycle {
   workflowMetadata?: CycleMetadata;
 }
 
+export interface CycleHistoryLoad {
+  cycles: SavedCycle[];
+  lifetimeCycleStats: LifetimeCycleStats;
+}
+
+export interface LifetimeCycleStats {
+  totalCyclesMade: number;
+  totalForecastsMade: number;
+  forecastStreak?: number;
+  lastSavedCycleDate?: string;
+}
+
 export interface ForecastState {
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
@@ -52,6 +65,7 @@ export interface ForecastState {
   isSaved: boolean;
   emergencyMode: boolean;
   savedCycles: SavedCycle[];
+  lifetimeCycleStats?: LifetimeCycleStats;
   historyByDay: Partial<Record<DayType, ForecastHistoryStacks>>;
   /** Unsaved discussion editor drafts, keyed by grouping id so shared owner days cannot collide. */
   discussionDraftsByScope: Record<string, DiscussionData>;
@@ -108,6 +122,7 @@ interface CopyFeatureRule {
 }
 
 const HISTORY_LIMIT = 50;
+export const SAVED_CYCLES_LIMIT = 50;
 /** Storage key for the workflow-active flag; persisted by the store subscription, not by reducers. */
 export const WORKFLOW_ACTIVE_STORAGE_KEY = 'gfc-active-forecast-workflow';
 /** Deterministic timestamp used for the module-level initial state so no clock read happens at import time. */
@@ -332,6 +347,7 @@ const initialState: ForecastState = {
   isSaved: true,
   emergencyMode: false,
   savedCycles: [],
+  lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
   historyByDay: {},
   discussionDraftsByScope: {},
   completionValidation: {
@@ -450,6 +466,27 @@ const applyPendingFeatureUpdates = (
 
 /** Clones one GeoJSON feature without JSON serialization so history snapshots are cheaper. */
 const cloneFeature = (feature: Feature): Feature => cloneJsonValue(feature);
+const featureCloneCache = new WeakMap<object, Feature>();
+
+/**
+ * Immer creates a fresh draft wrapper for each reducer invocation. Use the
+ * stable base object as the cache key while snapshots are captured before the
+ * enclosing reducer mutates that feature. Plain snapshots keep their own
+ * identity, so restore operations remain isolated from one another.
+ */
+const getFeatureCacheKey = (feature: Feature): object => {
+  if (!isDraft(feature)) return feature;
+  return original(feature) ?? feature;
+};
+
+const cloneFeatureCached = (feature: Feature): Feature => {
+  const cacheKey = getFeatureCacheKey(feature);
+  const cached = featureCloneCache.get(cacheKey);
+  if (cached) return cached;
+  const cloned = cloneFeature(feature);
+  featureCloneCache.set(cacheKey, cloned);
+  return cloned;
+};
 
 /** Returns the history stacks for one day, creating empty stacks when needed. */
 const getOrCreateDayHistory = (
@@ -471,7 +508,7 @@ const cloneEntries = (map?: Map<string, Feature[]>): Map<string, Feature[]> | un
   if (!map) return undefined;
   return new Map(Array.from(map.entries(), ([probability, features]) => [
     probability,
-    features.map(cloneFeature),
+    features.map(cloneFeatureCached),
   ]));
 };
 
@@ -903,6 +940,24 @@ export const forecastSlice = createSlice({
         workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
+      state.lifetimeCycleStats ??= { totalCyclesMade: 0, totalForecastsMade: 0 };
+      state.lifetimeCycleStats.totalCyclesMade += 1;
+      state.lifetimeCycleStats.totalForecastsMade += savedCycle.stats.forecastDays;
+      const lastSavedCycleDate = state.lifetimeCycleStats.lastSavedCycleDate;
+      if (!lastSavedCycleDate || savedCycle.cycleDate > lastSavedCycleDate) {
+        const previousDate = lastSavedCycleDate ? new Date(lastSavedCycleDate).getTime() : 0;
+        const currentDate = new Date(savedCycle.cycleDate).getTime();
+        const isConsecutiveDay = currentDate - previousDate === 86400000;
+        state.lifetimeCycleStats.forecastStreak = isConsecutiveDay
+          ? (state.lifetimeCycleStats.forecastStreak ?? 0) + 1
+          : 1;
+        state.lifetimeCycleStats.lastSavedCycleDate = savedCycle.cycleDate;
+      } else if (!state.lifetimeCycleStats.forecastStreak) {
+        state.lifetimeCycleStats.forecastStreak = 1;
+      }
+      if (state.savedCycles.length > SAVED_CYCLES_LIMIT) {
+        state.savedCycles.splice(0, state.savedCycles.length - SAVED_CYCLES_LIMIT);
+      }
       state.isSaved = true;
     },
 
@@ -937,6 +992,7 @@ export const forecastSlice = createSlice({
     deleteSavedCycle: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
       state.savedCycles = state.savedCycles.filter(c => c.id !== cycleId);
+      // lifetimeCycleStats intentionally tracks historical saves, not the retained/deletable window.
     },
 
     // Copy features from one cycle/day to current cycle/day
@@ -975,8 +1031,15 @@ export const forecastSlice = createSlice({
     },
 
     // Load cycles from storage (for hydration)
-    loadCycleHistory: (state, action: PayloadAction<SavedCycle[]>) => {
-      state.savedCycles = action.payload;
+    loadCycleHistory: (state, action: PayloadAction<SavedCycle[] | CycleHistoryLoad>) => {
+      const cycles = Array.isArray(action.payload) ? action.payload : action.payload.cycles;
+      state.savedCycles = cycles.slice(-SAVED_CYCLES_LIMIT);
+      state.lifetimeCycleStats = Array.isArray(action.payload)
+        ? {
+            totalCyclesMade: cycles.length,
+            totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
+          }
+        : action.payload.lifetimeCycleStats;
     },
 
     setLowProbability: (state, action: PayloadAction<{ outlookType: OutlookType, isLow: boolean }>) => {
@@ -1377,7 +1440,7 @@ export const selectDiscussionDraftForScope = (state: RootState, scopeId: string)
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay)!;
+  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
   };
 const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
@@ -1390,7 +1453,7 @@ export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollecti
 /** Selects the outlook maps for a specific day, falling back to a shared empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[day]?.data || sharedEmptyOutlookData(day)!;
+  return cycle.days[day]?.data || sharedEmptyOutlookData(day) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
   };
 /** Selects the saved forecast cycle snapshots shown in cycle history. */
 export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;

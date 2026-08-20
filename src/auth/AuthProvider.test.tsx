@@ -26,6 +26,7 @@ import {
   postLocalJson,
   readProfileBetaAccess,
   runInitialHostedSync,
+  attachHostedSettingsSubscription,
   readRemoteSettings,
   safeParseJson,
   seedOrApplySettings,
@@ -157,15 +158,28 @@ describe('AuthProvider Utils', () => {
   test('readRemoteSettings validates data', () => {
     const validSettings = {
       darkMode: true,
-      baseMapStyle: 'streets',
+      baseMapStyle: 'osm' as const,
       stateBorders: true,
       counties: false,
-      ghostOutlooks: {},
+      ghostOutlooks: {
+        tornado: false,
+        wind: false,
+        hail: false,
+        categorical: false,
+        totalSevere: false,
+        'day4-8': false,
+      },
       defaultForecasterName: 'Forecaster',
       forecastUiVariant: 'workspace_dock' as const,
       monitorSettings: DEFAULT_MONITOR_SETTINGS,
     };
     expect(readRemoteSettings(validSettings)).toEqual(validSettings);
+    expect(
+      readRemoteSettings({ ...validSettings, defaultForecasterName: 'a'.repeat(100) } as Record<string, unknown>)
+    ).not.toBeNull();
+    expect(
+      readRemoteSettings({ ...validSettings, defaultForecasterName: 'a'.repeat(101) } as Record<string, unknown>)
+    ).toBeNull();
     expect(readRemoteSettings({ darkMode: 'not boolean' } as Record<string, unknown>)).toBeNull();
     expect(readRemoteSettings()).toBeNull();
   });
@@ -663,6 +677,21 @@ describe('AuthProvider Utils', () => {
     expect(setSettingsSyncStatus).toHaveBeenCalledWith('syncing');
     expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
     expect(typeof unsubscribeResult).toBe('function');
+  });
+
+  test('cleans up a listener that resolves after hosted settings cleanup', async () => {
+    const unsubscribe = jest.fn();
+    const setSubscription = jest.fn();
+    let active = true;
+
+    const subscriptionPromise = Promise.resolve(unsubscribe);
+    const handoff = attachHostedSettingsSubscription(subscriptionPromise, () => active, setSubscription);
+    active = false;
+
+    await handoff;
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(setSubscription).not.toHaveBeenCalled();
   });
 });
 

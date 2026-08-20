@@ -70,6 +70,7 @@ import {
   GHOST_REFERENCE_LAYER_Z_INDEX,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
+import type { CustomCategoryStyle } from "../../types/customProducts";
 import {
   BLANK_LAND_FILL_STYLE,
   BLANK_LAND_OUTLINE_STYLE,
@@ -84,6 +85,17 @@ import {
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { dispatchModifyUpdates } from "./precisionPolygonEditHandler";
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
+
+/** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
+export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
+  style.fillColor,
+  style.fillOpacity,
+  style.strokeColor,
+  style.strokeOpacity,
+  style.strokeWidth,
+  style.hatch,
+  isTopLayer,
+].join("|");
 
 // OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
 // https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
@@ -1037,8 +1049,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 category.id,
                 category.label,
                 category.order,
-                JSON.stringify(category.style),
-                zIndex === highestCustomZIndex,
+                getCustomStyleSignature(category.style, zIndex === highestCustomZIndex),
               ].join("|"),
               read: () => format.readFeature(feature, {
                 dataProjection: "EPSG:4326",
