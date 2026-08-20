@@ -103,7 +103,6 @@ export const useAutoSave = (userId?: string | null) => {
     }
 
     const generation = ++saveGenerationRef.current;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       if (generation !== saveGenerationRef.current) return;
