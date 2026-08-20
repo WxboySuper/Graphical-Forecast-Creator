@@ -27,6 +27,29 @@ const createReplacementWorkerController = () => {
   return { controller, workers };
 };
 
+const assertReplacementRecovers = async ({
+  controller,
+  workers,
+  failedRequest,
+  triggerFailure,
+  expectedError,
+}: {
+  controller: DerivationController;
+  workers: ReturnType<typeof createFakeWorkerController>['worker'][];
+  failedRequest: Promise<unknown>;
+  triggerFailure: () => void;
+  expectedError: string | RegExp;
+}) => {
+  triggerFailure();
+  await expect(failedRequest).resolves.toMatchObject({ ok: false, error: expectedError });
+  expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+
+  const recoveredRequest = controller.derive(10, 1, emptyOutlooks());
+  expect(workers[1].postMessage).toHaveBeenCalledTimes(1);
+  workers[1].onmessage?.({ data: { requestId: 10, ok: true, features: [] } } as MessageEvent);
+  await expect(recoveredRequest).resolves.toMatchObject({ ok: true, features: [] });
+};
+
 describe('createDerivationController worker path', () => {
   it('resolves each request with its own worker response; the hook discards stale ones', async () => {
     const { controller, worker } = createFakeWorkerController();
@@ -70,13 +93,13 @@ describe('createDerivationController worker path', () => {
 
     const timedOut = controller.derive(7, 1, emptyOutlooks());
     jest.advanceTimersByTime(15_000);
-    await expect(timedOut).resolves.toMatchObject({ ok: false, error: expect.stringContaining('timed out') });
-    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
-
-    const replacementRequest = controller.derive(8, 1, emptyOutlooks());
-    expect(workers[1].postMessage).toHaveBeenCalledTimes(1);
-    workers[1].onmessage?.({ data: { requestId: 8, ok: true, features: [] } } as MessageEvent);
-    await expect(replacementRequest).resolves.toMatchObject({ ok: true, features: [] });
+    await assertReplacementRecovers({
+      controller,
+      workers,
+      failedRequest: timedOut,
+      triggerFailure: () => undefined,
+      expectedError: expect.stringContaining('timed out'),
+    });
 
     controller.dispose();
     jest.useRealTimers();
@@ -97,14 +120,13 @@ describe('createDerivationController worker path', () => {
     const { controller, workers } = createReplacementWorkerController();
 
     const failedRequest = controller.derive(9, 1, emptyOutlooks());
-    workers[0].onerror?.({} as ErrorEvent);
-    await expect(failedRequest).resolves.toMatchObject({ ok: false, error: 'Auto-categorical worker failed.' });
-    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
-
-    const recoveredRequest = controller.derive(10, 1, emptyOutlooks());
-    expect(workers[1].postMessage).toHaveBeenCalledTimes(1);
-    workers[1].onmessage?.({ data: { requestId: 10, ok: true, features: [] } } as MessageEvent);
-    await expect(recoveredRequest).resolves.toMatchObject({ ok: true, features: [] });
+    await assertReplacementRecovers({
+      controller,
+      workers,
+      failedRequest,
+      triggerFailure: () => workers[0].onerror?.({} as ErrorEvent),
+      expectedError: 'Auto-categorical worker failed.',
+    });
 
     controller.dispose();
   });
