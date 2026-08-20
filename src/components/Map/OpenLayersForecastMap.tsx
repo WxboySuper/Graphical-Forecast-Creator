@@ -42,6 +42,7 @@ import type {
   Feature as GeoJsonFeature,
   GeoJsonProperties,
   Polygon,
+  MultiPolygon,
 } from "geojson";
 import { apply } from "ol-mapbox-style";
 import Legend from "./Legend";
@@ -87,6 +88,10 @@ import {
   type FeatureSyncDescriptor,
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
+import { trimGeometryForAutoDraw } from "../../hooks/useTrimCurrentDayOutlooks";
+import { clearLandMaskRuntimeCache, ensureLandMask } from "../../utils/outlookPolygonMasking/landMaskRuntime";
+import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMasking/trimOutlookData";
+import { Fill, Stroke, Style as OlStyle } from "ol/style";
 
 /** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
 export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
@@ -132,6 +137,42 @@ const addTstmPreviewOlFeature = (
   item.set("outlookType", "categorical");
   item.set("probability", "TSTM");
   previewSource.addFeature(item);
+};
+
+const TRIM_PREVIEW_STYLE = new OlStyle({
+  fill: new Fill({ color: "rgba(0, 188, 212, 0.35)" }),
+  stroke: new Stroke({ color: "#00acc1", width: 2, lineDash: [8, 4] }),
+});
+
+/** Replaces trim-preview features on a dedicated overlay source. */
+const syncTrimPreviewSource = (
+  previewSource: VectorSource,
+  previewFeatures: GeoJsonFeature[],
+) => {
+  previewSource.clear();
+  const format = new GeoJSON();
+
+  previewFeatures.forEach((feature) => {
+    const olFeature = format.readFeature(feature, {
+      dataProjection: "EPSG:4326",
+      featureProjection: "EPSG:3857",
+    });
+
+    const applyPreview = (item: OLFeature<Geometry>) => {
+      item.setStyle(TRIM_PREVIEW_STYLE);
+      item.set("trimPreview", true);
+    };
+
+    if (Array.isArray(olFeature)) {
+      olFeature.forEach((item: FeatureLike) =>
+        applyPreview(item as OLFeature<Geometry>),
+      );
+      previewSource.addFeatures(olFeature as OLFeature<Geometry>[]);
+    } else {
+      applyPreview(olFeature as OLFeature<Geometry>);
+      previewSource.addFeature(olFeature as OLFeature<Geometry>);
+    }
+  });
 };
 
 /** Replaces Auto-TSTM preview features on a dedicated map source. */
@@ -180,6 +221,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       outlookOpacity,
       baseMapStyle,
       ghostOutlooks,
+      outlookTrimStrategy,
+      outlookTrimAutoOnDraw,
+      outlookTrimPreviewOnly,
       serializedFeatures,
       serializedCustomFeatures,
     } = useForecastMapReduxState();
@@ -200,6 +244,42 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const overlayRef = useRef<Overlay | null>(null);
     const interactionModeRef = useRef(interactionMode);
     const customModeRef = useRef(customMode);
+    const outlookTrimStrategyRef = useRef(outlookTrimStrategy);
+    const outlookTrimAutoOnDrawRef = useRef(outlookTrimAutoOnDraw);
+    const outlookTrimPreviewOnlyRef = useRef(outlookTrimPreviewOnly);
+
+    useEffect(() => {
+      outlookTrimStrategyRef.current = outlookTrimStrategy;
+    }, [outlookTrimStrategy]);
+
+    useEffect(() => {
+      outlookTrimAutoOnDrawRef.current = outlookTrimAutoOnDraw;
+    }, [outlookTrimAutoOnDraw]);
+
+    useEffect(() => {
+      outlookTrimPreviewOnlyRef.current = outlookTrimPreviewOnly;
+    }, [outlookTrimPreviewOnly]);
+
+    const trimStoredOutlookFeature = async (
+      feature: GeoJsonFeature,
+    ): Promise<GeoJsonFeature> => {
+      const geometry = feature.geometry;
+      if (geometry.type !== "Polygon" && geometry.type !== "MultiPolygon") {
+        return feature;
+      }
+
+      const trimmedGeometry = await trimGeometryForAutoDraw(
+        geometry as Polygon | MultiPolygon,
+        outlookTrimStrategyRef.current,
+        outlookTrimAutoOnDrawRef.current,
+        outlookTrimPreviewOnlyRef.current,
+      );
+
+      return {
+        ...feature,
+        geometry: trimmedGeometry,
+      };
+    };
 
     useEffect(() => {
       interactionModeRef.current = interactionMode;
@@ -229,9 +309,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const catSourceRef = useRef<VectorSource>(new VectorSource());
     const ghostSourceRef = useRef<VectorSource>(new VectorSource());
     const tstmPreviewSourceRef = useRef<VectorSource>(new VectorSource());
+    const trimPreviewSourceRef = useRef<VectorSource>(new VectorSource());
     const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const tstmPreviewLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const trimPreviewLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const drawRef = useRef<Draw | null>(null);
     const modifyRef = useRef<Modify | null>(null);
@@ -329,6 +411,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         zIndex: TOP_OUTLINE_LAYER_Z_INDEX + 5,
       });
       tstmPreviewLayerRef.current = tstmPreviewLayer;
+      const trimPreviewLayer = new VectorLayer({
+        source: trimPreviewSourceRef.current,
+        zIndex: TOP_OUTLINE_LAYER_Z_INDEX + 6,
+      });
+      trimPreviewLayerRef.current = trimPreviewLayer;
       // Probabilistic/other features layer: separate source, normal per-feature opacity
       const vectorLayer = new VectorLayer({
         source: vectorSourceRef.current,
@@ -358,6 +445,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           ghostLayer,
           catLayer,
           tstmPreviewLayer,
+          trimPreviewLayer,
           vectorLayer,
           landOutlineLayer,
           vectorReferenceGroup,
@@ -472,19 +560,22 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       modify.on("modifyend", (event) => {
         const format = new GeoJSON();
         event.features.forEach((feature) => {
-          const customFeature = toUpdatedCustomFeature(feature, format);
-          if (customFeature) {
-            dispatch(updateCustomFeature(customFeature));
-            return;
-          }
-          const updatedFeature = toUpdatedGeoJsonFeature(
-            feature,
-            format,
-            false,
-          );
-          if (updatedFeature) {
-            dispatch(updateFeature({ feature: updatedFeature }));
-          }
+          void (async () => {
+            const customFeature = toUpdatedCustomFeature(feature, format);
+            if (customFeature) {
+              dispatch(updateCustomFeature(customFeature));
+              return;
+            }
+            const updatedFeature = toUpdatedGeoJsonFeature(
+              feature,
+              format,
+              false,
+            );
+            if (updatedFeature) {
+              const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
+              dispatch(updateFeature({ feature: trimmedFeature }));
+            }
+          })();
         });
       });
       map.addInteraction(modify);
@@ -496,17 +587,20 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       catModify.on("modifyend", (event) => {
         const format = new GeoJSON();
         event.features.forEach((feature) => {
-          const derivedFrom = feature.get("derivedFrom") as string | undefined;
-          if (derivedFrom !== "auto-generated") {
-            const updatedFeature = toUpdatedGeoJsonFeature(
-              feature,
-              format,
-              true,
-            );
-            if (updatedFeature) {
-              dispatch(updateFeature({ feature: updatedFeature }));
+          void (async () => {
+            const derivedFrom = feature.get("derivedFrom") as string | undefined;
+            if (derivedFrom !== "auto-generated") {
+              const updatedFeature = toUpdatedGeoJsonFeature(
+                feature,
+                format,
+                true,
+              );
+              if (updatedFeature) {
+                const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
+                dispatch(updateFeature({ feature: trimmedFeature }));
+              }
             }
-          }
+          })();
         });
       });
       map.addInteraction(catModify);
@@ -889,35 +983,44 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           return;
         }
 
-        // Convert the drawn geometry to GeoJSON format with the correct projections for storage in Redux.
-        const geometry = format.writeGeometryObject(olGeometry, {
-          dataProjection: "EPSG:4326",
-          featureProjection: "EPSG:3857",
-        });
-        // Create a new feature object with the drawn geometry and current drawing state properties,
-        // then dispatch an action to add it to the Redux store.
-        const customFeature = toDrawnCustomFeature(
-          geometry as unknown as Geometry,
-          activeCustomLayer,
-          activeCustomCategory,
-          customMode,
-        );
-        if (customFeature) {
-          dispatch(addCustomFeature(customFeature));
-          return;
-        }
+        void (async () => {
+          const geometry = format.writeGeometryObject(olGeometry, {
+            dataProjection: "EPSG:4326",
+            featureProjection: "EPSG:3857",
+          });
+          const customFeature = toDrawnCustomFeature(
+            geometry as unknown as Geometry,
+            activeCustomLayer,
+            activeCustomCategory,
+            customMode,
+          );
+          if (customFeature) {
+            dispatch(addCustomFeature(customFeature));
+            return;
+          }
 
-        const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
-          type: "Feature",
-          id: uuidv4(),
-          geometry: geometry as Polygon,
-          properties: {
-            outlookType: drawingState.activeOutlookType,
-            probability: drawingState.activeProbability,
-            isSignificant: drawingState.isSignificant,
-          },
-        };
-        dispatch(addFeature({ feature }));
+          let outlookGeometry = geometry as Polygon;
+          if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
+            outlookGeometry = await trimGeometryForAutoDraw(
+              outlookGeometry,
+              outlookTrimStrategyRef.current,
+              outlookTrimAutoOnDrawRef.current,
+              outlookTrimPreviewOnlyRef.current,
+            ) as Polygon;
+          }
+
+          const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
+            type: "Feature",
+            id: uuidv4(),
+            geometry: outlookGeometry,
+            properties: {
+              outlookType: drawingState.activeOutlookType,
+              probability: drawingState.activeProbability,
+              isSignificant: drawingState.isSignificant,
+            },
+          };
+          dispatch(addFeature({ feature }));
+        })();
       });
       map.addInteraction(draw);
       drawRef.current = draw;
@@ -1117,6 +1220,47 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => {
       syncTstmPreviewSource(tstmPreviewSourceRef.current, tstmPreviewFeatures);
     }, [tstmPreviewFeatures]);
+
+    useEffect(() => {
+      clearLandMaskRuntimeCache();
+      if (outlookTrimAutoOnDraw || outlookTrimPreviewOnly) {
+        ensureLandMask(outlookTrimStrategy).catch(() => undefined);
+      }
+    }, [outlookTrimStrategy, outlookTrimAutoOnDraw, outlookTrimPreviewOnly]);
+
+    useEffect(() => {
+      const trimPreviewLayer = trimPreviewLayerRef.current;
+      if (!trimPreviewLayer) {
+        return;
+      }
+
+      if (!outlookTrimPreviewOnly) {
+        trimPreviewLayer.setVisible(false);
+        syncTrimPreviewSource(trimPreviewSourceRef.current, []);
+        return;
+      }
+
+      trimPreviewLayer.setVisible(true);
+      let cancelled = false;
+
+      ensureLandMask(outlookTrimStrategy)
+        .then((landMask) => {
+          if (cancelled || !landMask) {
+            return;
+          }
+          const previewFeatures = buildTrimmedOutlookPreviewFeatures(
+            outlooks,
+            landMask,
+            outlookTrimStrategy,
+          );
+          syncTrimPreviewSource(trimPreviewSourceRef.current, previewFeatures);
+        })
+        .catch(() => undefined);
+
+      return () => {
+        cancelled = true;
+      };
+    }, [outlookTrimPreviewOnly, outlookTrimStrategy, outlooks]);
 
     // Handlers for toolbar buttons to switch interaction modes and toggle style picker.
     const handleSetModePan = () => {
