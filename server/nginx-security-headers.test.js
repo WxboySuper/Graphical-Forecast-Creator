@@ -11,5 +11,13 @@ for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
     const config = fs.readFileSync(path.join(serverDirectory, filename), 'utf8');
     assert.equal(config.match(/include \/etc\/nginx\/snippets\/gfc-security-headers\.conf;/g)?.length, 2);
     assert.equal(securityHeaders.match(/^add_header /gm)?.length, 5);
+    assert.match(securityHeaders, /default-src 'self'/);
+    assert.match(securityHeaders, /script-src 'self'/);
+    assert.match(securityHeaders, /object-src 'none'/);
+    assert.match(securityHeaders, /frame-ancestors 'none'/);
+    assert.match(securityHeaders, /https:\/\/identitytoolkit\.googleapis\.com/);
+    assert.match(securityHeaders, /https:\/\/tiles\.openfreemap\.org/);
+    assert.match(securityHeaders, /https:\/\/opengeo\.ncep\.noaa\.gov/);
+    assert.doesNotMatch(securityHeaders, /report-only/i);
   });
 }
