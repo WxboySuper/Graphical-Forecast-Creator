@@ -63,6 +63,29 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
   const pending = new Map<number, { resolve: (r: DerivationResult) => void }>();
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
+  const replaceWorker = (failure: string, keepRequestId?: number): void => {
+    const failedWorker = worker;
+    worker = null;
+    failedWorker?.terminate();
+
+    pending.forEach(({ resolve }, pendingRequestId) => {
+      if (pendingRequestId !== keepRequestId) {
+        resolve({ ok: false, error: failure });
+      }
+    });
+    pending.clear();
+    timers.forEach((timer) => clearTimeout(timer));
+    timers.clear();
+
+    try {
+      const replacement = workerFactory();
+      worker = replacement;
+      attachWorkerHandlers(replacement);
+    } catch {
+      worker = null;
+    }
+  };
+
   const attachWorkerHandlers = (nextWorker: WorkerLike): void => {
     nextWorker.onmessage = (event: MessageEvent<AutoCategoricalWorkerResponse>) => {
       const { requestId, ok, features, error } = event.data;
@@ -79,14 +102,11 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
     };
 
     nextWorker.onerror = () => {
-      // Fail all pending requests so the caller preserves the last known-good result.
-      pending.forEach(({ resolve }) => resolve({ ok: false, error: 'Auto-categorical worker failed.' }));
-      pending.clear();
-      timers.forEach((timer) => clearTimeout(timer));
-      timers.clear();
-      if (worker === nextWorker) {
-        worker = null;
+      // Ignore late errors from a worker that timed out and was already replaced.
+      if (worker !== nextWorker) {
+        return;
       }
+      replaceWorker('Auto-categorical worker failed.');
     };
   };
 
@@ -107,25 +127,8 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
           // A Web Worker cannot be interrupted from the outside. Terminate it
           // on timeout so an expensive derivation cannot block every later
           // request, then create a clean worker for the next edit.
-          const timedOutWorker = worker;
-          if (timedOutWorker) {
-            timedOutWorker.terminate();
-            worker = null;
-            pending.forEach(({ resolve }, pendingRequestId) => {
-              if (pendingRequestId !== requestId) {
-                resolve({ ok: false, error: 'Auto-categorical worker reset after timeout.' });
-              }
-            });
-            pending.clear();
-            timers.forEach((pendingTimer) => clearTimeout(pendingTimer));
-            timers.clear();
-            try {
-              const replacement = workerFactory();
-              worker = replacement;
-              attachWorkerHandlers(replacement);
-            } catch {
-              worker = null;
-            }
+          if (worker === activeWorker) {
+            replaceWorker('Auto-categorical worker reset after timeout.', requestId);
           }
           resolve({ ok: false, error: 'Auto-categorical derivation timed out.' });
         }, DERIVATION_TIMEOUT_MS);
@@ -137,8 +140,9 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
       pending.clear();
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
-      worker?.terminate();
+      const disposedWorker = worker;
       worker = null;
+      disposedWorker?.terminate();
     },
   };
 };

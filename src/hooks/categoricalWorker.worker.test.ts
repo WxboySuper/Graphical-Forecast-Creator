@@ -88,6 +88,27 @@ describe('createDerivationController worker path', () => {
     controller.dispose();
   });
 
+  it('replaces a failed worker so later requests can recover', async () => {
+    const workers = [createFakeWorkerController().worker, createFakeWorkerController().worker];
+    let factoryCalls = 0;
+    const controller = createDerivationController(() => workers[factoryCalls++]);
+
+    const failedRequest = controller.derive(9, 1, emptyOutlooks());
+    workers[0].onerror?.({} as ErrorEvent);
+    await expect(failedRequest).resolves.toMatchObject({
+      ok: false,
+      error: 'Auto-categorical worker failed.',
+    });
+    expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+
+    const recoveredRequest = controller.derive(10, 1, emptyOutlooks());
+    expect(workers[1].postMessage).toHaveBeenCalledTimes(1);
+    workers[1].onmessage?.({ data: { requestId: 10, ok: true, features: [] } } as MessageEvent);
+    await expect(recoveredRequest).resolves.toMatchObject({ ok: true, features: [] });
+
+    controller.dispose();
+  });
+
   it('resolves pending requests when disposed and terminates the worker', async () => {
     const { controller, worker } = createFakeWorkerController();
 
