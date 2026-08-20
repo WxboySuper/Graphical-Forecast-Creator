@@ -20,6 +20,13 @@ const createFakeWorkerController = (): { controller: DerivationController; worke
   return { controller, worker };
 };
 
+const createReplacementWorkerController = () => {
+  const workers = [createFakeWorkerController().worker, createFakeWorkerController().worker];
+  let factoryCalls = 0;
+  const controller = createDerivationController(() => workers[factoryCalls++]);
+  return { controller, workers };
+};
+
 describe('createDerivationController worker path', () => {
   it('resolves each request with its own worker response; the hook discards stale ones', async () => {
     const { controller, worker } = createFakeWorkerController();
@@ -59,9 +66,7 @@ describe('createDerivationController worker path', () => {
 
   it('terminates the timed-out worker and uses a replacement for the next request', async () => {
     jest.useFakeTimers();
-    const workers = [createFakeWorkerController().worker, createFakeWorkerController().worker];
-    let factoryCalls = 0;
-    const controller = createDerivationController(() => workers[factoryCalls++]);
+    const { controller, workers } = createReplacementWorkerController();
 
     const timedOut = controller.derive(7, 1, emptyOutlooks());
     jest.advanceTimersByTime(15_000);
@@ -89,9 +94,7 @@ describe('createDerivationController worker path', () => {
   });
 
   it('replaces a failed worker so later requests can recover', async () => {
-    const workers = [createFakeWorkerController().worker, createFakeWorkerController().worker];
-    let factoryCalls = 0;
-    const controller = createDerivationController(() => workers[factoryCalls++]);
+    const { controller, workers } = createReplacementWorkerController();
 
     const failedRequest = controller.derive(9, 1, emptyOutlooks());
     workers[0].onerror?.({} as ErrorEvent);
