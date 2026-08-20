@@ -14,7 +14,6 @@ interface WmsPlaybackLoopOptions {
   setSatellitePlayback: Dispatch<SetStateAction<LayerPlaybackState>>;
 }
 
-/** Documents useWmsPlaybackLoop. */
 export const useWmsPlaybackLoop = ({
   shouldAnimate,
   frameSignature,

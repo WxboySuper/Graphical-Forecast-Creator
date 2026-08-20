@@ -15,7 +15,6 @@ interface UseMonitorNwsAlertsPlaybackArgs {
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
 }
 
-/** Documents useMonitorNwsAlertsPlayback. */
 export const useMonitorNwsAlertsPlayback = ({
   enabled,
   animationEnabled,

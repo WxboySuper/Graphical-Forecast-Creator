@@ -2,7 +2,6 @@ import { Circle, Fill, Stroke, Style } from 'ol/style';
 import type { ReportType } from '../types/stormReports';
 import { STORM_REPORT_COLORS, STORM_REPORT_FALLBACK_COLOR } from '../utils/stormReportColors';
 
-/** Documents buildStormReportStyle. */
 export const buildStormReportStyle = (type: ReportType): Style =>
   new Style({
     image: new Circle({

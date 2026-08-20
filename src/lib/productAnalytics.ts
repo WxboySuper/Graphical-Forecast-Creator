@@ -41,11 +41,9 @@ const WORKFLOW_EVENTS = new Set<ProductAnalyticsEvent>([
   'workflow_complete', 'workflow_complete_with_omissions', 'forecast_exported', 'workflow_rollover_action',
 ]);
 
-/** Documents hasAllowedWorkflowProperties. */
 const hasAllowedWorkflowProperties = (properties: ProductAnalyticsProperties): boolean =>
   Object.entries(properties).every(([key, value]) => typeof value === 'string' && WORKFLOW_DIMENSION_VALUES[key]?.includes(value));
 
-/** Documents hasAllowedCustomLayerProperties. */
 const hasAllowedCustomLayerProperties = (properties: ProductAnalyticsProperties): boolean => {
   const layerCount = properties.layer_count;
   return Object.keys(properties).length === 1
@@ -102,7 +100,6 @@ export const setProductAnalyticsEnabled = (enabled: boolean): boolean => {
   return enabled ? persisted : false;
 };
 
-/** Documents getWebsiteId. */
 const getWebsiteId = (zone: AnalyticsZone): string => {
   const websiteId = zone === 'production'
     ? (typeof __GFC_UMAMI_PRODUCTION_WEBSITE_ID__ === 'string' ? __GFC_UMAMI_PRODUCTION_WEBSITE_ID__ : '')
@@ -110,11 +107,9 @@ const getWebsiteId = (zone: AnalyticsZone): string => {
   return websiteId.trim();
 };
 
-/** Documents getUmamiHost. */
 const getUmamiHost = (): string =>
   (typeof __GFC_UMAMI_HOST__ === 'string' ? __GFC_UMAMI_HOST__ : '').trim().replace(/\/$/, '');
 
-/** Documents trackSafely. */
 const trackSafely = ({ event, properties }: { event: string; properties?: ProductAnalyticsProperties }): boolean => {
   try {
     if (!window.umami) return false;
@@ -132,7 +127,6 @@ const trackPageViewSafely = (path: string): boolean => {
   } catch { return false; }
 };
 
-/** Documents flushPendingTelemetry. */
 const flushPendingTelemetry = (): void => {
   if (pendingPagePath) trackPageViewSafely(pendingPagePath);
   pendingPagePath = null;
@@ -141,12 +135,10 @@ const flushPendingTelemetry = (): void => {
   queuedEvents.forEach(({ event, properties }) => trackSafely({ event, properties }));
 };
 
-/** Documents queueProductEvent. */
 const queueProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): void => {
   pendingEvents.push({ event, properties });
 };
 
-/** Documents createTrackerScript. */
 const createTrackerScript = ({ host, websiteId }: TrackerConfiguration): HTMLScriptElement => {
   const script = document.createElement('script');
   script.defer = true;
@@ -163,7 +155,6 @@ const createTrackerScript = ({ host, websiteId }: TrackerConfiguration): HTMLScr
   return script;
 };
 
-/** Documents getTrackerConfiguration. */
 const getTrackerConfiguration = (hostname?: string): TrackerConfiguration | null => {
   const zone = getProductAnalyticsZone(hostname);
   const host = getUmamiHost();
@@ -205,7 +196,6 @@ export const trackProductEvent = (event: ProductAnalyticsEvent, properties?: Pro
   if (!trackSafely({ event, properties })) queueProductEvent(event, properties);
 };
 
-/** Documents resetProductAnalyticsForTests. */
 export const resetProductAnalyticsForTests = (): void => {
   initializedZone = null;
   pendingPagePath = null;

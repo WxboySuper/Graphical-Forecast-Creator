@@ -17,7 +17,6 @@ export const resetRadarSiteCacheForTests = (): void => {
   cachedRadarSites = null;
 };
 
-/** Documents parseRadarSiteFeature. */
 const parseRadarSiteFeature = (feature: unknown): RadarSiteOption | null => {
   const site = readRadarSiteProperties(feature);
   if (!site) {
@@ -32,14 +31,12 @@ const parseRadarSiteFeature = (feature: unknown): RadarSiteOption | null => {
   };
 };
 
-/** Documents isRadarFeatureCollection. */
 const isRadarFeatureCollection = (payload: unknown): payload is { features: unknown[] } =>
   typeof payload === 'object' &&
   payload !== null &&
   'features' in payload &&
   Array.isArray((payload as { features?: unknown[] }).features);
 
-/** Documents parseRadarSites. */
 const parseRadarSites = (payload: unknown): RadarSiteOption[] => {
   if (!isRadarFeatureCollection(payload)) {
     return [];
@@ -51,7 +48,6 @@ const parseRadarSites = (payload: unknown): RadarSiteOption[] => {
     .sort((left, right) => left.id.localeCompare(right.id));
 };
 
-/** Documents fetchRadarSiteOptions. */
 export const fetchRadarSiteOptions = async (): Promise<RadarSiteOption[]> => {
   if (cachedRadarSites) {
     return cachedRadarSites;

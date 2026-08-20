@@ -6,11 +6,9 @@ import { stageCustomProductForForecast } from '../lib/customProductHandoff';
 import { useCustomProductCrudActions } from './useCustomProductCrudActions';
 import { useCustomProductWriter } from './useCustomProductWriter';
 
-/** Documents handoffError. */
 const handoffError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unable to load custom product.';
 
-/** Documents useCustomProductActions. */
 export const useCustomProductActions = ({
   repository,
   userId,

@@ -4,19 +4,16 @@ import { parseTodayCsvRow, TODAY_SECTION_HEADERS } from './stormReportRows';
 
 type TodayReportsByType = Record<ReportType, StormReport[]>;
 
-/** Documents createReportBuckets. */
 const createReportBuckets = (): TodayReportsByType => ({
   tornado: [],
   wind: [],
   hail: [],
 });
 
-/** Documents getTodaySectionType. */
 const getTodaySectionType = (line: string): ReportType | undefined => {
   return TODAY_SECTION_HEADERS.find(({ header }) => line.startsWith(header))?.type;
 };
 
-/** Documents flattenReports. */
 const flattenReports = (reportsByType: TodayReportsByType): StormReport[] => [
   ...reportsByType.tornado,
   ...reportsByType.wind,

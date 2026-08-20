@@ -16,27 +16,22 @@ export interface MonitorOutlookSourceOption {
 
 const DAY_ONE = 1 as DayType;
 
-/** Documents isSameLocalDay. */
 export const isSameLocalDay = (left: string, right: string): boolean => left === right;
 
-/** Documents hasDayOneData. */
 const hasDayOneData = (cycle: ForecastCycle, today: string): boolean =>
   isSameLocalDay(cycle.cycleDate, today) && Boolean(cycle.days[DAY_ONE]?.data);
 
-/** Documents cloneFeature. */
 const cloneFeature = (feature: Feature): Feature => ({
   ...feature,
   geometry: feature.geometry ? JSON.parse(JSON.stringify(feature.geometry)) : feature.geometry,
   properties: feature.properties ? { ...feature.properties } : feature.properties,
 });
 
-/** Documents cloneOutlookDataForReadOnly. */
 export const cloneOutlookDataForReadOnly = (data: OutlookData | undefined): OutlookData | undefined => {
   if (!data) {
     return undefined;
   }
 
-  /** Documents cloneMap. */
   const cloneMap = (map?: Map<string, Feature[]> | Record<string, Feature[]>): Map<string, Feature[]> | undefined => {
     const normalized = coerceOutlookProbabilityMap(map);
     if (!normalized) {
@@ -59,7 +54,6 @@ export const cloneOutlookDataForReadOnly = (data: OutlookData | undefined): Outl
   };
 };
 
-/** Documents buildMonitorOutlookOptions. */
 export const buildMonitorOutlookOptions = ({
   currentCycle,
   savedCycles,
@@ -111,7 +105,6 @@ export const buildMonitorOutlookOptions = ({
   return options;
 };
 
-/** Documents resolveSelectedOutlookOption. */
 export const resolveSelectedOutlookOption = (
   options: MonitorOutlookSourceOption[],
   selection: MonitorOutlookSourceSelection

@@ -9,7 +9,6 @@ export interface StormReportRowFieldMap {
   remarksField: string;
 }
 
-/** Documents splitCsvLine. */
 export const splitCsvLine = (line: string): string[] => {
   if (!line.includes('"')) {
     return line.split(',');
@@ -19,7 +18,6 @@ export const splitCsvLine = (line: string): string[] => {
   );
 };
 
-/** Documents buildCsvRow. */
 export const buildCsvRow = (headers: string[], values: string[]): Record<string, string> => {
   const row: Record<string, string> = {};
   for (const [index, header] of headers.entries()) {
@@ -28,7 +26,6 @@ export const buildCsvRow = (headers: string[], values: string[]): Record<string,
   return row;
 };
 
-/** Documents extractTornadoMagnitude. */
 const extractTornadoMagnitude = (row: Record<string, string>, fields: StormReportRowFieldMap): string => {
   const remarks = row[fields.remarksField] || '';
   const scaleField = fields.scaleField ? row[fields.scaleField] : '';
@@ -40,7 +37,6 @@ const extractTornadoMagnitude = (row: Record<string, string>, fields: StormRepor
   return efMatch ? `EF${efMatch[1]}` : '';
 };
 
-/** Documents extractWindMagnitude. */
 const extractWindMagnitude = (row: Record<string, string>, fields: StormReportRowFieldMap): string => {
   const speed = fields.speedField ? row[fields.speedField] : '';
   if (speed && speed !== 'UNK') {
@@ -49,7 +45,6 @@ const extractWindMagnitude = (row: Record<string, string>, fields: StormReportRo
   return '';
 };
 
-/** Documents extractHailMagnitude. */
 const extractHailMagnitude = (row: Record<string, string>, fields: StormReportRowFieldMap): string => {
   const size = fields.sizeField ? row[fields.sizeField] : '';
   if (!size || size === 'UNK') {
@@ -64,7 +59,6 @@ const extractHailMagnitude = (row: Record<string, string>, fields: StormReportRo
   return Number.isNaN(inches) ? '' : `${inches.toFixed(2)}"`;
 };
 
-/** Documents extractStormReportMagnitude. */
 export const extractStormReportMagnitude = (
   type: ReportType,
   row: Record<string, string>,

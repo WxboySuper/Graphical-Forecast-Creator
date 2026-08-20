@@ -1,7 +1,6 @@
 import { clamp, notEvaluatedComponent, scoredComponent, type ComponentScore } from './gradeContract';
 import { type GridEvaluation, isGradableEvaluation, roundTo } from './gridEvaluation';
 
-/** Documents brierScore. */
 const brierScore = (forecast: number[], observed: number[], cellCount: number): number => {
   let squaredError = 0;
   for (let index = 0; index < cellCount; index += 1) {
@@ -11,7 +10,6 @@ const brierScore = (forecast: number[], observed: number[], cellCount: number): 
   return squaredError / cellCount;
 };
 
-/** Documents brierSkillScore. */
 const brierSkillScore = (brier: number, observedFrequency: number): number => {
   if (observedFrequency <= 0 || observedFrequency >= 1) {
     return 0;

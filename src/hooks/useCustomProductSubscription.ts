@@ -9,7 +9,6 @@ interface CustomProductSubscriptionState {
   error: string | null;
 }
 
-/** Documents useCustomProductSubscription. */
 export const useCustomProductSubscription = (
   repository: CustomProductsRepository,
   userId?: string,

@@ -9,26 +9,21 @@ import { isBuiltInCustomProductId, isTrustedBuiltInCustomProduct } from './custo
 
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-/** Documents isRecord. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
-/** Documents hasOnlyKeys. */
 const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
   Object.keys(value).every((key) => keys.includes(key));
 
-/** Documents isBoundedText. */
 const isBoundedText = (value: unknown): value is string =>
   typeof value === 'string'
   && value.trim() === value
   && value.length > 0
   && value.length <= CUSTOM_PRODUCT_LIMITS.labelLength;
 
-/** Documents isPositiveInteger. */
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
 
-/** Documents isIsoTimestamp. */
 const isIsoTimestamp = (value: unknown): value is string =>
   typeof value === 'string'
   && ISO_TIMESTAMP.test(value)
@@ -49,13 +44,11 @@ export const createEmbeddedCustomProductSnapshot = (
   capturedAt,
 });
 
-/** Documents hasValidSnapshotReferences. */
 const hasValidSnapshotReferences = (value: Record<string, unknown>): boolean =>
   (value.sourceProductId === undefined || isBoundedText(value.sourceProductId))
   && (value.sourceProductVersion === undefined || isPositiveInteger(value.sourceProductVersion))
   && (value.builtIn === undefined || (value.builtIn === true && isBuiltInCustomProductId(value.sourceProductId)));
 
-/** Documents hasValidSnapshotContent. */
 const hasValidSnapshotContent = (value: Record<string, unknown>): boolean =>
   isBoundedText(value.label)
   && isCustomCategoryList(value.categories)

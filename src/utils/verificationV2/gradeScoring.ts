@@ -31,7 +31,6 @@ export const scoreToLetter = (grade: number | null): LetterGrade | null => {
 
 type ScorableComponent = Extract<ComponentScore, { applicable: true }>;
 
-/** Documents isScorableComponent. */
 const isScorableComponent = (component: ComponentScore): component is ScorableComponent => {
   if (!component.applicable) {
     return false;
@@ -59,7 +58,6 @@ export const composeComponents = (components: ComponentScore[]): number | null =
   return roundGrade((weighted / weightSum) * 100);
 };
 
-/** Documents notEvaluatedComponent. */
 export const notEvaluatedComponent = (key: ComponentKey, detail: string): ComponentScore => ({
   key,
   label: COMPONENT_LABELS[key],
@@ -69,7 +67,6 @@ export const notEvaluatedComponent = (key: ComponentKey, detail: string): Compon
   detail,
 });
 
-/** Documents scoredComponent. */
 export const scoredComponent = (
   key: ComponentKey,
   score: number,

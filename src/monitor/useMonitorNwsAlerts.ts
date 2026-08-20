@@ -15,13 +15,11 @@ interface UseMonitorNwsAlertsArgs {
   addToast: AddToastFn;
 }
 
-/** Documents emptyCollection. */
 const emptyCollection = (): NwsAlertFeatureCollection => ({
   type: 'FeatureCollection',
   features: [],
 });
 
-/** Documents useMonitorNwsAlerts. */
 export const useMonitorNwsAlerts = ({
   enabled,
   showWatches,

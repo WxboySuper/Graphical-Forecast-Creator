@@ -9,7 +9,6 @@ import {
   type ProductContour,
 } from './neighborhood';
 
-/** Documents tiersFrom. */
 const tiersFrom = (contours: ProductContour[]): number[] =>
   Array.from(new Set(contours.map((contour) => contour.probability).filter((p) => p > 0))).sort(
     (a, b) => a - b

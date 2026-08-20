@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { RadarSiteOption } from './radarSites';
 import { fetchRadarSiteOptions } from './radarSites';
 
-/** Documents useRadarSiteOptions. */
 export const useRadarSiteOptions = () => {
   const [sites, setSites] = useState<RadarSiteOption[]>([]);
   const [loading, setLoading] = useState(true);

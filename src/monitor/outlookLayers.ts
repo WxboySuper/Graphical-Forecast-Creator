@@ -15,7 +15,6 @@ export const MONITOR_OUTLOOK_LAYER_LABELS: Record<MonitorOutlookLayerType, strin
 
 const KNOWN_CIG_LEVELS = new Set(['CIG1', 'CIG2', 'CIG3']);
 
-/** Documents isRenderableMonitorProbability. */
 export const isRenderableMonitorProbability = (probability: string): boolean => {
   if (!probability.startsWith('CIG')) {
     return true;
@@ -24,7 +23,6 @@ export const isRenderableMonitorProbability = (probability: string): boolean => 
   return KNOWN_CIG_LEVELS.has(probability);
 };
 
-/** Documents flattenMonitorOutlookFeatures. */
 export const flattenMonitorOutlookFeatures = (
   data: OutlookData | undefined,
   outlookType: MonitorOutlookLayerType,

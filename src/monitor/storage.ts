@@ -3,7 +3,6 @@ import { normalizeMonitorSettings } from './monitorSettingsNormalize';
 
 export const MONITOR_SETTINGS_STORAGE_KEY = 'gfc-monitor-settings';
 
-/** Documents readStoredMonitorSettings. */
 export const readStoredMonitorSettings = (): MonitorSettings => {
   try {
     const storedValue = localStorage.getItem(MONITOR_SETTINGS_STORAGE_KEY);
@@ -17,7 +16,6 @@ export const readStoredMonitorSettings = (): MonitorSettings => {
   }
 };
 
-/** Documents writeStoredMonitorSettings. */
 export const writeStoredMonitorSettings = (settings: MonitorSettings): void => {
   try {
     localStorage.setItem(MONITOR_SETTINGS_STORAGE_KEY, JSON.stringify(settings));

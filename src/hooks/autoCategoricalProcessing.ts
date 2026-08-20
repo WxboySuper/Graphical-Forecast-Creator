@@ -31,7 +31,6 @@ export const toDerivationErrorMessage = (error: unknown, fallback: string): stri
   return fallback;
 };
 
-/** Documents processOutlooksToCategorical. */
 export function processOutlooksToCategorical(outlooks: OutlookData, day: number = 1): GeoJSON.Feature[] {
   if (day === 1 || day === 2) {
     return processDay12OutlooksToCategorical(outlooks);
@@ -66,7 +65,6 @@ const pairFeatureCollection = createPairFeatureCollection();
 
 // Helper to safely union a list of polygons. On a Turf topology error this
 // throws instead of silently publishing partial geometry.
-/** Documents safeUnion. */
 const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon | MultiPolygon> | null => {
   if (features.length === 0) return null;
   if (features.length === 1) return features[0];
@@ -308,7 +306,6 @@ const appendRiskPolygon = (
 };
 
 // Helper to convert Day 1/2 probability features to categorical pieces
-/** Documents processDay12OutlooksToCategorical. */
 export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
   const riskPolygons = new Map<CategoricalRiskLevel, PolygonOutlookFeature[]>();
   const types = ['tornado', 'wind', 'hail'] as const;
@@ -354,7 +351,6 @@ function addPieceToRiskMap(
 }
 
 // Helper to convert Day 3 Total Severe probability features to categorical pieces
-/** Documents processDay3OutlooksToCategorical. */
 export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
   const riskPolygons = new Map<CategoricalRiskLevel, PolygonOutlookFeature[]>();
   const probMap = coerceOutlookProbabilityMap(outlooks.totalSevere);

@@ -55,13 +55,11 @@ export const tierHasHistory = (tier: GradeAccountTier): boolean => tier !== 'sig
 /** True when the tier stores restorable full snapshots. */
 export const tierHasSnapshots = (tier: GradeAccountTier): boolean => tier === 'premium';
 
-/** Documents SourceLoadError. */
 export class SourceLoadError extends Error {}
 
 /** Maximum time the optional DAT source may hold a grading run open. */
 export const DAT_EVIDENCE_TIMEOUT_MS = 15_000;
 
-/** Documents toDatLoadError. */
 const toDatLoadError = (error: unknown, signal?: AbortSignal): SourceLoadError => {
   if (signal?.aborted) {
     return new SourceLoadError('NOAA DAT surveys timed out or were cancelled.');
@@ -120,7 +118,6 @@ export const loadForecastFromCloud = async (
   return deserializeCycle(result.data.payload, 'That cloud cycle could not be parsed.');
 };
 
-/** Documents resolveArchiveDate. */
 const resolveArchiveDate = (reportDate: string): string => {
   const archiveDate = toArchiveDate(reportDate);
   if (!archiveDate) {
@@ -176,7 +173,6 @@ export const loadReportsForDate = async (
   }
 };
 
-/** Documents datDateRangeFor. */
 const datDateRangeFor = (reportDate: string | null): { start: number; end: number } => {
   const date = reportDate ?? new Date().toISOString().slice(0, 10);
   const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -203,7 +199,6 @@ export const loadDatEvidenceForDate = async (
   }
 };
 
-/** Documents newId. */
 const newId = (): string => {
   try {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {

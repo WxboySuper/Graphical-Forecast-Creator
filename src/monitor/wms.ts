@@ -31,7 +31,6 @@ export const MRMS_PRODUCTS = [
   ...SITE_RADAR_PRODUCTS.map((product) => ({ ...product, mode: 'site' as const })),
 ];
 
-/** Documents getRadarProductsForMode. */
 export const getRadarProductsForMode = (mode: MonitorRadarMode) => {
   if (mode === 'site') {
     return SITE_RADAR_PRODUCTS;
@@ -44,7 +43,6 @@ export const getRadarProductsForMode = (mode: MonitorRadarMode) => {
   return [];
 };
 
-/** Documents resolveRadarProductForMode. */
 export const resolveRadarProductForMode = (
   mode: MonitorRadarMode,
   product: MonitorRadarProduct
@@ -103,7 +101,6 @@ const SATELLITE_LAYER_BY_PRODUCT: Record<Exclude<MonitorSatelliteProduct, 'none'
   },
 };
 
-/** Documents buildRadarLayerConfig. */
 export const buildRadarLayerConfig = ({
   radarMode,
   radarProduct,
@@ -138,7 +135,6 @@ export const buildRadarLayerConfig = ({
   };
 };
 
-/** Documents buildSatelliteLayerConfig. */
 export const buildSatelliteLayerConfig = (product: MonitorSatelliteProduct): WmsLayerConfig | null => {
   if (product === 'none') {
     return null;
@@ -147,11 +143,9 @@ export const buildSatelliteLayerConfig = (product: MonitorSatelliteProduct): Wms
   return SATELLITE_LAYER_BY_PRODUCT[product];
 };
 
-/** Documents buildCapabilitiesUrl. */
 export const buildCapabilitiesUrl = (url: string): string =>
   `${url}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities`;
 
-/** Documents parseTimeDimensionValues. */
 export const parseTimeDimensionValues = (dimension: Element | undefined): string[] => {
   if (!dimension) {
     return [];
@@ -170,7 +164,6 @@ export const parseTimeDimensionValues = (dimension: Element | undefined): string
   return fallback ? [fallback] : [];
 };
 
-/** Documents parseWmsLayerTimes. */
 export const parseWmsLayerTimes = (capabilitiesXml: string): WmsLayerTime[] => {
   const parser = new DOMParser();
   const documentXml = parser.parseFromString(capabilitiesXml, 'text/xml');
@@ -196,11 +189,9 @@ export const parseWmsLayerTimes = (capabilitiesXml: string): WmsLayerTime[] => {
     .filter((entry): entry is WmsLayerTime => Boolean(entry));
 };
 
-/** Documents findLayerTimeValues. */
 export const findLayerTimeValues = (capabilitiesXml: string, layerName: string): string[] =>
   parseWmsLayerTimes(capabilitiesXml).find((entry) => entry.layerName === layerName)?.timeValues ?? [];
 
-/** Documents findLatestLayerTime. */
 export const findLatestLayerTime = (capabilitiesXml: string, layerName: string): string | undefined =>
   parseWmsLayerTimes(capabilitiesXml).find((entry) => entry.layerName === layerName)?.latestTime;
 
@@ -213,7 +204,6 @@ export const selectAnimationFrameTimes = (timeValues: string[], maxFrames = MAX_
   return timeValues.slice(-maxFrames);
 };
 
-/** Documents fetchWmsCapabilities. */
 export const fetchWmsCapabilities = async (url: string): Promise<string> => {
   const response = await fetch(buildCapabilitiesUrl(url));
   if (!response.ok) {
@@ -223,11 +213,9 @@ export const fetchWmsCapabilities = async (url: string): Promise<string> => {
   return response.text();
 };
 
-/** Documents fetchLayerTimeValues. */
 export const fetchLayerTimeValues = async (config: WmsLayerConfig): Promise<string[]> =>
   findLayerTimeValues(await fetchWmsCapabilities(config.url), config.layer);
 
-/** Documents fetchLatestLayerTime. */
 export const fetchLatestLayerTime = async (config: WmsLayerConfig): Promise<string | undefined> => {
   const timeValues = await fetchLayerTimeValues(config);
   return timeValues[timeValues.length - 1];

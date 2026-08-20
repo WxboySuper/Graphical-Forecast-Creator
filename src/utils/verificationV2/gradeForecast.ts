@@ -90,7 +90,6 @@ export interface GradeProgress {
 
 export type GradeProgressHandler = (progress: GradeProgress) => void;
 
-/** Documents nextFrame. */
 const nextFrame = (): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, 0);

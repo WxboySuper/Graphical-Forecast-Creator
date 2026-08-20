@@ -82,6 +82,5 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
   },
 };
 
-/** Documents areMonitorSettingsEqual. */
 export const areMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean =>
   JSON.stringify(left) === JSON.stringify(right);

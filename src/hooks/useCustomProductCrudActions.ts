@@ -4,7 +4,6 @@ import type { CustomProductDraft, CustomProductsRepository } from '../lib/custom
 import { clearCustomProductForecastHandoff } from '../lib/customProductHandoff';
 import type { RunCustomProductWrite } from './useCustomProductWriter';
 
-/** Documents duplicateDraft. */
 const duplicateDraft = (product: HostedCustomProduct): CustomProductDraft => ({
   label: `${product.label} copy`.slice(0, 64),
   description: product.description,
