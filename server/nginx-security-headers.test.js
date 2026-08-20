@@ -12,12 +12,28 @@ for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
     assert.equal(config.match(/include \/etc\/nginx\/snippets\/gfc-security-headers\.conf;/g)?.length, 2);
     assert.equal(securityHeaders.match(/^add_header /gm)?.length, 5);
     assert.match(securityHeaders, /default-src 'self'/);
-    assert.match(securityHeaders, /script-src 'self'/);
-    assert.match(securityHeaders, /object-src 'none'/);
-    assert.match(securityHeaders, /frame-ancestors 'none'/);
+    for (const directive of [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "frame-src 'self'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self'",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "worker-src 'self'",
+      "manifest-src 'self'",
+      "media-src 'self'",
+    ]) {
+      assert.match(securityHeaders, new RegExp(directive.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    }
     assert.match(securityHeaders, /https:\/\/identitytoolkit\.googleapis\.com/);
     assert.match(securityHeaders, /https:\/\/tiles\.openfreemap\.org/);
     assert.match(securityHeaders, /https:\/\/opengeo\.ncep\.noaa\.gov/);
+    assert.match(securityHeaders, /https:\/\/telemetry\.gfc\.weatherboysuper\.com/);
     assert.doesNotMatch(securityHeaders, /report-only/i);
   });
 }
