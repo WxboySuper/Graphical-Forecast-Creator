@@ -63,16 +63,12 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
   const pending = new Map<number, { resolve: (r: DerivationResult) => void }>();
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  const replaceWorker = (failure: string, keepRequestId?: number): void => {
+  const replaceWorker = (failure: string): void => {
     const failedWorker = worker;
     worker = null;
     failedWorker?.terminate();
 
-    pending.forEach(({ resolve }, pendingRequestId) => {
-      if (pendingRequestId !== keepRequestId) {
-        resolve({ ok: false, error: failure });
-      }
-    });
+    pending.forEach(({ resolve }) => resolve({ ok: false, error: failure }));
     pending.clear();
     timers.forEach((timer) => clearTimeout(timer));
     timers.clear();
@@ -128,7 +124,7 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
           // on timeout so an expensive derivation cannot block every later
           // request, then create a clean worker for the next edit.
           if (worker === activeWorker) {
-            replaceWorker('Auto-categorical worker reset after timeout.', requestId);
+            replaceWorker('Auto-categorical worker reset after timeout.');
           }
           resolve({ ok: false, error: 'Auto-categorical derivation timed out.' });
         }, DERIVATION_TIMEOUT_MS);
