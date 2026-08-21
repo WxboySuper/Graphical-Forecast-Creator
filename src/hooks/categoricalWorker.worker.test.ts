@@ -88,6 +88,7 @@ describe('createDerivationController worker path', () => {
   });
 
   it('terminates the timed-out worker and uses a replacement for the next request', async () => {
+    expect.assertions(4);
     jest.useFakeTimers();
     const { controller, workers } = createReplacementWorkerController();
 
@@ -117,6 +118,7 @@ describe('createDerivationController worker path', () => {
   });
 
   it('replaces a failed worker so later requests can recover', async () => {
+    expect.assertions(4);
     const { controller, workers } = createReplacementWorkerController();
 
     const failedRequest = controller.derive(9, 1, emptyOutlooks());
