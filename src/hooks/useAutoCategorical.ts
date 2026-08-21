@@ -10,7 +10,14 @@ export { CategoricalDerivationError } from './categoricalErrors';
 const geometryIds = new WeakMap<object, number>();
 let nextGeometryId = 1;
 
-/** Returns a cheap identity token for an immutable geometry object. */
+/**
+ * Returns a cheap identity token for a geometry object.
+ *
+ * Forecast state follows Redux's immutable-update contract. Producers must
+ * replace the feature and geometry objects when coordinates change. This
+ * makes object identity a valid signature input and avoids serializing every
+ * polygon on each effect run.
+ */
 const getGeometryId = (geometry: GeoJSON.Geometry | null): number => {
   if (!geometry || typeof geometry !== 'object') return 0;
   const existingId = geometryIds.get(geometry);
@@ -109,7 +116,7 @@ const buildCategoricalMap = (
  * Day 4-8: Does nothing (no categorical conversion)
  */
 // @codescene(disable:"Complex Method", disable:"Overall Code Complexity")
-const useAutoCategorical = () => {
+const useAutoCategorical = (controllerFactory: () => ReturnType<typeof createDerivationController> = createDerivationController) => {
   const dispatch = useDispatch();
   const outlooks = useSelector(selectCurrentOutlooks);
   const currentDay = useSelector(selectCurrentDay);
@@ -117,7 +124,7 @@ const useAutoCategorical = () => {
   const lastProcessedRef = useRef<string>('');
   const latestHashRef = useRef<string>('');
   const requestIdRef = useRef(0);
-  const [controller] = useState(() => createDerivationController());
+  const [controller] = useState(() => controllerFactory());
   const [processingRevision, setProcessingRevision] = useState(0);
 
   // Process probabilistic outlooks to generate categorical outlooks
