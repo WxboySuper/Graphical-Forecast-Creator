@@ -7,30 +7,10 @@ import { toDerivationErrorMessage } from './categoricalErrors';
 export { processDay12OutlooksToCategorical, processDay3OutlooksToCategorical, processOutlooksToCategorical } from './autoCategoricalProcessing';
 export { CategoricalDerivationError } from './categoricalErrors';
 
-const geometryIds = new WeakMap<object, number>();
-let nextGeometryId = 1;
-
 /**
- * Returns a cheap identity token for a geometry object.
- *
- * Forecast state follows Redux's immutable-update contract. Producers must
- * replace the feature and geometry objects when coordinates change. This
- * makes object identity a valid signature input and avoids serializing every
- * polygon on each effect run.
- */
-const getGeometryId = (geometry: GeoJSON.Geometry | null): number => {
-  if (!geometry || typeof geometry !== 'object') return 0;
-  const existingId = geometryIds.get(geometry);
-  if (existingId) return existingId;
-  const id = nextGeometryId++;
-  geometryIds.set(geometry, id);
-  return id;
-};
-
-/**
- * Builds a signature without serializing every polygon geometry.
- * Redux replaces changed features, so object identity is enough to detect an
- * edit. Sorting the small identity-token strings preserves order independence.
+ * Builds a deterministic signature from source type, probability, and
+ * geometry. Sorting the entries preserves order independence, while
+ * serialization also detects accidental in-place geometry mutations.
  */
 export const signatureFromOutlookMap = (
   outlookType: string,
@@ -58,7 +38,7 @@ export const signatureFromOutlookMap = (
     .map((feature) => {
       const sourceType = String(feature.properties?.outlookType || '');
       const probability = String(feature.properties?.probability || '');
-      return `${sourceType}:${probability}:${getGeometryId(feature.geometry)}`;
+      return `${sourceType}:${probability}:${JSON.stringify(feature.geometry)}`;
     })
     .sort()
     .join('|');
@@ -125,6 +105,8 @@ const useAutoCategorical = (controllerFactory: () => ReturnType<typeof createDer
   const latestHashRef = useRef<string>('');
   const requestIdRef = useRef(0);
   const [controller] = useState(() => controllerFactory());
+  // This state only triggers one follow-up effect pass when an edit arrives
+  // during an active derivation. It does not represent derivation progress.
   const [processingRevision, setProcessingRevision] = useState(0);
 
   // Process probabilistic outlooks to generate categorical outlooks
