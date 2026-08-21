@@ -3,14 +3,16 @@ import { useDispatch, useSelector } from 'react-redux';
 import { applyAutoCategoricalSync, selectCurrentOutlooks, selectCurrentDay, setAutoCategoricalError } from '../store/forecastSlice';
 import { OutlookData } from '../types/outlooks';
 import { createDerivationController } from './categoricalWorker';
-import { toDerivationErrorMessage } from './autoCategoricalProcessing';
-export { processDay12OutlooksToCategorical, processDay3OutlooksToCategorical, processOutlooksToCategorical, CategoricalDerivationError } from './autoCategoricalProcessing';
+import { toDerivationErrorMessage } from './categoricalErrors';
+export { processDay12OutlooksToCategorical, processDay3OutlooksToCategorical, processOutlooksToCategorical } from './autoCategoricalProcessing';
+export { CategoricalDerivationError } from './categoricalErrors';
 
 /**
- * Serializes one probabilistic outlook map into a stable string that includes
- * both the source outlook type and the polygon geometry.
+ * Builds a deterministic signature from source type, probability, and
+ * geometry. Sorting the entries preserves order independence, while
+ * serialization also detects accidental in-place geometry mutations.
  */
-const signatureFromOutlookMap = (
+export const signatureFromOutlookMap = (
   outlookType: string,
   outlookMap?: Map<string, GeoJSON.Feature[]>
 ): string => {
@@ -94,14 +96,18 @@ const buildCategoricalMap = (
  * Day 4-8: Does nothing (no categorical conversion)
  */
 // @codescene(disable:"Complex Method", disable:"Overall Code Complexity")
-const useAutoCategorical = () => {
+const useAutoCategorical = (controllerFactory: () => ReturnType<typeof createDerivationController> = createDerivationController) => {
   const dispatch = useDispatch();
   const outlooks = useSelector(selectCurrentOutlooks);
   const currentDay = useSelector(selectCurrentDay);
   const processingRef = useRef(false);
   const lastProcessedRef = useRef<string>('');
+  const latestHashRef = useRef<string>('');
   const requestIdRef = useRef(0);
-  const [controller] = useState(() => createDerivationController());
+  const [controller] = useState(() => controllerFactory());
+  // This state only triggers one follow-up effect pass when an edit arrives
+  // during an active derivation. It does not represent derivation progress.
+  const [processingRevision, setProcessingRevision] = useState(0);
 
   // Process probabilistic outlooks to generate categorical outlooks
   useEffect(() => {
@@ -109,13 +115,18 @@ const useAutoCategorical = () => {
     if (currentDay >= 4) {
       return;
     }
+
+    const currentHash = signatureFromProbabilisticOutlooks(outlooks, currentDay);
+    latestHashRef.current = currentHash;
     
     // Prevent recursive updates
     if (processingRef.current) {
       return;
     }
 
-    const currentHash = signatureFromProbabilisticOutlooks(outlooks, currentDay);
+    if (currentHash === lastProcessedRef.current) {
+      return;
+    }
 
     // Skip if there are no changes to process
     let hasChanges = false;
@@ -129,10 +140,6 @@ const useAutoCategorical = () => {
     }
 
     // Fast path: same probabilistic state and no changes worth processing.
-    if (currentHash === lastProcessedRef.current && !hasChanges) {
-      return;
-    }
-
     // With nothing to process, record the baseline and skip derivation so an
     // empty mount does not spawn work that races with a follow-up edit.
     if (!hasChanges) {
@@ -160,6 +167,7 @@ const useAutoCategorical = () => {
             'Automatic categorical generation failed. Previous categorical geometry was preserved.'
           );
           dispatch(setAutoCategoricalError(message));
+          lastProcessedRef.current = currentHash;
           return;
         }
         // Advance the baseline only after a successful derivation so a failure
@@ -172,9 +180,12 @@ const useAutoCategorical = () => {
       .finally(() => {
         if (requestId === requestIdRef.current) {
           processingRef.current = false;
+          if (latestHashRef.current !== lastProcessedRef.current) {
+            setProcessingRevision((revision) => revision + 1);
+          }
         }
       });
-  }, [controller, dispatch, outlooks, currentDay]);
+  }, [controller, dispatch, outlooks, currentDay, processingRevision]);
 
   useEffect(() => () => controller.dispose(), [controller]);
 
