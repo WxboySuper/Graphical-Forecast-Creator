@@ -1104,13 +1104,13 @@ export const forecastSlice = createSlice({
         return;
       }
 
-      const copyableCount = countCopyableSourceFeatures(
+      const copyableCount = countCopyableSourceFeatures({
         sourceMap,
         sourceType,
         targetType,
         day,
-        action.payload.probabilityFilter,
-      );
+        probabilityFilter: action.payload.probabilityFilter,
+      });
       if (copyableCount === 0) {
         return;
       }

@@ -112,12 +112,12 @@ export function useOutlookPanelLogic() {
       return false;
     }
 
-    return countCopyableSourceFeatures(
-      outlooks[sourceType],
+    return countCopyableSourceFeatures({
+      sourceMap: outlooks[sourceType],
       sourceType,
-      activeProbabilisticHazard,
-      currentDay,
-    ) > 0;
+      targetType: activeProbabilisticHazard,
+      day: currentDay,
+    }) > 0;
   }, [activeProbabilisticHazard, currentDay, outlooks]);
 
   const canCopyProbabilityFrom = useCallback((sourceType: ProbabilisticHazardType) => {
@@ -125,13 +125,13 @@ export function useOutlookPanelLogic() {
       return false;
     }
 
-    return countCopyableSourceFeatures(
-      outlooks[sourceType],
+    return countCopyableSourceFeatures({
+      sourceMap: outlooks[sourceType],
       sourceType,
-      activeProbabilisticHazard,
-      currentDay,
-      activeProbability,
-    ) > 0;
+      targetType: activeProbabilisticHazard,
+      day: currentDay,
+      probabilityFilter: activeProbability,
+    }) > 0;
   }, [activeProbabilisticHazard, activeProbability, currentDay, outlooks]);
 
   const handleCopyAllGeometryFrom = useCallback((sourceType: ProbabilisticHazardType) => {

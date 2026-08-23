@@ -117,8 +117,16 @@ describe('outlookGeometryCopy', () => {
       ['15%', [createFeature('tornado-15', 'tornado', '15%', 1)]],
     ]);
 
-    expect(countCopyableSourceFeatures(sourceMap, 'tornado', 'wind', 1)).toBe(1);
-    expect(countCopyableSourceFeatures(sourceMap, 'tornado', 'wind', 1, '2%')).toBe(0);
-    expect(countCopyableSourceFeatures(sourceMap, 'tornado', 'wind', 1, '15%')).toBe(1);
+    const count = (probabilityFilter?: string) => countCopyableSourceFeatures({
+      sourceMap,
+      sourceType: 'tornado',
+      targetType: 'wind',
+      day: 1,
+      probabilityFilter,
+    });
+
+    expect(count()).toBe(1);
+    expect(count('2%')).toBe(0);
+    expect(count('15%')).toBe(1);
   });
 });

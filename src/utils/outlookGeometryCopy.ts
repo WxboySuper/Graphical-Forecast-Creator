@@ -51,13 +51,18 @@ export function countOutlookMapFeatures(map?: Map<string, Feature[]>): number {
   return total;
 }
 
+interface CountCopyableSourceFeaturesOptions {
+  sourceMap: Map<string, Feature[]> | undefined;
+  sourceType: ProbabilisticHazardType;
+  targetType: ProbabilisticHazardType;
+  day: DayType;
+  probabilityFilter?: string;
+}
+
 export function countCopyableSourceFeatures(
-  sourceMap: Map<string, Feature[]> | undefined,
-  sourceType: ProbabilisticHazardType,
-  targetType: ProbabilisticHazardType,
-  day: DayType,
-  probabilityFilter?: string,
+  options: CountCopyableSourceFeaturesOptions,
 ): number {
+  const { sourceMap, sourceType, targetType, day, probabilityFilter } = options;
   if (!sourceMap) {
     return 0;
   }

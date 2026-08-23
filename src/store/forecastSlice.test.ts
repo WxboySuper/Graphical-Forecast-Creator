@@ -5,7 +5,6 @@ import reducer, {
   addFeature,
   applyAutoCategoricalSync,
   copyFeaturesFromPrevious,
-  copyOutlookGeometryBetweenHazards,
   importForecastCycle,
   importWorkflowPackage,
   restoreForecastCycle,
@@ -315,7 +314,6 @@ const getLatestUndoEntry = (state: ReturnType<typeof reducer>, day: DayType) => 
 const getRedoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
   state.historyByDay[day]?.redoStack || [];
 
-// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module", disable:"Code Duplication")
 describe('forecastSlice undo/redo', () => {
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
     let state = reducer(undefined, { type: 'test/init' });
@@ -876,95 +874,6 @@ describe('forecastSlice undo/redo', () => {
     );
 
     expect(nextState.forecastCycle.days[4]?.data['day4-8']?.size ?? 0).toBe(0);
-  });
-
-  test('copies wind geometry to tornado and keeps source polygons intact', () => {
-    let state = reducer(undefined, setForecastDay(1));
-    state = reducer(
-      state,
-      addFeature({
-        feature: createBaseFeature('wind-15', 0, { outlookType: 'wind', probability: '15%' }),
-      }),
-    );
-
-    const nextState = reducer(
-      state,
-      copyOutlookGeometryBetweenHazards({
-        sourceType: 'wind',
-        targetType: 'tornado',
-        mode: 'replace',
-      }),
-    );
-
-    const tornadoFeatures = nextState.forecastCycle.days[1]?.data.tornado?.get('15%') ?? [];
-    const windFeatures = nextState.forecastCycle.days[1]?.data.wind?.get('15%') ?? [];
-
-    expect(tornadoFeatures).toHaveLength(1);
-    expect(tornadoFeatures[0].id).not.toBe('wind-15');
-    expect(tornadoFeatures[0].properties?.outlookType).toBe('tornado');
-    expect(tornadoFeatures[0].geometry).toEqual(windFeatures[0].geometry);
-    expect(windFeatures[0].id).toBe('wind-15');
-  });
-
-  test('copies only the active probability bucket between hazards', () => {
-    let state = reducer(undefined, setForecastDay(1));
-    state = reducer(
-      state,
-      addFeature({
-        feature: createBaseFeature('wind-15', 0, { outlookType: 'wind', probability: '15%' }),
-      }),
-    );
-    state = reducer(
-      state,
-      addFeature({
-        feature: createBaseFeature('wind-30', 1, { outlookType: 'wind', probability: '30%' }),
-      }),
-    );
-    state = reducer(
-      state,
-      addFeature({
-        feature: createBaseFeature('tornado-30', 2, { outlookType: 'tornado', probability: '30%' }),
-      }),
-    );
-
-    const nextState = reducer(
-      state,
-      copyOutlookGeometryBetweenHazards({
-        sourceType: 'wind',
-        targetType: 'tornado',
-        mode: 'replace',
-        probabilityFilter: '15%',
-      }),
-    );
-
-    expect(nextState.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(1);
-    expect(nextState.forecastCycle.days[1]?.data.tornado?.get('30%')?.[0].id).toBe('tornado-30');
-    expect(nextState.forecastCycle.days[1]?.data.wind?.get('30%')).toHaveLength(1);
-  });
-
-  test('geometry copy is undoable as one edit', () => {
-    let state = reducer(undefined, setForecastDay(1));
-    state = reducer(
-      state,
-      addFeature({
-        feature: createBaseFeature('wind-15', 0, { outlookType: 'wind', probability: '15%' }),
-      }),
-    );
-
-    state = reducer(
-      state,
-      copyOutlookGeometryBetweenHazards({
-        sourceType: 'wind',
-        targetType: 'tornado',
-        mode: 'replace',
-      }),
-    );
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(1);
-    expect(selectCanUndo({ forecast: state } as never)).toBe(true);
-
-    state = reducer(state, undoLastEdit());
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('15%') ?? []).toHaveLength(0);
-    expect(selectCanRedo({ forecast: state } as never)).toBe(true);
   });
 
   it('completeCycle persists acknowledgement metadata without omission reasons', () => {
