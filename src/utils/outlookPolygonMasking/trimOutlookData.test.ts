@@ -2,6 +2,7 @@ import * as turf from '@turf/turf';
 import { buildLandMask } from './buildLandMask';
 import { trimOutlookDataInPlace } from './trimOutlookData';
 import { loadVendoredBoundaryGeoBundle } from './loadVendoredBoundaryGeoBundle';
+import type { OutlookData } from '../../types/outlooks';
 
 describe('trimOutlookDataInPlace', () => {
   const boundaries = loadVendoredBoundaryGeoBundle();
@@ -66,7 +67,11 @@ describe('trimOutlookDataInPlace', () => {
       ]),
     };
 
-    const result = trimOutlookDataInPlace(outlookData, landMask, 'us-country-minus-great-lakes');
+    const result = trimOutlookDataInPlace(
+      outlookData as unknown as OutlookData,
+      landMask,
+      'us-country-minus-great-lakes',
+    );
     expect(result.skippedCount).toBe(1);
     expect(result.trimmedCount).toBe(1);
     expect(outlookData.categorical?.get('SLGT')?.[0].id).toBe('auto-cat');
