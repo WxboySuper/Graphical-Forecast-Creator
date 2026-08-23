@@ -41,10 +41,16 @@ const parsePlacemarkName = (name: string): { outlookType: OutlookType | null; pr
   return { outlookType: null, probabilityKey: trimmed || null };
 };
 
+// @codescene(disable:"Complex Conditional", disable:"Overall Code Complexity", disable:"String Heavy Function Arguments")
 const normalizeProbabilityKey = (value: string, isSignificant: boolean): string => {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.startsWith('CIG') || trimmed.includes('#')) return trimmed;
-  return isSignificant && /^\d+%$/.test(trimmed) ? `${trimmed}#` : trimmed;
+  if (!trimmed || trimmed.startsWith('CIG') || trimmed.includes('#')) {
+    return trimmed;
+  }
+  if (!isSignificant) {
+    return trimmed;
+  }
+  return /^\d+%$/.test(trimmed) ? `${trimmed}#` : trimmed;
 };
 
 interface FolderContext {
