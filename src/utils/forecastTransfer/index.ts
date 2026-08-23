@@ -6,7 +6,7 @@ import {
   readForecastImportFile,
   validateForecastDataReason,
 } from '../fileUtils';
-import { downloadKmlExport, downloadKmzExport } from '../kmzExport';
+import { downloadKmzExport } from '../kmzExport';
 import type { KmzExportStrategy } from '../kmzExport';
 import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
@@ -16,7 +16,6 @@ import { parseKmlDocument, forecastCycleFromKmlPlacemarks } from './parseKml';
 import type {
   ForecastExportRequest,
   ForecastImportResult,
-  ForecastTransferFormat,
   ForecastTransferMapView,
   KmlArchiveStrategy,
 } from './types';
@@ -53,7 +52,7 @@ const toKmzStrategy = (strategy: KmlArchiveStrategy | undefined): KmzExportStrat
 const toWorkflowScope = (scope: ForecastExportRequest['scope']): WorkflowExportScope =>
   scope === 'workflow' ? 'workflow' : 'cycle';
 
-const toKmlScope = (scope: ForecastExportRequest['scope'], day?: DayType): 'current-day' | 'cycle' =>
+const toKmlScope = (scope: ForecastExportRequest['scope']): 'current-day' | 'cycle' =>
   scope === 'current-day' ? 'current-day' : 'cycle';
 
 const readFileBytes = async (file: File): Promise<Uint8Array | undefined> => {
@@ -110,7 +109,7 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
     return;
   }
 
-  const kmlScope = toKmlScope(scope, day);
+  const kmlScope = toKmlScope(scope);
   const kmlOptions = {
     scope: kmlScope,
     day: kmlScope === 'current-day' ? (day ?? forecastCycle.currentDay) : undefined,

@@ -1,6 +1,5 @@
 import type { DayType, ForecastCycle, OutlookType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
-import type { WorkflowExportScope } from '../workflowPackage';
 
 /** Supported forecast data transfer formats. */
 export type ForecastTransferFormat = 'json' | 'package' | 'kml' | 'kmz';

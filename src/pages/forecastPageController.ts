@@ -16,7 +16,7 @@ import {
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
 import type { GFCForecastSaveData } from '../types/outlooks';
-import { deserializeForecast, exportForecastToJson, MAX_IMPORT_BYTES, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecast, exportForecastToJson, readForecastImportFile, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
 import { importForecastTransfer, type ForecastImportResult } from '../utils/forecastTransfer';
 import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
@@ -64,22 +64,23 @@ export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => 
   };
 };
 
+const getForecastImportErrorMessage = (file: File, error: unknown): string => {
+  if (error instanceof SyntaxError && !file.name.toLowerCase().endsWith('.zip')) {
+    return 'File is not valid JSON.';
+  }
+  return error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.';
+};
+
 /** Reads and validates one forecast JSON file. */
 export const parseLoadedForecast = async (
   file: File,
   addToast: AddToastFn,
 ): Promise<LoadedForecastPayload | null> => {
-  if (file.size > MAX_IMPORT_BYTES) {
-    addToast(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB); the maximum supported size is ${MAX_IMPORT_BYTES / 1024 / 1024} MB.`, 'error');
-    return null;
-  }
-
-  const text = await file.text();
   let data: unknown;
   try {
-    data = JSON.parse(text);
-  } catch {
-    addToast('File is not valid JSON.', 'error');
+    data = await readForecastImportFile(file);
+  } catch (error) {
+    addToast(getForecastImportErrorMessage(file, error), 'error');
     return null;
   }
 
@@ -100,20 +101,6 @@ export const dayHasAnyFeatures = (dayData: unknown): boolean => {
   if (!dayData || typeof dayData !== 'object') return false;
   return Object.values(dayData as Record<string, { size?: number } | undefined>)
     .some((outlookMap) => (outlookMap?.size ?? 0) > 0);
-};
-
-const applyLoadedForecast = (
-  payload: LoadedForecastPayload,
-  dispatch: ShortcutDispatch,
-  mapRef: React.RefObject<ForecastMapHandle | null>,
-) => {
-  applyForecastImportResult({
-    forecastCycle: payload.deserializedCycle,
-    mapView: payload.rawData.mapView,
-    cycleMetadata: payload.rawData.cycleMetadata,
-    warnings: [],
-    format: 'json',
-  }, dispatch, mapRef);
 };
 
 /** Applies any supported forecast import result to the active workspace session. */
