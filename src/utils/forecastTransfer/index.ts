@@ -12,7 +12,8 @@ import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
 import type { WorkflowExportScope } from '../workflowPackage';
 import { detectForecastTransferFormat } from './detectFormat';
-import { parseKmlDocument, forecastCycleFromKmlPlacemarks } from './parseKml';
+import { parseKmlDocument } from './parseKml';
+import { forecastCycleFromKmlPlacemarks } from './forecastCycleFromKml';
 import type {
   ForecastExportRequest,
   ForecastImportResult,
