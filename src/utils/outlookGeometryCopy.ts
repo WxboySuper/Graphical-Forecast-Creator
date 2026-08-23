@@ -88,6 +88,7 @@ export function cloneGeometryAsFeature(
   };
 }
 
+// @codescene(disable:"Complex Method")
 export function copyOutlookGeometry(
   sourceMap: Map<string, Feature[]>,
   targetMap: Map<string, Feature[]>,

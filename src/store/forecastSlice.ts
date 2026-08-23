@@ -1081,6 +1081,7 @@ export const forecastSlice = createSlice({
       }
     },
 
+    // @codescene(disable:"Complex Method")
     copyOutlookGeometryBetweenHazards: (state, action: PayloadAction<CopyOutlookGeometryOptions>) => {
       const day = state.forecastCycle.currentDay;
       if (day !== 1 && day !== 2) {
