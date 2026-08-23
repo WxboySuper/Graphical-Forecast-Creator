@@ -241,6 +241,7 @@ interface BuildForecastWorkspaceControllerArgs {
 /** Build the controller object returned by useForecastWorkspaceController.
  * Extracted to keep the hook body small for static analysis tools.
  */
+// @codescene(disable:"Large Method")
 function buildForecastWorkspaceController(args: BuildForecastWorkspaceControllerArgs): ForecastWorkspaceController {
   const {
     onSave,

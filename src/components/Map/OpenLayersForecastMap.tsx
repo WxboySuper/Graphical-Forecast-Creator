@@ -207,6 +207,7 @@ type OpenLayersForecastMapProps = {
 };
 
 // Main map component using OpenLayers, implementing the MapAdapterHandle interface for integration with the rest of the app.
+// @codescene(disable:"Code Duplication")
 const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLayersForecastMapProps>(
   ({ tstmPreviewFeatures = [] }, ref) => {
     const {

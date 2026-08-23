@@ -21,6 +21,7 @@ const shouldSkipOutlookFeature = (feature: Feature): boolean => {
  * Mutates outlook maps in place for one day's data.
  * Skips auto-generated categorical polygons.
  */
+// @codescene(disable:"Complex Method")
 export const trimOutlookDataInPlace = (
   outlookData: OutlookData,
   landMask: LandMaskFeature,

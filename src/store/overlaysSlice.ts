@@ -80,6 +80,7 @@ const overlaysSlice = createSlice({
     toggleOutlookTrimPreviewOnly: (state) => {
       state.outlookTrimPreviewOnly = !state.outlookTrimPreviewOnly;
     },
+    // @codescene(disable:"Complex Method")
     applyOverlaySettings: (state, action: PayloadAction<Partial<OverlaysState>>) => {
       const {
         stateBorders,

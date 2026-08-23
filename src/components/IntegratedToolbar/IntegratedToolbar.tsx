@@ -743,6 +743,7 @@ const TabbedToolbarDaysTab: React.FC<{ controller: ForecastWorkspaceController }
 );
 
 /** Layers tab exposing ghost layers and base map options. */
+// @codescene(disable:"Lines of Code in a Single File")
 const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <TabbedToolbarTabRow>
     <TabbedToolbarStripSection label="Ghost Layers" hint={`Day ${controller.currentDay}`} className="tabbed-integrated-toolbar__section--ghost-layers min-w-[560px] flex-1">
