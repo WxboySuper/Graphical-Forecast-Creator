@@ -1,5 +1,4 @@
 import type { OutlookData } from '../types/outlooks';
-import { processDay12OutlooksToCategorical, processDay3OutlooksToCategorical } from './autoCategoricalProcessing';
 import type { AutoCategoricalWorkerResponse } from './autoCategorical.worker';
 import AutoCategoricalWorker from './autoCategorical.worker?worker';
 
@@ -31,8 +30,9 @@ type WorkerFactory = () => WorkerLike;
 
 /**
  * Runs categorical derivation behind a cancellable Web Worker when the runtime
- * supports it, falling back to the synchronous derivation on the UI thread in
- * test/SSR environments. The returned controller tracks the newest request id
+ * supports it, falling back to a lazy-loaded synchronous derivation only in
+ * test/SSR environments. Keeping this import dynamic prevents Turf from being
+ * pulled into the main UI chunk. The returned controller tracks the newest request id
  * so stale worker responses can never overwrite newer edits.
  */
 export const createDerivationController = (workerFactory: WorkerFactory = () => new AutoCategoricalWorker()): DerivationController => {
@@ -47,6 +47,8 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
     return {
       derive: async (requestId, day, outlooks) => {
         try {
+          const { processDay12OutlooksToCategorical, processDay3OutlooksToCategorical } =
+            await import('./autoCategoricalProcessing');
           const features = day === 3
             ? processDay3OutlooksToCategorical(outlooks)
             : processDay12OutlooksToCategorical(outlooks);
@@ -61,44 +63,82 @@ export const createDerivationController = (workerFactory: WorkerFactory = () => 
   const pending = new Map<number, { resolve: (r: DerivationResult) => void }>();
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  worker.onmessage = (event: MessageEvent<AutoCategoricalWorkerResponse>) => {
-    const { requestId, ok, features, error } = event.data;
-    const timer = timers.get(requestId);
-    if (timer) {
-      clearTimeout(timer);
-      timers.delete(requestId);
-    }
-    const entry = pending.get(requestId);
-    if (entry) {
-      pending.delete(requestId);
-      entry.resolve({ ok, features, error });
+  const replaceWorker = (failure: string): void => {
+    const failedWorker = worker;
+    worker = null;
+    failedWorker?.terminate();
+
+    pending.forEach(({ resolve }) => resolve({ ok: false, error: failure }));
+    pending.clear();
+    timers.forEach((timer) => clearTimeout(timer));
+    timers.clear();
+
+    try {
+      const replacement = workerFactory();
+      worker = replacement;
+      attachWorkerHandlers(replacement);
+    } catch {
+      worker = null;
     }
   };
 
-  worker.onerror = () => {
-    // Fail all pending requests so the caller preserves the last known-good result.
-    pending.forEach(({ resolve }) => resolve({ ok: false, error: 'Auto-categorical worker failed.' }));
-    pending.clear();
+  const attachWorkerHandlers = (nextWorker: WorkerLike): void => {
+    nextWorker.onmessage = (event: MessageEvent<AutoCategoricalWorkerResponse>) => {
+      const { requestId, ok, features, error } = event.data;
+      const timer = timers.get(requestId);
+      if (timer) {
+        clearTimeout(timer);
+        timers.delete(requestId);
+      }
+      const entry = pending.get(requestId);
+      if (entry) {
+        pending.delete(requestId);
+        entry.resolve({ ok, features, error });
+      }
+    };
+
+    nextWorker.onerror = () => {
+      // Ignore late errors from a worker that timed out and was already replaced.
+      if (worker !== nextWorker) {
+        return;
+      }
+      replaceWorker('Auto-categorical worker failed.');
+    };
   };
+
+  attachWorkerHandlers(worker);
 
   return {
     derive: (requestId, day, outlooks) =>
       new Promise<DerivationResult>((resolve) => {
+        const activeWorker = worker;
+        if (!activeWorker) {
+          resolve({ ok: false, error: 'Auto-categorical worker unavailable.' });
+          return;
+        }
         pending.set(requestId, { resolve });
         const timer = setTimeout(() => {
           pending.delete(requestId);
           timers.delete(requestId);
+          // A Web Worker cannot be interrupted from the outside. Terminate it
+          // on timeout so an expensive derivation cannot block every later
+          // request, then create a clean worker for the next edit.
+          if (worker === activeWorker) {
+            replaceWorker('Auto-categorical worker reset after timeout.');
+          }
           resolve({ ok: false, error: 'Auto-categorical derivation timed out.' });
         }, DERIVATION_TIMEOUT_MS);
         timers.set(requestId, timer);
-        worker.postMessage({ requestId, day, outlooks });
+        activeWorker.postMessage({ requestId, day, outlooks });
       }),
     dispose: () => {
       pending.forEach(({ resolve }) => resolve({ ok: false, error: 'Auto-categorical worker disposed.' }));
       pending.clear();
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
-      worker.terminate();
+      const disposedWorker = worker;
+      worker = null;
+      disposedWorker?.terminate();
     },
   };
 };
