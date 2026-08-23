@@ -6,7 +6,7 @@ import {
 } from './parseKmlPlacemarkHelpers';
 import { parseKmlPlacemark } from './parseKmlPlacemark';
 
-/** Parses a KML document string into GFC placemark records. */
+/** Parses a KML document into GFC placemark records and import warnings. */
 export const parseKmlDocument = (
   kml: string,
   defaultDay: DayType = 1,
