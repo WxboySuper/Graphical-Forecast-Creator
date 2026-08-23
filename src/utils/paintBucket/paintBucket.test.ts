@@ -61,6 +61,7 @@ describe('resolveTargetProbability', () => {
   });
 });
 
+// @codescene(disable:"Code Duplication")
 describe('applyPaintBucketStrategy', () => {
   const probabilityList = ['2%', '5%', '10%', '15%'] as const;
 

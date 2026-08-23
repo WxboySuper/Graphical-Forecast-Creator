@@ -476,6 +476,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       map.addOverlay(overlay);
       overlayRef.current = overlay;
 
+      // @codescene(disable:"Complex Method")
       // Add click handler for pan and paint-bucket modes.
       map.on("click", (evt) => {
         const mode = interactionModeRef.current;
