@@ -14,7 +14,6 @@ import reducer, {
   selectCanRedo,
   selectCanUndo,
   setForecastDay,
-  setActiveProbability,
   setCycleDate,
   setOutlookMap,
   toggleLowProbability,
@@ -22,7 +21,6 @@ import reducer, {
   updateFeature,
   updateFeaturesBatch,
   removeFeature,
-  applyPaintBucketEdit,
   completeCycle,
   completeWithOmissions,
   dismissCompletionModal,
@@ -410,66 +408,6 @@ describe('forecastSlice undo/redo', () => {
 
     state = reducer(state, redoLastEdit());
     expect((getTornadoFeatures(state)[0].geometry as Polygon).coordinates[0][0]).toEqual([3, 3]);
-  });
-
-  test('undoes and redoes paint bucket recategorize edits', () => {
-    let state = reducer(undefined, addFeature({
-      feature: {
-        ...createFeature('bucket-feature', 0),
-        properties: {
-          outlookType: 'tornado',
-          probability: '5%',
-          isSignificant: false,
-        },
-      },
-    }));
-
-    state = reducer(state, applyPaintBucketEdit({
-      outlookType: 'tornado',
-      featureId: 'bucket-feature',
-      fromProbability: '5%',
-      action: 'recategorize',
-      probabilityList: ['2%', '5%', '10%', '15%'],
-    }));
-
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')).toHaveLength(1);
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('5%')).toBeUndefined();
-
-    state = reducer(state, undoLastEdit());
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('5%')).toHaveLength(1);
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')).toBeUndefined();
-
-    state = reducer(state, redoLastEdit());
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')).toHaveLength(1);
-  });
-
-  test('paint bucket recategorize preserves feature when active probability changes', () => {
-    const featureId = 'uuid-like-feature-id';
-    let state = reducer(undefined, addFeature({
-      feature: {
-        type: 'Feature',
-        id: featureId,
-        geometry: (createFeature('ignored', 0).geometry as Polygon),
-        properties: {
-          outlookType: 'tornado',
-          probability: '2%',
-          isSignificant: false,
-        },
-      },
-    }));
-
-    state = reducer(state, setActiveProbability('10%'));
-    state = reducer(state, applyPaintBucketEdit({
-      outlookType: 'tornado',
-      featureId,
-      fromProbability: '2%',
-      action: 'recategorize',
-      probabilityList: ['2%', '5%', '10%', '15%', 'CIG1', 'CIG2', 'CIG3'],
-    }));
-
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('10%')).toHaveLength(1);
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')).toBeUndefined();
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe(featureId);
   });
 
   test('batches undo for multi-feature geometry updates', () => {

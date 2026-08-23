@@ -4,17 +4,22 @@ import {
 } from './applyPaintBucketStrategy';
 import { isPaintBucketOutlookType, resolvePaintBucketEditAction } from './outlookScope';
 
-const square = (id: string, probability: string, minX: number, minY: number, size: number) => ({
+const square = ({
+  id,
+  probability,
+  offset = 0,
+  size = 1,
+}: { id: string; probability: string; offset?: number; size?: number }) => ({
   type: 'Feature' as const,
   id,
   geometry: {
     type: 'Polygon' as const,
     coordinates: [[
-      [minX, minY],
-      [minX + size, minY],
-      [minX + size, minY + size],
-      [minX, minY + size],
-      [minX, minY],
+      [offset, offset],
+      [offset + size, offset],
+      [offset + size, offset + size],
+      [offset, offset + size],
+      [offset, offset],
     ]],
   },
   properties: {
@@ -23,7 +28,33 @@ const square = (id: string, probability: string, minX: number, minY: number, siz
   },
 });
 
-const buildMap = (entries: Array<[string, ReturnType<typeof square>[]]>) => new Map(entries);
+const buildMap = (feature: ReturnType<typeof square>) => new Map([
+  [feature.properties.probability, [feature]],
+]);
+
+const runStrategy = ({
+  sourceProbability,
+  action,
+  activeProbability,
+}: {
+  sourceProbability: string;
+  action: 'recategorize' | 'step-up';
+  activeProbability: string;
+}) => {
+  const feature = square({ id: 'a', probability: sourceProbability });
+  const map = buildMap(feature);
+  return {
+    map,
+    result: applyPaintBucketStrategy(map, {
+    outlookType: 'tornado',
+    featureId: feature.id,
+    fromProbability: sourceProbability,
+    action,
+    activeProbability,
+    probabilityList: ['2%', '5%', '10%', '15%'],
+    }),
+  };
+};
 
 describe('resolvePaintBucketEditAction', () => {
   test('step mode uses shift for step-down', () => {
@@ -61,22 +92,9 @@ describe('resolveTargetProbability', () => {
   });
 });
 
-// @codescene(disable:"Code Duplication")
 describe('applyPaintBucketStrategy', () => {
-  const probabilityList = ['2%', '5%', '10%', '15%'] as const;
-
   test('recategorize moves a feature between keys', () => {
-    const feature = square('a', '5%', 0, 0, 1);
-    const map = buildMap([['5%', [feature]]]);
-
-    const result = applyPaintBucketStrategy(map, {
-      outlookType: 'tornado',
-      featureId: 'a',
-      fromProbability: '5%',
-      action: 'recategorize',
-      activeProbability: '15%',
-      probabilityList,
-    });
+    const { result } = runStrategy({ sourceProbability: '5%', action: 'recategorize', activeProbability: '15%' });
 
     expect(result.changed).toBe(true);
     expect(result.targetProbability).toBe('15%');
@@ -85,34 +103,14 @@ describe('applyPaintBucketStrategy', () => {
   });
 
   test('step-up promotes without changing the active brush', () => {
-    const feature = square('a', '10%', 0, 0, 1);
-    const map = buildMap([['10%', [feature]]]);
-
-    const result = applyPaintBucketStrategy(map, {
-      outlookType: 'tornado',
-      featureId: 'a',
-      fromProbability: '10%',
-      action: 'step-up',
-      activeProbability: '2%',
-      probabilityList,
-    });
+    const { result } = runStrategy({ sourceProbability: '10%', action: 'step-up', activeProbability: '2%' });
 
     expect(result.map.get('15%')).toHaveLength(1);
     expect(result.map.get('10%')).toBeUndefined();
   });
 
   test('returns unchanged map when target equals source', () => {
-    const feature = square('a', '10%', 0, 0, 1);
-    const map = buildMap([['10%', [feature]]]);
-
-    const result = applyPaintBucketStrategy(map, {
-      outlookType: 'tornado',
-      featureId: 'a',
-      fromProbability: '10%',
-      action: 'recategorize',
-      activeProbability: '10%',
-      probabilityList,
-    });
+    const { map, result } = runStrategy({ sourceProbability: '10%', action: 'recategorize', activeProbability: '10%' });
 
     expect(result.changed).toBe(false);
     expect(result.map).toBe(map);
