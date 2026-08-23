@@ -1,9 +1,9 @@
 import type { DayType } from '../../types/outlooks';
 import type { ParsedKmlPlacemark } from './types';
 import {
+  findKmlElementsByLocalName,
   inferKmlFolderContext,
 } from './parseKmlPlacemarkHelpers';
-import { findKmlElementsByLocalName } from './parseKmlPlacemarkHelpers';
 import { parseKmlPlacemark } from './parseKmlPlacemark';
 
 /** Parses a KML document string into GFC placemark records. */
