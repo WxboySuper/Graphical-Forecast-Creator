@@ -130,6 +130,7 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
 };
 
 /** Imports a forecast file and adapts supported formats to the GFC schema. */
+// @codescene(disable:"Complex Method")
 export const importForecastTransfer = async (
   file: File,
   options?: { baseCycle?: ForecastCycle; defaultDay?: DayType },

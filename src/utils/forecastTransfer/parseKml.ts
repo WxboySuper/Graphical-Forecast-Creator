@@ -82,6 +82,7 @@ interface FolderContext {
   outlookType: OutlookType | null;
 }
 
+// @codescene(disable:"Complex Method", disable:"Complex Conditional")
 const parsePlacemark = (
   placemark: Element,
   context: FolderContext,

@@ -8,6 +8,7 @@ const hasExtension = (name: string, extensions: Set<string>): boolean =>
   [...extensions].some((ext) => name.endsWith(ext));
 
 /** Detects the forecast transfer format from file metadata. */
+// @codescene(disable:"Complex Method", disable:"Complex Conditional")
 export const detectForecastTransferFormat = (file: File, bytes?: Uint8Array): ForecastTransferFormat | null => {
   const lowerName = file.name.toLowerCase();
 

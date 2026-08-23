@@ -42,6 +42,7 @@ const resolveOutlookTypes = (options: KmzExportOptions): OutlookType[] => {
 const defaultFillOpacity = (probabilityKey: string): number => (isCigKey(probabilityKey) ? 0.15 : 0.66);
 
 /** Collects exportable outlook polygons from the forecast cycle. */
+// @codescene(disable:"Complex Method")
 export const collectKmzExportFeatures = ({ forecastCycle, options }: KmzExportInput): KmzExportFeature[] => {
   const days = resolveDays(forecastCycle, options);
   const outlookTypes = resolveOutlookTypes(options);

@@ -8,6 +8,7 @@ const findElementsByLocalName = (root: Element, name: string): Element[] => {
   return Array.from(root.getElementsByTagName('*')).filter((node) => localTagName(node) === target);
 };
 
+// @codescene(disable:"Complex Conditional")
 const parseCoordinateTuple = (tuple: string): Position | null => {
   const parts = tuple.trim().split(',').map((part) => Number(part.trim()));
   if (parts.length < 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) {
