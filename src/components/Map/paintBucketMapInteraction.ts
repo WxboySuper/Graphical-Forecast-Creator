@@ -2,7 +2,7 @@ import type OLMap from 'ol/Map';
 import type VectorLayer from 'ol/layer/Vector';
 import type { AppDispatch } from '../../store';
 import { applyPaintBucketEdit } from '../../store/forecastSlice';
-import type { OutlookType } from '../../types/outlooks';
+import type { DayType, OutlookType } from '../../types/outlooks';
 import { getAvailableProbabilities } from '../OutlookPanel/outlookPanelUtils';
 import {
   isPaintBucketOutlookType,
@@ -19,7 +19,7 @@ interface PaintBucketClickInput {
   vectorLayer: VectorLayer | null;
   dispatch: AppDispatch;
   outlookType: OutlookType;
-  currentDay: number;
+  currentDay: DayType;
   mode: PaintBucketMode;
   shiftKey: boolean;
 }

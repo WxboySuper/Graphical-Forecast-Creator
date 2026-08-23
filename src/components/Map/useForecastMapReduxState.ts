@@ -75,19 +75,6 @@ const projectActiveOutlookFeatures = (
   );
 };
 
-const buildActiveOutlookSignature = (
-  outlooks: OutlookMapLike,
-  activeOutlookType: string,
-): string => {
-  const probabilities = outlooks[activeOutlookType];
-  if (!(probabilities instanceof Map)) return '';
-  return Array.from(probabilities.entries())
-    .flatMap(([probability, features]) =>
-      features.map((feature) => `${probability}:${String(feature.id ?? 'legacy')}`),
-    )
-    .join('|');
-};
-
 const projectCustomLayerFeatures = (layer: ForecastMapSelections["customLayers"]["layers"][number]) => {
   const categories = new Map(layer.categories.map((category) => [category.id, category]));
   return layer.features.flatMap((feature) => {
