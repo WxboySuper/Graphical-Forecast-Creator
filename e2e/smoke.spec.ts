@@ -57,13 +57,14 @@ test.describe('App smoke tests', () => {
     await expect(page.locator('.map-history-button[aria-label="Undo"]')).toBeVisible();
     await expect(page.locator('.map-history-button[aria-label="Undo"]')).toBeDisabled();
     await expect(page.locator('.map-history-button[aria-label="Redo"]')).toBeDisabled();
-    await expect(page.locator('.map-toolbar-surface > *')).toHaveCount(7);
+    await expect(page.locator('.map-toolbar-surface > *')).toHaveCount(8);
     const toolbarClassifications = [
       ['map-history-group', 'history'],
       ['map-toolbar-spacer', 'spacer'],
       ['map-toolbar-divider', 'divider'],
       ['mode-key', 'key'],
       ['mode-delete', 'delete'],
+      ['mode-edit', 'edit'],
       ['mode-draw', 'draw'],
       ['mode-pan', 'pan'],
     ] as const;
@@ -76,7 +77,7 @@ test.describe('App smoke tests', () => {
         }),
       toolbarClassifications
     );
-    expect(mapToolbarOrder).toEqual(['pan', 'draw', 'delete', 'divider', 'key', 'spacer', 'history']);
+    expect(mapToolbarOrder).toEqual(['pan', 'draw', 'delete', 'edit', 'divider', 'key', 'spacer', 'history']);
     await expect(page.getByRole('complementary', { name: /map legend/i })).not.toBeVisible();
     await page.getByRole('button', { name: /show map key/i }).click();
     await expect(page.getByRole('complementary', { name: /map legend/i })).toBeVisible();
