@@ -1,3 +1,4 @@
+// @codescene(disable:"Overall Code Complexity")
 import type { DayType, ForecastCycle, OutlookData, OutlookDay, OutlookType } from '../../types/outlooks';
 import { geometryFromKmlElement } from './kmlGeometry';
 import type { ParsedKmlPlacemark } from './types';

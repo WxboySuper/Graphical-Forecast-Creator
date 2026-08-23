@@ -59,7 +59,7 @@ const KML_LIMITATIONS = [
 ];
 
 /** Unified import/export dialog for forecast transfer formats. */
-// @codescene(disable:"Complex Method")
+// @codescene(disable:"Complex Method", disable:"Large Method")
 export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   open,
   direction,

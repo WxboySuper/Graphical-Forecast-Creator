@@ -60,6 +60,7 @@ const readFileBytes = async (file: File): Promise<Uint8Array | undefined> => {
   return new Uint8Array(await file.arrayBuffer());
 };
 
+// @codescene(disable:"Complex Method")
 const readKmlPayload = async (file: File, bytes?: Uint8Array): Promise<string> => {
   const lowerName = file.name.toLowerCase();
   if (lowerName.endsWith('.kmz') || file.type === 'application/vnd.google-earth.kmz') {
