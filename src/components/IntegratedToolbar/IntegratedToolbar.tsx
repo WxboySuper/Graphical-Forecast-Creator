@@ -49,7 +49,7 @@ const getGhostLayerColor = (type: OutlookType) => getOutlookColor({ outlookType:
 import TabbedToolbarSelectionStrip from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
 import CustomProductsDialog from './CustomProductsDialog';
-import OutlookTrimPopover from './OutlookTrimPopover';
+import OutlookTrimToolbarSection from './OutlookTrimToolbarSection';
 import type { RootState } from '../../store';
 import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
@@ -822,13 +822,7 @@ const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController
       </div>
     </TabbedToolbarStripSection>
 
-    <TabbedToolbarStripSection
-      label="Trim to land"
-      hint="Optional"
-      className="tabbed-integrated-toolbar__section--trim w-[132px]"
-    >
-      <OutlookTrimPopover controller={controller} />
-    </TabbedToolbarStripSection>
+    <OutlookTrimToolbarSection controller={controller} />
 
     <TabbedToolbarStripSection label="Layer Status" className="tabbed-integrated-toolbar__section--layer-status w-[250px]">
       <div className="flex flex-wrap items-center gap-2">

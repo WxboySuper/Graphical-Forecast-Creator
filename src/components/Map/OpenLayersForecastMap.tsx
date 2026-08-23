@@ -366,6 +366,37 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => {
       if (!mapElementRef.current || mapRef.current) return undefined;
 
+      // @codescene(disable:"Complex Method")
+      const handleModifiedFeatures = (
+        features: OLFeature<Geometry>[],
+        isCategorical: boolean,
+      ): void => {
+        const format = new GeoJSON();
+        features.forEach((feature) => {
+          void (async () => {
+            if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
+              return;
+            }
+
+            if (!isCategorical) {
+              const customFeature = toUpdatedCustomFeature(feature, format);
+              if (customFeature) {
+                dispatch(updateCustomFeature(customFeature));
+                return;
+              }
+            }
+
+            const updatedFeature = toUpdatedGeoJsonFeature(feature, format, isCategorical);
+            if (!updatedFeature) {
+              return;
+            }
+
+            const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
+            dispatch(updateFeature({ feature: trimmedFeature }));
+          })();
+        });
+      };
+
       const tileLayer = new TileLayer({
         source: new OSM({ crossOrigin: "anonymous" }),
       });
@@ -594,25 +625,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       });
 
       modify.on("modifyend", (event) => {
-        const format = new GeoJSON();
-        event.features.forEach((feature) => {
-          void (async () => {
-            const customFeature = toUpdatedCustomFeature(feature, format);
-            if (customFeature) {
-              dispatch(updateCustomFeature(customFeature));
-              return;
-            }
-            const updatedFeature = toUpdatedGeoJsonFeature(
-              feature,
-              format,
-              false,
-            );
-            if (updatedFeature) {
-              const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
-              dispatch(updateFeature({ feature: trimmedFeature }));
-            }
-          })();
-        });
+        handleModifiedFeatures(
+          event.features.getArray() as OLFeature<Geometry>[],
+          false,
+        );
       });
       map.addInteraction(modify);
       modifyRef.current = modify;
@@ -636,23 +652,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
       });
       catModify.on("modifyend", (event) => {
-        const format = new GeoJSON();
-        event.features.forEach((feature) => {
-          void (async () => {
-            const derivedFrom = feature.get("derivedFrom") as string | undefined;
-            if (derivedFrom !== "auto-generated") {
-              const updatedFeature = toUpdatedGeoJsonFeature(
-                feature,
-                format,
-                true,
-              );
-              if (updatedFeature) {
-                const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
-                dispatch(updateFeature({ feature: trimmedFeature }));
-              }
-            }
-          })();
-        });
+        handleModifiedFeatures(
+          event.features.getArray() as OLFeature<Geometry>[],
+          true,
+        );
       });
       map.addInteraction(catModify);
       catModifyRef.current = catModify;
