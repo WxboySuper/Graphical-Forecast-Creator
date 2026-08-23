@@ -1,5 +1,5 @@
 import * as turf from '@turf/turf';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 import { CONUS_BBOX, GREAT_LAKE_NAMES } from './constants';
 import type { LandMaskFeature } from './types';
 

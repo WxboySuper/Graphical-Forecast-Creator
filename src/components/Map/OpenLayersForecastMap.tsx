@@ -21,7 +21,7 @@ import Overlay from "ol/Overlay";
 import type { FeatureLike } from "ol/Feature";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
-import { click } from "ol/events/condition";
+import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { v4 as uuidv4 } from "uuid";
 import { Redo2, Undo2 } from "lucide-react";
 import {
@@ -75,6 +75,7 @@ import {
   GHOST_REFERENCE_LAYER_Z_INDEX,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
+import type { CustomCategoryStyle } from "../../types/customProducts";
 import {
   BLANK_LAND_FILL_STYLE,
   BLANK_LAND_OUTLINE_STYLE,
@@ -91,6 +92,18 @@ import { trimGeometryForAutoDraw } from "../../hooks/useTrimCurrentDayOutlooks";
 import { clearLandMaskRuntimeCache, ensureLandMask } from "../../utils/outlookPolygonMasking/landMaskRuntime";
 import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMasking/trimOutlookData";
 import { Fill, Stroke, Style as OlStyle } from "ol/style";
+import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
+
+/** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
+export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
+  style.fillColor,
+  style.fillOpacity,
+  style.strokeColor,
+  style.strokeOpacity,
+  style.strokeWidth,
+  style.hatch,
+  isTopLayer,
+].join("|");
 
 // OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
 // https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
@@ -268,12 +281,27 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         geometry: trimmedGeometry,
       };
     };
+    const activeProbabilityRef = useRef(drawingState.activeProbability);
+    const activeOutlookTypeRef = useRef(drawingState.activeOutlookType);
+    const activeCustomCategoryRef = useRef(activeCustomCategory);
 
     useEffect(() => {
       interactionModeRef.current = interactionMode;
     }, [interactionMode]);
 
     useEffect(() => { customModeRef.current = customMode; }, [customMode]);
+
+    useEffect(() => {
+      activeProbabilityRef.current = drawingState.activeProbability;
+    }, [drawingState.activeProbability]);
+
+    useEffect(() => {
+      activeOutlookTypeRef.current = drawingState.activeOutlookType;
+    }, [drawingState.activeOutlookType]);
+
+    useEffect(() => {
+      activeCustomCategoryRef.current = activeCustomCategory;
+    }, [activeCustomCategory]);
 
     useEffect(() => {
       currentMapViewRef.current = currentMapView;
@@ -543,7 +571,25 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         }
       });
 
-      const modify = new Modify({ source: vectorSourceRef.current });
+      const modify = new Modify({
+        source: vectorSourceRef.current,
+        filter: (feature) => {
+          const customIdentity = getCustomFeatureIdentity(feature);
+          if (customIdentity) {
+            if (!customModeRef.current) {
+              return false;
+            }
+            return customIdentity.categoryId === activeCustomCategoryRef.current?.id;
+          }
+          return matchesPrecisionEditTier(
+            feature,
+            activeOutlookTypeRef.current,
+            activeProbabilityRef.current,
+          );
+        },
+        deleteCondition: (event) =>
+          singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
+      });
 
       modify.on("modifyend", (event) => {
         const format = new GeoJSON();
@@ -571,7 +617,22 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
       // Separate modify interaction for categorical layer to handle its unique properties
       // and to prevent accidental edits of auto-generated categorical features.
-      const catModify = new Modify({ source: catSourceRef.current });
+      const catModify = new Modify({
+        source: catSourceRef.current,
+        filter: (feature) => {
+          const derivedFrom = feature.get("derivedFrom") as string | undefined;
+          if (derivedFrom === "auto-generated") {
+            return false;
+          }
+          return matchesPrecisionEditTier(
+            feature,
+            "categorical",
+            activeProbabilityRef.current,
+          );
+        },
+        deleteCondition: (event) =>
+          singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
+      });
       catModify.on("modifyend", (event) => {
         const format = new GeoJSON();
         event.features.forEach((feature) => {
@@ -1113,8 +1174,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 category.id,
                 category.label,
                 category.order,
-                JSON.stringify(category.style),
-                zIndex === highestCustomZIndex,
+                getCustomStyleSignature(category.style, zIndex === highestCustomZIndex),
               ].join("|"),
               read: () => format.readFeature(feature, {
                 dataProjection: "EPSG:4326",
@@ -1340,8 +1400,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               "Draw mode: click to place points, double-click to finish polygon."}
             {interactionMode === "delete" &&
               "Delete mode: click any polygon to remove it."}
-            {interactionMode === "pan" &&
-              "Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details."}
+            {interactionMode === "pan" && PAN_MODE_VERTEX_EDIT_HELP}
           </div>
         </div>
         <Legend desktopOpen={showDesktopLegend} mobileOpen={showMobileLegend} showReportLegend={false} />

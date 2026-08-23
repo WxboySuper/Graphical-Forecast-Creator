@@ -2,12 +2,15 @@ import React from 'react';
 import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
-import useAutoCategorical, {
+import useAutoCategorical from '../useAutoCategorical';
+import {
   processDay12OutlooksToCategorical,
   processDay3OutlooksToCategorical,
   processOutlooksToCategorical,
-  CategoricalDerivationError,
-} from '../useAutoCategorical';
+} from '../autoCategoricalProcessing';
+import { signatureFromOutlookMap } from '../useAutoCategorical';
+import { CategoricalDerivationError } from '../categoricalErrors';
+import type { DerivationController, DerivationResult } from '../categoricalWorker';
 import { OutlookData } from '../../types/outlooks';
 import { Feature, Polygon } from 'geojson';
 import * as turf from '@turf/turf';
@@ -57,6 +60,19 @@ const makeProbabilisticFeature = (id: string, offset: number): Feature<Polygon> 
   }
 });
 
+test('signature tokens are stable for reordering and change for replacement geometry', () => {
+  const first = makeProbabilisticFeature('first', 0);
+  const second = makeProbabilisticFeature('second', 3);
+  const ordered = new Map([['30%', [first]], ['45%', [second]]]);
+  const reordered = new Map([['45%', [second]], ['30%', [first]]]);
+  const replacement = { ...first, geometry: { ...first.geometry, coordinates: [[[9, 9], [10, 9], [10, 10], [9, 9]]] } };
+
+  expect(signatureFromOutlookMap('tornado', ordered)).toBe(signatureFromOutlookMap('tornado', reordered));
+  expect(signatureFromOutlookMap('tornado', ordered)).not.toBe(
+    signatureFromOutlookMap('tornado', new Map([['30%', [replacement]], ['45%', [second]]] ))
+  );
+});
+
 const makeSquare = (id: string, offset: number, size = 2): Feature<Polygon> => ({
   type: 'Feature',
   id,
@@ -83,9 +99,23 @@ const createStore = () => configureStore({
   })
 });
 
-const HookHarness = () => {
-  useAutoCategorical();
+const HookHarness: React.FC<{ controllerFactory?: () => DerivationController }> = ({ controllerFactory }) => {
+  useAutoCategorical(controllerFactory);
   return null;
+};
+
+const createControlledController = () => {
+  const requests: Array<{
+    requestId: number;
+    resolve: (result: DerivationResult) => void;
+  }> = [];
+  const controller: DerivationController = {
+    derive: (requestId, _day, _outlooks) => new Promise((resolve) => {
+      requests.push({ requestId, resolve });
+    }),
+    dispose: jest.fn(),
+  };
+  return { controller, requests };
 };
 
 const getCategoricalFeatures = (store: ReturnType<typeof createStore>) =>
@@ -345,6 +375,69 @@ describe('processOutlooksToCategorical', () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(categoricalUpdates).toBe(1);
     unsubscribe();
+  });
+
+  test('re-derives the newest edit that arrives during processing', async () => {
+    const store = createStore();
+    const controlled = createControlledController();
+    const ProviderComponent = Provider as unknown as React.ComponentType<{ store: ReturnType<typeof createStore>; children?: React.ReactNode }>;
+    render(React.createElement(
+      ProviderComponent,
+      { store },
+      React.createElement(HookHarness, { controllerFactory: () => controlled.controller }),
+    ));
+
+    act(() => {
+      store.dispatch(addFeature({ feature: makeProbabilisticFeature('feature-1', 0) }));
+    });
+    await waitFor(() => expect(controlled.requests).toHaveLength(1));
+
+    act(() => {
+      store.dispatch(updateFeature({ feature: makeProbabilisticFeature('feature-1', 3) }));
+    });
+    await act(async () => {
+      controlled.requests[0].resolve({ ok: true, features: [] });
+    });
+
+    await waitFor(() => expect(controlled.requests).toHaveLength(2));
+    expect(controlled.requests[1].requestId).toBeGreaterThan(controlled.requests[0].requestId);
+  });
+
+  test('does not retry a failed hash on unrelated updates but retries a new geometry', async () => {
+    const store = createStore();
+    const controlled = createControlledController();
+    const ProviderComponent = Provider as unknown as React.ComponentType<{ store: ReturnType<typeof createStore>; children?: React.ReactNode }>;
+    render(React.createElement(
+      ProviderComponent,
+      { store },
+      React.createElement(HookHarness, { controllerFactory: () => controlled.controller }),
+    ));
+
+    act(() => {
+      store.dispatch(addFeature({ feature: makeProbabilisticFeature('feature-1', 0) }));
+    });
+    await waitFor(() => expect(controlled.requests).toHaveLength(1));
+
+    await act(async () => {
+      controlled.requests[0].resolve({ ok: false, error: 'controlled derivation failure' });
+    });
+    await waitFor(() => expect(store.getState().forecast.autoCategoricalError).toMatch(/controlled/i));
+
+    act(() => {
+      store.dispatch(addFeature({
+        feature: {
+          ...makeFeature('manual-tstm'),
+          properties: { outlookType: 'categorical', probability: 'TSTM' },
+        },
+      }));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(controlled.requests).toHaveLength(1);
+
+    act(() => {
+      store.dispatch(updateFeature({ feature: makeProbabilisticFeature('feature-1', 3) }));
+    });
+    await waitFor(() => expect(controlled.requests).toHaveLength(2));
   });
 
   test('preserves manual TSTM geometry when regenerating categorical output', async () => {
