@@ -1,11 +1,10 @@
-import { v4 as uuidv4 } from 'uuid';
 import type { Feature } from 'geojson';
 import type { DayType, OutlookType } from '../types/outlooks';
 import { getAvailableProbabilities } from '../components/OutlookPanel/outlookPanelUtils';
 import { cloneJsonValue } from '../store/cloneJsonValue';
 
 export type ProbabilisticHazardType = 'tornado' | 'wind' | 'hail';
-export type HazardGeometryCopyMode = 'replace' | 'merge';
+export type HazardGeometryCopyMode = 'replace';
 
 export interface CopyOutlookGeometryOptions {
   sourceType: ProbabilisticHazardType;
@@ -78,11 +77,15 @@ export function cloneGeometryAsFeature(
   source: Feature,
   targetType: ProbabilisticHazardType,
   targetProbability: string,
+  sourceIndex = 0,
 ): Feature {
   const sourceOutlookType = source.properties?.outlookType;
+  const sourceId = typeof source.id === 'string' || typeof source.id === 'number'
+    ? source.id
+    : 'anonymous';
   return {
     type: 'Feature',
-    id: uuidv4(),
+    id: `geometry-copy:${sourceId}:${targetType}:${targetProbability}:${sourceIndex}`,
     geometry: cloneJsonValue(source.geometry),
     properties: {
       outlookType: targetType,
@@ -93,19 +96,18 @@ export function cloneGeometryAsFeature(
   };
 }
 
-// @codescene(disable:"Complex Method")
 export function copyOutlookGeometry(
   sourceMap: Map<string, Feature[]>,
   targetMap: Map<string, Feature[]>,
   options: CopyOutlookGeometryOptions,
   day: DayType,
 ): CopyOutlookGeometryResult {
-  const { sourceType, targetType, mode, probabilityFilter } = options;
+  const { sourceType, targetType, probabilityFilter } = options;
   const keys = probabilityFilter
     ? getCopyableProbabilityKeys(sourceType, targetType, day).filter((key) => key === probabilityFilter)
     : getCopyableProbabilityKeys(sourceType, targetType, day);
 
-  if (mode === 'replace' && !probabilityFilter) {
+  if (!probabilityFilter) {
     targetMap.clear();
   }
 
@@ -118,16 +120,11 @@ export function copyOutlookGeometry(
       continue;
     }
 
-    const cloned = sourceFeatures.map((feature) => cloneGeometryAsFeature(feature, targetType, key));
+    const cloned = sourceFeatures.map((feature, index) =>
+      cloneGeometryAsFeature(feature, targetType, key, index),
+    );
 
-    if (probabilityFilter) {
-      targetMap.set(key, cloned);
-    } else if (mode === 'merge') {
-      const existing = targetMap.get(key) ?? [];
-      targetMap.set(key, [...existing, ...cloned]);
-    } else {
-      targetMap.set(key, cloned);
-    }
+    targetMap.set(key, cloned);
 
     copiedFeatureCount += cloned.length;
     copiedProbabilityKeys.push(key);

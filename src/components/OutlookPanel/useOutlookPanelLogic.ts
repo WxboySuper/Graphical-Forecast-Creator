@@ -161,13 +161,23 @@ export function useOutlookPanelLogic() {
       return;
     }
 
+    const targetFeatureCount = outlooks[activeProbabilisticHazard]?.get(activeProbability)?.length ?? 0;
+    if (targetFeatureCount > 0) {
+      const confirmed = window.confirm(
+        `Replace ${activeProbabilisticHazard} ${activeProbability} polygons with geometry from ${sourceType}? Existing ${activeProbabilisticHazard} shapes at this level will be removed.`,
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
     dispatch(copyOutlookGeometryBetweenHazards({
       sourceType,
       targetType: activeProbabilisticHazard,
       mode: 'replace',
       probabilityFilter: activeProbability,
     }));
-  }, [activeProbabilisticHazard, activeProbability, dispatch]);
+  }, [activeProbabilisticHazard, activeProbability, dispatch, outlooks]);
 
   return {
     emergencyMode,

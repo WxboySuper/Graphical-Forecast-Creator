@@ -82,4 +82,12 @@ describe('forecast geometry copy reducer', () => {
     expect(state.forecastCycle.days[1]?.data.tornado?.get('15%') ?? []).toHaveLength(0);
     expect(selectCanRedo({ forecast: state } as never)).toBe(true);
   });
+
+  it('does not create an undo entry when there is no copyable geometry', () => {
+    const state = reducer(reducer(undefined, setForecastDay(1)), copyOutlookGeometryBetweenHazards({
+      sourceType: 'wind', targetType: 'tornado', mode: 'replace',
+    }));
+
+    expect(selectCanUndo({ forecast: state } as never)).toBe(false);
+  });
 });

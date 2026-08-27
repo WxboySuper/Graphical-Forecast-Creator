@@ -68,6 +68,14 @@ describe('outlookGeometryCopy', () => {
     });
   });
 
+  it('assigns the same id when the same feature is copied again', () => {
+    const source = createFeature('source-1', 'wind', '15%', 0);
+
+    expect(cloneGeometryAsFeature(source, 'tornado', '15%')).toEqual(
+      cloneGeometryAsFeature(source, 'tornado', '15%'),
+    );
+  });
+
   it('replaces the full target hazard map when copying all geometry', () => {
     const sourceMap = new Map([
       ['15%', [createFeature('wind-15', 'wind', '15%', 0)]],

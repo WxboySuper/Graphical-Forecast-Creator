@@ -1081,7 +1081,6 @@ export const forecastSlice = createSlice({
       }
     },
 
-    // @codescene(disable:"Complex Method")
     copyOutlookGeometryBetweenHazards: (state, action: PayloadAction<CopyOutlookGeometryOptions>) => {
       const day = state.forecastCycle.currentDay;
       if (day !== 1 && day !== 2) {
@@ -1116,11 +1115,7 @@ export const forecastSlice = createSlice({
       }
 
       pushUndoSnapshot(state);
-
-      const result = copyOutlookGeometry(sourceMap, targetMap, action.payload, day);
-      if (result.copiedFeatureCount === 0) {
-        return;
-      }
+      copyOutlookGeometry(sourceMap, targetMap, action.payload, day);
 
       if (dayData.metadata.lowProbabilityOutlooks) {
         dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
