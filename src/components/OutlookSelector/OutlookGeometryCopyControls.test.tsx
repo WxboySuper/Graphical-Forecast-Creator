@@ -65,4 +65,30 @@ describe('OutlookGeometryCopyControls', () => {
     expect(screen.getByText('From Wind')).toBeInTheDocument();
     expect(screen.getByText('From Hail')).toBeInTheDocument();
   });
+
+  it('invokes the selected copy mode without requiring a nested submenu', async () => {
+    const user = userEvent.setup();
+    const onCopyAllFrom = jest.fn();
+    const onCopyProbabilityFrom = jest.fn();
+
+    render(
+      <OutlookGeometryCopyControls
+        activeHazard="tornado"
+        activeProbability="15%"
+        otherHazards={['wind']}
+        canCopyAllFrom={() => true}
+        canCopyProbabilityFrom={() => true}
+        onCopyAllFrom={onCopyAllFrom}
+        onCopyProbabilityFrom={onCopyProbabilityFrom}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Match geometry from another hazard'));
+    await user.click(screen.getByRole('menuitem', { name: 'All levels' }));
+    expect(onCopyAllFrom).toHaveBeenCalledWith('wind');
+
+    await user.click(screen.getByLabelText('Match geometry from another hazard'));
+    await user.click(screen.getByRole('menuitem', { name: '15% only' }));
+    expect(onCopyProbabilityFrom).toHaveBeenCalledWith('wind');
+  });
 });

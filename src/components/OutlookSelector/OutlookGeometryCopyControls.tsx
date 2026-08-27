@@ -8,9 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import {
@@ -87,25 +84,23 @@ export const OutlookGeometryCopyControls: React.FC<OutlookGeometryCopyControlsPr
           <DropdownMenuSeparator />
 
           {availableSources.map((sourceType) => (
-            <DropdownMenuSub key={sourceType}>
-              <DropdownMenuSubTrigger>
+            <React.Fragment key={sourceType}>
+              <DropdownMenuLabel className="pb-1 pt-2 text-xs font-semibold text-muted-foreground">
                 From {hazardLabels[sourceType]}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem
-                  disabled={!canCopyAllFrom(sourceType)}
-                  onSelect={() => onCopyAllFrom(sourceType)}
-                >
-                  All levels
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!canCopyProbabilityFrom(sourceType)}
-                  onSelect={() => onCopyProbabilityFrom(sourceType)}
-                >
-                  {activeProbability} only
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                disabled={!canCopyAllFrom(sourceType)}
+                onSelect={() => onCopyAllFrom(sourceType)}
+              >
+                All levels
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!canCopyProbabilityFrom(sourceType)}
+                onSelect={() => onCopyProbabilityFrom(sourceType)}
+              >
+                {activeProbability} only
+              </DropdownMenuItem>
+            </React.Fragment>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
