@@ -4,6 +4,8 @@ import {
 } from './applyPaintBucketStrategy';
 import { isPaintBucketOutlookType, resolvePaintBucketEditAction } from './outlookScope';
 
+const combinedProbabilityList = ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG0', 'CIG1', 'CIG2'] as const;
+
 const square = ({
   id,
   probability,
@@ -80,8 +82,6 @@ describe('isPaintBucketOutlookType', () => {
 
 describe('resolveTargetProbability', () => {
   const list = ['2%', '5%', '10%', '15%'] as const;
-  const combinedList = ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG0', 'CIG1', 'CIG2'] as const;
-
   test('recategorize uses the active probability', () => {
     expect(resolveTargetProbability('recategorize', '5%', '15%', list)).toBe('15%');
     expect(resolveTargetProbability('recategorize', '15%', '15%', list)).toBeNull();
@@ -95,13 +95,13 @@ describe('resolveTargetProbability', () => {
   });
 
   test('step up crosses from the highest probability into CIG levels', () => {
-    expect(resolveTargetProbability('step-up', '60%', '2%', combinedList)).toBe('CIG0');
-    expect(resolveTargetProbability('step-up', 'CIG1', '2%', combinedList)).toBe('CIG2');
+    expect(resolveTargetProbability('step-up', '60%', '2%', combinedProbabilityList)).toBe('CIG0');
+    expect(resolveTargetProbability('step-up', 'CIG1', '2%', combinedProbabilityList)).toBe('CIG2');
   });
 
   test('step down crosses from CIG0 back to the highest probability', () => {
-    expect(resolveTargetProbability('step-down', 'CIG0', '2%', combinedList)).toBe('60%');
-    expect(resolveTargetProbability('step-down', 'CIG1', '2%', combinedList)).toBe('CIG0');
+    expect(resolveTargetProbability('step-down', 'CIG0', '2%', combinedProbabilityList)).toBe('60%');
+    expect(resolveTargetProbability('step-down', 'CIG1', '2%', combinedProbabilityList)).toBe('CIG0');
   });
 });
 
@@ -127,7 +127,7 @@ describe('applyPaintBucketStrategy', () => {
       sourceProbability: '60%',
       action: 'step-up',
       activeProbability: '2%',
-      probabilityList: ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG0', 'CIG1'],
+      probabilityList: combinedProbabilityList,
     });
 
     expect(result.targetProbability).toBe('CIG0');
@@ -140,7 +140,7 @@ describe('applyPaintBucketStrategy', () => {
       sourceProbability: 'CIG1',
       action: 'step-up',
       activeProbability: '2%',
-      probabilityList: ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG0', 'CIG1', 'CIG2'],
+      probabilityList: combinedProbabilityList,
     });
 
     expect(result.targetProbability).toBe('CIG2');
@@ -162,7 +162,7 @@ describe('applyPaintBucketStrategy', () => {
       fromProbability: '5%',
       action: 'recategorize',
       activeProbability: '15%',
-      probabilityList: ['2%', '5%', '10%', '15%', 'CIG0', 'CIG1'],
+      probabilityList: combinedProbabilityList,
     });
 
     expect(result.map.get('15%')?.map((feature) => feature.id)).toEqual(['selected']);
