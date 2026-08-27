@@ -163,7 +163,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
   paintBucketTool: {
     exposure: {
       local: true,
-      beta: false,
+      beta: true,
       staging: false,
       production: false,
     },
@@ -171,7 +171,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     addedDate: '2026-08-18',
     temporary: true,
     removalCondition:
-      'Remove strategy selector after paint-bucket interaction is chosen and promoted beyond local prototype (#623).',
+      'Remove strategy selector after paint-bucket interaction is validated by beta testers and the stable production rollout is approved (#623).',
     serverBacked: false,
     trackingIssue: 623,
   },
