@@ -76,7 +76,7 @@ GFC stores outlook geometry as independent GeoJSON `Feature` polygons grouped in
 
 ## Recommended rollout
 
-1. **Prototype (this branch):** Step + Assign modes behind `paintBucketTool` (local only).
+1. **Prototype (this branch):** Step + Assign modes behind `paintBucketTool` (local and beta only).
 2. **Beta candidate:** Ship both modes after user testing.
 3. **Defer:** True region flood-fill and combined prob+CIG bucket actions until product rules are defined.
 
