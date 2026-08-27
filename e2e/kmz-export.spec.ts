@@ -169,4 +169,21 @@ test.describe('Forecast transfer modal', () => {
     const dayOneTornado = await zip.file('days/day-1/tornado.kml')!.async('string');
     expect(dayOneTornado).toContain('<name>Tornado 15%</name>');
   });
+
+  test('exports only the selected outlook', async ({ page }) => {
+    await page.locator('#transfer-format').selectOption('kml');
+    await page.locator('#transfer-outlook').selectOption('tornado');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download' }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    if (!downloadPath) throw new Error('Selected-outlook export did not produce a file');
+
+    const kml = await readFile(downloadPath, 'utf8');
+    expect(kml).toContain('<name>Tornado 15%</name>');
+    expect(kml).not.toContain('<name>Categorical SLGT</name>');
+  });
+
 });

@@ -11,7 +11,7 @@ const triggerBlobDownload = (blob: Blob, filename: string): void => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
 const buildFilename = (forecastCycle: ForecastCycle, options: KmzExportOptions, extension: 'kml' | 'kmz'): string => {

@@ -47,10 +47,8 @@ export const parseKmlPlacemark = (
     return null;
   }
 
-  const cigValue = getExtendedDataValue(placemark, 'gfc_cig');
   const isSignificant = getExtendedDataValue(placemark, 'gfc_significant') === 'true'
-    || probabilityKey.includes('#')
-    || (cigValue !== null && cigValue !== 'false' && cigValue !== 'CIG0');
+    || probabilityKey.includes('#');
   return {
     day,
     outlookType,

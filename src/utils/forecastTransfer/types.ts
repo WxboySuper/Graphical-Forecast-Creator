@@ -22,6 +22,7 @@ export interface ForecastExportRequest {
   cycleMetadata?: CycleMetadata;
   day?: DayType;
   kmlStrategy?: KmlArchiveStrategy;
+  outlookTypes?: OutlookType[];
 }
 
 export interface ForecastImportResult {

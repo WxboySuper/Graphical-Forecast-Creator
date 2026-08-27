@@ -9,7 +9,7 @@ import {
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import type { DayType, ForecastCycle } from '../../types/outlooks';
+import type { DayType, ForecastCycle, OutlookType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
 import {
   exportForecastTransfer,
@@ -52,6 +52,15 @@ const SCOPE_OPTIONS: Array<{ value: ForecastTransferScope; label: string }> = [
   { value: 'workflow', label: 'Workflow package' },
 ];
 
+const OUTLOOK_OPTIONS: Array<{ value: OutlookType; label: string }> = [
+  { value: 'categorical', label: 'Categorical' },
+  { value: 'tornado', label: 'Tornado' },
+  { value: 'wind', label: 'Wind' },
+  { value: 'hail', label: 'Hail' },
+  { value: 'totalSevere', label: 'Total severe' },
+  { value: 'day4-8', label: 'Day 4-8' },
+];
+
 const KML_LIMITATIONS = [
   'CIG hatch patterns are stored as metadata only.',
   'Significant (#) hatch overlays are not imported or exported.',
@@ -80,6 +89,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   const [format, setFormat] = useState<ForecastTransferFormat>('json');
   const [scope, setScope] = useState<ForecastTransferScope>('cycle');
   const [kmlStrategy, setKmlStrategy] = useState<KmlArchiveStrategy>('structured');
+  const [outlookType, setOutlookType] = useState<OutlookType | 'all'>('all');
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
   const availableFormats = useMemo(
@@ -129,6 +139,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         cycleMetadata,
         day: forecastCycle.currentDay,
         kmlStrategy,
+        outlookTypes: outlookType === 'all' ? undefined : [outlookType],
       });
       onExported(format, scope);
       onClose();
@@ -145,6 +156,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     mapView,
     cycleMetadata,
     kmlStrategy,
+    outlookType,
     onExported,
     onError,
     onClose,
@@ -263,6 +275,24 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
                 >
                   <option value="structured">Single structured KML</option>
                   <option value="split">Split per day/outlook files</option>
+                </select>
+              </div>
+            ) : null}
+
+            {(format === 'kml' || format === 'kmz') ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="transfer-outlook">Outlook</label>
+                <select
+                  id="transfer-outlook"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={outlookType}
+                  onChange={(event) => setOutlookType(event.target.value as OutlookType | 'all')}
+                  disabled={isBusy}
+                >
+                  <option value="all">All outlooks</option>
+                  {OUTLOOK_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
             ) : null}

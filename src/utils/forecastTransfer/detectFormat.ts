@@ -20,16 +20,16 @@ export const detectForecastTransferFormat = (file: File, bytes?: Uint8Array): Fo
     return 'json';
   }
 
+  if (file.type === 'application/vnd.google-earth.kml+xml' || file.type === 'application/vnd.google-earth.kmz') {
+    return file.type === 'application/vnd.google-earth.kmz' || lowerName.endsWith('.kmz') ? 'kmz' : 'kml';
+  }
+
   if (
     hasExtension(lowerName, PACKAGE_EXTENSIONS)
     || file.type === 'application/zip'
     || (bytes?.[0] === 0x50 && bytes?.[1] === 0x4b)
   ) {
     return 'package';
-  }
-
-  if (file.type === 'application/vnd.google-earth.kml+xml' || file.type === 'application/vnd.google-earth.kmz') {
-    return lowerName.endsWith('.kmz') ? 'kmz' : 'kml';
   }
 
   return null;

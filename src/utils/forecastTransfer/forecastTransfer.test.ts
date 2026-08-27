@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import type { Feature, Polygon } from 'geojson';
 import type { ForecastCycle } from '../../types/outlooks';
 import { buildStructuredKmlDocument } from '../kmzExport/buildKml';
@@ -87,6 +88,34 @@ describe('forecastTransfer', () => {
     expect(result.format).toBe('kml');
     expect(result.warnings).toEqual([]);
     expect(result.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(2);
+  });
+
+  test('rejects KMZ files whose expanded KML exceeds the import limit', async () => {
+    const zip = new JSZip();
+    zip.file('doc.kml', `<kml>${'x'.repeat(10 * 1024 * 1024 + 1)}</kml>`);
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const buffer = Uint8Array.from(bytes).buffer;
+    const file = new File([buffer], 'oversized.kmz', { type: 'application/vnd.google-earth.kmz' });
+    file.arrayBuffer = async () => buffer;
+
+    await expect(importForecastTransfer(file)).rejects.toThrow('Expanded KML is too large');
+  });
+
+  test('does not treat CIG metadata as significant threat metadata', () => {
+    const kml = `<kml><Document><Folder><name>Day 1</name></Folder><Placemark>
+      <name>Tornado CIG2</name>
+      <ExtendedData>
+        <Data name="gfc_day"><value>1</value></Data>
+        <Data name="gfc_outlook_type"><value>tornado</value></Data>
+        <Data name="gfc_probability_key"><value>CIG2</value></Data>
+        <Data name="gfc_significant"><value>false</value></Data>
+        <Data name="gfc_cig"><value>CIG2</value></Data>
+      </ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>-98,34 -96,34 -96,36 -98,36 -98,34</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark></Document></kml>`;
+
+    const { placemarks } = parseKmlDocument(kml, 1);
+    expect(placemarks[0]?.isSignificant).toBe(false);
   });
 
   test('exports KML blobs through exportForecastTransfer', async () => {
