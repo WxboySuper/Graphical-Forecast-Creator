@@ -19,14 +19,26 @@ export const resolveTargetProbability = (
     case 'recategorize':
       return fromProbability === activeProbability ? null : activeProbability;
     case 'step-up':
-      if (currentIndex === -1) return null;
-      return probabilityList[currentIndex + 1] ?? null;
+      return resolveAdjacentProbability(probabilityList, currentIndex, 1);
     case 'step-down':
-      if (currentIndex === -1) return null;
-      return probabilityList[currentIndex - 1] ?? null;
+      return resolveAdjacentProbability(probabilityList, currentIndex, -1);
     default:
       return null;
   }
+};
+
+/**
+ * Returns the adjacent entry in the ordered brush list. The list deliberately
+ * contains ordinary probabilities followed by CIG levels, so stepping at a
+ * boundary changes the feature's classification instead of stopping there.
+ */
+const resolveAdjacentProbability = (
+  probabilityList: readonly string[],
+  currentIndex: number,
+  offset: -1 | 1,
+): string | null => {
+  if (currentIndex === -1) return null;
+  return probabilityList[currentIndex + offset] ?? null;
 };
 
 const cloneOutlookMap = (outlookMap: Map<string, Feature[]>): Map<string, Feature[]> => {

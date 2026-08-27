@@ -483,6 +483,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         if (
           paintBucketEnabled
           && mode === "edit"
+          && !customModeRef.current
+          && isPaintBucketOutlookType(drawingStateRef.current.activeOutlookType)
         ) {
           handlePaintBucketMapClick({
             map,

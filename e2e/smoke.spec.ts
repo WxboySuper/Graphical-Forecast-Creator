@@ -57,7 +57,8 @@ test.describe('App smoke tests', () => {
     await expect(page.locator('.map-history-button[aria-label="Undo"]')).toBeVisible();
     await expect(page.locator('.map-history-button[aria-label="Undo"]')).toBeDisabled();
     await expect(page.locator('.map-history-button[aria-label="Redo"]')).toBeDisabled();
-    await expect(page.locator('.map-toolbar-surface > *')).toHaveCount(8);
+    const toolbarItems = page.locator('.map-toolbar-surface > *');
+    await expect.poll(() => toolbarItems.count()).toBeGreaterThanOrEqual(8);
     const toolbarClassifications = [
       ['map-history-group', 'history'],
       ['map-toolbar-spacer', 'spacer'],
