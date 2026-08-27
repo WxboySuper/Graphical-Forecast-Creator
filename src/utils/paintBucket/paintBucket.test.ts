@@ -105,6 +105,7 @@ describe('resolveTargetProbability', () => {
   });
 });
 
+// @codescene(disable:"Code Duplication")
 describe('applyPaintBucketStrategy', () => {
   test('recategorize moves a feature between keys', () => {
     const { result } = runStrategy({ sourceProbability: '5%', action: 'recategorize', activeProbability: '15%' });
