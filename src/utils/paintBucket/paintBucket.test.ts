@@ -36,10 +36,12 @@ const runStrategy = ({
   sourceProbability,
   action,
   activeProbability,
+  probabilityList = ['2%', '5%', '10%', '15%'],
 }: {
   sourceProbability: string;
   action: 'recategorize' | 'step-up';
   activeProbability: string;
+  probabilityList?: readonly string[];
 }) => {
   const feature = square({ id: 'a', probability: sourceProbability });
   const map = buildMap(feature);
@@ -51,7 +53,7 @@ const runStrategy = ({
     fromProbability: sourceProbability,
     action,
     activeProbability,
-    probabilityList: ['2%', '5%', '10%', '15%'],
+    probabilityList,
     }),
   };
 };
@@ -121,13 +123,8 @@ describe('applyPaintBucketStrategy', () => {
   });
 
   test('step-up moves a highest-probability feature into CIG0', () => {
-    const feature = square({ id: 'a', probability: '60%' });
-    const map = buildMap(feature);
-
-    const result = applyPaintBucketStrategy(map, {
-      outlookType: 'tornado',
-      featureId: 'a',
-      fromProbability: '60%',
+    const { result } = runStrategy({
+      sourceProbability: '60%',
       action: 'step-up',
       activeProbability: '2%',
       probabilityList: ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG0', 'CIG1'],
@@ -139,13 +136,8 @@ describe('applyPaintBucketStrategy', () => {
   });
 
   test('step-up advances a CIG1 feature to CIG2', () => {
-    const feature = square({ id: 'a', probability: 'CIG1' });
-    const map = buildMap(feature);
-
-    const result = applyPaintBucketStrategy(map, {
-      outlookType: 'tornado',
-      featureId: 'a',
-      fromProbability: 'CIG1',
+    const { result } = runStrategy({
+      sourceProbability: 'CIG1',
       action: 'step-up',
       activeProbability: '2%',
       probabilityList: ['2%', '5%', '10%', '15%', '30%', '45%', '60%', 'CIG0', 'CIG1', 'CIG2'],

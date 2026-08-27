@@ -89,6 +89,16 @@ import { handlePaintBucketMapClick } from "./paintBucketMapInteraction";
 import { dispatchModifyUpdates } from "./precisionPolygonEditHandler";
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 
+const shouldHandlePaintBucketClick = (
+  paintBucketEnabled: boolean,
+  interactionMode: "pan" | "draw" | "delete" | "edit",
+  customMode: boolean,
+  activeOutlookType: string,
+): boolean => paintBucketEnabled
+  && interactionMode === "edit"
+  && !customMode
+  && isPaintBucketOutlookType(activeOutlookType);
+
 /** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
 export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
   style.fillColor,
@@ -480,12 +490,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       // Add click handler for pan and paint-bucket modes.
       map.on("click", (evt) => {
         const mode = interactionModeRef.current;
-        if (
-          paintBucketEnabled
-          && mode === "edit"
-          && !customModeRef.current
-          && isPaintBucketOutlookType(drawingStateRef.current.activeOutlookType)
-        ) {
+        if (shouldHandlePaintBucketClick(
+          paintBucketEnabled,
+          mode,
+          customModeRef.current,
+          drawingStateRef.current.activeOutlookType,
+        )) {
           handlePaintBucketMapClick({
             map,
             pixel: evt.pixel,
