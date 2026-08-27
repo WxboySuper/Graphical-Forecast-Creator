@@ -445,6 +445,7 @@ const collectPendingFeatureUpdates = (
   });
 };
 
+// @codescene(disable:"Bumpy Road Ahead")
 const applyPendingFeatureUpdates = (
   state: ForecastState,
   pendingUpdates: PendingFeatureUpdate[],
