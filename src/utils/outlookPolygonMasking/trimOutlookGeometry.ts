@@ -9,7 +9,7 @@ export interface TrimOutlookGeometryResult {
   error?: string;
 }
 
-/** Clips one outlook geometry to a land mask; returns the original geometry on failure. */
+/** Clips one outlook geometry to a land mask. A null geometry is a valid empty intersection. */
 export const trimOutlookGeometry = (
   geometry: Polygon | MultiPolygon,
   landMask: LandMaskFeature,
@@ -27,7 +27,6 @@ export const trimOutlookGeometry = (
       return {
         geometry: null,
         removedAreaRatio: clipped.removedAreaRatio,
-        error: 'Trim removed the entire polygon.',
       };
     }
 

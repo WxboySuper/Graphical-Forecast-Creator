@@ -45,6 +45,7 @@ import type {
   Polygon,
   MultiPolygon,
 } from "geojson";
+import type { DayType } from "../../types/outlooks";
 import { apply } from "ol-mapbox-style";
 import Legend from "./Legend";
 import StatusOverlay from "./StatusOverlay";
@@ -220,6 +221,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       activeCustomLayer,
       activeCustomCategory,
       currentMapView,
+      currentDay,
       outlooks,
       outlookOpacity,
       baseMapStyle,
@@ -250,6 +252,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const outlookTrimStrategyRef = useRef(outlookTrimStrategy);
     const outlookTrimAutoOnDrawRef = useRef(outlookTrimAutoOnDraw);
     const outlookTrimPreviewOnlyRef = useRef(outlookTrimPreviewOnly);
+    const currentDayRef = useRef<DayType>(currentDay);
 
     useEffect(() => {
       outlookTrimStrategyRef.current = outlookTrimStrategy;
@@ -262,6 +265,10 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => {
       outlookTrimPreviewOnlyRef.current = outlookTrimPreviewOnly;
     }, [outlookTrimPreviewOnly]);
+
+    useEffect(() => {
+      currentDayRef.current = currentDay;
+    }, [currentDay]);
 
     const trimStoredOutlookFeature = async (
       feature: GeoJsonFeature,
@@ -280,7 +287,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
       return {
         ...feature,
-        geometry: trimmedGeometry,
+        geometry: trimmedGeometry as unknown as GeoJsonFeature["geometry"],
       };
     };
     const activeProbabilityRef = useRef(drawingState.activeProbability);
@@ -372,6 +379,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         isCategorical: boolean,
       ): void => {
         const format = new GeoJSON();
+        const editDay = currentDayRef.current;
         features.forEach((feature) => {
           void (async () => {
             if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
@@ -392,7 +400,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             }
 
             const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
-            dispatch(updateFeature({ feature: trimmedFeature }));
+            dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
           })();
         });
       };
@@ -1036,6 +1044,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         if (!olGeometry) {
           return;
         }
+        const drawDay = currentDayRef.current;
 
         void (async () => {
           const geometry = format.writeGeometryObject(olGeometry, {
@@ -1053,17 +1062,21 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             return;
           }
 
-          let outlookGeometry = geometry as Polygon;
+          let outlookGeometry: Polygon | MultiPolygon | null = geometry as Polygon | MultiPolygon;
           if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
             outlookGeometry = await trimGeometryForAutoDraw(
               outlookGeometry,
               outlookTrimStrategyRef.current,
               outlookTrimAutoOnDrawRef.current,
               outlookTrimPreviewOnlyRef.current,
-            ) as Polygon;
+            );
           }
 
-          const feature: GeoJsonFeature<Polygon, GeoJsonProperties> = {
+          if (!outlookGeometry) {
+            return;
+          }
+
+          const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
             type: "Feature",
             id: uuidv4(),
             geometry: outlookGeometry,
@@ -1073,7 +1086,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               isSignificant: drawingState.isSignificant,
             },
           };
-          dispatch(addFeature({ feature }));
+          dispatch(addFeature({ feature, day: drawDay }));
         })();
       });
       map.addInteraction(draw);

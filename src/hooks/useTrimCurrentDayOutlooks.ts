@@ -20,6 +20,7 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
   const [isTrimming, setIsTrimming] = useState(false);
 
   const trimCurrentDayOutlooks = useCallback(async () => {
+    const trimDay = currentDay;
     setIsTrimming(true);
     try {
       const landMask = await ensureLandMask(strategy);
@@ -28,8 +29,8 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
         return;
       }
 
-      dispatch(trimCurrentDayOutlooksToLand({ strategy }));
-      addToast(`Trimmed outlooks on day ${currentDay} (prototype).`, 'success');
+      dispatch(trimCurrentDayOutlooksToLand({ strategy, day: trimDay }));
+      addToast(`Trimmed outlooks on day ${trimDay} (prototype).`, 'success');
     } catch (error) {
       addToast(
         error instanceof Error ? error.message : 'Failed to trim outlook polygons.',
@@ -49,7 +50,7 @@ export const trimGeometryForAutoDraw = async (
   strategy: LandMaskStrategy,
   autoOnDraw: boolean,
   previewOnly: boolean,
-): Promise<Polygon | MultiPolygon> => {
+): Promise<Polygon | MultiPolygon | null> => {
   if (!autoOnDraw || previewOnly) {
     return geometry;
   }
@@ -60,5 +61,5 @@ export const trimGeometryForAutoDraw = async (
   }
 
   const trimmed = trimOutlookGeometry(geometry, landMask, strategy);
-  return trimmed.geometry ?? geometry;
+  return trimmed.geometry;
 };
