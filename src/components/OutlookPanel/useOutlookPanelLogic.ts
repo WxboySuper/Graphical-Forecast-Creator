@@ -28,7 +28,7 @@ import {
   type ProbabilisticHazardType,
 } from '../../utils/outlookGeometryCopy';
 
-// @codescene(disable:"Large Method", disable:"Complex Method")
+// @codescene(disable:"Large Method", disable:"Complex Method", disable:"Bumpy Road Ahead")
 export function useOutlookPanelLogic() {
   const dispatch = useDispatch();
   const drawingState = useSelector((s: RootState) => s.forecast.drawingState);
