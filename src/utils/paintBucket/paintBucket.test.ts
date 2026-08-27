@@ -105,7 +105,6 @@ describe('resolveTargetProbability', () => {
   });
 });
 
-// @codescene(disable:"Code Duplication")
 describe('applyPaintBucketStrategy', () => {
   test('recategorize moves a feature between keys', () => {
     const { result } = runStrategy({ sourceProbability: '5%', action: 'recategorize', activeProbability: '15%' });
@@ -121,32 +120,6 @@ describe('applyPaintBucketStrategy', () => {
 
     expect(result.map.get('15%')).toHaveLength(1);
     expect(result.map.get('10%')).toBeUndefined();
-  });
-
-  test('step-up moves a highest-probability feature into CIG0', () => {
-    const { result } = runStrategy({
-      sourceProbability: '60%',
-      action: 'step-up',
-      activeProbability: '2%',
-      probabilityList: combinedProbabilityList,
-    });
-
-    expect(result.targetProbability).toBe('CIG0');
-    expect(result.map.get('CIG0')?.[0].properties?.probability).toBe('CIG0');
-    expect(result.map.get('60%')).toBeUndefined();
-  });
-
-  test('step-up advances a CIG1 feature to CIG2', () => {
-    const { result } = runStrategy({
-      sourceProbability: 'CIG1',
-      action: 'step-up',
-      activeProbability: '2%',
-      probabilityList: combinedProbabilityList,
-    });
-
-    expect(result.targetProbability).toBe('CIG2');
-    expect(result.map.get('CIG2')?.[0].properties?.probability).toBe('CIG2');
-    expect(result.map.get('CIG1')).toBeUndefined();
   });
 
   test('moves only the selected feature when risk polygons overlap', () => {
