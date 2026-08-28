@@ -493,6 +493,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => {
       if (!mapElementRef.current || mapRef.current) return undefined;
 
+      // CodeScene suppression is limited to this legacy async feature-sync coordinator.
+      // It batches categorical filtering, custom-feature conversion, and Redux updates;
+      // the paint-bucket click path is extracted and has no suppression.
       // @codescene(disable:"Complex Method")
       const handleModifiedFeatures = (
         features: OLFeature<Geometry>[],
