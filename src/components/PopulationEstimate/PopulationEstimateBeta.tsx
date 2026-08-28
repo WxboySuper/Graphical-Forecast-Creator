@@ -1,0 +1,117 @@
+import React from 'react';
+import { Calculator, Loader2, Users } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import type { RootState } from '../../store';
+import { outlookLabels } from '../ForecastWorkspace/workspaceMeta';
+import { estimatePopulation, unionForecastPolygons, type WorldPopEstimate } from '../../utils/worldpop';
+
+const formatPopulation = (value: number): string => new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
+}).format(Math.round(value));
+
+/** Beta-only on-demand population estimate for the active day's active hazard. */
+const PopulationEstimateBeta: React.FC = () => {
+  const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
+  const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
+  const currentDayData = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]?.data);
+  const [open, setOpen] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [estimate, setEstimate] = React.useState<WorldPopEstimate | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleEstimate = async () => {
+    const outlookMap = currentDayData?.[activeOutlookType];
+    const features = outlookMap ? Array.from(outlookMap.values()).flat() : [];
+    const geometry = unionForecastPolygons(features);
+
+    setOpen(true);
+    setEstimate(null);
+    setError(null);
+    if (!geometry) {
+      setError(`Draw at least one ${outlookLabels[activeOutlookType]} polygon on Day ${currentDay} first.`);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      setEstimate(await estimatePopulation(geometry));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'WorldPop could not calculate this estimate.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="flex min-w-[250px] flex-1 flex-col justify-between rounded-xl border border-violet-500/30 bg-violet-500/5 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-violet-700 dark:text-violet-300" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide">Population beta</p>
+            <p className="text-[11px] text-muted-foreground">Day {currentDay} {outlookLabels[activeOutlookType]}</p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2 h-8 justify-start gap-2 border-violet-500/40 bg-background"
+          onClick={handleEstimate}
+          disabled={isLoading}
+        >
+          <Calculator className="h-4 w-4" />
+          Estimate affected population
+        </Button>
+      </div>
+
+      <Dialog open={open} onOpenChange={(nextOpen) => { if (!isLoading) setOpen(nextOpen); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Affected population estimate</DialogTitle>
+            <DialogDescription>
+              Day {currentDay} {outlookLabels[activeOutlookType]} polygons, merged before the request.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoading ? (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              WorldPop is calculating the population inside your outlook...
+            </div>
+          ) : error ? (
+            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+              {error}
+            </p>
+          ) : estimate ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-5 text-center">
+                <p className="text-sm text-muted-foreground">Estimated residents inside the outlook</p>
+                <p className="mt-1 text-4xl font-bold tracking-tight">{formatPopulation(estimate.totalPopulation)}</p>
+              </div>
+              <dl className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Population grid</dt><dd className="font-medium">{estimate.resolution}</dd></div>
+                <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Data year</dt><dd className="font-medium">{estimate.dataYear}</dd></div>
+                {estimate.areaKm2 !== undefined ? <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Outlook area</dt><dd className="font-medium">{estimate.areaKm2.toFixed(1)} km²</dd></div> : null}
+              </dl>
+              <p className="text-xs text-muted-foreground">
+                WorldPop is a modeled estimate, not an official impact or warning product. The beta uses the public WorldPop API at 100m resolution.{' '}
+                <a href="https://www.worldpop.org/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">Source and attribution</a>.
+              </p>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+export default PopulationEstimateBeta;
