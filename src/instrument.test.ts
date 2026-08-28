@@ -254,6 +254,17 @@ describe('instrument', () => {
     });
   });
 
+  it('drops opaque global errors with only Redux initialization context', () => {
+    expectBeforeSendToDrop(() => {
+      const event = createOpaqueGlobalError();
+      event.breadcrumbs = [{
+        category: 'redux.action',
+        data: { type: '@@redux/INITu.s.n.p.5.4' },
+      }];
+      return event;
+    });
+  });
+
   it('keeps the opaque message when it comes from another mechanism', () => {
     expectBeforeSendToKeep(() => {
       const event = createOpaqueGlobalError();
