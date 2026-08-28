@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import type { RootState } from '../../store';
+import type { DayType, OutlookData, OutlookType } from '../../types/outlooks';
 import { outlookLabels } from '../ForecastWorkspace/workspaceMeta';
 import { estimatePopulation, unionForecastPolygons, type WorldPopEstimate } from '../../utils/worldpop';
 
@@ -17,11 +18,13 @@ const formatPopulation = (value: number): string => new Intl.NumberFormat('en-US
   maximumFractionDigits: 0,
 }).format(Math.round(value));
 
-/** Beta-only on-demand population estimate for the active day's active hazard. */
-const PopulationEstimateBeta: React.FC = () => {
-  const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
-  const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
-  const currentDayData = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]?.data);
+type EstimateContext = {
+  currentDay: DayType;
+  activeOutlookType: OutlookType;
+  currentDayData: OutlookData | undefined;
+};
+
+const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }: EstimateContext) => {
   const [open, setOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [estimate, setEstimate] = React.useState<WorldPopEstimate | null>(null);
@@ -49,6 +52,59 @@ const PopulationEstimateBeta: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  return { open, setOpen, isLoading, estimate, error, handleEstimate };
+};
+
+const EstimateContent: React.FC<Pick<ReturnType<typeof usePopulationEstimate>, 'isLoading' | 'estimate' | 'error'>> = ({
+  isLoading,
+  estimate,
+  error,
+}) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        WorldPop is calculating the population inside your outlook...
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{error}</p>;
+  }
+
+  if (!estimate) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-5 text-center">
+        <p className="text-sm text-muted-foreground">Estimated residents inside the outlook</p>
+        <p className="mt-1 text-4xl font-bold tracking-tight">{formatPopulation(estimate.totalPopulation)}</p>
+      </div>
+      <dl className="grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Population grid</dt><dd className="font-medium">{estimate.resolution}</dd></div>
+        <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Data year</dt><dd className="font-medium">{estimate.dataYear}</dd></div>
+        {estimate.areaKm2 !== undefined ? <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Outlook area</dt><dd className="font-medium">{estimate.areaKm2.toFixed(1)} km²</dd></div> : null}
+      </dl>
+      <p className="text-xs text-muted-foreground">
+        WorldPop is a modeled estimate, not an official impact or warning product. The beta uses the public WorldPop API at 100m resolution.{' '}
+        <a href="https://www.worldpop.org/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">Source and attribution</a>.
+      </p>
+    </div>
+  );
+};
+
+/** Beta-only on-demand population estimate for the active day's active hazard. */
+const PopulationEstimateBeta: React.FC = () => {
+  const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
+  const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
+  const currentDayData = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]?.data);
+  const { open, setOpen, isLoading, estimate, error, handleEstimate } = usePopulationEstimate({
+    currentDay,
+    activeOutlookType,
+    currentDayData,
+  });
 
   return (
     <>
@@ -82,32 +138,7 @@ const PopulationEstimateBeta: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          {isLoading ? (
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              WorldPop is calculating the population inside your outlook...
-            </div>
-          ) : error ? (
-            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-              {error}
-            </p>
-          ) : estimate ? (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-5 text-center">
-                <p className="text-sm text-muted-foreground">Estimated residents inside the outlook</p>
-                <p className="mt-1 text-4xl font-bold tracking-tight">{formatPopulation(estimate.totalPopulation)}</p>
-              </div>
-              <dl className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Population grid</dt><dd className="font-medium">{estimate.resolution}</dd></div>
-                <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Data year</dt><dd className="font-medium">{estimate.dataYear}</dd></div>
-                {estimate.areaKm2 !== undefined ? <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Outlook area</dt><dd className="font-medium">{estimate.areaKm2.toFixed(1)} km²</dd></div> : null}
-              </dl>
-              <p className="text-xs text-muted-foreground">
-                WorldPop is a modeled estimate, not an official impact or warning product. The beta uses the public WorldPop API at 100m resolution.{' '}
-                <a href="https://www.worldpop.org/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">Source and attribution</a>.
-              </p>
-            </div>
-          ) : null}
+          <EstimateContent isLoading={isLoading} estimate={estimate} error={error} />
         </DialogContent>
       </Dialog>
     </>
