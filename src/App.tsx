@@ -36,6 +36,7 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
+import { getDefaultForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -207,7 +208,10 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="pricing" element={<PricingPage />} />
         <Route path="admin" element={<Suspense fallback={<RouteFallback />}><AdminPage /></Suspense>} />
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
-        <Route path="forecast" element={<Suspense fallback={<RouteFallback />}><ForecastPage /></Suspense>} />
+        <Route path="forecast">
+          <Route index element={<Navigate to={getDefaultForecastWorkspacePath()} replace />} />
+          <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage /></Suspense>} />
+        </Route>
         <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
         <Route path="monitor" element={<Suspense fallback={<RouteFallback />}><MonitorPage /></Suspense>} />
