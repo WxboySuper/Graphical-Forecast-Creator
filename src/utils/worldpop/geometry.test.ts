@@ -1,9 +1,10 @@
 import { polygon } from '@turf/turf';
+import type { Feature } from 'geojson';
 import { unionForecastPolygons } from './geometry';
 
 describe('unionForecastPolygons', () => {
   test('returns null when no polygon features are present', () => {
-    expect(unionForecastPolygons([{ type: 'Feature', properties: {}, geometry: null }])).toBeNull();
+    expect(unionForecastPolygons([{ type: 'Feature', properties: {}, geometry: null } as Feature])).toBeNull();
   });
 
   test('unions overlapping polygons into one geometry', () => {
@@ -13,6 +14,8 @@ describe('unionForecastPolygons', () => {
     ]);
 
     expect(result?.type).toBe('Polygon');
-    expect(result && result.coordinates[0].length).toBeGreaterThan(4);
+    if (result?.type === 'Polygon') {
+      expect(result.coordinates[0].length).toBeGreaterThan(4);
+    }
   });
 });
