@@ -39,6 +39,8 @@ import {
 } from "../../store/forecastSlice";
 
 import type { BaseMapStyle } from "../../store/overlaysSlice";
+import type { AppDispatch } from "../../store";
+import type { DayType, OutlookType } from "../../types/outlooks";
 import type { MapAdapterHandle } from "../../maps/contracts";
 import type {
   Feature as GeoJsonFeature,
@@ -46,7 +48,6 @@ import type {
   Polygon,
   MultiPolygon,
 } from "geojson";
-import type { DayType } from "../../types/outlooks";
 import { apply } from "ol-mapbox-style";
 import Legend from "./Legend";
 import StatusOverlay from "./StatusOverlay";
@@ -109,6 +110,88 @@ const shouldHandlePaintBucketClick = (
   && interactionMode === "edit"
   && !customMode
   && isPaintBucketOutlookType(activeOutlookType);
+
+interface ForecastMapClickEvent {
+  pixel: number[];
+  coordinate: number[];
+  originalEvent: { shiftKey?: boolean };
+}
+
+const handleForecastMapClick = ({
+  map,
+  event,
+  mode,
+  paintBucketEnabled,
+  customMode,
+  activeOutlookType,
+  editBehavior,
+  stepDirection,
+  activeProbability,
+  currentDay,
+  vectorLayer,
+  catLayer,
+  dispatch,
+  overlay,
+  setFeedback,
+  setPopupInfo,
+}: {
+  map: OLMap;
+  event: ForecastMapClickEvent;
+  mode: "pan" | "draw" | "delete" | "edit";
+  paintBucketEnabled: boolean;
+  customMode: boolean;
+  activeOutlookType: string;
+  editBehavior: PaintBucketMode;
+  stepDirection: PaintBucketStepDirection;
+  activeProbability: string;
+  currentDay: DayType;
+  vectorLayer: VectorLayer | null;
+  catLayer: VectorLayer | null;
+  dispatch: AppDispatch;
+  overlay: Overlay | null;
+  setFeedback: (value: string | null) => void;
+  setPopupInfo: (value: { outlookType: string; probability: string; isSignificant: boolean } | null) => void;
+}): void => {
+  if (shouldHandlePaintBucketClick(paintBucketEnabled, mode, customMode, activeOutlookType)) {
+    setFeedback(null);
+    handlePaintBucketMapClick({
+      map,
+      pixel: event.pixel,
+      vectorLayer,
+      dispatch,
+      outlookType: activeOutlookType as OutlookType,
+      currentDay,
+      mode: editBehavior,
+      stepDirection,
+      shiftKey: Boolean(event.originalEvent.shiftKey),
+      activeProbability,
+      onNoOp: () => setFeedback(`Set mode: this polygon already uses ${activeProbability}.`),
+    });
+    return;
+  }
+
+  if (mode !== "pan") return;
+
+  const feature = map.forEachFeatureAtPixel(event.pixel, (candidate) => candidate, {
+    layerFilter: (layer) => layer === vectorLayer || layer === catLayer,
+  });
+  if (feature && overlay) {
+    const customIdentity = getCustomFeatureIdentity(feature);
+    const outlookType = customIdentity
+      ? (feature.get("customLayerTitle") as string || "Custom layer")
+      : feature.get("outlookType") as string;
+    const probability = customIdentity?.title ?? feature.get("probability") as string;
+    const isSignificant = feature.get("isSignificant") as boolean;
+    setPopupInfo({ outlookType, probability, isSignificant });
+    overlay.setPosition(event.coordinate);
+    return;
+  }
+
+  if (overlay) {
+    hideOverlay(overlay);
+    setPopupInfo(null);
+  }
+};
 
 /** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
 export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
@@ -627,56 +710,24 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
       // Add click handler for pan and paint-bucket modes.
       map.on("click", (evt) => {
-        const mode = interactionModeRef.current;
-        if (shouldHandlePaintBucketClick(
+        handleForecastMapClick({
+          map,
+          event: evt,
+          mode: interactionModeRef.current,
           paintBucketEnabled,
-          mode,
-          customModeRef.current,
-          drawingStateRef.current.activeOutlookType,
-        )) {
-          setPaintBucketFeedback(null);
-          handlePaintBucketMapClick({
-            map,
-            pixel: evt.pixel,
-            vectorLayer: vectorLayerRef.current,
-            dispatch,
-            outlookType: drawingStateRef.current.activeOutlookType,
-            currentDay: currentDayRef.current,
-            mode: editBehaviorRef.current,
-            stepDirection: stepDirectionRef.current,
-            shiftKey: Boolean(evt.originalEvent.shiftKey),
-            activeProbability: activeProbabilityRef.current,
-            onNoOp: () => setPaintBucketFeedback(
-              `Set mode: this polygon already uses ${activeProbabilityRef.current}.`,
-            ),
-          });
-          return;
-        }
-
-        if (mode !== "pan") {
-          return;
-        }
-
-        // Use forEachFeatureAtPixel to get the topmost feature at the clicked pixel,
-        // which accounts for z-index and layer visibility.
-        const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f, {
-          layerFilter: (layer) =>
-            layer === vectorLayerRef.current || layer === catLayerRef.current,
+          customMode: customModeRef.current,
+          activeOutlookType: drawingStateRef.current.activeOutlookType,
+          editBehavior: editBehaviorRef.current,
+          stepDirection: stepDirectionRef.current,
+          activeProbability: activeProbabilityRef.current,
+          currentDay: currentDayRef.current,
+          vectorLayer: vectorLayerRef.current,
+          catLayer: catLayerRef.current,
+          dispatch,
+          overlay: overlayRef.current,
+          setFeedback: setPaintBucketFeedback,
+          setPopupInfo,
         });
-        if (feature && overlayRef.current) {
-          const customIdentity = getCustomFeatureIdentity(feature);
-          const outlookType = customIdentity
-            ? (feature.get("customLayerTitle") as string || "Custom layer")
-            : feature.get("outlookType") as string;
-          const probability = customIdentity?.title ?? feature.get("probability") as string;
-          const isSignificant = feature.get("isSignificant") as boolean;
-
-          setPopupInfo({ outlookType, probability, isSignificant });
-          overlayRef.current.setPosition(evt.coordinate);
-        } else if (overlayRef.current) {
-          hideOverlay(overlayRef.current);
-          setPopupInfo(null);
-        }
       });
 
       const modify = new Modify({
