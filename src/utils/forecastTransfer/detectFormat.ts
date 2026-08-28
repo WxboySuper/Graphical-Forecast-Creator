@@ -7,40 +7,25 @@ const PACKAGE_EXTENSIONS = new Set(['.zip']);
 const hasExtension = (name: string, extensions: Set<string>): boolean =>
   [...extensions].some((ext) => name.endsWith(ext));
 
-const isKmlFile = (file: File, lowerName: string): boolean =>
-  hasExtension(lowerName, KML_EXTENSIONS)
-  || file.type === 'application/vnd.google-earth.kml+xml'
-  || file.type === 'application/vnd.google-earth.kmz';
+const detectByName = (lowerName: string): ForecastTransferFormat | null => {
+  if (hasExtension(lowerName, KML_EXTENSIONS)) return lowerName.endsWith('.kmz') ? 'kmz' : 'kml';
+  if (hasExtension(lowerName, JSON_EXTENSIONS)) return 'json';
+  if (hasExtension(lowerName, PACKAGE_EXTENSIONS)) return 'package';
+  return null;
+};
 
-const isKmzFile = (file: File, lowerName: string): boolean =>
-  lowerName.endsWith('.kmz') || file.type === 'application/vnd.google-earth.kmz';
+const detectByMime = (file: File): ForecastTransferFormat | null => {
+  if (file.type === 'application/vnd.google-earth.kml+xml') return 'kml';
+  if (file.type === 'application/vnd.google-earth.kmz') return 'kmz';
+  if (file.type === 'application/zip') return 'package';
+  return null;
+};
+
+const hasZipSignature = (bytes?: Uint8Array): boolean => bytes?.[0] === 0x50 && bytes?.[1] === 0x4b;
 
 /** Detects the forecast transfer format from file metadata. */
-// The ordered metadata branches are intentionally kept together to preserve ZIP/KMZ precedence.
-// @codescene(disable:"Complex Method", disable:"Complex Conditional")
 export const detectForecastTransferFormat = (file: File, bytes?: Uint8Array): ForecastTransferFormat | null => {
   const lowerName = file.name.toLowerCase();
-
   // Prefer explicit KML/KMZ metadata before the generic ZIP signature: KMZ is a ZIP container.
-  if (isKmlFile(file, lowerName)) {
-    return isKmzFile(file, lowerName) ? 'kmz' : 'kml';
-  }
-
-  if (hasExtension(lowerName, JSON_EXTENSIONS)) {
-    return 'json';
-  }
-
-  if (file.type === 'application/vnd.google-earth.kml+xml' || file.type === 'application/vnd.google-earth.kmz') {
-    return file.type === 'application/vnd.google-earth.kmz' || lowerName.endsWith('.kmz') ? 'kmz' : 'kml';
-  }
-
-  if (
-    hasExtension(lowerName, PACKAGE_EXTENSIONS)
-    || file.type === 'application/zip'
-    || (bytes?.[0] === 0x50 && bytes?.[1] === 0x4b)
-  ) {
-    return 'package';
-  }
-
-  return null;
+  return detectByName(lowerName) ?? detectByMime(file) ?? (hasZipSignature(bytes) ? 'package' : null);
 };

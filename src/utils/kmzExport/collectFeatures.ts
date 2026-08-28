@@ -46,63 +46,66 @@ const resolveOutlookTypes = (options: KmzExportOptions): OutlookType[] => {
 
 const defaultFillOpacity = (probabilityKey: string): number => (isCigKey(probabilityKey) ? 0.15 : 0.66);
 
+const collectProbabilityFeatures = (
+  day: DayType,
+  outlookType: OutlookType,
+  probabilityKey: string,
+  dayFeatures: KmzExportFeature['feature'][],
+  configuredOpacity: number | undefined,
+): KmzExportFeature[] => {
+  const isCig = isCigKey(probabilityKey);
+  const isSignificant = isSignificantThreat({ probability: probabilityKey })
+    || dayFeatures.some((feature) => feature.properties?.isSignificant === true);
+  const fillOpacity = typeof configuredOpacity === 'number'
+    ? Math.min(1, Math.max(0, configuredOpacity))
+    : defaultFillOpacity(probabilityKey);
+
+  return dayFeatures.flatMap((feature, featureIndex) => geometryToKml(feature.geometry) ? [{
+    day,
+    outlookType,
+    probabilityKey,
+    featureIndex,
+    feature,
+    fillColor: resolveFeatureColor(outlookType, probabilityKey),
+    fillOpacity,
+    strokeColor: isSignificant || isCig ? '#000000' : '#1a1a1a',
+    strokeWidth: isSignificant ? 3 : isCig ? 2 : 1.5,
+    isSignificant,
+    isCig,
+    cigLevel: isCig ? probabilityKey : undefined,
+  }] : []);
+};
+
+const collectOutlookFeatures = (
+  day: DayType,
+  outlookType: OutlookType,
+  outlookMap: NonNullable<ForecastCycle['days'][DayType]>['data'][OutlookType],
+  configuredOpacity: number | undefined,
+): KmzExportFeature[] => {
+  if (!outlookMap) return [];
+  return [...outlookMap.entries()].flatMap(([probabilityKey, dayFeatures]) =>
+    collectProbabilityFeatures(day, outlookType, probabilityKey, dayFeatures, configuredOpacity));
+};
+
+const collectDayFeatures = (
+  day: DayType,
+  forecastCycle: ForecastCycle,
+  outlookTypes: OutlookType[],
+): KmzExportFeature[] => {
+  const outlookDay = forecastCycle.days[day];
+  if (!outlookDay) return [];
+  return outlookTypes.flatMap((outlookType) => collectOutlookFeatures(
+    day,
+    outlookType,
+    outlookDay.data[outlookType],
+    outlookDay.metadata.outlookOpacities?.[outlookType],
+  ));
+};
+
 /** Collects exportable outlook polygons from the forecast cycle. */
-// The nested day/outlook/probability/feature traversal mirrors the forecast data shape.
-// @codescene(disable:"Complex Method")
 export const collectKmzExportFeatures = ({ forecastCycle, options }: KmzExportInput): KmzExportFeature[] => {
-  const days = resolveDays(forecastCycle, options);
   const outlookTypes = resolveOutlookTypes(options);
-  const features: KmzExportFeature[] = [];
-
-  days.forEach((day) => {
-    const outlookDay = forecastCycle.days[day];
-    if (!outlookDay) {
-      return;
-    }
-
-    const outlookOpacities = outlookDay.metadata.outlookOpacities ?? {};
-
-    outlookTypes.forEach((outlookType) => {
-      const outlookMap = outlookDay.data[outlookType];
-      if (!outlookMap) {
-        return;
-      }
-
-      outlookMap.forEach((dayFeatures, probabilityKey) => {
-        const fillColor = resolveFeatureColor(outlookType, probabilityKey);
-        const configuredOpacity = outlookOpacities[outlookType];
-        const fillOpacity = typeof configuredOpacity === 'number'
-          ? Math.min(1, Math.max(0, configuredOpacity))
-          : defaultFillOpacity(probabilityKey);
-        const isCig = isCigKey(probabilityKey);
-        const isSignificant = isSignificantThreat({ probability: probabilityKey })
-          || dayFeatures.some((feature) => feature.properties?.isSignificant === true);
-
-        dayFeatures.forEach((feature, featureIndex) => {
-          if (!geometryToKml(feature.geometry)) {
-            return;
-          }
-
-          features.push({
-            day,
-            outlookType,
-            probabilityKey,
-            featureIndex,
-            feature,
-            fillColor,
-            fillOpacity,
-            strokeColor: isSignificant || isCig ? '#000000' : '#1a1a1a',
-            strokeWidth: isSignificant ? 3 : isCig ? 2 : 1.5,
-            isSignificant,
-            isCig,
-            cigLevel: isCig ? probabilityKey : undefined,
-          });
-        });
-      });
-    });
-  });
-
-  return features;
+  return resolveDays(forecastCycle, options).flatMap((day) => collectDayFeatures(day, forecastCycle, outlookTypes));
 };
 
 export const getOutlookLabel = (outlookType: OutlookType): string => OUTLOOK_LABELS[outlookType];
