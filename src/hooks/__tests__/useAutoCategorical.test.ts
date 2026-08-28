@@ -555,8 +555,9 @@ describe('processOutlooksToCategorical', () => {
       throw new Error('turf difference exploded');
     });
 
-    expect(() => processDay12OutlooksToCategorical(outlooks)).toThrow(CategoricalDerivationError);
-    expect(() => processDay12OutlooksToCategorical(outlooks)).toThrow(/intersection failed/i);
+    expect(() => processDay12OutlooksToCategorical(outlooks)).toThrow(
+      expect.objectContaining({ name: 'CategoricalDerivationError', message: expect.stringMatching(/intersection failed/i) }),
+    );
   });
 
   test('non-finite coordinates fail loudly with CategoricalDerivationError', () => {

@@ -20,6 +20,9 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
+import { getCachedLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
+import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
+import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import {
   applyPaintBucketStrategy,
   type PaintBucketEditAction,
@@ -93,6 +96,7 @@ export interface ForecastState {
   outlookVersionSnapshots: OutlookVersionSnapshot[];
   /** Editor-visible auto-categorical derivation error, or null when derivation is healthy. */
   autoCategoricalError: string | null;
+  lastTrimResult: TrimOutlookDataResult | null;
 }
 
 interface ForecastDaySnapshot {
@@ -367,6 +371,7 @@ const initialState: ForecastState = {
   isWorkflowActive: false,
   outlookVersionSnapshots: [],
   autoCategoricalError: null,
+  lastTrimResult: null,
 };
 
 // Helpers to keep reducers small and testable
@@ -415,11 +420,11 @@ const buildFeatureWithProps = (
 };
 
 // Helper to get current outlook data safely
-const getCurrentOutlook = (state: ForecastState): OutlookData => {
-  const day = state.forecastCycle.days[state.forecastCycle.currentDay];
+const getCurrentOutlook = (state: ForecastState, dayNumber = state.forecastCycle.currentDay): OutlookData => {
+  const day = state.forecastCycle.days[dayNumber];
   if (!day) {
     // Should not happen if logic is correct, but safe fallback
-    return createEmptyOutlook(state.forecastCycle.currentDay, INITIAL_TIMESTAMP).data;
+    return createEmptyOutlook(dayNumber, INITIAL_TIMESTAMP).data;
   }
   return day.data;
 };
@@ -434,8 +439,9 @@ interface PendingFeatureUpdate {
 const collectPendingFeatureUpdates = (
   state: ForecastState,
   incoming: Feature[],
+  day?: DayType,
 ): PendingFeatureUpdate[] => {
-  const outlookData = getCurrentOutlook(state);
+  const outlookData = getCurrentOutlook(state, day);
 
   return incoming.flatMap((feature) => {
     const outlookType = (feature.properties?.outlookType as OutlookType)
@@ -450,15 +456,25 @@ const collectPendingFeatureUpdates = (
   });
 };
 
+// @codescene(disable:"Bumpy Road Ahead")
 const applyPendingFeatureUpdates = (
   state: ForecastState,
   pendingUpdates: PendingFeatureUpdate[],
+  day?: DayType,
 ): void => {
-  const outlookData = getCurrentOutlook(state);
+  const outlookData = getCurrentOutlook(state, day);
 
   for (const update of pendingUpdates) {
     const features = outlookData[update.outlookType]?.get(update.probability);
     if (!features) {
+      continue;
+    }
+
+    if (update.feature.geometry === null) {
+      features.splice(update.index, 1);
+      if (features.length === 0) {
+        outlookData[update.outlookType]?.delete(update.probability);
+      }
       continue;
     }
 
@@ -810,6 +826,26 @@ export const forecastSlice = createSlice({
       result.map.forEach((features, key) => {
         outlookMap.set(key, features);
       });
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
+    trimCurrentDayOutlooksToLand: (
+      state,
+      action: PayloadAction<{ strategy: LandMaskStrategy; day?: DayType }>,
+    ) => {
+      const landMask = getCachedLandMask(action.payload.strategy);
+      if (!landMask) {
+        return;
+      }
+
+      const dayData = state.forecastCycle.days[action.payload.day ?? state.forecastCycle.currentDay];
+      if (!dayData) {
+        return;
+      }
+
+      pushUndoSnapshot(state);
+      state.lastTrimResult = trimOutlookDataInPlace(dayData.data, landMask, action.payload.strategy);
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
@@ -1477,6 +1513,7 @@ export const {
   updateFeaturesBatch,
   removeFeature,
   applyPaintBucketEdit,
+  trimCurrentDayOutlooksToLand,
   resetCategorical,
   setOutlookMap,
   applyAutoCategoricalSync,
