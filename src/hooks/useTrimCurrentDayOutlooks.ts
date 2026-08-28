@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
-import { trimCurrentDayOutlooksToLand } from '../store/forecastSlice';
+import { selectCurrentOutlooks, trimCurrentDayOutlooksToLand } from '../store/forecastSlice';
 import type { AddToastFn } from '../components/Layout';
 import { ensureLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
 import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import { trimOutlookGeometry } from '../utils/outlookPolygonMasking/trimOutlookGeometry';
 import type { Polygon, MultiPolygon } from 'geojson';
+import type { OutlookType } from '../types/outlooks';
 
 interface UseTrimCurrentDayOutlooksOptions {
   addToast: AddToastFn;
@@ -17,6 +18,7 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
   const dispatch = useDispatch<AppDispatch>();
   const strategy = useSelector((state: RootState) => state.overlays.outlookTrimStrategy);
   const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
+  const currentOutlooks = useSelector(selectCurrentOutlooks);
   const [isTrimming, setIsTrimming] = useState(false);
 
   const trimCurrentDayOutlooks = useCallback(async () => {
@@ -26,6 +28,14 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
       const landMask = await ensureLandMask(strategy);
       if (!landMask) {
         addToast('Land mask could not be built for trimming.', 'error');
+        return;
+      }
+
+      const hasOutlooks = (Object.keys(currentOutlooks) as OutlookType[]).some(
+        (outlookType) => (currentOutlooks[outlookType]?.size ?? 0) > 0,
+      );
+      if (!hasOutlooks) {
+        addToast(`No outlook polygons to trim on day ${trimDay}.`, 'info');
         return;
       }
 
@@ -39,7 +49,7 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
     } finally {
       setIsTrimming(false);
     }
-  }, [addToast, currentDay, dispatch, strategy]);
+  }, [addToast, currentDay, currentOutlooks, dispatch, strategy]);
 
   return { trimCurrentDayOutlooks, isTrimming };
 };
