@@ -581,11 +581,13 @@ const useForecastPageWorkspace = ({
   addToast,
   navigate,
   mapRef,
+  onSaveForecast,
 }: {
   dispatch: ShortcutDispatch;
   addToast: AddToastFn;
   navigate: ReturnType<typeof useNavigate>;
   mapRef: React.RefObject<ForecastMapHandle | null>;
+  onSaveForecast: () => void;
 }) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const discussionDraftsByScope = useSelector((state: RootState) => state.forecast.discussionDraftsByScope);
@@ -618,15 +620,6 @@ const useForecastPageWorkspace = ({
     userId: user?.uid,
     workflowMetadata,
   });
-
-  const { handleSave } = useForecastFileActions(
-    dispatch,
-    addToast,
-    forecastCycle,
-    mapRef,
-    user,
-    workflowMetadata,
-  );
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
     applyForecastImportResult(result, dispatch, mapRef);
@@ -688,7 +681,7 @@ const useForecastPageWorkspace = ({
     canUndo,
     canRedo,
     onOpenTransferModal: workspaceController.onOpenTransferModal,
-    onSaveForecast: handleSave,
+    onSaveForecast,
     onInitiateExport: workspaceController.onInitiateExport,
     mapRef,
     currentDay: forecastCycle.currentDay,
@@ -725,8 +718,18 @@ export const ForecastPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { addToast } = useOutletContext<PageContext>();
-  const { syncedSettings } = useAuth();
+  const { syncedSettings, user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
+  const forecastCycle = useSelector(selectForecastCycle);
+  const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
+  const { handleSave } = useForecastFileActions(
+    dispatch,
+    addToast,
+    forecastCycle,
+    mapRef,
+    user,
+    workflowMetadata,
+  );
   const {
     emergencyMode,
     dayRolloverPrompt,
@@ -739,6 +742,7 @@ export const ForecastPage: React.FC = () => {
     addToast,
     navigate,
     mapRef,
+    onSaveForecast: handleSave,
   });
 
   if (emergencyMode) {
