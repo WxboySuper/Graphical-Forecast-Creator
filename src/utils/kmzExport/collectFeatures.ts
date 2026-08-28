@@ -1,5 +1,5 @@
 import type { DayType, ForecastCycle, OutlookType } from '../../types/outlooks';
-import { getOutlookColor, isSignificantThreat } from '../outlookUtils';
+import { colorMappings, getOutlookColor, isSignificantThreat } from '../outlookUtils';
 import { geometryToKml } from './geometry';
 import type { KmzExportFeature, KmzExportInput, KmzExportOptions } from './types';
 
@@ -18,6 +18,11 @@ const isCigKey = (probabilityKey: string): boolean => probabilityKey.startsWith(
 
 const normalizeProbabilityForColor = (probabilityKey: string): string =>
   probabilityKey.replace(/#/g, '%');
+
+const resolveFeatureColor = (outlookType: OutlookType, probabilityKey: string): string =>
+  isCigKey(probabilityKey)
+    ? colorMappings.significant
+    : getOutlookColor({ outlookType, probability: normalizeProbabilityForColor(probabilityKey) });
 
 const resolveDays = (forecastCycle: ForecastCycle, options: KmzExportOptions): DayType[] => {
   if (options.scope === 'cycle') {
@@ -42,6 +47,7 @@ const resolveOutlookTypes = (options: KmzExportOptions): OutlookType[] => {
 const defaultFillOpacity = (probabilityKey: string): number => (isCigKey(probabilityKey) ? 0.15 : 0.66);
 
 /** Collects exportable outlook polygons from the forecast cycle. */
+// The nested day/outlook/probability/feature traversal mirrors the forecast data shape.
 // @codescene(disable:"Complex Method")
 export const collectKmzExportFeatures = ({ forecastCycle, options }: KmzExportInput): KmzExportFeature[] => {
   const days = resolveDays(forecastCycle, options);
@@ -63,8 +69,7 @@ export const collectKmzExportFeatures = ({ forecastCycle, options }: KmzExportIn
       }
 
       outlookMap.forEach((dayFeatures, probabilityKey) => {
-        const colorKey = normalizeProbabilityForColor(probabilityKey);
-        const fillColor = getOutlookColor({ outlookType, probability: colorKey });
+        const fillColor = resolveFeatureColor(outlookType, probabilityKey);
         const configuredOpacity = outlookOpacities[outlookType];
         const fillOpacity = typeof configuredOpacity === 'number'
           ? Math.min(1, Math.max(0, configuredOpacity))

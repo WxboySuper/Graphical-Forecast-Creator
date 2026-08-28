@@ -7,13 +7,23 @@ const PACKAGE_EXTENSIONS = new Set(['.zip']);
 const hasExtension = (name: string, extensions: Set<string>): boolean =>
   [...extensions].some((ext) => name.endsWith(ext));
 
+const isKmlFile = (file: File, lowerName: string): boolean =>
+  hasExtension(lowerName, KML_EXTENSIONS)
+  || file.type === 'application/vnd.google-earth.kml+xml'
+  || file.type === 'application/vnd.google-earth.kmz';
+
+const isKmzFile = (file: File, lowerName: string): boolean =>
+  lowerName.endsWith('.kmz') || file.type === 'application/vnd.google-earth.kmz';
+
 /** Detects the forecast transfer format from file metadata. */
+// The ordered metadata branches are intentionally kept together to preserve ZIP/KMZ precedence.
 // @codescene(disable:"Complex Method", disable:"Complex Conditional")
 export const detectForecastTransferFormat = (file: File, bytes?: Uint8Array): ForecastTransferFormat | null => {
   const lowerName = file.name.toLowerCase();
 
-  if (hasExtension(lowerName, KML_EXTENSIONS)) {
-    return lowerName.endsWith('.kmz') ? 'kmz' : 'kml';
+  // Prefer explicit KML/KMZ metadata before the generic ZIP signature: KMZ is a ZIP container.
+  if (isKmlFile(file, lowerName)) {
+    return isKmzFile(file, lowerName) ? 'kmz' : 'kml';
   }
 
   if (hasExtension(lowerName, JSON_EXTENSIONS)) {

@@ -102,6 +102,7 @@ describe('kmzExport', () => {
     expect(tornadoOnly.every((feature) => feature.outlookType === 'tornado')).toBe(true);
     expect(tornadoOnly.some((feature) => feature.isSignificant)).toBe(true);
     expect(tornadoOnly.some((feature) => feature.isCig)).toBe(true);
+    expect(tornadoOnly.find((feature) => feature.probabilityKey === 'CIG2')?.fillColor).toBe('#000000');
   });
 
   test('buildStructuredKmlDocument emits placemarks with ExtendedData', () => {
