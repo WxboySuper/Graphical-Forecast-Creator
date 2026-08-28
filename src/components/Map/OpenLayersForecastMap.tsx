@@ -25,6 +25,7 @@ import type Geometry from "ol/geom/Geometry";
 import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { v4 as uuidv4 } from "uuid";
 import { Redo2, Undo2 } from "lucide-react";
+import { captureException } from "@sentry/react";
 import {
   addFeature,
   addCustomFeature,
@@ -382,6 +383,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         const editDay = currentDayRef.current;
         features.forEach((feature) => {
           void (async () => {
+            try {
             if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
               return;
             }
@@ -401,6 +403,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
             const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
             dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
+            } catch (error) {
+              captureException(error, { tags: { featureOperation: "modify-outlook" } });
+            }
           })();
         });
       };
@@ -1047,6 +1052,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         const drawDay = currentDayRef.current;
 
         void (async () => {
+          try {
           const geometry = format.writeGeometryObject(olGeometry, {
             dataProjection: "EPSG:4326",
             featureProjection: "EPSG:3857",
@@ -1087,6 +1093,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             },
           };
           dispatch(addFeature({ feature, day: drawDay }));
+          } catch (error) {
+            captureException(error, { tags: { featureOperation: "draw-outlook" } });
+          }
         })();
       });
       map.addInteraction(draw);

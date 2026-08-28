@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
 import { selectCurrentOutlooks, trimCurrentDayOutlooksToLand } from '../store/forecastSlice';
 import type { AddToastFn } from '../components/Layout';
@@ -16,6 +16,7 @@ interface UseTrimCurrentDayOutlooksOptions {
 /** Runs the on-demand trim action after preloading the cached land mask. */
 export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlooksOptions) => {
   const dispatch = useDispatch<AppDispatch>();
+  const store = useStore<RootState>();
   const strategy = useSelector((state: RootState) => state.overlays.outlookTrimStrategy);
   const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
   const currentOutlooks = useSelector(selectCurrentOutlooks);
@@ -40,7 +41,20 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
       }
 
       dispatch(trimCurrentDayOutlooksToLand({ strategy, day: trimDay }));
-      addToast(`Trimmed outlooks on day ${trimDay} (prototype).`, 'success');
+      const result = store.getState().forecast.lastTrimResult;
+      if (!result || result.failedCount > 0) {
+        addToast(
+          `Trimmed outlooks on day ${trimDay} with ${result?.failedCount ?? 0} failure(s).`,
+          'error',
+        );
+      } else if (result.trimmedCount === 0 && result.removedCount === 0) {
+        addToast(`No outlook polygons changed on day ${trimDay}.`, 'info');
+      } else {
+        addToast(
+          `Trimmed outlooks on day ${trimDay}: ${result.trimmedCount} adjusted, ${result.removedCount} removed.`,
+          'success',
+        );
+      }
     } catch (error) {
       addToast(
         error instanceof Error ? error.message : 'Failed to trim outlook polygons.',
@@ -49,7 +63,7 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
     } finally {
       setIsTrimming(false);
     }
-  }, [addToast, currentDay, currentOutlooks, dispatch, strategy]);
+  }, [addToast, currentDay, currentOutlooks, dispatch, store, strategy]);
 
   return { trimCurrentDayOutlooks, isTrimming };
 };
@@ -71,5 +85,8 @@ export const trimGeometryForAutoDraw = async (
   }
 
   const trimmed = trimOutlookGeometry(geometry, landMask, strategy);
+  if (trimmed.error) {
+    throw new Error(trimmed.error);
+  }
   return trimmed.geometry;
 };

@@ -20,7 +20,7 @@ import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflow
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
 import { getCachedLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
-import { trimOutlookDataInPlace } from '../utils/outlookPolygonMasking/trimOutlookData';
+import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import { createForecastOutlookReducers } from './forecastOutlookReducers';
 
@@ -87,6 +87,7 @@ export interface ForecastState {
   outlookVersionSnapshots: OutlookVersionSnapshot[];
   /** Editor-visible auto-categorical derivation error, or null when derivation is healthy. */
   autoCategoricalError: string | null;
+  lastTrimResult: TrimOutlookDataResult | null;
 }
 
 interface ForecastDaySnapshot {
@@ -361,6 +362,7 @@ const initialState: ForecastState = {
   isWorkflowActive: false,
   outlookVersionSnapshots: [],
   autoCategoricalError: null,
+  lastTrimResult: null,
 };
 
 // Helpers to keep reducers small and testable
@@ -798,7 +800,7 @@ export const forecastSlice = createSlice({
       }
 
       pushUndoSnapshot(state);
-      trimOutlookDataInPlace(dayData.data, landMask, action.payload.strategy);
+      state.lastTrimResult = trimOutlookDataInPlace(dayData.data, landMask, action.payload.strategy);
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
