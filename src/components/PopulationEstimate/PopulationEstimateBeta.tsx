@@ -27,6 +27,17 @@ type EstimateContext = {
 
 type EstimateRequestContext = Pick<EstimateContext, 'currentDay' | 'activeOutlookType'>;
 
+const getPolygonCount = (features: Feature[]): number => features.filter(
+  (feature) => feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon',
+).length;
+
+const getGeometryError = (
+  polygonCount: number,
+  context: EstimateRequestContext,
+): string => polygonCount > 0
+  ? 'The outlook polygons could not be combined into a valid request.'
+  : `Draw at least one ${outlookLabels[context.activeOutlookType]} polygon on Day ${context.currentDay} first.`;
+
 const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }: EstimateContext) => {
   const [open, setOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -59,29 +70,7 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
     }
   }, [activeOutlookType, cancelActiveRequest, currentDay, isLoading, requestContext]);
 
-  const handleEstimate = async () => {
-    const capturedContext = { currentDay, activeOutlookType };
-    const outlookMap = currentDayData?.[activeOutlookType];
-    const features: Feature[] = outlookMap ? Array.from(outlookMap.values()).flat() : [];
-    const polygonCount = features.filter((feature) => feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon').length;
-    const geometry = unionForecastPolygons(features);
-    const controller = new AbortController();
-
-    cancelActiveRequest();
-    requestController.current = controller;
-    setRequestContext(capturedContext);
-    setOpen(true);
-    setEstimate(null);
-    setError(null);
-    if (!geometry) {
-      setError(polygonCount > 0
-        ? 'The outlook polygons could not be combined into a valid request.'
-        : `Draw at least one ${outlookLabels[capturedContext.activeOutlookType]} polygon on Day ${capturedContext.currentDay} first.`);
-      requestController.current = null;
-      return;
-    }
-
-    setIsLoading(true);
+  const runEstimate = async (geometry: NonNullable<ReturnType<typeof unionForecastPolygons>>, controller: AbortController) => {
     try {
       setEstimate(await estimatePopulation(geometry, { signal: controller.signal }));
     } catch (caught) {
@@ -93,6 +82,30 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
         setIsLoading(false);
       }
     }
+  };
+
+  const handleEstimate = async () => {
+    const capturedContext = { currentDay, activeOutlookType };
+    const outlookMap = currentDayData?.[activeOutlookType];
+    const features: Feature[] = outlookMap ? Array.from(outlookMap.values()).flat() : [];
+    const polygonCount = getPolygonCount(features);
+    const geometry = unionForecastPolygons(features);
+    const controller = new AbortController();
+
+    cancelActiveRequest();
+    requestController.current = controller;
+    setRequestContext(capturedContext);
+    setOpen(true);
+    setEstimate(null);
+    setError(null);
+    if (!geometry) {
+      setError(getGeometryError(polygonCount, capturedContext));
+      requestController.current = null;
+      return;
+    }
+
+    setIsLoading(true);
+    await runEstimate(geometry, controller);
   };
 
   return { open, setOpen, isLoading, estimate, error, requestContext, handleEstimate };
