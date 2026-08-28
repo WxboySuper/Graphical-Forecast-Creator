@@ -24,22 +24,27 @@ type EstimateContext = {
   currentDayData: OutlookData | undefined;
 };
 
+type EstimateRequestContext = Pick<EstimateContext, 'currentDay' | 'activeOutlookType'>;
+
 const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }: EstimateContext) => {
   const [open, setOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [estimate, setEstimate] = React.useState<WorldPopEstimate | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [requestContext, setRequestContext] = React.useState<EstimateRequestContext | null>(null);
 
   const handleEstimate = async () => {
+    const capturedContext = { currentDay, activeOutlookType };
     const outlookMap = currentDayData?.[activeOutlookType];
     const features = outlookMap ? Array.from(outlookMap.values()).flat() : [];
     const geometry = unionForecastPolygons(features);
 
+    setRequestContext(capturedContext);
     setOpen(true);
     setEstimate(null);
     setError(null);
     if (!geometry) {
-      setError(`Draw at least one ${outlookLabels[activeOutlookType]} polygon on Day ${currentDay} first.`);
+      setError(`Draw at least one ${outlookLabels[capturedContext.activeOutlookType]} polygon on Day ${capturedContext.currentDay} first.`);
       return;
     }
 
@@ -53,7 +58,7 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
     }
   };
 
-  return { open, setOpen, isLoading, estimate, error, handleEstimate };
+  return { open, setOpen, isLoading, estimate, error, requestContext, handleEstimate };
 };
 
 const EstimateContent: React.FC<Pick<ReturnType<typeof usePopulationEstimate>, 'isLoading' | 'estimate' | 'error'>> = ({
@@ -100,11 +105,12 @@ const PopulationEstimateBeta: React.FC = () => {
   const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
   const currentDayData = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]?.data);
-  const { open, setOpen, isLoading, estimate, error, handleEstimate } = usePopulationEstimate({
+  const { open, setOpen, isLoading, estimate, error, requestContext, handleEstimate } = usePopulationEstimate({
     currentDay,
     activeOutlookType,
     currentDayData,
   });
+  const dialogContext = requestContext ?? { currentDay, activeOutlookType };
 
   return (
     <>
@@ -134,7 +140,7 @@ const PopulationEstimateBeta: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Affected population estimate</DialogTitle>
             <DialogDescription>
-              Day {currentDay} {outlookLabels[activeOutlookType]} polygons, merged before the request.
+              Day {dialogContext.currentDay} {outlookLabels[dialogContext.activeOutlookType]} polygons, merged before the request.
             </DialogDescription>
           </DialogHeader>
 
