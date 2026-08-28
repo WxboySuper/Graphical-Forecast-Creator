@@ -48,4 +48,51 @@ describe('estimatePopulation', () => {
     await expect(estimatePopulation(TEST_GEOMETRY, { pollIntervalMs: 0, fetchImpl }))
       .rejects.toThrow('Area is too large.');
   });
+
+  test('reports an HTTP error even when the upstream body is not JSON', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => { throw new Error('not json'); },
+    } as unknown as Response);
+
+    await expect(estimatePopulation(TEST_GEOMETRY, { fetchImpl })).rejects.toThrow(
+      'WorldPop request failed with HTTP 503.',
+    );
+  });
+
+  test('reports a missing task ID', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(response({ error_message: 'Invalid geometry.' }, 202));
+
+    await expect(estimatePopulation(TEST_GEOMETRY, { fetchImpl })).rejects.toThrow('Invalid geometry.');
+  });
+
+  test('rejects an invalid population total', async () => {
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response({ task_id: 'invalid-total' }, 202))
+      .mockResolvedValueOnce(response({ status: 'complete', result: { total_population: Number.NaN } }));
+
+    await expect(estimatePopulation(TEST_GEOMETRY, { pollIntervalMs: 0, fetchImpl }))
+      .rejects.toThrow('invalid population total');
+  });
+
+  test('reports when polling times out', async () => {
+    const fetchImpl = jest.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+    }));
+
+    await expect(estimatePopulation(TEST_GEOMETRY, { timeoutMs: 1, fetchImpl: fetchImpl as unknown as typeof fetch }))
+      .rejects.toThrow('took too long');
+  });
+
+  test('supports caller cancellation', async () => {
+    const controller = new AbortController();
+    const fetchImpl = jest.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      controller.abort();
+    }));
+
+    await expect(estimatePopulation(TEST_GEOMETRY, { signal: controller.signal, fetchImpl: fetchImpl as unknown as typeof fetch }))
+      .rejects.toThrow('cancelled');
+  });
 });

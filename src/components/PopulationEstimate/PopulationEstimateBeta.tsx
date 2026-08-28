@@ -11,6 +11,7 @@ import {
 } from '../ui/dialog';
 import type { RootState } from '../../store';
 import type { DayType, OutlookData, OutlookType } from '../../types/outlooks';
+import type { Feature } from 'geojson';
 import { outlookLabels } from '../ForecastWorkspace/workspaceMeta';
 import { estimatePopulation, unionForecastPolygons, type WorldPopEstimate } from '../../utils/worldpop';
 
@@ -32,29 +33,65 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
   const [estimate, setEstimate] = React.useState<WorldPopEstimate | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [requestContext, setRequestContext] = React.useState<EstimateRequestContext | null>(null);
+  const requestController = React.useRef<AbortController | null>(null);
+
+  const cancelActiveRequest = React.useCallback((message?: string) => {
+    const controller = requestController.current;
+    requestController.current = null;
+    controller?.abort();
+    if (message) {
+      setIsLoading(false);
+      setError(message);
+    }
+  }, []);
+
+  React.useEffect(() => () => {
+    requestController.current?.abort();
+    requestController.current = null;
+  }, []);
+
+  React.useEffect(() => {
+    if (!isLoading || !requestContext) return;
+    const contextChanged = requestContext.currentDay !== currentDay
+      || requestContext.activeOutlookType !== activeOutlookType;
+    if (contextChanged) {
+      cancelActiveRequest('Estimate cancelled because the forecast day or outlook changed.');
+    }
+  }, [activeOutlookType, cancelActiveRequest, currentDay, isLoading, requestContext]);
 
   const handleEstimate = async () => {
     const capturedContext = { currentDay, activeOutlookType };
     const outlookMap = currentDayData?.[activeOutlookType];
-    const features = outlookMap ? Array.from(outlookMap.values()).flat() : [];
+    const features: Feature[] = outlookMap ? Array.from(outlookMap.values()).flat() : [];
+    const polygonCount = features.filter((feature) => feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon').length;
     const geometry = unionForecastPolygons(features);
+    const controller = new AbortController();
 
+    cancelActiveRequest();
+    requestController.current = controller;
     setRequestContext(capturedContext);
     setOpen(true);
     setEstimate(null);
     setError(null);
     if (!geometry) {
-      setError(`Draw at least one ${outlookLabels[capturedContext.activeOutlookType]} polygon on Day ${capturedContext.currentDay} first.`);
+      setError(polygonCount > 0
+        ? 'The outlook polygons could not be combined into a valid request.'
+        : `Draw at least one ${outlookLabels[capturedContext.activeOutlookType]} polygon on Day ${capturedContext.currentDay} first.`);
+      requestController.current = null;
       return;
     }
 
     setIsLoading(true);
     try {
-      setEstimate(await estimatePopulation(geometry));
+      setEstimate(await estimatePopulation(geometry, { signal: controller.signal }));
     } catch (caught) {
+      if (requestController.current !== controller) return;
       setError(caught instanceof Error ? caught.message : 'WorldPop could not calculate this estimate.');
     } finally {
-      setIsLoading(false);
+      if (requestController.current === controller) {
+        requestController.current = null;
+        setIsLoading(false);
+      }
     }
   };
 
@@ -93,7 +130,7 @@ const EstimateContent: React.FC<Pick<ReturnType<typeof usePopulationEstimate>, '
         {estimate.areaKm2 !== undefined ? <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Outlook area</dt><dd className="font-medium">{estimate.areaKm2.toFixed(1)} km²</dd></div> : null}
       </dl>
       <p className="text-xs text-muted-foreground">
-        WorldPop is a modeled estimate, not an official impact or warning product. The beta uses the public WorldPop API at 100m resolution.{' '}
+        WorldPop is a modeled estimate, not an official impact or warning product. This beta uses the public WorldPop API at {estimate.resolution} resolution.{' '}
         <a href="https://www.worldpop.org/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">Source and attribution</a>.
       </p>
     </div>

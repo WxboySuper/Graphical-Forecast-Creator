@@ -47,16 +47,22 @@ const sleep = (milliseconds: number, signal?: AbortSignal): Promise<void> => new
   const timeout = globalThis.setTimeout(resolve, milliseconds);
   signal?.addEventListener('abort', () => {
     globalThis.clearTimeout(timeout);
-    reject(new DOMException('The WorldPop request was cancelled.', 'AbortError'));
+    reject(signal.reason ?? new DOMException('The WorldPop request was cancelled.', 'AbortError'));
   }, { once: true });
 });
 
 const readJson = async <T>(response: Response): Promise<T> => {
-  const payload = await response.json() as T;
   if (!response.ok) {
-    throw new Error(`WorldPop request failed with HTTP ${response.status}.`);
+    let detail = '';
+    try {
+      const payload = await response.json() as WorldPopSubmitResponse | WorldPopTaskResponse;
+      detail = payload.error ?? ('error_message' in payload ? payload.error_message : '') ?? '';
+    } catch {
+      // Keep the HTTP status useful when an upstream proxy returns non-JSON text.
+    }
+    throw new Error(`WorldPop request failed with HTTP ${response.status}.${detail ? ` ${detail}` : ''}`);
   }
-  return payload;
+  return await response.json() as T;
 };
 
 /** Submits a GeoJSON geometry to WorldPop and waits for its asynchronous result. */
@@ -73,7 +79,7 @@ export const estimatePopulation = async (
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort(options.signal?.reason);
   options.signal?.addEventListener('abort', abortFromCaller, { once: true });
-  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = globalThis.setTimeout(() => controller.abort(new DOMException('WorldPop request timed out.', 'TimeoutError')), timeoutMs);
 
   try {
     const submitResponse = await fetchImpl(`${apiBaseUrl}/population`, {
@@ -115,6 +121,14 @@ export const estimatePopulation = async (
 
       await sleep(pollIntervalMs, controller.signal);
     }
+  } catch (caught) {
+    if (options.signal?.aborted) {
+      throw new Error('The WorldPop request was cancelled.');
+    }
+    if (controller.signal.aborted) {
+      throw new Error('WorldPop took too long to calculate this estimate. Please try again.');
+    }
+    throw caught;
   } finally {
     globalThis.clearTimeout(timeout);
     options.signal?.removeEventListener('abort', abortFromCaller);
