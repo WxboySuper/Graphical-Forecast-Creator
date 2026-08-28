@@ -132,7 +132,7 @@ describe('instrument', () => {
         },
       ],
     },
-  });
+  } as ErrorEvent);
 
   const loadBeforeSend = () => {
     globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
