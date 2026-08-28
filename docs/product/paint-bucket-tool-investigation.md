@@ -97,7 +97,7 @@ Manual QA:
 - Auto-generated categorical remains read-only in fill mode
 - CIG layer: draw CIG2 hatch, bucket to CIG3
 
-Prototype deferrals tracked for follow-up:
+Prototype deferrals tracked in [#1079](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1079):
 
 - [ ] Verify nested same-pixel polygons through the full map click and move flow.
 - [ ] Add CIG blanket and clipping rules before enabling overlap subtraction.
