@@ -27,6 +27,36 @@ interface PaintBucketClickInput {
   onNoOp?: () => void;
 }
 
+interface PaintBucketEditTarget {
+  identity: { featureId: string; outlookType: string; probability: string };
+  probabilityList: readonly string[];
+}
+
+const resolvePaintBucketEditTarget = ({
+  map,
+  pixel,
+  vectorLayer,
+  outlookType,
+  currentDay,
+}: Pick<PaintBucketClickInput, 'map' | 'pixel' | 'vectorLayer' | 'outlookType' | 'currentDay'>): PaintBucketEditTarget | null => {
+  if (!isPaintBucketOutlookType(outlookType)) {
+    return null;
+  }
+
+  const feature = pickTopmostPaintBucketFeature(map, pixel, vectorLayer);
+  if (!feature) {
+    return null;
+  }
+
+  const identity = getFeatureIdentity(feature);
+  if (!identity || !isPaintBucketOutlookType(identity.outlookType)) {
+    return null;
+  }
+
+  const probabilityList = getAvailableProbabilities(outlookType, currentDay);
+  return probabilityList.length > 0 ? { identity, probabilityList } : null;
+};
+
 /** Handles a paint-bucket click on an existing probabilistic polygon. */
 export const handlePaintBucketMapClick = ({
   map,
@@ -41,36 +71,28 @@ export const handlePaintBucketMapClick = ({
   activeProbability,
   onNoOp,
 }: PaintBucketClickInput): boolean => {
-  if (!isPaintBucketOutlookType(outlookType)) {
+  const target = resolvePaintBucketEditTarget({
+    map,
+    pixel,
+    vectorLayer,
+    outlookType,
+    currentDay,
+  });
+  if (!target) {
     return false;
   }
 
-  const feature = pickTopmostPaintBucketFeature(map, pixel, vectorLayer);
-  if (!feature) {
-    return false;
-  }
-
-  const identity = getFeatureIdentity(feature);
-  if (!identity || !isPaintBucketOutlookType(identity.outlookType)) {
-    return false;
-  }
-
-  const probabilityList = getAvailableProbabilities(outlookType, currentDay);
-  if (probabilityList.length === 0) {
-    return false;
-  }
-
-  if (mode === 'assign' && identity.probability === activeProbability) {
+  if (mode === 'assign' && target.identity.probability === activeProbability) {
     onNoOp?.();
     return false;
   }
 
   dispatch(applyPaintBucketEdit({
-    outlookType: identity.outlookType as EditableOutlookType,
-    featureId: identity.featureId,
-    fromProbability: identity.probability,
+    outlookType: target.identity.outlookType as EditableOutlookType,
+    featureId: target.identity.featureId,
+    fromProbability: target.identity.probability,
     action: resolvePaintBucketEditAction(mode, shiftKey, stepDirection),
-    probabilityList,
+    probabilityList: target.probabilityList,
   }));
 
   return true;
