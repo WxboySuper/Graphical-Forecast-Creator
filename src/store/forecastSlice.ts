@@ -24,6 +24,11 @@ import {
   applyPaintBucketStrategy,
   type PaintBucketEditAction,
 } from '../utils/paintBucket';
+import {
+  copyOutlookGeometry,
+  countCopyableSourceFeatures,
+  type CopyOutlookGeometryOptions,
+} from '../utils/outlookGeometryCopy';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -1116,6 +1121,54 @@ export const forecastSlice = createSlice({
       }
     },
 
+    // @codescene(disable:"Complex Method")
+    copyOutlookGeometryBetweenHazards: (state, action: PayloadAction<CopyOutlookGeometryOptions>) => {
+      const day = state.forecastCycle.currentDay;
+      if (day !== 1 && day !== 2) {
+        return;
+      }
+
+      const { sourceType, targetType } = action.payload;
+      if (sourceType === targetType) {
+        return;
+      }
+
+      const dayData = state.forecastCycle.days[day];
+      if (!dayData) {
+        return;
+      }
+
+      const sourceMap = dayData.data[sourceType];
+      const targetMap = dayData.data[targetType];
+      if (!sourceMap || !targetMap) {
+        return;
+      }
+
+      const copyableCount = countCopyableSourceFeatures({
+        sourceMap,
+        sourceType,
+        targetType,
+        day,
+        probabilityFilter: action.payload.probabilityFilter,
+      });
+      if (copyableCount === 0) {
+        return;
+      }
+
+      pushUndoSnapshot(state);
+      copyOutlookGeometry(sourceMap, targetMap, action.payload, day);
+
+      if (dayData.metadata.lowProbabilityOutlooks) {
+        dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
+          (type) => type !== targetType,
+        );
+      }
+
+      dayData.metadata.lastModified = readActionTimestamp(action);
+      invalidateCompletionAcknowledgement(state);
+      state.isSaved = false;
+    },
+
     undoLastEdit: (state, action: UnknownAction) => {
       const dayHistory = getOrCreateDayHistory(state);
       restoreHistoryEntry(dayHistory.undoStack, dayHistory.redoStack, state, readActionTimestamp(action));
@@ -1446,6 +1499,7 @@ export const {
   loadSavedCycle,
   deleteSavedCycle,
   copyFeaturesFromPrevious,
+  copyOutlookGeometryBetweenHazards,
   loadCycleHistory,
   setLowProbability,
   setOutlookOpacity,
