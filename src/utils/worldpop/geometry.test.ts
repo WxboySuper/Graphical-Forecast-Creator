@@ -4,7 +4,11 @@ import { unionForecastPolygons } from './geometry';
 
 describe('unionForecastPolygons', () => {
   test('returns null when no polygon features are present', () => {
-    expect(unionForecastPolygons([{ type: 'Feature', properties: {}, geometry: null } as Feature])).toBeNull();
+    expect(
+      unionForecastPolygons(
+        [{ type: 'Feature', properties: {}, geometry: null } as unknown as Feature],
+      ),
+    ).toBeNull();
   });
 
   test('unions overlapping polygons into one geometry', () => {
