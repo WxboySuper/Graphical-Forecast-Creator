@@ -252,7 +252,7 @@ describe('instrument', () => {
 
       expect(beforeSend(event, {})).toBe(event);
     });
-  } as ErrorEvent);
+  });
 
   it('drops opaque global errors with only Redux initialization context', () => {
     expectBeforeSendToDrop(() => {
