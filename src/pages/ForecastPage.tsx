@@ -63,6 +63,7 @@ import {
 } from '../utils/forecastUiVariant';
 import {
   applyForecastImportResult,
+  useForecastFileActions,
   useDayRolloverPrompt as useControllerDayRolloverPrompt,
   useSessionRestore as useControllerSessionRestore,
   useUnsavedChangesWarning as useControllerUnsavedChangesWarning,
@@ -216,6 +217,7 @@ interface KeyboardShortcutContext {
   canUndo: boolean;
   canRedo: boolean;
   onOpenTransferModal: (direction?: 'import' | 'export') => void;
+  onSaveForecast: () => void;
   onInitiateExport: () => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   currentDay: DayType;
@@ -251,7 +253,7 @@ export const canToggleSignificantForState = (
 
 const COMMAND_SHORTCUT_HANDLERS: Record<CommandShortcutKey, CommandShortcutHandler> = {
   s: (context) => {
-    context.onOpenTransferModal('export');
+    context.onSaveForecast();
   },
   o: (context) => {
     context.onOpenTransferModal('import');
@@ -447,6 +449,7 @@ interface KeyboardShortcutHookParams {
   canUndo: boolean;
   canRedo: boolean;
   onOpenTransferModal: (direction?: 'import' | 'export') => void;
+  onSaveForecast: () => void;
   onInitiateExport: () => void;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   currentDay: DayType;
@@ -460,6 +463,7 @@ const useKeyboardShortcuts = ({
   canUndo,
   canRedo,
   onOpenTransferModal,
+  onSaveForecast,
   onInitiateExport,
   mapRef,
   currentDay,
@@ -472,6 +476,7 @@ const useKeyboardShortcuts = ({
       canUndo,
       canRedo,
       onOpenTransferModal,
+      onSaveForecast,
       onInitiateExport,
       mapRef,
       currentDay,
@@ -485,7 +490,7 @@ const useKeyboardShortcuts = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, addToast, drawingState, canUndo, canRedo, onOpenTransferModal, onInitiateExport, mapRef, currentDay]);
+  }, [dispatch, addToast, drawingState, canUndo, canRedo, onOpenTransferModal, onSaveForecast, onInitiateExport, mapRef, currentDay]);
 };
 
 /** Returns the cloud-cycle restore callback and cloud-save action used by the forecast toolbar. */
@@ -614,6 +619,15 @@ const useForecastPageWorkspace = ({
     workflowMetadata,
   });
 
+  const { handleSave } = useForecastFileActions(
+    dispatch,
+    addToast,
+    forecastCycle,
+    mapRef,
+    user,
+    workflowMetadata,
+  );
+
   const handleImportResult = useCallback((result: ForecastImportResult) => {
     applyForecastImportResult(result, dispatch, mapRef);
     const warningSuffix = result.warnings.length > 0
@@ -674,6 +688,7 @@ const useForecastPageWorkspace = ({
     canUndo,
     canRedo,
     onOpenTransferModal: workspaceController.onOpenTransferModal,
+    onSaveForecast: handleSave,
     onInitiateExport: workspaceController.onInitiateExport,
     mapRef,
     currentDay: forecastCycle.currentDay,

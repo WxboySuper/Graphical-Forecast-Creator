@@ -186,4 +186,27 @@ test.describe('Forecast transfer modal', () => {
     expect(kml).not.toContain('<name>Categorical SLGT</name>');
   });
 
+  test('imports an exported KML back into the forecast', async ({ page }) => {
+    await page.locator('#transfer-format').selectOption('kml');
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download' }).click();
+    const downloadPath = await (await downloadPromise).path();
+    expect(downloadPath).not.toBeNull();
+    if (!downloadPath) throw new Error('KML export did not produce a file');
+
+    await expect(page.getByRole('dialog', { name: 'Import / Export Forecast' })).toBeHidden();
+    await page.getByRole('button', { name: 'Import / Export', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import / Export Forecast' });
+    await dialog.getByRole('tab', { name: 'Import' }).click();
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await dialog.getByText('Choose a forecast file').click();
+    await (await fileChooserPromise).setFiles({
+      name: 'forecast-roundtrip.kml',
+      mimeType: 'application/vnd.google-earth.kml+xml',
+      buffer: await readFile(downloadPath),
+    });
+    await expect(dialog).toBeHidden({ timeout: 10000 });
+    await expect(page.getByText('Forecast imported from KML!', { exact: false })).toBeVisible();
+  });
+
 });

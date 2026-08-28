@@ -33,7 +33,17 @@ export const forecastCycleFromKmlPlacemarks = (
   baseCycle?: ForecastCycle,
 ): ForecastCycle => {
   const cycle: ForecastCycle = baseCycle
-    ? { ...baseCycle, days: { ...baseCycle.days } }
+    ? {
+        ...baseCycle,
+        days: Object.fromEntries(
+          Object.entries(baseCycle.days).map(([day, outlookDay]) => [
+            day,
+            outlookDay
+              ? { ...outlookDay, data: { ...outlookDay.data } }
+              : outlookDay,
+          ])
+        ) as ForecastCycle['days'],
+      }
     : {
         cycleDate: new Date().toISOString().slice(0, 10),
         currentDay: placemarks[0]?.day ?? 1,
@@ -42,7 +52,7 @@ export const forecastCycleFromKmlPlacemarks = (
 
   placemarks.forEach((placemark) => {
     const existingDay = cycle.days[placemark.day] ?? createOutlookDay(placemark.day);
-    const outlookMap = existingDay.data[placemark.outlookType] ?? new Map();
+    const outlookMap = new Map(existingDay.data[placemark.outlookType] ?? []);
     const bucket = [...(outlookMap.get(placemark.probabilityKey) ?? []), placemark.feature];
     outlookMap.set(placemark.probabilityKey, bucket);
     cycle.days[placemark.day] = {

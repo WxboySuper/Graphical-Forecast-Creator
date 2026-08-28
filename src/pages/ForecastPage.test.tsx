@@ -595,6 +595,7 @@ describe('ForecastPage helpers', () => {
     const dispatch = jest.fn();
     const addToast = jest.fn();
     const onOpenTransferModal = jest.fn();
+    const onSaveForecast = jest.fn();
     const onInitiateExport = jest.fn();
     const context = {
       dispatch,
@@ -602,6 +603,7 @@ describe('ForecastPage helpers', () => {
       canUndo: true,
       canRedo: true,
       onOpenTransferModal,
+      onSaveForecast,
       onInitiateExport,
       mapRef: { current: null },
       currentDay: 1,
@@ -612,7 +614,8 @@ describe('ForecastPage helpers', () => {
 
     const ctrlS = new KeyboardEvent('keydown', { key: 's', ctrlKey: true });
     processShortcutKeyDown(ctrlS, context);
-    expect(onOpenTransferModal).toHaveBeenCalledWith('export');
+    expect(onSaveForecast).toHaveBeenCalledTimes(1);
+    expect(onOpenTransferModal).not.toHaveBeenCalled();
 
     processShortcutKeyDown(new KeyboardEvent('keydown', { key: 'o', ctrlKey: true }), context);
     expect(onOpenTransferModal).toHaveBeenCalledWith('import');
@@ -650,12 +653,14 @@ describe('ForecastPage helpers', () => {
     const dispatch = jest.fn();
     const addToast = jest.fn();
     const onOpenTransferModal = jest.fn();
+    const onSaveForecast = jest.fn();
     const context = {
       dispatch,
       addToast,
       canUndo: false,
       canRedo: false,
       onOpenTransferModal,
+      onSaveForecast,
       onInitiateExport: jest.fn(),
       mapRef: { current: null },
       currentDay: 1,
