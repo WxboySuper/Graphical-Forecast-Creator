@@ -117,7 +117,7 @@ describe('instrument', () => {
     },
   });
 
-  const createOpaqueGlobalError = (value = 'uncaught exception: undefined', withStack = false) => ({
+  const createOpaqueGlobalError = (value = 'uncaught exception: undefined', withStack = false): ErrorEvent => ({
     exception: {
       values: [
         {
@@ -252,11 +252,11 @@ describe('instrument', () => {
 
       expect(beforeSend(event, {})).toBe(event);
     });
-  });
+  } as ErrorEvent);
 
   it('drops opaque global errors with only Redux initialization context', () => {
     expectBeforeSendToDrop(() => {
-      const event = createOpaqueGlobalError() as Event;
+      const event = createOpaqueGlobalError();
       event.breadcrumbs = [{
         category: 'redux.action',
         data: { type: '@@redux/INITu.s.n.p.5.4' },
