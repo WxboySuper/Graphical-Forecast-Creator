@@ -117,7 +117,7 @@ describe('instrument', () => {
     },
   });
 
-  const createOpaqueGlobalError = (value = 'uncaught exception: undefined', withStack = false): ErrorEvent => ({
+  const createOpaqueGlobalError = (value = 'uncaught exception: undefined', withStack = false) => ({
     exception: {
       values: [
         {
@@ -132,7 +132,7 @@ describe('instrument', () => {
         },
       ],
     },
-  } as ErrorEvent);
+  });
 
   const loadBeforeSend = () => {
     globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
@@ -256,12 +256,13 @@ describe('instrument', () => {
 
   it('drops opaque global errors with only Redux initialization context', () => {
     expectBeforeSendToDrop(() => {
-      const event = createOpaqueGlobalError();
-      event.breadcrumbs = [{
-        category: 'redux.action',
-        data: { type: '@@redux/INITu.s.n.p.5.4' },
-      }];
-      return event;
+      return {
+        ...createOpaqueGlobalError(),
+        breadcrumbs: [{
+          category: 'redux.action',
+          data: { type: '@@redux/INITu.s.n.p.5.4' },
+        }],
+      };
     });
   });
 
