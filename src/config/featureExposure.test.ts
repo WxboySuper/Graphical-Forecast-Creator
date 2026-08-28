@@ -71,6 +71,7 @@ describe('featureExposure registry', () => {
       'tropicalWorkspace',
       'collaborationRoom',
       'paintBucketTool',
+      'kmzExport',
     ]);
   });
 
