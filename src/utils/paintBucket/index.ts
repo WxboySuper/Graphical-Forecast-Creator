@@ -9,4 +9,5 @@ export {
   type PaintBucketEditRequest,
   type PaintBucketEditResult,
   type PaintBucketMode,
+  type PaintBucketStepDirection,
 } from './types';

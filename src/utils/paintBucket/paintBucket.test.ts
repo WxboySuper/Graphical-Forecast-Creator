@@ -143,6 +143,38 @@ describe('applyPaintBucketStrategy', () => {
     expect(result.map.get('10%')?.map((feature) => feature.id)).toEqual(['overlapping']);
   });
 
+  test('preserves holes and multipolygon geometry while moving a feature', () => {
+    const feature = {
+      type: 'Feature' as const,
+      id: 'complex',
+      geometry: {
+        type: 'MultiPolygon' as const,
+        coordinates: [
+          [
+            [[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]],
+            [[1, 1], [1, 2], [2, 2], [2, 1], [1, 1]],
+          ],
+          [
+            [[5, 5], [6, 5], [6, 6], [5, 6], [5, 5]],
+          ],
+        ],
+      },
+      properties: { outlookType: 'tornado', probability: '5%' },
+    };
+    const map = new Map([['5%', [feature]]]);
+
+    const result = applyPaintBucketStrategy(map, {
+      outlookType: 'tornado',
+      featureId: 'complex',
+      fromProbability: '5%',
+      action: 'recategorize',
+      activeProbability: '15%',
+      probabilityList: combinedProbabilityList,
+    });
+
+    expect(result.map.get('15%')?.[0].geometry).toEqual(feature.geometry);
+  });
+
   test('returns unchanged map when target equals source', () => {
     const { map, result } = runStrategy({ sourceProbability: '10%', action: 'recategorize', activeProbability: '10%' });
 

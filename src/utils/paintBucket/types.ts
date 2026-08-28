@@ -2,6 +2,7 @@ import type { OutlookType } from '../../types/outlooks';
 
 /** First-class paint-bucket interaction modes exposed in the map toolbar. */
 export type PaintBucketMode = 'step' | 'assign';
+export type PaintBucketStepDirection = 'up' | 'down';
 
 export const PAINT_BUCKET_MODES: readonly PaintBucketMode[] = ['step', 'assign'] as const;
 

@@ -97,6 +97,13 @@ Manual QA:
 - Auto-generated categorical remains read-only in fill mode
 - CIG layer: draw CIG2 hatch, bucket to CIG3
 
+Prototype deferrals tracked for follow-up:
+
+- [ ] Verify nested same-pixel polygons through the full map click and move flow.
+- [ ] Add CIG blanket and clipping rules before enabling overlap subtraction.
+- [ ] Add Turf difference failure-path coverage when Option C is implemented.
+- [x] Preserve holes and MultiPolygon geometry when moving an existing feature.
+
 ## Prototype UX (local builds)
 
 One **Edit** toolbar button keeps the map chrome minimal. When Edit is active, a compact **Step | Set** toggle appears inline:

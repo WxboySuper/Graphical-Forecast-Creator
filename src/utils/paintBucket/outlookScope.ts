@@ -1,5 +1,5 @@
 import type { OutlookType } from '../../types/outlooks';
-import type { PaintBucketEditAction, PaintBucketMode } from './types';
+import type { PaintBucketEditAction, PaintBucketMode, PaintBucketStepDirection } from './types';
 
 const PAINT_BUCKET_OUTLOOK_TYPES = new Set<OutlookType>([
   'tornado',
@@ -17,9 +17,10 @@ export const isPaintBucketOutlookType = (outlookType: string): outlookType is Ou
 export const resolvePaintBucketEditAction = (
   mode: PaintBucketMode,
   shiftKey: boolean,
+  stepDirection: PaintBucketStepDirection = 'up',
 ): PaintBucketEditAction => {
   if (mode === 'assign') {
     return 'recategorize';
   }
-  return shiftKey ? 'step-down' : 'step-up';
+  return shiftKey || stepDirection === 'down' ? 'step-down' : 'step-up';
 };

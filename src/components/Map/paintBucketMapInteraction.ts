@@ -22,6 +22,9 @@ interface PaintBucketClickInput {
   currentDay: DayType;
   mode: PaintBucketMode;
   shiftKey: boolean;
+  stepDirection?: 'up' | 'down';
+  activeProbability: string;
+  onNoOp?: () => void;
 }
 
 /** Handles a paint-bucket click on an existing probabilistic polygon. */
@@ -34,6 +37,9 @@ export const handlePaintBucketMapClick = ({
   currentDay,
   mode,
   shiftKey,
+  stepDirection = 'up',
+  activeProbability,
+  onNoOp,
 }: PaintBucketClickInput): boolean => {
   if (!isPaintBucketOutlookType(outlookType)) {
     return false;
@@ -54,11 +60,16 @@ export const handlePaintBucketMapClick = ({
     return false;
   }
 
+  if (mode === 'assign' && identity.probability === activeProbability) {
+    onNoOp?.();
+    return false;
+  }
+
   dispatch(applyPaintBucketEdit({
     outlookType: identity.outlookType as EditableOutlookType,
     featureId: identity.featureId,
     fromProbability: identity.probability,
-    action: resolvePaintBucketEditAction(mode, shiftKey),
+    action: resolvePaintBucketEditAction(mode, shiftKey, stepDirection),
     probabilityList,
   }));
 

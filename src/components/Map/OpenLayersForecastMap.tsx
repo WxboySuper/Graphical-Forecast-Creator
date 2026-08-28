@@ -84,7 +84,7 @@ import {
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { isFeatureExposed } from "../../config/featureExposure";
-import { isPaintBucketOutlookType, type PaintBucketMode } from "../../utils/paintBucket";
+import { isPaintBucketOutlookType, type PaintBucketMode, type PaintBucketStepDirection } from "../../utils/paintBucket";
 import { handlePaintBucketMapClick } from "./paintBucketMapInteraction";
 import { dispatchModifyUpdates } from "./precisionPolygonEditHandler";
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
@@ -203,6 +203,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       "pan" | "draw" | "delete" | "edit"
     >("pan");
     const [editBehavior, setEditBehavior] = useState<PaintBucketMode>("step");
+    const [stepDirection, setStepDirection] = useState<PaintBucketStepDirection>("up");
+    const [paintBucketFeedback, setPaintBucketFeedback] = useState<string | null>(null);
 
     const [popupInfo, setPopupInfo] = useState<{
       outlookType: string;
@@ -220,6 +222,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     const drawingStateRef = useRef(drawingState);
     const currentDayRef = useRef(currentDay);
     const editBehaviorRef = useRef(editBehavior);
+    const stepDirectionRef = useRef(stepDirection);
     const activeProbabilityRef = useRef(drawingState.activeProbability);
     const activeOutlookTypeRef = useRef(drawingState.activeOutlookType);
     const activeCustomCategoryRef = useRef(activeCustomCategory);
@@ -232,6 +235,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => { drawingStateRef.current = drawingState; }, [drawingState]);
     useEffect(() => { currentDayRef.current = currentDay; }, [currentDay]);
     useEffect(() => { editBehaviorRef.current = editBehavior; }, [editBehavior]);
+    useEffect(() => { stepDirectionRef.current = stepDirection; }, [stepDirection]);
 
     useEffect(() => {
       if (
@@ -496,6 +500,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           customModeRef.current,
           drawingStateRef.current.activeOutlookType,
         )) {
+          setPaintBucketFeedback(null);
           handlePaintBucketMapClick({
             map,
             pixel: evt.pixel,
@@ -504,7 +509,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             outlookType: drawingStateRef.current.activeOutlookType,
             currentDay: currentDayRef.current,
             mode: editBehaviorRef.current,
+            stepDirection: stepDirectionRef.current,
             shiftKey: Boolean(evt.originalEvent.shiftKey),
+            activeProbability: activeProbabilityRef.current,
+            onNoOp: () => setPaintBucketFeedback(
+              `Set mode: this polygon already uses ${activeProbabilityRef.current}.`,
+            ),
           });
           return;
         }
@@ -1283,11 +1293,33 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                       type="button"
                       className={editBehavior === "step" ? "active" : ""}
                       onClick={() => setEditBehavior("step")}
-                      title="Click to raise risk; Shift+click to lower"
+                      title="Click to raise risk; use Down or Shift+click to lower"
                       aria-pressed={editBehavior === "step"}
                     >
                       Step
                     </button>
+                    {editBehavior === "step" && (
+                      <>
+                        <button
+                          type="button"
+                          className={stepDirection === "up" ? "active" : ""}
+                          onClick={() => setStepDirection("up")}
+                          title="Step up on polygon click"
+                          aria-pressed={stepDirection === "up"}
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          className={stepDirection === "down" ? "active" : ""}
+                          onClick={() => setStepDirection("down")}
+                          title="Step down on polygon click"
+                          aria-pressed={stepDirection === "down"}
+                        >
+                          Down
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       className={editBehavior === "assign" ? "active" : ""}
@@ -1344,9 +1376,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
             {interactionMode === "delete" &&
               "Delete mode: click any polygon to remove it."}
             {interactionMode === "edit" && editBehavior === "step" &&
-              "Edit (Step): click to raise risk one level. Shift+click to lower."}
+              `Edit (Step): ${stepDirection === "up" ? "click to raise risk" : "click to lower risk"}. Shift+click also lowers.`}
             {interactionMode === "edit" && editBehavior === "assign" &&
-              `Edit (Set): click a polygon to apply the active risk (${drawingState.activeProbability}).`}
+              (paintBucketFeedback ?? `Edit (Set): click a polygon to apply the active risk (${drawingState.activeProbability}).`)}
             {interactionMode === "pan" &&
               "Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details."}
             {interactionMode === "pan" && PAN_MODE_VERTEX_EDIT_HELP}

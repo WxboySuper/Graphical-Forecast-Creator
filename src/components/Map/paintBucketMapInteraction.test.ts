@@ -10,4 +10,9 @@ describe('paintBucketMapInteraction helpers', () => {
     expect(resolvePaintBucketEditAction('step', false)).toBe('step-up');
     expect(resolvePaintBucketEditAction('step', true)).toBe('step-down');
   });
+
+  test('step mode supports a visible down direction for touch input', () => {
+    expect(resolvePaintBucketEditAction('step', false, 'down')).toBe('step-down');
+    expect(resolvePaintBucketEditAction('assign', false, 'down')).toBe('recategorize');
+  });
 });
