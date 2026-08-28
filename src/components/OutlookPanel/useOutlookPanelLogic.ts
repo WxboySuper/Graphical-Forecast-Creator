@@ -18,6 +18,7 @@ import { getAvailableProbabilities } from './outlookPanelUtils';
 import { getOutlookConstraints } from '../../utils/outlookUtils';
 import {
   isOutlookTypeExposed,
+  isOutlookGeometryCopyExposed,
   isSignificantThreatsExposed,
 } from '../../config/productExposureSelectors';
 import {
@@ -108,7 +109,7 @@ export function useOutlookPanelLogic() {
   );
 
   const canCopyAllFrom = useCallback((sourceType: ProbabilisticHazardType) => {
-    if (!activeProbabilisticHazard || sourceType === activeProbabilisticHazard) {
+    if (!isOutlookGeometryCopyExposed() || !activeProbabilisticHazard || sourceType === activeProbabilisticHazard) {
       return false;
     }
 
@@ -121,7 +122,7 @@ export function useOutlookPanelLogic() {
   }, [activeProbabilisticHazard, currentDay, outlooks]);
 
   const canCopyProbabilityFrom = useCallback((sourceType: ProbabilisticHazardType) => {
-    if (!activeProbabilisticHazard || sourceType === activeProbabilisticHazard) {
+    if (!isOutlookGeometryCopyExposed() || !activeProbabilisticHazard || sourceType === activeProbabilisticHazard) {
       return false;
     }
 
