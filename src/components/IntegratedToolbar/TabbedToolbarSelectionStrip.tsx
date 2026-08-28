@@ -6,6 +6,7 @@ import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForeca
 import { outlookLabels } from '../ForecastWorkspace/workspaceMeta';
 import OutlookTrimPopover from './OutlookTrimPopover';
 import { isFeatureExposed } from '../../config/featureExposure';
+import OutlookGeometryCopyControls from '../OutlookSelector/OutlookGeometryCopyControls';
 
 /** Small presentational swatch showing outlook label and probability */
 const SelectionSwatch: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
@@ -72,6 +73,17 @@ const TabbedToolbarSelectionStrip: React.FC<{
   return (
     <div className="tabbed-integrated-toolbar__selection-strip flex min-w-0 items-center gap-2">
       <SelectionSwatch controller={controller} />
+      {controller.activeProbabilisticHazard ? (
+        <OutlookGeometryCopyControls
+          activeHazard={controller.activeProbabilisticHazard}
+          activeProbability={controller.activeProbability}
+          otherHazards={controller.otherProbabilisticHazards}
+          canCopyAllFrom={controller.canCopyAllFrom}
+          canCopyProbabilityFrom={controller.canCopyProbabilityFrom}
+          onCopyAllFrom={controller.onCopyAllGeometryFrom}
+          onCopyProbabilityFrom={controller.onCopyProbabilityGeometryFrom}
+        />
+      ) : null}
       {showToggle ? <LowProbToggle controller={controller} /> : null}
       {showShortcuts ? <ShortcutsPills /> : null}
     </div>

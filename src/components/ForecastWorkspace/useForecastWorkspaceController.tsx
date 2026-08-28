@@ -12,6 +12,7 @@ import { useExportMap } from '../DrawingTools/useExportMap';
 import { useTrimCurrentDayOutlooks } from '../../hooks/useTrimCurrentDayOutlooks';
 import type { LandMaskStrategy } from '../../utils/outlookPolygonMasking/types';
 
+import type { ProbabilisticHazardType } from '../../utils/outlookGeometryCopy';
 import { DayType, OutlookData, OutlookType } from '../../types/outlooks';
 import { getOutlookColor } from '../../utils/outlookUtils';
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
@@ -169,6 +170,12 @@ export interface ForecastWorkspaceController {
   onOmitDay: (day: DayType, reason: string) => void;
   omittedDays: Partial<Record<DayType, string>>;
   onNavigateToIssue: (day: DayType, outlookType: OutlookType) => void;
+  activeProbabilisticHazard: ProbabilisticHazardType | null;
+  otherProbabilisticHazards: ProbabilisticHazardType[];
+  canCopyAllFrom: (sourceType: ProbabilisticHazardType) => boolean;
+  canCopyProbabilityFrom: (sourceType: ProbabilisticHazardType) => boolean;
+  onCopyAllGeometryFrom: (sourceType: ProbabilisticHazardType) => void;
+  onCopyProbabilityGeometryFrom: (sourceType: ProbabilisticHazardType) => void;
 }
 
 interface UseForecastWorkspaceControllerOptions {
@@ -369,6 +376,12 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     onOmitDay: handleOmitDay,
     omittedDays,
     onNavigateToIssue: handleNavigateToIssue,
+    activeProbabilisticHazard: panel.activeProbabilisticHazard,
+    otherProbabilisticHazards: panel.otherProbabilisticHazards,
+    canCopyAllFrom: panel.canCopyAllFrom,
+    canCopyProbabilityFrom: panel.canCopyProbabilityFrom,
+    onCopyAllGeometryFrom: panel.handleCopyAllGeometryFrom,
+    onCopyProbabilityGeometryFrom: panel.handleCopyProbabilityGeometryFrom,
     ...handlers,
   };
 }
