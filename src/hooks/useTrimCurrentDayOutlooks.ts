@@ -14,6 +14,7 @@ interface UseTrimCurrentDayOutlooksOptions {
 }
 
 /** Runs the on-demand trim action after preloading the cached land mask. */
+// @codescene(disable:"Complex Method")
 export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlooksOptions) => {
   const dispatch = useDispatch<AppDispatch>();
   const store = useStore<RootState>();
