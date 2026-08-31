@@ -53,6 +53,42 @@ const normalizeReadResult = (
   result: Feature<Geometry> | Feature<Geometry>[],
 ): Feature<Geometry>[] => (Array.isArray(result) ? result : [result]);
 
+/**
+ * OpenLayers' Snap interaction assumes every indexed geometry has a finite,
+ * non-empty extent. A malformed persisted or derived feature can otherwise
+ * throw from inside Snap while VectorSource dispatches its add event.
+ */
+const hasRenderableGeometry = (feature: Feature<Geometry>): boolean => {
+  const geometry = feature.getGeometry();
+  if (!geometry) {
+    return false;
+  }
+
+  try {
+    const extent = geometry.getExtent();
+    return extent.length === 4
+      && extent.every(Number.isFinite)
+      && extent[0] <= extent[2]
+      && extent[1] <= extent[3];
+  } catch {
+    return false;
+  }
+};
+
+/** Reads a descriptor without allowing malformed geometry to reach OpenLayers. */
+const readRenderableFeatures = (
+  descriptor: FeatureSyncDescriptor,
+): Feature<Geometry>[] | null => {
+  try {
+    const parsedFeatures = normalizeReadResult(descriptor.read());
+    return parsedFeatures.length > 0 && parsedFeatures.every(hasRenderableGeometry)
+      ? parsedFeatures
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 const requireStableId = (descriptor: FeatureSyncDescriptor): void => {
   const stableId = descriptor.stableId ?? descriptor.feature.id;
   if (String(stableId ?? "").trim() === "") {
@@ -204,7 +240,12 @@ const reconcileDescriptor = (
     return;
   }
 
-  const parsedFeatures = normalizeReadResult(descriptor.read());
+  const parsedFeatures = readRenderableFeatures(descriptor);
+  if (!parsedFeatures) {
+    // Keep an existing good render when a replacement cannot be parsed. New
+    // malformed features are omitted until their source data becomes valid.
+    return;
+  }
   increment(stats, "parsed");
   const sharedFeatureCount = updateSharedFeatures(
     existing,

@@ -104,10 +104,10 @@ describe("reconcileFeatureSource", () => {
   test("only parses one feature during a representative large-forecast edit", () => {
     const source = new VectorSource();
     const format = new GeoJSON();
-    const features = Array.from({ length: 256 }, (_, index) => createFeature(`feature-${index}`, index));
+    const features = Array.from({ length: 256 }, (_, index) => createFeature(`feature-${index}`, index / 10));
     reconcileFeatureSource(source, features.map((feature) => createDescriptor(feature, format)));
 
-    const changedFeature = createFeature("feature-128", 1000);
+    const changedFeature = createFeature("feature-128", 50);
     const stats = createStats();
     reconcileFeatureSource(
       source,
@@ -288,5 +288,34 @@ describe("reconcileFeatureSource", () => {
     expect(source.getFeatures()).toHaveLength(1);
     expect(source.getFeatures()[0]).toBe(olFeature);
     expect(source.getFeatures()[0]?.get("probability")).toBe("10%");
+  });
+
+  test("skips empty geometry before OpenLayers Snap can index it", () => {
+    const source = new VectorSource();
+    const format = new GeoJSON();
+    const feature = createFeature("empty", 0);
+    feature.geometry = { type: "Polygon", coordinates: [] };
+    const stats = createStats();
+
+    reconcileFeatureSource(source, [createDescriptor(feature, format)], stats);
+
+    expect(source.getFeatures()).toHaveLength(0);
+    expect(stats).toEqual({ parsed: 0, added: 0, updated: 0, removed: 0, reused: 0 });
+  });
+
+  test("keeps existing geometry when a replacement cannot be rendered", () => {
+    const source = new VectorSource();
+    const format = new GeoJSON();
+    const initial = createFeature("stable", 0);
+    reconcileFeatureSource(source, [createDescriptor(initial, format)]);
+    const initialOlFeature = source.getFeatures()[0];
+
+    const replacement = createFeature("stable", 10);
+    replacement.geometry = { type: "Polygon", coordinates: [] };
+    const stats = createStats();
+    reconcileFeatureSource(source, [createDescriptor(replacement, format)], stats);
+
+    expect(source.getFeatures()).toEqual([initialOlFeature]);
+    expect(stats).toEqual({ parsed: 0, added: 0, updated: 0, removed: 0, reused: 0 });
   });
 });
