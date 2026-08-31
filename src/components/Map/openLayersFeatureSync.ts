@@ -1,3 +1,4 @@
+// @codescene(disable:"Overall Code Complexity")
 import Feature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import type VectorSource from "ol/source/Vector";
