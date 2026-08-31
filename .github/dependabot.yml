@@ -6,16 +6,25 @@ version: 2
 
 updates:
   - package-ecosystem: npm
-    directories:
-      - /
-      - /server
+    directory: /
     target-branch: main
     schedule:
       interval: weekly
-    patterns:
-      - "*"
     groups:
-      non-major:
+      app-non-major:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /server
+    target-branch: main
+    schedule:
+      interval: weekly
+    groups:
+      server-non-major:
         patterns:
           - "*"
         update-types:
