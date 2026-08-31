@@ -183,6 +183,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     temporary: true,
     removalCondition: 'Keep disabled until a future Winter workspace release is approved.',
     serverBacked: false,
+    trackingIssue: 913,
   },
   collaborationRoom: {
     exposure: { ...ALL_TARGETS_OFF },

@@ -30,9 +30,10 @@ export const getDefaultForecastWorkspacePath = (): '/forecast/severe' => '/forec
 /** Returns routes whose feature exposure allows registration on a target. */
 export const getExposedForecastWorkspaceRoutes = (
   target: BuildTarget = getBuildTarget(),
-): ForecastWorkspaceRouteDefinition[] => FORECAST_WORKSPACE_ROUTES.filter(
-  (route) => !route.feature || isFeatureExposedOnTarget(route.feature, target),
-) as ForecastWorkspaceRouteDefinition[];
+): ForecastWorkspaceRouteDefinition[] => FORECAST_WORKSPACE_ROUTES.filter((route) => {
+  if (!('feature' in route)) return true;
+  return isFeatureExposedOnTarget(route.feature, target);
+}) as ForecastWorkspaceRouteDefinition[];
 
 /** Returns the workspace definition for a canonical id. */
 export const getForecastWorkspaceRoute = (
@@ -40,4 +41,3 @@ export const getForecastWorkspaceRoute = (
 ): ForecastWorkspaceRouteDefinition => FORECAST_WORKSPACE_ROUTES.find(
   (route) => route.id === workspaceId,
 ) as ForecastWorkspaceRouteDefinition;
-

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Provider, useDispatch } from 'react-redux';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
 import { store } from './store';
 import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
 import useAutoCategorical from './hooks/useAutoCategorical';
@@ -61,6 +61,17 @@ const RouteFallback = () => (
     <span className="text-sm text-muted-foreground">Loading…</span>
   </div>
 );
+
+/** Redirects the legacy Forecast entry point without dropping deep-link options. */
+const ForecastLegacyRedirect = () => {
+  const location = useLocation();
+  return (
+    <Navigate
+      to={{ pathname: getDefaultForecastWorkspacePath(), search: location.search, hash: location.hash }}
+      replace
+    />
+  );
+};
 
 // Launch gate: set VITE_COMING_SOON=true in the public build to enable pre-launch mode.
 // The app auto-unlocks at the launch date/time regardless of the env var.
@@ -209,7 +220,7 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="admin" element={<Suspense fallback={<RouteFallback />}><AdminPage /></Suspense>} />
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
         <Route path="forecast">
-          <Route index element={<Navigate to={getDefaultForecastWorkspacePath()} replace />} />
+          <Route index element={<ForecastLegacyRedirect />} />
           <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage /></Suspense>} />
         </Route>
         <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />

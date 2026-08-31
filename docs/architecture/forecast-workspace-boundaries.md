@@ -19,7 +19,7 @@ The canonical Forecast routes are:
 | Custom | `/forecast/custom` | registered by #915 | `customProducts` |
 
 `/forecast` is a compatibility entry point. It redirects to
-`/forecast/severe`. The workspace id comes from the URL, not from a global
+`/forecast/severe` while preserving the query string and hash. The workspace id comes from the URL, not from a global
 "current workspace" value in Redux. That makes refresh, browser history, and
 shared links deterministic.
 
@@ -135,4 +135,3 @@ server-backed work.
 - #919 registers and enables Mesoscale in stages, then defines its payload
   details against this boundary.
 - #921 consumes Mesoscale data in Monitor as read-only display state.
-
