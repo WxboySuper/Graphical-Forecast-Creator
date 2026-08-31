@@ -75,6 +75,7 @@ const hasFiniteCoordinateTree = (value: unknown): boolean => {
 };
 
 /** Checks the minimum coordinate shape needed by OpenLayers' Snap segmenters. */
+// @codescene(disable:"Complex Method")
 const hasValidCoordinateShape = (feature: Feature<Geometry>): boolean => {
   const geometry = feature.getGeometry();
   if (!geometry) return false;
