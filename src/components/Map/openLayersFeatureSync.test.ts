@@ -304,6 +304,22 @@ describe("reconcileFeatureSource", () => {
     expect(stats).toEqual({ parsed: 0, added: 0, updated: 0, removed: 0, reused: 0, skipped: 1 });
   });
 
+  test("skips a polygon with an unusable ring before OpenLayers Snap can index it", () => {
+    const source = new VectorSource();
+    const format = new GeoJSON();
+    const feature = createFeature("short-ring", 0);
+    feature.geometry = {
+      type: "Polygon",
+      coordinates: [[[0, 0], [1, 0], [0, 0]]],
+    };
+    const stats = createStats();
+
+    reconcileFeatureSource(source, [createDescriptor(feature, format)], stats);
+
+    expect(source.getFeatures()).toHaveLength(0);
+    expect(stats.skipped).toBe(1);
+  });
+
   test("keeps existing geometry when a replacement cannot be rendered", () => {
     const source = new VectorSource();
     const format = new GeoJSON();
