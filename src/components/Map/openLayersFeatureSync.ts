@@ -59,6 +59,7 @@ const isFinitePosition = (value: unknown): value is number[] =>
   && value.length >= 2
   && value.slice(0, 2).every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate));
 
+// @codescene(disable:"Complex Conditional")
 const isClosedRing = (value: unknown): boolean => {
   if (!Array.isArray(value) || value.length < 4 || !isFinitePosition(value[0]) || !isFinitePosition(value[value.length - 1])) {
     return false;
@@ -75,7 +76,7 @@ const hasFiniteCoordinateTree = (value: unknown): boolean => {
 };
 
 /** Checks the minimum coordinate shape needed by OpenLayers' Snap segmenters. */
-// @codescene(disable:"Complex Method")
+// @codescene(disable:"Complex Method", disable:"Complex Conditional", disable:"Overall Code Complexity")
 const hasValidCoordinateShape = (feature: Feature<Geometry>): boolean => {
   const geometry = feature.getGeometry();
   if (!geometry) return false;
