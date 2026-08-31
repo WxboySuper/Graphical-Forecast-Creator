@@ -24,6 +24,7 @@ import type Geometry from "ol/geom/Geometry";
 import { click } from "ol/events/condition";
 import { v4 as uuidv4 } from "uuid";
 import { Redo2, Undo2 } from "lucide-react";
+import { captureMessage } from "@sentry/react";
 import {
   addFeature,
   addCustomFeature,
@@ -84,6 +85,7 @@ import {
   getForecastSourceDescriptorPlan,
   reconcileFeatureSource,
   type FeatureSyncDescriptor,
+  type FeatureSyncStats,
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 
@@ -1090,9 +1092,31 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         source,
         categoricalSource: catSource,
       });
-      reconcileFeatureSource(source, sourceDescriptorPlan.source);
-      reconcileFeatureSource(catSource, sourceDescriptorPlan.categorical);
-      reconcileFeatureSource(ghostSource, ghostDescriptors);
+      const reconcileSource = (
+        targetSource: VectorSource,
+        descriptors: FeatureSyncDescriptor[],
+        sourceName: string,
+      ): void => {
+        const stats: FeatureSyncStats = {
+          parsed: 0,
+          added: 0,
+          updated: 0,
+          removed: 0,
+          reused: 0,
+          skipped: 0,
+        };
+        reconcileFeatureSource(targetSource, descriptors, stats);
+        if (stats.skipped > 0) {
+          captureMessage("Forecast map skipped invalid geometry", {
+            level: "warning",
+            tags: { source: sourceName, reason: "invalid-geometry" },
+          });
+        }
+      };
+
+      reconcileSource(source, sourceDescriptorPlan.source, "forecast");
+      reconcileSource(catSource, sourceDescriptorPlan.categorical, "categorical");
+      reconcileSource(ghostSource, ghostDescriptors, "ghost");
     }, [
       serializedFeatures,
       outlookOpacity,
