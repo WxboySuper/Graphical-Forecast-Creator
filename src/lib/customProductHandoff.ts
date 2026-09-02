@@ -16,10 +16,47 @@ const isKnownBuiltInProductSnapshot = (snapshot: OneOffCustomLayer['productSnaps
     product.id === snapshot?.sourceProductId && product.version === snapshot?.sourceProductVersion
   ));
 
+const isStorageUnavailableError = (error: unknown): boolean => {
+  if (error instanceof DOMException) {
+    return error.name === 'SecurityError' || error.code === 18 || error.name === 'QuotaExceededError';
+  }
+  // Some WebKit versions throw plain Error with code 18 or message containing SecurityError
+  if (error && typeof error === 'object' && 'code' in error && (error as { code?: number }).code === 18) return true;
+  if (error instanceof Error && /SecurityError|The operation is insecure|QuotaExceededError/i.test(error.message)) return true;
+  return false;
+};
+
+const safeGetItem = (key: string): string | null => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch (error) {
+    if (isStorageUnavailableError(error)) return null;
+    return null; // be conservative: any storage read failure -> treat as no handoff
+  }
+};
+
+const safeSetItem = (key: string, value: string): void => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (error) {
+    if (isStorageUnavailableError(error)) return;
+    return; // swallow storage write failure — caller cannot recover
+  }
+};
+
+const safeRemoveItem = (key: string): void => {
+  try {
+    sessionStorage.removeItem(key);
+  } catch (error) {
+    if (isStorageUnavailableError(error)) return;
+    return;
+  }
+};
+
 /** Restores a validated handoff when the forecast cannot accept it yet. */
 export const restoreCustomProductForecastHandoff = (layer: OneOffCustomLayer): void => {
   if (!isOneOffCustomLayer(layer)) throw new TypeError('Cannot restore an invalid custom product handoff.');
-  sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
+  safeSetItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
 };
 
 /** Stages a detached empty layer for the forecast editor to consume without retaining a live template reference. */
@@ -41,9 +78,9 @@ export const stageCustomProductForForecast = (
 
 /** Consumes only a fully validated staged layer and clears malformed handoffs defensively. */
 export const consumeCustomProductForecastHandoff = (premiumActive: boolean): OneOffCustomLayer | null => {
-  const serialized = sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  const serialized = safeGetItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   if (!serialized) return null;
-  sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   try {
     const parsed = JSON.parse(serialized) as unknown;
     if (!isOneOffCustomLayer(parsed)) return null;
@@ -55,14 +92,14 @@ export const consumeCustomProductForecastHandoff = (premiumActive: boolean): One
 
 /** Clears a staged layer only when it was created from the deleted product. */
 export const clearCustomProductForecastHandoff = (sourceProductId: CustomProductId): void => {
-  const serialized = sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  const serialized = safeGetItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   if (!serialized) return;
   try {
     const parsed = JSON.parse(serialized) as unknown;
     if (isOneOffCustomLayer(parsed) && parsed.productSnapshot?.sourceProductId === sourceProductId) {
-      sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+      safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY);
     }
   } catch {
-    sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+    safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   }
 };
