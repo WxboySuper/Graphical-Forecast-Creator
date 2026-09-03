@@ -16,7 +16,7 @@ const LIMITATIONS_TEXT = `GFC KMZ export limitations
 `;
 
 /** Builds a KMZ archive with one KML file per day/outlook combination plus a root index. */
-export const buildSplitKmzArchive = async (input: KmzExportInput): Promise<Blob> => {
+export const buildSplitKmzArchive = (input: KmzExportInput): Promise<Blob> => {
   const zip = new JSZip();
   const features = collectKmzExportFeatures(input);
   const groupedByDay = groupFeaturesByDay(features);
@@ -71,7 +71,7 @@ export const buildSplitKmzArchive = async (input: KmzExportInput): Promise<Blob>
 };
 
 /** Builds a KMZ archive containing a single structured KML document. */
-export const buildStructuredKmzArchive = async (input: KmzExportInput): Promise<Blob> => {
+export const buildStructuredKmzArchive = (input: KmzExportInput): Promise<Blob> => {
   const zip = new JSZip();
   zip.file('doc.kml', buildStructuredKmlDocument(input));
   zip.file('README-limitations.txt', LIMITATIONS_TEXT);
