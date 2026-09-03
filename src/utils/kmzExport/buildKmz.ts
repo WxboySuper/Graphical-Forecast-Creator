@@ -5,7 +5,7 @@ import { escapeXml } from './color';
 import type { KmzExportInput } from './types';
 
 const LIMITATIONS_TEXT = `GFC KMZ export limitations
-==========================
+--------------------------
 
 - CIG hatch patterns (CIG1/CIG2/CIG3) export as lightly filled polygons with metadata only.
 - Significant (#) contours keep fill color but do not export the black hatch overlay.
