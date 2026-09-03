@@ -58,10 +58,11 @@ describe('customProductHandoff — iOS private mode hardening (GFC-WEB-Y)', () =
     expect(consumeCustomProductForecastHandoff(true)).toBeNull();
   });
 
-  test('consume returns null and swallows removeItem SecurityError', () => {
+  test('consume returns null when removeItem SecurityError prevents consume-once semantics', () => {
     sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(validLayer()));
     jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError'); });
-    expect(consumeCustomProductForecastHandoff(true)).toEqual(validLayer());
+    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
+    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
   });
 
   test('restore does not throw when setItem throws SecurityError', () => {
