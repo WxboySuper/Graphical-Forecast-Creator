@@ -111,6 +111,7 @@ Work toward the next major release continues in the beta channel while the final
 
 #### Fixed
 
+- **Custom product handoff:** Handle unavailable sessionStorage safely and avoid consuming a handoff when its removal fails.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical worker recovery:** Reset failed or timed-out workers, preserve the last good categorical geometry, and allow later edits to derive again instead of repeating the same Redux error.
 - **Auto-TSTM production runtime:** Start the versioned analytics release with the verified Python worker runtime, restore the production capability endpoint, and fail deploys when Auto-TSTM is unavailable.
