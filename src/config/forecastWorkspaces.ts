@@ -17,6 +17,7 @@ export const FORECAST_WORKSPACES: Record<ForecastWorkspaceId, ForecastWorkspace>
   winter: { id: "winter", route: "/forecast/winter", label: "Winter", exposureKey: "winterWorkspace" },
 };
 
+/** Throws when a cycle date is not a real ISO calendar date. */
 const assertValidCycleDate = (cycleDate: string): void => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cycleDate)) {
     throw new Error(`Invalid cycle date ${JSON.stringify(cycleDate)}.`);
