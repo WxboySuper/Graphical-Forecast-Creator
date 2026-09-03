@@ -49,6 +49,7 @@ Work toward the next major release continues in the beta channel while the final
 
 #### Fixed
 
+- **Custom product handoff:** Handle unavailable sessionStorage safely and avoid consuming a handoff when its removal fails.
 - **Workflow review and Tropical AOI:** Restore review-package visibility and Discussion-page modal controls, and align Tropical AOI with the three probability-band colors used by the reference product.
 - **Forecast reliability:** Repair legacy serialized map shapes, auto-categorical restoration, export sizing, map popup teardown, keyboard shortcuts, and Safari Firestore sleep/reconnect behavior.
 - **Import hardening:** Bound and schema-validate imported forecast files (size, nesting, arrays, features, strings, and coordinates) before any state mutation, with supported geometry types and finite coordinates enforced at every import entry point.
@@ -110,6 +111,7 @@ Work toward the next major release continues in the beta channel while the final
 
 #### Fixed
 
+- **Custom product handoff:** Handle unavailable sessionStorage safely and avoid consuming a handoff when its removal fails.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical worker recovery:** Reset failed or timed-out workers, preserve the last good categorical geometry, and allow later edits to derive again instead of repeating the same Redux error.
 - **Auto-TSTM production runtime:** Start the versioned analytics release with the verified Python worker runtime, restore the production capability endpoint, and fail deploys when Auto-TSTM is unavailable.
