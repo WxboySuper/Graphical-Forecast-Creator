@@ -9,6 +9,7 @@ import { isBuiltInCustomProductId } from './customProductTrust';
 
 export const CUSTOM_PRODUCT_HANDOFF_KEY = 'gfc-custom-product-handoff';
 
+/** Returns whether a snapshot still matches one of the built-in products. */
 const isKnownBuiltInProductSnapshot = (snapshot: OneOffCustomLayer['productSnapshot']): boolean =>
   Boolean(snapshot?.builtIn)
   && isBuiltInCustomProductId(snapshot?.sourceProductId)
@@ -16,39 +17,29 @@ const isKnownBuiltInProductSnapshot = (snapshot: OneOffCustomLayer['productSnaps
     product.id === snapshot?.sourceProductId && product.version === snapshot?.sourceProductVersion
   ));
 
-const isStorageUnavailableError = (error: unknown): boolean => {
-  if (error instanceof DOMException) {
-    return error.name === 'SecurityError' || error.code === 18 || error.name === 'QuotaExceededError';
-  }
-  // Some WebKit versions throw plain Error with code 18 or message containing SecurityError
-  if (error && typeof error === 'object' && 'code' in error && (error as { code?: number }).code === 18) return true;
-  if (error instanceof Error && /SecurityError|The operation is insecure|QuotaExceededError/i.test(error.message)) return true;
-  return false;
-};
-
+/** Reads the handoff without allowing unavailable browser storage to break forecast mounting. */
 const safeGetItem = (key: string): string | null => {
   try {
     return sessionStorage.getItem(key);
-  } catch (error) {
-    if (isStorageUnavailableError(error)) return null;
-    return null; // be conservative: any storage read failure -> treat as no handoff
+  } catch {
+    return null;
   }
 };
 
+/** Writes the handoff when browser storage is available. */
 const safeSetItem = (key: string, value: string): void => {
   try {
     sessionStorage.setItem(key, value);
-  } catch (error) {
-    if (isStorageUnavailableError(error)) return;
+  } catch {
     return; // swallow storage write failure — caller cannot recover
   }
 };
 
+/** Removes the handoff when browser storage is available. */
 const safeRemoveItem = (key: string): void => {
   try {
     sessionStorage.removeItem(key);
-  } catch (error) {
-    if (isStorageUnavailableError(error)) return;
+  } catch {
     return;
   }
 };
