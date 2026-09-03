@@ -5,7 +5,7 @@ import { escapeXml } from './color';
 import type { KmzExportInput } from './types';
 
 const LIMITATIONS_TEXT = `GFC KMZ export limitations
---------------------------
+==========================
 
 - CIG hatch patterns (CIG1/CIG2/CIG3) export as lightly filled polygons with metadata only.
 - Significant (#) contours keep fill color but do not export the black hatch overlay.
@@ -16,7 +16,7 @@ const LIMITATIONS_TEXT = `GFC KMZ export limitations
 `;
 
 /** Builds a KMZ archive with one KML file per day/outlook combination plus a root index. */
-export const buildSplitKmzArchive = (input: KmzExportInput): Promise<Blob> => {
+export const buildSplitKmzArchive = async (input: KmzExportInput): Promise<Blob> => {
   const zip = new JSZip();
   const features = collectKmzExportFeatures(input);
   const groupedByDay = groupFeaturesByDay(features);
@@ -27,8 +27,6 @@ export const buildSplitKmzArchive = (input: KmzExportInput): Promise<Blob> => {
 
   groupedByDay.forEach((dayFeatures, day) => {
     const groupedByOutlook = groupFeaturesByOutlook(dayFeatures);
-    const dayForecast = input.forecastCycle.days[day];
-    if (!dayForecast) return;
 
     groupedByOutlook.forEach((outlookFeatures, outlookType) => {
       const relativePath = `days/day-${day}/${outlookType}.kml`;
@@ -36,7 +34,7 @@ export const buildSplitKmzArchive = (input: KmzExportInput): Promise<Blob> => {
         forecastCycle: {
           ...input.forecastCycle,
           days: {
-            [day]: dayForecast,
+            [day]: input.forecastCycle.days[day]!,
           },
           currentDay: day,
         },
@@ -71,7 +69,7 @@ export const buildSplitKmzArchive = (input: KmzExportInput): Promise<Blob> => {
 };
 
 /** Builds a KMZ archive containing a single structured KML document. */
-export const buildStructuredKmzArchive = (input: KmzExportInput): Promise<Blob> => {
+export const buildStructuredKmzArchive = async (input: KmzExportInput): Promise<Blob> => {
   const zip = new JSZip();
   zip.file('doc.kml', buildStructuredKmlDocument(input));
   zip.file('README-limitations.txt', LIMITATIONS_TEXT);
