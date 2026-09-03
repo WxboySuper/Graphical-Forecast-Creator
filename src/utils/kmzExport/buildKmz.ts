@@ -27,6 +27,8 @@ export const buildSplitKmzArchive = async (input: KmzExportInput): Promise<Blob>
 
   groupedByDay.forEach((dayFeatures, day) => {
     const groupedByOutlook = groupFeaturesByOutlook(dayFeatures);
+    const dayForecast = input.forecastCycle.days[day];
+    if (!dayForecast) return;
 
     groupedByOutlook.forEach((outlookFeatures, outlookType) => {
       const relativePath = `days/day-${day}/${outlookType}.kml`;
@@ -34,7 +36,7 @@ export const buildSplitKmzArchive = async (input: KmzExportInput): Promise<Blob>
         forecastCycle: {
           ...input.forecastCycle,
           days: {
-            [day]: input.forecastCycle.days[day]!,
+            [day]: dayForecast,
           },
           currentDay: day,
         },
