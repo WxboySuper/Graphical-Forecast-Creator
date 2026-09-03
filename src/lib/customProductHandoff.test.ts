@@ -22,6 +22,25 @@ const draft = () => ({
   categories: [category('Moderate', 0), category('High', 1)],
 });
 
+const validLayer = () => ({
+  schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+  id: 'layer-1',
+  label: 'Test',
+  order: 0,
+  categories: [category('Moderate', 0)],
+  features: [],
+  productSnapshot: {
+    schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+    sourceProductId: 'product-01',
+    sourceProductVersion: 1,
+    label: 'Test',
+    categories: [category('Moderate', 0)],
+    capturedAt: '2026-07-17T12:00:00.000Z',
+  },
+  createdAt: '2026-07-17T12:00:00.000Z',
+  updatedAt: '2026-07-17T12:00:00.000Z',
+});
+
 describe('customProductHandoff — iOS private mode hardening (GFC-WEB-Y)', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); jest.restoreAllMocks(); });
 
@@ -40,20 +59,9 @@ describe('customProductHandoff — iOS private mode hardening (GFC-WEB-Y)', () =
   });
 
   test('consume returns null and swallows removeItem SecurityError', () => {
-    const validLayer = {
-      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
-      id: 'layer-1',
-      label: 'Test',
-      order: 0,
-      categories: [category('Moderate', 0)],
-      features: [],
-      productSnapshot: { schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, sourceProductId: 'product-01', sourceProductVersion: 1, label: 'Test', categories: [category('Moderate', 0)], capturedAt: '2026-07-17T12:00:00.000Z' },
-      createdAt: '2026-07-17T12:00:00.000Z',
-      updatedAt: '2026-07-17T12:00:00.000Z',
-    };
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(validLayer));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(validLayer()));
     jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError'); });
-    expect(consumeCustomProductForecastHandoff(true)).toEqual(validLayer);
+    expect(consumeCustomProductForecastHandoff(true)).toEqual(validLayer());
   });
 
   test('restore does not throw when setItem throws SecurityError', () => {
@@ -79,18 +87,7 @@ describe('customProductHandoff — iOS private mode hardening (GFC-WEB-Y)', () =
   });
 
   test('clear does not throw when removeItem throws QuotaExceededError variant', () => {
-    const validLayer = {
-      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
-      id: 'layer-1',
-      label: 'Test',
-      order: 0,
-      categories: [category('Moderate', 0)],
-      features: [],
-      productSnapshot: { schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, sourceProductId: 'product-01', sourceProductVersion: 1, label: 'Test', categories: [category('Moderate', 0)], capturedAt: '2026-07-17T12:00:00.000Z' },
-      createdAt: '2026-07-17T12:00:00.000Z',
-      updatedAt: '2026-07-17T12:00:00.000Z',
-    };
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(validLayer));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(validLayer()));
     jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); });
     sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, '{bad json');
     jest.spyOn(Storage.prototype, 'getItem').mockReturnValue('{bad json');
