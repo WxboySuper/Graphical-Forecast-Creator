@@ -36,11 +36,12 @@ const safeSetItem = (key: string, value: string): void => {
 };
 
 /** Removes the handoff when browser storage is available. */
-const safeRemoveItem = (key: string): void => {
+const safeRemoveItem = (key: string): boolean => {
   try {
     sessionStorage.removeItem(key);
+    return true;
   } catch {
-    return;
+    return false;
   }
 };
 
@@ -71,7 +72,7 @@ export const stageCustomProductForForecast = (
 export const consumeCustomProductForecastHandoff = (premiumActive: boolean): OneOffCustomLayer | null => {
   const serialized = safeGetItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   if (!serialized) return null;
-  safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  if (!safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY)) return null;
   try {
     const parsed = JSON.parse(serialized) as unknown;
     if (!isOneOffCustomLayer(parsed)) return null;
