@@ -15,9 +15,9 @@ describe('featureSurfaces', () => {
     expect(FEATURE_SIDE_EFFECT_MODULES.customProducts).toEqual(['../lib/customProductsRepository']);
   });
 
-  test('keeps unfinished workspace exposure disabled', () => {
+  test('keeps unfinished workspace exposure scoped to its approved targets', () => {
     expect(FEATURE_EXPOSURE_REGISTRY.mesoscaleWorkspace.exposure).toEqual({
-      local: false, beta: false, staging: false, production: false,
+      local: true, beta: false, staging: false, production: false,
     });
     expect(FEATURE_EXPOSURE_REGISTRY.winterWorkspace.exposure).toEqual({
       local: false, beta: false, staging: false, production: false,

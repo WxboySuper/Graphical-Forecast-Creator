@@ -13,7 +13,7 @@ The canonical Forecast routes are:
 | Workspace | Canonical path | v1.8 state | Exposure owner |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
+| Mesoscale | `/forecast/mesoscale` | available locally; gated on deployed targets until #919 enables it | `mesoscaleWorkspace` |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
 | Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
 | Custom | `/forecast/custom` | registered by #915 | `customProducts` |
