@@ -36,11 +36,17 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
+import { isFeatureExposed } from './config/featureExposure';
 import { getDefaultForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
 const ForecastPage = lazy(() => import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage })));
+const MesoscaleWorkspacePage = lazy(() =>
+  import('./components/MesoscaleWorkspace/MesoscaleWorkspace').then(({ MesoscaleWorkspace }) => ({
+    default: () => <MesoscaleWorkspace payload={null} />,
+  })),
+);
 const DiscussionPage = lazy(() => import('./pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage })));
 const VerificationPage = lazy(() => import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage })));
 const MonitorPage = lazy(() => import('./pages/MonitorPage').then((module) => ({ default: module.MonitorPage })));
@@ -222,6 +228,12 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
         <Route path="forecast">
           <Route index element={<ForecastLegacyRedirect />} />
           <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage /></Suspense>} />
+          {isFeatureExposed('mesoscaleWorkspace') ? (
+            <Route
+              path="mesoscale"
+              element={<Suspense fallback={<RouteFallback />}><MesoscaleWorkspacePage /></Suspense>}
+            />
+          ) : null}
         </Route>
         <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />

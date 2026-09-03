@@ -7,6 +7,14 @@ jest.mock('./pages/HomePage', () => ({
   __esModule: true,
   default: () => <div>HomePage Mock</div>,
 }));
+
+jest.mock('./config/featureExposure', () => {
+  const actual = jest.requireActual('./config/featureExposure');
+  return {
+    ...actual,
+    isFeatureExposed: (feature: string) => feature === 'mesoscaleWorkspace' || actual.isFeatureExposed(feature),
+  };
+});
 jest.mock('./pages/ComingSoonPage', () => ({
   ComingSoonPage: () => <div>ComingSoonPage Mock</div>,
 }));
@@ -45,6 +53,9 @@ jest.mock('./components/Layout', () => ({
 }));
 
 jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
+jest.mock('./components/MesoscaleWorkspace/MesoscaleWorkspace', () => ({
+  MesoscaleWorkspace: () => <div>MesoscaleWorkspace Mock</div>,
+}));
 jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
 jest.mock('./components/Beta/BetaAccessGuard', () => () => <MockOutlet />);
@@ -66,5 +77,14 @@ describe('App Simple', () => {
       render(<App />);
     });
     expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
+  });
+
+  test('registers the Mesoscale route when its feature is exposed', async () => {
+    window.history.pushState({}, '', '/forecast/mesoscale');
+
+    render(<App />);
+
+    expect(await screen.findByText(/MesoscaleWorkspace Mock/i)).toBeInTheDocument();
+    window.history.pushState({}, '', '/');
   });
 });
