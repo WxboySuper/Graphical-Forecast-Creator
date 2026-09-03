@@ -23,14 +23,18 @@ describe("forecastWorkspaces #914", () => {
       "winter",
     ]);
     expect(isWorkspaceExposed("severe")).toBe(true);
-    expect(isWorkspaceExposed("mesoscale")).toBe(false);
+    expect(isWorkspaceExposed("mesoscale")).toBe(target === "local");
     expect(isWorkspaceExposed("tropical")).toBe(false);
     expect(isWorkspaceExposed("winter")).toBe(false);
     expect(isWorkspaceExposed("custom")).toBe(true);
   });
 
   test("exposed workspaces includes only enabled workspaces", () => {
-    expect(getExposedWorkspaces().map((workspace) => workspace.id)).toEqual(["severe", "custom"]);
+    expect(getExposedWorkspaces().map((workspace) => workspace.id)).toEqual(
+      globalThis.__GFC_BUILD_TARGET__ === "local"
+        ? ["severe", "mesoscale", "custom"]
+        : ["severe", "custom"],
+    );
   });
 
   test("returns false for an unknown workspace at runtime", () => {
