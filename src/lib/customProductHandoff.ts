@@ -9,6 +9,7 @@ import { isBuiltInCustomProductId } from './customProductTrust';
 
 export const CUSTOM_PRODUCT_HANDOFF_KEY = 'gfc-custom-product-handoff';
 
+/** Returns whether a snapshot still matches one of the built-in products. */
 const isKnownBuiltInProductSnapshot = (snapshot: OneOffCustomLayer['productSnapshot']): boolean =>
   Boolean(snapshot?.builtIn)
   && isBuiltInCustomProductId(snapshot?.sourceProductId)
@@ -16,10 +17,38 @@ const isKnownBuiltInProductSnapshot = (snapshot: OneOffCustomLayer['productSnaps
     product.id === snapshot?.sourceProductId && product.version === snapshot?.sourceProductVersion
   ));
 
+/** Reads the handoff without allowing unavailable browser storage to break forecast mounting. */
+const safeGetItem = (key: string): string | null => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+/** Writes the handoff when browser storage is available. */
+const safeSetItem = (key: string, value: string): void => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    return; // swallow storage write failure — caller cannot recover
+  }
+};
+
+/** Removes the handoff when browser storage is available. */
+const safeRemoveItem = (key: string): boolean => {
+  try {
+    sessionStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** Restores a validated handoff when the forecast cannot accept it yet. */
 export const restoreCustomProductForecastHandoff = (layer: OneOffCustomLayer): void => {
   if (!isOneOffCustomLayer(layer)) throw new TypeError('Cannot restore an invalid custom product handoff.');
-  sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
+  safeSetItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
 };
 
 /** Stages a detached empty layer for the forecast editor to consume without retaining a live template reference. */
@@ -41,9 +70,9 @@ export const stageCustomProductForForecast = (
 
 /** Consumes only a fully validated staged layer and clears malformed handoffs defensively. */
 export const consumeCustomProductForecastHandoff = (premiumActive: boolean): OneOffCustomLayer | null => {
-  const serialized = sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  const serialized = safeGetItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   if (!serialized) return null;
-  sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  if (!safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY)) return null;
   try {
     const parsed = JSON.parse(serialized) as unknown;
     if (!isOneOffCustomLayer(parsed)) return null;
@@ -55,14 +84,14 @@ export const consumeCustomProductForecastHandoff = (premiumActive: boolean): One
 
 /** Clears a staged layer only when it was created from the deleted product. */
 export const clearCustomProductForecastHandoff = (sourceProductId: CustomProductId): void => {
-  const serialized = sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+  const serialized = safeGetItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   if (!serialized) return;
   try {
     const parsed = JSON.parse(serialized) as unknown;
     if (isOneOffCustomLayer(parsed) && parsed.productSnapshot?.sourceProductId === sourceProductId) {
-      sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+      safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY);
     }
   } catch {
-    sessionStorage.removeItem(CUSTOM_PRODUCT_HANDOFF_KEY);
+    safeRemoveItem(CUSTOM_PRODUCT_HANDOFF_KEY);
   }
 };
