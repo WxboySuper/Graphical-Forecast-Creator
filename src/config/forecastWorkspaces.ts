@@ -17,6 +17,25 @@ export const FORECAST_WORKSPACES: Record<ForecastWorkspaceId, ForecastWorkspace>
   winter: { id: "winter", route: "/forecast/winter", label: "Winter", exposureKey: "winterWorkspace" },
 };
 
+const assertValidCycleDate = (cycleDate: string): void => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cycleDate)) {
+    throw new Error(`Invalid cycle date ${JSON.stringify(cycleDate)}.`);
+  }
+
+  const [year, month, day] = cycleDate.split("-").map(Number);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  const actualParts = [
+    parsedDate.getUTCFullYear(),
+    parsedDate.getUTCMonth(),
+    parsedDate.getUTCDate(),
+  ];
+  const expectedParts = [year, month - 1, day];
+
+  if (actualParts.some((part, index) => part !== expectedParts[index])) {
+    throw new Error(`Invalid cycle date ${JSON.stringify(cycleDate)}.`);
+  }
+};
+
 /** Returns whether the workspace is available under the current feature flags. */
 export const isWorkspaceExposed = (id: ForecastWorkspaceId): boolean => {
   const ws = FORECAST_WORKSPACES[id];
@@ -31,20 +50,7 @@ export const getExposedWorkspaces = (): ForecastWorkspace[] =>
 
 /** Builds the storage key for a forecast cycle and workspace. */
 export const getPersistenceKey = (cycleDate: string, workspaceId: ForecastWorkspaceId): string => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(cycleDate)) {
-    throw new Error(`Invalid cycle date ${JSON.stringify(cycleDate)}.`);
-  }
-
-  const [year, month, day] = cycleDate.split("-").map(Number);
-  const parsedDate = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsedDate.getUTCFullYear() !== year ||
-    parsedDate.getUTCMonth() !== month - 1 ||
-    parsedDate.getUTCDate() !== day
-  ) {
-    throw new Error(`Invalid cycle date ${JSON.stringify(cycleDate)}.`);
-  }
-
+  assertValidCycleDate(cycleDate);
   return `gfc-forecast-cycle-v2:${cycleDate}:${workspaceId}`;
 };
 
