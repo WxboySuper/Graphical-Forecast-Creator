@@ -37,6 +37,13 @@ const assertValidCycleDate = (cycleDate: string): void => {
   }
 };
 
+/** Throws when a workspace ID is not registered in the workspace registry. */
+const assertValidWorkspaceId = (workspaceId: string): void => {
+  if (!(workspaceId in FORECAST_WORKSPACES)) {
+    throw new Error(`Invalid workspace ID ${JSON.stringify(workspaceId)}.`);
+  }
+};
+
 /** Returns whether the workspace is available under the current feature flags. */
 export const isWorkspaceExposed = (id: ForecastWorkspaceId): boolean => {
   const ws = FORECAST_WORKSPACES[id];
@@ -52,6 +59,7 @@ export const getExposedWorkspaces = (): ForecastWorkspace[] =>
 /** Builds the storage key for a forecast cycle and workspace. */
 export const getPersistenceKey = (cycleDate: string, workspaceId: ForecastWorkspaceId): string => {
   assertValidCycleDate(cycleDate);
+  assertValidWorkspaceId(workspaceId);
   return `gfc-forecast-cycle-v2:${cycleDate}:${workspaceId}`;
 };
 

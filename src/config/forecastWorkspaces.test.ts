@@ -42,6 +42,7 @@ describe("forecastWorkspaces #914", () => {
     expect(getPersistenceKey("2026-09-01", "mesoscale")).toBe("gfc-forecast-cycle-v2:2026-09-01:mesoscale");
     expect(() => getPersistenceKey("", "severe")).toThrow("Invalid cycle date");
     expect(() => getPersistenceKey("2026-02-30", "severe")).toThrow("Invalid cycle date");
+    expect(() => getPersistenceKey("2026-09-01", "unknown" as never)).toThrow("Invalid workspace ID");
   });
 
   test("default workspace is severe", () => {
