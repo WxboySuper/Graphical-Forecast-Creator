@@ -9,7 +9,6 @@ review.
 | File | Justification | Owner |
 |------|---------------|-------|
 | `src/index.tsx` | Application entry point; no behavior to unit test. | Maintainer |
-| `src/reportWebVitals.ts` | Vendor glue for the `web-vitals` callback; covered by e2e smoke. | Maintainer |
 | `src/setupTests.ts` | Jest setup only; not application behavior. | Maintainer |
 | `src/immerSetup.ts` | Immer configuration; no branching behavior. | Maintainer |
 | `src/testUtils.ts` | Test helpers only. | Maintainer |
