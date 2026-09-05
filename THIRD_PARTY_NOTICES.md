@@ -33,7 +33,6 @@ to each.
 - **@types/node** ^26.4.0 (root (pnpm)) — MIT — allowed
 - **@types/react** 19.2.18 (root (pnpm)) — MIT — allowed
 - **@types/react-dom** 19.2.5 (root (pnpm)) — MIT — allowed
-- **@types/uuid** ^11.0.0 (root (pnpm)) — MIT — allowed
 - **@typescript/native** npm:typescript@^7.0.2 (root (pnpm)) — Apache-2.0 — allowed
 - **@vitejs/plugin-react** ^6.0.5 (root (pnpm)) — MIT — allowed
 - **autoprefixer** ^10.5.4 (root (pnpm)) — MIT — allowed
