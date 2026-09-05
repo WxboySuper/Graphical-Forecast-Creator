@@ -118,8 +118,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate release automation unit tests
-        run: node --test scripts/create-github-release.test.mjs scripts/lib/*.test.mjs scripts/lib/license-policy.test.mjs scripts/validate-geo-assets.test.mjs
+      - name: Run repository script tests
+        run: pnpm run test:scripts
 
       - name: Validate package version for target branch
         env:
@@ -329,13 +329,8 @@ jobs:
       - name: Enforce entry-chunk budget
         run: node scripts/check-bundle-budget.mjs
 
-      - name: Run tests
-        run: pnpm test --silent
-        env:
-          CI: true
-
-      - name: Produce coverage summary
-        run: pnpm run test:coverage -- --silent 2>&1 | tail -n 40
+      - name: Run tests with coverage
+        run: pnpm run test:coverage --silent
         env:
           CI: true
 
