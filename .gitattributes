@@ -1,0 +1,3 @@
+# Boundary checksums describe these exact bytes on every platform.
+public/geodata/*.json text eol=lf
+public/geodata/*.geojson text eol=lf
