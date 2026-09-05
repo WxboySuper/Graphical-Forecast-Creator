@@ -81,6 +81,7 @@
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",
     "licenses:check": "node scripts/check-third-party-licenses.mjs",
     "test": "jest",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "test:coverage": "jest --coverage",
     "perf": "cross-env GFC_PERF=1 jest --runInBand src/performance",
     "test:firestore-rules": "pnpm exec firebase emulators:exec --only firestore --project gfc-rules-test \"node --test tests/firestore.rules.test.mjs\"",
