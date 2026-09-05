@@ -24,6 +24,7 @@ const assetSize = (relativePath) => {
   return file.byteLength;
 };
 
+/** Validates the built entry's static dependencies and JavaScript size budgets. */
 const main = () => {
   const entryPath = findEntryChunk();
   if (!entryPath) {
