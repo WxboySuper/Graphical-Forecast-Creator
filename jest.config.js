@@ -23,7 +23,6 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/setupTests.ts',
     '!src/index.tsx',
-    '!src/reportWebVitals.ts',
     '!src/immerSetup.ts',
     '!src/testUtils.ts',
     '!src/**/index.ts',
@@ -35,7 +34,6 @@ module.exports = {
   ],
   coveragePathIgnorePatterns: [
     '[/\\\\]src[/\\\\]index\\.tsx$',
-    '[/\\\\]src[/\\\\]reportWebVitals\\.ts$',
     '[/\\\\]src[/\\\\]setupTests\\.ts$',
     '[/\\\\]src[/\\\\]immerSetup\\.ts$',
     '[/\\\\]src[/\\\\]testUtils\\.ts$',
