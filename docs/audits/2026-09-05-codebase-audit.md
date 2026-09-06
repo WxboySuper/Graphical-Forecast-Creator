@@ -33,7 +33,7 @@ The review covers every repository area. Behavioral inspection focused on import
 
 ## Review decisions
 
-The four selectable forecast layouts are supported user preferences. Their existence alone is not a deletion reason. The weather grading algorithms, bounded import validation, account isolation, capability gates, and hosted billing checks remain behavior contracts during cleanup. Versioned formats and historical release documents can serve real compatibility or provenance needs. Vendored geodata is checked against its declared checksums rather than judged by file size.
+The forecast page supports the tabbed toolbar. Four historical preference values remain accepted, but all render that same layout. The initial audit mistook those values for four active layouts; SA-35 records the redundant resolution code. Cleanup must retain compatibility with saved settings and old links. The weather grading algorithms, bounded import validation, account isolation, capability gates, and hosted billing checks remain behavior contracts during cleanup. Versioned formats and historical release documents can serve real compatibility or provenance needs. Vendored geodata is checked against its declared checksums rather than judged by file size.
 
 No application fixes preceded this report or issue creation. Work will use focused PRs, with stacks only where changes depend on earlier patches. Each issue states its own acceptance checks; every PR must also finish the repository checks.
 
@@ -143,9 +143,9 @@ Files: `src/components/DaySelector`, `src/components/OutlookDaySelector`, `src/c
 
 These components are unreachable from src/index.tsx and only imported by their own tests or unused barrel files. Active forecast layouts use ForecastWorkspace and IntegratedToolbar instead. Their tests keep retired UI alive.
 
-Proposed fix: Remove the disconnected controls, exclusive helpers/styles, and retired tests while preserving the live export hook and all four supported forecast layouts.
+Proposed fix: Remove the disconnected controls, exclusive helpers/styles, and retired tests while preserving the live export hook and compatibility with all four historical layout preference values.
 
-Validation: Import graph, typecheck, forecast layout tests, and browser checks for each layout.
+Validation: Import graph, typecheck, forecast layout tests, and browser checks for every historical layout preference value.
 
 ### SA-10. Remove the disconnected legacy discussion editor
 
@@ -446,3 +446,15 @@ lastSyncedHash is not tied to a cloud cycle ID, so selecting another cycle with 
 Proposed fix: Track sync identity and request generation, ignore completions for replaced selections, and preserve pending edits for the current cycle.
 
 Validation: Same-content cycle switches, out-of-order saves, selection clearing, and sign-out during a save.
+
+### SA-35. Remove obsolete forecast layout preference resolution
+
+Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1155
+
+Files: `src/pages/ForecastPage.tsx`, `src/utils/forecastUiVariant.ts`.
+
+The forecast page reads query, stored, and synced layout preferences and passes the result to a renderer that ignores it. All values have already rendered the tabbed toolbar since the old layouts were removed. The unused options table still describes retired layouts.
+
+Proposed fix: Render the supported toolbar directly and remove unused preference reads, resolver, and options. Keep persisted/auth schema compatibility where required, so existing settings do not break profile validation.
+
+Validation: Browser coverage for every legacy forecastUi query value, forecast page tests, auth compatibility, and typechecks.
