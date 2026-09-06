@@ -319,6 +319,84 @@ function markExistingCloudCycleSaving(
   if (currentCloudRef.current) updateSyncState('saving', undefined, currentCloudRef.current.id);
 }
 
+/** Applies a successful save without replacing a newer cloud selection. */
+function applyCloudSaveSuccess({
+  result,
+  savedCycleId,
+  label,
+  user,
+  currentCloudRef,
+  setCurrentCloud,
+  updateSyncState,
+}: {
+  result: CloudOperationResult<string>;
+  savedCycleId?: string;
+  label: string;
+  user: ReturnType<typeof useAuth>['user'];
+  currentCloudRef: CloudStateContext['currentCloudRef'];
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+  updateSyncState: CloudStateContext['updateSyncState'];
+}): true {
+  if (result.data && (!savedCycleId || currentCloudRef.current?.id === savedCycleId)) {
+    setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
+  }
+  queueProductMetric({ event: 'cloud_cycle_saved', user });
+  trackProductEvent('cloud_save_completed');
+  updateSyncState('saved', undefined, savedCycleId);
+  return true;
+}
+
+/** Executes one hosted save request and maps its result to sync state. */
+async function executeCloudSave({
+  userId,
+  label,
+  cycleDate,
+  stats,
+  payload,
+  workflowMetadata,
+  savedCycleId,
+  setError,
+  updateSyncState,
+  user,
+  currentCloudRef,
+  setCurrentCloud,
+}: {
+  userId: string;
+  label: string;
+  cycleDate: string;
+  stats: SavedCycleStats;
+  payload: GFCForecastSaveData;
+  workflowMetadata?: CycleMetadata;
+  savedCycleId?: string;
+  setError: Dispatch<SetStateAction<string | null>>;
+  updateSyncState: CloudStateContext['updateSyncState'];
+  user: ReturnType<typeof useAuth>['user'];
+  currentCloudRef: CloudStateContext['currentCloudRef'];
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+}): Promise<boolean> {
+  const result = await saveCloudCycle({
+    userId,
+    label,
+    cycleDate,
+    stats,
+    payload,
+    workflowMetadata,
+    existingId: savedCycleId,
+  });
+  if (!result.success) {
+    return handleCloudSaveFailure({ result, setError, updateSyncState, cycleId: savedCycleId });
+  }
+  return applyCloudSaveSuccess({
+    result,
+    savedCycleId,
+    label,
+    user,
+    currentCloudRef,
+    setCurrentCloud,
+    updateSyncState,
+  });
+}
+
 /** Returns the save callback for hosted cloud cycles. */
 function useCloudSaveCycle({
   userId,
@@ -352,27 +430,20 @@ function useCloudSaveCycle({
       setError(null);
       markExistingCloudCycleSaving(currentCloudRef, updateSyncState);
 
-      const result = await saveCloudCycle({
+      return executeCloudSave({
         userId: authenticatedUserId,
         label,
         cycleDate,
         stats,
         payload,
         workflowMetadata,
-        existingId: savedCycleId,
+        savedCycleId,
+        setError,
+        updateSyncState,
+        user,
+        currentCloudRef,
+        setCurrentCloud,
       });
-
-      if (!result.success) {
-        return handleCloudSaveFailure({ result, setError, updateSyncState, cycleId: savedCycleId });
-      }
-
-      if (result.data && (!savedCycleId || currentCloudRef.current?.id === savedCycleId)) {
-        setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
-      }
-      queueProductMetric({ event: 'cloud_cycle_saved', user });
-      trackProductEvent('cloud_save_completed');
-      updateSyncState('saved', undefined, savedCycleId);
-      return true;
     },
     [canWrite, currentCloudRef, localFixtureActive, setCurrentCloud, setError, updateSyncState, user, userId]
   );
