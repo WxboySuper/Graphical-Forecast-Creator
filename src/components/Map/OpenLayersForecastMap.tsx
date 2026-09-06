@@ -857,7 +857,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       map.addInteraction(select);
       selectRef.current = select;
 
-      // deepsource-disable-next-line JS-0045 -- React effects return this cleanup function intentionally.
       return () => {
         window.cancelAnimationFrame(raf1);
         if (raf2 !== null) window.cancelAnimationFrame(raf2);
@@ -1476,6 +1475,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           /* Reconciliation errors are reported through the source statistics. */
         });
 
+      // deepsource-disable-next-line JS-0045 -- React effects return this cleanup function intentionally.
       return () => {
         cancelled = true;
       };
@@ -1501,9 +1501,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       setInteractionMode("edit");
     };
 
-    // deepsource-disable-next-line JS-0415 -- the toolbar is intentionally nested inside the map container.
     return (
       <div className="map-container" translate="no">
+        {/* skipcq: JS-0415 -- the toolbar is intentionally nested inside the map container. */}
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
         <div className="map-toolbar-bottom-right">
           <div
