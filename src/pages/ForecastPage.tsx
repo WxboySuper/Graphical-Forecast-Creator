@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation, useNavigate, useOutletContext } from 'react-router';
+import { useNavigate, useOutletContext } from 'react-router';
 import type { Dispatch, UnknownAction } from 'redux';
 import { ForecastMapHandle } from '../components/Map/ForecastMap';
 import { Button } from '../components/ui/button';
@@ -23,6 +23,7 @@ import {
   setForecastDay,
   redoLastEdit,
   undoLastEdit,
+  markAsSaved,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType } from '../types/outlooks';
 import { serializeForecast } from '../utils/fileUtils';
@@ -57,18 +58,13 @@ import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/For
 import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
 import { useForecastWorkspaceController } from '../components/ForecastWorkspace/useForecastWorkspaceController';
 import {
-  readStoredForecastUiVariant,
-  resolveForecastUiVariant,
-  type ForecastUiVariant,
-} from '../utils/forecastUiVariant';
-import {
   applyForecastImportResult,
   useForecastFileActions,
   useDayRolloverPrompt as useControllerDayRolloverPrompt,
   useSessionRestore as useControllerSessionRestore,
   useUnsavedChangesWarning as useControllerUnsavedChangesWarning,
+  formatRolloverDayLabel,
 } from './forecastPageController';
-import { markAsSaved } from '../store/forecastSlice';
 import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../utils/forecastTransfer';
 import { queueProductMetric } from '../utils/productMetrics';
 export {
@@ -92,23 +88,9 @@ export {
   runDayRolloverDownloadAction,
   runDayRolloverCloudSaveAction,
 } from './forecastPageController';
-import { formatRolloverDayLabel } from './forecastPageController';
 import './ForecastPage.css';
 
 interface PageContext { addToast: AddToastFn; }
-
-const renderForecastWorkspaceLayout = (
-  variant: ForecastUiVariant,
-  props: {
-    mapRef: React.RefObject<ForecastMapHandle | null>;
-    controller: ReturnType<typeof useForecastWorkspaceController>;
-    autoTstmTools?: React.ReactNode;
-    tstmPreviewFeatures?: ReturnType<typeof useAutoTstm>['previewFeatures'];
-  }
-) => {
-  // Only the Tabbed Toolbar variant is supported now.
-  return <ForecastTabbedToolbarLayout {...props} />;
-};
 
 // Helper to get probability list based on outlook type
 export const getProbabilityList = (activeOutlookType: string) => {
@@ -716,9 +698,8 @@ const useForecastPageWorkspace = ({
 export const ForecastPage: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const location = useLocation();
   const { addToast } = useOutletContext<PageContext>();
-  const { syncedSettings, user } = useAuth();
+  const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
@@ -749,20 +730,14 @@ export const ForecastPage: React.FC = () => {
     return <EmergencyModeMessage />;
   }
 
-  const forecastUiVariant = resolveForecastUiVariant({
-    search: location.search,
-    syncedSettingValue: syncedSettings?.forecastUiVariant,
-    storageValue: readStoredForecastUiVariant(),
-  });
-
   return (
     <div className="forecast-page-shell">
-      {renderForecastWorkspaceLayout(forecastUiVariant, {
-        mapRef,
-        controller: workspaceController,
-        autoTstmTools,
-        tstmPreviewFeatures,
-      })}
+      <ForecastTabbedToolbarLayout
+        mapRef={mapRef}
+        controller={workspaceController}
+        autoTstmTools={autoTstmTools}
+        tstmPreviewFeatures={tstmPreviewFeatures}
+      />
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />
       <DayRolloverDialog
         promptState={dayRolloverPrompt.promptState}
