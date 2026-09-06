@@ -2,8 +2,7 @@
 
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
-const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
-const { verifyFirebaseToken } = require('./firebase-auth');
+const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 
 const METRIC_EVENT_TYPES = new Set([
   'account_signup',
@@ -284,7 +283,19 @@ const accumulateAdminWindowTotals = (totals, dayMetrics) => ({
 
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
 const verifyRequestUser = async (req) => {
-  return verifyFirebaseToken(req);
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const adminAuth = getAdminAuth();
+
+  if (!adminAuth || !token) {
+    return null;
+  }
+
+  try {
+    return await adminAuth.verifyIdToken(token);
+  } catch {
+    return null;
+  }
 };
 
 /** Returns the current server-side admin UID allowlist parsed from env. */
