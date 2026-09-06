@@ -39,6 +39,7 @@ const syncCurrentCloudCycle = async ({
   workflowMetadata,
   setLastSyncedHash,
   currentHash,
+  isLatestRequest,
 }: {
   canSync: boolean;
   currentCloud: Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud'];
@@ -50,6 +51,7 @@ const syncCurrentCloudCycle = async ({
   workflowMetadata: RootState['forecast']['workflowMetadata'];
   setLastSyncedHash: (cloudId: string, hash: string) => void;
   currentHash: string;
+  isLatestRequest: () => boolean;
 }) => {
   if (!canSync || !currentCloud) {
     return;
@@ -62,15 +64,19 @@ const syncCurrentCloudCycle = async ({
     const success = await saveCycle(currentCloud.label, cycleDate, stats, payload, workflowMetadata);
 
     if (!success) {
-      updateSyncState('error', 'Failed to sync to cloud', currentCloud.id);
+      if (isLatestRequest()) updateSyncState('error', 'Failed to sync to cloud', currentCloud.id);
       return;
     }
 
-    updateSyncState('saved', undefined, currentCloud.id);
-    setLastSyncedHash(currentCloud.id, currentHash);
+    if (isLatestRequest()) {
+      updateSyncState('saved', undefined, currentCloud.id);
+      setLastSyncedHash(currentCloud.id, currentHash);
+    }
   } catch (error) {
     console.error('Error syncing to cloud:', error);
-    updateSyncState('error', error instanceof Error ? error.message : 'Unknown error', currentCloud.id);
+    if (isLatestRequest()) {
+      updateSyncState('error', error instanceof Error ? error.message : 'Unknown error', currentCloud.id);
+    }
   }
 };
 
@@ -100,8 +106,10 @@ const useCloudSyncOperations = ({
   currentHash: string;
 }) => {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncGenerationRef = useRef(0);
   const [lastSyncedState, setLastSyncedState] = useState<{ cloudId: string; hash: string } | null>(null);
   const performSync = useCallback(async () => {
+    const requestGeneration = ++syncGenerationRef.current;
     await syncCurrentCloudCycle({
       canSync,
       currentCloud,
@@ -113,6 +121,7 @@ const useCloudSyncOperations = ({
       workflowMetadata,
        setLastSyncedHash: (cloudId, hash) => setLastSyncedState({ cloudId, hash }),
       currentHash,
+      isLatestRequest: () => syncGenerationRef.current === requestGeneration,
     });
   }, [canSync, currentCloud, currentHash, forecastCycle, saveCycle, serializedPayload, updateSyncState, workflowMetadata]);
 

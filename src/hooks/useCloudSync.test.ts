@@ -221,4 +221,36 @@ describe('useCloudSync', () => {
     expect(updateSyncState).toHaveBeenCalledWith('saved', undefined, 'cloud-1');
     expect(result.current.isSynced).toBe(false);
   });
+
+  it('does not let an older completion replace a newer cycle synchronization', async () => {
+    const resolvers: Array<(value: boolean) => void> = [];
+    saveCycle.mockImplementation(() => new Promise<boolean>((resolve) => resolvers.push(resolve)));
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useCloudSync(cloud(id)), {
+      initialProps: { id: 'cloud-1' },
+    });
+
+    let firstSync: Promise<void> | undefined;
+    await act(async () => {
+      firstSync = result.current.syncNow();
+      await Promise.resolve();
+    });
+    rerender({ id: 'cloud-2' });
+    let secondSync: Promise<void> | undefined;
+    await act(async () => {
+      secondSync = result.current.syncNow();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      resolvers[1]?.(true);
+      await secondSync;
+    });
+    expect(result.current.isSynced).toBe(true);
+
+    await act(async () => {
+      resolvers[0]?.(true);
+      await firstSync;
+    });
+    expect(result.current.isSynced).toBe(true);
+  });
 });
