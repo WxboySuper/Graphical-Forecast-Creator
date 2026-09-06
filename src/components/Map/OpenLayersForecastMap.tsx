@@ -102,6 +102,7 @@ import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMa
 import { Fill, Stroke, Style as OlStyle } from "ol/style";
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 
+/** Returns whether a click should be handled by the paint-bucket interaction. */
 const shouldHandlePaintBucketClick = (
   paintBucketEnabled: boolean,
   interactionMode: "pan" | "draw" | "delete" | "edit",
@@ -118,6 +119,7 @@ interface ForecastMapClickEvent {
   originalEvent: { shiftKey?: boolean };
 }
 
+/** Handles map clicks for forecast editing, drawing, and paint-bucket interactions. */
 const handleForecastMapClick = ({
   map,
   event,
@@ -259,6 +261,7 @@ const syncTrimPreviewSource = (
       featureProjection: "EPSG:3857",
     });
 
+    /** Marks a feature as part of the temporary trim preview. */
     const applyPreview = (item: OLFeature<Geometry>) => {
       item.setStyle(TRIM_PREVIEW_STYLE);
       item.set("trimPreview", true);
@@ -378,6 +381,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       currentDayRef.current = currentDay;
     }, [currentDay]);
 
+    /** Applies the configured trim strategy to a stored outlook feature. */
     const trimStoredOutlookFeature = async (
       feature: GeoJsonFeature,
     ): Promise<GeoJsonFeature> => {
@@ -505,7 +509,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         const format = new GeoJSON();
         const editDay = currentDayRef.current;
         features.forEach((feature) => {
-          void (async () => {
+          (async () => {
             try {
             if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
               return;
@@ -1164,7 +1168,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         }
         const drawDay = currentDayRef.current;
 
-        void (async () => {
+      (async () => {
           try {
           const geometry = format.writeGeometryObject(olGeometry, {
             dataProjection: "EPSG:4326",
@@ -1209,7 +1213,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           } catch (error) {
             captureException(error, { tags: { featureOperation: "draw-outlook" } });
           }
-        })();
+      })();
       });
       map.addInteraction(draw);
       drawRef.current = draw;
@@ -1393,7 +1397,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         source,
         categoricalSource: catSource,
       });
-      const reconcileSource = (
+    /** Reconciles one OpenLayers source with the current Redux feature descriptors. */
+    const reconcileSource = (
         targetSource: VectorSource,
         descriptors: FeatureSyncDescriptor[],
         sourceName: string,
@@ -1466,7 +1471,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           );
           syncTrimPreviewSource(trimPreviewSourceRef.current, previewFeatures);
         })
-        .catch(() => undefined);
+        .catch(() => {
+          /* Reconciliation errors are reported through the source statistics. */
+        });
 
       return () => {
         cancelled = true;
