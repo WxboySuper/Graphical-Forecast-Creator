@@ -38,18 +38,21 @@ export const getAutoSaveTimestamp = (storedValue: string | null): number => {
   }
 };
 
+/** Returns whether a stored autosave has a usable timestamp or legacy shape. */
+const isValidAutoSaveCandidate = (value: string | null): value is string => {
+  if (value === null) return false;
+  try {
+    const parsed = JSON.parse(value) as { timestamp?: unknown };
+    if (parsed.timestamp === undefined) return true;
+    return typeof parsed.timestamp === 'string' && Number.isFinite(Date.parse(parsed.timestamp));
+  } catch {
+    return false;
+  }
+};
+
 /** Picks the newest autosave snapshot when multiple scoped copies exist. */
 export const pickNewestAutoSaveValue = (...values: (string | null)[]): string | null => {
-  const candidates = values.filter((value): value is string => {
-    if (value === null) return false;
-    try {
-      const parsed = JSON.parse(value) as { timestamp?: unknown };
-      if (parsed.timestamp === undefined) return true;
-      return typeof parsed.timestamp === 'string' && Number.isFinite(Date.parse(parsed.timestamp));
-    } catch {
-      return false;
-    }
-  });
+  const candidates = values.filter(isValidAutoSaveCandidate);
   if (candidates.length === 0) return null;
 
   return candidates.reduce((best, current) => (
@@ -125,7 +128,6 @@ export const useAutoSave = (userId?: string | null) => {
       }
     }, AUTOSAVE_DELAY);
 
-    // deepsource-disable-next-line JS-0045 -- React useEffect cleanup callbacks return void.
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
