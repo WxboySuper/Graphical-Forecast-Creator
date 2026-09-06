@@ -82,6 +82,7 @@ const isolateBackground = (modal: HTMLElement): (() => void) => {
     ancestor = ancestor.parentElement;
   }
 
+  /** Hides one background element while preserving any existing aria-hidden value. */
   const hideElement = (element: Element) => {
     const previousValue = element.getAttribute('aria-hidden');
     if (previousValue === 'true') {
@@ -161,6 +162,7 @@ export const useModalFocusTrap = ({
 
     getFocusableElements(modal)[0]?.focus();
 
+    /** Routes keyboard input through Escape and Tab handling for this modal. */
     const handleKeyDown = (event: KeyboardEvent) => {
       if (handleEscapeKey(event, onCloseRef.current)) {
         return;
@@ -173,7 +175,8 @@ export const useModalFocusTrap = ({
     const restoreBackground = isolateBackground(modal);
     window.addEventListener('keydown', handleKeyDown, true);
 
-    return () => {
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupModalFocusTrap() {
       window.removeEventListener('keydown', handleKeyDown, true);
       restoreBackground();
       previouslyFocusedRef.current?.focus();
