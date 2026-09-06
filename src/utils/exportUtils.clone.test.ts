@@ -34,7 +34,7 @@ describe('captureContainer onclone behavior', () => {
     svg.appendChild(defs);
     document.body.appendChild(svg);
 
-    const dataUrl = await captureContainer(container, 100, 100, 'png', 0.9);
+    const dataUrl = await captureContainer(container, { width: 100, height: 100, format: 'png', quality: 0.9 });
     expect(dataUrl).toBe('data:image/png;base64,CLONE');
 
     // After onclone, image should have crossOrigin set
