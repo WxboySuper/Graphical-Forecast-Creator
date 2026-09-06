@@ -222,6 +222,7 @@ const VerifMapStylePickerButton: React.FC<{
   </div>
 );
 
+/** Map toolbar button that toggles the mobile verification legend. */
 export const VerifMapLegendToggleButton: React.FC<{
   mobileOpen: boolean;
   onToggle: () => void;
