@@ -1,5 +1,4 @@
 import LayerGroup from "ol/layer/Group";
-import { apply } from "ol-mapbox-style";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import GeoJSON from "ol/format/GeoJSON";
@@ -30,6 +29,7 @@ type EditableOutlookType =
 export const loadOpenFreeMapLayerGroups = async (
   styleSet: OpenFreeMapStyleSet,
 ): Promise<{ baseGroup: LayerGroup; referenceGroup: LayerGroup }> => {
+  const { apply } = await import("ol-mapbox-style");
   const baseGroup = new LayerGroup();
   const referenceGroup = new LayerGroup();
   await Promise.all([
