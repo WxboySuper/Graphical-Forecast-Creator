@@ -309,6 +309,26 @@ const getAdminUidAllowlist = () =>
 const isAllowedAdminUid = (uid) => getAdminUidAllowlist().includes(uid);
 
 /** Returns the current number of Stripe-backed premium subscriptions derived from entitlement truth in Firestore. */
+const readPremiumSubscriptionCount = async (db) => {
+  const query = db
+    .collection('userEntitlements')
+    .where('billingStatus', 'in', ['active', 'trialing']);
+
+  if (typeof query.count === 'function') {
+    try {
+      const snapshot = await query.count().get();
+      const count = snapshot.data?.()?.count;
+      if (typeof count === 'number') return count;
+    } catch {
+      // Fall through to the filtered document count when aggregation is unavailable.
+    }
+  }
+
+  const fallbackSnapshot = await query.get();
+  return fallbackSnapshot.size;
+};
+
+/** Returns the cached or in-flight premium subscription count, refreshing it when expired. */
 const countPremiumSubscriptions = () => {
   const db = getAdminDb();
   if (!db) {
@@ -323,18 +343,7 @@ const countPremiumSubscriptions = () => {
     return pendingPremiumCount;
   }
 
-  const query = db
-    .collection('userEntitlements')
-    .where('billingStatus', 'in', ['active', 'trialing']);
-  const countPromise = typeof query.count === 'function'
-    ? query.count().get().then((snapshot) => {
-      const count = snapshot.data?.()?.count;
-      if (typeof count === 'number') return count;
-      return query.get().then((fallbackSnapshot) => fallbackSnapshot.size);
-    }).catch(() => query.get().then((fallbackSnapshot) => fallbackSnapshot.size))
-    : query.get().then((snapshot) => snapshot.size);
-
-  pendingPremiumCount = countPromise
+  pendingPremiumCount = readPremiumSubscriptionCount(db)
     .then((count) => {
       cachePremiumSubscriptions(count);
       pendingPremiumCount = null;
