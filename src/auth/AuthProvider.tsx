@@ -815,139 +815,42 @@ export const getDefaultContextValue = (): AuthContextValue => ({
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
 /** Local-only auth action helpers (extracted to reduce hook complexity) */
-/** Local-only sign in helper: posts to /api/local/signin and applies returned auth data to state. */
-export const localSignInWithEmail = async (
+/** Local API route and metric suffix selected by the public credential wrappers. */
+type LocalCredentialAction = 'signin' | 'signup';
+
+/** Post a local credential action and apply its response to the shared auth state. */
+async function localCredentialAction(
+  action: LocalCredentialAction,
   creds: { email: string; password: string },
-  deps: {
-    dispatch: ReturnType<typeof useDispatch>;
-    currentDarkModeRef: React.MutableRefObject<boolean>;
-    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-    setUser: React.Dispatch<React.SetStateAction<User | null>>;
-    setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
-    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-    setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-    setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-  }
-) => {
-  const {
-    dispatch,
-    currentDarkModeRef,
-    currentOverlaysRef,
-    setUser,
-    setStatus,
-    setSyncedSettings,
-    setSettingsSyncStatus,
-    lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
-    setError,
-  } = deps;
-  const { email, password } = creds;
-
-  setError(null);
-
-  const resp = await fetch('/api/local/signin', {
+  deps: LocalAuthDeps
+) {
+  const failureMessage = action === 'signin' ? 'Sign in failed' : 'Sign up failed';
+  const resp = await fetch(`/api/local/${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(creds),
     credentials: 'include',
   });
 
   if (!resp.ok) {
-    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign in failed' };
-    setError(body?.message ?? 'Sign in failed');
-    throw new Error(body?.message ?? 'Sign in failed');
+    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: failureMessage };
+    deps.setError(body.message ?? failureMessage);
+    throw new Error(body.message ?? failureMessage);
   }
 
   const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
   const localUser = extractLocalUserFromData(data) as unknown as User;
+  applyLocalAuthData(data, deps);
+  queueProductMetric({ event: action === 'signin' ? 'account_signin' : 'account_signup', user: localUser });
+}
 
-  applyLocalAuthData(data, {
-    dispatch,
-    currentDarkModeRef,
-    currentOverlaysRef,
-    setUser,
-    setStatus,
-    setSyncedSettings,
-    setSettingsSyncStatus,
-    lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
-    setError,
-  });
-
-  queueProductMetric({ event: 'account_signin', user: localUser });
-};
+/** Local-only sign in helper: posts to /api/local/signin and applies returned auth data to state. */
+export const localSignInWithEmail = (creds: { email: string; password: string }, deps: LocalAuthDeps) =>
+  localCredentialAction('signin', creds, deps);
 
 /** Local-only sign up helper: posts to /api/local/signup and applies returned auth data to state. */
-export const localSignUpWithEmail = async (
-  creds: { email: string; password: string },
-  deps: {
-    dispatch: ReturnType<typeof useDispatch>;
-    currentDarkModeRef: React.MutableRefObject<boolean>;
-    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-    setUser: React.Dispatch<React.SetStateAction<User | null>>;
-    setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
-    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-    setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-    setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-  }
-) => {
-  const {
-    dispatch,
-    currentDarkModeRef,
-    currentOverlaysRef,
-    setUser,
-    setStatus,
-    setSyncedSettings,
-    setSettingsSyncStatus,
-    lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
-    setError,
-  } = deps;
-  const { email, password } = creds;
-
-  setError(null);
-
-  const resp = await fetch('/api/local/signup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-    credentials: 'include',
-  });
-
-  if (!resp.ok) {
-    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: 'Sign up failed' };
-    setError(body?.message ?? 'Sign up failed');
-    throw new Error(body?.message ?? 'Sign up failed');
-  }
-
-  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-  const localUser = extractLocalUserFromData(data) as unknown as User;
-
-  applyLocalAuthData(data, {
-    dispatch,
-    currentDarkModeRef,
-    currentOverlaysRef,
-    setUser,
-    setStatus,
-    setSyncedSettings,
-    setSettingsSyncStatus,
-    lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
-    setError,
-  });
-
-  queueProductMetric({ event: 'account_signup', user: localUser });
-};
+export const localSignUpWithEmail = (creds: { email: string; password: string }, deps: LocalAuthDeps) =>
+  localCredentialAction('signup', creds, deps);
 
 /** Local-only sign out helper: invalidates local session and clears local state. */
 export const localSignOutUser = async (deps: {
