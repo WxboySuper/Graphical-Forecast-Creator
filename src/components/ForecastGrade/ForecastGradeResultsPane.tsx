@@ -23,7 +23,6 @@ interface ForecastGradeResultsPaneProps {
   onSelectProduct: (product: ProductKind) => void;
   onSelectHistoryCard: (card: GradeCard) => void;
   result?: PackageGrade | null;
-  afterResult?: React.ReactNode;
 }
 
 /** Presents empty, in-progress, and completed verification results. */
@@ -37,7 +36,6 @@ const ForecastGradeResultsPane: React.FC<ForecastGradeResultsPaneProps> = ({
   onSelectProduct,
   onSelectHistoryCard,
   result,
-  afterResult,
 }) => {
   const [openSection, setOpenSection] = useState<'breakdown' | 'quality' | 'reports' | 'dat' | null>(null);
   /** Keeps only one results disclosure open at a time. */
@@ -98,7 +96,6 @@ const ForecastGradeResultsPane: React.FC<ForecastGradeResultsPaneProps> = ({
           open={openSection === 'dat'}
           onToggle={() => toggleSection('dat')}
         />
-        {afterResult}
       </div>
     )}
 
