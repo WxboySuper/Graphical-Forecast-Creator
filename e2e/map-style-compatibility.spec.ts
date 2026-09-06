@@ -4,7 +4,7 @@ import { prepareAppState } from './testSetup';
 test('renders a drawn outlook in forecast and verification with shared map styles', async ({ page }, testInfo) => {
   test.setTimeout(60000);
   await prepareAppState(page);
-  await page.goto('/');
+  await page.goto('/?localTestAccount=premium');
   await page.getByRole('button', { name: 'Day 1', exact: true }).click();
   await page.getByRole('button', { name: 'Start Workflow', exact: true }).click();
   const viewport = page.locator('.map-container .ol-viewport');
