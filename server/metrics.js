@@ -323,12 +323,19 @@ const countPremiumSubscriptions = () => {
     return pendingPremiumCount;
   }
 
-  pendingPremiumCount = db
+  const query = db
     .collection('userEntitlements')
-    .where('billingStatus', 'in', ['active', 'trialing'])
-    .get()
-    .then((snapshot) => {
-      const count = snapshot.size;
+    .where('billingStatus', 'in', ['active', 'trialing']);
+  const countPromise = typeof query.count === 'function'
+    ? query.count().get().then((snapshot) => {
+      const count = snapshot.data?.()?.count;
+      if (typeof count === 'number') return count;
+      return query.get().then((fallbackSnapshot) => fallbackSnapshot.size);
+    }).catch(() => query.get().then((fallbackSnapshot) => fallbackSnapshot.size))
+    : query.get().then((snapshot) => snapshot.size);
+
+  pendingPremiumCount = countPromise
+    .then((count) => {
       cachePremiumSubscriptions(count);
       pendingPremiumCount = null;
       return count;
@@ -870,6 +877,7 @@ module.exports = {
   recordBillingMetricEvent,
   registerMetricsRoutes,
   countCollectionDocuments,
+  countPremiumSubscriptions,
   countTotalAccounts,
   readCloudCyclePayloadBytes,
   getCurrentStorageBytes,
