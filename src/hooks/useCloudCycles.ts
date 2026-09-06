@@ -52,7 +52,7 @@ interface CloudStateContext {
   setCycles: Dispatch<SetStateAction<CloudCycleMetadata[]>>;
   setError: Dispatch<SetStateAction<string | null>>;
   setLoading: Dispatch<SetStateAction<boolean>>;
-  updateSyncState: (state: CloudSyncState, error?: string) => void;
+  updateSyncState: (state: CloudSyncState, error?: string, cycleId?: string) => void;
 }
 
 /** Returns the shared error message for cloud write actions when the user cannot save. */
