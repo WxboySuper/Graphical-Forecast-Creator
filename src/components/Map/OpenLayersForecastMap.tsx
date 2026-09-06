@@ -48,7 +48,6 @@ import type {
   Polygon,
   MultiPolygon,
 } from "geojson";
-import { apply } from "ol-mapbox-style";
 import Legend from "./Legend";
 import StatusOverlay from "./StatusOverlay";
 import CategoricalErrorBanner from "./CategoricalErrorBanner";
@@ -77,6 +76,7 @@ import {
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
   GHOST_REFERENCE_LAYER_Z_INDEX,
+  loadOpenFreeMapLayerGroups,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
 import type { CustomCategoryStyle } from "../../types/customProducts";
@@ -1074,22 +1074,14 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         vectorReferenceGroup.getLayers().clear();
 
         getOpenFreeMapStyleSet(baseMapStyle)
-          .then(({ baseStyle, overlayStyle }) => {
-            const nextBaseGroup = new LayerGroup();
-            const nextReferenceGroup = new LayerGroup();
-
-            return Promise.all([
-              apply(nextBaseGroup, baseStyle),
-              apply(nextReferenceGroup, overlayStyle),
-            ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
-          })
-          .then(({ nextBaseGroup, nextReferenceGroup }) => {
+          .then(loadOpenFreeMapLayerGroups)
+          .then(({ baseGroup, referenceGroup }) => {
             if (vectorStyleRequestRef.current !== requestId) {
               return;
             }
 
-            replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
-            replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
+            replaceLayerGroupLayers(vectorBaseGroup, baseGroup);
+            replaceLayerGroupLayers(vectorReferenceGroup, referenceGroup);
             vectorBaseGroup.setVisible(true);
             vectorReferenceGroup.setVisible(true);
           })

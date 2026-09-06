@@ -39,7 +39,6 @@ import {
   Stroke,
   Style,
 } from "ol/style";
-import { apply } from "ol-mapbox-style";
 import Legend from "./Legend";
 import UnofficialBadge from "./UnofficialBadge";
 import {
@@ -58,6 +57,7 @@ import {
   TOP_OUTLINE_LAYER_Z_INDEX,
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
+  loadOpenFreeMapLayerGroups,
 } from "./openLayersMapStyles";
 import { ReportType } from "../../types/stormReports";
 import { STORM_REPORT_COLORS, STORM_REPORT_FALLBACK_COLOR } from "../../utils/stormReportColors";
@@ -537,22 +537,14 @@ const OpenLayersVerificationMap = forwardRef<
       vectorReferenceGroup.getLayers().clear();
 
       getOpenFreeMapStyleSet(baseMapStyle)
-        .then(({ baseStyle, overlayStyle }) => {
-          const nextBaseGroup = new LayerGroup();
-          const nextReferenceGroup = new LayerGroup();
-
-          return Promise.all([
-            apply(nextBaseGroup, baseStyle),
-            apply(nextReferenceGroup, overlayStyle),
-          ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
-        })
-        .then(({ nextBaseGroup, nextReferenceGroup }) => {
+        .then(loadOpenFreeMapLayerGroups)
+        .then(({ baseGroup, referenceGroup }) => {
           if (vectorStyleRequestRef.current !== requestId) {
             return;
           }
 
-          replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
-          replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
+          replaceLayerGroupLayers(vectorBaseGroup, baseGroup);
+          replaceLayerGroupLayers(vectorReferenceGroup, referenceGroup);
           vectorBaseGroup.setVisible(true);
           vectorReferenceGroup.setVisible(true);
         })
