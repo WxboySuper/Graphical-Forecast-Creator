@@ -32,7 +32,6 @@ jest.mock('./components/IntegratedToolbar/IntegratedToolbar', () => ({
   TabbedIntegratedToolbar: () => <div>IntegratedToolbar</div>,
 }));
 jest.mock('./components/ForecastWorkspace/ForecastWorkspaceModals', () => () => <div>ForecastWorkspaceModals</div>);
-jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation</div>);
 jest.mock('./components/Toast/Toast', () => ({
   ToastManager: () => <div>ToastManager</div>

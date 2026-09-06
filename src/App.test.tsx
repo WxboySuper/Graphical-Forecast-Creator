@@ -45,7 +45,6 @@ jest.mock('./components/Layout', () => ({
 }));
 
 jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
-jest.mock('./components/DrawingTools/DrawingTools', () => () => <div>DrawingTools Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
 jest.mock('./components/Beta/BetaAccessGuard', () => () => <MockOutlet />);
 jest.mock('./components/ToS/ToSModal', () => ({
