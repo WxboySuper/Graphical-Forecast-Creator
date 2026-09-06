@@ -36,7 +36,7 @@ export interface UseCloudCyclesResult {
   markAsCurrent: (cycleId: string, label: string) => void;
   clearCurrent: () => void;
   refreshCycles: () => Promise<void>;
-  updateSyncState: (state: CloudSyncState, error?: string) => void;
+  updateSyncState: (state: CloudSyncState, error?: string, cycleId?: string) => void;
 }
 
 interface CloudAccessContext {
@@ -52,7 +52,7 @@ interface CloudStateContext {
   setCycles: Dispatch<SetStateAction<CloudCycleMetadata[]>>;
   setError: Dispatch<SetStateAction<string | null>>;
   setLoading: Dispatch<SetStateAction<boolean>>;
-  updateSyncState: (state: CloudSyncState, error?: string) => void;
+  updateSyncState: (state: CloudSyncState, error?: string, cycleId?: string) => void;
 }
 
 /** Returns the shared error message for cloud write actions when the user cannot save. */
@@ -90,14 +90,20 @@ function applySyncStateUpdate({
   setCurrentCloud,
   state,
   syncError,
+  cycleId,
 }: {
   setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
   state: CloudSyncState;
   syncError?: string;
+  cycleId?: string;
 }): void {
   setCurrentCloud((prev) => {
     if (!prev) {
       return null;
+    }
+
+    if (cycleId && prev.id !== cycleId) {
+      return prev;
     }
 
     if (hasMatchingSyncState({ currentCloud: prev, state, syncError })) {
@@ -293,13 +299,15 @@ function handleCloudSaveFailure<T>({
   result,
   setError,
   updateSyncState,
+  cycleId,
 }: {
   result: CloudOperationResult<T>;
   setError: Dispatch<SetStateAction<string | null>>;
-  updateSyncState: (state: CloudSyncState, error?: string) => void;
+  updateSyncState: (state: CloudSyncState, error?: string, cycleId?: string) => void;
+  cycleId?: string;
 }): false {
   setError(result.error || 'Failed to save cloud cycle');
-  updateSyncState('error', result.error);
+  updateSyncState('error', result.error, cycleId);
   return false;
 }
 
@@ -308,7 +316,90 @@ function markExistingCloudCycleSaving(
   currentCloudRef: CloudStateContext['currentCloudRef'],
   updateSyncState: CloudStateContext['updateSyncState'],
 ): void {
-  if (currentCloudRef.current) updateSyncState('saving');
+  if (currentCloudRef.current) updateSyncState('saving', undefined, currentCloudRef.current.id);
+}
+
+/** Returns whether a save may replace the selected cloud context. */
+function canApplyCloudSaveSelection(savedCycleId: string | undefined, currentCycleId: string | undefined): boolean {
+  return !savedCycleId || savedCycleId === currentCycleId;
+}
+
+/** Applies a successful save without replacing a newer cloud selection. */
+function applyCloudSaveSuccess({
+  result,
+  savedCycleId,
+  label,
+  user,
+  currentCloudRef,
+  setCurrentCloud,
+  updateSyncState,
+}: {
+  result: CloudOperationResult<string>;
+  savedCycleId?: string;
+  label: string;
+  user: ReturnType<typeof useAuth>['user'];
+  currentCloudRef: CloudStateContext['currentCloudRef'];
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+  updateSyncState: CloudStateContext['updateSyncState'];
+}): true {
+  if (result.data && canApplyCloudSaveSelection(savedCycleId, currentCloudRef.current?.id)) {
+    setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
+  }
+  queueProductMetric({ event: 'cloud_cycle_saved', user });
+  trackProductEvent('cloud_save_completed');
+  updateSyncState('saved', undefined, savedCycleId);
+  return true;
+}
+
+/** Executes one hosted save request and maps its result to sync state. */
+async function executeCloudSave({
+  userId,
+  label,
+  cycleDate,
+  stats,
+  payload,
+  workflowMetadata,
+  savedCycleId,
+  setError,
+  updateSyncState,
+  user,
+  currentCloudRef,
+  setCurrentCloud,
+}: {
+  userId: string;
+  label: string;
+  cycleDate: string;
+  stats: SavedCycleStats;
+  payload: GFCForecastSaveData;
+  workflowMetadata?: CycleMetadata;
+  savedCycleId?: string;
+  setError: Dispatch<SetStateAction<string | null>>;
+  updateSyncState: CloudStateContext['updateSyncState'];
+  user: ReturnType<typeof useAuth>['user'];
+  currentCloudRef: CloudStateContext['currentCloudRef'];
+  setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
+}): Promise<boolean> {
+  const result = await saveCloudCycle({
+    userId,
+    label,
+    cycleDate,
+    stats,
+    payload,
+    workflowMetadata,
+    existingId: savedCycleId,
+  });
+  if (!result.success) {
+    return handleCloudSaveFailure({ result, setError, updateSyncState, cycleId: savedCycleId });
+  }
+  return applyCloudSaveSuccess({
+    result,
+    savedCycleId,
+    label,
+    user,
+    currentCloudRef,
+    setCurrentCloud,
+    updateSyncState,
+  });
 }
 
 /** Returns the save callback for hosted cloud cycles. */
@@ -326,7 +417,7 @@ function useCloudSaveCycle({
     user: ReturnType<typeof useAuth>['user'];
   }) {
   return useCallback(
-    async (
+    (
       label: string,
       cycleDate: string,
       stats: SavedCycleStats,
@@ -336,34 +427,28 @@ function useCloudSaveCycle({
     ): Promise<boolean> => {
       if (!canSaveCloudCycle({ userId, canWrite, localFixtureActive })) {
         setError(getCloudWriteBlockedMessage({ userId, canWrite, localFixtureActive }));
-        return false;
+        return Promise.resolve(false);
       }
       const authenticatedUserId = userId as string;
+      const savedCycleId = options?.saveAsNew ? undefined : currentCloudRef.current?.id;
 
       setError(null);
       markExistingCloudCycleSaving(currentCloudRef, updateSyncState);
 
-      const result = await saveCloudCycle({
+      return executeCloudSave({
         userId: authenticatedUserId,
         label,
         cycleDate,
         stats,
         payload,
         workflowMetadata,
-        existingId: options?.saveAsNew ? undefined : currentCloudRef.current?.id,
+        savedCycleId,
+        setError,
+        updateSyncState,
+        user,
+        currentCloudRef,
+        setCurrentCloud,
       });
-
-      if (!result.success) {
-        return handleCloudSaveFailure({ result, setError, updateSyncState });
-      }
-
-      if (result.data) {
-        setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
-      }
-      queueProductMetric({ event: 'cloud_cycle_saved', user });
-      trackProductEvent('cloud_save_completed');
-      updateSyncState('saved');
-      return true;
     },
     [canWrite, currentCloudRef, localFixtureActive, setCurrentCloud, setError, updateSyncState, user, userId]
   );
@@ -607,8 +692,8 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
     currentCloudRef,
   });
 
-  const updateSyncState = useCallback((state: CloudSyncState, syncError?: string) => {
-    applySyncStateUpdate({ setCurrentCloud, state, syncError });
+  const updateSyncState = useCallback((state: CloudSyncState, syncError?: string, cycleId?: string) => {
+    applySyncStateUpdate({ setCurrentCloud, state, syncError, cycleId });
   }, [setCurrentCloud]);
 
   useCloudCycleSubscription({
