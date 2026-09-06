@@ -30,7 +30,9 @@ export const getAutoSaveTimestamp = (storedValue: string | null): number => {
 
   try {
     const parsed = JSON.parse(storedValue) as { timestamp?: string };
-    return parsed.timestamp ? Date.parse(parsed.timestamp) : 0;
+    if (!parsed.timestamp) return 0;
+    const timestamp = Date.parse(parsed.timestamp);
+    return Number.isFinite(timestamp) ? timestamp : 0;
   } catch {
     return 0;
   }
@@ -38,7 +40,16 @@ export const getAutoSaveTimestamp = (storedValue: string | null): number => {
 
 /** Picks the newest autosave snapshot when multiple scoped copies exist. */
 export const pickNewestAutoSaveValue = (...values: (string | null)[]): string | null => {
-  const candidates = values.filter((value): value is string => value !== null);
+  const candidates = values.filter((value): value is string => {
+    if (value === null) return false;
+    try {
+      const parsed = JSON.parse(value) as { timestamp?: unknown };
+      if (parsed.timestamp === undefined) return true;
+      return typeof parsed.timestamp === 'string' && Number.isFinite(Date.parse(parsed.timestamp));
+    } catch {
+      return false;
+    }
+  });
   if (candidates.length === 0) return null;
 
   return candidates.reduce((best, current) => (
