@@ -21,6 +21,18 @@ export { MAX_IMPORT_BYTES } from './forecastImportValidation';
 
 const CURRENT_VERSION = '1.0.0';
 
+/** Downloads a browser Blob and releases its temporary object URL after the click. */
+export const downloadBlob = (blob: Blob, filename: string): void => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
 /** Reads bytes when the browser File implementation exposes arrayBuffer. */
 const readFileBytes = async (file: File): Promise<Uint8Array | undefined> => {
   if (typeof file.arrayBuffer !== 'function') return undefined;

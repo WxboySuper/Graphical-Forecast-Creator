@@ -3,6 +3,7 @@ import {
   deserializeForecast,
   exportForecastToJson,
   downloadGfcPackage,
+  downloadBlob,
   readForecastImportFile,
   validateForecastDataReason,
 } from '../fileUtils';
@@ -22,17 +23,6 @@ import type {
 } from './types';
 import { isWorkflowExportPackage } from '../workflowPackage';
 import { MAX_IMPORT_BYTES, MAX_KML_IMPORT_BYTES, validateImportFileBytes } from '../forecastImportValidation';
-
-const triggerBlobDownload = (blob: Blob, filename: string): void => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-};
 
 const buildFilename = (
   forecastCycle: ForecastCycle,
@@ -199,7 +189,7 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
   if (format === 'kml') {
     const { buildStructuredKmlDocument } = await import('../kmzExport/buildKml');
     const kml = buildStructuredKmlDocument({ forecastCycle, options: kmlOptions });
-    triggerBlobDownload(
+    downloadBlob(
       new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }),
       buildFilename(forecastCycle, scope, day, 'kml'),
     );
