@@ -81,6 +81,21 @@ describe('useModalFocusTrap', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('keeps focus stable and uses the latest close callback after rerender', () => {
+    const firstOnClose = jest.fn();
+    const secondOnClose = jest.fn();
+    const { rerender } = render(<FocusTrapHarness onClose={firstOnClose} />);
+    const last = screen.getByRole('button', { name: 'Last' });
+    last.focus();
+
+    rerender(<FocusTrapHarness onClose={secondOnClose} />);
+
+    expect(last).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(firstOnClose).not.toHaveBeenCalled();
+    expect(secondOnClose).toHaveBeenCalled();
+  });
+
   it('hides background siblings but never the modal subtree', () => {
     render(<FocusTrapHarness />);
     const dialog = screen.getByRole('dialog');
