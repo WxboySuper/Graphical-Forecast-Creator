@@ -35,13 +35,15 @@ The review covers every repository area. Behavioral inspection focused on import
 
 The forecast page supports the tabbed toolbar. Four historical preference values remain accepted, but all render that same layout. The initial audit mistook those values for four active layouts; SA-35 records the redundant resolution code. Cleanup must retain compatibility with saved settings and old links. The weather grading algorithms, bounded import validation, account isolation, capability gates, and hosted billing checks remain behavior contracts during cleanup. Versioned formats and historical release documents can serve real compatibility or provenance needs. Vendored geodata is checked against its declared checksums rather than judged by file size.
 
-No application fixes preceded this report or issue creation. Work will use focused PRs, with stacks only where changes depend on earlier patches. Each issue states its own acceptance checks; every PR must also finish the repository checks.
+The original 34 issues were published before application fixes began. SA-35 through SA-37 were verified during cleanup and documented before their own fixes. Work will use focused PRs, with stacks only where changes depend on earlier patches. Each issue states its own acceptance checks; every PR must also finish the repository checks.
 
 ## Findings
 
+37 findings are tracked below. See [the implementation handoff](2026-09-06-audit-handoff.md) for PRs, validation status, and remaining work.
+
 ### SA-01. Discover all server tests instead of maintaining a filename list
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1110
+Issue: [SA-01](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1110)
 
 Files: `server/package.json`.
 
@@ -53,7 +55,7 @@ Validation: Run every server test and verify the three omitted suites appear.
 
 ### SA-02. Run all script tests in CI and remove duplicate Jest coverage runs
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1111
+Issue: [SA-02](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1111)
 
 Files: `.github/workflows/ci.yml`, `package.json`.
 
@@ -65,7 +67,7 @@ Validation: Run all script tests and retain failures as blocking CI results.
 
 ### SA-03. Add the existing Auto-TSTM Python tests to CI
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1112
+Issue: [SA-03](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1112)
 
 Files: `server/weather/test_generate_tstm.py`, `server/requirements.txt`, `.github/workflows/ci.yml`.
 
@@ -77,7 +79,7 @@ Validation: Execute the Python suite locally and in CI without live upstream dow
 
 ### SA-04. Separate production bundle verification from ordinary Jest tests
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1113
+Issue: [SA-04](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1113)
 
 Files: `src/hooks/categoricalBundleBoundary.test.ts`, `scripts/check-bundle-budget.mjs`.
 
@@ -89,7 +91,7 @@ Validation: Plain Jest passes without build artifacts, and post-build verificati
 
 ### SA-05. Preserve vendored boundary checksums across Windows checkouts
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1114
+Issue: [SA-05](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1114)
 
 Files: `src/config/geoBoundarySources.ts`, `scripts/validate-geo-assets.test.mjs`, `public/geodata`.
 
@@ -101,7 +103,7 @@ Validation: Validate pinned bytes in a fresh Windows checkout and retain failure
 
 ### SA-06. Remove the package command for the deleted beta changelog script
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1115
+Issue: [SA-06](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1115)
 
 Files: `package.json`.
 
@@ -113,7 +115,7 @@ Validation: Verify every repository script path declared in package.json exists.
 
 ### SA-07. Separate development dependencies from shipped application dependencies
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1116
+Issue: [SA-07](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1116)
 
 Files: `package.json`, `pnpm-lock.yaml`, `server/package.json`.
 
@@ -125,7 +127,7 @@ Validation: Frozen install, licenses, build, typechecks, and dependency audits.
 
 ### SA-08. Remove unused Create React App bootstrap artifacts
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1117
+Issue: [SA-08](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1117)
 
 Files: `src/reportWebVitals.ts`, `src/index.tsx`, `src/logo.svg`, `docs/coverage-exclusions.md`, `package.json`.
 
@@ -137,7 +139,7 @@ Validation: Build, app smoke tests, and no remaining references.
 
 ### SA-09. Remove retired day, outlook, toolbar, and drawing control implementations
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1118
+Issue: [SA-09](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1118)
 
 Files: `src/components/DaySelector`, `src/components/OutlookDaySelector`, `src/components/OutlookSelector`, `src/components/Toolbar`, `src/components/DrawingTools/DrawingTools.tsx`.
 
@@ -145,11 +147,11 @@ These components are unreachable from src/index.tsx and only imported by their o
 
 Proposed fix: Remove the disconnected controls, exclusive helpers/styles, and retired tests while preserving the live export hook and compatibility with all four historical layout preference values.
 
-Validation: Import graph, typecheck, forecast layout tests, and browser checks for every historical layout preference value.
+Validation: Import graph, typecheck, live forecast layout tests, and browser checks for every historical layout preference value.
 
 ### SA-10. Remove the disconnected legacy discussion editor
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1119
+Issue: [SA-10](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1119)
 
 Files: `src/components/DiscussionEditor/DiscussionEditor.tsx`, `src/components/DiscussionEditor/DiscussionEditor.test.tsx`.
 
@@ -161,7 +163,7 @@ Validation: Discussion tests and discussion browser workflow.
 
 ### SA-11. Remove obsolete map controls and the unused React alert popup
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1120
+Issue: [SA-11](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1120)
 
 Files: `src/components/Map/DeleteConfirmation.tsx`, `src/components/Map/OverlayControls.tsx`, `src/components/Map/useOutlookLayersState.ts`, `src/components/Map/precisionPolygonEditHandler.ts`, `src/monitor/components/MonitorAlertPopup.tsx`, `src/utils/domUtils.ts`.
 
@@ -173,7 +175,7 @@ Validation: Map tests, alert popup tests, precision editing and deletion browser
 
 ### SA-12. Remove disconnected workflow serialization and analytics compatibility layers
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1121
+Issue: [SA-12](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1121)
 
 Files: `src/utils/workflowSerialization.ts`, `src/lib/workflowAnalytics.ts`, `src/types/workflowAnalytics.ts`.
 
@@ -183,21 +185,21 @@ Proposed fix: Remove unused implementations and tests, retain schema types requi
 
 Validation: Import/export compatibility, workflow analytics tests, and typecheck.
 
-### SA-13. Use one forecast workspace registry
+### SA-13. Remove unused forecast workspace registries
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1122
+Issue: [SA-13](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1122)
 
-Files: `src/config/forecastWorkspaces.ts`, `src/routing/forecastWorkspaceRoutes.ts`, `src/routing/forecastWorkspacePersistence.ts`.
+Files: `src/config/forecastWorkspaces.ts`, `src/routing/forecastWorkspaceRoutes.ts`, `src/App.tsx`, `src/config/featureSurfaces.ts`.
 
-Two files define the same workspace ID union and route/exposure tables. The config registry only has test consumers, while routing owns the application contract.
+Two workspace catalogs define IDs, routes, and exposure rules that the application never reads. The only application import from either module is a helper returning the literal /forecast/severe redirect. Actual gated registration uses featureSurfaces and buildFeatureGatedRoutes. The config catalog also has an unused storage-key helper; it has never written data.
 
-Proposed fix: Remove the redundant registry and move any useful persistence validation tests onto the canonical routing helpers.
+Proposed fix: Remove both unused catalogs and their exclusive tests. Inline the fixed legacy redirect path in App. Preserve the actual feature-gated route definitions and their tests. No storage migration is needed because the deleted helper has no callers.
 
-Validation: Workspace route, exposure, and persistence tests, including invalid inputs.
+Validation: Application typecheck, actual gated-route/exposure tests, app tests, and browser navigation including the legacy redirect and gated workspaces.
 
 ### SA-14. Resolve the disconnected verification share-card implementation
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1123
+Issue: [SA-14](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1123)
 
 Files: `src/components/ForecastGrade/ShareCard.tsx`, `src/components/ForecastGrade/shareCard.ts`, `src/components/ForecastGrade/useCaptureGradeMap.ts`, `src/components/ForecastGrade/useShareCardActions.ts`.
 
@@ -209,7 +211,7 @@ Validation: Verification browser workflow and share/download tests if connected;
 
 ### SA-15. Remove the Leaflet export fallback after the OpenLayers migration
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1124
+Issue: [SA-15](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1124)
 
 Files: `src/utils/exportUtils.ts`, `src/App.tsx`, `src/setupTests.ts`, `src/components/Map/ForecastMap.css`, `src/darkMode.css`, `src/maps/contracts.ts`, `vite.config.ts`, `package.json`.
 
@@ -221,7 +223,7 @@ Validation: Image export tests and browser JPEG export with legends, tile failur
 
 ### SA-16. Share forecast and verification map style helpers
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1125
+Issue: [SA-16](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1125)
 
 Files: `src/components/Map/openLayersMapStyles.ts`, `src/components/Map/OpenLayersVerificationMap.tsx`.
 
@@ -233,7 +235,7 @@ Validation: Existing map style tests and forecast/verification visual checks.
 
 ### SA-17. Share asynchronous basemap style loading and cleanup
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1126
+Issue: [SA-17](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1126)
 
 Files: `src/components/Map/OpenLayersForecastMap.tsx`, `src/components/Map/OpenLayersVerificationMap.tsx`.
 
@@ -245,7 +247,7 @@ Validation: Fast style switches, failed style requests, and map unmount behavior
 
 ### SA-18. Use one blob download helper
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1127
+Issue: [SA-18](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1127)
 
 Files: `src/utils/forecastTransfer/index.ts`, `src/utils/kmzExport/index.ts`, `src/utils/fileUtils.ts`.
 
@@ -257,7 +259,7 @@ Validation: Native and KML/KMZ export tests, including cleanup after a failed cl
 
 ### SA-19. Share custom-product validation primitives
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1128
+Issue: [SA-19](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1128)
 
 Files: `src/lib/customCategoryValidation.ts`, `src/lib/customProductSnapshots.ts`.
 
@@ -269,7 +271,7 @@ Validation: Malformed category and snapshot tests, including extra keys and whit
 
 ### SA-20. Stop stale and overlapping Monitor alert refreshes
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1129
+Issue: [SA-20](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1129)
 
 Files: `src/monitor/useMonitorNwsAlertsRefresh.ts`, `src/monitor/useMonitorNwsAlertsLoad.ts`.
 
@@ -281,7 +283,7 @@ Validation: Deferred response tests for disable/unmount and slow polling, plus f
 
 ### SA-21. Connect alert-banner validation and scheduling to the live hook
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1130
+Issue: [SA-21](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1130)
 
 Files: `src/components/useAlertBanner.ts`, `src/components/alertBannerConfig.ts`, `src/components/AlertBanner.tsx`.
 
@@ -293,7 +295,7 @@ Validation: Malformed JSON shapes, expired/future banners, failed path changes, 
 
 ### SA-22. Reject invalid timestamps when choosing autosave snapshots
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1131
+Issue: [SA-22](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1131)
 
 Files: `src/hooks/useAutoSave.ts`.
 
@@ -305,7 +307,7 @@ Validation: Invalid date strings, malformed JSON, missing timestamps, and valid 
 
 ### SA-23. Bound queued analytics events and clean up failed tracker scripts
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1132
+Issue: [SA-23](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1132)
 
 Files: `src/lib/productAnalytics.ts`.
 
@@ -317,7 +319,7 @@ Validation: Blocked/failed tracker loads, queue limits, retry, and opt-out teard
 
 ### SA-24. Share duplicate server Firebase bearer-token verification
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1133
+Issue: [SA-24](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1133)
 
 Files: `server/beta.js`, `server/metrics.js`.
 
@@ -329,7 +331,7 @@ Validation: Missing, malformed, valid, and rejected tokens plus both route suite
 
 ### SA-25. Consolidate duplicate legacy analytics viewer commands
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1134
+Issue: [SA-25](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1134)
 
 Files: `scripts/view-analytics.js`, `server/view-analytics.js`.
 
@@ -341,7 +343,7 @@ Validation: Fixture-based command output, malformed lines, missing input, and do
 
 ### SA-26. Remove the expired March 2026 launch countdown and gate
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1135
+Issue: [SA-26](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1135)
 
 Files: `src/App.tsx`, `src/pages/ComingSoonPage.tsx`, `vite.config.ts`, `src/vite-env.d.ts`, `babel.config.js`.
 
@@ -353,7 +355,7 @@ Validation: App routes, agreement flow, and beta-gated browser smoke checks.
 
 ### SA-27. Reuse local-date helpers for workflow suggestions and Home
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1136
+Issue: [SA-27](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1136)
 
 Files: `src/components/ForecastWorkflow/ForecastWorkflowPanel.tsx`, `src/pages/home/useHomePageLogic.ts`, `src/utils/localDate.ts`.
 
@@ -365,7 +367,7 @@ Validation: Timezone tests east and west of UTC and daylight-saving transitions.
 
 ### SA-28. Make outlook trimming independent of the global land-mask cache
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1137
+Issue: [SA-28](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1137)
 
 Files: `src/store/forecastSlice.ts`, `src/hooks/useTrimCurrentDayOutlooks.ts`.
 
@@ -377,7 +379,7 @@ Validation: Identical state/action results with cleared cache, non-current-day u
 
 ### SA-29. Keep modal focus stable when the close callback changes
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1138
+Issue: [SA-29](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1138)
 
 Files: `src/hooks/useModalFocusTrap.ts`.
 
@@ -389,7 +391,7 @@ Validation: Type into a non-first control, rerender, verify focus is retained, a
 
 ### SA-30. Eliminate the permitted test TypeScript errors
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1139
+Issue: [SA-30](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1139)
 
 Files: `scripts/check-test-types.mjs`, `scripts/test-type-errors-baseline.json`, `tsconfig.test.json`, `src/**/*.test.ts`, `src/**/*.test.tsx`.
 
@@ -401,7 +403,7 @@ Validation: Application, tooling, and test typechecks all pass with zero diagnos
 
 ### SA-31. Restore reproducible utility CSS generation
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1140
+Issue: [SA-31](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1140)
 
 Files: `src/index.css`, `src/tailwind.generated.css`, `tailwind.compat.config.js`, `postcss.config.js`, `package.json`.
 
@@ -413,7 +415,7 @@ Validation: A newly added utility is emitted, production build works from a clea
 
 ### SA-32. Count premium subscriptions without fetching every entitlement document
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1141
+Issue: [SA-32](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1141)
 
 Files: `server/metrics.js`.
 
@@ -425,7 +427,7 @@ Validation: Count result, cache hit, concurrent callers, and failed-request retr
 
 ### SA-33. Remove duplicated local sign-in and sign-up orchestration
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1142
+Issue: [SA-33](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1142)
 
 Files: `src/auth/AuthProvider.tsx`.
 
@@ -437,7 +439,7 @@ Validation: Local sign-in/sign-up success, HTTP error, malformed response, and h
 
 ### SA-34. Scope cloud sync completion to the selected cycle
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1143
+Issue: [SA-34](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1143)
 
 Files: `src/hooks/useCloudSync.ts`, `src/hooks/useCloudCycles.ts`.
 
@@ -449,7 +451,7 @@ Validation: Same-content cycle switches, out-of-order saves, selection clearing,
 
 ### SA-35. Remove obsolete forecast layout preference resolution
 
-Issue: https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1155
+Issue: [SA-35](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1155)
 
 Files: `src/pages/ForecastPage.tsx`, `src/utils/forecastUiVariant.ts`.
 
@@ -458,3 +460,27 @@ The forecast page reads query, stored, and synced layout preferences and passes 
 Proposed fix: Render the supported toolbar directly and remove unused preference reads, resolver, and options. Keep persisted/auth schema compatibility where required, so existing settings do not break profile validation.
 
 Validation: Browser coverage for every legacy forecastUi query value, forecast page tests, auth compatibility, and typechecks.
+
+### SA-36. Prevent exported footer and unofficial badge from overlapping
+
+Issue: [SA-36](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1162)
+
+Files: `src/utils/exportUtils.ts`.
+
+JPEG exports at the standard 1280x720 browser viewport place the centered unofficial badge across the timestamp/attribution footer. Verified in both light and dark exported images while testing SA-15. Independently positioned overlays share the same bottom row without reserving space.
+
+Proposed fix: Give the unofficial badge and attribution footer separate rows or measured non-overlapping bounds, including narrow exports. Preserve the visible warning and attribution.
+
+Validation: Export and visually inspect light/dark images at desktop and narrow widths; assert that footer and badge bounds do not overlap.
+
+### SA-37. Prevent verification telemetry from overlapping the unofficial badge
+
+Issue: [SA-37](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1164)
+
+Files: `src/components/ForecastGrade/ForecastGradeDashboard.css`, `src/components/ForecastGrade/ForecastGradeMapPane.tsx`, `src/components/Map/UnofficialBadge.tsx`.
+
+At the standard 1280x720 desktop viewport, the live verification map column is about 588px wide. Its telemetry strip and unofficial-forecast badge occupy the same bottom row and overlap in both themes. This was visually verified after uploading a drawn wind forecast and selecting the blank basemap.
+
+Proposed fix: Reserve separate space for telemetry and the unofficial warning, or move telemetry into the existing map toolbar. Preserve both readable evidence information and the warning.
+
+Validation: Check desktop, narrow map columns, and phone layouts in both themes. Assert that the badge and telemetry element bounds do not intersect.
