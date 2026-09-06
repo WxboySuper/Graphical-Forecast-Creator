@@ -143,7 +143,7 @@ export const useAutoSave = (
   const saveGenerationRef = useRef(0);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  useEffect(function autosaveEffect() {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
