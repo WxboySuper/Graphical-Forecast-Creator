@@ -6,8 +6,6 @@ import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
-// Import required libraries 
-import 'leaflet/dist/leaflet.css';
 import {
   getFirstExposedOutlookType,
   shouldActivateEmergencyMode,

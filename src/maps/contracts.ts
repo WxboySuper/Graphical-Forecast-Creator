@@ -1,4 +1,4 @@
-export type MapEngine = 'leaflet' | 'openlayers';
+export type MapEngine = 'openlayers';
 
 export interface MapViewState {
   center: [number, number];
