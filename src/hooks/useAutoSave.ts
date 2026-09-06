@@ -125,11 +125,13 @@ export const useAutoSave = (userId?: string | null) => {
       }
     }, AUTOSAVE_DELAY);
 
-    return () => {
+    function cleanupAutoSaveTimeout(): void {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-    };
+    }
+
+    return cleanupAutoSaveTimeout;
   }, [forecastCycle, mapView, userId, workflowMetadata]);
 };
