@@ -434,6 +434,7 @@ interface PendingFeatureUpdate {
   feature: Feature;
 }
 
+/** Finds incoming features that already exist in the selected day's outlook maps. */
 const collectPendingFeatureUpdates = (
   state: ForecastState,
   incoming: Feature[],
@@ -502,6 +503,7 @@ const getFeatureCacheKey = (feature: Feature): object => {
   return original(feature) ?? feature;
 };
 
+/** Clones a feature once per stable source identity while building history snapshots. */
 const cloneFeatureCached = (feature: Feature): Feature => {
   const cacheKey = getFeatureCacheKey(feature);
   const cached = featureCloneCache.get(cacheKey);
@@ -564,6 +566,7 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
   };
 };
 
+/** Deep-clones custom layer metadata for an isolated history snapshot. */
 const cloneCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
   customLayers ? cloneJsonValue(customLayers) : undefined;
 
@@ -1575,6 +1578,7 @@ const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
   layers: [],
 };
+/** Selects custom layers for the active forecast day, or an immutable empty value. */
 export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollection => {
   const cycle = state.forecast.forecastCycle;
   return cycle?.days?.[cycle.currentDay]?.customLayers || EMPTY_CUSTOM_LAYERS;
@@ -1605,6 +1609,7 @@ export const selectIsLowProbability = (state: RootState) => {
   return day?.metadata?.lowProbabilityOutlooks?.includes(activeType) || false;
 };
 
+/** Selects the clamped display opacity for one active-day outlook type. */
 export const selectCurrentOutlookOpacity = (state: RootState, outlookType: OutlookType): number => {
   const day = state.forecast.forecastCycle.days[state.forecast.forecastCycle.currentDay];
   const value = day?.metadata.outlookOpacities?.[outlookType];
