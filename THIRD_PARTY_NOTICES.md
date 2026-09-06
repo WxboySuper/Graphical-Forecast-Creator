@@ -21,7 +21,6 @@ to each.
 - **@reduxjs/toolkit** ^2.12.0 (root (pnpm)) — MIT — allowed
 - **@sentry/react** ^10.72.0 (root (pnpm)) — MIT — allowed
 - **@sentry/vite-plugin** ^5.4.0 (root (pnpm)) — MIT — allowed
-- **@tailwindcss/postcss** ^4.3.3 (root (pnpm)) — MIT — allowed
 - **@testing-library/dom** ^10.4.0 (root (pnpm)) — MIT — allowed
 - **@testing-library/jest-dom** ^7.0.1 (root (pnpm)) — MIT — allowed
 - **@testing-library/react** ^16.3.3 (root (pnpm)) — MIT — allowed
@@ -67,7 +66,7 @@ to each.
 - **redux** ^5.0.1 (root (pnpm)) — MIT — allowed
 - **rollup** >=4.62.4 (root (pnpm)) — MIT — allowed
 - **tailwind-merge** ^3.5.0 (root (pnpm)) — MIT — allowed
-- **tailwindcss** ^4.3.3 (root (pnpm)) — MIT — allowed
+- **tailwindcss** ^3.4.19 (root (pnpm)) — MIT — allowed
 - **typescript** npm:@typescript/typescript6@^6.0.2 (root (pnpm)) — Apache-2.0 — allowed
 - **typescript-eslint** ^8.68.0 (root (pnpm)) — MIT — allowed
 - **uuid** ^14.0.2 (root (pnpm)) — MIT — allowed
