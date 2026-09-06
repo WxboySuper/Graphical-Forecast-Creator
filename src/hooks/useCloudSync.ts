@@ -120,6 +120,7 @@ const syncCurrentCloudCycle = async ({
 
 type CloudSyncInput = Pick<UseCloudCyclesResult, 'currentCloud' | 'updateSyncState' | 'saveCycle'>;
 
+/** Owns debounced cloud-sync execution and exposes explicit sync controls. */
 const useCloudSyncOperations = ({
   canSync,
   currentCloud,
@@ -153,7 +154,7 @@ const useCloudSyncOperations = ({
       cycleDate: forecastCycle.cycleDate,
       forecastCycle,
       workflowMetadata,
-       setLastSyncedHash: (cloudId, hash) => setLastSyncedState({ cloudId, hash }),
+      setLastSyncedHash: (cloudId, hash) => setLastSyncedState({ cloudId, hash }),
       currentHash,
       isLatestRequest: () => syncGenerationRef.current === requestGeneration,
     });
@@ -183,7 +184,8 @@ const useCloudSyncOperations = ({
   };
 };
 
-const useCloudSyncScheduling = ({
+/** Schedules a debounced save whenever the selected cycle has unsynced state. */
+function useCloudSyncScheduling({
   canSync,
   currentCloudId,
   currentHash,
@@ -197,7 +199,7 @@ const useCloudSyncScheduling = ({
   lastSyncedState: { cloudId: string; hash: string } | null;
   performSync: () => Promise<void>;
   syncTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-}) => {
+}) {
   useEffect(() => {
     if (!canSync || !currentCloudId || (lastSyncedState?.cloudId === currentCloudId && isCurrentStateSynced(lastSyncedState.hash, currentHash))) {
       clearSyncTimeout(syncTimeoutRef);
@@ -215,7 +217,7 @@ const useCloudSyncScheduling = ({
       clearSyncTimeout(syncTimeoutRef);
     };
   }, [canSync, currentCloudId, currentHash, lastSyncedState, performSync, syncTimeoutRef]);
-};
+}
 
 /** Hook for managing automatic sync of the current forecast to cloud. */
 export const useCloudSync = (cloud: CloudSyncInput) => {

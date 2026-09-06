@@ -417,7 +417,7 @@ function useCloudSaveCycle({
     user: ReturnType<typeof useAuth>['user'];
   }) {
   return useCallback(
-    async (
+    (
       label: string,
       cycleDate: string,
       stats: SavedCycleStats,
@@ -427,7 +427,7 @@ function useCloudSaveCycle({
     ): Promise<boolean> => {
       if (!canSaveCloudCycle({ userId, canWrite, localFixtureActive })) {
         setError(getCloudWriteBlockedMessage({ userId, canWrite, localFixtureActive }));
-        return false;
+        return Promise.resolve(false);
       }
       const authenticatedUserId = userId as string;
       const savedCycleId = options?.saveAsNew ? undefined : currentCloudRef.current?.id;
