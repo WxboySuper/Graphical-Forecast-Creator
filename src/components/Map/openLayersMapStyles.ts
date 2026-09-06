@@ -327,6 +327,7 @@ export const createCustomFill = (style: CustomCategoryStyle): Fill => {
   context.fillRect(0, 0, 12, 12);
   context.strokeStyle = toRgbaColor({ color: style.strokeColor, alpha: style.strokeOpacity });
   context.lineWidth = Math.max(1, style.strokeWidth / 2);
+  /** Draws one hatch segment on the repeating pattern tile. */
   const line = (x1: number, y1: number, x2: number, y2: number) => {
     context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
   };
@@ -342,6 +343,7 @@ export const createCustomFill = (style: CustomCategoryStyle): Fill => {
   return new Fill({ color: pattern ?? toRgbaColor({ color: style.fillColor, alpha: style.fillOpacity }) });
 };
 
+/** Builds an OpenLayers style for a custom product category. */
 export const toCustomOlStyle = (category: CustomCategoryTemplate, isTopLayer = false, zIndex = 700 + category.order): Style => new Style({
   fill: createCustomFill(category.style),
   stroke: new Stroke({
@@ -351,6 +353,7 @@ export const toCustomOlStyle = (category: CustomCategoryTemplate, isTopLayer = f
   zIndex,
 });
 
+/** Reads the custom-layer identity fields from an OpenLayers feature. */
 export const getCustomFeatureIdentity = (feature: FeatureLike): CustomFeatureIdentity | null => {
   const featureId = feature.get("featureId") as string | undefined;
   const customLayerId = feature.get("customLayerId") as string | undefined;
@@ -359,6 +362,7 @@ export const getCustomFeatureIdentity = (feature: FeatureLike): CustomFeatureIde
   return featureId && customLayerId && categoryId && title ? { featureId, customLayerId, categoryId, title } : null;
 };
 
+/** Converts an edited custom OpenLayers feature back to the persisted polygon shape. */
 export const toUpdatedCustomFeature = (feature: FeatureLike, format: GeoJSON): CustomPolygonFeature | null => {
   const identity = getCustomFeatureIdentity(feature);
   const geometry = feature.getGeometry();
