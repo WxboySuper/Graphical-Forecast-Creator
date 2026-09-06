@@ -8,10 +8,8 @@ import {
   validateForecastDataReason,
 } from '../fileUtils';
 import { downloadKmzExport } from '../kmzExport';
-import type { KmzExportStrategy } from '../kmzExport';
 import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
-import type { WorkflowExportScope } from '../workflowPackage';
 import { detectForecastTransferFormat } from './detectFormat';
 import { parseKmlDocument } from './parseKml';
 import { forecastCycleFromKmlPlacemarks } from './forecastCycleFromKml';
@@ -19,36 +17,15 @@ import type {
   ForecastExportRequest,
   ForecastImportResult,
   ForecastTransferMapView,
-  KmlArchiveStrategy,
 } from './types';
+import {
+  buildTransferFilename,
+  toKmzStrategy,
+  toKmlScope,
+  toWorkflowScope,
+} from './transferExportUtils';
 import { isWorkflowExportPackage } from '../workflowPackage';
 import { MAX_IMPORT_BYTES, MAX_KML_IMPORT_BYTES, validateImportFileBytes } from '../forecastImportValidation';
-
-/** Builds a timestamped filename for a forecast transfer export. */
-const buildFilename = (
-  forecastCycle: ForecastCycle,
-  scope: ForecastExportRequest['scope'],
-  day: DayType | undefined,
-  extension: string,
-): string => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const scopeLabel = scope === 'current-day'
-    ? `day-${day ?? forecastCycle.currentDay}`
-    : scope;
-  return `gfc-${scopeLabel}-${timestamp}.${extension}`;
-};
-
-/** Maps the transfer archive option to the KMZ export strategy. */
-const toKmzStrategy = (strategy: KmlArchiveStrategy | undefined): KmzExportStrategy =>
-  strategy === 'split' ? 'split-kmz' : 'structured-kml';
-
-/** Maps a transfer scope to the workflow-package scope. */
-const toWorkflowScope = (scope: ForecastExportRequest['scope']): WorkflowExportScope =>
-  scope === 'workflow' ? 'workflow' : 'cycle';
-
-/** Maps a transfer scope to the KML export scope. */
-const toKmlScope = (scope: ForecastExportRequest['scope']): 'current-day' | 'cycle' =>
-  scope === 'current-day' ? 'current-day' : 'cycle';
 
 /** Reads a browser File into bytes when the File API supports arrayBuffer. */
 const readFileBytes = async (file: File): Promise<Uint8Array | undefined> => {
@@ -203,7 +180,7 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
     const kml = buildStructuredKmlDocument({ forecastCycle, options: kmlOptions });
     downloadBlob(
       new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }),
-      buildFilename(forecastCycle, scope, day, 'kml'),
+      buildTransferFilename(forecastCycle, scope, day, 'kml'),
     );
     return;
   }
