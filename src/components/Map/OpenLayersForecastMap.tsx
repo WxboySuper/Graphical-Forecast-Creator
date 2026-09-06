@@ -857,6 +857,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       map.addInteraction(select);
       selectRef.current = select;
 
+      // skipcq: JS-0045 -- React effects return this cleanup function intentionally.
       return () => {
         window.cancelAnimationFrame(raf1);
         if (raf2 !== null) window.cancelAnimationFrame(raf2);
@@ -1495,10 +1496,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       setInteractionMode("delete");
     };
 
+    /** Switches the forecast map into polygon-edit mode. */
     const handleSetModeEdit = () => {
       setInteractionMode("edit");
     };
 
+    // skipcq: JS-0415 -- the toolbar is intentionally nested inside the map container.
     return (
       <div className="map-container" translate="no">
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
