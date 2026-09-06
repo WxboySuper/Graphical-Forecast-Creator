@@ -122,7 +122,7 @@ describe('exportUtils additional unit tests', () => {
     legend.className = 'map-legend';
     clonedRoot.appendChild(legend);
 
-    const cb = buildCloneCallback('MyTitle', true, 'StatusText', 'Unofficial');
+    const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: true, statusText: 'StatusText', unofficialText: 'Unofficial' });
     cb(clonedRoot);
 
     // original control should be hidden

@@ -585,6 +585,7 @@ function useForecastWorkspaceControllerArgs({
     handleCancelReset: modalState.handleCancelReset,
   });
 
+  /** Returns the live map view, falling back to the US center when the map is not mounted. */
   const getMapView = () => mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
 
   return {
