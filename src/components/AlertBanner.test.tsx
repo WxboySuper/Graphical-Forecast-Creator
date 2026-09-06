@@ -62,6 +62,7 @@ describe('AlertBanner', () => {
     renderBanner();
 
     await waitFor(() => {
+      expect(screen.queryByText('Future alert')).not.toBeInTheDocument();
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
