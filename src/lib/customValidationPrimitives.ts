@@ -15,4 +15,3 @@ export const isBoundedText = (value: unknown, max: number = CUSTOM_PRODUCT_LIMIT
 /** Validates a whole number that may be zero. */
 export const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
