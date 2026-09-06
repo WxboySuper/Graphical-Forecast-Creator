@@ -3,7 +3,6 @@
  * without instantiating a full OpenLayers Map instance.
  */
 
-import { jest } from '@jest/globals';
 
 // Mock ol-mapbox-style to avoid ESM modules during tests
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));

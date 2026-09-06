@@ -3,7 +3,6 @@
  * Focuses on pure utilities to raise coverage without instantiating a full OL Map.
  */
 
-import { jest } from '@jest/globals';
 
 // Mock ol-mapbox-style (pulls pbf; avoid loading ESM module in Jest)
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
