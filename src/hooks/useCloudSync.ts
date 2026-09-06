@@ -27,6 +27,44 @@ const buildCloudSyncHash = (serializedPayload: ReturnType<typeof serializeForeca
     cycleMetadata: serializedPayload.cycleMetadata,
   }) : '';
 
+/** Returns true when the current forecast state has not changed since the last successful sync. */
+const isCurrentStateSynced = (lastSyncedHash: string | null, currentHash: string): boolean =>
+  lastSyncedHash === currentHash;
+
+/** Records a successful sync only when its request is still current. */
+function applyCloudSyncSuccess({
+  isLatestRequest,
+  updateSyncState,
+  setLastSyncedHash,
+  currentCloud,
+  currentHash,
+}: {
+  isLatestRequest: () => boolean;
+  updateSyncState: Pick<UseCloudCyclesResult, 'updateSyncState'>['updateSyncState'];
+  setLastSyncedHash: (cloudId: string, hash: string) => void;
+  currentCloud: NonNullable<Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud']>;
+  currentHash: string;
+}): void {
+  if (!isLatestRequest()) return;
+  updateSyncState('saved', undefined, currentCloud.id);
+  setLastSyncedHash(currentCloud.id, currentHash);
+}
+
+/** Records a failed sync only when its request is still current. */
+function applyCloudSyncFailure({
+  isLatestRequest,
+  updateSyncState,
+  currentCloud,
+  message,
+}: {
+  isLatestRequest: () => boolean;
+  updateSyncState: Pick<UseCloudCyclesResult, 'updateSyncState'>['updateSyncState'];
+  currentCloud: NonNullable<Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud']>;
+  message: string;
+}): void {
+  if (isLatestRequest()) updateSyncState('error', message, currentCloud.id);
+}
+
 /** Runs one hosted cloud save and scopes completion state to the cycle that started it. */
 const syncCurrentCloudCycle = async ({
   canSync,
@@ -79,44 +117,6 @@ const syncCurrentCloudCycle = async ({
     });
   }
 };
-
-/** Returns true when the current forecast state has not changed since the last successful sync. */
-const isCurrentStateSynced = (lastSyncedHash: string | null, currentHash: string): boolean =>
-  lastSyncedHash === currentHash;
-
-/** Records a successful sync only when its request is still current. */
-function applyCloudSyncSuccess({
-  isLatestRequest,
-  updateSyncState,
-  setLastSyncedHash,
-  currentCloud,
-  currentHash,
-}: {
-  isLatestRequest: () => boolean;
-  updateSyncState: Pick<UseCloudCyclesResult, 'updateSyncState'>['updateSyncState'];
-  setLastSyncedHash: (cloudId: string, hash: string) => void;
-  currentCloud: NonNullable<Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud']>;
-  currentHash: string;
-}): void {
-  if (!isLatestRequest()) return;
-  updateSyncState('saved', undefined, currentCloud.id);
-  setLastSyncedHash(currentCloud.id, currentHash);
-}
-
-/** Records a failed sync only when its request is still current. */
-function applyCloudSyncFailure({
-  isLatestRequest,
-  updateSyncState,
-  currentCloud,
-  message,
-}: {
-  isLatestRequest: () => boolean;
-  updateSyncState: Pick<UseCloudCyclesResult, 'updateSyncState'>['updateSyncState'];
-  currentCloud: NonNullable<Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud']>;
-  message: string;
-}): void {
-  if (isLatestRequest()) updateSyncState('error', message, currentCloud.id);
-}
 
 type CloudSyncInput = Pick<UseCloudCyclesResult, 'currentCloud' | 'updateSyncState' | 'saveCycle'>;
 
