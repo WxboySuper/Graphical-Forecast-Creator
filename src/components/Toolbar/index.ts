@@ -1,1 +1,0 @@
-export { ToolbarPanel } from './ToolbarPanel';
