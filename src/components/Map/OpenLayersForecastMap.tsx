@@ -1443,8 +1443,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           /* Reconciliation errors are reported through the source statistics. */
         });
 
-      // deepsource-disable-next-line JS-0045 -- React effects return this cleanup function intentionally.
-      return () => {
+      return () => { // skipcq: JS-0045 -- React effects return this cleanup function intentionally.
         cancelled = true;
       };
     }, [outlookTrimPreviewOnly, outlookTrimStrategy, outlooks]);
@@ -1470,8 +1469,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     };
 
     return (
-      <div className="map-container" translate="no">
-        {/* skipcq: JS-0415 -- the toolbar is intentionally nested inside the map container. */}
+      <div className="map-container" translate="no"> {/* skipcq: JS-0415 -- the toolbar is intentionally nested inside the map container. */}
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
         <div className="map-toolbar-bottom-right">
           <div
