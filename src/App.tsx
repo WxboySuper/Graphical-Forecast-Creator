@@ -36,7 +36,6 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
-import { getDefaultForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -67,7 +66,7 @@ const ForecastLegacyRedirect = () => {
   const location = useLocation();
   return (
     <Navigate
-      to={{ pathname: getDefaultForecastWorkspacePath(), search: location.search, hash: location.hash }}
+      to={{ pathname: '/forecast/severe', search: location.search, hash: location.hash }}
       replace
     />
   );

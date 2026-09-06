@@ -8,7 +8,7 @@ promise that every workspace already has a page.
 
 ## Route contract
 
-The canonical Forecast routes are:
+The planned Forecast routes are:
 
 | Workspace | Canonical path | v1.8 state | Exposure owner |
 | --- | --- | --- | --- |
@@ -16,17 +16,17 @@ The canonical Forecast routes are:
 | Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
 | Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
-| Custom | `/forecast/custom` | registered by #915 | `customProducts` |
+| Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
 
 `/forecast` is a compatibility entry point. It redirects to
 `/forecast/severe` while preserving the query string and hash. The workspace id comes from the URL, not from a global
 "current workspace" value in Redux. That makes refresh, browser history, and
 shared links deterministic.
 
-The route contract lives in
-`src/routing/forecastWorkspaceRoutes.ts`. A route definition can be present
-before its page is registered. This lets exposure tests describe future paths
-without importing or initializing unfinished workspace code.
+`src/App.tsx` registers the current Severe route and its legacy redirect.
+`src/config/featureSurfaces.ts` owns the actual gated route definitions, which
+`src/routing/buildFeatureGatedRoutes.tsx` filters by exposure. The planned paths
+above do not register pages. Route tests exercise these active definitions.
 
 Future routes stay unregistered when their feature is off. A direct request
 falls through the normal application fallback instead of mounting a disabled
