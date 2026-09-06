@@ -46,6 +46,7 @@ export interface OverlayOptions {
 }
 
 // Helper: add title/footer/status and unofficial overlays
+/** Adds the status pill to the export container. */
 export const addStatusOverlay = (container: HTMLElement, statusText: string, isDarkMode: boolean) => {
   const doc = container.ownerDocument;
   const wrapperDiv = doc.createElement('div');
@@ -65,6 +66,7 @@ export const addStatusOverlay = (container: HTMLElement, statusText: string, isD
   container.appendChild(wrapperDiv);
 };
 
+/** Adds the unofficial forecast badge to the export container. */
 export const addUnofficialOverlay = (container: HTMLElement, unofficialText: string) => {
   const doc = container.ownerDocument;
   const unofficialWrapper = doc.createElement('div');
@@ -89,6 +91,7 @@ export const addUnofficialOverlay = (container: HTMLElement, unofficialText: str
   container.appendChild(unofficialWrapper);
 };
 
+/** Adds the title and footer overlays to the export container. */
 export const addTitleAndFooter = (container: HTMLElement, options: OverlayOptions, isDarkMode: boolean) => {
   const doc = container.ownerDocument;
   if (options.title) {
@@ -108,6 +111,7 @@ export const addTitleAndFooter = (container: HTMLElement, options: OverlayOption
   container.appendChild(footerDiv);
 };
 
+/** Adds status, unofficial, title, and footer overlays to the export container. */
 export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}) => {
   const isDarkMode = store.getState().theme.darkMode;
 
@@ -136,6 +140,7 @@ const readUnofficialText = (root: HTMLElement): string =>
   '';
 
 // Helper: mark cloned images CORS-safe so html2canvas can load external tiles.
+/** Marks cloned images as CORS safe so html2canvas can load external tiles. */
 export const markCloneImagesCorsSafe = (clonedContainer: HTMLElement) => {
   Array.from(clonedContainer.querySelectorAll('img')).forEach((img) => {
     try { (img as HTMLImageElement).crossOrigin = 'anonymous'; } catch {
@@ -146,6 +151,7 @@ export const markCloneImagesCorsSafe = (clonedContainer: HTMLElement) => {
 };
 
 // Helper: copy SVG defs so patterns and hatching render in the export.
+/** Copies SVG defs into the cloned document so patterns and hatching render. */
 export const copySvgDefsToClone = (clonedDocument: Document) => {
   try {
     const srcDefs = Array.from(document.querySelectorAll('svg defs')) as Element[];
@@ -177,6 +183,7 @@ export const copySvgDefsToClone = (clonedDocument: Document) => {
 };
 
 // Helper: apply the html2canvas clone adjustments for one capture.
+/** Applies background, CORS, and SVG adjustments to the cloned export document. */
 export const handleCloneDocument = (
   clonedDocument: Document,
   captureId: string,
