@@ -11,6 +11,7 @@ interface MonitorNwsAlertsRefreshOptions {
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
 }
 
+/** Polls animated NWS alerts without overlapping or stale requests. */
 export const useMonitorNwsAlertsRefresh = ({
   enabled,
   animationEnabled,

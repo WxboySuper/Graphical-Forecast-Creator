@@ -15,6 +15,7 @@ interface UseMonitorNwsAlertsLoadOptions {
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
 }
 
+/** Loads the initial or manually refreshed NWS alert snapshot. */
 export const useMonitorNwsAlertsLoad = ({
   enabled,
   refreshToken,
