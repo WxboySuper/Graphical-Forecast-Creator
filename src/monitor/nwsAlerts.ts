@@ -152,14 +152,3 @@ export const snapshotCollectionsEqual = (
     return true;
   });
 };
-
-/** Appends a changed alert snapshot while retaining only the animation frame window. */
-export const appendAlertSnapshotFrame = (
-  current: NwsAlertFeatureCollection[],
-  collection: NwsAlertFeatureCollection,
-  maxFrames: number,
-): NwsAlertFeatureCollection[] => {
-  const last = current[current.length - 1];
-  if (last && snapshotCollectionsEqual(last, collection)) return current;
-  return [...current, collection].slice(-maxFrames);
-};

@@ -1,8 +1,20 @@
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
-import { appendAlertSnapshotFrame, fetchActiveNwsAlerts, type NwsAlertFeatureCollection } from './nwsAlerts';
+import { fetchActiveNwsAlerts, snapshotCollectionsEqual, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
+
+const appendSnapshotFrame = (
+  current: NwsAlertFeatureCollection[],
+  collection: NwsAlertFeatureCollection,
+): NwsAlertFeatureCollection[] => {
+  const last = current[current.length - 1];
+  if (last && snapshotCollectionsEqual(last, collection)) {
+    return current;
+  }
+
+  return [...current, collection].slice(-MAX_ANIMATION_FRAMES);
+};
 
 interface UseMonitorNwsAlertsLoadOptions {
   enabled: boolean;
@@ -44,7 +56,7 @@ export const useMonitorNwsAlertsLoad = ({
           return undefined;
         }
 
-        const nextFrames = appendAlertSnapshotFrame([], collection, MAX_ANIMATION_FRAMES);
+        const nextFrames = appendSnapshotFrame([], collection);
         setRawFrames(nextFrames);
         setFrameIndex(Math.max(0, nextFrames.length - 1));
         setFetchedAt(new Date().toISOString());

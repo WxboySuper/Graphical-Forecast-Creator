@@ -1,7 +1,19 @@
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { appendAlertSnapshotFrame, fetchActiveNwsAlerts, type NwsAlertFeatureCollection } from './nwsAlerts';
+import { fetchActiveNwsAlerts, snapshotCollectionsEqual, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
+
+const appendSnapshotFrame = (
+  current: NwsAlertFeatureCollection[],
+  collection: NwsAlertFeatureCollection,
+): NwsAlertFeatureCollection[] => {
+  const last = current[current.length - 1];
+  if (last && snapshotCollectionsEqual(last, collection)) {
+    return current;
+  }
+
+  return [...current, collection].slice(-MAX_ANIMATION_FRAMES);
+};
 
 interface MonitorNwsAlertsRefreshOptions {
   enabled: boolean;
@@ -23,26 +35,15 @@ export const useMonitorNwsAlertsRefresh = ({
       return undefined;
     }
 
-    let active = true;
-    let requestInFlight = false;
     const intervalId = window.setInterval(() => {
-      if (!active || requestInFlight) return;
-      requestInFlight = true;
       fetchActiveNwsAlerts()
         .then((collection) => {
-          if (!active) return;
-          setRawFrames((current) => appendAlertSnapshotFrame(current, collection, MAX_ANIMATION_FRAMES));
+          setRawFrames((current) => appendSnapshotFrame(current, collection));
           setFetchedAt(new Date().toISOString());
         })
-        .catch(() => undefined)
-        .finally(() => {
-          requestInFlight = false;
-        });
+        .catch(() => undefined);
     }, Math.max(animationSpeedMs * 4, 15_000));
 
-    return () => {
-      active = false;
-      window.clearInterval(intervalId);
-    };
+    return () => window.clearInterval(intervalId);
   }, [animationEnabled, animationSpeedMs, enabled, setFetchedAt, setRawFrames]);
 };
