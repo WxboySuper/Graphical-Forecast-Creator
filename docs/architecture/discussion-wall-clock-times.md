@@ -19,7 +19,7 @@ shifted by the timezone offset.
 - `isoToDatetimeLocal(isoString)` — converts a stored ISO timestamp to the
   local input value.
 
-`useDiscussionFormState` (and the dormant `DiscussionEditor`) use these
+`useDiscussionFormState` uses these
 helpers so values are pre-filled, displayed, and persisted in the user's local
 wall-clock.
 
