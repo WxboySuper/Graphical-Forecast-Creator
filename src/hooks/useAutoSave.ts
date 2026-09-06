@@ -128,8 +128,8 @@ export const useAutoSave = (userId?: string | null) => {
       }
     }, AUTOSAVE_DELAY);
 
-    // skipcq: JS-0045 -- React useEffect callbacks may return a cleanup function.
-    return () => {
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupAutoSaveTimeout() {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
