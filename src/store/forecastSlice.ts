@@ -20,9 +20,8 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
-import { getCachedLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
 import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
-import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
+import type { LandMaskFeature, LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import {
   applyPaintBucketStrategy,
   type PaintBucketEditAction,
@@ -574,13 +573,12 @@ const cloneIntegratedCustomLayers = (customLayers?: CustomLayerCollection): Cust
   cloneCustomLayers(customLayers);
 
 /** Captures the current day's drawable outlook data and low-probability metadata for history. */
-const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {
-  const currentDay = state.forecastCycle.currentDay;
-  const dayData = state.forecastCycle.days[currentDay];
+const getCurrentDaySnapshot = (state: ForecastState, day = state.forecastCycle.currentDay): ForecastDaySnapshot | null => {
+  const dayData = state.forecastCycle.days[day];
   if (!dayData) return null;
 
   return {
-    day: currentDay,
+    day,
     data: cloneOutlookData(dayData.data),
     lowProbabilityOutlooks: [...(dayData.metadata.lowProbabilityOutlooks || [])],
     outlookOpacities: dayData.metadata.outlookOpacities ? { ...dayData.metadata.outlookOpacities } : undefined,
@@ -620,8 +618,8 @@ const pushHistoryEntry = (
 };
 
 /** Saves the current day into the undo stack and clears redo after a new user edit. */
-const pushUndoSnapshot = (state: ForecastState) => {
-  const snapshot = getCurrentDaySnapshot(state);
+const pushUndoSnapshot = (state: ForecastState, day = state.forecastCycle.currentDay) => {
+  const snapshot = getCurrentDaySnapshot(state, day);
   if (!snapshot) return;
 
   const dayHistory = getOrCreateDayHistory(state, snapshot.day);
@@ -832,20 +830,16 @@ export const forecastSlice = createSlice({
 
     trimCurrentDayOutlooksToLand: (
       state,
-      action: PayloadAction<{ strategy: LandMaskStrategy; day?: DayType }>,
+      action: PayloadAction<{ strategy: LandMaskStrategy; landMask: LandMaskFeature; day?: DayType }>,
     ) => {
-      const landMask = getCachedLandMask(action.payload.strategy);
-      if (!landMask) {
-        return;
-      }
-
-      const dayData = state.forecastCycle.days[action.payload.day ?? state.forecastCycle.currentDay];
+      const targetDay = action.payload.day ?? state.forecastCycle.currentDay;
+      const dayData = state.forecastCycle.days[targetDay];
       if (!dayData) {
         return;
       }
 
-      pushUndoSnapshot(state);
-      state.lastTrimResult = trimOutlookDataInPlace(dayData.data, landMask, action.payload.strategy);
+      pushUndoSnapshot(state, targetDay);
+      state.lastTrimResult = trimOutlookDataInPlace(dayData.data, action.payload.landMask, action.payload.strategy);
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
