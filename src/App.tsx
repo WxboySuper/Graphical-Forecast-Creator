@@ -130,66 +130,16 @@ const AppHooks = () => {
   return null;
 };
 
-interface AgreementGateProps {
-  showComingSoon: boolean;
-}
-
-const getAgreementState = (localBetaBypass: boolean) => ({
-  tosAccepted: localBetaBypass || hasAcceptedToS(),
-  privacyAccepted: localBetaBypass || hasAcceptedPrivacyPolicy(),
-});
-
-const AcceptedApplication: React.FC<{ showComingSoon: boolean }> = ({ showComingSoon }) => (
-  <AppProviders>
-    <AppHooks />
-    <ProductAnalyticsRouteTracker />
-    <AppRoutes showComingSoon={showComingSoon} />
-  </AppProviders>
+/** Composes the application providers without coupling them to route markup. */
+const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
+  <Provider store={store}>
+    <AuthProvider>
+      <EntitlementProvider>
+        <WorkflowAwarenessProvider>{children}</WorkflowAwarenessProvider>
+      </EntitlementProvider>
+    </AuthProvider>
+  </Provider>
 );
-
-const useAgreementState = (showComingSoon: boolean) => {
-  const localBetaBypass = __GFC_DEV_MODE__ && new URLSearchParams(window.location.search).get('localBetaBypass') === 'true';
-  const initial = getAgreementState(localBetaBypass);
-  const [tosAccepted, setTosAccepted] = useState(initial.tosAccepted);
-  const [privacyAccepted, setPrivacyAccepted] = useState(initial.privacyAccepted);
-  useEffect(() => {
-    if (privacyAccepted && !showComingSoon) initProductAnalytics();
-  }, [privacyAccepted, showComingSoon]);
-  useEffect(() => {
-    if (!showComingSoon) {
-      const next = getAgreementState(localBetaBypass);
-      setTosAccepted(next.tosAccepted);
-      setPrivacyAccepted(next.privacyAccepted);
-    }
-  }, [localBetaBypass, showComingSoon]);
-  return { tosAccepted, privacyAccepted, setTosAccepted, setPrivacyAccepted };
-};
-
-/** Handles the launch-dependent agreement flow before the main app is allowed to initialize. */
-const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
-  const { tosAccepted, privacyAccepted, setTosAccepted, setPrivacyAccepted } = useAgreementState(showComingSoon);
-
-  const handleAcceptToS = useCallback(() => {
-    setTosAccepted(true);
-  }, [setTosAccepted]);
-
-  const handleAcceptPrivacyPolicy = useCallback(() => {
-    setPrivacyAccepted(true);
-  }, [setPrivacyAccepted]);
-
-  if (showComingSoon || !tosAccepted) {
-    return showComingSoon ? <AppRoutes showComingSoon /> : <ToSModal onAccept={handleAcceptToS} />;
-  }
-
-  if (!privacyAccepted) {
-    return <PrivacyPolicyModal onAccept={handleAcceptPrivacyPolicy} />;
-  }
-
-  // Keep the routed product tree behind the agreement boundary. Previously the
-  // modal was rendered beside AppRoutes, so pages, providers, and global hooks
-  // were live in the DOM before the user accepted the policies.
-  return <AcceptedApplication showComingSoon={showComingSoon} />;
-};
 
 interface AppRoutesProps {
   showComingSoon: boolean;
@@ -243,6 +193,70 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
   );
 };
 
+interface AgreementGateProps {
+  showComingSoon: boolean;
+}
+
+/** Reads agreement acceptance, including the development-only beta bypass. */
+const getAgreementState = (localBetaBypass: boolean) => ({
+  tosAccepted: localBetaBypass || hasAcceptedToS(),
+  privacyAccepted: localBetaBypass || hasAcceptedPrivacyPolicy(),
+});
+
+/** Starts providers and shared hooks after the required agreements are accepted. */
+const AcceptedApplication: React.FC<{ showComingSoon: boolean }> = ({ showComingSoon }) => (
+  <AppProviders>
+    <AppHooks />
+    <ProductAnalyticsRouteTracker />
+    <AppRoutes showComingSoon={showComingSoon} />
+  </AppProviders>
+);
+
+/** Refreshes agreement state when the launch gate opens and initializes consented analytics. */
+const useAgreementState = (showComingSoon: boolean) => {
+  const localBetaBypass = __GFC_DEV_MODE__ && new URLSearchParams(window.location.search).get('localBetaBypass') === 'true';
+  const initial = getAgreementState(localBetaBypass);
+  const [tosAccepted, setTosAccepted] = useState(initial.tosAccepted);
+  const [privacyAccepted, setPrivacyAccepted] = useState(initial.privacyAccepted);
+  useEffect(() => {
+    if (privacyAccepted && !showComingSoon) initProductAnalytics();
+  }, [privacyAccepted, showComingSoon]);
+  useEffect(() => {
+    if (!showComingSoon) {
+      const next = getAgreementState(localBetaBypass);
+      setTosAccepted(next.tosAccepted);
+      setPrivacyAccepted(next.privacyAccepted);
+    }
+  }, [localBetaBypass, showComingSoon]);
+  return { tosAccepted, privacyAccepted, setTosAccepted, setPrivacyAccepted };
+};
+
+/** Handles the launch-dependent agreement flow before the main app is allowed to initialize. */
+const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
+  const { tosAccepted, privacyAccepted, setTosAccepted, setPrivacyAccepted } = useAgreementState(showComingSoon);
+
+  const handleAcceptToS = useCallback(() => {
+    setTosAccepted(true);
+  }, [setTosAccepted]);
+
+  const handleAcceptPrivacyPolicy = useCallback(() => {
+    setPrivacyAccepted(true);
+  }, [setPrivacyAccepted]);
+
+  if (showComingSoon || !tosAccepted) {
+    return showComingSoon ? <AppRoutes showComingSoon /> : <ToSModal onAccept={handleAcceptToS} />;
+  }
+
+  if (!privacyAccepted) {
+    return <PrivacyPolicyModal onAccept={handleAcceptPrivacyPolicy} />;
+  }
+
+  // Keep the routed product tree behind the agreement boundary. Previously the
+  // modal was rendered beside AppRoutes, so pages, providers, and global hooks
+  // were live in the DOM before the user accepted the policies.
+  return <AcceptedApplication showComingSoon={showComingSoon} />;
+};
+
 // Main App with Router
 interface AppContentProps {
   showComingSoon: boolean;
@@ -253,17 +267,6 @@ const AppContent: React.FC<AppContentProps> = ({ showComingSoon }) => (
   <BrowserRouter>
     <AgreementGate showComingSoon={showComingSoon} />
   </BrowserRouter>
-);
-
-/** Composes the application providers without coupling them to route markup. */
-const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
-  <Provider store={store}>
-    <AuthProvider>
-      <EntitlementProvider>
-        <WorkflowAwarenessProvider>{children}</WorkflowAwarenessProvider>
-      </EntitlementProvider>
-    </AuthProvider>
-  </Provider>
 );
 
 /** Renders the authenticated application shell and route tree. */
