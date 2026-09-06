@@ -4,6 +4,7 @@ import { buildStructuredKmlDocument } from './buildKml';
 import { buildSplitKmzArchive, buildStructuredKmzArchive } from './buildKmz';
 import type { KmzExportOptions, KmzExportStrategy } from './types';
 
+/** Builds a timestamped filename for a KML or KMZ export. */
 const buildFilename = (forecastCycle: ForecastCycle, options: KmzExportOptions, extension: 'kml' | 'kmz'): string => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const scope = options.scope === 'cycle'

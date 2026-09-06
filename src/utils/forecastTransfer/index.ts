@@ -24,6 +24,7 @@ import type {
 import { isWorkflowExportPackage } from '../workflowPackage';
 import { MAX_IMPORT_BYTES, MAX_KML_IMPORT_BYTES, validateImportFileBytes } from '../forecastImportValidation';
 
+/** Builds a timestamped filename for a forecast transfer export. */
 const buildFilename = (
   forecastCycle: ForecastCycle,
   scope: ForecastExportRequest['scope'],
@@ -37,20 +38,25 @@ const buildFilename = (
   return `gfc-${scopeLabel}-${timestamp}.${extension}`;
 };
 
+/** Maps the transfer archive option to the KMZ export strategy. */
 const toKmzStrategy = (strategy: KmlArchiveStrategy | undefined): KmzExportStrategy =>
   strategy === 'split' ? 'split-kmz' : 'structured-kml';
 
+/** Maps a transfer scope to the workflow-package scope. */
 const toWorkflowScope = (scope: ForecastExportRequest['scope']): WorkflowExportScope =>
   scope === 'workflow' ? 'workflow' : 'cycle';
 
+/** Maps a transfer scope to the KML export scope. */
 const toKmlScope = (scope: ForecastExportRequest['scope']): 'current-day' | 'cycle' =>
   scope === 'current-day' ? 'current-day' : 'cycle';
 
+/** Reads a browser File into bytes when the File API supports arrayBuffer. */
 const readFileBytes = async (file: File): Promise<Uint8Array | undefined> => {
   if (typeof file.arrayBuffer !== 'function') return undefined;
   return new Uint8Array(await file.arrayBuffer());
 };
 
+/** Finds the preferred KML entry in an archive, falling back to any .kml file. */
 const findKmlEntry = (zip: JSZip): JSZip.JSZipObject => {
   const preferred = zip.file('doc.kml')
     ?? Object.values(zip.files).find((entry) => entry.name.toLowerCase().endsWith('.kml'));
@@ -60,6 +66,7 @@ const findKmlEntry = (zip: JSZip): JSZip.JSZipObject => {
   return preferred;
 };
 
+/** Expands and validates one KML archive entry. */
 const expandKmlEntry = async (entry: JSZip.JSZipObject): Promise<string> => {
   const declaredSize = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
   if (declaredSize !== undefined && declaredSize > MAX_KML_IMPORT_BYTES) {
@@ -73,11 +80,13 @@ const expandKmlEntry = async (entry: JSZip.JSZipObject): Promise<string> => {
   return new TextDecoder().decode(expandedKml);
 };
 
+/** Reads the KML payload from a KMZ file. */
 const readKmzPayload = async (file: File, bytes?: Uint8Array): Promise<string> => {
   const zip = await JSZip.loadAsync(bytes ?? file);
   return expandKmlEntry(findKmlEntry(zip));
 };
 
+/** Reads plain-text KML or the KML payload from a KMZ file. */
 const readKmlPayload = async (file: File, bytes?: Uint8Array): Promise<string> => {
   if (file.name.toLowerCase().endsWith('.kmz') || file.type === 'application/vnd.google-earth.kmz') {
     return readKmzPayload(file, bytes);
@@ -97,6 +106,7 @@ const readKmlPayload = async (file: File, bytes?: Uint8Array): Promise<string> =
   throw new Error('Unable to read KML file contents.');
 };
 
+/** Imports a KML/KMZ transfer into a forecast cycle. */
 const importKmlTransfer = async (
   file: File,
   bytes: Uint8Array | undefined,
@@ -112,6 +122,7 @@ const importKmlTransfer = async (
   };
 };
 
+/** Imports a native JSON or workflow package transfer. */
 const importNativeTransfer = async (
   file: File,
   format: 'json' | 'package',
@@ -137,6 +148,7 @@ const importNativeTransfer = async (
   };
 };
 
+/** Reads transfer bytes and detects the import format before parsing. */
 const prepareImport = async (file: File): Promise<{ bytes: Uint8Array | undefined; format: ForecastImportResult['format'] }> => {
   const bytes = await readFileBytes(file);
   const byteGate = validateImportFileBytes(bytes);
