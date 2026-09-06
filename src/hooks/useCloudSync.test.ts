@@ -63,8 +63,8 @@ describe('useCloudSync', () => {
     jest.useRealTimers();
   });
 
-  const cloud = () => ({
-    currentCloud: { id: 'cloud-1', label: 'Storm Day', syncState: 'idle' as const },
+  const cloud = (id = 'cloud-1') => ({
+    currentCloud: { id, label: id === 'cloud-1' ? 'Storm Day' : 'Second Day', syncState: 'idle' as const },
     saveCycle,
     updateSyncState,
   });
@@ -79,13 +79,13 @@ describe('useCloudSync', () => {
       await Promise.resolve();
     });
 
-    expect(updateSyncState).toHaveBeenCalledWith('saving');
+    expect(updateSyncState).toHaveBeenCalledWith('saving', undefined, 'cloud-1');
     expect(saveCycle).toHaveBeenCalledWith('Storm Day', '2026-04-24', {
       forecastDays: 1,
       totalOutlooks: 2,
       totalFeatures: 3,
     }, payload, workflowMetadata);
-    expect(updateSyncState).toHaveBeenCalledWith('saved');
+    expect(updateSyncState).toHaveBeenCalledWith('saved', undefined, 'cloud-1');
   });
 
   it('syncs metadata-only changes after the initial state is synced', async () => {
@@ -156,7 +156,7 @@ describe('useCloudSync', () => {
     await act(async () => {
       await result.current.syncNow();
     });
-    expect(updateSyncState).toHaveBeenCalledWith('error', 'Failed to sync to cloud');
+    expect(updateSyncState).toHaveBeenCalledWith('error', 'Failed to sync to cloud', 'cloud-1');
 
     saveCycle.mockRejectedValueOnce(new Error('network down'));
     mockSerializeForecast.mockReturnValue({ ...payload, mapView: { center: [3, 4], zoom: 6 } } as never);
@@ -165,7 +165,7 @@ describe('useCloudSync', () => {
     await act(async () => {
       await result.current.syncNow();
     });
-    expect(updateSyncState).toHaveBeenCalledWith('error', 'network down');
+    expect(updateSyncState).toHaveBeenCalledWith('error', 'network down', 'cloud-1');
   });
 
   it('can mark the current state as already synced', () => {
@@ -177,5 +177,48 @@ describe('useCloudSync', () => {
     rerender();
 
     expect(result.current.isSynced).toBe(true);
+  });
+
+  it('does not treat identical content as synced after switching cloud cycles', async () => {
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useCloudSync(cloud(id)), {
+      initialProps: { id: 'cloud-1' },
+    });
+
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(result.current.isSynced).toBe(true);
+
+    rerender({ id: 'cloud-2' });
+    expect(result.current.isSynced).toBe(false);
+
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    expect(saveCycle).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an out-of-order completion scoped to the cycle that started the save', async () => {
+    let resolveSave: ((value: boolean) => void) | undefined;
+    saveCycle.mockImplementationOnce(() => new Promise<boolean>((resolve) => {
+      resolveSave = resolve;
+    }));
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useCloudSync(cloud(id)), {
+      initialProps: { id: 'cloud-1' },
+    });
+
+    let pendingSync: Promise<void> | undefined;
+    await act(async () => {
+      pendingSync = result.current.syncNow();
+      await Promise.resolve();
+    });
+    rerender({ id: 'cloud-2' });
+    await act(async () => {
+      resolveSave?.(true);
+      await pendingSync;
+    });
+
+    expect(updateSyncState).toHaveBeenCalledWith('saved', undefined, 'cloud-1');
+    expect(result.current.isSynced).toBe(false);
   });
 });
