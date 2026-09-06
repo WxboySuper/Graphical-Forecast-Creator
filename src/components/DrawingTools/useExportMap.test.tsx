@@ -14,7 +14,7 @@ const mockExportMapAsImage = exportMapAsImage as jest.MockedFunction<typeof expo
 const mockDownloadDataUrl = downloadDataUrl as jest.MockedFunction<typeof downloadDataUrl>;
 const mockGetFormattedDate = getFormattedDate as jest.MockedFunction<typeof getFormattedDate>;
 type MockMapHandle = {
-  getEngine: () => 'leaflet' | 'openlayers';
+  getEngine: () => 'openlayers';
   getMap: () => unknown;
   getView: () => { center: [number, number]; zoom: number };
 };
@@ -27,7 +27,6 @@ type RenderProps = {
 const createMapRef = (current: MockMapHandle | null) => ({ current } as RefObject<ForecastMapHandle | null>);
 
 describe('useExportMap', () => {
-  const outlooks = { tornado: new Map([['1', []]]) } as never;
   const addToast = jest.fn();
 
   beforeEach(() => {
@@ -40,7 +39,6 @@ describe('useExportMap', () => {
       ({ disabled, current }: RenderProps) =>
         useExportMap({
           mapRef: createMapRef(current),
-          outlooks,
           isExportDisabled: disabled,
           addToast,
         }),
@@ -66,22 +64,12 @@ describe('useExportMap', () => {
     act(() => result.current.initiateExport());
     expect(addToast).toHaveBeenCalledWith('Map not fully loaded. Please try again.', 'error');
 
-    rerender({
-      disabled: false,
-      current: {
-        getEngine: () => 'leaflet',
-        getMap: () => null,
-        getView: () => ({ center: [0, 0], zoom: 1 }),
-      },
-    });
-    act(() => result.current.initiateExport());
-    expect(addToast).toHaveBeenCalledWith('Map not fully loaded. Please try again.', 'error');
   });
 
   test('exports successfully and closes the modal', async () => {
     const map = { id: 'map-1' };
     const current: MockMapHandle = {
-      getEngine: () => 'leaflet',
+      getEngine: () => 'openlayers',
       getMap: () => map,
       getView: () => ({ center: [0, 0], zoom: 1 }),
     };
@@ -91,7 +79,6 @@ describe('useExportMap', () => {
     const { result } = renderHook(() =>
       useExportMap({
         mapRef: createMapRef(current),
-        outlooks,
         isExportDisabled: false,
         addToast,
       })
@@ -106,7 +93,6 @@ describe('useExportMap', () => {
 
     expect(mockExportMapAsImage).toHaveBeenCalledWith(
       map,
-      outlooks,
       expect.objectContaining({
         title: 'Storm Day',
         format: 'jpeg',
@@ -126,7 +112,7 @@ describe('useExportMap', () => {
 
   test('surfaces export failures', async () => {
     const current: MockMapHandle = {
-      getEngine: () => 'leaflet',
+      getEngine: () => 'openlayers',
       getMap: () => ({ id: 'map-1' }),
       getView: () => ({ center: [0, 0], zoom: 1 }),
     };
@@ -136,7 +122,6 @@ describe('useExportMap', () => {
     const { result } = renderHook(() =>
       useExportMap({
         mapRef: createMapRef(current),
-        outlooks,
         isExportDisabled: false,
         addToast,
       })
@@ -147,28 +132,5 @@ describe('useExportMap', () => {
     });
 
     expect(addToast).toHaveBeenCalledWith('Failed to export the map. Please try again.', 'error');
-  });
-
-  test('treats engine lookup errors as unsupported exports', () => {
-    const current: MockMapHandle = {
-      getEngine: () => {
-        throw new Error('engine unavailable');
-      },
-      getMap: () => ({ id: 'map-1' }),
-      getView: () => ({ center: [0, 0], zoom: 1 }),
-    };
-
-    const { result } = renderHook(() =>
-      useExportMap({
-        mapRef: createMapRef(current),
-        outlooks,
-        isExportDisabled: false,
-        addToast,
-      })
-    );
-
-    act(() => result.current.initiateExport());
-
-    expect(result.current.isModalOpen).toBe(true);
   });
 });
