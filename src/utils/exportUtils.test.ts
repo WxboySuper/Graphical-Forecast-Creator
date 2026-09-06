@@ -83,7 +83,7 @@ describe('exportUtils', () => {
   test('captureContainer returns data URL via html2canvas mock', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
-    const dataUrl = await captureContainer(container, 100, 100, 'png', 0.9);
+    const dataUrl = await captureContainer(container, { width: 100, height: 100, format: 'png', quality: 0.9 });
     expect(dataUrl).toBe('data:image/png;base64,FAKE');
     document.body.removeChild(container);
   });

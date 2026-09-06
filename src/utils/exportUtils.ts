@@ -205,15 +205,22 @@ export const handleCloneDocument = (
   }
 };
 
+/** Options for capturing an export container. Grouped to avoid excess function arguments. */
+export interface CaptureContainerOptions {
+  width: number;
+  height: number;
+  format?: ExportImageFormat;
+  quality?: number;
+  onClone?: (clonedContainer: HTMLElement) => void;
+}
+
 // Helper: capture container to data URL
+/** Captures a container element to a data URL. */
 export const captureContainer = async (
   container: HTMLElement,
-  width: number,
-  height: number,
-  format: ExportImageFormat,
-  quality: number,
-  onClone?: (clonedContainer: HTMLElement) => void
+  options: CaptureContainerOptions
 ): Promise<string> => {
+  const { width, height, format = 'png', quality = 0.92, onClone } = options;
   const { default: html2canvas } = await import('html2canvas');
   const captureId = `gfc-export-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   container.setAttribute('data-gfc-export-capture-id', captureId);
@@ -268,6 +275,7 @@ export const waitForMapRender = async (map: ExportMapLike, timeout = 1200): Prom
 };
 
 // Wait for all images within the export root to finish loading, with a timeout fallback.
+/** Waits for images in the export root to load, with a timeout fallback. */
 export const waitForImagesLoaded = (root: HTMLElement, timeout = 1200): Promise<{ timedOut: boolean; remaining: number }> => {
   return new Promise((resolve) => {
     try {
@@ -316,6 +324,7 @@ export const waitForImagesLoaded = (root: HTMLElement, timeout = 1200): Promise<
 };
 
 // Helper: hide elements in the cloned export DOM that shouldn't appear in the export, based on selectors
+/** Hides selectors in the cloned export DOM. */
 export const hideElementsInClone = (root: HTMLElement, selectors: string[]) => {
   selectors.forEach((selector) => {
     root.querySelectorAll(selector).forEach((el) => {
@@ -346,9 +355,13 @@ export const exportMapAsImage = async (
   const imgResult = await waitForImagesLoaded(exportRoot, 1200);
   maybeShowTileTimeoutWarning(exportRoot, imgResult);
 
-  return captureContainer(exportRoot, width, height, format, quality,
-    buildCloneCallback({ title, includeLegendAndStatus, statusText, unofficialText })
-  );
+  return captureContainer(exportRoot, {
+    width,
+    height,
+    format,
+    quality,
+    onClone: buildCloneCallback({ title, includeLegendAndStatus, statusText, unofficialText }),
+  });
 };
 
 /**
