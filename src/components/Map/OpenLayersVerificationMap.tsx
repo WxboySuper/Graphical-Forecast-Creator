@@ -91,20 +91,24 @@ const datColors = {
   EFU: '#f8fafc',
 };
 
+/** Returns the display color for a DAT Enhanced Fujita scale. */
 const datColorFor = (efScale: string | null | undefined): string => {
   const key = (efScale ?? '').toUpperCase() as keyof typeof datColors;
   return datColors[key] ?? '#fbbf24';
 };
 
+/** Builds the line style used for a DAT damage track. */
 const buildDatTrackStyle = () => new OlStyle({
   stroke: new StyleStroke({ color: '#fbbf24', width: 3 }),
 });
 
+/** Builds the polygon style used for a DAT damage area. */
 const buildDatPolygonStyle = (efScale: string | null | undefined) => new OlStyle({
   fill: new StyleFill({ color: 'rgba(245, 158, 11, 0.16)' }),
   stroke: new StyleStroke({ color: datColorFor(efScale), width: 1.5 }),
 });
 
+/** Builds the point style used for a DAT damage report. */
 const buildDatPointStyle = (efScale: string | null | undefined) => new OlStyle({
   image: new Circle({
     radius: 4,

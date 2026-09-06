@@ -18,7 +18,9 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await page.mouse.click(box.x + box.width * .6, box.y + box.height * .35);
   await page.mouse.dblclick(box.x + box.width * .5, box.y + box.height * .65);
   await page.getByRole('button', { name: 'Pan map' }).click();
-  await viewport.screenshot({ path: testInfo.outputPath('forecast-style.png') });
+  const forecastScreenshot = testInfo.outputPath('forecast-style.png');
+  await viewport.screenshot({ path: forecastScreenshot });
+  await testInfo.attach('forecast-style', { path: forecastScreenshot, contentType: 'image/png' });
 
   const downloadReady = page.waitForEvent('download');
   await page.locator('section[aria-label="Forecast package workflow"]').getByRole('button', { name: 'Export', exact: true }).click();
@@ -34,7 +36,11 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await page.getByRole('button', { name: 'Blank (Weather)', exact: true }).click();
   await expect(verificationViewport.locator('canvas').first()).toBeVisible();
   expect(await verificationViewport.locator('canvas').count()).toBeGreaterThan(0);
-  await verificationViewport.screenshot({ path: testInfo.outputPath('verification-style.png') });
+  const verificationScreenshot = testInfo.outputPath('verification-style.png');
+  await verificationViewport.screenshot({ path: verificationScreenshot });
+  await testInfo.attach('verification-style', { path: verificationScreenshot, contentType: 'image/png' });
   await page.getByRole('button', { name: 'Switch to dark mode' }).click();
-  await verificationViewport.screenshot({ path: testInfo.outputPath('verification-dark-style.png') });
+  const verificationDarkScreenshot = testInfo.outputPath('verification-dark-style.png');
+  await verificationViewport.screenshot({ path: verificationDarkScreenshot });
+  await testInfo.attach('verification-dark-style', { path: verificationDarkScreenshot, contentType: 'image/png' });
 });
