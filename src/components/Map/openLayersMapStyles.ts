@@ -75,7 +75,8 @@ interface StrokeWidthInput {
 
 interface HatchPatternInput {
   cigLevel: string;
-  alpha?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
 }
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
@@ -128,6 +129,8 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
 // Create canvas pattern for CIG hatching
 export const createHatchPattern = ({
   cigLevel,
+  strokeColor = "#000000",
+  strokeWidth = 1,
 }: HatchPatternInput): CanvasPattern | null => {
   const canvas = document.createElement("canvas");
   const size = 10;
@@ -137,8 +140,8 @@ export const createHatchPattern = ({
 
   if (!ctx) return null;
 
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeWidth;
 
   if (cigLevel === "CIG1") {
     // Broken diagonal lines
@@ -186,7 +189,7 @@ export const createOutlookFill = ({
     });
   }
 
-  const pattern = createHatchPattern({ cigLevel: probability, alpha: fillOpacity });
+  const pattern = createHatchPattern({ cigLevel: probability });
   if (pattern) {
     return new Fill({ color: pattern as CanvasPattern });
   }
