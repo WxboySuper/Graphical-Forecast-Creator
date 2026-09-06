@@ -54,6 +54,7 @@ const saveCloudCycle = async (db, uid, cycle) => {
   });
 };
 
+/** Handles a validated cloud-cycle save request. */
 const handleCloudCycleSave = async (req, res) => {
   if (!hasFirebaseAdminConfig()) return res.status(503).json({ error: 'Cloud storage is unavailable.' });
   const user = await verifyUser(req);
@@ -67,6 +68,7 @@ const handleCloudCycleSave = async (req, res) => {
   return res.status(200).json({ success: true, data: cycle.id });
 };
 
+/** Sends the stable public response for a cloud-cycle save failure. */
 const sendCloudCycleSaveError = (res, error) => {
   if (error?.code === 'CLOUD_QUOTA_EXCEEDED' || error?.message === 'CLOUD_QUOTA_EXCEEDED') {
     return res.status(409).json({ error: 'Cloud storage quota reached.' });
@@ -78,6 +80,7 @@ const sendCloudCycleSaveError = (res, error) => {
   return res.status(500).json({ error: 'Unable to save cloud cycle.' });
 };
 
+/** Registers the cloud-cycle API routes on the application. */
 const registerCloudCycleRoutes = (app, express, rateLimit) => {
   const saveRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
   app.post('/api/cloud-cycles', saveRateLimit, express.json({ limit: '800kb' }), async (req, res) => {
