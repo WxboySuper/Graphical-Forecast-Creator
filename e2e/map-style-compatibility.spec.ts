@@ -33,6 +33,7 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await page.getByRole('button', { name: 'Base map style', exact: true }).click();
   await page.getByRole('button', { name: 'Blank (Weather)', exact: true }).click();
   await expect(verificationViewport.locator('canvas').first()).toBeVisible();
+  expect(await verificationViewport.locator('canvas').count()).toBeGreaterThan(0);
   await verificationViewport.screenshot({ path: testInfo.outputPath('verification-style.png') });
   await page.getByRole('button', { name: 'Switch to dark mode' }).click();
   await verificationViewport.screenshot({ path: testInfo.outputPath('verification-dark-style.png') });
