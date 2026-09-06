@@ -23,6 +23,7 @@ declare global {
 }
 
 const eventSet = new Set<string>(PRODUCT_ANALYTICS_EVENTS);
+const MAX_PENDING_EVENTS = 100;
 let initializedZone: AnalyticsZone | null = null;
 let pendingPagePath: string | null = null;
 let pendingEvents: Array<{ event: ProductAnalyticsEvent; properties?: ProductAnalyticsProperties }> = [];
@@ -136,6 +137,7 @@ const flushPendingTelemetry = (): void => {
 };
 
 const queueProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): void => {
+  if (pendingEvents.length >= MAX_PENDING_EVENTS) pendingEvents.shift();
   pendingEvents.push({ event, properties });
 };
 
@@ -151,7 +153,10 @@ const createTrackerScript = ({ host, websiteId }: TrackerConfiguration): HTMLScr
   script.dataset.excludeHash = 'true';
   script.dataset.gfcUmami = 'true';
   script.addEventListener('load', () => { if (isProductAnalyticsEnabled()) flushPendingTelemetry(); });
-  script.addEventListener('error', () => { initializedZone = null; });
+  script.addEventListener('error', () => {
+    initializedZone = null;
+    script.remove();
+  });
   return script;
 };
 
@@ -187,12 +192,12 @@ export const trackProductPageView = (pathname?: string, hostname?: string): void
 };
 
 /** Sends only registry-backed, coarse event properties. */
-export const trackProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties): void => {
+export const trackProductEvent = (event: ProductAnalyticsEvent, properties?: ProductAnalyticsProperties, hostname?: string): void => {
   if (!eventSet.has(event)) return;
   if (!hasAllowedProperties(event, properties)) return;
   if (!isProductAnalyticsEnabled()) return;
-  if (!getProductAnalyticsZone()) return;
-  initProductAnalytics();
+  if (!getProductAnalyticsZone(hostname)) return;
+  initProductAnalytics(hostname);
   if (!trackSafely({ event, properties })) queueProductEvent(event, properties);
 };
 
