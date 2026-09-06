@@ -22,7 +22,7 @@ const getBetaInviteToken = () => process.env.BETA_INVITE_TOKEN || '';
 const getBetaInvitePath = () => (process.env.BETA_INVITE_PATH || '').trim();
 
 /** Returns the verified Firebase user for authenticated beta-claim requests. */
-const verifyRequestUser = async (req) => {
+const verifyRequestUser = (req) => {
   return verifyFirebaseToken(req);
 };
 

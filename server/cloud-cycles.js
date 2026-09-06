@@ -6,16 +6,21 @@ const { normalizeMetadata } = require('./cloud-cycle-metadata');
 const MAX_CLOUD_CYCLES = 100;
 const MAX_PAYLOAD_BYTES = 750000;
 
-const verifyUser = async (req) => {
+/** Returns the Firebase user for an authenticated cloud-cycle request. */
+const verifyUser = (req) => {
   return verifyFirebaseToken(req);
 };
 
+/** Validates that a cloud-cycle identity belongs to the verified user. */
 const hasValidCycleIdentity = ({ userId, id, label }, uid) => userId === uid && typeof id === 'string' && id.length <= 128 && typeof label === 'string' && label.length > 0 && label.length <= 200;
+/** Returns the UTF-8 byte length of a serialized cloud-cycle payload. */
 const getPayloadBytes = (payloadJson) => Buffer.byteLength(payloadJson, 'utf8');
+/** Validates the bounded payload fields accepted by the cloud-cycle API. */
 const hasValidCyclePayload = ({ cycleDate, payloadJson }) => {
   const bytes = typeof payloadJson === 'string' ? getPayloadBytes(payloadJson) : -1;
   return typeof cycleDate === 'string' && cycleDate.length <= 32 && typeof payloadJson === 'string' && bytes <= MAX_PAYLOAD_BYTES;
 };
+/** Reads and normalizes a cloud-cycle request body for persistence. */
 const readCloudCycleRequest = (body, uid) => {
   const { id, userId, label, cycleDate, payloadJson, metadata } = body || {};
   if (!hasValidCycleIdentity({ userId, id, label }, uid)) return null;
@@ -25,6 +30,7 @@ const readCloudCycleRequest = (body, uid) => {
   return { id, label, cycleDate, payloadJson, payloadBytes: getPayloadBytes(payloadJson), metadata: normalizedMetadata };
 };
 
+/** Persists a cloud cycle and its payload atomically. */
 const saveCloudCycle = async (db, uid, cycle) => {
   const cycleRef = db.collection('cloudCycles').doc(cycle.id);
   const payloadRef = cycleRef.collection('payload').doc('payload');
