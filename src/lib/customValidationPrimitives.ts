@@ -1,3 +1,5 @@
+import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
+
 /** Returns true only for non-array object records. */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
