@@ -319,6 +319,11 @@ function markExistingCloudCycleSaving(
   if (currentCloudRef.current) updateSyncState('saving', undefined, currentCloudRef.current.id);
 }
 
+/** Returns whether a save may replace the selected cloud context. */
+function canApplyCloudSaveSelection(savedCycleId: string | undefined, currentCycleId: string | undefined): boolean {
+  return !savedCycleId || savedCycleId === currentCycleId;
+}
+
 /** Applies a successful save without replacing a newer cloud selection. */
 function applyCloudSaveSuccess({
   result,
@@ -337,7 +342,7 @@ function applyCloudSaveSuccess({
   setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
   updateSyncState: CloudStateContext['updateSyncState'];
 }): true {
-  if (result.data && (!savedCycleId || currentCloudRef.current?.id === savedCycleId)) {
+  if (result.data && canApplyCloudSaveSelection(savedCycleId, currentCloudRef.current?.id)) {
     setCurrentCloud(createCurrentCloudContext({ id: result.data, label, syncState: 'saved' }));
   }
   queueProductMetric({ event: 'cloud_cycle_saved', user });
