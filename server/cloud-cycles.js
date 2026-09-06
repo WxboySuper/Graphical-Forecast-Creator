@@ -1,15 +1,13 @@
 'use strict';
 
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { verifyFirebaseToken } = require('./firebase-auth');
 const { normalizeMetadata } = require('./cloud-cycle-metadata');
 const MAX_CLOUD_CYCLES = 100;
 const MAX_PAYLOAD_BYTES = 750000;
 
 const verifyUser = async (req) => {
-  const token = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '';
-  const auth = getAdminAuth();
-  if (!auth || !token) return null;
-  try { return await auth.verifyIdToken(token); } catch { return null; }
+  return verifyFirebaseToken(req);
 };
 
 const hasValidCycleIdentity = ({ userId, id, label }, uid) => userId === uid && typeof id === 'string' && id.length <= 128 && typeof label === 'string' && label.length > 0 && label.length <= 200;

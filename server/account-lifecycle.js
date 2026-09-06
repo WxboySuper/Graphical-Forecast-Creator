@@ -4,6 +4,7 @@ const Stripe = require('stripe');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getBearerToken } = require('./firebase-auth');
 
 const RECENT_AUTH_SECONDS = 5 * 60;
 const DIRECT_USER_COLLECTIONS = ['userProfiles', 'userSettings', 'userEntitlements', 'userMetrics'];
@@ -48,8 +49,7 @@ const getStripeClient = () => (process.env.STRIPE_SECRET_KEY ? new Stripe(proces
 
 /** Extracts and verifies the caller's Firebase ID token. */
 const verifyDeletionUser = async (req, res, adminAuth) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const token = getBearerToken(req);
   if (!token) {
     res.status(401).json({ error: 'Sign in again before deleting your account.' });
     return null;
