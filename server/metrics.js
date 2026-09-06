@@ -363,10 +363,11 @@ const readTotalAccounts = async (db) => {
   return countCollectionDocuments(db, 'userProfiles');
 };
 
-const countTotalAccounts = async () => {
+/** Returns the cached or freshly aggregated total account count. */
+const countTotalAccounts = () => {
   const db = getAdminDb();
   if (!db) {
-    return 0;
+    return Promise.resolve(0);
   }
 
   if (typeof totalAccountsCache.value === 'number' && Date.now() < totalAccountsCache.expiresAt) {
@@ -394,7 +395,7 @@ const ESTIMATED_CLOUD_CYCLE_METADATA_BYTES = 512;
  * Reads a bounded count for one collection without transferring documents.
  * Falls back to a capped scan when the emulator or test double lacks aggregate support.
  */
-const countCollectionDocuments = async (db, collectionName) => {
+async function countCollectionDocuments(db, collectionName) {
   try {
     const snapshot = await db.collection(collectionName).count().get();
     return typeof snapshot.data?.()?.count === 'number' ? snapshot.data().count : 0;
@@ -407,7 +408,7 @@ const countCollectionDocuments = async (db, collectionName) => {
     const docs = capped.docs || [];
     return docs.length === STORAGE_SCAN_LIMIT ? STORAGE_SCAN_LIMIT : docs.length;
   }
-};
+}
 
 /** Reads the bounded sum of cloud-cycle payload bytes without transferring documents. */
 const readCloudCyclePayloadBytes = async (db) => {
@@ -422,7 +423,7 @@ const readCloudCyclePayloadBytes = async (db) => {
 };
 
 /** Sums payloadBytes from a capped scan when the emulator or test double lacks aggregate support. */
-const sumCappedPayloadBytes = async (db) => {
+async function sumCappedPayloadBytes(db) {
   if (!db.collection('cloudCycles').limit) {
     return 0;
   }
@@ -432,7 +433,7 @@ const sumCappedPayloadBytes = async (db) => {
     (total, docSnapshot) => total + (Number(docSnapshot.data?.()?.payloadBytes) || 0),
     0
   );
-};
+}
 
 /** Estimates the current hosted Firestore storage footprint using bounded server-side aggregation. */
 const getCurrentStorageBytes = async () => {
