@@ -143,6 +143,8 @@ export const useModalFocusTrap = ({
 }: ModalFocusTrapOptions) => {
   const modalRef = useRef<HTMLElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!active) {
@@ -160,7 +162,7 @@ export const useModalFocusTrap = ({
     getFocusableElements(modal)[0]?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (handleEscapeKey(event, onClose)) {
+      if (handleEscapeKey(event, onCloseRef.current)) {
         return;
       }
       if (event.key === 'Tab') {
@@ -176,7 +178,7 @@ export const useModalFocusTrap = ({
       restoreBackground();
       previouslyFocusedRef.current?.focus();
     };
-  }, [active, onClose]);
+  }, [active]);
 
   const setModalRef = useCallback((node: HTMLElement | null) => {
     modalRef.current = node;
