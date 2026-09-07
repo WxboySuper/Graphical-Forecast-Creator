@@ -35,6 +35,24 @@ export interface BuildSettingsArgs {
   monitorSettings?: MonitorSettings;
 }
 
+/** Checks the required primitive fields before a remote settings payload is normalized. */
+const hasValidRemoteSettingsFields = ({
+  darkMode,
+  baseMapStyle,
+  stateBorders,
+  counties,
+  ghostOutlooks,
+  defaultForecasterName,
+}: Partial<UserSettingsDocument>): boolean =>
+  [
+    typeof darkMode === 'boolean',
+    Boolean(baseMapStyle),
+    typeof stateBorders === 'boolean',
+    typeof counties === 'boolean',
+    Boolean(ghostOutlooks),
+    typeof defaultForecasterName === 'string' && defaultForecasterName.length <= 100,
+  ].every(Boolean);
+
 /** Safely parse the settings fields stored in a remote document. */
 export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
   if (!value) return null;
@@ -50,10 +68,7 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
     monitorSettings,
   } = value;
 
-  if (typeof darkMode !== 'boolean') return null;
-  if (typeof stateBorders !== 'boolean' || typeof counties !== 'boolean') return null;
-  if (typeof defaultForecasterName !== 'string' || defaultForecasterName.length > 100) return null;
-  if (!baseMapStyle || !ghostOutlooks) return null;
+  if (!hasValidRemoteSettingsFields(value)) return null;
 
   return {
     darkMode,
