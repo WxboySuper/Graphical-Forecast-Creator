@@ -74,7 +74,6 @@ to each.
 - **typescript-eslint** ^8.68.0 (root (pnpm)) — MIT — allowed
 - **uuid** ^14.0.2 (root (pnpm)) — MIT — allowed
 - **vite** ^8.2.1 (root (pnpm)) — MIT — allowed
-- **web-vitals** ^6.2.1 (root (pnpm)) — Apache-2.0 — allowed
 - **@sentry/node** ^10.72.0 (server (npm)) — MIT — allowed
 - **express** ^5.2.1 (server (npm)) — MIT — allowed
 - **express-rate-limit** ^8.6.2 (server (npm)) — MIT — allowed
