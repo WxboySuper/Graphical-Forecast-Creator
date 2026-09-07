@@ -1,5 +1,7 @@
 import { captureMessage } from "@sentry/react";
 import type VectorSource from "ol/source/Vector";
+import type OLFeature from "ol/Feature";
+import type Geometry from "ol/geom/Geometry";
 import { reconcileFeatureSource, type FeatureSyncDescriptor, type FeatureSyncStats } from "./openLayersFeatureSync";
 
 /** Reconciles a forecast source and reports skipped invalid geometry with its source name. */
@@ -23,4 +25,22 @@ export const reconcileForecastSource = (
       tags: { source: sourceName, reason: "invalid-geometry" },
     });
   }
+};
+
+/** Applies the shared identity and outlook metadata to a rendered feature. */
+export const applyForecastFeatureMetadata = (
+  item: OLFeature<Geometry>,
+  metadata: {
+    featureId: string;
+    outlookType: string;
+    probability: string;
+    isSignificant: boolean;
+    derivedFrom: unknown;
+  },
+): void => {
+  item.set("featureId", metadata.featureId);
+  item.set("outlookType", metadata.outlookType);
+  item.set("probability", metadata.probability);
+  item.set("isSignificant", metadata.isSignificant);
+  item.set("derivedFrom", metadata.derivedFrom);
 };
