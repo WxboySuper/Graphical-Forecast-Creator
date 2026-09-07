@@ -262,9 +262,9 @@ export const saveCycleHistoryToStorage = (
 /**
  * Load cycle history from localStorage
  */
-export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[] => {
+export function loadCycleHistoryFromStorage(userId?: string | null): SavedCycle[] {
   return loadCycleHistorySnapshotFromStorage(userId).cycles;
-};
+}
 
 /** Loads a scoped history snapshot and performs the legacy-scope migration when needed. */
 export const loadCycleHistorySnapshotFromStorage = (userId?: string | null): CycleHistorySnapshot => {
