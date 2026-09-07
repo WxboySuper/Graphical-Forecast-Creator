@@ -36,49 +36,41 @@ export interface BuildSettingsArgs {
 }
 
 /** Checks the required primitive fields before a remote settings payload is normalized. */
-const hasValidRemoteSettingsFields = ({
-  darkMode,
-  baseMapStyle,
-  stateBorders,
-  counties,
-  ghostOutlooks,
-  defaultForecasterName,
-}: Partial<UserSettingsDocument>): boolean =>
-  [
-    typeof darkMode === 'boolean',
-    Boolean(baseMapStyle),
-    typeof stateBorders === 'boolean',
-    typeof counties === 'boolean',
-    Boolean(ghostOutlooks),
-    typeof defaultForecasterName === 'string' && defaultForecasterName.length <= 100,
-  ].every(Boolean);
+type ValidRemoteSettingsFields = Pick<
+  UserSettingsDocument,
+  'darkMode' | 'baseMapStyle' | 'stateBorders' | 'counties' | 'ghostOutlooks' | 'defaultForecasterName'
+>;
+
+const hasValidRemoteSettingsFields = (
+  value: Partial<UserSettingsDocument>,
+): value is ValidRemoteSettingsFields & Partial<UserSettingsDocument> => {
+  const { darkMode, baseMapStyle, stateBorders, counties, ghostOutlooks, defaultForecasterName } = value;
+  return (
+    typeof darkMode === 'boolean' &&
+    Boolean(baseMapStyle) &&
+    typeof stateBorders === 'boolean' &&
+    typeof counties === 'boolean' &&
+    Boolean(ghostOutlooks) &&
+    typeof defaultForecasterName === 'string' &&
+    defaultForecasterName.length <= 100
+  );
+};
 
 /** Safely parse the settings fields stored in a remote document. */
 export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
   if (!value) return null;
 
-  const {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant,
-    monitorSettings,
-  } = value;
-
   if (!hasValidRemoteSettingsFields(value)) return null;
 
   return {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
-    monitorSettings: normalizeMonitorSettings(monitorSettings),
+    darkMode: value.darkMode,
+    baseMapStyle: value.baseMapStyle,
+    stateBorders: value.stateBorders,
+    counties: value.counties,
+    ghostOutlooks: value.ghostOutlooks,
+    defaultForecasterName: value.defaultForecasterName,
+    forecastUiVariant: normalizeForecastUiVariant(value.forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
+    monitorSettings: normalizeMonitorSettings(value.monitorSettings),
   };
 };
 
