@@ -52,15 +52,11 @@ import Legend from "./Legend";
 import StatusOverlay from "./StatusOverlay";
 import CategoricalErrorBanner from "./CategoricalErrorBanner";
 import UnofficialBadge from "./UnofficialBadge";
-import {
-  getOpenFreeMapStyleSet,
-  isOpenFreeMapStyle,
-} from "../../lib/openFreeMap";
+import { isOpenFreeMapStyle } from "../../lib/openFreeMap";
 import "./ForecastMap.css";
 import {
   getFeatureIdentity,
   toUpdatedGeoJsonFeature,
-  replaceLayerGroupLayers,
   isDrawableOutlookType,
   toOlStyle,
   toCustomOlStyle,
@@ -76,9 +72,9 @@ import {
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
   GHOST_REFERENCE_LAYER_Z_INDEX,
-  loadOpenFreeMapLayerGroups,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
+import { loadOpenFreeMapBasemap } from "./openLayersBasemap";
 import type { CustomCategoryStyle } from "../../types/customProducts";
 import {
   BLANK_LAND_FILL_STYLE,
@@ -1062,9 +1058,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       }
 
       if (isOpenFreeMapStyle(baseMapStyle)) {
-        const requestId = vectorStyleRequestRef.current + 1;
-        vectorStyleRequestRef.current = requestId;
-
         tile.setVisible(false);
         world.setVisible(false);
         lakes.setVisible(false);
@@ -1072,45 +1065,15 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         landOutline.setVisible(true);
         labels.setVisible(false);
         el.style.backgroundColor = "";
-        vectorBaseGroup.setVisible(false);
-        vectorReferenceGroup.setVisible(false);
-        vectorBaseGroup.getLayers().clear();
-        vectorReferenceGroup.getLayers().clear();
-
-        getOpenFreeMapStyleSet(baseMapStyle)
-          .then(loadOpenFreeMapLayerGroups)
-          .then(({ baseGroup, referenceGroup }) => {
-            if (vectorStyleRequestRef.current !== requestId) {
-              return;
-            }
-
-            replaceLayerGroupLayers(vectorBaseGroup, baseGroup);
-            replaceLayerGroupLayers(vectorReferenceGroup, referenceGroup);
-            vectorBaseGroup.setVisible(true);
-            vectorReferenceGroup.setVisible(true);
-          })
-          .catch((error) => {
-            if (vectorStyleRequestRef.current !== requestId) {
-              return;
-            }
-
-            console.warn(
-              "[forecast-map] falling back to raster basemap after vector load failure",
-              {
-                baseMapStyle,
-                error,
-              },
-            );
-            vectorBaseGroup.getLayers().clear();
-            vectorReferenceGroup.getLayers().clear();
-            tile.setSource(createTileSource(baseMapStyle));
-            tile.setVisible(true);
-            const labelSource = createLabelOverlaySource(baseMapStyle);
-            if (labelSource) {
-              labels.setSource(labelSource);
-              labels.setVisible(true);
-            }
-          });
+        loadOpenFreeMapBasemap({
+          style: baseMapStyle,
+          tile,
+          labels,
+          vectorBaseGroup,
+          vectorReferenceGroup,
+          requestRef: vectorStyleRequestRef,
+          logPrefix: "forecast-map",
+        });
       } else {
         hideVectorBasemapGroups();
         tile.setVisible(true);
