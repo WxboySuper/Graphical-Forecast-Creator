@@ -13,9 +13,9 @@ The planned Forecast routes are:
 | Workspace | Canonical path | v1.8 state | Exposure owner |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
+| Mesoscale | `/forecast/mesoscale` | planned; tracked in #919 | Issue #919 |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
-| Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
+| Winter | `/forecast/winter` | planned; tracked in #913 | Issue #913 |
 | Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
 
 `/forecast` is a compatibility entry point. It redirects to
