@@ -31,15 +31,13 @@ import { computeHomeStats } from "./homeUtils";
 import { isFeatureExposed } from "../config/featureExposure";
 import {
   formatLastActiveDate,
-  getBillingSupportCopy,
-  getCurrentPlanPrice,
-  getPlanLabel,
-  getPricingButtonVariant,
   getProviderLabel,
   getSyncStatusMeta,
   type SyncStatusMeta,
 } from './accountPageUtils';
 import { AccountDeletionCard } from './AccountDeletionCard';
+import { AccountBillingCard } from './AccountBillingCard';
+import { AccountSummaryTile as SummaryTile } from './AccountSummaryTile';
 import "./AccountPage.css";
 
 type AuthMode = "sign_in" | "sign_up";
@@ -111,17 +109,6 @@ const AccountIdentityChips: React.FC<{
         {statusMeta.label}
       </Badge>
     ) : null}
-  </div>
-);
-
-/** Small summary tile that keeps the profile card readable and compact. */
-const SummaryTile: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <div className="account-summary-tile">
-    <p>{label}</p>
-    <strong>{value}</strong>
   </div>
 );
 
@@ -307,209 +294,6 @@ const CustomProductsCard: React.FC = () => {
       <CardContent className="account-section-content">
         <Button asChild><Link to="/custom-products">Manage Custom Products</Link></Button>
       </CardContent>
-    </Card>
-  );
-};
-
-/** Billing summary card for Phase 3 subscription state and management. */
-const BillingCardHeader: React.FC<{
-  premiumActive: boolean;
-  planLabel: string;
-}> = ({ premiumActive, planLabel }) => (
-  <CardHeader className="account-section-header">
-    <div className="account-section-topline">
-      <div className="account-section-copy">
-        <CardTitle className="text-2xl">Billing & Premium</CardTitle>
-        <CardDescription>
-          Premium funds hosted sync and storage. Core forecasting workflows
-          remain free.
-        </CardDescription>
-      </div>
-      <Badge
-        variant={premiumActive ? "success" : "outline"}
-        className="account-plan-badge"
-      >
-        {planLabel}
-      </Badge>
-    </div>
-  </CardHeader>
-);
-
-/** Small summary grid used by the billing card. */
-const BillingSummaryGrid: React.FC<{
-  billingStatus: string;
-  currentPlanPrice: string;
-}> = ({ billingStatus, currentPlanPrice }) => (
-  <div className="account-summary-grid">
-    <SummaryTile label="Billing status" value={billingStatus || "inactive"} />
-    <SummaryTile label="Current plan price" value={currentPlanPrice} />
-  </div>
-);
-
-/** Action row for billing management and pricing navigation. */
-const BillingActionRow: React.FC<{
-  stripeCustomerId: string | null;
-  billingEnabled: boolean;
-  openingPortal: boolean;
-  premiumActive: boolean;
-  onOpenPortal: () => void;
-}> = ({
-  stripeCustomerId,
-  billingEnabled,
-  openingPortal,
-  premiumActive,
-  onOpenPortal,
-}) => (
-  <div className="account-button-row">
-    {stripeCustomerId && billingEnabled ? (
-      <Button variant="outline" onClick={onOpenPortal} disabled={openingPortal}>
-        {openingPortal ? (
-          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-        ) : null}
-        Manage Subscription
-      </Button>
-    ) : null}
-
-    <Button asChild variant={getPricingButtonVariant(premiumActive)}>
-      <Link to="/pricing">
-        <Crown className="mr-2 h-4 w-4" />
-        View Pricing
-      </Link>
-    </Button>
-  </div>
-);
-
-/** Supporting helper text and error state inside the billing card body. */
-const BillingCardMessages: React.FC<{
-  supportCopy: string | null;
-  portalMessage: string | null;
-  error: string | null;
-}> = ({ supportCopy, portalMessage, error }) => (
-  <>
-    {supportCopy ? (
-      <p className="text-sm text-muted-foreground">{supportCopy}</p>
-    ) : null}
-    {portalMessage || error ? (
-      <p className="text-sm text-destructive">{portalMessage ?? error}</p>
-    ) : null}
-  </>
-);
-
-/** Main billing card content so the top-level card tree stays flatter. */
-const BillingCardContent: React.FC<{
-  billingStatus: string;
-  currentPlanPrice: string;
-  supportCopy: string | null;
-  portalMessage: string | null;
-  error: string | null;
-  stripeCustomerId: string | null;
-  billingEnabled: boolean;
-  openingPortal: boolean;
-  premiumActive: boolean;
-  onOpenPortal: () => void;
-}> = ({
-  billingStatus,
-  currentPlanPrice,
-  supportCopy,
-  portalMessage,
-  error,
-  stripeCustomerId,
-  billingEnabled,
-  openingPortal,
-  premiumActive,
-  onOpenPortal,
-}) => (
-  <CardContent className="account-section-content">
-    <BillingSummaryGrid
-      billingStatus={billingStatus}
-      currentPlanPrice={currentPlanPrice}
-    />
-    <BillingCardMessages
-      supportCopy={supportCopy}
-      portalMessage={portalMessage}
-      error={error}
-    />
-    <BillingActionRow
-      stripeCustomerId={stripeCustomerId}
-      billingEnabled={billingEnabled}
-      openingPortal={openingPortal}
-      premiumActive={premiumActive}
-      onOpenPortal={onOpenPortal}
-    />
-  </CardContent>
-);
-
-/** Billing summary card for Phase 3 subscription state and management. */
-const BillingCard: React.FC = () => {
-  const {
-    annualPromoActive,
-    annualDisplayPrice,
-    billingEnabled,
-    billingStatus,
-    effectiveSource,
-    error,
-    monthlyDisplayPrice,
-    openBillingPortal,
-    planInterval,
-    premiumActive,
-    stripeCustomerId,
-  } = useEntitlement();
-  const [portalMessage, setPortalMessage] = useState<string | null>(null);
-  const [openingPortal, setOpeningPortal] = useState(false);
-
-  const currentPlanPrice = getCurrentPlanPrice(
-    premiumActive,
-    planInterval,
-    monthlyDisplayPrice,
-    annualDisplayPrice,
-  );
-  const planLabel = getPlanLabel(premiumActive, planInterval, effectiveSource);
-  const supportCopy = getBillingSupportCopy(
-    effectiveSource,
-    premiumActive,
-    annualPromoActive,
-  );
-
-  /** Opens the Stripe billing portal and surfaces any failure as local account feedback. */
-  const handleOpenPortal = async () => {
-    setPortalMessage(null);
-    setOpeningPortal(true);
-
-    try {
-      await openBillingPortal();
-    } catch (nextError) {
-      setPortalMessage(
-        nextError instanceof Error
-          ? nextError.message
-          : "Unable to open billing management right now.",
-      );
-    } finally {
-      setOpeningPortal(false);
-    }
-  };
-
-  /** Wraps the portal action so button handlers stay synchronous. */
-  const handleOpenPortalClick = () => {
-    handleOpenPortal().catch(() => {
-      // Billing feedback is already surfaced by handleOpenPortal.
-    });
-  };
-
-  return (
-    <Card className="account-surface-card">
-      <BillingCardHeader premiumActive={premiumActive} planLabel={planLabel} />
-      <BillingCardContent
-        billingStatus={billingStatus}
-        currentPlanPrice={currentPlanPrice}
-        supportCopy={supportCopy}
-        portalMessage={portalMessage}
-        error={error}
-        stripeCustomerId={stripeCustomerId}
-        billingEnabled={billingEnabled}
-        openingPortal={openingPortal}
-        premiumActive={premiumActive}
-        onOpenPortal={handleOpenPortalClick}
-      />
     </Card>
   );
 };
@@ -785,7 +569,7 @@ const SignedInAccountView: React.FC = () => {
         </div>
         <div className="account-side-stack">
           <MetricsCard />
-          <BillingCard />
+          <AccountBillingCard />
           <AccountDeletionCard />
         </div>
       </div>
