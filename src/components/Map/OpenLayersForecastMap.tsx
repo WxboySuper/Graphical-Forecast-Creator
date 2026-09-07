@@ -83,6 +83,7 @@ import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
 import {
   applyForecastFeatureMetadata,
   applyCustomFeatureMetadata,
+  createFeatureApplier,
   reconcileForecastSource,
 } from "./openLayersForecastReconciliation";
 import {
@@ -908,21 +909,20 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               dataProjection: "EPSG:4326",
               featureProjection: "EPSG:3857",
             }),
-            apply: (item: OLFeature<Geometry>) => {
-              item.setStyle(
+              apply: createFeatureApplier(
                 toOlStyle(
                   { outlookType, probability },
                   { isTopLayer, outlookOpacity },
                 ),
-              );
-              applyForecastFeatureMetadata(item, {
-                featureId: stableId,
-                outlookType,
-                probability,
-                isSignificant: Boolean(feature.properties?.isSignificant),
-                derivedFrom: feature.properties?.derivedFrom,
-              });
-            },
+                applyForecastFeatureMetadata,
+                {
+                  featureId: stableId,
+                  outlookType,
+                  probability,
+                  isSignificant: Boolean(feature.properties?.isSignificant),
+                  derivedFrom: feature.properties?.derivedFrom,
+                },
+              ),
             targetSource,
           };
         },
@@ -955,22 +955,21 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 dataProjection: "EPSG:4326",
                 featureProjection: "EPSG:3857",
               }),
-              apply: (item: OLFeature<Geometry>) => {
-                item.setStyle(
-                  toCustomOlStyle(
-                    category,
-                    zIndex === highestCustomZIndex,
-                    zIndex,
-                  ),
-                );
-                applyCustomFeatureMetadata(item, {
+              apply: createFeatureApplier(
+                toCustomOlStyle(
+                  category,
+                  zIndex === highestCustomZIndex,
+                  zIndex,
+                ),
+                applyCustomFeatureMetadata,
+                {
                   featureId: stableId,
                   customLayerId: layer.id,
                   customLayerTitle: layer.label,
                   categoryId: category.id,
                   title: category.label,
-                });
-              },
+                },
+              ),
               targetSource: source,
             };
           })
@@ -1007,18 +1006,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 dataProjection: "EPSG:4326",
                 featureProjection: "EPSG:3857",
               }),
-              apply: (item: OLFeature<Geometry>) => {
-                item.setStyle(
-                  toGhostOlStyle({ outlookType, probability, isCategorical }),
-                );
-                applyForecastFeatureMetadata(item, {
+              apply: createFeatureApplier(
+                toGhostOlStyle({ outlookType, probability, isCategorical }),
+                applyForecastFeatureMetadata,
+                {
                   featureId: stableId,
                   outlookType,
                   probability,
                   isSignificant: Boolean(feature.properties?.isSignificant),
                   derivedFrom: feature.properties?.derivedFrom,
-                });
-              },
+                },
+              ),
               targetSource: ghostSource,
             });
           });
