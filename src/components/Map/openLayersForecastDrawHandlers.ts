@@ -46,7 +46,7 @@ export const handleForecastDrawEnd = (
         featureProjection: "EPSG:3857",
       });
       const customFeature = toDrawnCustomFeature(
-        geometry,
+        geometryObject as unknown as Geometry,
         options.activeCustomLayer,
         options.activeCustomCategory,
         options.customMode,
