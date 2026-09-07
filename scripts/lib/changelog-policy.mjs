@@ -9,14 +9,6 @@ const SOURCE_PATTERN = /(?:port|backport|forward[- ]port|inherited)\s+(?:of\s+)?
 export { CHANGELOG_LANE_HEADINGS };
 
 /**
- * Selects the changelog lane for a target base branch.
- * @param {string} baseRef
- * @returns {'stable-hotfix' | 'next-major'}
- */
-export const changelogLaneForBase = (baseRef) =>
-  /^stable\/\d+\.\d+\.x$/.test(baseRef) ? 'stable-hotfix' : 'next-major';
-
-/**
  * Builds the stable-line heading for a target base branch.
  * @param {string} baseRef
  * @returns {string}
