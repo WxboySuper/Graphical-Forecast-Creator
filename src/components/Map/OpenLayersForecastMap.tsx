@@ -22,12 +22,9 @@ import Overlay from "ol/Overlay";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
-import { v4 as uuidv4 } from "uuid";
 import { Redo2, Undo2 } from "lucide-react";
-import { captureException, captureMessage } from "@sentry/react";
+import { captureMessage } from "@sentry/react";
 import {
-  addFeature,
-  addCustomFeature,
   removeFeature,
   removeCustomFeature,
   redoLastEdit,
@@ -39,7 +36,6 @@ import type { DayType } from "../../types/outlooks";
 import type { MapAdapterHandle } from "../../maps/contracts";
 import type {
   Feature as GeoJsonFeature,
-  GeoJsonProperties,
   Polygon,
   MultiPolygon,
 } from "geojson";
@@ -55,7 +51,6 @@ import {
   toOlStyle,
   toCustomOlStyle,
   getCustomFeatureIdentity,
-  toDrawnCustomFeature,
   toGhostOlStyle,
   createLabelOverlaySource,
   hideOverlay,
@@ -87,6 +82,7 @@ import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMa
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
+import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
 import {
   syncMapViewFromOpenLayers,
   syncOpenLayersViewFromState,
@@ -832,61 +828,20 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           ? catSourceRef.current
           : vectorSourceRef.current;
       const draw = new Draw({ source: drawSource, type: "Polygon" });
-      draw.on("drawend", (event) => {
-        const format = new GeoJSON();
-        const olGeometry = event.feature.getGeometry();
-        if (!olGeometry) {
-          return;
-        }
-        const drawDay = currentDayRef.current;
-
-      (async () => {
-          try {
-          const geometry = format.writeGeometryObject(olGeometry, {
-            dataProjection: "EPSG:4326",
-            featureProjection: "EPSG:3857",
-          });
-          const customFeature = toDrawnCustomFeature(
-            geometry as unknown as Geometry,
-            activeCustomLayer,
-            activeCustomCategory,
-            customMode,
-          );
-          if (customFeature) {
-            dispatch(addCustomFeature(customFeature));
-            return;
-          }
-
-          let outlookGeometry: Polygon | MultiPolygon | null = geometry as Polygon | MultiPolygon;
-          if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
-            outlookGeometry = await trimGeometryForAutoDraw(
-              outlookGeometry,
-              outlookTrimStrategyRef.current,
-              outlookTrimAutoOnDrawRef.current,
-              outlookTrimPreviewOnlyRef.current,
-            );
-          }
-
-          if (!outlookGeometry) {
-            return;
-          }
-
-          const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
-            type: "Feature",
-            id: uuidv4(),
-            geometry: outlookGeometry,
-            properties: {
-              outlookType: drawingState.activeOutlookType,
-              probability: drawingState.activeProbability,
-              isSignificant: drawingState.isSignificant,
-            },
-          };
-          dispatch(addFeature({ feature, day: drawDay }));
-          } catch (error) {
-            captureException(error, { tags: { featureOperation: "draw-outlook" } });
-          }
-      })();
-      });
+      draw.on("drawend", (event) => handleForecastDrawEnd(event, {
+        currentDay: currentDayRef.current,
+        activeOutlookType: drawingState.activeOutlookType,
+        activeProbability: drawingState.activeProbability,
+        isSignificant: drawingState.isSignificant,
+        customMode,
+        activeCustomLayer,
+        activeCustomCategory,
+        trimGeometryForAutoDraw,
+        trimStrategy: outlookTrimStrategyRef.current,
+        trimAutoOnDraw: outlookTrimAutoOnDrawRef.current,
+        trimPreviewOnly: outlookTrimPreviewOnlyRef.current,
+        dispatch,
+      }));
       map.addInteraction(draw);
       drawRef.current = draw;
 
