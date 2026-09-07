@@ -4,8 +4,7 @@ const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
-const { getBearerToken } = require('./firebase-auth');
+const { getAdminAuth, getAdminDb } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
 const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
@@ -23,6 +22,7 @@ const {
   isCheckoutAvailable,
   isPortalAvailable,
 } = require('./billingRouteHelpers');
+const { verifyRequestUser } = require('./billingRequestAuth');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -242,29 +242,6 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
     billingStatus: result.nextPayload.billingStatus,
   });
   return result;
-};
-
-/** Extracts a verified Firebase user from the Authorization header. */
-const verifyRequestUser = async (req, res) => {
-  const token = getBearerToken(req);
-  const adminAuth = getAdminAuth();
-
-  if (!adminAuth || !hasFirebaseAdminConfig()) {
-    res.status(503).json({ error: 'Firebase Admin is not configured on this deployment.' });
-    return null;
-  }
-
-  if (!token) {
-    res.status(401).json({ error: 'Missing Firebase ID token.' });
-    return null;
-  }
-
-  try {
-    return await adminAuth.verifyIdToken(token);
-  } catch {
-    res.status(401).json({ error: 'Invalid Firebase ID token.' });
-    return null;
-  }
 };
 
 /** Creates the plan-specific Stripe checkout session for the verified user. */
