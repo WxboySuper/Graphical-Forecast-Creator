@@ -14,9 +14,6 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Draw, Modify, Select, Snap } from "ol/interaction";
 import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
-import type OLFeature from "ol/Feature";
-import type Geometry from "ol/geom/Geometry";
-import { altKeyOnly, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { Redo2, Undo2 } from "lucide-react";
 import { redoLastEdit, undoLastEdit } from "../../store/forecastSlice";
 
@@ -38,7 +35,6 @@ import {
   isDrawableOutlookType,
   toOlStyle,
   toCustomOlStyle,
-  getCustomFeatureIdentity,
   toGhostOlStyle,
   hideOverlay,
 } from "./openLayersMapStyles";
@@ -55,7 +51,7 @@ import { isPaintBucketOutlookType, type PaintBucketMode, type PaintBucketStepDir
 import { trimGeometryForAutoDraw } from "../../hooks/useTrimCurrentDayOutlooks";
 import { clearLandMaskRuntimeCache, ensureLandMask } from "../../utils/outlookPolygonMasking/landMaskRuntime";
 import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMasking/trimOutlookData";
-import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
+import { PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
 import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
@@ -73,6 +69,7 @@ import {
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
 import { createForecastMapLayers, type ForecastMapLayerSet } from "./openLayersForecastLayerSetup";
 import { createForecastDeleteInteraction } from "./openLayersForecastDeleteInteraction";
+import { registerForecastEditInteractions } from "./openLayersForecastEditInteractions";
 export { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 
@@ -409,74 +406,28 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         });
       });
 
-      const modify = new Modify({
-        source: vectorSourceRef.current,
-        filter: (feature) => {
-          const customIdentity = getCustomFeatureIdentity(feature);
-          if (customIdentity) {
-            if (!customModeRef.current) {
-              return false;
-            }
-            return customIdentity.categoryId === activeCustomCategoryRef.current?.id;
-          }
-          return matchesPrecisionEditTier(
-            feature,
-            activeOutlookTypeRef.current,
-            activeProbabilityRef.current,
-          );
+      const editInteractions = registerForecastEditInteractions({
+        map,
+        vectorSource: vectorSourceRef.current,
+        catSource: catSourceRef.current,
+        ghostSource: ghostSourceRef.current,
+        isCustomMode: () => customModeRef.current,
+        activeCustomCategoryId: () => activeCustomCategoryRef.current?.id,
+        activeOutlookType: () => activeOutlookTypeRef.current,
+        activeProbability: () => activeProbabilityRef.current,
+        onModifyEnd: (features, isCategorical) => {
+          handleModifiedFeatures(features, isCategorical, {
+            currentDay: currentDayRef.current,
+            dispatch,
+            trimStoredOutlookFeature,
+          });
         },
-        deleteCondition: (event) =>
-          singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
       });
-
-      /** Creates a modify listener for either regular or categorical forecast features. */
-      const handleModifyEnd = (isCategorical: boolean) => (event: {
-        features: { getArray: () => OLFeature<Geometry>[] };
-      }) => {
-        handleModifiedFeatures(event.features.getArray(), isCategorical, {
-          currentDay: currentDayRef.current,
-          dispatch,
-          trimStoredOutlookFeature,
-        });
-      };
-
-      modify.on("modifyend", handleModifyEnd(false));
-      map.addInteraction(modify);
-      modifyRef.current = modify;
-
-      // Separate modify interaction for categorical layer to handle its unique properties
-      // and to prevent accidental edits of auto-generated categorical features.
-      const catModify = new Modify({
-        source: catSourceRef.current,
-        filter: (feature) => {
-          const derivedFrom = feature.get("derivedFrom") as string | undefined;
-          if (derivedFrom === "auto-generated") {
-            return false;
-          }
-          return matchesPrecisionEditTier(
-            feature,
-            "categorical",
-            activeProbabilityRef.current,
-          );
-        },
-        deleteCondition: (event) =>
-          singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
-      });
-      catModify.on("modifyend", handleModifyEnd(true));
-      map.addInteraction(catModify);
-      catModifyRef.current = catModify;
-
-      const snap = new Snap({ source: vectorSourceRef.current });
-      map.addInteraction(snap);
-      snapRef.current = snap;
-
-      const catSnap = new Snap({ source: catSourceRef.current });
-      map.addInteraction(catSnap);
-      catSnapRef.current = catSnap;
-
-      const ghostSnap = new Snap({ source: ghostSourceRef.current });
-      map.addInteraction(ghostSnap);
-      ghostSnapRef.current = ghostSnap;
+      modifyRef.current = editInteractions.modify;
+      catModifyRef.current = editInteractions.catModify;
+      snapRef.current = editInteractions.snap;
+      catSnapRef.current = editInteractions.catSnap;
+      ghostSnapRef.current = editInteractions.ghostSnap;
 
       // Limit delete picking to editable outlook layers so top overlays (state outlines/labels)
       // do not intercept clicks and prevent polygon deletion.
