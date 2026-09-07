@@ -40,7 +40,6 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import {
-  cloneCustomLayers,
   cloneEntries,
   cloneIntegratedCustomLayers,
   cloneOutlookData,
@@ -50,6 +49,13 @@ import {
   computeOutlookType,
   computeProbability,
 } from './forecastFeatureNormalization';
+import {
+  clearHistory,
+  getOrCreateDayHistory,
+  pushUndoSnapshot,
+  restoreHistoryEntry,
+  type ForecastHistoryStacks,
+} from './forecastHistory';
 import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import type { LandMaskFeature, LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import {
@@ -128,24 +134,6 @@ export interface ForecastState {
   lastTrimResult: TrimOutlookDataResult | null;
 }
 
-interface ForecastDaySnapshot {
-  day: DayType;
-  data: OutlookData;
-  lowProbabilityOutlooks: OutlookType[];
-  outlookOpacities?: Partial<Record<OutlookType, number>>;
-  customLayers?: CustomLayerCollection;
-}
-
-interface ForecastHistoryEntry {
-  day: DayType;
-  snapshot: ForecastDaySnapshot;
-}
-
-interface ForecastHistoryStacks {
-  undoStack: ForecastHistoryEntry[];
-  redoStack: ForecastHistoryEntry[];
-}
-
 /** Stores a snapshot of outlook data for a specific version within a cycle. */
 interface OutlookVersionSnapshot {
   /** Version number within the cycle. */
@@ -163,7 +151,6 @@ interface CopyFeatureRule {
   targetType: OutlookType;
 }
 
-const HISTORY_LIMIT = 50;
 export const SAVED_CYCLES_LIMIT = 50;
 /** Storage key for the workflow-active flag; persisted by the store subscription, not by reducers. */
 export const WORKFLOW_ACTIVE_STORAGE_KEY = 'gfc-active-forecast-workflow';
@@ -474,21 +461,6 @@ const applyPendingFeatureUpdates = (
   }
 };
 
-/** Returns the history stacks for one day, creating empty stacks when needed. */
-const getOrCreateDayHistory = (
-  state: ForecastState,
-  day: DayType = state.forecastCycle.currentDay
-): ForecastHistoryStacks => {
-  if (!state.historyByDay[day]) {
-    state.historyByDay[day] = {
-      undoStack: [],
-      redoStack: []
-    };
-  }
-
-  return state.historyByDay[day] as ForecastHistoryStacks;
-};
-
 /** Copies only the outlook types allowed by the source/target day compatibility rules. */
 const copyCompatibleOutlooks = (
   sourceData: OutlookData,
@@ -504,66 +476,6 @@ const copyCompatibleOutlooks = (
       targetData[targetType] = clonedMap;
     }
   });
-};
-
-/** Captures the current day's drawable outlook data and low-probability metadata for history. */
-const getCurrentDaySnapshot = (state: ForecastState, day = state.forecastCycle.currentDay): ForecastDaySnapshot | null => {
-  const dayData = state.forecastCycle.days[day];
-  if (!dayData) return null;
-
-  return {
-    day,
-    data: cloneOutlookData(dayData.data),
-    lowProbabilityOutlooks: [...(dayData.metadata.lowProbabilityOutlooks || [])],
-    outlookOpacities: dayData.metadata.outlookOpacities ? { ...dayData.metadata.outlookOpacities } : undefined,
-    customLayers: cloneCustomLayers(dayData.customLayers),
-  };
-};
-
-/** Applies a stored day snapshot back into Redux state during undo/redo restoration. */
-const applyDaySnapshot = (state: ForecastState, snapshot: ForecastDaySnapshot, now: string) => {
-  const dayData = state.forecastCycle.days[snapshot.day];
-  if (!dayData) {
-    state.forecastCycle.days[snapshot.day] = createEmptyOutlook(snapshot.day, now);
-  }
-
-  const targetDay = state.forecastCycle.days[snapshot.day];
-  if (!targetDay) return;
-
-  targetDay.data = cloneOutlookData(snapshot.data);
-  targetDay.customLayers = cloneCustomLayers(snapshot.customLayers);
-  targetDay.metadata.lowProbabilityOutlooks = [...snapshot.lowProbabilityOutlooks];
-  targetDay.metadata.outlookOpacities = snapshot.outlookOpacities ? { ...snapshot.outlookOpacities } : undefined;
-  targetDay.metadata.lastModified = now;
-};
-
-/** Moves the current day snapshot onto the provided history stack before a reversible edit. */
-const pushHistoryEntry = (
-  stack: ForecastHistoryEntry[],
-  snapshot: ForecastDaySnapshot
-) => {
-  stack.push({
-    day: snapshot.day,
-    snapshot,
-  });
-  if (stack.length > HISTORY_LIMIT) {
-    stack.shift();
-  }
-};
-
-/** Saves the current day into the undo stack and clears redo after a new user edit. */
-const pushUndoSnapshot = (state: ForecastState, day = state.forecastCycle.currentDay) => {
-  const snapshot = getCurrentDaySnapshot(state, day);
-  if (!snapshot) return;
-
-  const dayHistory = getOrCreateDayHistory(state, snapshot.day);
-  pushHistoryEntry(dayHistory.undoStack, snapshot);
-  dayHistory.redoStack = [];
-};
-
-/** Clears all per-day history stacks when the editing context changes to a new document. */
-const clearHistory = (state: ForecastState) => {
-  state.historyByDay = {};
 };
 
 /** Clears stale package completion when forecast package content changes. */
@@ -684,24 +596,26 @@ const applyLowProbabilityState = (
   state.isSaved = false;
 };
 
-/** Moves one history snapshot to the opposite stack and restores it for undo/redo reducers. */
-const restoreHistoryEntry = (
-  sourceStack: ForecastHistoryEntry[],
-  targetStack: ForecastHistoryEntry[],
-  state: ForecastState,
-  now: string
-) => {
-  const nextEntry = sourceStack.pop();
-  if (!nextEntry) return;
-
-  const currentSnapshot = getCurrentDaySnapshot(state);
-  if (currentSnapshot) {
-    pushHistoryEntry(targetStack, currentSnapshot);
-  }
-
-  applyDaySnapshot(state, nextEntry.snapshot, now);
-  state.forecastCycle.currentDay = nextEntry.day;
-  state.isSaved = false;
+/** Restores one direction of history using the action timestamp and empty-day factory. */
+const restoreHistoryForAction = ({
+  state,
+  action,
+  source,
+  target,
+}: {
+  state: ForecastState;
+  action: UnknownAction;
+  source: 'undoStack' | 'redoStack';
+  target: 'undoStack' | 'redoStack';
+}) => {
+  const dayHistory = getOrCreateDayHistory(state);
+  restoreHistoryEntry({
+    sourceStack: dayHistory[source],
+    targetStack: dayHistory[target],
+    state,
+    now: readActionTimestamp(action),
+    createEmptyDay: createEmptyOutlook,
+  });
 };
 
 export const forecastSlice = createSlice({
@@ -1134,13 +1048,11 @@ export const forecastSlice = createSlice({
     },
 
     undoLastEdit: (state, action: UnknownAction) => {
-      const dayHistory = getOrCreateDayHistory(state);
-      restoreHistoryEntry(dayHistory.undoStack, dayHistory.redoStack, state, readActionTimestamp(action));
+      restoreHistoryForAction({ state, action, source: 'undoStack', target: 'redoStack' });
     },
 
     redoLastEdit: (state, action: UnknownAction) => {
-      const dayHistory = getOrCreateDayHistory(state);
-      restoreHistoryEntry(dayHistory.redoStack, dayHistory.undoStack, state, readActionTimestamp(action));
+      restoreHistoryForAction({ state, action, source: 'redoStack', target: 'undoStack' });
     },
 
     // v2 workflow metadata reducers
