@@ -10,10 +10,8 @@ const { recordBillingMetricEvent } = require('./metrics');
 const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
 const { getStripeObjectId, refundDeletedAccountInvoice } = require('./billing-cleanup');
 const {
-  createCheckoutEntitlementWrite,
   createSubscriptionEntitlementWrite,
   getCheckoutRefundTarget,
-  getSubscriptionUid,
 } = require('./billingEntitlementBuilders');
 const {
   createCheckoutMetadata,
@@ -23,6 +21,11 @@ const {
   isPortalAvailable,
 } = require('./billingRouteHelpers');
 const { verifyRequestUser } = require('./billingRequestAuth');
+const {
+  buildCheckoutEntitlementWrite,
+  resolveAuthoritativeSubscription,
+  resolveInvoiceUid,
+} = require('./billingWebhookResolvers');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -402,51 +405,6 @@ const recordBillingMetricEventSafely = async (eventType) => {
   }
 };
 
-/** Resolves a subscription id or expanded object from a supported webhook payload. */
-const getInvoiceSubscription = (invoice) =>
-  invoice.subscription || invoice.parent?.subscription_details?.subscription || null;
-
-/** Resolves a subscription id or expanded object from a supported webhook payload. */
-const getWebhookSubscription = (event) => {
-  const object = event.data.object;
-  if (event.type.startsWith('customer.subscription.')) {
-    return object;
-  }
-  if (event.type === 'checkout.session.completed') {
-    return object.subscription || null;
-  }
-  return getInvoiceSubscription(object);
-};
-
-/** Retrieves current Stripe lifecycle state for convenience events such as invoices. */
-const resolveAuthoritativeSubscription = (stripe, event) => {
-  const subscription = getWebhookSubscription(event);
-  if (!subscription) {
-    return null;
-  }
-  if (typeof subscription === 'object') {
-    return subscription;
-  }
-  return stripe.subscriptions.retrieve(subscription);
-};
-
-/** Preserves the checkout UID if Stripe has not copied metadata onto the subscription yet. */
-const withFallbackSubscriptionUid = (subscription, fallbackUid) => ({
-  ...subscription,
-  metadata: {
-    ...(subscription.metadata || {}),
-    ...(subscription.metadata?.uid || !fallbackUid ? {} : { uid: fallbackUid }),
-  },
-});
-
-/** Builds the entitlement write from the checkout session's subscription or session data. */
-const buildCheckoutEntitlementWrite = async (stripe, event, session) => {
-  const subscription = await resolveAuthoritativeSubscription(stripe, event);
-  return subscription
-    ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
-    : createCheckoutEntitlementWrite(session);
-};
-
 /** Applies checkout completion using current subscription state when available. */
 const handleCheckoutSessionCompleted = async (event, stripe) => {
   const session = event.data.object;
@@ -471,13 +429,6 @@ const handleSubscriptionEvent = async (event) => {
     await recordBillingMetricEventSafely('premium_cancellation');
   }
 };
-
-/** Returns the UID from the subscription or invoice metadata. */
-const resolveInvoiceUid = (subscription, invoice) =>
-  getSubscriptionUid(subscription) ||
-  invoice.parent?.subscription_details?.metadata?.uid ||
-  invoice.subscription_details?.metadata?.uid ||
-  '';
 
 /** Checks whether an invoice belongs to a deleted account. */
 const isInvoiceForDeletedAccount = (subscription, invoice, customerId) => {
