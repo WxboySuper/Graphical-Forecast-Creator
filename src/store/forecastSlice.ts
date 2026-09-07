@@ -596,6 +596,28 @@ const applyLowProbabilityState = (
   state.isSaved = false;
 };
 
+/** Restores one direction of history using the action timestamp and empty-day factory. */
+const restoreHistoryForAction = ({
+  state,
+  action,
+  source,
+  target,
+}: {
+  state: ForecastState;
+  action: UnknownAction;
+  source: 'undoStack' | 'redoStack';
+  target: 'undoStack' | 'redoStack';
+}) => {
+  const dayHistory = getOrCreateDayHistory(state);
+  restoreHistoryEntry({
+    sourceStack: dayHistory[source],
+    targetStack: dayHistory[target],
+    state,
+    now: readActionTimestamp(action),
+    createEmptyDay: createEmptyOutlook,
+  });
+};
+
 export const forecastSlice = createSlice({
   name: 'forecast',
   initialState,
@@ -1026,25 +1048,11 @@ export const forecastSlice = createSlice({
     },
 
     undoLastEdit: (state, action: UnknownAction) => {
-      const dayHistory = getOrCreateDayHistory(state);
-      restoreHistoryEntry({
-        sourceStack: dayHistory.undoStack,
-        targetStack: dayHistory.redoStack,
-        state,
-        now: readActionTimestamp(action),
-        createEmptyDay: createEmptyOutlook,
-      });
+      restoreHistoryForAction({ state, action, source: 'undoStack', target: 'redoStack' });
     },
 
     redoLastEdit: (state, action: UnknownAction) => {
-      const dayHistory = getOrCreateDayHistory(state);
-      restoreHistoryEntry({
-        sourceStack: dayHistory.redoStack,
-        targetStack: dayHistory.undoStack,
-        state,
-        now: readActionTimestamp(action),
-        createEmptyDay: createEmptyOutlook,
-      });
+      restoreHistoryForAction({ state, action, source: 'redoStack', target: 'undoStack' });
     },
 
     // v2 workflow metadata reducers
