@@ -57,26 +57,18 @@ const hasValidRemoteSettingsFields = ({
 export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
   if (!value) return null;
 
-  const {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant,
-    monitorSettings,
-  } = value;
+  const { forecastUiVariant, monitorSettings } = value;
 
   if (!hasValidRemoteSettingsFields(value)) return null;
+  const normalized = value as UserSettingsDocument;
 
   return {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
+    darkMode: normalized.darkMode,
+    baseMapStyle: normalized.baseMapStyle,
+    stateBorders: normalized.stateBorders,
+    counties: normalized.counties,
+    ghostOutlooks: normalized.ghostOutlooks,
+    defaultForecasterName: normalized.defaultForecasterName,
     forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
     monitorSettings: normalizeMonitorSettings(monitorSettings),
   };
