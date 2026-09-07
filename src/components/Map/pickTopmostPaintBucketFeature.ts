@@ -5,6 +5,7 @@ import type VectorLayer from 'ol/layer/Vector';
 import { computeZIndex } from '../../utils/mapStyleUtils';
 import type { EditableOutlookType } from './openLayersMapStyles';
 
+/** Computes the display priority used to choose an overlapping feature. */
 const getFeatureStackIndex = (feature: FeatureLike): number => {
   const outlookType = feature.get('outlookType') as string | undefined;
   const probability = feature.get('probability') as string | undefined;
