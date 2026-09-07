@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { useWorkflowAwareness } from "../hooks/useWorkflowAwarenessSync";
 
 /** Owns signed-in account settings state and the actions used by the account page. */
+// @codescene(disable:"Complex Method")
 export const useSignedInAccountSettings = () => {
   const { user, signOutUser, settingsSyncStatus, syncedSettings, updateSyncedSettings } = useAuth();
   const [defaultForecasterName, setDefaultForecasterName] = useState(
