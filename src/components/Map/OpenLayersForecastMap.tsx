@@ -506,6 +506,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
       });
 
+      /** Creates a modify listener for either regular or categorical forecast features. */
       const handleModifyEnd = (isCategorical: boolean) => (event: {
         features: { getArray: () => OLFeature<Geometry>[] };
       }) => {
