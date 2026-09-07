@@ -14,7 +14,6 @@ import {
 } from 'firebase/auth';
 import {
   doc,
-  getDoc,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
@@ -38,9 +37,7 @@ import {
   createSettingsSnapshot,
   getSettingsUpdateError,
   mergeUserSettingsDocument,
-  readProfileBetaAccess,
   readRemoteSettings,
-  type UserProfileDocument,
   type UserSettingsDocument,
 } from './authSettings';
 import {
@@ -53,6 +50,7 @@ import {
   postLocalJson,
   safeParseJson,
 } from './authLocalTransport';
+import { refreshHostedBetaAccess } from './hostedBetaAccess';
 
 export {
   areUserSettingsEqual,
@@ -942,39 +940,16 @@ const useHostedAuthState = (): AuthContextValue => {
   }, [dispatch, status, user]);
 
   /** Refreshes the signed-in user's beta-access flag from the hosted profile document. */
-  const refreshBetaAccess = useCallback(async (): Promise<void> => {
-    const hostedProfileUnavailable = !isHostedAuthEnabled || !db || !user;
-    if (hostedProfileUnavailable) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-
-    betaAccessRequestIdRef.current += 1;
-    const requestId = betaAccessRequestIdRef.current;
-    setBetaAccessLoading(true);
-
-    try {
-      const profileSnapshot = await getDoc(doc(requireDb(), 'userProfiles', user.uid));
-      if (requestId !== betaAccessRequestIdRef.current) {
-        return;
-      }
-
-      setBetaAccess(
-        readProfileBetaAccess(profileSnapshot.data() as Partial<UserProfileDocument> | undefined)
-      );
-    } catch {
-      if (requestId !== betaAccessRequestIdRef.current) {
-        return;
-      }
-
-      setBetaAccess(false);
-    } finally {
-      if (requestId === betaAccessRequestIdRef.current) {
-        setBetaAccessLoading(false);
-      }
-    }
-  }, [user]);
+  const refreshBetaAccess = useCallback(
+    () =>
+      refreshHostedBetaAccess({
+        user,
+        requestIdRef: betaAccessRequestIdRef,
+        setBetaAccess,
+        setBetaAccessLoading,
+      }),
+    [user],
+  );
 
   useEffect(() => {
     if (!isHostedAuthEnabled || !db) {
