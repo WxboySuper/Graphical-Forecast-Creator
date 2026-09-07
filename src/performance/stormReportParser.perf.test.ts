@@ -2,7 +2,7 @@ import type { ReportType, StormReport } from '../types/stormReports';
 import { splitCsvLine } from '../utils/stormReportCsv';
 import { parseTodayCsvRow, TODAY_SECTION_HEADERS } from '../utils/stormReportRows';
 import { parseTodayStormReportCsv } from '../utils/stormReportParser';
-import { measure, reportComparison } from './benchmarkUtils';
+import { measure, reportComparison } from '../testing/benchmarkUtils';
 
 const splitCsvLineLegacy = (line: string): string[] => {
   const values: string[] = [];
