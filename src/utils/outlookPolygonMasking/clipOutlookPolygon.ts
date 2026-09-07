@@ -1,4 +1,4 @@
-import * as turf from '@turf/turf';
+import { area, cleanCoords, featureCollection, intersect } from '@turf/turf';
 import type { Feature, Polygon, MultiPolygon } from 'geojson';
 import type { ClipOutlookResult, LandMaskFeature, LandMaskStrategy } from './types';
 
@@ -13,18 +13,18 @@ export const clipOutlookToLandMask = (
   landMask: LandMaskFeature,
   strategy: LandMaskStrategy,
 ): ClipOutlookResult => {
-  const originalArea = turf.area(outlook);
+  const originalArea = area(outlook);
   if (originalArea <= 0) {
     return { feature: null, removedAreaRatio: 1, strategy };
   }
 
-  const clipped = turf.intersect(turf.featureCollection([outlook, landMask]));
+  const clipped = intersect(featureCollection([outlook, landMask]));
   if (!clipped) {
     return { feature: null, removedAreaRatio: 1, strategy };
   }
 
-  const cleaned = turf.cleanCoords(clipped) as LandMaskFeature;
-  const clippedArea = turf.area(cleaned);
+  const cleaned = cleanCoords(clipped) as LandMaskFeature;
+  const clippedArea = area(cleaned);
   const removedAreaRatio = Math.max(0, Math.min(1, 1 - clippedArea / originalArea));
 
   return {
