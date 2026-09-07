@@ -14,8 +14,6 @@ import {
   disabledAuthAction,
   extractLocalUserFromData,
   getDefaultContextValue,
-  getSettingsSyncError,
-  getSettingsUpdateError,
   initLocalAuthState,
   localRefreshBetaAccess,
   localSignInWithEmail,
@@ -23,8 +21,6 @@ import {
   localSignUpWithEmail,
   localUpdateSyncedSettings,
   postLocalJson,
-  readProfileBetaAccess,
-  readRemoteSettings,
   safeParseJson,
   AuthProvider,
   useAuth,
@@ -37,7 +33,16 @@ import {
   startSettingsSubscription,
   syncProfileDocument,
 } from './hostedSettingsSync';
-import { queueProductMetric } from '../utils/productMetrics';
+import { queueProductMetric } from '../utils/productMetrics';import {
+  areUserSettingsEqual,
+  createProfilePayload,
+  createSettingsSnapshot,
+  getRemoteSeedPayload,
+  getSettingsSyncError,
+  getSettingsUpdateError,
+  readProfileBetaAccess,
+  readRemoteSettings,
+} from './authSettings';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer, { type OverlaysState } from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
