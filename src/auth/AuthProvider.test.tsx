@@ -118,6 +118,9 @@ const waitForAuthEffects = async (delay = 100) => {
 };
 
 describe('AuthProvider Utils', () => {
+  test('keeps the existing provider re-export for settings helpers', () => {
+    expect(createProviderSettingsSnapshot).toBe(createSettingsSnapshot);
+  });
   afterEach(() => {
     jest.useRealTimers();
   });
