@@ -109,6 +109,7 @@ interface RestoreHistoryOptions {
   createEmptyDay: (day: DayType, timestamp: string) => NonNullable<ForecastState['forecastCycle']['days'][DayType]>;
 }
 
+/** Restores one history entry and moves the current snapshot to the opposite stack. */
 export const restoreHistoryEntry = ({
   sourceStack,
   targetStack,
