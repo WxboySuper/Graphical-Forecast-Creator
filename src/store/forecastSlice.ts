@@ -24,6 +24,11 @@ import {
   cloneIntegratedCustomLayers,
   cloneOutlookData,
 } from './forecastSnapshotHelpers';
+import {
+  buildFeatureWithProps,
+  computeOutlookType,
+  computeProbability,
+} from './forecastFeatureNormalization';
 import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import type { LandMaskFeature, LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import {
@@ -375,51 +380,6 @@ const initialState: ForecastState = {
   outlookVersionSnapshots: [],
   autoCategoricalError: null,
   lastTrimResult: null,
-};
-
-// Helpers to keep reducers small and testable
-const computeOutlookType = (feature: Feature, state: ForecastState): OutlookType => {
-  return (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
-};
-
-/** Normalizes a feature's probability into the store format for its outlook type. */
-const computeProbability = (feature: Feature, state: ForecastState): string => {
-  const fallback = state.drawingState.activeProbability;
-  const base = (feature.properties?.probability ?? fallback) as string;
-  const outlookType = (feature.properties?.outlookType as OutlookType) || state.drawingState.activeOutlookType;
-
-  // If the outlook type is categorical, return categorical labels unchanged
-  if (outlookType === 'categorical') {
-    return base;
-  }
-
-  // If hatching or CIG level, return CIG label unchanged
-  if (String(base).startsWith('CIG')) {
-    return base;
-  }
-
-  const normalized = String(base).replace(/[%#]/g, '');
-  return `${normalized}%`;
-};
-
-/** Ensures new features carry the active outlook metadata required by the editor. */
-const buildFeatureWithProps = (
-  feature: Feature,
-  outlookType: OutlookType,
-  probability: string,
-  isSignificant: boolean
-): Feature => {
-  return {
-    ...feature,
-    properties: {
-      ...feature.properties,
-      outlookType,
-      probability,
-      isSignificant,
-      derivedFrom: feature.properties?.derivedFrom || outlookType,
-      originalProbability: feature.properties?.originalProbability || probability
-    }
-  } as Feature;
 };
 
 // Helper to get current outlook data safely
