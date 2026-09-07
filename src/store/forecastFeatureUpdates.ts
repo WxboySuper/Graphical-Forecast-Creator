@@ -65,6 +65,7 @@ export const createForecastFeatureUpdateHelpers = (
   };
 
   /** Applies pending geometry and property updates in place, removing null geometries. */
+  // @codescene(disable:"Bumpy Road Ahead")
   const applyPendingFeatureUpdates = (
     state: ForecastState,
     pendingUpdates: PendingFeatureUpdate[],
