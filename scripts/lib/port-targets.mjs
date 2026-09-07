@@ -2,7 +2,7 @@ import { PORTING_MANUAL_LABEL } from './porting-constants.mjs';
 
 export { PORTING_MANUAL_LABEL } from './porting-constants.mjs';
 
-/** @param {string | undefined} json */
+/** @param {string | undefined} json @returns {unknown[]} */
 export const parseOpenPortPrsJson = (json) => {
   if (!json) return [];
   try {
