@@ -27,6 +27,23 @@ export interface TabbedToolbarActionItem {
   accentClass: string;
 }
 
+export interface TabbedToolbarActionGroups {
+  history: TabbedToolbarActionItem[];
+  file: TabbedToolbarActionItem[];
+  completion: TabbedToolbarActionItem[];
+  destructive: TabbedToolbarActionItem[];
+}
+
+/** Partitions Tools-tab actions into the groups shown by the toolbar. */
+export const groupTabbedToolbarActions = (
+  actionItems: TabbedToolbarActionItem[],
+): TabbedToolbarActionGroups => ({
+  history: actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key)),
+  file: actionItems.filter((item) => ['transfer', 'export-image'].includes(item.key)),
+  completion: actionItems.filter((item) => item.key === 'complete'),
+  destructive: actionItems.filter((item) => item.key === 'reset'),
+});
+
 /** Returns the action items displayed in the Tools tab. */
 export const getTabbedToolbarActionItems = (
   controller: ForecastWorkspaceController,
