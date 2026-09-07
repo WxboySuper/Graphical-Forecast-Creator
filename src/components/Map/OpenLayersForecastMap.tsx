@@ -38,8 +38,7 @@ import {
 } from "../../store/forecastSlice";
 
 import type { BaseMapStyle } from "../../store/overlaysSlice";
-import type { AppDispatch } from "../../store";
-import type { DayType, OutlookType } from "../../types/outlooks";
+import type { DayType } from "../../types/outlooks";
 import type { MapAdapterHandle } from "../../maps/contracts";
 import type {
   Feature as GeoJsonFeature,
@@ -88,106 +87,12 @@ import {
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { isFeatureExposed } from "../../config/featureExposure";
 import { isPaintBucketOutlookType, type PaintBucketMode, type PaintBucketStepDirection } from "../../utils/paintBucket";
-import { handlePaintBucketMapClick } from "./paintBucketMapInteraction";
 import { trimGeometryForAutoDraw } from "../../hooks/useTrimCurrentDayOutlooks";
 import { clearLandMaskRuntimeCache, ensureLandMask } from "../../utils/outlookPolygonMasking/landMaskRuntime";
 import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMasking/trimOutlookData";
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
-
-/** Returns whether a click should be handled by the paint-bucket interaction. */
-const shouldHandlePaintBucketClick = (
-  paintBucketEnabled: boolean,
-  interactionMode: "pan" | "draw" | "delete" | "edit",
-  customMode: boolean,
-  activeOutlookType: string,
-): boolean => paintBucketEnabled
-  && interactionMode === "edit"
-  && !customMode
-  && isPaintBucketOutlookType(activeOutlookType);
-
-interface ForecastMapClickEvent {
-  pixel: number[];
-  coordinate: number[];
-  originalEvent: { shiftKey?: boolean };
-}
-
-/** Handles map clicks for forecast editing, drawing, and paint-bucket interactions. */
-const handleForecastMapClick = ({
-  map,
-  event,
-  mode,
-  paintBucketEnabled,
-  customMode,
-  activeOutlookType,
-  editBehavior,
-  stepDirection,
-  activeProbability,
-  currentDay,
-  vectorLayer,
-  catLayer,
-  dispatch,
-  overlay,
-  setFeedback,
-  setPopupInfo,
-}: {
-  map: OLMap;
-  event: ForecastMapClickEvent;
-  mode: "pan" | "draw" | "delete" | "edit";
-  paintBucketEnabled: boolean;
-  customMode: boolean;
-  activeOutlookType: string;
-  editBehavior: PaintBucketMode;
-  stepDirection: PaintBucketStepDirection;
-  activeProbability: string;
-  currentDay: DayType;
-  vectorLayer: VectorLayer | null;
-  catLayer: VectorLayer | null;
-  dispatch: AppDispatch;
-  overlay: Overlay | null;
-  setFeedback: (value: string | null) => void;
-  setPopupInfo: (value: { outlookType: string; probability: string; isSignificant: boolean } | null) => void;
-}): void => {
-  if (shouldHandlePaintBucketClick(paintBucketEnabled, mode, customMode, activeOutlookType)) {
-    setFeedback(null);
-    handlePaintBucketMapClick({
-      map,
-      pixel: event.pixel,
-      vectorLayer,
-      dispatch,
-      outlookType: activeOutlookType as OutlookType,
-      currentDay,
-      mode: editBehavior,
-      stepDirection,
-      shiftKey: Boolean(event.originalEvent.shiftKey),
-      activeProbability,
-      onNoOp: () => setFeedback(`Set mode: this polygon already uses ${activeProbability}.`),
-    });
-    return;
-  }
-
-  if (mode !== "pan") return;
-
-  const feature = map.forEachFeatureAtPixel(event.pixel, (candidate) => candidate, {
-    layerFilter: (layer) => layer === vectorLayer || layer === catLayer,
-  });
-  if (feature && overlay) {
-    const customIdentity = getCustomFeatureIdentity(feature);
-    const outlookType = customIdentity
-      ? (feature.get("customLayerTitle") as string || "Custom layer")
-      : feature.get("outlookType") as string;
-    const probability = customIdentity?.title ?? feature.get("probability") as string;
-    const isSignificant = feature.get("isSignificant") as boolean;
-    setPopupInfo({ outlookType, probability, isSignificant });
-    overlay.setPosition(event.coordinate);
-    return;
-  }
-
-  if (overlay) {
-    hideOverlay(overlay);
-    setPopupInfo(null);
-  }
-};
+import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
 
 /** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
 export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
