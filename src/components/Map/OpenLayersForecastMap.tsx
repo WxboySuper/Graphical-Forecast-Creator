@@ -506,17 +506,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
       });
 
-      modify.on("modifyend", (event) => {
-        handleModifiedFeatures(
-          event.features.getArray() as OLFeature<Geometry>[],
-          false,
-          {
-            currentDay: currentDayRef.current,
-            dispatch,
-            trimStoredOutlookFeature,
-          },
-        );
-      });
+      const handleModifyEnd = (isCategorical: boolean) => (event: {
+        features: { getArray: () => OLFeature<Geometry>[] };
+      }) => {
+        handleModifiedFeatures(event.features.getArray(), isCategorical, {
+          currentDay: currentDayRef.current,
+          dispatch,
+          trimStoredOutlookFeature,
+        });
+      };
+
+      modify.on("modifyend", handleModifyEnd(false));
       map.addInteraction(modify);
       modifyRef.current = modify;
 
@@ -538,17 +538,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         deleteCondition: (event) =>
           singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
       });
-      catModify.on("modifyend", (event) => {
-        handleModifiedFeatures(
-          event.features.getArray() as OLFeature<Geometry>[],
-          true,
-          {
-            currentDay: currentDayRef.current,
-            dispatch,
-            trimStoredOutlookFeature,
-          },
-        );
-      });
+      catModify.on("modifyend", handleModifyEnd(true));
       map.addInteraction(catModify);
       catModifyRef.current = catModify;
 
