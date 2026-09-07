@@ -12,7 +12,7 @@ import {
   Palette,
   Trash2,
 } from "lucide-react";
-import { Badge, type BadgeProps } from "../components/ui/badge";
+import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -24,152 +24,33 @@ import {
 import { Input } from "../components/ui/input";
 import { useAuth } from "../auth/AuthProvider";
 import { useEntitlement } from "../billing/EntitlementProvider";
-import { PRICING_COPY } from "../billing/pricingCopy";
 import { useUserMetrics } from "../metrics/useUserMetrics";
 import { useWorkflowAwareness } from "../hooks/useWorkflowAwarenessSync";
 import type { RootState } from "../store";
 import { selectForecastCycle, selectSavedCycles } from "../store/forecastSlice";
 import { computeHomeStats } from "./homeUtils";
 import { isFeatureExposed } from "../config/featureExposure";
+import {
+  formatLastActiveDate,
+  getBillingSupportCopy,
+  getCurrentPlanPrice,
+  getPlanLabel,
+  getPricingButtonVariant,
+  getProviderLabel,
+  getSyncStatusMeta,
+  type SyncStatusMeta,
+} from './accountPageUtils';
 import "./AccountPage.css";
 
 type AuthMode = "sign_in" | "sign_up";
-type SyncStatus = ReturnType<typeof useAuth>["settingsSyncStatus"];
-
-interface SyncStatusMeta {
-  label: string;
-  variant: BadgeProps["variant"];
-}
-
-/** Maps Firebase provider ids to short labels for the account UI. */
-const getProviderLabel = (providerId: string): string => {
-  switch (providerId) {
-    case "google.com":
-      return "Google";
-    case "password":
-      return "Email / Password";
-    default:
-      return providerId;
-  }
-};
-
-/** Converts the raw settings status into the one compact badge shown on the signed-in account page. */
-const getSyncStatusMeta = (settingsSyncStatus: SyncStatus): SyncStatusMeta => {
-  switch (settingsSyncStatus) {
-    case "synced":
-      return { label: "Synced", variant: "success" };
-    case "syncing":
-      return { label: "Syncing", variant: "secondary" };
-    case "error":
-      return { label: "Needs Attention", variant: "warning" };
-    case "disabled":
-      return { label: "Local Only", variant: "outline" };
-    case "idle":
-    default:
-      return { label: "Ready", variant: "secondary" };
-  }
-};
 
 /** Renders the save button label while optionally showing a loading spinner. */
-const renderSaveDefaultsButtonLabel = (
-  savingDefaults: boolean,
-): React.ReactNode => (
+const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode => (
   <>
-    {savingDefaults ? (
-      <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-    ) : null}
+    {savingDefaults ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
     Save Changes
   </>
 );
-
-/** Returns the user-facing current plan price based on the active entitlement interval. */
-const getPlanLabel = (
-  premiumActive: boolean,
-  planInterval: ReturnType<typeof useEntitlement>["planInterval"],
-  effectiveSource: ReturnType<typeof useEntitlement>["effectiveSource"],
-): string => {
-  if (!premiumActive) {
-    return "Free Plan";
-  }
-
-  if (planInterval === "annual") {
-    return "Premium Annual";
-  }
-
-  if (planInterval === "monthly") {
-    return "Premium Monthly";
-  }
-
-  return effectiveSource === "beta_override"
-    ? "Premium Beta Access"
-    : "Premium";
-};
-
-/** Returns the short helper copy used under the billing summary grid. */
-const getBillingSupportCopy = (
-  effectiveSource: ReturnType<typeof useEntitlement>["effectiveSource"],
-  premiumActive: boolean,
-  annualPromoActive: boolean,
-): string | null => {
-  if (effectiveSource === "beta_override") {
-    return "Premium is currently being granted through the beta override path, so no live Stripe subscription is required yet.";
-  }
-
-  if (!premiumActive) {
-    return PRICING_COPY.downgradeSummary;
-  }
-
-  if (annualPromoActive) {
-    return "Annual intro pricing is currently active on this deployment.";
-  }
-
-  return null;
-};
-
-/** Returns the CTA variant for the pricing button based on current entitlement state. */
-const getPricingButtonVariant = (
-  premiumActive: boolean,
-): "outline" | "default" => (premiumActive ? "outline" : "default");
-
-/** Returns the current plan price shown in the billing summary card. */
-const getCurrentPlanPrice = (
-  premiumActive: boolean,
-  planInterval: ReturnType<typeof useEntitlement>["planInterval"],
-  monthlyDisplayPrice: string,
-  annualDisplayPrice: string,
-): string => {
-  if (!premiumActive) {
-    return "$0";
-  }
-
-  if (planInterval === "annual") {
-    return annualDisplayPrice;
-  }
-
-  if (planInterval === "monthly") {
-    return monthlyDisplayPrice;
-  }
-
-  return "Included";
-};
-
-/** Formats the last recorded active-day key into a compact account-friendly date label. */
-const formatLastActiveDate = (value: string | null): string => {
-  if (!value) {
-    return "No activity yet";
-  }
-
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
 
 /** Decorative background accents shared by the account hero. */
 const AccountHeroBackdrop: React.FC = () => (
@@ -664,6 +545,7 @@ const useAccountDeletionAction = (usesPassword: boolean) => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const canDelete = canSubmitAccountDeletion(confirmation, usesPassword, password);
 
+  /** Attempts account deletion after confirmation and any required reauthentication. */
   const handleDelete = async () => {
     setDeleting(true);
     setDeleteError(null);
