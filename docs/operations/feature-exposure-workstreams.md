@@ -36,21 +36,21 @@ Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM,
 
 ### Forecast workflow v2 (`forecastWorkflowV2`, #429)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** home workflow actions and forecast workspace workflow panel
 - **Tests:** signed-in home interaction coverage in `src/pages/home/HomePage.test.tsx`, adoption contract in `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after workflow continuity and adoption coverage
 
 ### Verification relaunch (`verificationRelaunch`, #430)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** none yet — the existing `/verification` route is core product, not this relaunch key
 - **Tests:** acknowledgement in `featureExposure.acknowledgements.json`, `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after dashboard, coexistence, and adoption coverage
 
 ### Custom products (`customProducts`, #431)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** custom route, navigation, toolbar, repository, entitlement, and Firestore capability checks
 - **Tests:** acknowledgement in `featureExposure.acknowledgements.json`, `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after implementation, UI review, and regression/E2E coverage
