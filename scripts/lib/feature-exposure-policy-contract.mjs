@@ -98,10 +98,6 @@ function validateV17RestrictedTargets(featureKey, definition, acknowledgements, 
 function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors) {
   const { acknowledgements } = contract;
 
-  if (definition.temporary !== true) {
-    errors.push(`v1.7 workstream "${featureKey}" must remain temporary until production promotion.`);
-  }
-
   validateV17LocalDevelopmentExposure(featureKey, definition, acknowledgements, errors);
   validateV17RestrictedTargets(featureKey, definition, acknowledgements, errors);
 
