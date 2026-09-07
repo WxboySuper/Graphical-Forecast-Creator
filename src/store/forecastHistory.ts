@@ -101,13 +101,21 @@ export const clearHistory = (state: ForecastState) => {
 };
 
 /** Moves one history snapshot to the opposite stack and restores it. */
-export const restoreHistoryEntry = (
-  sourceStack: ForecastHistoryEntry[],
-  targetStack: ForecastHistoryEntry[],
-  state: ForecastState,
-  now: string,
-  createEmptyDay: (day: DayType, timestamp: string) => NonNullable<ForecastState['forecastCycle']['days'][DayType]>,
-) => {
+interface RestoreHistoryOptions {
+  sourceStack: ForecastHistoryEntry[];
+  targetStack: ForecastHistoryEntry[];
+  state: ForecastState;
+  now: string;
+  createEmptyDay: (day: DayType, timestamp: string) => NonNullable<ForecastState['forecastCycle']['days'][DayType]>;
+}
+
+export const restoreHistoryEntry = ({
+  sourceStack,
+  targetStack,
+  state,
+  now,
+  createEmptyDay,
+}: RestoreHistoryOptions) => {
   const nextEntry = sourceStack.pop();
   if (!nextEntry) return;
 

@@ -1027,12 +1027,24 @@ export const forecastSlice = createSlice({
 
     undoLastEdit: (state, action: UnknownAction) => {
       const dayHistory = getOrCreateDayHistory(state);
-      restoreHistoryEntry(dayHistory.undoStack, dayHistory.redoStack, state, readActionTimestamp(action), createEmptyOutlook);
+      restoreHistoryEntry({
+        sourceStack: dayHistory.undoStack,
+        targetStack: dayHistory.redoStack,
+        state,
+        now: readActionTimestamp(action),
+        createEmptyDay: createEmptyOutlook,
+      });
     },
 
     redoLastEdit: (state, action: UnknownAction) => {
       const dayHistory = getOrCreateDayHistory(state);
-      restoreHistoryEntry(dayHistory.redoStack, dayHistory.undoStack, state, readActionTimestamp(action), createEmptyOutlook);
+      restoreHistoryEntry({
+        sourceStack: dayHistory.redoStack,
+        targetStack: dayHistory.undoStack,
+        state,
+        now: readActionTimestamp(action),
+        createEmptyDay: createEmptyOutlook,
+      });
     },
 
     // v2 workflow metadata reducers
