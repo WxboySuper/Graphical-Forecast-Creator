@@ -9,12 +9,7 @@ import {
 import "ol/ol.css";
 import OLMap from "ol/Map";
 import View from "ol/View";
-import LayerGroup from "ol/layer/Group";
-import TileLayer from "ol/layer/Tile";
-import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
-import OSM from "ol/source/OSM";
-import XYZ from "ol/source/XYZ";
 import GeoJSON from "ol/format/GeoJSON";
 import { Draw, Modify, Select, Snap } from "ol/interaction";
 import { fromLonLat, toLonLat } from "ol/proj";
@@ -51,21 +46,11 @@ import {
   toCustomOlStyle,
   getCustomFeatureIdentity,
   toGhostOlStyle,
-  createLabelOverlaySource,
   hideOverlay,
-  TOP_OUTLINE_LAYER_Z_INDEX,
-  TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
-  TOP_LABEL_LAYER_Z_INDEX,
-  GHOST_REFERENCE_LAYER_Z_INDEX,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
 import { applyRasterBasemap, loadOpenFreeMapBasemap } from "./openLayersBasemap";
-import {
-  BLANK_LAND_FILL_STYLE,
-  BLANK_LAND_OUTLINE_STYLE,
-  createBlankLayerConfig,
-  ensureBlankLayerLoaded,
-} from "./openLayersBlankBasemap";
+import { createBlankLayerConfig, ensureBlankLayerLoaded } from "./openLayersBlankBasemap";
 import {
   getForecastSourceDescriptorPlan,
   type FeatureSyncDescriptor,
@@ -92,6 +77,7 @@ import {
   type ForecastMapView,
 } from "./openLayersForecastViewSync";
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
+import { createForecastMapLayers, type ForecastMapLayerSet } from "./openLayersForecastLayerSetup";
 export { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 
@@ -233,28 +219,28 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
     const mapElementRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<OLMap | null>(null);
-    const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
-    const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
-    const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
+    const tileLayerRef = useRef<ForecastMapLayerSet["tileLayer"] | null>(null);
+    const vectorBaseGroupRef = useRef<ForecastMapLayerSet["vectorBaseGroup"] | null>(null);
+    const vectorReferenceGroupRef = useRef<ForecastMapLayerSet["vectorReferenceGroup"] | null>(null);
     const vectorStyleRequestRef = useRef(0);
     const worldSourceRef = useRef<VectorSource>(new VectorSource());
-    const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const worldLayerRef = useRef<ForecastMapLayerSet["worldLayer"] | null>(null);
     const lakesSourceRef = useRef<VectorSource>(new VectorSource());
-    const lakesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const lakesLayerRef = useRef<ForecastMapLayerSet["lakesLayer"] | null>(null);
     const landSourceRef = useRef<VectorSource>(new VectorSource());
-    const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-    const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-    const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
+    const landLayerRef = useRef<ForecastMapLayerSet["landLayer"] | null>(null);
+    const landOutlineLayerRef = useRef<ForecastMapLayerSet["landOutlineLayer"] | null>(null);
+    const labelLayerRef = useRef<ForecastMapLayerSet["labelLayer"] | null>(null);
     const vectorSourceRef = useRef<VectorSource>(new VectorSource());
     const catSourceRef = useRef<VectorSource>(new VectorSource());
     const ghostSourceRef = useRef<VectorSource>(new VectorSource());
     const tstmPreviewSourceRef = useRef<VectorSource>(new VectorSource());
     const trimPreviewSourceRef = useRef<VectorSource>(new VectorSource());
-    const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-    const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-    const tstmPreviewLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-    const trimPreviewLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
-    const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const catLayerRef = useRef<ForecastMapLayerSet["catLayer"] | null>(null);
+    const ghostLayerRef = useRef<ForecastMapLayerSet["ghostLayer"] | null>(null);
+    const tstmPreviewLayerRef = useRef<ForecastMapLayerSet["tstmPreviewLayer"] | null>(null);
+    const trimPreviewLayerRef = useRef<ForecastMapLayerSet["trimPreviewLayer"] | null>(null);
+    const vectorLayerRef = useRef<ForecastMapLayerSet["vectorLayer"] | null>(null);
     const drawRef = useRef<Draw | null>(null);
     const modifyRef = useRef<Modify | null>(null);
     const catModifyRef = useRef<Modify | null>(null);
@@ -288,86 +274,42 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => {
       if (!mapElementRef.current || mapRef.current) return undefined;
 
-      const tileLayer = new TileLayer({
-        source: new OSM({ crossOrigin: "anonymous" }),
+      const {
+        tileLayer,
+        vectorBaseGroup,
+        vectorReferenceGroup,
+        worldLayer,
+        lakesLayer,
+        landLayer,
+        landOutlineLayer,
+        catLayer,
+        ghostLayer,
+        tstmPreviewLayer,
+        trimPreviewLayer,
+        vectorLayer,
+        labelLayer,
+      } = createForecastMapLayers({
+        worldSource: worldSourceRef.current,
+        lakesSource: lakesSourceRef.current,
+        landSource: landSourceRef.current,
+        catSource: catSourceRef.current,
+        ghostSource: ghostSourceRef.current,
+        tstmPreviewSource: tstmPreviewSourceRef.current,
+        trimPreviewSource: trimPreviewSourceRef.current,
+        vectorSource: vectorSourceRef.current,
       });
       tileLayerRef.current = tileLayer;
-      const vectorBaseGroup = new LayerGroup({
-        visible: false,
-        zIndex: 1,
-      });
       vectorBaseGroupRef.current = vectorBaseGroup;
-      const vectorReferenceGroup = new LayerGroup({
-        visible: false,
-        zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
-      });
       vectorReferenceGroupRef.current = vectorReferenceGroup;
-      // Blank base map layers: start hidden, only one (tile vs. world+lakes+land) will be visible at a time based on baseMapStyle.
-      const worldLayer = new VectorLayer({
-        source: worldSourceRef.current,
-        visible: false,
-        zIndex: 1,
-      });
       worldLayerRef.current = worldLayer;
-      // Lakes layer sits above world layer to provide better definition of coastlines and inland water bodies,
-      // especially when using blank basemap style.
-      const lakesLayer = new VectorLayer({
-        source: lakesSourceRef.current,
-        visible: false,
-        zIndex: 1.5,
-      });
       lakesLayerRef.current = lakesLayer;
-      // Land fill sits above world and lakes, below outlook polygons.
-      const landLayer = new VectorLayer({
-        source: landSourceRef.current,
-        visible: false,
-        zIndex: 2,
-        style: BLANK_LAND_FILL_STYLE,
-      });
       landLayerRef.current = landLayer;
-      // Land outlines sit above outlook polygons so borders remain visible.
-      const landOutlineLayer = new VectorLayer({
-        source: landSourceRef.current,
-        visible: false,
-        zIndex: TOP_OUTLINE_LAYER_Z_INDEX,
-        style: BLANK_LAND_OUTLINE_STYLE,
-      });
       landOutlineLayerRef.current = landOutlineLayer;
-      // Categorical features stay in a dedicated source so their edit flow
-      // remains separate from probabilistic outlook layers.
-      const catLayer = new VectorLayer({
-        source: catSourceRef.current,
-        zIndex: 3,
-        opacity: 1,
-      });
       catLayerRef.current = catLayer;
-      const ghostLayer = new VectorLayer({
-        source: ghostSourceRef.current,
-        zIndex: GHOST_REFERENCE_LAYER_Z_INDEX,
-      });
       ghostLayerRef.current = ghostLayer;
-      const tstmPreviewLayer = new VectorLayer({
-        source: tstmPreviewSourceRef.current,
-        zIndex: TOP_OUTLINE_LAYER_Z_INDEX + 5,
-      });
       tstmPreviewLayerRef.current = tstmPreviewLayer;
-      const trimPreviewLayer = new VectorLayer({
-        source: trimPreviewSourceRef.current,
-        zIndex: TOP_OUTLINE_LAYER_Z_INDEX + 6,
-      });
       trimPreviewLayerRef.current = trimPreviewLayer;
-      // Probabilistic/other features layer: separate source, normal per-feature opacity
-      const vectorLayer = new VectorLayer({
-        source: vectorSourceRef.current,
-        zIndex: 4,
-      });
       vectorLayerRef.current = vectorLayer;
-      // Place labels/cities above outlook polygons.
-      const labelLayer = new TileLayer({
-        source: createLabelOverlaySource("osm") ?? undefined,
-        visible: true,
-        zIndex: TOP_LABEL_LAYER_Z_INDEX,
-      });
       labelLayerRef.current = labelLayer;
 
       // Initialize the map with all layers, but only the tile layer visible by default.
