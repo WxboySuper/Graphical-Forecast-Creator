@@ -44,3 +44,21 @@ export const applyForecastFeatureMetadata = (
   item.set("isSignificant", metadata.isSignificant);
   item.set("derivedFrom", metadata.derivedFrom);
 };
+
+/** Applies custom-layer identity metadata to a rendered custom feature. */
+export const applyCustomFeatureMetadata = (
+  item: OLFeature<Geometry>,
+  metadata: {
+    featureId: string;
+    customLayerId: string;
+    customLayerTitle: string;
+    categoryId: string;
+    title: string;
+  },
+): void => {
+  item.set("featureId", metadata.featureId);
+  item.set("customLayerId", metadata.customLayerId);
+  item.set("customLayerTitle", metadata.customLayerTitle);
+  item.set("categoryId", metadata.categoryId);
+  item.set("title", metadata.title);
+};
