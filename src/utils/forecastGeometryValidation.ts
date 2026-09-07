@@ -83,7 +83,7 @@ const validateGeometryCoordinates = (geometry: { type?: unknown; coordinates?: u
 
 /** Validates one GeoJSON geometry object against supported types and coordinate bounds. */
 // @codescene(disable:"Complex Conditional")
-export const validateGeometry = (value: unknown): ImportValidationResult | null => {
+export function validateGeometry(value: unknown): ImportValidationResult | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return fail('Forecast geometry is not a valid object.');
   }
@@ -98,7 +98,7 @@ export const validateGeometry = (value: unknown): ImportValidationResult | null 
   }
 
   return validateGeometryCoordinates(geometry);
-};
+}
 
 /** Validates one serialized outlook feature and its geometry. */
 // @codescene(disable:"Complex Method", disable:"Complex Conditional")
