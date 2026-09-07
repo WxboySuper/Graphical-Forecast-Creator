@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { captureExpectedMonitorReferenceFailure } from '../instrument';
 import {
