@@ -11,7 +11,7 @@ import {
   loadOpenFreeMapLayerGroups,
   replaceLayerGroupLayers,
 } from './openLayersMapStyles';
-import { loadOpenFreeMapBasemap } from './openLayersBasemap';
+import { applyRasterBasemap, loadOpenFreeMapBasemap } from './openLayersBasemap';
 
 jest.mock('../../lib/openFreeMap', () => ({
   getOpenFreeMapStyleSet: jest.fn(),
@@ -75,6 +75,58 @@ const options = ({
 const flushPromises = async () => {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 };
+
+describe('applyRasterBasemap', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('applies raster tiles and shows labels when an overlay exists', () => {
+    const tile = makeTile();
+    const labels = makeTile();
+    const tileSource = {};
+    const labelSource = {};
+    jest.mocked(createTileSource).mockReturnValue(
+      tileSource as unknown as ReturnType<typeof createTileSource>
+    );
+    jest.mocked(createLabelOverlaySource).mockReturnValue(
+      labelSource as unknown as ReturnType<typeof createLabelOverlaySource>
+    );
+
+    applyRasterBasemap({
+      style,
+      tile: tile as unknown as TileLayer<OSM | XYZ>,
+      labels: labels as unknown as TileLayer<OSM | XYZ>,
+    });
+
+    expect(createTileSource).toHaveBeenCalledWith(style);
+    expect(tile.setSource).toHaveBeenCalledWith(tileSource);
+    expect(labels.setSource).toHaveBeenCalledWith(labelSource);
+    expect(labels.setVisible).toHaveBeenCalledWith(true);
+  });
+
+  test('hides labels when the raster style has no overlay', () => {
+    const tile = makeTile();
+    const labels = makeTile();
+    const tileSource = {};
+    jest.mocked(createTileSource).mockReturnValue(
+      tileSource as unknown as ReturnType<typeof createTileSource>
+    );
+    jest.mocked(createLabelOverlaySource).mockReturnValue(
+      undefined as unknown as ReturnType<typeof createLabelOverlaySource>
+    );
+
+    applyRasterBasemap({
+      style,
+      tile: tile as unknown as TileLayer<OSM | XYZ>,
+      labels: labels as unknown as TileLayer<OSM | XYZ>,
+    });
+
+    expect(tile.setSource).toHaveBeenCalledWith(tileSource);
+    expect(labels.setSource).not.toHaveBeenCalled();
+    expect(labels.setVisible).toHaveBeenCalledWith(false);
+  });
+});
 
 describe('loadOpenFreeMapBasemap', () => {
   beforeEach(() => {
@@ -204,5 +256,27 @@ describe('loadOpenFreeMapBasemap', () => {
     expect(tile.setVisible).toHaveBeenCalledWith(true);
     expect(labels.setSource).toHaveBeenCalledWith(labelSource);
     expect(labels.setVisible).toHaveBeenCalledWith(true);
+  });
+
+  test('hides labels when the fallback raster style has no overlay', async () => {
+    const tile = makeTile();
+    const labels = makeTile();
+    const tileSource = {};
+    jest.mocked(getOpenFreeMapStyleSet).mockResolvedValue({} as OpenFreeMapStyleSet);
+    jest.mocked(loadOpenFreeMapLayerGroups).mockRejectedValue(new Error('load failed'));
+    jest.mocked(createTileSource).mockReturnValue(
+      tileSource as unknown as ReturnType<typeof createTileSource>
+    );
+    jest.mocked(createLabelOverlaySource).mockReturnValue(
+      undefined as unknown as ReturnType<typeof createLabelOverlaySource>
+    );
+
+    loadOpenFreeMapBasemap(options({ requestRef: { current: 1 }, requestId: 1, tile, labels }));
+    await flushPromises();
+
+    expect(tile.setSource).toHaveBeenCalledWith(tileSource);
+    expect(tile.setVisible).toHaveBeenCalledWith(true);
+    expect(labels.setSource).not.toHaveBeenCalled();
+    expect(labels.setVisible).toHaveBeenCalledWith(false);
   });
 });
