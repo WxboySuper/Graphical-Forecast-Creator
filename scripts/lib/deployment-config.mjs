@@ -21,7 +21,15 @@ export function normalizeDeploymentConfig(config) {
     normalizedServerEnv[normalizeServerEnvKey(key)] = normalizeServerEnvValue(key, value);
   }
 
-  return { serverEnv: normalizedServerEnv };
+  const environment = config.environment;
+  if (environment !== undefined && typeof environment !== 'string') {
+    throw new Error('Deployment config environment must be a string.');
+  }
+
+  return {
+    ...(environment === undefined ? {} : { environment }),
+    serverEnv: normalizedServerEnv,
+  };
 }
 
 /** Merges a shared config with an environment override and validates the result. */
@@ -31,6 +39,9 @@ export function mergeDeploymentConfigs(baseConfig, overrideConfig) {
   }
 
   return normalizeDeploymentConfig({
+    ...(overrideConfig.environment === undefined
+      ? { environment: baseConfig.environment }
+      : { environment: overrideConfig.environment }),
     serverEnv: {
       ...(isPlainObject(baseConfig.serverEnv) ? baseConfig.serverEnv : {}),
       ...(isPlainObject(overrideConfig.serverEnv) ? overrideConfig.serverEnv : {}),

@@ -46,10 +46,11 @@ describe('deployment config', () => {
   it('merges shared defaults with environment overrides', () => {
     assert.deepEqual(
       mergeDeploymentConfigs(
-        { serverEnv: { TSTM_GENERATION_ENABLED: 'true', SHARED: 'base' } },
-        { serverEnv: { SHARED: 'override', TSTM_INGESTION_ENABLED: 'true' } },
+        { environment: 'base', serverEnv: { TSTM_GENERATION_ENABLED: 'true', SHARED: 'base' } },
+        { environment: 'override', serverEnv: { SHARED: 'override', TSTM_INGESTION_ENABLED: 'true' } },
       ),
       {
+        environment: 'override',
         serverEnv: {
           TSTM_GENERATION_ENABLED: 'true',
           TSTM_INGESTION_ENABLED: 'true',

@@ -1,3 +1,4 @@
 {
+  "environment": "production",
   "extends": "common-deployment-config.json"
 }

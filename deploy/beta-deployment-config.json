@@ -1,3 +1,4 @@
 {
+  "environment": "beta",
   "extends": "common-deployment-config.json"
 }
