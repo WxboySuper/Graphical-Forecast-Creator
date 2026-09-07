@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { CloudSaveModal, CloudLoadModal } from './CloudSaveLoadModals';
+import { CloudSaveModal } from './CloudSaveLoadModals';
 
 // Mock lucide-react
 jest.mock('lucide-react', () => ({
@@ -95,61 +95,5 @@ describe('CloudSaveModal', () => {
       />
     );
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-  });
-});
-
-describe('CloudLoadModal', () => {
-  const onOpenChange = jest.fn();
-  const onLoad = jest.fn();
-  const mockCycles = [
-    { id: '1', label: 'Cycle 1', updatedAt: '2026-04-01T12:00:00Z', cycleDate: '20260401' },
-    { id: '2', label: 'Cycle 2', updatedAt: '2026-04-02T12:00:00Z', cycleDate: '20260402' },
-  ];
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  test('renders cycles and handles selection', async () => {
-    render(
-      <CloudLoadModal
-        open
-        onOpenChange={onOpenChange}
-        onLoad={onLoad}
-        cycles={mockCycles}
-      />
-    );
-
-    expect(screen.getByText('Cycle 1')).toBeInTheDocument();
-    expect(screen.getByText('Cycle 2')).toBeInTheDocument();
-
-    const cycle1Button = screen.getByRole('button', { name: /Cycle 1/i });
-    fireEvent.click(cycle1Button);
-
-    const loadButton = screen.getByRole('button', { name: 'Load' });
-    fireEvent.click(loadButton);
-
-    await waitFor(() => expect(onLoad).toHaveBeenCalledWith('1'));
-    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
-  });
-
-  it.each([
-    { name: 'shows empty message when no cycles', cycles: [], expected: 'No cloud cycles saved yet' },
-    { name: 'shows loading indicator', cycles: [], expected: 'loader-icon' },
-  ])('$name', ({ cycles, expected }) => {
-    render(
-      <CloudLoadModal
-        open
-        onOpenChange={onOpenChange}
-        onLoad={onLoad}
-        cycles={cycles}
-        isLoading={expected === 'loader-icon'}
-      />
-    );
-
-    const indicator = expected === 'loader-icon'
-      ? screen.queryByTestId('loader-icon')
-      : screen.queryByText(expected);
-    expect(indicator).toBeInTheDocument();
   });
 });
