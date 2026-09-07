@@ -1,6 +1,6 @@
 import type { OutlookData } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
-import type { DatEvidence } from '../dat';
+import { summarizeDatEvidence, tornadoDamagePoints, type DatEvidence } from '../dat';
 import { LIMITED_REPORT_CEILING } from './constants';
 import {
   COMPONENT_ORDER,
@@ -34,7 +34,6 @@ import { FORECAST_GRADE_FORMULA_VERSION } from './formulaVersion';
 import { scoreEventYield, scoreSeverity } from './yieldSeverity';
 import { scoreEventCapture } from './eventCapture';
 import { scoreTierPlacement } from './tierPlacement';
-import { summarizeDatEvidence, tornadoDamagePoints } from '../dat';
 
 /**
  * Composite rollup for the versioned Forecast Grade engine (PR 04 — yield-composite).

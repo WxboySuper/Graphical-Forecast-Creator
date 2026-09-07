@@ -14,8 +14,7 @@ import { resolveNativeFileContent } from '../forecastTransfer/nativeImportUtils'
 import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../stormReportParser';
 import { isTodayReportDate, isYesterdayReportDate, toArchiveDate } from './archiveDate';
 import type { PackageGrade, ProductKind } from './gradeContract';
-import { queryDatEvidenceForDate } from '../dat';
-import type { DatEvidence } from '../dat';
+import { queryDatEvidenceForDate, type DatEvidence } from '../dat';
 
 export {
   getCurrentSpcReportDate,
