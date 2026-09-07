@@ -55,7 +55,7 @@ const countCoordinatePositions = (geometry: Geometry, limit: number): { count: n
 };
 
 /** Validates the child geometries of a GeometryCollection. */
-const validateGeometryCollection = (geometries: unknown): ImportValidationResult | null => {
+function validateGeometryCollection(geometries: unknown): ImportValidationResult | null {
   if (!Array.isArray(geometries) || geometries.length > MAX_ARRAY_ITEMS) {
     return fail('Forecast geometry collection is invalid or too large.');
   }
@@ -64,7 +64,7 @@ const validateGeometryCollection = (geometries: unknown): ImportValidationResult
     if (childResult) return childResult;
   }
   return null;
-};
+}
 
 /** Validates a non-collection geometry's coordinates and size. */
 const validateGeometryCoordinates = (geometry: { type?: unknown; coordinates?: unknown }): ImportValidationResult | null => {
