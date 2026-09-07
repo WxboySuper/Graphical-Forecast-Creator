@@ -17,19 +17,22 @@ mkdir -p /opt/gfc-analytics/logs
 mkdir -p /opt/gfc-staging-analytics/config
 mkdir -p /opt/gfc-staging-analytics/logs
 
-echo ">> Checking for Node.js >= 18 ..."
+echo ">> Checking for a supported Node.js release (22.22+, 24.11+, or 26+) ..."
 NODE_OK=false
 if command -v node &>/dev/null; then
-  NODE_VER=$(node -e "process.stdout.write(process.versions.node.split('.')[0])")
-  if [ "$NODE_VER" -ge 18 ]; then
+  NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
+  NODE_MINOR=$(node -p "process.versions.node.split('.')[1]")
+  if { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -ge 22 ]; } \
+    || { [ "$NODE_MAJOR" -eq 24 ] && [ "$NODE_MINOR" -ge 11 ]; } \
+    || [ "$NODE_MAJOR" -ge 26 ]; then
     NODE_OK=true
     echo "   Found Node.js v$(node --version)"
   fi
 fi
 
 if [ "$NODE_OK" = false ]; then
-  echo "   Installing Node.js 20 via NodeSource ..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  echo "   Installing Node.js 22 via NodeSource ..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
 fi
 
@@ -76,5 +79,5 @@ echo "  4. GitHub Actions secrets: PROD_SSH_KEY, PROD_SSH_HOST, BETA_INVITE_PATH
 echo ""
 echo "  5. Merge release automation PR, then run Deploy Production to VPS (action=live once to migrate layout)."
 echo ""
-echo "  See docs/release-workflow.md for the manual release and staging flow."
+echo "  See docs/operations/release-workflow.md for the manual release and staging flow."
 echo ""
