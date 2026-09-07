@@ -71,7 +71,6 @@ import {
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
 import { applyRasterBasemap, loadOpenFreeMapBasemap } from "./openLayersBasemap";
-import type { CustomCategoryStyle } from "../../types/customProducts";
 import {
   BLANK_LAND_FILL_STYLE,
   BLANK_LAND_OUTLINE_STYLE,
@@ -93,39 +92,9 @@ import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMa
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
+export { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
+import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 
-/** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
-export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
-  style.fillColor,
-  style.fillOpacity,
-  style.strokeColor,
-  style.strokeOpacity,
-  style.strokeWidth,
-  style.hatch,
-  isTopLayer,
-].join("|");
-
-// OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
-// https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
-// Recheck this workaround whenever `ol` is upgraded; remove it once upstream
-// guarantees that detaching Draw cancels the pending callback.
-type DrawWithPendingPointerMove = {
-  downTimeout_?: ReturnType<typeof setTimeout>;
-};
-
-/**
- * OpenLayers Draw keeps a delayed pointer-move callback after removal.
- * Cancel it before detaching so it cannot read map pixels after map teardown.
- */
-export const removeDrawInteraction = (map: OLMap, interaction: Draw): void => {
-  const draw = interaction as unknown as DrawWithPendingPointerMove;
-  if (draw.downTimeout_ !== undefined) {
-    clearTimeout(draw.downTimeout_);
-    draw.downTimeout_ = undefined;
-  }
-
-  map.removeInteraction(interaction);
-};
 type OpenLayersForecastMapProps = {
   tstmPreviewFeatures?: GeoJsonFeature[];
 };
