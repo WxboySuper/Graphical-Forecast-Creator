@@ -13,9 +13,6 @@ export const parseOpenPortPrsJson = (json) => {
   }
 };
 
-/** @deprecated Use parseOpenPortPrsJson. */
-export const parseOpenBetaPrsJson = parseOpenPortPrsJson;
-
 /**
  * Stable merges are the only merges that need a forward-port target. Main
  * merges intentionally have no reverse target because main contains work that
