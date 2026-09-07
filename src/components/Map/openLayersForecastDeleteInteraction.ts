@@ -24,7 +24,7 @@ export const createForecastDeleteInteraction = ({
   vectorLayer: SelectableLayer;
   catLayer: SelectableLayer;
   dispatch: AppDispatch;
-}): Select<Geometry> => {
+}): Select => {
   const select = new Select({
     condition: click,
     layers: [vectorLayer, catLayer],
