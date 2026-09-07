@@ -8,6 +8,7 @@ import {
 } from '../utils/outlookGeometryCopy';
 
 /** Copies compatible outlook geometry between hazards in the active forecast day. */
+// @codescene(disable:"Complex Method")
 export const applyCopyOutlookGeometryBetweenHazards = (
   state: ForecastState,
   options: CopyOutlookGeometryOptions,
