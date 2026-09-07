@@ -17,6 +17,20 @@ import { CUSTOM_PRODUCT_LIMITS, type OneOffCustomLayer } from '../../types/custo
 import CustomProductsWorkspace from '../../pages/gated/CustomProductsWorkspace';
 import './CustomProductsDialog.css';
 
+/** Renders the saved-products dialog heading and supporting copy. */
+const CustomProductsDialogHeader = () => (
+  <DialogHeader className="custom-products-dialog-header">
+    <div className="custom-products-dialog-header__identity">
+      <span className="custom-products-dialog-header__icon" aria-hidden="true"><LibraryBig /></span>
+      <div>
+        <span className="custom-products-dialog-header__eyebrow">Custom library</span>
+        <DialogTitle>Saved products</DialogTitle>
+      </div>
+    </div>
+    <DialogDescription>Use the free Rainfall and Tropical AOI products, or apply a personal reusable category set without leaving your workspace.</DialogDescription>
+  </DialogHeader>
+);
+
 /** Keeps reusable custom products in the forecast workspace rather than navigating away from in-progress work. */
 const CustomProductsDialog = () => {
   const dispatch = useDispatch();
@@ -24,6 +38,7 @@ const CustomProductsDialog = () => {
   const layerCount = useSelector((state: RootState) => state.forecast.forecastCycle.days[state.forecast.forecastCycle.currentDay]?.customLayers?.layers.length ?? 0);
   if (!isFeatureExposed('customProducts')) return null;
 
+  /** Adds a saved product to the active forecast and closes the dialog. */
   const useProduct = (layer: OneOffCustomLayer) => {
     if (layerCount >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) return false;
     dispatch(addCustomLayer(layer));
@@ -40,16 +55,7 @@ const CustomProductsDialog = () => {
         </Button>
       </DialogTrigger>
       <DialogContent className="custom-products-dialog-content">
-        <DialogHeader className="custom-products-dialog-header">
-          <div className="custom-products-dialog-header__identity">
-            <span className="custom-products-dialog-header__icon" aria-hidden="true"><LibraryBig /></span>
-            <div>
-              <span className="custom-products-dialog-header__eyebrow">Custom library</span>
-              <DialogTitle>Saved products</DialogTitle>
-            </div>
-          </div>
-          <DialogDescription>Use the free Rainfall and Tropical AOI products, or apply a personal reusable category set without leaving your workspace.</DialogDescription>
-        </DialogHeader>
+        <CustomProductsDialogHeader />
         <CustomProductsWorkspace embedded onProductUse={useProduct} />
       </DialogContent>
     </Dialog>
