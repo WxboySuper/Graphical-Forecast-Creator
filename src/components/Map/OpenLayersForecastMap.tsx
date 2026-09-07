@@ -23,7 +23,6 @@ import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { Redo2, Undo2 } from "lucide-react";
-import { captureMessage } from "@sentry/react";
 import {
   removeFeature,
   removeCustomFeature,
@@ -69,9 +68,7 @@ import {
 } from "./openLayersBlankBasemap";
 import {
   getForecastSourceDescriptorPlan,
-  reconcileFeatureSource,
   type FeatureSyncDescriptor,
-  type FeatureSyncStats,
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { isFeatureExposed } from "../../config/featureExposure";
@@ -83,6 +80,12 @@ import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precision
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
 import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
+import {
+  applyForecastFeatureMetadata,
+  applyCustomFeatureMetadata,
+  createFeatureApplier,
+  reconcileForecastSource,
+} from "./openLayersForecastReconciliation";
 import {
   syncMapViewFromOpenLayers,
   syncOpenLayersViewFromState,
@@ -906,19 +909,20 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               dataProjection: "EPSG:4326",
               featureProjection: "EPSG:3857",
             }),
-            apply: (item: OLFeature<Geometry>) => {
-              item.setStyle(
+              apply: createFeatureApplier(
                 toOlStyle(
                   { outlookType, probability },
                   { isTopLayer, outlookOpacity },
                 ),
-              );
-              item.set("featureId", stableId);
-              item.set("outlookType", outlookType);
-              item.set("probability", probability);
-              item.set("isSignificant", Boolean(feature.properties?.isSignificant));
-              item.set("derivedFrom", feature.properties?.derivedFrom);
-            },
+                applyForecastFeatureMetadata,
+                {
+                  featureId: stableId,
+                  outlookType,
+                  probability,
+                  isSignificant: Boolean(feature.properties?.isSignificant),
+                  derivedFrom: feature.properties?.derivedFrom,
+                },
+              ),
             targetSource,
           };
         },
@@ -951,20 +955,21 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 dataProjection: "EPSG:4326",
                 featureProjection: "EPSG:3857",
               }),
-              apply: (item: OLFeature<Geometry>) => {
-                item.setStyle(
-                  toCustomOlStyle(
-                    category,
-                    zIndex === highestCustomZIndex,
-                    zIndex,
-                  ),
-                );
-                item.set("featureId", stableId);
-                item.set("customLayerId", layer.id);
-                item.set("customLayerTitle", layer.label);
-                item.set("categoryId", category.id);
-                item.set("title", category.label);
-              },
+              apply: createFeatureApplier(
+                toCustomOlStyle(
+                  category,
+                  zIndex === highestCustomZIndex,
+                  zIndex,
+                ),
+                applyCustomFeatureMetadata,
+                {
+                  featureId: stableId,
+                  customLayerId: layer.id,
+                  customLayerTitle: layer.label,
+                  categoryId: category.id,
+                  title: category.label,
+                },
+              ),
               targetSource: source,
             };
           })
@@ -1001,16 +1006,17 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 dataProjection: "EPSG:4326",
                 featureProjection: "EPSG:3857",
               }),
-              apply: (item: OLFeature<Geometry>) => {
-                item.setStyle(
-                  toGhostOlStyle({ outlookType, probability, isCategorical }),
-                );
-                item.set("featureId", stableId);
-                item.set("outlookType", outlookType);
-                item.set("probability", probability);
-                item.set("isSignificant", Boolean(feature.properties?.isSignificant));
-                item.set("derivedFrom", feature.properties?.derivedFrom);
-              },
+              apply: createFeatureApplier(
+                toGhostOlStyle({ outlookType, probability, isCategorical }),
+                applyForecastFeatureMetadata,
+                {
+                  featureId: stableId,
+                  outlookType,
+                  probability,
+                  isSignificant: Boolean(feature.properties?.isSignificant),
+                  derivedFrom: feature.properties?.derivedFrom,
+                },
+              ),
               targetSource: ghostSource,
             });
           });
@@ -1024,32 +1030,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         source,
         categoricalSource: catSource,
       });
-    /** Reconciles one OpenLayers source with the current Redux feature descriptors. */
-    const reconcileSource = (
-        targetSource: VectorSource,
-        descriptors: FeatureSyncDescriptor[],
-        sourceName: string,
-      ): void => {
-        const stats: FeatureSyncStats = {
-          parsed: 0,
-          added: 0,
-          updated: 0,
-          removed: 0,
-          reused: 0,
-          skipped: 0,
-        };
-        reconcileFeatureSource(targetSource, descriptors, stats);
-        if (stats.skipped > 0) {
-          captureMessage("Forecast map skipped invalid geometry", {
-            level: "warning",
-            tags: { source: sourceName, reason: "invalid-geometry" },
-          });
-        }
-      };
-
-      reconcileSource(source, sourceDescriptorPlan.source, "forecast");
-      reconcileSource(catSource, sourceDescriptorPlan.categorical, "categorical");
-      reconcileSource(ghostSource, ghostDescriptors, "ghost");
+      reconcileForecastSource(source, sourceDescriptorPlan.source, "forecast");
+      reconcileForecastSource(catSource, sourceDescriptorPlan.categorical, "categorical");
+      reconcileForecastSource(ghostSource, ghostDescriptors, "ghost");
     }, [
       serializedFeatures,
       outlookOpacity,
