@@ -48,6 +48,7 @@ const ARCHIVE_HEADER_ALIASES: Readonly<Record<string, string>> = {
   remarks: 'Remarks',
 };
 
+/** Parses one normalized storm-report CSV row using the supplied column mapping. */
 const parseStormReportRow = (
   line: string,
   type: ReportType,

@@ -42,6 +42,7 @@ const roundTo = (value: number, digits = 3): number => {
 const reportsForProduct = (product: ProductKind, reports: StormReport[]): StormReport[] =>
   reports.filter((report) => report.type === product);
 
+/** Converts DAT damage points into reports for the tornado product. */
 const datReportsForProduct = (
   product: ProductKind,
   datDamagePoints: DatDamagePoint[],
@@ -55,6 +56,7 @@ const datReportsForProduct = (
     .filter((report): report is StormReport => Boolean(report));
 };
 
+/** Adds the SPC/DAT source breakdown to an applicable score. */
 const withDatSourceDetail = (
   scored: ComponentScore,
   sigReports: StormReport[],
