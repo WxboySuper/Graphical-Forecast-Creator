@@ -34,6 +34,7 @@ export const createForecastDeleteInteraction = ({
     const selected = event.selected[0] as OLFeature<Geometry> | undefined;
     if (!selected) return;
 
+    /** Clears the transient OpenLayers selection after a delete decision. */
     const clearSelection = () => select.getFeatures().clear();
     const outlookType = selected.get("outlookType") as string | undefined;
     const derivedFrom = selected.get("derivedFrom") as string | undefined;
