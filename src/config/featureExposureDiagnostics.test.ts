@@ -12,8 +12,7 @@ const SERVER_BACKED_AUTO_TSTM = {
   exposure: { local: true, beta: true, staging: true, production: true },
   owner: 'WxboySuper',
   addedDate: '2026-06-20',
-  temporary: true,
-  removalCondition: 'Remove after the v1.7 production rollout completes.',
+  temporary: false,
   serverBacked: true as const,
   serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
   trackingIssue: 427,
@@ -210,7 +209,7 @@ describe('featureExposureDiagnostics', () => {
 
     expect(withMetadata.owner).toBe('WxboySuper');
     expect(withMetadata.trackingIssue).toBe(427);
-    expect(withMetadata.removalCondition).toMatch(/Auto-TSTM/);
+    expect(withMetadata.removalCondition).toBeUndefined();
     expect(withoutMetadata.owner).toBeUndefined();
     expect(withoutMetadata.trackingIssue).toBeUndefined();
     expect(withoutMetadata.removalCondition).toBeUndefined();
