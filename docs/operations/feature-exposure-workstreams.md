@@ -28,7 +28,7 @@ Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM,
 
 ### Auto-TSTM (`autoTstm`, #427)
 
-- **Registry:** `temporary: true`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
+- **Registry:** `temporary: false`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
 - **Gates:** `FEATURE_SIDE_EFFECT_MODULES.autoTstm`, `ServerBackedFeatureBoundary`, `server/tstm.js` capability gate
 - **Tests:** `src/testing/featureExposure/exemplar.exposure.test.tsx`, `server/testing/autoTstm.exposure.test.js`
 - **Ops:** [auto-tstm-operations.md](./auto-tstm-operations.md)
