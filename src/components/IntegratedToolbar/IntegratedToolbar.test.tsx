@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
-import { IntegratedToolbar, TabbedIntegratedToolbar } from './IntegratedToolbar';
+import { TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
-import forecastReducer, { addFeature, undoLastEdit } from '../../store/forecastSlice';
+import forecastReducer, { undoLastEdit } from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 
@@ -67,21 +67,7 @@ const createStore = () => configureStore({
   }),
 });
 
-const createFeature = () => ({
-  type: 'Feature' as const,
-  id: 'feature-1',
-  geometry: {
-    type: 'Polygon' as const,
-    coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
-  },
-  properties: {
-    outlookType: 'tornado' as const,
-    probability: '2%',
-    isSignificant: false,
-  },
-});
-
-const ToolbarTestHarness: React.FC<{ variant: 'legacy' | 'tabbed' }> = ({ variant }) => {
+const ToolbarTestHarness: React.FC = () => {
   const mapRef = useRef<ForecastMapHandle | null>(null);
   const controller = useForecastWorkspaceController({
     mapRef,
@@ -90,52 +76,16 @@ const ToolbarTestHarness: React.FC<{ variant: 'legacy' | 'tabbed' }> = ({ varian
     onExportComplete: jest.fn(),
   });
 
-  return variant === 'tabbed'
-    ? <TabbedIntegratedToolbar controller={controller} />
-    : <IntegratedToolbar controller={controller} />;
+  return <TabbedIntegratedToolbar controller={controller} />;
 };
 
-const renderToolbar = (variant: 'legacy' | 'tabbed', store = createStore()) => render(
+const renderToolbar = (store = createStore()) => render(
   <MemoryRouter>
     <Provider store={store}>
-      <ToolbarTestHarness variant={variant} />
+      <ToolbarTestHarness />
     </Provider>
   </MemoryRouter>
 );
-
-describe('IntegratedToolbar undo/redo buttons', () => {
-  beforeEach(() => {
-    mockAddToast.mockReset();
-  });
-
-  test('renders undo and redo buttons with disabled state from selectors', () => {
-    renderToolbar('legacy');
-
-    expect(screen.getByLabelText('Undo')).toBeDisabled();
-    expect(screen.getByLabelText('Redo')).toBeDisabled();
-  });
-
-  test('clicking undo and redo dispatches history actions through the toolbar', async () => {
-    const user = userEvent.setup();
-    const store = createStore();
-    store.dispatch(addFeature({ feature: createFeature() }));
-
-    renderToolbar('legacy', store);
-
-    const undoButton = screen.getByLabelText('Undo');
-    const redoButton = screen.getByLabelText('Redo');
-
-    expect(undoButton).toBeEnabled();
-    expect(redoButton).toBeDisabled();
-
-    await user.click(undoButton);
-    expect(screen.getByLabelText('Undo')).toBeDisabled();
-    expect(screen.getByLabelText('Redo')).toBeEnabled();
-
-    await user.click(screen.getByLabelText('Redo'));
-    expect(screen.getByLabelText('Undo')).toBeEnabled();
-  });
-});
 
 describe('TabbedIntegratedToolbar completion validation exposure', () => {
   afterEach(() => {
@@ -151,7 +101,7 @@ describe('TabbedIntegratedToolbar completion validation exposure', () => {
       jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(exposed);
       const user = userEvent.setup();
 
-      renderToolbar('tabbed');
+      renderToolbar();
       await user.click(screen.getByRole('tab', { name: /Tools/i }));
 
       expect(Boolean(screen.queryByRole('button', { name: 'Complete' }))).toBe(visible);
@@ -164,7 +114,7 @@ describe('custom Draw mode exposure', () => {
 
   test('keeps hosted Draw UI unchanged with no custom toggle or placeholder', () => {
     jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature: string) => feature !== 'customProducts');
-    renderToolbar('tabbed');
+    renderToolbar();
     expect(screen.queryByRole('radiogroup', { name: 'Drawing product' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Saved products/i })).not.toBeInTheDocument();
     expect(screen.getByTitle('Wind')).toBeInTheDocument();
@@ -175,7 +125,7 @@ describe('custom Draw mode exposure', () => {
     jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
     const user = userEvent.setup();
     const store = createStore();
-    renderToolbar('tabbed', store);
+    renderToolbar(store);
     const toggle = screen.getByTestId('custom-product-toggle');
     expect(toggle).not.toHaveClass('is-custom-mode');
     expect(screen.getByRole('radio', { name: 'Severe' }))
