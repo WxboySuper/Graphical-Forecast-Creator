@@ -3,7 +3,6 @@ import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
-import type { Feature } from 'geojson';
 import type { CustomLayerCollection } from '../types/customProducts';
 import type { RootState } from './index'; // Need RootState for selectors
 export {
@@ -64,6 +63,7 @@ import {
   canSetLowProbabilityState,
   invalidateCompletionAcknowledgement,
 } from './forecastProbabilityState';
+import { createForecastFeatureUpdateHelpers } from './forecastFeatureUpdates';
 import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import type { LandMaskFeature, LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import {
@@ -333,76 +333,11 @@ const initialState: ForecastState = {
   lastTrimResult: null,
 };
 
-// Helper to get current outlook data safely
-const getCurrentOutlook = (state: ForecastState, dayNumber = state.forecastCycle.currentDay): OutlookData => {
-  const day = state.forecastCycle.days[dayNumber];
-  if (!day) {
-    // Should not happen if logic is correct, but safe fallback
-    return createEmptyOutlook(dayNumber, INITIAL_TIMESTAMP).data;
-  }
-  return day.data;
-};
-
-interface PendingFeatureUpdate {
-  outlookType: OutlookType;
-  probability: string;
-  index: number;
-  feature: Feature;
-}
-
-/** Finds incoming features that already exist in the selected day's outlook maps. */
-const collectPendingFeatureUpdates = (
-  state: ForecastState,
-  incoming: Feature[],
-  day?: DayType,
-): PendingFeatureUpdate[] => {
-  const outlookData = getCurrentOutlook(state, day);
-
-  return incoming.flatMap((feature) => {
-    const outlookType = (feature.properties?.outlookType as OutlookType)
-      || state.drawingState.activeOutlookType;
-    const probability = (feature.properties?.probability as string)
-      || state.drawingState.activeProbability;
-    const features = outlookData[outlookType]?.get(probability);
-    if (!features) return [];
-
-    const index = features.findIndex((entry) => entry.id === feature.id);
-    return index === -1 ? [] : [{ outlookType, probability, index, feature }];
-  });
-};
-
-// @codescene(disable:"Bumpy Road Ahead")
-const applyPendingFeatureUpdates = (
-  state: ForecastState,
-  pendingUpdates: PendingFeatureUpdate[],
-  day?: DayType,
-): void => {
-  const outlookData = getCurrentOutlook(state, day);
-
-  for (const update of pendingUpdates) {
-    const features = outlookData[update.outlookType]?.get(update.probability);
-    if (!features) {
-      continue;
-    }
-
-    if (update.feature.geometry === null) {
-      features.splice(update.index, 1);
-      if (features.length === 0) {
-        outlookData[update.outlookType]?.delete(update.probability);
-      }
-      continue;
-    }
-
-    features[update.index] = {
-      ...features[update.index],
-      geometry: update.feature.geometry,
-      properties: {
-        ...features[update.index].properties,
-        ...update.feature.properties,
-      },
-    };
-  }
-};
+const {
+  getCurrentOutlook,
+  collectPendingFeatureUpdates,
+  applyPendingFeatureUpdates,
+} = createForecastFeatureUpdateHelpers(createEmptyOutlook, INITIAL_TIMESTAMP);
 
 /** Restores one direction of history using the action timestamp and empty-day factory. */
 const restoreHistoryForAction = ({
