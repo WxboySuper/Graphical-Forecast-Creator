@@ -6,8 +6,7 @@ import {
   restoreCustomProductForecastHandoff,
 } from './customProductHandoff';
 import { createHostedProduct } from './customProductsRepository';
-import type { CustomCategoryId } from '../types/customProducts';
-import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
+import { CUSTOM_PRODUCTS_SCHEMA_VERSION, type CustomCategoryId } from '../types/customProducts';
 
 const category = (id: string, order: number) => ({
   id: id as CustomCategoryId,
