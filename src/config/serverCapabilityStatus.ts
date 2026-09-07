@@ -179,7 +179,7 @@ export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnap
 };
 
 /** Schedules another shared capability status request after a failed attempt. */
-const scheduleCapabilityStatusRetry = (): void => {
+function scheduleCapabilityStatusRetry(): void {
   if (retryTimer || retryAttempts >= MAX_RETRY_ATTEMPTS) {
     return;
   }
@@ -190,7 +190,7 @@ const scheduleCapabilityStatusRetry = (): void => {
       loadSharedServerCapabilityStatus();
     }
   }, RETRY_DELAY_MS);
-};
+}
 
 /** Returns whether a capability is currently treated as unavailable on the client. */
 export const isServerCapabilityAvailable = (
