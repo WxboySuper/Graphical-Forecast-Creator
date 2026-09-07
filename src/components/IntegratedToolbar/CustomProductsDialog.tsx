@@ -13,8 +13,7 @@ import {
 import { isFeatureExposed } from '../../config/featureExposure';
 import { addCustomLayer, selectCustomLayer } from '../../store/forecastSlice';
 import type { RootState } from '../../store';
-import type { OneOffCustomLayer } from '../../types/customProducts';
-import { CUSTOM_PRODUCT_LIMITS } from '../../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS, type OneOffCustomLayer } from '../../types/customProducts';
 import CustomProductsWorkspace from '../../pages/gated/CustomProductsWorkspace';
 import './CustomProductsDialog.css';
 
