@@ -487,13 +487,13 @@ export const forecastSlice = createSlice({
     }>) => {
       clearHistory(state);
       const { sourceCycle, sourceDay, targetDay } = action.payload;
-      applyCopyFeaturesFromPrevious(
+      applyCopyFeaturesFromPrevious({
         state,
         sourceCycle,
         sourceDay,
         targetDay,
-        readActionTimestamp(action),
-      );
+        timestamp: readActionTimestamp(action),
+      });
     },
 
     // Load cycles from storage (for hydration)
