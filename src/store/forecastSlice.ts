@@ -1461,14 +1461,6 @@ export const {
   setWorkflowActive,
 } = forecastSlice.actions;
 
-/** Selects the full forecast slice. */
-export const selectForecast = (state: RootState) => state.forecast;
-/** Selects the active forecast cycle document. */
-export const selectForecastCycle = (state: RootState) => state.forecast.forecastCycle;
-/** Selects the currently active forecast day number. */
-export const selectCurrentDay = (state: RootState) => state.forecast.forecastCycle.currentDay;
-/** Selects one day's unsaved discussion draft, if the editor has changed it. */
-export const selectDiscussionDraftForScope = (state: RootState, scopeId: string) => state.forecast.discussionDraftsByScope[scopeId];
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
