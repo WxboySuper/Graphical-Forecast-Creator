@@ -33,10 +33,3 @@ export const clipOutlookToLandMask = (
     strategy,
   };
 };
-
-/**
- * Prototype B — preview-only path: same math as clipOutlookToLandMask but documented
- * as a non-persisted render/export preview helper. Callers should not dispatch Redux
- * updates when using this for `render-only` experiments.
- */
-export const previewClipOutlookToLandMask = clipOutlookToLandMask;
