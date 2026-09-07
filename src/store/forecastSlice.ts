@@ -60,6 +60,7 @@ import {
 import { getSavedCycleWorkspaceId } from './forecastSliceSelectors';
 import { applyCreateOutlookUpdate } from './forecastVersioning';
 import { applyDiscussionDraftMigrations } from './forecastDiscussionDrafts';
+import { applyLegacyForecastImport } from './forecastLegacyImport';
 
 const HISTORY_LIMIT = 50;
 
@@ -695,36 +696,8 @@ export const forecastSlice = createSlice({
     // Legacy import support (Single day) -> Import into CURRENT day
     importForecasts: (state, action: PayloadAction<OutlookData>) => {
       clearHistory(state);
-      const currentDay = state.forecastCycle.currentDay;
-      const dayData = state.forecastCycle.days[currentDay];
-      if (dayData) {
-        // Preserve existing TSTM features if categorical exists
-        const existingTstm = dayData.data.categorical?.get('TSTM') || [];
-
-        // Replace current day data with imported data
-        dayData.data = action.payload;
-
-        // Merge TSTM features if categorical map exists
-        if (dayData.data.categorical) {
-          const importedTstm = dayData.data.categorical.get('TSTM') || [];
-          const mergedTstm = [...existingTstm, ...importedTstm];
-          if (mergedTstm.length > 0) {
-            dayData.data.categorical.set('TSTM', mergedTstm);
-          }
-        }
-
-        // Reset low probability flags for types that now have data
-        if (dayData.metadata.lowProbabilityOutlooks) {
-          dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
-            t => !(dayData.data[t] && dayData.data[t].size > 0)
-          );
-        }
-
-        // Update metadata
-        dayData.metadata.lastModified = readActionTimestamp(action);
-      }
+      applyLegacyForecastImport(state, action.payload, readActionTimestamp(action));
       advanceCycleGeneration(state);
-      state.isSaved = true;
     },
 
     // Update an unsaved discussion draft without coupling it to the mounted page.
