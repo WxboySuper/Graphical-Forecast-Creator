@@ -55,7 +55,6 @@
   },
   "scripts": {
     "dev": "vite",
-    "start": "vite",
     "build": "vite build",
     "prebuild": "pnpm run css:build",
     "css:build": "tailwindcss -c tailwind.compat.config.js -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --minify",
