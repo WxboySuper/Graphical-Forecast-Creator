@@ -1,5 +1,4 @@
-import { useCallback } from 'react';
-import type { MutableRefObject } from 'react';
+import { useCallback, type MutableRefObject } from 'react';
 import type { Dispatch } from '@reduxjs/toolkit';
 import type { DayType, ForecastCycle } from '../types/outlooks';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';

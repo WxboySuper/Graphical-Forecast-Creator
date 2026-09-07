@@ -1,5 +1,4 @@
-import type { BuildTarget } from './buildTarget';
-import { getBuildTarget } from './buildTarget';
+import { getBuildTarget, type BuildTarget } from './buildTarget';
 import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
 
 export type AppNavigationItem = {

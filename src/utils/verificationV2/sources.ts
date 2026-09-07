@@ -14,8 +14,7 @@ import {
 import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../stormReportParser';
 import { isTodayReportDate, isYesterdayReportDate, toArchiveDate } from './archiveDate';
 import type { PackageGrade, ProductKind } from './gradeContract';
-import { queryDatEvidenceForDate } from '../dat';
-import type { DatEvidence } from '../dat';
+import { queryDatEvidenceForDate, type DatEvidence } from '../dat';
 
 export {
   getCurrentSpcReportDate,
@@ -55,11 +54,13 @@ export const tierHasHistory = (tier: GradeAccountTier): boolean => tier !== 'sig
 /** True when the tier stores restorable full snapshots. */
 export const tierHasSnapshots = (tier: GradeAccountTier): boolean => tier === 'premium';
 
+/** Represents a user-facing failure while loading a verification source. */
 export class SourceLoadError extends Error {}
 
 /** Maximum time the optional DAT source may hold a grading run open. */
 export const DAT_EVIDENCE_TIMEOUT_MS = 15_000;
 
+/** Converts a DAT request failure into the source-specific error type. */
 const toDatLoadError = (error: unknown, signal?: AbortSignal): SourceLoadError => {
   if (signal?.aborted) {
     return new SourceLoadError('NOAA DAT surveys timed out or were cancelled.');
@@ -118,6 +119,7 @@ export const loadForecastFromCloud = async (
   return deserializeCycle(result.data.payload, 'That cloud cycle could not be parsed.');
 };
 
+/** Resolves a valid report date to the SPC archive date format. */
 const resolveArchiveDate = (reportDate: string): string => {
   const archiveDate = toArchiveDate(reportDate);
   if (!archiveDate) {
@@ -173,6 +175,7 @@ export const loadReportsForDate = async (
   }
 };
 
+/** Computes the UTC day range used for a DAT evidence request. */
 const datDateRangeFor = (reportDate: string | null): { start: number; end: number } => {
   const date = reportDate ?? new Date().toISOString().slice(0, 10);
   const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -199,6 +202,7 @@ export const loadDatEvidenceForDate = async (
   }
 };
 
+/** Creates an identifier for a generated verification package. */
 const newId = (): string => {
   try {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {

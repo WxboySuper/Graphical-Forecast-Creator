@@ -1,6 +1,5 @@
 import type { Feature, Geometry } from 'geojson';
-import type { ImportValidationResult } from './forecastValidationTypes';
-import { MAX_ARRAY_ITEMS, fail } from './forecastValidationTypes';
+import { MAX_ARRAY_ITEMS, fail, type ImportValidationResult } from './forecastValidationTypes';
 
 /** Maximum coordinate positions per geometry. */
 export const MAX_COORDINATE_POSITIONS = 500_000;
@@ -56,7 +55,7 @@ const countCoordinatePositions = (geometry: Geometry, limit: number): { count: n
 };
 
 /** Validates the child geometries of a GeometryCollection. */
-const validateGeometryCollection = (geometries: unknown): ImportValidationResult | null => {
+function validateGeometryCollection(geometries: unknown): ImportValidationResult | null {
   if (!Array.isArray(geometries) || geometries.length > MAX_ARRAY_ITEMS) {
     return fail('Forecast geometry collection is invalid or too large.');
   }
@@ -65,7 +64,7 @@ const validateGeometryCollection = (geometries: unknown): ImportValidationResult
     if (childResult) return childResult;
   }
   return null;
-};
+}
 
 /** Validates a non-collection geometry's coordinates and size. */
 const validateGeometryCoordinates = (geometry: { type?: unknown; coordinates?: unknown }): ImportValidationResult | null => {
@@ -84,7 +83,7 @@ const validateGeometryCoordinates = (geometry: { type?: unknown; coordinates?: u
 
 /** Validates one GeoJSON geometry object against supported types and coordinate bounds. */
 // @codescene(disable:"Complex Conditional")
-export const validateGeometry = (value: unknown): ImportValidationResult | null => {
+export function validateGeometry(value: unknown): ImportValidationResult | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return fail('Forecast geometry is not a valid object.');
   }
@@ -99,7 +98,7 @@ export const validateGeometry = (value: unknown): ImportValidationResult | null 
   }
 
   return validateGeometryCoordinates(geometry);
-};
+}
 
 /** Validates one serialized outlook feature and its geometry. */
 // @codescene(disable:"Complex Method", disable:"Complex Conditional")

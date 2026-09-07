@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type { HostedCustomProduct } from '../types/customProducts';
 import type { CustomProductsRepository } from '../lib/customProductsRepository';
 
