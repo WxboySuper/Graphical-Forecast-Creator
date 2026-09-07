@@ -1,6 +1,5 @@
 import type { StormReport } from '../../types/stormReports';
-import type { DatDamagePoint } from '../dat';
-import { datDamagePointToStormReport, isTornadoDamagePoint } from '../dat';
+import { datDamagePointToStormReport, isTornadoDamagePoint, type DatDamagePoint } from '../dat';
 import {
   SEVERITY_SIG_DRAWN_NONE_OBSERVED,
   SEVERITY_SIG_HIT,
