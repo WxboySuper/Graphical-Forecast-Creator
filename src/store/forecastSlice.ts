@@ -39,9 +39,6 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import {
-  cloneIntegratedCustomLayers,
-} from './forecastSnapshotHelpers';
-import {
   buildFeatureWithProps,
   computeOutlookType,
   computeProbability,
@@ -53,10 +50,7 @@ import {
   restoreHistoryEntry,
   type ForecastHistoryStacks,
 } from './forecastHistory';
-import {
-  applyRolloverFromPreviousCycle,
-  copyCompatibleOutlooks,
-} from './forecastRollover';
+import { applyRolloverFromPreviousCycle } from './forecastRollover';
 import {
   applyLowProbabilityState,
   canSetLowProbabilityState,
@@ -75,7 +69,6 @@ import {
   type CopyOutlookGeometryOptions,
 } from '../utils/outlookGeometryCopy';
 import {
-  clearOutlookMaps,
   createEmptyOutlook,
   getFallbackOutlookData,
   INITIAL_TIMESTAMP,
@@ -85,6 +78,7 @@ import { createInitialForecastState } from './forecastInitialState';
 import { applyCreateOutlookUpdate } from './forecastVersioning';
 import { applyDiscussionDraftMigrations } from './forecastDiscussionDrafts';
 import { applyLegacyForecastImport } from './forecastLegacyImport';
+import { applyCopyFeaturesFromPrevious } from './forecastCopy';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -493,31 +487,13 @@ export const forecastSlice = createSlice({
     }>) => {
       clearHistory(state);
       const { sourceCycle, sourceDay, targetDay } = action.payload;
-
-      const sourceDayData = sourceCycle.days[sourceDay];
-      if (!sourceDayData) {
-        return;
-      }
-
-      // Ensure target day exists
-      if (!state.forecastCycle.days[targetDay]) {
-        state.forecastCycle.days[targetDay] = createEmptyOutlook(targetDay, readActionTimestamp(action));
-      }
-
-      const targetDayData = state.forecastCycle.days[targetDay];
-      if (!targetDayData) {
-        return;
-      }
-
-      clearOutlookMaps(targetDayData.data);
-      copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDay, targetDay);
-      // Custom layers are grouping-agnostic. Copy replaces the target
-      // collection with a detached clone, just like severe outlook data.
-      targetDayData.customLayers = cloneIntegratedCustomLayers(sourceDayData.customLayers);
-
-      targetDayData.metadata.lastModified = readActionTimestamp(action);
-      clearHistory(state);
-      state.isSaved = false;
+      applyCopyFeaturesFromPrevious(
+        state,
+        sourceCycle,
+        sourceDay,
+        targetDay,
+        readActionTimestamp(action),
+      );
     },
 
     // Load cycles from storage (for hydration)
