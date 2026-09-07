@@ -1,8 +1,7 @@
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
 import { Fill, Stroke, Style } from "ol/style";
-import type { FeatureLike } from "ol/Feature";
-import type OLFeature from "ol/Feature";
+import { type default as OLFeature, type FeatureLike } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { getGeoBoundarySource } from "../../config/geoBoundarySources";
 

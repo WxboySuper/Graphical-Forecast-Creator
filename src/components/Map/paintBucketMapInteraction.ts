@@ -9,8 +9,7 @@ import {
   resolvePaintBucketEditAction,
   type PaintBucketMode,
 } from '../../utils/paintBucket';
-import { getFeatureIdentity } from './openLayersMapStyles';
-import type { EditableOutlookType } from './openLayersMapStyles';
+import { getFeatureIdentity, type EditableOutlookType } from './openLayersMapStyles';
 import { pickTopmostPaintBucketFeature } from './pickTopmostPaintBucketFeature';
 
 interface PaintBucketClickInput {

@@ -2,7 +2,6 @@ import GeoJSON from "ol/format/GeoJSON";
 import Feature from "ol/Feature";
 import Point from "ol/geom/Point";
 import VectorSource from "ol/source/Vector";
-import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import type { Feature as GeoJsonFeature, Polygon } from "geojson";
 import {
