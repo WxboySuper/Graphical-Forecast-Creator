@@ -40,7 +40,6 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import {
-  cloneEntries,
   cloneIntegratedCustomLayers,
   cloneOutlookData,
 } from './forecastSnapshotHelpers';
@@ -56,6 +55,10 @@ import {
   restoreHistoryEntry,
   type ForecastHistoryStacks,
 } from './forecastHistory';
+import {
+  applyRolloverFromPreviousCycle,
+  copyCompatibleOutlooks,
+} from './forecastRollover';
 import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import type { LandMaskFeature, LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import {
@@ -144,13 +147,6 @@ interface OutlookVersionSnapshot {
   createdAt: string;
 }
 
-type DayBucket = 'day12' | 'day3' | 'day48';
-
-interface CopyFeatureRule {
-  sourceType: OutlookType;
-  targetType: OutlookType;
-}
-
 export const SAVED_CYCLES_LIMIT = 50;
 /** Storage key for the workflow-active flag; persisted by the store subscription, not by reducers. */
 export const WORKFLOW_ACTIVE_STORAGE_KEY = 'gfc-active-forecast-workflow';
@@ -166,8 +162,6 @@ const ALL_OUTLOOK_TYPES: OutlookType[] = [
   'totalSevere',
   'day4-8',
 ];
-const DIRECT_DAY12_COPY_TYPES: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical'];
-
 /** Resolves the local calendar date from an action's stamped timestamp instead of the clock. */
 const getActionLocalCalendarDate = (action: UnknownAction): string =>
   getLocalCalendarDate(new Date(readActionTimestamp(action)));
@@ -202,62 +196,6 @@ const getWorkflowValidationGroupings = (template?: WorkflowMetadata): StandardGr
       grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
   );
   return standardGroupings.length > 0 ? standardGroupings : undefined;
-};
-
-/** Resolves the workflow ID from template or cycle metadata, falling back to 'default'. */
-const resolveWorkflowId = (
-  template?: WorkflowMetadata,
-  cycleMetadata?: CycleMetadata,
-): string => template?.id || cycleMetadata?.workflowId || 'default';
-
-/** Creates initial CycleMetadata for a new cycle. */
-const createInitialCycleMetadata = (
-  workflowId: string,
-  cycleDate: string,
-  now: string,
-): CycleMetadata => ({
-  id: `WF-${workflowId}-${cycleDate}`,
-  workflowId,
-  cycleDate,
-  status: 'in-progress',
-  outlookVersions: [{
-    version: 1,
-    status: 'in-progress',
-    createdAt: now,
-  }],
-  createdAt: now,
-  updatedAt: now,
-});
-const COPY_FEATURE_RULES: Record<DayBucket, Record<DayBucket, CopyFeatureRule[]>> = {
-  day12: {
-    day12: DIRECT_DAY12_COPY_TYPES.map((type) => ({ sourceType: type, targetType: type })),
-    day3: [{ sourceType: 'categorical', targetType: 'categorical' }],
-    day48: [],
-  },
-  day3: {
-    day12: [{ sourceType: 'categorical', targetType: 'categorical' }],
-    day3: [
-      { sourceType: 'totalSevere', targetType: 'totalSevere' },
-      { sourceType: 'categorical', targetType: 'categorical' },
-    ],
-    day48: [],
-  },
-  day48: {
-    day12: [],
-    day3: [{ sourceType: 'day4-8', targetType: 'totalSevere' }],
-    day48: [{ sourceType: 'day4-8', targetType: 'day4-8' }],
-  },
-};
-
-/** Collapses the eight forecast days into the three compatibility groups used for copying. */
-const getDayBucket = (day: DayType): DayBucket => {
-  if (day === 1 || day === 2) {
-    return 'day12';
-  }
-  if (day === 3) {
-    return 'day3';
-  }
-  return 'day48';
 };
 
 /** Clears every supported outlook map on a target day before incoming copy operations. */
@@ -461,23 +399,6 @@ const applyPendingFeatureUpdates = (
   }
 };
 
-/** Copies only the outlook types allowed by the source/target day compatibility rules. */
-const copyCompatibleOutlooks = (
-  sourceData: OutlookData,
-  targetData: OutlookData,
-  sourceDay: DayType,
-  targetDay: DayType
-) => {
-  const copyRules = COPY_FEATURE_RULES[getDayBucket(sourceDay)][getDayBucket(targetDay)];
-
-  copyRules.forEach(({ sourceType, targetType }) => {
-    const clonedMap = cloneEntries(sourceData[sourceType]);
-    if (clonedMap) {
-      targetData[targetType] = clonedMap;
-    }
-  });
-};
-
 /** Clears stale package completion when forecast package content changes. */
 const invalidateCompletionAcknowledgement = (state: ForecastState) => {
   if (state.forecastCycle.completionAcknowledgedAt || state.forecastCycle.omittedDayReasons) {
@@ -485,68 +406,6 @@ const invalidateCompletionAcknowledgement = (state: ForecastState) => {
     delete state.forecastCycle.omittedDayReasons;
   }
   state.completionValidation.lastResult = null;
-};
-
-interface ApplyRolloverArgs {
-  sourceCycle: ForecastState['savedCycles'][number];
-  sourceDayData: NonNullable<ReturnType<typeof normalizeForecastCycle>['days'][DayType]>;
-  sourceDayNumber: DayType;
-  targetDay: DayType;
-  targetDate: string;
-  workflowTemplate?: WorkflowMetadata;
-}
-
-/** Builds the fresh rollover cycle and copies the requested day into it. */
-const buildRolloverCycle = ({
-  sourceDayData,
-  sourceDayNumber,
-  targetDay,
-  targetDate,
-  now,
-}: Omit<ApplyRolloverArgs, 'sourceCycle' | 'workflowTemplate'> & { now: string }): ForecastCycle => {
-  const newCycle: ForecastCycle = {
-    days: { [targetDay]: createEmptyOutlook(targetDay, now) },
-    currentDay: targetDay,
-    cycleDate: targetDate,
-  };
-  const targetDayData = newCycle.days[targetDay];
-  if (targetDayData) {
-    copyCompatibleOutlooks(sourceDayData.data, targetDayData.data, sourceDayNumber, targetDay);
-    targetDayData.customLayers = cloneIntegratedCustomLayers(sourceDayData.customLayers);
-  }
-  return newCycle;
-};
-
-/**
- * Attaches workflow metadata to the rollover only when a template was passed
- * or the source cycle was already a workflow cycle. Plain rollovers stay plain.
- */
-const applyRolloverWorkflowState = (
-  state: ForecastState,
-  { sourceCycle, targetDate, workflowTemplate }: Pick<ApplyRolloverArgs, 'sourceCycle' | 'targetDate' | 'workflowTemplate'>,
-  now: string
-) => {
-  const sourceHadWorkflow = Boolean(sourceCycle.workflowMetadata);
-  if (workflowTemplate || sourceHadWorkflow) {
-    const workflowId = resolveWorkflowId(workflowTemplate, sourceCycle.workflowMetadata);
-    state.workflowMetadata = createInitialCycleMetadata(workflowId, targetDate, now);
-    state.isWorkflowActive = true;
-    state.workflowTemplate = workflowTemplate || getWorkflowTemplateById(workflowId) || undefined;
-    return;
-  }
-  state.workflowMetadata = undefined;
-  state.isWorkflowActive = false;
-  state.workflowTemplate = undefined;
-};
-
-/** Resets the in-memory cycle to a fresh rollover derived from the requested source. */
-const applyRolloverFromPreviousCycle = (state: ForecastState, args: ApplyRolloverArgs, now: string) => {
-  clearHistory(state);
-  state.discussionDraftsByScope = {};
-  state.forecastCycle = buildRolloverCycle({ ...args, now });
-  state.isSaved = false;
-  state.outlookVersionSnapshots = [];
-  applyRolloverWorkflowState(state, args, now);
 };
 
 /** Ensures low-probability metadata exists before mutating it in reducers. */
@@ -1315,7 +1174,7 @@ export const forecastSlice = createSlice({
         targetDay,
         targetDate: newCycleDate || getActionLocalCalendarDate(action),
         workflowTemplate,
-      }, readActionTimestamp(action));
+      }, readActionTimestamp(action), createEmptyOutlook);
     },
 
     /** Sets the editor-visible auto-categorical derivation error (null clears it). */
