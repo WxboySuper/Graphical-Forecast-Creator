@@ -49,6 +49,7 @@ interface PageContext {
   addToast: AddToastFn;
 }
 
+/** Builds attribution text for the reference layers shown on the monitor page. */
 export const buildMonitorReferenceAttributions = ({
   enabled,
   meta,
@@ -96,6 +97,7 @@ const resolveHandoffSource = (
   return undefined;
 };
 
+/** Loads and selects the forecast sources used by the monitor page. */
 const useMonitorPageSources = ({
   dispatch,
   searchParams,
@@ -149,6 +151,7 @@ const useMonitorPageSources = ({
   };
 };
 
+/** Connects monitor settings to live radar, satellite, and reference layers. */
 const useMonitorPageLayers = ({ settings, addToast }: {
   settings: MonitorSettings;
   addToast: AddToastFn;
@@ -226,6 +229,7 @@ interface MonitorPageWorkspaceProps {
   dispatch: AppDispatch;
 }
 
+/** Renders the monitor workspace after page-level data has been assembled. */
 const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
   settings,
   outlookOptions,
