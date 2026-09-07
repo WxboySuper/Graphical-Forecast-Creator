@@ -2,8 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import type { Store } from 'redux';
 import type { RootState } from '../store';
-import { loadCycleHistory } from '../store/forecastSlice';
-import type { LifetimeCycleStats, SavedCycle, SavedCycleStats } from '../store/forecastSlice';
+import { loadCycleHistory, type LifetimeCycleStats, type SavedCycle, type SavedCycleStats } from '../store/forecastSlice';
 import { deserializeForecast, serializeForecast } from './fileUtils';
 import { countForecastMetrics } from './forecastMetrics';
 import { normalizeForecastCycle } from './outlookMapCoercion';
@@ -108,16 +107,19 @@ const parseStoredCycleHistory = (serialized: string | null): SavedCycle[] => {
   }
 };
 
+/** Returns an empty history snapshot for missing or malformed storage. */
 const emptyCycleHistorySnapshot = (): CycleHistorySnapshot => ({
   cycles: [],
   lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
 });
 
+/** Converts an ISO cycle date to a UTC day index for streak calculations. */
 const getCycleDayIndex = (cycleDate: string): number => {
   const [year, month, day] = cycleDate.split('-').map(Number);
   return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
 };
 
+/** Derives the consecutive forecast-day streak from saved cycles. */
 const deriveForecastStreak = (cycles: SavedCycle[]): Pick<LifetimeCycleStats, 'forecastStreak' | 'lastSavedCycleDate'> => {
   const uniqueDates = Array.from(new Set(cycles.map((cycle) => cycle.cycleDate))).sort();
   if (uniqueDates.length === 0) return {};
@@ -131,21 +133,26 @@ const deriveForecastStreak = (cycles: SavedCycle[]): Pick<LifetimeCycleStats, 'f
   return { forecastStreak, lastSavedCycleDate: uniqueDates[uniqueDates.length - 1] };
 };
 
+/** Derives aggregate lifetime statistics from saved cycles. */
 const deriveLifetimeCycleStats = (cycles: SavedCycle[]): LifetimeCycleStats => ({
   totalCyclesMade: cycles.length,
   totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
   ...deriveForecastStreak(cycles),
 });
 
+/** Checks an optional numeric persisted statistic. */
 const isOptionalNumber = (value: unknown): value is number | undefined =>
   value === undefined || typeof value === 'number';
 
+/** Checks an optional string persisted statistic. */
 const isOptionalString = (value: unknown): value is string | undefined =>
   value === undefined || typeof value === 'string';
 
+/** Returns true for plain object values read from JSON. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Object.prototype.toString.call(value) === '[object Object]';
 
+/** Validates the shape of persisted lifetime statistics. */
 const isLifetimeCycleStats = (value: unknown): value is LifetimeCycleStats => {
   if (!isRecord(value)) return false;
   return [
@@ -156,11 +163,13 @@ const isLifetimeCycleStats = (value: unknown): value is LifetimeCycleStats => {
   ].every(Boolean);
 };
 
+/** Extracts valid lifetime statistics from a parsed storage payload. */
 const getStoredLifetimeStats = (parsed: unknown) => {
   const stats = (parsed as { lifetimeCycleStats?: unknown } | null)?.lifetimeCycleStats;
   return isLifetimeCycleStats(stats) ? stats : undefined;
 };
 
+/** Combines stored statistics with values derived from the loaded cycles. */
 const readStoredLifetimeStats = (parsed: unknown, cycles: SavedCycle[]) => {
   const derived = deriveLifetimeCycleStats(cycles);
   const stored = getStoredLifetimeStats(parsed);
@@ -174,6 +183,7 @@ const readStoredLifetimeStats = (parsed: unknown, cycles: SavedCycle[]) => {
     : derived;
 };
 
+/** Parses both legacy-array and current-snapshot storage formats. */
 const parseStoredCycleHistorySnapshot = (serialized: string | null): CycleHistorySnapshot => {
   if (!serialized) return emptyCycleHistorySnapshot();
 
@@ -256,6 +266,7 @@ export const loadCycleHistoryFromStorage = (userId?: string | null): SavedCycle[
   return loadCycleHistorySnapshotFromStorage(userId).cycles;
 };
 
+/** Loads a scoped history snapshot and performs the legacy-scope migration when needed. */
 export const loadCycleHistorySnapshotFromStorage = (userId?: string | null): CycleHistorySnapshot => {
   try {
     const scopedKey = getCycleHistoryStorageKey(userId);

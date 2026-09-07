@@ -1,8 +1,8 @@
-import type { CustomPolygonFeature } from '../types/customProducts';
-import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS, type CustomPolygonFeature } from '../types/customProducts';
 import { hasValidCustomFeatureShape } from './customFeatureShape';
 import { hasOnlyKeys, isBoundedText, isRecord } from './customValidationPrimitives';
 
+/** Validates the bounded property set attached to a custom polygon. */
 const hasValidProperties = (properties: Record<string, unknown>): boolean => {
   if (!hasOnlyKeys(properties, ['customLayerId', 'categoryId', 'title'])) return false;
   return isBoundedText(properties.customLayerId, CUSTOM_PRODUCT_LIMITS.labelLength)
@@ -10,6 +10,7 @@ const hasValidProperties = (properties: Record<string, unknown>): boolean => {
     && isBoundedText(properties.title, CUSTOM_PRODUCT_LIMITS.labelLength);
 };
 
+/** Checks whether a polygon belongs to the requested layer and categories. */
 const matchesOwner = (
   properties: Record<string, unknown>,
   layerId?: string,
