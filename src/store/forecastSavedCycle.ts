@@ -4,7 +4,7 @@ import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import { clearHistory } from './forecastHistory';
 import type { ForecastState, SavedCycle } from './forecastSlice';
 
-/** Restores a saved cycle and its workflow metadata into the active forecast state. */
+/** Restores a saved cycle and its workflow metadata for load and resume reducers. */
 export const restoreSavedCycle = (state: ForecastState, savedCycle: SavedCycle): void => {
   state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
   clearHistory(state);
