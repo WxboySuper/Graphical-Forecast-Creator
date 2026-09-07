@@ -79,10 +79,10 @@ import {
   clearOutlookMaps,
   createEmptyOutlook,
   getFallbackOutlookData,
-  INITIAL_CYCLE_DATE,
   INITIAL_TIMESTAMP,
   sharedEmptyOutlookData,
 } from './forecastStateFactory';
+import { createInitialForecastState } from './forecastInitialState';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -199,45 +199,7 @@ const getWorkflowValidationGroupings = (template?: WorkflowMetadata): StandardGr
   return standardGroupings.length > 0 ? standardGroupings : undefined;
 };
 
-const initialState: ForecastState = {
-  forecastCycle: {
-    days: {
-      1: createEmptyOutlook(1, INITIAL_TIMESTAMP)
-    },
-    currentDay: 1,
-    cycleDate: INITIAL_CYCLE_DATE
-  },
-  drawingState: {
-    // Start with tornado for Day 1/2 (default day)
-    activeOutlookType: 'tornado',
-    activeProbability: '2%',
-    isSignificant: false
-  },
-  customEditor: {
-    mode: 'severe',
-    activeLayerId: null,
-    activeCategoryId: null,
-  },
-  currentMapView: {
-    center: [39.8283, -98.5795],
-    zoom: 4
-  },
-  isSaved: true,
-  emergencyMode: false,
-  savedCycles: [],
-  lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
-  historyByDay: {},
-  discussionDraftsByScope: {},
-  completionValidation: {
-    lastResult: null,
-    showCompletionModal: false,
-    omittedDays: {},
-  },
-  isWorkflowActive: false,
-  outlookVersionSnapshots: [],
-  autoCategoricalError: null,
-  lastTrimResult: null,
-};
+const initialState = createInitialForecastState();
 
 const {
   getCurrentOutlook,
