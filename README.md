@@ -69,7 +69,7 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 
 ### Prerequisites
 
-- Node.js `20.19.0` or later
+- Node.js `22.22.0+`, `24.11.0+`, or `26.x`
 - pnpm `9`
 
 ### Installation
