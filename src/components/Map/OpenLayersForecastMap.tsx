@@ -23,7 +23,6 @@ import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { Redo2, Undo2 } from "lucide-react";
-import { captureMessage } from "@sentry/react";
 import {
   removeFeature,
   removeCustomFeature,
@@ -69,9 +68,7 @@ import {
 } from "./openLayersBlankBasemap";
 import {
   getForecastSourceDescriptorPlan,
-  reconcileFeatureSource,
   type FeatureSyncDescriptor,
-  type FeatureSyncStats,
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { isFeatureExposed } from "../../config/featureExposure";
@@ -83,6 +80,7 @@ import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precision
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
 import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
+import { reconcileForecastSource } from "./openLayersForecastReconciliation";
 import {
   syncMapViewFromOpenLayers,
   syncOpenLayersViewFromState,
@@ -1024,32 +1022,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         source,
         categoricalSource: catSource,
       });
-    /** Reconciles one OpenLayers source with the current Redux feature descriptors. */
-    const reconcileSource = (
-        targetSource: VectorSource,
-        descriptors: FeatureSyncDescriptor[],
-        sourceName: string,
-      ): void => {
-        const stats: FeatureSyncStats = {
-          parsed: 0,
-          added: 0,
-          updated: 0,
-          removed: 0,
-          reused: 0,
-          skipped: 0,
-        };
-        reconcileFeatureSource(targetSource, descriptors, stats);
-        if (stats.skipped > 0) {
-          captureMessage("Forecast map skipped invalid geometry", {
-            level: "warning",
-            tags: { source: sourceName, reason: "invalid-geometry" },
-          });
-        }
-      };
-
-      reconcileSource(source, sourceDescriptorPlan.source, "forecast");
-      reconcileSource(catSource, sourceDescriptorPlan.categorical, "categorical");
-      reconcileSource(ghostSource, ghostDescriptors, "ghost");
+      reconcileForecastSource(source, sourceDescriptorPlan.source, "forecast");
+      reconcileForecastSource(catSource, sourceDescriptorPlan.categorical, "categorical");
+      reconcileForecastSource(ghostSource, ghostDescriptors, "ghost");
     }, [
       serializedFeatures,
       outlookOpacity,
