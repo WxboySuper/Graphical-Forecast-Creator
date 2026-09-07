@@ -273,13 +273,6 @@ export const saveCycleHistoryToStorage = (
   }
 };
 
-/**
- * Load cycle history from localStorage
- */
-export function loadCycleHistoryFromStorage(userId?: string | null): SavedCycle[] {
-  return loadCycleHistorySnapshotFromStorage(userId).cycles;
-}
-
 /** Loads a scoped history snapshot and performs the legacy-scope migration when needed. */
 export const loadCycleHistorySnapshotFromStorage = (userId?: string | null): CycleHistorySnapshot => {
   try {
@@ -309,6 +302,11 @@ export const loadCycleHistorySnapshotFromStorage = (userId?: string | null): Cyc
     return { cycles: [], lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 } };
   }
 };
+
+/** Loads only the saved cycles from the current localStorage snapshot. */
+export function loadCycleHistoryFromStorage(userId?: string | null): SavedCycle[] {
+  return loadCycleHistorySnapshotFromStorage(userId).cycles;
+}
 
 /**
  * Hook to hydrate cycle history on app startup
