@@ -24,7 +24,7 @@ if command -v node &>/dev/null; then
   NODE_MINOR=$(node -p "process.versions.node.split('.')[1]")
   if { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -ge 22 ]; } \
     || { [ "$NODE_MAJOR" -eq 24 ] && [ "$NODE_MINOR" -ge 11 ]; } \
-    || [ "$NODE_MAJOR" -ge 26 ]; then
+    || [ "$NODE_MAJOR" -eq 26 ]; then
     NODE_OK=true
     echo "   Found Node.js v$(node --version)"
   fi
