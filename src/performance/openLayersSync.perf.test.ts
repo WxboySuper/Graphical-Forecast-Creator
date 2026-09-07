@@ -6,7 +6,7 @@ import {
   type FeatureSyncDescriptor,
   type FeatureSyncStats,
 } from '../components/Map/openLayersFeatureSync';
-import { measure, reportComparison } from './benchmarkUtils';
+import { measure, reportComparison } from '../testing/benchmarkUtils';
 
 const createFeature = (id: string, offset: number): GeoJsonFeature<Polygon> => ({
   type: 'Feature',
