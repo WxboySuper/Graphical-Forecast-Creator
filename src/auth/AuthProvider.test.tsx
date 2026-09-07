@@ -5,18 +5,12 @@ import { getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import {
   applySettingsToState,
   areOverlaySettingsEqual,
-  areUserSettingsEqual,
   asRecord,
   canSyncHostedUserDocuments,
   clearDeletedAccountSession,
-  createProfilePayload,
-  createSettingsSnapshot,
   disabledAuthAction,
   extractLocalUserFromData,
   getDefaultContextValue,
-  getRemoteSeedPayload,
-  getSettingsSyncError,
-  getSettingsUpdateError,
   initLocalAuthState,
   localRefreshBetaAccess,
   localSignInWithEmail,
@@ -24,17 +18,26 @@ import {
   localSignUpWithEmail,
   localUpdateSyncedSettings,
   postLocalJson,
-  readProfileBetaAccess,
   runInitialHostedSync,
   attachHostedSettingsSubscription,
-  readRemoteSettings,
   safeParseJson,
   seedOrApplySettings,
   startSettingsSubscription,
   syncProfileDocument,
+  createSettingsSnapshot as createProviderSettingsSnapshot,
   AuthProvider,
   useAuth,
 } from './AuthProvider';
+import {
+  areUserSettingsEqual,
+  createProfilePayload,
+  createSettingsSnapshot,
+  getRemoteSeedPayload,
+  getSettingsSyncError,
+  getSettingsUpdateError,
+  readProfileBetaAccess,
+  readRemoteSettings,
+} from './authSettings';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer, { type OverlaysState } from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
@@ -110,6 +113,10 @@ const waitForAuthEffects = async (delay = 100) => {
 };
 
 describe('AuthProvider Utils', () => {
+  test('keeps the existing provider re-export for settings helpers', () => {
+    expect(createProviderSettingsSnapshot).toBe(createSettingsSnapshot);
+  });
+
   test('local sign-out failure does not turn completed server deletion into a failure', async () => {
     const clearLocalState = jest.fn();
     await expect(clearDeletedAccountSession(
