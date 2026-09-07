@@ -1,4 +1,15 @@
 ﻿// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
+/**
+ * Redux boundary for the active forecast editor.
+ *
+ * This slice owns the durable client state and public action names used by the
+ * Forecast surface: outlook edits, custom layers, cycle lifecycle, discussion
+ * drafts, workflow metadata, completion state, and local saved-cycle history.
+ * Domain transitions that have independent responsibilities live in the
+ * adjacent `forecast*` helpers; selectors are exported from `forecastSelectors`.
+ * Network and hosted persistence orchestration belongs in hooks or services,
+ * so reducers remain deterministic and replayable.
+ */
 import '../immerSetup';
 import { isDraft, original } from 'immer';
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
