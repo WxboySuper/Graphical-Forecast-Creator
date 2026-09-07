@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import {
+  mergeDeploymentConfigs,
   normalizeDeploymentConfig,
   renderServerEnvFile,
 } from './deployment-config.mjs';
@@ -39,6 +40,23 @@ describe('deployment config', () => {
         },
       }),
       ['TSTM_GENERATION_ENABLED=true', 'TSTM_INGESTION_ENABLED=true'].join('\n')
+    );
+  });
+
+  it('merges shared defaults with environment overrides', () => {
+    assert.deepEqual(
+      mergeDeploymentConfigs(
+        { environment: 'base', serverEnv: { TSTM_GENERATION_ENABLED: 'true', SHARED: 'base' } },
+        { environment: 'override', serverEnv: { SHARED: 'override', TSTM_INGESTION_ENABLED: 'true' } },
+      ),
+      {
+        environment: 'override',
+        serverEnv: {
+          TSTM_GENERATION_ENABLED: 'true',
+          TSTM_INGESTION_ENABLED: 'true',
+          SHARED: 'override',
+        },
+      },
     );
   });
 
