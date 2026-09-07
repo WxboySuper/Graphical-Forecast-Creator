@@ -46,7 +46,6 @@ import "./ForecastMap.css";
 import {
   createHatchPattern,
   createLabelOverlaySource,
-  createTileSource,
   resolveFillOpacity,
   resolveStrokeWidth,
   toRgbaColor,
@@ -54,7 +53,7 @@ import {
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
 } from "./openLayersMapStyles";
-import { loadOpenFreeMapBasemap } from "./openLayersBasemap";
+import { applyRasterBasemap, loadOpenFreeMapBasemap } from "./openLayersBasemap";
 import { ReportType } from "../../types/stormReports";
 import { STORM_REPORT_COLORS, STORM_REPORT_FALLBACK_COLOR } from "../../utils/stormReportColors";
 import type { DatEvidence } from "../../utils/dat";
@@ -539,18 +538,11 @@ const OpenLayersVerificationMap = forwardRef<
       land.setVisible(false);
       landOutline.setVisible(true);
       el.style.backgroundColor = "";
-      tile.setSource(
-        createTileSource(baseMapStyle as Exclude<BaseMapStyle, "blank">),
-      );
-      const labelSource = createLabelOverlaySource(
-        baseMapStyle as Exclude<BaseMapStyle, "blank">,
-      );
-      if (labelSource) {
-        labels.setSource(labelSource);
-        labels.setVisible(true);
-      } else {
-        labels.setVisible(false);
-      }
+      applyRasterBasemap({
+        style: baseMapStyle as Exclude<BaseMapStyle, "blank">,
+        tile,
+        labels,
+      });
     }
   }, [baseMapStyle]);
 
