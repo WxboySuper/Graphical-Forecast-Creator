@@ -15,7 +15,6 @@ import {
 import {
   doc,
   getDoc,
-  onSnapshot,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
@@ -36,10 +35,7 @@ import {
 } from '../utils/forecastUiVariant';
 import {
   areUserSettingsEqual,
-  createProfilePayload,
   createSettingsSnapshot,
-  getRemoteSeedPayload,
-  getSettingsSyncError,
   getSettingsUpdateError,
   mergeUserSettingsDocument,
   readProfileBetaAccess,
@@ -47,6 +43,11 @@ import {
   type UserProfileDocument,
   type UserSettingsDocument,
 } from './authSettings';
+import {
+  attachHostedSettingsSubscription,
+  runInitialHostedSync,
+  type SettingsSyncStatus,
+} from './authHostedSettings';
 
 export {
   areUserSettingsEqual,
@@ -60,6 +61,14 @@ export {
   readRemoteSettings,
 } from './authSettings';
 export type { BuildSettingsArgs, UserProfileDocument, UserSettingsDocument } from './authSettings';
+export {
+  attachHostedSettingsSubscription,
+  runInitialHostedSync,
+  seedOrApplySettings,
+  startSettingsSubscription,
+  syncProfileDocument,
+} from './authHostedSettings';
+export type { SettingsSyncStatus } from './authHostedSettings';
 
 /**
  * Safely parse JSON from a Response. Returns parsed value or null on failure.
@@ -92,7 +101,6 @@ export const extractLocalUserFromData = (data: unknown) => {
 };
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
-type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -359,163 +367,6 @@ export const applySettingsToState = (
   lastSyncedSettingsRef.current = settings;
   setSyncedSettings(settings);
 };
-
-/** Creates or updates the hosted profile document while preserving the original creation timestamp. */
-export const syncProfileDocument = async (
-  profileRef: ReturnType<typeof doc>,
-  user: User
-): Promise<void> => {
-  const profileSnapshot = await getDoc(profileRef);
-  const needsCreatedAt =
-    !profileSnapshot.exists() || profileSnapshot.data()?.createdAt === undefined;
-  await setDoc(
-    profileRef,
-    {
-      ...createProfilePayload(user, { includeCreatedAt: needsCreatedAt }),
-    },
-    { merge: true }
-  );
-};
-
-/** Reuses remote settings when available or seeds Firestore from the current local settings snapshot. */
-export const seedOrApplySettings = async (opts: {
-  settingsRef: ReturnType<typeof doc>;
-  settingsSnapshot: Awaited<ReturnType<typeof getDoc>>;
-  localSettings: UserSettingsDocument;
-  applyRemoteSettings: (settings: UserSettingsDocument) => void;
-  isActive: () => boolean;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-}): Promise<void> => {
-  const {
-    settingsRef,
-    settingsSnapshot,
-    localSettings,
-    applyRemoteSettings,
-    isActive,
-    lastSyncedSettingsRef,
-    setSyncedSettings,
-  } = opts;
-  const remoteSettings = readRemoteSettings(settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined);
-
-  if (!isActive()) {
-    return;
-  }
-
-  if (remoteSettings) {
-    applyRemoteSettings(remoteSettings);
-    return;
-  }
-
-  await setDoc(
-    settingsRef,
-    getRemoteSeedPayload(localSettings, { includeCreatedAt: !settingsSnapshot.exists() }),
-    { merge: true }
-  );
-
-  if (!isActive()) {
-    return;
-  }
-
-  lastSyncedSettingsRef.current = localSettings;
-  setSyncedSettings(localSettings);
-};
-
-/** Starts the live Firestore listener that keeps hosted settings mirrored into local app state. */
-export const startSettingsSubscription = (opts: {
-  settingsRef: ReturnType<typeof doc>;
-  isActive: () => boolean;
-  applyRemoteSettings: (settings: UserSettingsDocument) => void;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-}): Unsubscribe =>
-  onSnapshot(
-    opts.settingsRef,
-    (snapshot) => {
-      const nextSettings = readRemoteSettings(snapshot.data() as Partial<UserSettingsDocument> | undefined);
-      if (!opts.isActive() || !nextSettings) {
-        return;
-      }
-
-      opts.applyRemoteSettings(nextSettings);
-      opts.setSettingsSyncStatus('synced');
-    },
-    (snapshotError) => {
-      if (opts.isActive()) {
-        opts.setSettingsSyncStatus('error');
-        opts.setError(snapshotError.message);
-      }
-    }
-  );
-
-/** Runs the initial hosted profile/settings sync before the live subscription takes over. */
-export const runInitialHostedSync = async (opts: {
-  profileRef: ReturnType<typeof doc>;
-  settingsRef: ReturnType<typeof doc>;
-  user: User;
-  buildLocalSettingsSnapshot: () => UserSettingsDocument;
-  applyRemoteSettings: (settings: UserSettingsDocument) => void;
-  isActive: () => boolean;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  hasInitializedSettingsRef: React.MutableRefObject<boolean>;
-}): Promise<Unsubscribe | undefined> => {
-  opts.setSettingsSyncStatus('syncing');
-
-  try {
-    await syncProfileDocument(opts.profileRef, opts.user);
-
-    const settingsSnapshot = await getDoc(opts.settingsRef);
-    const localSettings = opts.buildLocalSettingsSnapshot();
-    await seedOrApplySettings({
-      settingsRef: opts.settingsRef,
-      settingsSnapshot,
-      localSettings,
-      applyRemoteSettings: opts.applyRemoteSettings,
-      isActive: opts.isActive,
-      lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
-      setSyncedSettings: opts.setSyncedSettings,
-    });
-
-    if (!opts.isActive()) {
-      return undefined;
-    }
-
-    opts.hasInitializedSettingsRef.current = true;
-    opts.setSettingsSyncStatus('synced');
-
-    return startSettingsSubscription({
-      settingsRef: opts.settingsRef,
-      isActive: opts.isActive,
-      applyRemoteSettings: opts.applyRemoteSettings,
-      setSettingsSyncStatus: opts.setSettingsSyncStatus,
-      setError: opts.setError,
-    });
-  } catch (syncError) {
-    if (opts.isActive()) {
-      opts.setSettingsSyncStatus('error');
-      opts.setError(getSettingsSyncError(syncError));
-    }
-    return undefined;
-  }
-};
-
-/** Stores a late-created listener only while its effect is still active. */
-export const attachHostedSettingsSubscription = (
-  subscriptionPromise: Promise<Unsubscribe | undefined>,
-  isActive: () => boolean,
-  setSubscription: (unsubscribe: Unsubscribe) => void,
-): Promise<void> => subscriptionPromise.then((nextUnsubscribe) => {
-  if (!isActive()) {
-    nextUnsubscribe?.();
-    return;
-  }
-  if (nextUnsubscribe) {
-    setSubscription(nextUnsubscribe);
-  }
-});
 
 /**
  * Initializes local-only auth state by probing the dev server's /api/local/profile endpoint.
