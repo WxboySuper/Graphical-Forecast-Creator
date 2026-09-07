@@ -82,6 +82,7 @@ import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
 import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
 import {
   applyForecastFeatureMetadata,
+  applyCustomFeatureMetadata,
   reconcileForecastSource,
 } from "./openLayersForecastReconciliation";
 import {
@@ -962,11 +963,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                     zIndex,
                   ),
                 );
-                item.set("featureId", stableId);
-                item.set("customLayerId", layer.id);
-                item.set("customLayerTitle", layer.label);
-                item.set("categoryId", category.id);
-                item.set("title", category.label);
+                applyCustomFeatureMetadata(item, {
+                  featureId: stableId,
+                  customLayerId: layer.id,
+                  customLayerTitle: layer.label,
+                  categoryId: category.id,
+                  title: category.label,
+                });
               },
               targetSource: source,
             };
