@@ -1,5 +1,4 @@
-import { addCustomLayer } from '../store/forecastSlice';
-import forecastReducer from '../store/forecastSlice';
+import forecastReducer, { addCustomLayer } from '../store/forecastSlice';
 import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
 import { asCustomLayerId } from '../lib/customProducts';
 import { deserializeForecast, serializeForecast } from './fileUtils';

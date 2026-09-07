@@ -31,8 +31,7 @@ import ForecastPage, {
   readStoredDayValue,
   writeStoredDayValue,
 } from './ForecastPage';
-import forecastReducer from '../store/forecastSlice';
-import { addCustomLayer, addFeature, updateDiscussionDraft } from '../store/forecastSlice';
+import forecastReducer, { addCustomLayer, addFeature, updateDiscussionDraft } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -40,7 +39,7 @@ import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
 import * as fileUtils from '../utils/fileUtils';
-import { serializeForecast } from '../utils/fileUtils';
+const { serializeForecast } = fileUtils;
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
