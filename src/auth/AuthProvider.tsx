@@ -61,6 +61,7 @@ export {
   readRemoteSettings,
 } from './userSettingsDocument';
 export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
+import { createSettingsSnapshot } from './authSettings';
 export { createProfilePayload, readProfileBetaAccess } from './authSettings';
 export {
   applySettingsToState,
@@ -98,6 +99,7 @@ import {
   localSignUpWithEmail,
   localUpdateSyncedSettings,
 } from './localAuthClient';
+export { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from './authCommon';
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
@@ -196,59 +198,8 @@ export const deleteHostedAccount = async (
   await clearDeletedAccountSession(() => signOut(requireAuth()), clearLocalState);
 };
 
-/** Builds the normalized settings document shape from current local state. */
-interface BuildSettingsArgs {
-  darkMode: boolean;
-  overlays: OverlaysState;
-  defaultForecasterName: string;
-  forecastUiVariant: ForecastUiVariant;
-  monitorSettings?: MonitorSettings;
-}
-/** Builds the normalized settings document shape from current local state. */
-export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
-  const { darkMode, overlays, defaultForecasterName, forecastUiVariant, monitorSettings } = args;
-  return {
-    darkMode,
-    baseMapStyle: overlays.baseMapStyle,
-    stateBorders: overlays.stateBorders,
-    counties: overlays.counties,
-    ghostOutlooks: overlays.ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant,
-    monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
-  };
-};
-
-/** Creates the user profile payload written to Firestore on hosted sign-in. */
-export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boolean }) => ({
-  email: user.email ?? '',
-  displayName: user.displayName ?? '',
-  photoURL: user.photoURL ?? '',
-  providers: (user.providerData ?? []).map((provider) => provider.providerId),
-  updatedAt: serverTimestamp(),
-  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
-});
-
-/** Reads the current beta-access flag from one hosted profile document snapshot. */
-export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
-  Boolean(value?.betaAccess);
-
-export {
-  asRecord,
-  extractLocalUserFromData,
-  postLocalJson,
-  safeParseJson,
-} from './authCommon';
-export {
-  applyLocalAuthData,
-  initLocalAuthState,
-  localRefreshBetaAccess,
-  localSignInWithEmail,
-  localSignOutUser,
-  localSignUpWithEmail,
-  localUpdateSyncedSettings,
-} from './localAuthClient';
-
+export { createSettingsSnapshot } from './authSettings';
+export { applyLocalAuthData, initLocalAuthState, localRefreshBetaAccess, localSignInWithEmail, localSignOutUser, localSignUpWithEmail, localUpdateSyncedSettings } from './localAuthClient';
 /** Writes a merged settings document to Firestore with an updated server timestamp. */
 const writeHostedSettingsDocument = async (
   settingsRef: ReturnType<typeof doc>,
