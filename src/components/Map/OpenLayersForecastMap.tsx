@@ -32,7 +32,6 @@ import {
   removeFeature,
   removeCustomFeature,
   redoLastEdit,
-  setMapView,
   undoLastEdit,
 } from "../../store/forecastSlice";
 
@@ -89,6 +88,11 @@ import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMa
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
+import {
+  syncMapViewFromOpenLayers,
+  syncOpenLayersViewFromState,
+  type ForecastMapView,
+} from "./openLayersForecastViewSync";
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
 import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 export { getCustomStyleSignature, removeDrawInteraction };
@@ -139,8 +143,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     } | null>(null);
     const [showDesktopLegend, setShowDesktopLegend] = useState(true);
     const [showMobileLegend, setShowMobileLegend] = useState(false);
-    const initialMapViewRef = useRef(currentMapView);
-    const currentMapViewRef = useRef(currentMapView);
+    const initialMapViewRef = useRef<ForecastMapView>(currentMapView);
+    const currentMapViewRef = useRef<ForecastMapView>(currentMapView);
     const popupRef = useRef<HTMLDivElement>(null);
     const overlayRef = useRef<Overlay | null>(null);
     const interactionModeRef = useRef(interactionMode);
@@ -398,29 +402,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         }),
       });
 
-      map.on("moveend", () => {
-        if (isApplyingExternalViewRef.current) {
-          return;
-        }
-
-        const view = map.getView();
-        const center = view.getCenter();
-        if (!center) return;
-        const [lon, lat] = toLonLat(center);
-        const nextCenter: [number, number] = [lat, lon];
-        const nextZoom = view.getZoom() || 4;
-        const [stateLat, stateLon] = currentMapViewRef.current.center;
-        const stateZoom = currentMapViewRef.current.zoom;
-
-        const centerChanged =
-          Math.abs(stateLat - nextCenter[0]) > 0.000001 ||
-          Math.abs(stateLon - nextCenter[1]) > 0.000001;
-        const zoomChanged = Math.abs(stateZoom - nextZoom) > 0.000001;
-
-        if (centerChanged || zoomChanged) {
-          dispatch(setMapView({ center: nextCenter, zoom: nextZoom }));
-        }
-      });
+      map.on("moveend", () => syncMapViewFromOpenLayers({
+        map,
+        isApplyingExternalViewRef,
+        currentMapViewRef,
+        dispatch,
+      }));
 
       mapRef.current = map;
 
@@ -715,32 +702,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       const map = mapRef.current;
       if (!map) return;
 
-      const view = map.getView();
-      const targetCenter = fromLonLat([
-        currentMapView.center[1],
-        currentMapView.center[0],
-      ]);
-      const currentCenter = view.getCenter();
-      const currentZoom = view.getZoom() || 4;
-
-      const centerChanged =
-        !currentCenter ||
-        Math.abs(currentCenter[0] - targetCenter[0]) > 0.01 ||
-        Math.abs(currentCenter[1] - targetCenter[1]) > 0.01;
-      const zoomChanged =
-        Math.abs(currentZoom - currentMapView.zoom) > 0.000001;
-
-      if (!centerChanged && !zoomChanged) {
-        return;
-      }
-
-      isApplyingExternalViewRef.current = true;
-      view.setCenter(targetCenter);
-      view.setZoom(currentMapView.zoom);
-      setTimeout(() => {
-        isApplyingExternalViewRef.current = false;
-      }, 0);
-    }, [currentMapView.center, currentMapView.zoom]);
+      syncOpenLayersViewFromState({ map, currentMapView, isApplyingExternalViewRef });
+    }, [currentMapView]);
 
     // Swap base tile source / blank land layer when style changes
     useEffect(() => {
