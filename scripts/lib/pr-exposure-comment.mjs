@@ -1,5 +1,6 @@
-import { fetchAllPages, GITHUB_PAGE_SIZE } from './github-paginate.mjs';
 import { formatFeatureList } from './feature-exposure-report.mjs';
+import { githubRequest } from './github-api.mjs';
+import { fetchAllPages, GITHUB_PAGE_SIZE } from './github-paginate.mjs';
 
 export const PROMOTION_EXPOSURE_COMMENT_MARKER = '<!-- gfc-promotion-exposure-report -->';
 
@@ -68,34 +69,6 @@ export function formatPromotionExposureComment({ checkRows, report, newlyProduct
     '',
     `<sub>Updated by ${runLink} · Re-run locally: \`pnpm exposure:report\`</sub>`,
   ].join('\n');
-}
-
-/**
- * @param {string} repository
- * @param {string} token
- * @param {number} prNumber
- * @param {string} path
- * @param {{ method?: string, body?: unknown }} [options]
- */
-async function githubRequest(repository, token, path, options = {}) {
-  const response = await fetch(`https://api.github.com/repos/${repository}${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`GitHub API ${response.status} for ${path}: ${text}`);
-  }
-
-  if (response.status === 204) return null;
-  return response.json();
 }
 
 /**
