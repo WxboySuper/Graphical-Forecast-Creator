@@ -1,5 +1,4 @@
-import type { ImportValidationResult } from './forecastValidationTypes';
-import { MAX_ARRAY_ITEMS, fail } from './forecastValidationTypes';
+import { MAX_ARRAY_ITEMS, fail, type ImportValidationResult } from './forecastValidationTypes';
 import { validateFeature } from './forecastGeometryValidation';
 
 /** Maximum features per outlook probability map. */

@@ -1,5 +1,4 @@
-import type { CustomPolygonFeature } from '../types/customProducts';
-import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS, type CustomPolygonFeature } from '../types/customProducts';
 import { hasValidCustomFeatureShape } from './customFeatureShape';
 import { hasOnlyKeys, isBoundedText, isRecord } from './customValidationPrimitives';
 
