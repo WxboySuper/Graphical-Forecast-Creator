@@ -12,12 +12,12 @@ All notable changes to this project will be documented in this file.
 - **@sentry/react:** ^10.69.0 → ^10.72.0
 - **@testing-library/jest-dom:** ^7.0.0 → ^7.0.1
 - **@testing-library/react:** ^16.2.0 → ^16.3.3
-- **@testing-library/user-event:** ^14.6.3 → ^14.6.6
-- **@types/node:** ^26.1.2 → ^26.4.0
-- **@types/react-dom:** 19.2.4 → 19.2.5
+- **@testing-library/user-event:** ^14.6.6 → ^14.6.7
+- **@types/node:** ^26.4.0 → ^26.4.1
+- **@types/react-dom:** 19.2.5 → 19.2.7
 - **firebase:** ^12.17.1 → ^12.18.0
 - **immer:** ^11.1.16 → ^11.1.18
-- **lucide-react:** ^1.30.0 → ^1.35.0
+- **lucide-react:** ^1.35.0 → ^1.41.0
 - **ol-mapbox-style:** ^13.4.2 → ^13.4.3
 - **react-router:** ^8.3.0 → ^8.3.1
 - **rollup:** >=4.62.4 → >=4.63.1
@@ -25,36 +25,27 @@ All notable changes to this project will be documented in this file.
 - **web-vitals:** ^6.1.0 → ^6.2.1
 - **@firebase/rules-unit-testing:** ^5.0.1 → ^5.0.2
 - **@vitejs/plugin-react:** ^6.0.5 → ^6.1.1
-- **babel-jest:** ^30.2.0 → ^30.5.0
+- **babel-jest:** ^30.5.0 → ^30.5.1
 - **esbuild:** ^0.28.1 → ^0.28.2
 - **eslint-plugin-jest:** ^29.16.0 → ^29.16.5
-- **firebase-tools:** 15.26.0 → 15.28.2
-- **globals:** ^17.9.0 → ^17.11.0
-- **jest:** ^30.2.0 → ^30.5.0
-- **jest-environment-jsdom:** ^30.2.0 → ^30.5.0
+- **firebase-tools:** 15.28.2 → 15.29.0
+- **globals:** ^17.11.0 → ^17.12.0
+- **jest:** ^30.5.0 → ^30.5.1
+- **jest-environment-jsdom:** ^30.5.0 → ^30.5.1
 - **typescript-eslint:** ^8.66.0 → ^8.68.0
 - **vite:** ^8.2.1 → ^8.2.2
 - **@sentry/node:** ^10.69.0 → ^10.72.0 (`server`)
 - **firebase-admin:** ^14.2.0 → ^14.3.0 (`server`)
 - **stripe:** ^22.4.0 → ^22.6.0 (`server`)
-
-
-#### Added
-
 - **Paint bucket editing prototype:** Add beta-gated Step and Set editing for existing probabilistic outlook polygons, with undo/redo support.
 - **Population estimate prototype:** Add a beta-gated WorldPop estimate for the population inside the active day's active-hazard outlook polygons.
-
-<!-- Continue next-major work here after this stable line is cut. -->
-
-- Unified forecast transfer modal with KML and KMZ import/export support.
-- Cross-hazard outlook geometry copy prototype for related Day 1/2 tornado, wind, and hail outlooks. It is exposed on local and beta builds only; categorical, day 3/4-8, same-hazard, and per-feature variants remain follow-up work for #620.
-
-#### Fixed
-
 - **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical recovery:** Reset timed-out geometry workers, preserve the newest probabilistic edit for a follow-up derivation, and prevent repeated retries of unchanged failed geometry.
-- Precision polygon editing now scopes vertex changes to the selected outlook tier and records multi-vertex edits as one undo step.
+- **autoprefixer:** ^10.5.4 → ^10.5.5
+- **postcss:** 8.5.26 → 8.5.28
+
+#
 ## v1.7.0
 
 #### Dependencies
