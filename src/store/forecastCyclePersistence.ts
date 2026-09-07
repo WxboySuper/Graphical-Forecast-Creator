@@ -9,6 +9,7 @@ interface SaveForecastCycleOptions {
 
 export const SAVED_CYCLES_LIMIT = 50;
 
+/** Builds the next deterministic saved-cycle identifier for the current history. */
 const createSavedCycleId = (state: ForecastState, timestamp: string): string => {
   const highest = state.savedCycles.reduce((max, cycle) => {
     const match = /-(\d+)$/.exec(cycle.id);
