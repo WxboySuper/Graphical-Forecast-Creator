@@ -35,6 +35,7 @@ import { setCustomEditorMode } from '../../store/forecastSlice';
 import { TabbedIntegratedToolbarTabsList, type TabbedToolbarTabKey } from './IntegratedToolbarTabsList';
 import {
   getTabbedToolbarActionItems,
+  groupTabbedToolbarActions,
   TabbedToolbarActionGroup,
 } from './TabbedToolbarActions';
 import './IntegratedToolbar.css';
@@ -465,20 +466,16 @@ const TabbedToolbarToolsTab: React.FC<{
   controller: ForecastWorkspaceController;
   autoTstmTools?: React.ReactNode;
 }> = ({ controller, autoTstmTools = null }) => {
-  const actionItems = getTabbedToolbarActionItems(controller);
-  const historyItems = actionItems.filter((item) => ['undo', 'redo', 'history', 'copy'].includes(item.key));
-  const fileItems = actionItems.filter((item) => ['transfer', 'export-image'].includes(item.key));
-  const completionItems = actionItems.filter((item) => item.key === 'complete');
-  const destructiveItems = actionItems.filter((item) => item.key === 'reset');
+  const actionGroups = groupTabbedToolbarActions(getTabbedToolbarActionItems(controller));
 
   return (
     <TabbedToolbarTabRow>
       <TabbedToolbarStripSection label="Workspace Actions" className="tabbed-integrated-toolbar__section--workspace-actions min-w-[760px] flex-1">
         <div className="tabbed-integrated-toolbar__action-groups flex flex-wrap items-center gap-2">
-          <TabbedToolbarActionGroup label="History" items={historyItems} />
-          <TabbedToolbarActionGroup label="File" items={fileItems} />
-          <TabbedToolbarActionGroup label="Complete" items={completionItems} />
-          <TabbedToolbarActionGroup label="Danger" items={destructiveItems} tone="danger" />
+          <TabbedToolbarActionGroup label="History" items={actionGroups.history} />
+          <TabbedToolbarActionGroup label="File" items={actionGroups.file} />
+          <TabbedToolbarActionGroup label="Complete" items={actionGroups.completion} />
+          <TabbedToolbarActionGroup label="Danger" items={actionGroups.destructive} tone="danger" />
         </div>
       </TabbedToolbarStripSection>
 

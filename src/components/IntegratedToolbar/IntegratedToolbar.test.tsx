@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
 import { TabbedIntegratedToolbar } from './IntegratedToolbar';
+import { groupTabbedToolbarActions, type TabbedToolbarActionItem } from './TabbedToolbarActions';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, { undoLastEdit } from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
@@ -38,6 +39,19 @@ jest.mock('../OutlookPanel/useOutlookPanelLogic', () => () => ({
   handleCopyAllGeometryFrom: jest.fn(),
   handleCopyProbabilityGeometryFrom: jest.fn(),
 }));
+
+describe('Tools tab action grouping', () => {
+  it('keeps action groups aligned with their toolbar sections', () => {
+    const items = ['undo', 'transfer', 'complete', 'reset'].map((key) => ({ key })) as TabbedToolbarActionItem[];
+
+    expect(groupTabbedToolbarActions(items)).toEqual({
+      history: [items[0]],
+      file: [items[1]],
+      completion: [items[2]],
+      destructive: [items[3]],
+    });
+  });
+});
 jest.mock('../DrawingTools/useExportMap', () => ({
   useExportMap: () => ({
     isExporting: false,
