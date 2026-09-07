@@ -59,6 +59,7 @@ interface MonitorMapLayerOptions {
   alertsOpacity: number;
 }
 
+/** Creates the monitor map layer collection and its backing sources. */
 const createMonitorMapLayers = ({
   refs,
   radarOpacity,
@@ -83,6 +84,7 @@ const createMonitorMapLayers = ({
   base: new TileLayer({ zIndex: BASE_LAYER_Z_INDEX }),
 });
 
+/** Creates an OpenLayers map bound to the monitor page target. */
 const createMonitorMap = ({
   target,
   mapView,
@@ -114,6 +116,7 @@ const createMonitorMap = ({
   }),
 });
 
+/** Persists the monitor map view after the map stops moving. */
 const createMoveEndHandler = ({ map, refs, dispatch }: {
   map: OLMap;
   refs: MonitorMapRefs;
@@ -127,6 +130,7 @@ const createMoveEndHandler = ({ map, refs, dispatch }: {
   dispatch(setMonitorMapView({ center: [latitude, longitude], zoom }));
 };
 
+/** Selects an alert feature when the monitor map is clicked. */
 const createMapClickHandler = ({ map, layers, refs, onSelectAlert }: {
   map: OLMap;
   layers: MonitorMapLayers;
@@ -152,6 +156,7 @@ const createMapClickHandler = ({ map, layers, refs, onSelectAlert }: {
   onSelectAlert(null);
 };
 
+/** Updates the map cursor while hovering an interactive alert. */
 const createPointerMoveHandler = ({ map, layers }: {
   map: OLMap;
   layers: MonitorMapLayers;
@@ -159,7 +164,8 @@ const createPointerMoveHandler = ({ map, layers }: {
   let frameId: number | null = null;
   let latestPixel: number[] | null = null;
 
-  const updateCursor = () => {
+/** Applies the pending pointer cursor state to the map target. */
+const updateCursor = () => {
     frameId = null;
     if (!latestPixel) return;
     const target = map.getTargetElement();
@@ -183,6 +189,7 @@ const createPointerMoveHandler = ({ map, layers }: {
   };
 };
 
+/** Attaches the alert popup overlay to the monitor map. */
 const attachMonitorMapPopup = (map: OLMap, refs: MonitorMapRefs): void => {
   const popupEl = document.createElement('div');
   popupEl.className = 'monitor-map__alertOverlay';
@@ -193,6 +200,7 @@ const attachMonitorMapPopup = (map: OLMap, refs: MonitorMapRefs): void => {
   refs.overlayRef.current = overlay;
 };
 
+/** Stores map and layer handles for later effects and cleanup. */
 const assignMonitorMapRefs = (refs: MonitorMapRefs, map: OLMap, layers: MonitorMapLayers): void => {
   refs.mapRef.current = map;
   refs.baseLayerRef.current = layers.base;
@@ -203,6 +211,7 @@ const assignMonitorMapRefs = (refs: MonitorMapRefs, map: OLMap, layers: MonitorM
   refs.vectorReferenceGroupRef.current = layers.vectorReferenceGroup;
 };
 
+/** Loads the current vector reference style into the monitor map. */
 const loadVectorReferenceStyle = (refs: MonitorMapRefs): void => {
   const requestId = refs.vectorStyleRequestRef.current + 1;
   refs.vectorStyleRequestRef.current = requestId;
@@ -220,6 +229,7 @@ const loadVectorReferenceStyle = (refs: MonitorMapRefs): void => {
     .catch(() => undefined);
 };
 
+/** Clears map handles when the monitor map is disposed. */
 const clearMonitorMapRefs = (refs: MonitorMapRefs): void => {
   refs.mapRef.current = null;
   refs.baseLayerRef.current = null;
@@ -232,6 +242,7 @@ const clearMonitorMapRefs = (refs: MonitorMapRefs): void => {
   refs.satelliteLayerKeyRef.current = null;
 };
 
+/** Removes popup listeners and DOM content during map cleanup. */
 const cleanupMonitorMapPopup = (map: OLMap, refs: MonitorMapRefs): void => {
   if (refs.overlayRef.current) {
     map.removeOverlay(refs.overlayRef.current);

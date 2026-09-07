@@ -31,6 +31,7 @@ interface PaintBucketEditTarget {
   probabilityList: readonly string[];
 }
 
+/** Resolves the topmost editable feature and its available probabilities. */
 const resolvePaintBucketEditTarget = ({
   map,
   pixel,

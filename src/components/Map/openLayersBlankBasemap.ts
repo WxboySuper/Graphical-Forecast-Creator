@@ -41,6 +41,7 @@ export const BLANK_LAND_OUTLINE_STYLE = new Style({
   stroke: new Stroke({ color: "#333333", width: 1 }),
 });
 
+/** Returns the shared style for a blank basemap layer. */
 const getStyleForKey = (key: BlankLayerKey): Style | undefined => {
   if (key === "worldCountries") return BLANK_WORLD_STYLE;
   if (key === "lakes") return BLANK_LAKE_STYLE;

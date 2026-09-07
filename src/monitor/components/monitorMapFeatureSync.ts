@@ -41,7 +41,8 @@ export const syncOutlookFeatures = (
     });
 
     // Applies monitor outlook styling before adding a feature to the source.
-    const applyStyle = (item: FeatureLike) => {
+/** Applies the computed monitor style to a feature. */
+const applyStyle = (item: FeatureLike) => {
       if ('setStyle' in item && typeof item.setStyle === 'function') {
         item.setStyle(toOlStyle(
           { outlookType, probability },
