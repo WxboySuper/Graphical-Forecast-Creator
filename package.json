@@ -55,7 +55,6 @@
   },
   "scripts": {
     "dev": "vite",
-    "start": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:tooling": "tsc --noEmit -p tsconfig.node.json",
