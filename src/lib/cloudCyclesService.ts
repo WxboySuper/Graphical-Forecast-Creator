@@ -81,6 +81,7 @@ interface SaveCloudCycleParams {
   existingId?: string;
 }
 
+/** Sends a normalized cloud cycle payload to the authenticated API. */
 const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
   const response = await fetch('/api/cloud-cycles', {
     method: 'POST',
@@ -91,6 +92,7 @@ const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
   return { success: true };
 };
 
+/** Builds the API request body for a cloud cycle save or update. */
 const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }: { cycleId: string; params: SaveCloudCycleParams; metadata: CloudCycleMetadata; workflowMetadata?: CycleMetadata }) => ({
   id: cycleId,
   userId: params.userId,
@@ -100,9 +102,10 @@ const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }:
   metadata: { ...metadata, ...(workflowMetadata ? { workflowMetadata } : {}) },
 });
 
-const getCloudSaveToken = async (): Promise<string | null> => {
+/** Returns the current Firebase token when a user is signed in. */
+const getCloudSaveToken = (): Promise<string | null> => {
   const currentUser = auth?.currentUser;
-  return currentUser ? currentUser.getIdToken() : null;
+  return Promise.resolve(currentUser ? currentUser.getIdToken() : null);
 };
 
 type LegacyCloudCyclesValue = string | Record<string, unknown> | undefined;
@@ -447,6 +450,7 @@ const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
   return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
 };
 
+/** Performs the authenticated cloud cycle save and converts failures to results. */
 const saveCloudCycleInternal = async (params: SaveCloudCycleParams): Promise<CloudOperationResult<string>> => {
   try {
     const context = await buildCloudCycleSaveContext(params);
@@ -465,6 +469,7 @@ const saveCloudCycleInternal = async (params: SaveCloudCycleParams): Promise<Clo
   }
 };
 
+/** Saves a cloud cycle through the shared cloud persistence flow. */
 export const saveCloudCycle = (params: SaveCloudCycleParams): Promise<CloudOperationResult<string>> =>
   saveCloudCycleInternal(params);
 
@@ -602,8 +607,8 @@ export const subscribeToCloudCycles = (
           return;
         }
 
-        void readLegacyCloudCycles(userId)
-          .then(async (legacyCycles) => {
+        readLegacyCloudCycles(userId)
+          .then((legacyCycles) => {
             if (!active) {
               return;
             }
@@ -632,15 +637,4 @@ export const subscribeToCloudCycles = (
     if (onError && error instanceof Error) onError(error);
     return noopUnsubscribe;
   }
-};
-
-/**
- * Checks if a local cycle differs from the remote version
- */
-export const hasRemoteChanges = (
-  localPayload: GFCForecastSaveData,
-  remoteMetadata: CloudCycleMetadata
-): boolean => {
-  const localHash = computePayloadHash(localPayload);
-  return localHash !== remoteMetadata.payloadHash;
 };
