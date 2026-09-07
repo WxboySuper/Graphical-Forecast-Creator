@@ -35,6 +35,7 @@ export const TODAY_SECTION_HEADERS: ReadonlyArray<TodaySectionHeader> = (
   type,
 }));
 
+/** Parses one normalized storm-report CSV row using the supplied column mapping. */
 const parseStormReportRow = (
   line: string,
   type: ReportType,
@@ -63,6 +64,7 @@ const parseStormReportRow = (
   };
 };
 
+/** Parses one today.csv row for the selected report type. */
 export const parseTodayCsvRow = (line: string, type: ReportType): StormReport | null => {
   const { rowHeaders } = TODAY_SECTION_DESCRIPTORS[type];
 
@@ -76,6 +78,7 @@ export const parseTodayCsvRow = (line: string, type: ReportType): StormReport | 
   });
 };
 
+/** Parses one archived SPC CSV row using its header order. */
 export const parseArchiveCsvRow = (
   line: string,
   type: ReportType,
