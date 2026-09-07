@@ -40,6 +40,7 @@ export const registerForecastEditInteractions = ({
   activeProbability: () => string;
   onModifyEnd: ModifyEndHandler;
 }): ForecastEditInteractions => {
+  /** Allows vertex deletion only on a single Alt-click or Shift-click. */
   const deleteCondition = (event: Parameters<typeof singleClick>[0]) =>
     singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event));
   const modify = new Modify({
