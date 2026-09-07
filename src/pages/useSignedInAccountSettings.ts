@@ -33,12 +33,16 @@ export const useSignedInAccountSettings = () => {
 
   /** Wraps the async save action for a button click without leaking promise handling into JSX. */
   const handleSaveDefaultsClick = () => {
-    handleSaveDefaults().catch(() => {});
+    handleSaveDefaults().catch(() => {
+      // Save feedback is already surfaced by handleSaveDefaults.
+    });
   };
 
   /** Wraps sign-out for button usage while shared auth state handles any failure messaging. */
   const handleSignOutClick = () => {
-    signOutUser().catch(() => {});
+    signOutUser().catch(() => {
+      // Auth failures surface through shared auth state.
+    });
   };
 
   /** Clears any forecast UI message when opening forecast. */
