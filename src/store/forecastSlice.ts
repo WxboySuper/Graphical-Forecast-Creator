@@ -35,7 +35,6 @@ import {
   createInitialCycleMetadata,
   createWorkspaceEditorDefaults,
   getDayBucket,
-  getWorkflowStartDay,
   getWorkflowValidationGroupings,
   normalizeCycleWorkspace,
   resolveWorkflowId,
@@ -64,6 +63,7 @@ import { applyCopyFeaturesFromPrevious } from './forecastCopy';
 import { restoreSavedCycle } from './forecastSavedCycle';
 import { hydrateForecastCycle } from './forecastCycleHydration';
 import { applyWorkflowPackageImport } from './forecastWorkflowImport';
+import { startBlankForecastCycle } from './forecastBlankCycle';
 
 const HISTORY_LIMIT = 50;
 
@@ -1051,45 +1051,14 @@ export const forecastSlice = createSlice({
       workflowTemplate?: WorkflowMetadata;
       cycleDate?: string;
     }>) => {
-      const { workflowTemplate, cycleDate } = action.payload;
-      clearHistory(state);
-      state.discussionDraftsByScope = {};
-      const now = readActionTimestamp(action);
-      const today = cycleDate || getActionLocalCalendarDate(action);
-      const startDay = getWorkflowStartDay(workflowTemplate);
-      const newCycle: ForecastCycle = {
-        days: { [startDay]: createEmptyOutlook(startDay, now) },
-        currentDay: startDay,
-        cycleDate: today,
-      };
-      state.forecastCycle = newCycle;
+      const timestamp = readActionTimestamp(action);
+      startBlankForecastCycle(state, {
+        workflowTemplate: action.payload.workflowTemplate,
+        cycleDate: action.payload.cycleDate,
+        today: getActionLocalCalendarDate(action),
+        timestamp,
+      });
       advanceCycleGeneration(state);
-      state.isSaved = false;
-      state.outlookVersionSnapshots = [];
-      
-      if (workflowTemplate) {
-        state.workflowTemplate = workflowTemplate;
-        // Create initial cycle metadata
-        state.workflowMetadata = {
-          id: `WF-${workflowTemplate.id}-${today}`,
-          workflowId: workflowTemplate.id,
-          cycleDate: today,
-          status: 'in-progress',
-          outlookVersions: [{
-            version: 1,
-            status: 'in-progress',
-            createdAt: now,
-          }],
-          createdAt: now,
-          updatedAt: now,
-        };
-        state.isWorkflowActive = true;
-      } else {
-        // Clear stale workflow state when starting without a template
-        state.workflowTemplate = undefined;
-        state.workflowMetadata = undefined;
-        state.isWorkflowActive = false;
-      }
     },
 
     /** Resume an incomplete cycle from a saved snapshot, restoring workflow metadata. */
