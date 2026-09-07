@@ -1,7 +1,6 @@
 import GeoJSON from 'ol/format/GeoJSON';
-import Feature from 'ol/Feature';
+import Feature, { type FeatureLike } from 'ol/Feature';
 import Point from 'ol/geom/Point';
-import type { FeatureLike } from 'ol/Feature';
 import VectorSource from 'ol/source/Vector';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
