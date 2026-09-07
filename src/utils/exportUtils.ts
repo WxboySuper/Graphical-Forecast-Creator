@@ -70,6 +70,7 @@ export const addStatusOverlay = (container: HTMLElement, statusText: string, isD
 export const addUnofficialOverlay = (container: HTMLElement, unofficialText: string) => {
   const doc = container.ownerDocument;
   const unofficialWrapper = doc.createElement('div');
+  // Keep the warning on its own bottom row; the attribution footer occupies the row above it.
   unofficialWrapper.style.cssText = 'position:absolute;bottom:8px;left:0;right:0;text-align:center;z-index:1300;pointer-events:none;';
 
   const innerBg = 'rgba(20,20,20,0.62)';
@@ -106,7 +107,7 @@ export const addTitleAndFooter = (container: HTMLElement, options: OverlayOption
   const footerDiv = doc.createElement('div');
   const bg = isDarkMode ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)';
   const text = isDarkMode ? '#e4e4e4' : '#212529';
-  footerDiv.style.cssText = `position:absolute;bottom:20px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
+  footerDiv.style.cssText = `position:absolute;bottom:42px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
   footerDiv.textContent = `Created with Graphical Forecast Creator | ${getFormattedDate()} | OpenStreetMap contributors`;
   container.appendChild(footerDiv);
 };
