@@ -4,6 +4,7 @@ const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
+const { registerBillingRoutes: registerBillingRoutesImpl } = require('./billingRoutes');
 const { getAdminAuth, getAdminDb } = require('./firebase-admin');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
@@ -533,33 +534,18 @@ const wrapBillingJsonRoute = ({ handler, fallbackMessage, failureCode }) => asyn
 
 /** Registers the billing endpoints on the existing hosted-service Express app. */
 const registerBillingRoutes = (app, express) => {
-  app.get('/api/billing/config', handleBillingConfig);
-  app.post(
-    '/api/billing/webhook',
+  registerBillingRoutesImpl({
+    app,
+    express,
     webhookRateLimit,
-    express.raw({ type: 'application/json' }),
-    handleBillingWebhook
-  );
-  app.post(
-    '/api/billing/checkout',
     checkoutRateLimit,
-    express.json({ limit: '8kb' }),
-    wrapBillingJsonRoute({
-      handler: handleCheckout,
-      fallbackMessage: 'Unable to create checkout session.',
-      failureCode: 'billing_checkout_failed',
-    })
-  );
-  app.post(
-    '/api/billing/portal',
     portalRateLimit,
-    express.json({ limit: '8kb' }),
-    wrapBillingJsonRoute({
-      handler: handleBillingPortal,
-      fallbackMessage: 'Unable to open the billing portal.',
-      failureCode: 'billing_portal_failed',
-    })
-  );
+    handleBillingConfig,
+    handleBillingWebhook,
+    handleCheckout,
+    handleBillingPortal,
+    wrapBillingJsonRoute,
+  });
 };
 
 module.exports = {
