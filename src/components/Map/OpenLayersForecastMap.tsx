@@ -16,14 +16,9 @@ import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
-import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
+import { altKeyOnly, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { Redo2, Undo2 } from "lucide-react";
-import {
-  removeFeature,
-  removeCustomFeature,
-  redoLastEdit,
-  undoLastEdit,
-} from "../../store/forecastSlice";
+import { redoLastEdit, undoLastEdit } from "../../store/forecastSlice";
 
 import type { BaseMapStyle } from "../../store/overlaysSlice";
 import type { DayType } from "../../types/outlooks";
@@ -40,7 +35,6 @@ import UnofficialBadge from "./UnofficialBadge";
 import { isOpenFreeMapStyle } from "../../lib/openFreeMap";
 import "./ForecastMap.css";
 import {
-  getFeatureIdentity,
   isDrawableOutlookType,
   toOlStyle,
   toCustomOlStyle,
@@ -78,6 +72,7 @@ import {
 } from "./openLayersForecastViewSync";
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
 import { createForecastMapLayers, type ForecastMapLayerSet } from "./openLayersForecastLayerSetup";
+import { createForecastDeleteInteraction } from "./openLayersForecastDeleteInteraction";
 export { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 
@@ -485,52 +480,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
       // Limit delete picking to editable outlook layers so top overlays (state outlines/labels)
       // do not intercept clicks and prevent polygon deletion.
-      const select = new Select({
-        condition: click,
-        layers: [vectorLayer, catLayer],
-      });
-      select.setActive(false);
-      select.on("select", (event) => {
-        const selected = event.selected[0];
-        if (!selected) {
-          return;
-        }
-
-        const outlookType = selected.get("outlookType") as string | undefined;
-        const derivedFrom = selected.get("derivedFrom") as string | undefined;
-
-        // Auto-generated categorical polygons are derived from probabilistic outlooks.
-        // Keep them read-only here; users should edit tornado/wind/hail/totalSevere
-        // (or draw/delete TSTM manually) and let auto-categorical regenerate.
-        if (outlookType === "categorical" && derivedFrom === "auto-generated") {
-          select.getFeatures().clear();
-          return;
-        }
-
-        const customIdentity = getCustomFeatureIdentity(selected);
-        if (customIdentity) {
-          dispatch(removeCustomFeature({ layerId: customIdentity.customLayerId, featureId: customIdentity.featureId }));
-          select.getFeatures().clear();
-          return;
-        }
-
-        const identity = getFeatureIdentity(selected);
-        if (!identity) {
-          select.getFeatures().clear();
-          return;
-        }
-
-        dispatch(
-          removeFeature({
-            outlookType: identity.outlookType as EditableOutlookType,
-            probability: identity.probability,
-            featureId: identity.featureId,
-          }),
-        );
-
-        select.getFeatures().clear();
-        return;
-      });
+      const select = createForecastDeleteInteraction({ vectorLayer, catLayer, dispatch });
       map.addInteraction(select);
       selectRef.current = select;
 
