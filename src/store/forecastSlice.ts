@@ -61,6 +61,7 @@ import { applyCreateOutlookUpdate } from './forecastVersioning';
 import { applyDiscussionDraftMigrations } from './forecastDiscussionDrafts';
 import { applyLegacyForecastImport } from './forecastLegacyImport';
 import { applyCopyFeaturesFromPrevious } from './forecastCopy';
+import { restoreSavedCycle } from './forecastSavedCycle';
 
 const HISTORY_LIMIT = 50;
 
@@ -836,28 +837,8 @@ export const forecastSlice = createSlice({
       if (savedCycle && getSavedCycleWorkspaceId(savedCycle) === resolveForecastWorkspaceId(state.workspaceId)) {
         // The route owns workspace identity: loading a saved cycle never retags
         // the active workspace. Cross-workspace opens must navigate explicitly.
-        state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
+        restoreSavedCycle(state, savedCycle);
         advanceCycleGeneration(state);
-        clearHistory(state);
-        state.discussionDraftsByScope = {};
-        state.isSaved = true;
-        state.outlookVersionSnapshots = [];
-        
-        // Restore or clear workflow metadata
-        if (savedCycle.workflowMetadata) {
-          state.workflowMetadata = savedCycle.workflowMetadata;
-          // Restore the workflow template from the workflowId
-          state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
-            id: savedCycle.workflowMetadata.workflowId,
-            label: savedCycle.workflowMetadata.workflowId,
-            groupings: [],
-          };
-          state.isWorkflowActive = true;
-        } else {
-          state.workflowMetadata = undefined;
-          state.workflowTemplate = undefined;
-          state.isWorkflowActive = false;
-        }
       }
     },
 
@@ -1146,28 +1127,8 @@ export const forecastSlice = createSlice({
       const savedCycle = state.savedCycles.find((c) => c.id === cycleId);
       if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== resolveForecastWorkspaceId(state.workspaceId)) return;
 
-      clearHistory(state);
-      state.discussionDraftsByScope = {};
-      state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
+      restoreSavedCycle(state, savedCycle);
       advanceCycleGeneration(state);
-      state.isSaved = true;
-      state.outlookVersionSnapshots = [];
-      
-      // Restore or clear workflow metadata
-      if (savedCycle.workflowMetadata) {
-        state.workflowMetadata = savedCycle.workflowMetadata;
-        // Restore the workflow template from the workflowId
-        state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
-          id: savedCycle.workflowMetadata.workflowId,
-          label: savedCycle.workflowMetadata.workflowId,
-          groupings: [],
-        };
-        state.isWorkflowActive = true;
-      } else {
-        state.workflowMetadata = undefined;
-        state.workflowTemplate = undefined;
-        state.isWorkflowActive = false;
-      }
     },
 
     /** Create a new outlook version within the current cycle (same-cycle update). */
