@@ -2,6 +2,7 @@
 
 const rateLimit = require('express-rate-limit');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { registerMetricsRoutes: registerMetricsRoutesImpl } = require('./metricsRoutes');
 
 const METRIC_EVENT_TYPES = new Set([
   'account_signup',
@@ -667,22 +668,13 @@ const handleAdminMetrics = async (req, res) => {
 
 /** Registers the product-metrics ingestion and private admin metrics endpoints on the hosted-service server. */
 const registerMetricsRoutes = (app, express) => {
-  app.post('/api/metrics/event', METRICS_RATE_LIMIT, express.json({ limit: '2kb' }), async (req, res) => {
-    try {
-      await handleMetricEvent(req, res);
-    } catch (error) {
-      console.error('[metrics] event:error', error);
-      res.status(500).json({ error: 'Unable to record metrics right now.' });
-    }
-  });
-
-  app.get('/api/admin/metrics', ADMIN_RATE_LIMIT, async (req, res) => {
-    try {
-      await handleAdminMetrics(req, res);
-    } catch (error) {
-      console.error('[metrics] admin:error', error);
-      res.status(500).json({ error: 'Unable to read admin metrics right now.' });
-    }
+  registerMetricsRoutesImpl({
+    app,
+    express,
+    metricsRateLimit: METRICS_RATE_LIMIT,
+    adminRateLimit: ADMIN_RATE_LIMIT,
+    handleMetricEvent,
+    handleAdminMetrics,
   });
 };
 
