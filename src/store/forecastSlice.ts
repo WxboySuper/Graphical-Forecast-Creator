@@ -40,7 +40,6 @@ import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflow
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import {
   cloneIntegratedCustomLayers,
-  cloneOutlookData,
 } from './forecastSnapshotHelpers';
 import {
   buildFeatureWithProps,
@@ -83,6 +82,7 @@ import {
   sharedEmptyOutlookData,
 } from './forecastStateFactory';
 import { createInitialForecastState } from './forecastInitialState';
+import { applyCreateOutlookUpdate } from './forecastVersioning';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -841,64 +841,7 @@ export const forecastSlice = createSlice({
 
     /** Create a new outlook version within the current cycle (same-cycle update). */
     createOutlookUpdate: (state, action: UnknownAction) => {
-      const now = readActionTimestamp(action);
-
-      // Determine the next version number
-      const currentVersions = state.workflowMetadata?.outlookVersions || [];
-      const nextVersion = currentVersions.length > 0
-        ? Math.max(...currentVersions.map(v => v.version)) + 1
-        : 1;
-
-      // Snapshot every day that has data so full-outlook workflows keep
-      // the whole version side-by-side with the next iteration, not just
-      // the currently selected day.
-      const snapshotDays: typeof state.forecastCycle.days = {};
-      let hasSnapshot = false;
-      (Object.entries(state.forecastCycle.days) as unknown as [DayType, typeof state.forecastCycle.days[DayType]][]).forEach(
-        ([day, dayData]) => {
-          if (!dayData) return;
-          snapshotDays[day] = {
-            ...dayData,
-            data: cloneOutlookData(dayData.data),
-            // Version history must retain the exact geometry and appearance
-            // that existed before the update, not a live reference.
-            customLayers: cloneIntegratedCustomLayers(dayData.customLayers),
-          };
-          hasSnapshot = true;
-        },
-      );
-
-      if (hasSnapshot) {
-        state.outlookVersionSnapshots.push({
-          version: nextVersion - 1, // Snapshot the previous version
-          days: snapshotDays,
-          createdAt: now,
-        });
-      }
-      
-      // Mark previous versions as completed
-      if (state.workflowMetadata) {
-        state.workflowMetadata.outlookVersions.forEach(v => {
-          if (v.status === 'in-progress') {
-            v.status = 'completed';
-          }
-        });
-        
-        // Add new version
-        state.workflowMetadata.outlookVersions.push({
-          version: nextVersion,
-          status: 'in-progress',
-          derivedFrom: nextVersion - 1,
-          createdAt: now,
-        });
-        
-        state.workflowMetadata.status = 'in-progress';
-        state.workflowMetadata.updatedAt = now;
-      }
-      
-      state.forecastCycle.updateInProgressVersion = nextVersion;
-      invalidateCompletionAcknowledgement(state);
-      state.isSaved = false;
+      applyCreateOutlookUpdate(state, readActionTimestamp(action));
     },
 
     /** Start a new cycle derived from a previous cycle. */
