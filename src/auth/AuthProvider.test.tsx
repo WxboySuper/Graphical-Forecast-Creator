@@ -24,6 +24,7 @@ import {
   seedOrApplySettings,
   startSettingsSubscription,
   syncProfileDocument,
+  createSettingsSnapshot as createProviderSettingsSnapshot,
   AuthProvider,
   useAuth,
 } from './AuthProvider';
@@ -112,6 +113,10 @@ const waitForAuthEffects = async (delay = 100) => {
 };
 
 describe('AuthProvider Utils', () => {
+  test('keeps the existing provider re-export for settings helpers', () => {
+    expect(createProviderSettingsSnapshot).toBe(createSettingsSnapshot);
+  });
+
   test('local sign-out failure does not turn completed server deletion into a failure', async () => {
     const clearLocalState = jest.fn();
     await expect(clearDeletedAccountSession(
