@@ -129,5 +129,10 @@ describe('exportUtils additional unit tests', () => {
     expect((ctrl as HTMLElement).style.display).toBe('none');
     // overlays/footer should have been added; look for known footer text
     expect(clonedRoot.textContent).toContain('Created with Graphical Forecast Creator');
+    const overlays = Array.from(clonedRoot.children) as HTMLElement[];
+    const unofficial = overlays.find((child) => child.textContent?.includes('Unofficial'));
+    const footer = overlays.find((child) => child.textContent?.includes('Created with Graphical Forecast Creator'));
+    expect(unofficial?.style.bottom).toBe('8px');
+    expect(footer?.style.bottom).toBe('42px');
   });
 });
