@@ -5,14 +5,22 @@ import { clearHistory } from './forecastHistory';
 import { copyCompatibleOutlooks } from './forecastRollover';
 import { clearOutlookMaps, createEmptyOutlook } from './forecastStateFactory';
 
+interface CopyFeaturesArgs {
+  state: ForecastState;
+  sourceCycle: ForecastCycle;
+  sourceDay: DayType;
+  targetDay: DayType;
+  timestamp: string;
+}
+
 /** Copies compatible outlooks and custom layers from a source cycle into a target day. */
-export const applyCopyFeaturesFromPrevious = (
-  state: ForecastState,
-  sourceCycle: ForecastCycle,
-  sourceDay: DayType,
-  targetDay: DayType,
-  timestamp: string,
-): void => {
+export const applyCopyFeaturesFromPrevious = ({
+  state,
+  sourceCycle,
+  sourceDay,
+  targetDay,
+  timestamp,
+}: CopyFeaturesArgs): void => {
   const sourceDayData = sourceCycle.days[sourceDay];
   if (!sourceDayData) return;
 
