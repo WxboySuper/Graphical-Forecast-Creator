@@ -59,6 +59,11 @@ import {
   applyRolloverFromPreviousCycle,
   copyCompatibleOutlooks,
 } from './forecastRollover';
+import {
+  applyLowProbabilityState,
+  canSetLowProbabilityState,
+  invalidateCompletionAcknowledgement,
+} from './forecastProbabilityState';
 import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import type { LandMaskFeature, LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 import {
@@ -397,62 +402,6 @@ const applyPendingFeatureUpdates = (
       },
     };
   }
-};
-
-/** Clears stale package completion when forecast package content changes. */
-const invalidateCompletionAcknowledgement = (state: ForecastState) => {
-  if (state.forecastCycle.completionAcknowledgedAt || state.forecastCycle.omittedDayReasons) {
-    delete state.forecastCycle.completionAcknowledgedAt;
-    delete state.forecastCycle.omittedDayReasons;
-  }
-  state.completionValidation.lastResult = null;
-};
-
-/** Ensures low-probability metadata exists before mutating it in reducers. */
-const ensureLowProbabilityOutlooks = (dayData: OutlookDay): OutlookType[] => {
-  if (!dayData.metadata.lowProbabilityOutlooks) {
-    dayData.metadata.lowProbabilityOutlooks = [];
-  }
-
-  return dayData.metadata.lowProbabilityOutlooks;
-};
-
-/** Returns whether a low-probability toggle would actually change the current day state. */
-const canSetLowProbabilityState = (
-  state: ForecastState,
-  outlookType: OutlookType,
-  isLow: boolean
-) => {
-  const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
-  if (!dayData) return false;
-
-  const lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks || [];
-  const isCurrentlyLow = lowProbabilityOutlooks.includes(outlookType);
-
-  return (isLow && !isCurrentlyLow) || (!isLow && isCurrentlyLow);
-};
-
-/** Applies a low-probability toggle for one outlook type and clears its features when enabled. */
-const applyLowProbabilityState = (
-  state: ForecastState,
-  outlookType: OutlookType,
-  isLow: boolean
-) => {
-  const dayData = state.forecastCycle.days[state.forecastCycle.currentDay];
-  if (!dayData) return;
-
-  const lowProbabilityOutlooks = ensureLowProbabilityOutlooks(dayData);
-  const isCurrentlyLow = lowProbabilityOutlooks.includes(outlookType);
-
-  if (isLow && !isCurrentlyLow) {
-    lowProbabilityOutlooks.push(outlookType);
-    dayData.data[outlookType]?.clear();
-  } else if (!isLow && isCurrentlyLow) {
-    dayData.metadata.lowProbabilityOutlooks = lowProbabilityOutlooks.filter((type) => type !== outlookType);
-  }
-
-  invalidateCompletionAcknowledgement(state);
-  state.isSaved = false;
 };
 
 /** Restores one direction of history using the action timestamp and empty-day factory. */
