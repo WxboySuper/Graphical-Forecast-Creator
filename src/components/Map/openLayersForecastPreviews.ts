@@ -39,6 +39,7 @@ export const syncTrimPreviewSource = (
       featureProjection: "EPSG:3857",
     });
 
+    /** Marks a feature as part of the temporary trim preview. */
     const applyPreview = (item: OLFeature<Geometry>) => {
       item.setStyle(TRIM_PREVIEW_STYLE);
       item.set("trimPreview", true);
