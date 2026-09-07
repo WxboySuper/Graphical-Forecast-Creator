@@ -1,5 +1,4 @@
-import React from 'react';
-import type { MutableRefObject } from 'react';
+import React, { type MutableRefObject } from 'react';
 import type { VerificationMapHandle } from '../Map/VerificationMap';
 import type { StormReport } from '../../types/stormReports';
 import type { ComponentKey, MapOutlookLayer, ProductGrade, ProductKind } from '../../utils/verificationV2';
