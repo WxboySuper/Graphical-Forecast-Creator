@@ -11,6 +11,7 @@ interface StartBlankForecastCycleOptions {
   timestamp: string;
 }
 
+/** Resolves the first forecast day implied by a workflow template. */
 const getWorkflowStartDay = (template?: WorkflowMetadata): DayType => {
   const firstGrouping = template?.groupings[0];
   if (firstGrouping === 'day2') return 2;
