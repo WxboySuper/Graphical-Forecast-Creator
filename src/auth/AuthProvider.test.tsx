@@ -5,18 +5,12 @@ import { getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import {
   applySettingsToState,
   areOverlaySettingsEqual,
-  areUserSettingsEqual,
   asRecord,
   canSyncHostedUserDocuments,
   clearDeletedAccountSession,
-  createProfilePayload,
-  createSettingsSnapshot,
   disabledAuthAction,
   extractLocalUserFromData,
   getDefaultContextValue,
-  getRemoteSeedPayload,
-  getSettingsSyncError,
-  getSettingsUpdateError,
   initLocalAuthState,
   localRefreshBetaAccess,
   localSignInWithEmail,
@@ -24,10 +18,8 @@ import {
   localSignUpWithEmail,
   localUpdateSyncedSettings,
   postLocalJson,
-  readProfileBetaAccess,
   runInitialHostedSync,
   attachHostedSettingsSubscription,
-  readRemoteSettings,
   safeParseJson,
   seedOrApplySettings,
   startSettingsSubscription,
@@ -36,6 +28,16 @@ import {
   useAuth,
 } from './AuthProvider';
 import { queueProductMetric } from '../utils/productMetrics';
+import {
+  areUserSettingsEqual,
+  createProfilePayload,
+  createSettingsSnapshot,
+  getRemoteSeedPayload,
+  getSettingsSyncError,
+  getSettingsUpdateError,
+  readProfileBetaAccess,
+  readRemoteSettings,
+} from './authSettings';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer, { type OverlaysState } from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
