@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ReportType, StormReport } from '../types/stormReports';
-import { buildCsvRow, extractStormReportMagnitude, splitCsvLine } from './stormReportCsv';
-import type { StormReportRowFieldMap } from './stormReportCsv';
+import { buildCsvRow, extractStormReportMagnitude, splitCsvLine, type StormReportRowFieldMap } from './stormReportCsv';
 
 export type TodaySectionDescriptor = {
   header: string;

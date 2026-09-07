@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
 export type PendingCustomProductAction = { action: string; productId?: string } | null;
 export type RunCustomProductWrite = (
