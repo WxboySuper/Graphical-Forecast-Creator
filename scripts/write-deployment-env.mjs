@@ -27,11 +27,13 @@ if (
   process.exit(1);
 }
 
+/** Returns whether a resolved config path remains inside deploy/. */
 const isDeployPath = (candidatePath) => {
   const relativePath = relative(DEPLOY_DIR, candidatePath);
   return !relativePath.startsWith('..') && !isAbsolute(relativePath) && relativePath !== '';
 };
 
+/** Reads one deployment config and recursively merges its optional shared parent. */
 const readDeploymentConfig = (candidatePath, seen = new Set()) => {
   if (!isDeployPath(candidatePath)) {
     throw new Error('Deployment config inheritance must stay under deploy/.');
