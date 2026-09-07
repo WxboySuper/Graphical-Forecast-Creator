@@ -2,13 +2,12 @@ import React from 'react';
 import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
-import useAutoCategorical from '../useAutoCategorical';
+import useAutoCategorical, { signatureFromOutlookMap } from '../useAutoCategorical';
 import {
   processDay12OutlooksToCategorical,
   processDay3OutlooksToCategorical,
   processOutlooksToCategorical,
 } from '../autoCategoricalProcessing';
-import { signatureFromOutlookMap } from '../useAutoCategorical';
 import { CategoricalDerivationError } from '../categoricalErrors';
 import type { DerivationController, DerivationResult } from '../categoricalWorker';
 import { OutlookData } from '../../types/outlooks';
