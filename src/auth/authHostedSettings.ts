@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore';
-import type * as React from 'react';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import {
   createProfilePayload,
   getRemoteSeedPayload,
@@ -30,8 +30,8 @@ export const seedOrApplySettings = async (opts: {
   localSettings: UserSettingsDocument;
   applyRemoteSettings: (settings: UserSettingsDocument) => void;
   isActive: () => boolean;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  lastSyncedSettingsRef: MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: Dispatch<SetStateAction<UserSettingsDocument | null>>;
 }): Promise<void> => {
   const {
     settingsRef,
@@ -66,8 +66,8 @@ export const startSettingsSubscription = (opts: {
   settingsRef: ReturnType<typeof doc>;
   isActive: () => boolean;
   applyRemoteSettings: (settings: UserSettingsDocument) => void;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setSettingsSyncStatus: Dispatch<SetStateAction<SettingsSyncStatus>>;
+  setError: Dispatch<SetStateAction<string | null>>;
 }): Unsubscribe =>
   onSnapshot(
     opts.settingsRef,
@@ -93,11 +93,11 @@ export const runInitialHostedSync = async (opts: {
   buildLocalSettingsSnapshot: () => UserSettingsDocument;
   applyRemoteSettings: (settings: UserSettingsDocument) => void;
   isActive: () => boolean;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  hasInitializedSettingsRef: React.MutableRefObject<boolean>;
+  lastSyncedSettingsRef: MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: Dispatch<SetStateAction<UserSettingsDocument | null>>;
+  setSettingsSyncStatus: Dispatch<SetStateAction<SettingsSyncStatus>>;
+  setError: Dispatch<SetStateAction<string | null>>;
+  hasInitializedSettingsRef: MutableRefObject<boolean>;
 }): Promise<Unsubscribe | undefined> => {
   opts.setSettingsSyncStatus('syncing');
 
