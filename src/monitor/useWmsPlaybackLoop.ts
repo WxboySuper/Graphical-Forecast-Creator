@@ -12,6 +12,7 @@ interface WmsPlaybackLoopOptions {
   setPlayback: Dispatch<SetStateAction<{ radar: LayerPlaybackState; satellite: LayerPlaybackState }>>;
 }
 
+/** Advances radar and satellite playback while animation is enabled. */
 export const useWmsPlaybackLoop = ({
   shouldAnimate,
   frameSignature,
