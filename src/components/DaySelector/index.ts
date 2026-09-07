@@ -1,1 +1,0 @@
-export { DaySelectorPanel } from './DaySelectorPanel';
