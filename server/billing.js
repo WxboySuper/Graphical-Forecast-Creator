@@ -3,7 +3,6 @@
 const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
-const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBearerToken } = require('./firebase-auth');
@@ -11,6 +10,12 @@ const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require(
 const { recordBillingMetricEvent } = require('./metrics');
 const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
 const { getStripeObjectId, refundDeletedAccountInvoice } = require('./billing-cleanup');
+const {
+  createCheckoutEntitlementWrite,
+  createSubscriptionEntitlementWrite,
+  getCheckoutRefundTarget,
+  getSubscriptionUid,
+} = require('./billingEntitlementBuilders');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -352,96 +357,6 @@ const handleBillingPortal = async (req, res) => {
   });
 
   res.json({ url: portal.url });
-};
-
-/** Maps Stripe recurring intervals into the entitlement interval shape. */
-const getPlanInterval = (interval) => (interval === 'year' ? 'annual' : 'monthly');
-
-/** Normalizes a Stripe API customer id into a nullable string. */
-const getStripeCustomerId = (value) => (typeof value === 'string' ? value : null);
-
-/** Normalizes a Stripe API subscription id into a nullable string. */
-const getStripeSubscriptionId = (value) => (typeof value === 'string' ? value : null);
-
-/** Converts Stripe unix timestamps into nullable JS dates. */
-const getStripeDate = (value) => (value ? new Date(value * 1000) : null);
-
-/** Builds the entitlement payload for a checkout completion event. */
-const createCheckoutEntitlementWrite = (session) => {
-  const uid = session.metadata?.uid || '';
-  const stripeCustomerId = getStripeCustomerId(session.customer);
-  const stripeSubscriptionId = getStripeSubscriptionId(session.subscription);
-
-  return {
-    uid,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    payload: {
-      uid,
-      planInterval: session.metadata?.plan === 'annual' ? 'annual' : 'monthly',
-      billingStatus: 'active',
-      stripeCustomerId,
-      stripeSubscriptionId,
-      cancelAtPeriodEnd: false,
-      currentPeriodEnd: null,
-    },
-  };
-};
-
-/** Builds the entitlement payload for subscription lifecycle updates. */
-const getSubscriptionUid = (subscription) => subscription.metadata?.uid || '';
-
-/** Builds the nested payload for a subscription webhook entitlement update. */
-const createSubscriptionEntitlementPayload = (subscription, uid, stripeCustomerId) => ({
-  uid,
-  planInterval: getPlanInterval(subscription.items?.data?.[0]?.price?.recurring?.interval),
-  billingStatus: subscription.status || 'inactive',
-  stripeCustomerId,
-  stripeSubscriptionId: subscription.id,
-  cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-  currentPeriodEnd: getStripeDate(getSubscriptionPeriodEndUnix(subscription)),
-});
-
-/** Builds the entitlement payload for subscription lifecycle updates. */
-const createSubscriptionEntitlementWrite = (subscription) => {
-  const uid = getSubscriptionUid(subscription);
-  const stripeCustomerId = getStripeCustomerId(subscription.customer);
-
-  return {
-    uid,
-    stripeCustomerId,
-    stripeSubscriptionId: subscription.id,
-    payload: createSubscriptionEntitlementPayload(subscription, uid, stripeCustomerId),
-  };
-};
-
-/** Returns the first usable Stripe ID from a list of expanded objects or plain IDs. */
-const getFirstStripeObjectId = (values) => values.map(getStripeObjectId).find(Boolean) || '';
-
-/** Finds the payment intent across Checkout and legacy/current invoice shapes. */
-const getCheckoutPaymentIntentId = (session, invoice, payments) =>
-  getFirstStripeObjectId([
-    session.payment_intent,
-    invoice?.payment_intent,
-    ...payments.map((payment) => payment?.payment?.payment_intent),
-  ]);
-
-/** Finds a charge-only payment across current and legacy invoice shapes. */
-const getCheckoutChargeId = (invoice, payments) =>
-  getFirstStripeObjectId([
-    ...payments.map((payment) => payment?.payment?.charge),
-    invoice?.charge,
-  ]);
-
-/** Finds the initial Checkout payment across Stripe's legacy and current invoice shapes. */
-const getCheckoutRefundTarget = (session, subscription) => {
-  const invoice = subscription?.latest_invoice;
-  const payments = invoice?.payments?.data || [];
-  const paymentIntent = getCheckoutPaymentIntentId(session, invoice, payments);
-  if (paymentIntent) return { payment_intent: paymentIntent };
-
-  const charge = getCheckoutChargeId(invoice, payments);
-  return charge ? { charge } : null;
 };
 
 /** Returns the UID only when this Checkout belongs to an account blocked from writes. */
