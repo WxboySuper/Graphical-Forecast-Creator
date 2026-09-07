@@ -5,6 +5,7 @@
  * @param {string} token
  * @param {string} path
  * @param {{ method?: string, body?: unknown, allowStatuses?: number[] }} [options]
+ * @returns {Promise<unknown>}
  */
 export async function githubRequest(repository, token, path, options = {}) {
   const response = await fetch(`https://api.github.com/repos/${repository}${path}`, {
