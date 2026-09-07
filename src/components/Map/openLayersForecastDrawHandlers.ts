@@ -39,7 +39,7 @@ export const handleForecastDrawEnd = (
   const geometry = event.feature.getGeometry();
   if (!geometry) return;
 
-  void (async () => {
+  (async () => {
     try {
       const geometryObject = format.writeGeometryObject(geometry, {
         dataProjection: "EPSG:4326",
