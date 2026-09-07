@@ -81,7 +81,10 @@ import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precision
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
 import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
-import { reconcileForecastSource } from "./openLayersForecastReconciliation";
+import {
+  applyForecastFeatureMetadata,
+  reconcileForecastSource,
+} from "./openLayersForecastReconciliation";
 import {
   syncMapViewFromOpenLayers,
   syncOpenLayersViewFromState,
@@ -910,11 +913,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                   { isTopLayer, outlookOpacity },
                 ),
               );
-              item.set("featureId", stableId);
-              item.set("outlookType", outlookType);
-              item.set("probability", probability);
-              item.set("isSignificant", Boolean(feature.properties?.isSignificant));
-              item.set("derivedFrom", feature.properties?.derivedFrom);
+              applyForecastFeatureMetadata(item, {
+                featureId: stableId,
+                outlookType,
+                probability,
+                isSignificant: Boolean(feature.properties?.isSignificant),
+                derivedFrom: feature.properties?.derivedFrom,
+              });
             },
             targetSource,
           };
@@ -1002,11 +1007,13 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 item.setStyle(
                   toGhostOlStyle({ outlookType, probability, isCategorical }),
                 );
-                item.set("featureId", stableId);
-                item.set("outlookType", outlookType);
-                item.set("probability", probability);
-                item.set("isSignificant", Boolean(feature.properties?.isSignificant));
-                item.set("derivedFrom", feature.properties?.derivedFrom);
+                applyForecastFeatureMetadata(item, {
+                  featureId: stableId,
+                  outlookType,
+                  probability,
+                  isSignificant: Boolean(feature.properties?.isSignificant),
+                  derivedFrom: feature.properties?.derivedFrom,
+                });
               },
               targetSource: ghostSource,
             });
