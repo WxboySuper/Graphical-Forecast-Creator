@@ -75,6 +75,14 @@ import {
   countCopyableSourceFeatures,
   type CopyOutlookGeometryOptions,
 } from '../utils/outlookGeometryCopy';
+import {
+  clearOutlookMaps,
+  createEmptyOutlook,
+  getFallbackOutlookData,
+  INITIAL_CYCLE_DATE,
+  INITIAL_TIMESTAMP,
+  sharedEmptyOutlookData,
+} from './forecastStateFactory';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -155,18 +163,6 @@ interface OutlookVersionSnapshot {
 export const SAVED_CYCLES_LIMIT = 50;
 /** Storage key for the workflow-active flag; persisted by the store subscription, not by reducers. */
 export const WORKFLOW_ACTIVE_STORAGE_KEY = 'gfc-active-forecast-workflow';
-/** Deterministic timestamp used for the module-level initial state so no clock read happens at import time. */
-const INITIAL_TIMESTAMP = '2026-01-01T00:00:00.000Z';
-/** Deterministic cycle date for the module-level initial state, overridden on first user action. */
-const INITIAL_CYCLE_DATE = '2026-01-01';
-const ALL_OUTLOOK_TYPES: OutlookType[] = [
-  'tornado',
-  'wind',
-  'hail',
-  'categorical',
-  'totalSevere',
-  'day4-8',
-];
 /** Resolves the local calendar date from an action's stamped timestamp instead of the clock. */
 const getActionLocalCalendarDate = (action: UnknownAction): string =>
   getLocalCalendarDate(new Date(readActionTimestamp(action)));
@@ -201,96 +197,6 @@ const getWorkflowValidationGroupings = (template?: WorkflowMetadata): StandardGr
       grouping === 'day1' || grouping === 'day2' || grouping === 'day3' || grouping === 'day4-8',
   );
   return standardGroupings.length > 0 ? standardGroupings : undefined;
-};
-
-/** Clears every supported outlook map on a target day before incoming copy operations. */
-const clearOutlookMaps = (data: OutlookData) => {
-  ALL_OUTLOOK_TYPES.forEach((type) => {
-    data[type]?.clear();
-  });
-};
-
-/** Creates an empty forecast day with the outlook maps supported for that day number. */
-const createEmptyOutlook = (day: DayType, now: string): OutlookDay => {
-  const baseData: OutlookData = {};
-
-  if (day === 1 || day === 2) {
-    // Day 1/2: tornado, wind, hail, categorical
-    baseData.tornado = new Map();
-    baseData.wind = new Map();
-    baseData.hail = new Map();
-    baseData.categorical = new Map();
-  } else if (day === 3) {
-    // Day 3: totalSevere, categorical
-    baseData.totalSevere = new Map();
-    baseData.categorical = new Map();
-  } else {
-    // Day 4-8: only day4-8 outlook type
-    baseData['day4-8'] = new Map();
-  }
-
-  return {
-    day,
-    data: baseData,
-    metadata: {
-      issueDate: now,
-      validDate: now,
-      issuanceTime: '0600',
-      createdAt: now,
-      lastModified: now,
-      lowProbabilityOutlooks: []
-    }
-  };
-};
-
-/** Returns a read-only Map proxy that throws if a consumer tries to mutate it. */
-const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> =>
-  new Proxy(map, {
-    set: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    deleteProperty: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    get: (target, property, receiver) => {
-      if (property === 'set' || property === 'delete' || property === 'clear') {
-        return () => {
-          throw new Error('Attempted to mutate a shared read-only outlook map.');
-        };
-      }
-      return Reflect.get(target, property, receiver);
-    },
-  });
-
-/** Deeply guards a value so shared fallbacks cannot be mutated. */
-const deepFreezeOutlookData = (data: OutlookData): OutlookData => {
-  const guarded: OutlookData = {};
-  for (const [type, map] of Object.entries(data)) {
-    guarded[type as OutlookType] = map instanceof Map ? freezeMap(map) : map;
-  }
-  return Object.freeze(guarded);
-};
-
-/**
- * Shared, immutable fallback outlook data keyed by day category. Returning the
- * same reference for a given day shape keeps selectors referentially stable so
- * unrelated renders do not trigger avoidable state changes or selector-stability
- * warnings. Consumers must treat these as read-only; the nested Maps are wrapped
- * in a proxy that throws on set/delete/clear so accidental writes fail loudly
- * instead of silently corrupting the shared singleton.
- */
-const EMPTY_OUTLOOK_DATA_BY_DAY: Record<string, OutlookData> = {
-  day12: deepFreezeOutlookData(createEmptyOutlook(1, INITIAL_TIMESTAMP).data),
-  day3: deepFreezeOutlookData(createEmptyOutlook(3, INITIAL_TIMESTAMP).data),
-  day48: deepFreezeOutlookData(createEmptyOutlook(4, INITIAL_TIMESTAMP).data),
-};
-
-/** Returns the shared empty outlook data for a day, or null when the day is unknown. */
-const sharedEmptyOutlookData = (day: DayType): OutlookData | null => {
-  if (day === 1 || day === 2) return EMPTY_OUTLOOK_DATA_BY_DAY.day12;
-  if (day === 3) return EMPTY_OUTLOOK_DATA_BY_DAY.day3;
-  if (day >= 4 && day <= 8) return EMPTY_OUTLOOK_DATA_BY_DAY.day48;
-  return null;
 };
 
 const initialState: ForecastState = {
@@ -1147,7 +1053,7 @@ export const {
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
+  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay) || getFallbackOutlookData();
   };
 const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
@@ -1161,6 +1067,6 @@ export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollecti
 /** Selects the outlook maps for a specific day, falling back to a shared empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[day]?.data || sharedEmptyOutlookData(day) || EMPTY_OUTLOOK_DATA_BY_DAY.day48;
+  return cycle.days[day]?.data || sharedEmptyOutlookData(day) || getFallbackOutlookData();
   };
 export default forecastSlice.reducer;
