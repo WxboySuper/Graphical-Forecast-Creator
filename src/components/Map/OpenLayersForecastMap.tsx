@@ -33,8 +33,6 @@ import {
   redoLastEdit,
   setMapView,
   undoLastEdit,
-  updateFeature,
-  updateCustomFeature,
 } from "../../store/forecastSlice";
 
 import type { BaseMapStyle } from "../../store/overlaysSlice";
@@ -54,12 +52,10 @@ import { isOpenFreeMapStyle } from "../../lib/openFreeMap";
 import "./ForecastMap.css";
 import {
   getFeatureIdentity,
-  toUpdatedGeoJsonFeature,
   isDrawableOutlookType,
   toOlStyle,
   toCustomOlStyle,
   getCustomFeatureIdentity,
-  toUpdatedCustomFeature,
   toDrawnCustomFeature,
   toGhostOlStyle,
   createLabelOverlaySource,
@@ -91,6 +87,7 @@ import { clearLandMaskRuntimeCache, ensureLandMask } from "../../utils/outlookPo
 import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMasking/trimOutlookData";
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
+import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
 export { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
@@ -287,45 +284,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
     useEffect(() => {
       if (!mapElementRef.current || mapRef.current) return undefined;
-
-      // CodeScene suppression is limited to this legacy async feature-sync coordinator.
-      // It batches categorical filtering, custom-feature conversion, and Redux updates;
-      // the paint-bucket click path is extracted and has no suppression.
-      // @codescene(disable:"Complex Method")
-      const handleModifiedFeatures = (
-        features: OLFeature<Geometry>[],
-        isCategorical: boolean,
-      ): void => {
-        const format = new GeoJSON();
-        const editDay = currentDayRef.current;
-        features.forEach((feature) => {
-          (async () => {
-            try {
-            if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
-              return;
-            }
-
-            if (!isCategorical) {
-              const customFeature = toUpdatedCustomFeature(feature, format);
-              if (customFeature) {
-                dispatch(updateCustomFeature(customFeature));
-                return;
-              }
-            }
-
-            const updatedFeature = toUpdatedGeoJsonFeature(feature, format, isCategorical);
-            if (!updatedFeature) {
-              return;
-            }
-
-            const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
-            dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
-            } catch (error) {
-              captureException(error, { tags: { featureOperation: "modify-outlook" } });
-            }
-          })();
-        });
-      };
 
       const tileLayer = new TileLayer({
         source: new OSM({ crossOrigin: "anonymous" }),
@@ -552,6 +510,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         handleModifiedFeatures(
           event.features.getArray() as OLFeature<Geometry>[],
           false,
+          {
+            currentDay: currentDayRef.current,
+            dispatch,
+            trimStoredOutlookFeature,
+          },
         );
       });
       map.addInteraction(modify);
@@ -579,6 +542,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         handleModifiedFeatures(
           event.features.getArray() as OLFeature<Geometry>[],
           true,
+          {
+            currentDay: currentDayRef.current,
+            dispatch,
+            trimStoredOutlookFeature,
+          },
         );
       });
       map.addInteraction(catModify);
