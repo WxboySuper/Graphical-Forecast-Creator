@@ -91,7 +91,6 @@ Use `pnpm` consistently for this repo so the checked-in `pnpm-lock.yaml` remains
 
 | Command | Description |
 |---------|-------------|
-| `pnpm start` | Vite dev server at http://localhost:3000 |
 | `pnpm run dev` | Vite dev server at http://localhost:3000 |
 | `pnpm test` | Run Jest unit test suite |
 | `pnpm run lint` | Run ESLint over the codebase |
