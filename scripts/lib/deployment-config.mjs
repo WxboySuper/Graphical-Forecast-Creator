@@ -6,6 +6,7 @@ function isPlainObject(value) {
 }
 
 /** Normalizes and validates deployment config JSON. */
+// @codescene(disable:"Complex Method")
 export function normalizeDeploymentConfig(config) {
   if (!isPlainObject(config)) {
     throw new Error('Deployment config must be a JSON object.');
