@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/react';
-import type { ErrorEvent, Event, EventHint } from '@sentry/react';
 import React from 'react';
 import {
   useLocation,
@@ -12,7 +11,7 @@ declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
 declare const __GFC_APP_VERSION__: string;
 
-type SentryExceptionValue = NonNullable<NonNullable<Event['exception']>['values']>[number];
+type SentryExceptionValue = NonNullable<NonNullable<Sentry.Event['exception']>['values']>[number];
 
 const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]{1,2}\.canvas'\)$/i;
 const REQUEST_ANIMATION_FRAME_MECHANISM = 'auto.browser.browserapierrors.requestAnimationFrame';
@@ -109,7 +108,7 @@ function hasApplicationStackFrame(values: SentryExceptionValue[]): boolean {
 }
 
 /** True when breadcrumbs contain more than Redux's initial store action. */
-function hasActionableBreadcrumbs(event: Event): boolean {
+function hasActionableBreadcrumbs(event: Sentry.Event): boolean {
   return (event.breadcrumbs ?? []).some((breadcrumb) => {
     if (breadcrumb.category !== 'redux.action') {
       return true;
@@ -123,7 +122,7 @@ function hasActionableBreadcrumbs(event: Event): boolean {
 }
 
 /** True when the event is known browser noise that is safe to drop. */
-function isKnownBrowserNoise(event: Event): boolean {
+function isKnownBrowserNoise(event: Sentry.Event): boolean {
   const values = event.exception?.values ?? [];
   const message = values[0]?.value ?? event.message ?? '';
   const normalizedMessage = message.replace(/\s+/g, ' ').trim();
@@ -150,7 +149,7 @@ function isKnownBrowserNoise(event: Event): boolean {
 }
 
 /** Returns whether an externally captured event is explicitly marked as an expected outage. */
-function isExpectedMonitorReferenceOutage(event: Event): boolean {
+function isExpectedMonitorReferenceOutage(event: Sentry.Event): boolean {
   return event.tags?.[EXPECTED_MONITOR_REFERENCE_OUTAGE_TAG] === 'true';
 }
 
@@ -168,7 +167,7 @@ function getSafeMonitorReferenceError(error: unknown): Record<string, boolean | 
 }
 
 /** Drops known no-stack browser noise while preserving actionable stacked errors. */
-export function beforeSend(event: ErrorEvent, _hint: EventHint): ErrorEvent | null {
+export function beforeSend(event: Sentry.ErrorEvent, _hint: Sentry.EventHint): Sentry.ErrorEvent | null {
   return isKnownBrowserNoise(event) || isExpectedMonitorReferenceOutage(event) ? null : event;
 }
 
