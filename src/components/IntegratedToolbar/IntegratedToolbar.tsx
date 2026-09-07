@@ -40,6 +40,7 @@ import {
   outlookLabels,
 } from '../ForecastWorkspace/workspaceMeta';
 
+/** Returns the display color used for a non-active outlook layer. */
 const getGhostLayerColor = (type: OutlookType) => getOutlookColor({ outlookType: type, probability: type === 'categorical' ? 'SLGT' : '15%' });
 import TabbedToolbarSelectionStrip, { OutlookTrimToolbarSection } from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
