@@ -1,6 +1,5 @@
 import type { Feature, Geometry } from 'geojson';
-import type { ImportValidationResult } from './forecastValidationTypes';
-import { MAX_ARRAY_ITEMS, fail } from './forecastValidationTypes';
+import { MAX_ARRAY_ITEMS, fail, type ImportValidationResult } from './forecastValidationTypes';
 
 /** Maximum coordinate positions per geometry. */
 export const MAX_COORDINATE_POSITIONS = 500_000;
