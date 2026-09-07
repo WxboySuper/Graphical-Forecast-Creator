@@ -11,6 +11,8 @@ import {
   type FeatureSyncStats,
 } from "./openLayersFeatureSync";
 
+type OLFeature<T extends Geometry = Geometry> = Feature<T>;
+
 const createFeature = (id: string, offset: number): GeoJsonFeature<Polygon> => ({
   type: "Feature",
   id,
