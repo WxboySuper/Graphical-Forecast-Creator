@@ -1,3 +1,6 @@
+/**
+ * Cloud library page tests. Verify cloud cycle listing, selection, and user actions.
+ */
 import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { Provider } from "react-redux";

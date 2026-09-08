@@ -1,3 +1,6 @@
+/**
+ * Monitor reference layer tests. Verify reference overlays load and track monitor map state.
+ */
 import { renderHook, waitFor } from '@testing-library/react';
 import * as referenceLayers from './referenceLayers';
 import { useMonitorReferenceLayers } from './useMonitorReferenceLayers';
