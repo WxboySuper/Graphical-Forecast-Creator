@@ -11,7 +11,7 @@ export interface CloudCycleMetadata {
   id: string;
   userId: string;
   /** Product workspace that owns this saved cycle. Legacy records default to Severe. */
-  workspaceId: ForecastWorkspaceId;
+  workspaceId?: ForecastWorkspaceId;
   label: string;
   cycleDate: string;
   createdAt: string;
