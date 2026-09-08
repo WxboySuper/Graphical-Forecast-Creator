@@ -1,3 +1,7 @@
+/**
+ * Defines shared monitor-mode configuration and state types for radar, reports, alerts, and overlays.
+ * This module owns monitor domain contracts; loading, rendering, and persistence behavior live in the corresponding hooks and components.
+ */
 export type MonitorRadarMode = 'none' | 'mrms-conus' | 'site';
 
 export type MonitorRadarProduct = 'bref-qcd' | 'cref-qcd' | 'sr-bref' | 'sr-bvel';
