@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { exportForecastToJson, downloadGfcPackage, readForecastImportFile } from '../fileUtils';
+import { downloadGfcPackage, readForecastImportFile } from '../fileUtils';
 import { downloadKmzExport } from '../kmzExport';
 import type { KmzExportStrategy } from '../kmzExport';
 import type { ForecastCycle, DayType } from '../../types/outlooks';
@@ -18,6 +18,7 @@ import { isWorkflowExportPackage } from '../workflowPackage';
 import { MAX_IMPORT_BYTES, MAX_KML_IMPORT_BYTES, validateImportFileBytes } from '../forecastImportValidation';
 import { deserializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 import { getForecastDataFromWorkspacePayload } from '../forecastWorkspacePersistence';
+import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 
 const triggerBlobDownload = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
@@ -166,6 +167,7 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
   const {
     format,
     scope,
+    workspaceId,
     forecastCycle,
     mapView,
     cycleMetadata,
@@ -175,7 +177,18 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
   } = request;
 
   if (format === 'json') {
-    exportForecastToJson(forecastCycle, mapView, cycleMetadata);
+    const payload = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, cycleMetadata);
+    const jsonString = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `gfc-${workspaceId}-forecast-${timestamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
     return;
   }
 

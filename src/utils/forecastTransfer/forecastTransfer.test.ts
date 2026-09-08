@@ -156,6 +156,7 @@ describe('forecastTransfer', () => {
     await exportForecastTransfer({
       format: 'kml',
       scope: 'current-day',
+      workspaceId: 'severe',
       forecastCycle,
       mapView: { center: [39.8, -98.5], zoom: 4 },
       day: 1,

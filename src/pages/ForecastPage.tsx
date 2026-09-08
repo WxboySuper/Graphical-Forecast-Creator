@@ -670,6 +670,7 @@ const useForecastPageWorkspace = ({
   useControllerUnsavedChangesWarning(isSaved);
 
   const workspaceController = useForecastWorkspaceController({
+    workspaceId,
     mapRef,
     addToast,
     onImportResult: handleImportResult,

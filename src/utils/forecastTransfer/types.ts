@@ -17,6 +17,7 @@ export interface ForecastTransferMapView {
 
 export interface ForecastExportRequest {
   format: ForecastTransferFormat;
+  workspaceId: ForecastWorkspaceId;
   scope: ForecastTransferScope;
   forecastCycle: ForecastCycle;
   mapView: ForecastTransferMapView;

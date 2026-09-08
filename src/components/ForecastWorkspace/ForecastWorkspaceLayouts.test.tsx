@@ -46,6 +46,7 @@ const LayoutHarness: React.FC<{
 }> = ({ cloudTools }) => {
   const mapRef = useRef<ForecastMapHandle | null>(null);
   const controller = useForecastWorkspaceController({
+    workspaceId: 'severe',
     mapRef,
     addToast: mockAddToast,
     onImportResult: jest.fn(),

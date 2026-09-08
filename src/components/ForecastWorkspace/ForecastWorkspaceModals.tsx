@@ -63,6 +63,7 @@ export const ForecastWorkspaceModals: React.FC<{
         forecastCycle={controller.forecastCycle}
         mapView={controller.getMapView()}
         cycleMetadata={controller.cycleMetadata}
+        workspaceId={controller.workspaceId}
         isWorkflowActive={controller.isWorkflowActive}
         isBusy={controller.isTransferBusy}
         onBusyChange={controller.onTransferBusyChange}

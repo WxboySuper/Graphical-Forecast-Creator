@@ -19,6 +19,7 @@ import {
   type KmlArchiveStrategy,
 } from '../../utils/forecastTransfer';
 import { isFeatureExposed } from '../../config/featureExposure';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 export type ForecastTransferDirection = 'import' | 'export';
 
@@ -30,6 +31,7 @@ export interface ForecastTransferModalProps {
   forecastCycle: ForecastCycle;
   mapView: { center: [number, number]; zoom: number };
   cycleMetadata?: CycleMetadata;
+  workspaceId: ForecastWorkspaceId;
   isWorkflowActive: boolean;
   isBusy: boolean;
   onBusyChange: (busy: boolean) => void;
@@ -77,6 +79,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   forecastCycle,
   mapView,
   cycleMetadata,
+  workspaceId,
   isWorkflowActive,
   isBusy,
   onBusyChange,
@@ -134,6 +137,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
       await exportForecastTransfer({
         format,
         scope,
+        workspaceId,
         forecastCycle,
         mapView,
         cycleMetadata,
@@ -155,6 +159,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     forecastCycle,
     mapView,
     cycleMetadata,
+    workspaceId,
     kmlStrategy,
     outlookType,
     onExported,

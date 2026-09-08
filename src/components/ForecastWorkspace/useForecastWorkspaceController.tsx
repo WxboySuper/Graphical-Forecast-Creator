@@ -18,6 +18,7 @@ import { getOutlookColor } from '../../utils/outlookUtils';
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 import type { ForecastTransferDirection } from './ForecastTransferModal';
 import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../../utils/forecastTransfer';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 const EMPTY_LOW_PROBABILITY_OUTLOOKS: OutlookType[] = [];
@@ -95,6 +96,7 @@ function createDateAndModalHandlers(opts: {
 }
 
 export interface ForecastWorkspaceController {
+  workspaceId: ForecastWorkspaceId;
   onOpenTransferModal: (direction?: ForecastTransferDirection) => void;
   onCloseTransferModal: () => void;
   onTransferDirectionChange: (direction: ForecastTransferDirection) => void;
@@ -184,6 +186,7 @@ export interface ForecastWorkspaceController {
 }
 
 interface UseForecastWorkspaceControllerOptions {
+  workspaceId: ForecastWorkspaceId;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   addToast: AddToastFn;
   cloudTools?: React.ReactNode;
@@ -195,6 +198,7 @@ interface UseForecastWorkspaceControllerOptions {
 
 /** Arguments required to assemble the public ForecastWorkspaceController returned by the hook. */
 interface BuildForecastWorkspaceControllerArgs {
+  workspaceId: ForecastWorkspaceId;
   cloudTools: React.ReactNode;
   isSaved: boolean;
   canUndo: boolean;
@@ -264,6 +268,7 @@ interface BuildForecastWorkspaceControllerArgs {
 // @codescene(disable:"Large Method")
 function buildForecastWorkspaceController(args: BuildForecastWorkspaceControllerArgs): ForecastWorkspaceController {
   const {
+    workspaceId,
     cloudTools,
     isSaved,
     canUndo,
@@ -330,6 +335,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
   const isLowProb = lowProbabilityOutlooks.includes(panel.activeOutlookType);
 
   return {
+    workspaceId,
     cloudTools,
     isSaved,
     canUndo,
@@ -562,6 +568,7 @@ function useForecastWorkspaceCoreState(
 
 /** Shared controller for all Forecast workspace layouts. */
 function useForecastWorkspaceControllerArgs({
+  workspaceId,
   mapRef,
   addToast,
   cloudTools = null,
@@ -589,6 +596,7 @@ function useForecastWorkspaceControllerArgs({
   const getMapView = () => mapRef.current?.getView() ?? ({ center: [39.8283, -98.5795] as [number, number], zoom: 4 });
 
   return {
+    workspaceId,
     cloudTools,
     isSaved: core.isSaved,
     canUndo: core.canUndo,
