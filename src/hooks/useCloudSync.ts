@@ -5,6 +5,7 @@ import { serializeForecast } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import type { UseCloudCyclesResult } from './useCloudCycles';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 const SYNC_DEBOUNCE_MS = 5000; // 5 second debounce
 
@@ -39,6 +40,7 @@ const syncCurrentCloudCycle = async ({
   workflowMetadata,
   setLastSyncedHash,
   currentHash,
+  workspaceId,
 }: {
   canSync: boolean;
   currentCloud: Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud'];
@@ -50,6 +52,7 @@ const syncCurrentCloudCycle = async ({
   workflowMetadata: RootState['forecast']['workflowMetadata'];
   setLastSyncedHash: (hash: string) => void;
   currentHash: string;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   if (!canSync || !currentCloud) {
     return;
@@ -59,7 +62,7 @@ const syncCurrentCloudCycle = async ({
     updateSyncState('saving');
 
     const stats = countForecastMetrics(forecastCycle);
-    const success = await saveCycle(currentCloud.label, cycleDate, stats, payload, workflowMetadata);
+    const success = await saveCycle(currentCloud.label, cycleDate, stats, payload, workflowMetadata, { workspaceId });
 
     if (!success) {
       updateSyncState('error', 'Failed to sync to cloud');
@@ -89,6 +92,7 @@ const useCloudSyncOperations = ({
   forecastCycle,
   workflowMetadata,
   currentHash,
+  workspaceId,
 }: {
   canSync: boolean;
   currentCloud: CloudSyncInput['currentCloud'];
@@ -98,6 +102,7 @@ const useCloudSyncOperations = ({
   forecastCycle: RootState['forecast']['forecastCycle'];
   workflowMetadata: RootState['forecast']['workflowMetadata'];
   currentHash: string;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastSyncedHash, setLastSyncedHashState] = useState<string | null>(null);
@@ -113,8 +118,9 @@ const useCloudSyncOperations = ({
       workflowMetadata,
       setLastSyncedHash: setLastSyncedHashState,
       currentHash,
+      workspaceId,
     });
-  }, [canSync, currentCloud, currentHash, forecastCycle, saveCycle, serializedPayload, updateSyncState, workflowMetadata]);
+  }, [canSync, currentCloud, currentHash, forecastCycle, saveCycle, serializedPayload, updateSyncState, workflowMetadata, workspaceId]);
 
   useCloudSyncScheduling({ canSync, currentHash, lastSyncedHash, performSync, syncTimeoutRef });
 
@@ -166,7 +172,10 @@ const useCloudSyncScheduling = ({
 };
 
 /** Hook for managing automatic sync of the current forecast to cloud. */
-export const useCloudSync = (cloud: CloudSyncInput) => {
+export const useCloudSync = (
+  cloud: CloudSyncInput,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+) => {
   const { premiumActive } = useEntitlement();
   const currentCloud = cloud.currentCloud;
   const forecastCycle = useSelector((state: RootState) => state.forecast.forecastCycle);
@@ -187,6 +196,7 @@ export const useCloudSync = (cloud: CloudSyncInput) => {
     forecastCycle,
     workflowMetadata,
     currentHash,
+    workspaceId,
   });
 
   return { ...operations, currentCloud };

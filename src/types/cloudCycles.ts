@@ -1,5 +1,6 @@
 import { GFCForecastSaveData } from './outlooks';
 import type { CycleMetadata } from './workflow';
+import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 /**
  * Cloud-backed cycle metadata stored in Firestore.
@@ -9,6 +10,8 @@ import type { CycleMetadata } from './workflow';
 export interface CloudCycleMetadata {
   id: string;
   userId: string;
+  /** Product workspace that owns this saved cycle. Legacy records default to Severe. */
+  workspaceId: ForecastWorkspaceId;
   label: string;
   cycleDate: string;
   createdAt: string;

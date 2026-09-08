@@ -84,7 +84,7 @@ describe('useCloudSync', () => {
       forecastDays: 1,
       totalOutlooks: 2,
       totalFeatures: 3,
-    }, payload, workflowMetadata);
+    }, payload, workflowMetadata, { workspaceId: 'severe' });
     expect(updateSyncState).toHaveBeenCalledWith('saved');
   });
 
