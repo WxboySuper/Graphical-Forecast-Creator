@@ -1,3 +1,8 @@
+/**
+ * KML forecast-cycle conversion helpers.
+ *
+ * This module converts parsed KML placemarks into the forecast-cycle shape used by imports. KML parsing and persistence are handled by their respective callers.
+ */
 import type { DayType, ForecastCycle, OutlookData, OutlookDay } from '../../types/outlooks';
 import type { ParsedKmlPlacemark } from './types';
 

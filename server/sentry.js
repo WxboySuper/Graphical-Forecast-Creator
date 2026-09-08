@@ -1,3 +1,8 @@
+/**
+ * Server-side Sentry configuration helpers.
+ *
+ * This file reads the server Sentry DSN and exposes the small configuration boundary used by analytics services. Event capture remains with the server bootstrap and request handlers.
+ */
 'use strict';
 
 /** @returns {string} Trimmed Sentry DSN or empty when unset. */

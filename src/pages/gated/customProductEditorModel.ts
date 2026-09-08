@@ -1,3 +1,8 @@
+/**
+ * Custom product editor model helpers.
+ *
+ * This module builds the normalized model used by the gated custom-product editor. UI components own rendering and submission; this file owns model defaults and transformations.
+ */
 import type { CSSProperties } from 'react';
 import type {
   CustomCategoryId,
