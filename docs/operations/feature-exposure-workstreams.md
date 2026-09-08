@@ -9,7 +9,7 @@ Every workstream must:
 1. Declare a registry key with an exposure matrix that reflects the current rollout stage (unreleased targets stay off until enablement criteria pass).
 2. Gate routes, navigation, boundaries, side-effect modules, and server capabilities **before** the first exposed slice merges.
 3. Ship disabled-side-effect tests or a documented acknowledgement (see [feature-exposure-testing.md](./feature-exposure-testing.md)).
-4. Record the tracker issue and the PR that may first flip `exposure.beta` (TBD until an implementation slice is ready).
+4. Record the tracker issue and the PR that may first flip `exposure.beta` (not assigned until an implementation slice is ready).
 
 ## Summary
 
@@ -60,14 +60,14 @@ Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM,
 - **Registry:** `temporary: true`, client-only
 - **Gates:** gated lazy route `/tropical`, navbar item `tropical-workspace`
 - **Tests:** exemplar + `buildFeatureGatedRoutes.test.tsx` + `featureNavigation.test.ts`
-- **Beta enablement:** tracker #432; first enable PR: TBD
+- **Beta enablement:** tracker #432; first enable PR: not assigned
 
 ### Collaboration room (`collaborationRoom`, #433)
 
 - **Registry:** `temporary: true`, client-only
 - **Gates:** gated lazy route `/collaborate`, navbar item `collaboration-room`
 - **Tests:** exemplar contract runner + route/nav tests
-- **Beta enablement:** tracker #433; first enable PR: TBD
+- **Beta enablement:** tracker #433; first enable PR: not assigned
 
 ## Commands
 
