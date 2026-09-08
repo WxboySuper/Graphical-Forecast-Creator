@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade selection control. It renders the accessible grade or product
+ * selector and reports the chosen option through the parent callback.
+ */
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 
