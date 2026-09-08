@@ -1,3 +1,7 @@
+/**
+ * Translates map paint-bucket gestures into forecast feature edits.
+ * This module owns map interaction coordination; state mutation and feature rendering are delegated to the forecast store and OpenLayers helpers.
+ */
 import type OLMap from 'ol/Map';
 import type VectorLayer from 'ol/layer/Vector';
 import type { AppDispatch } from '../../store';

@@ -1,3 +1,7 @@
+/**
+ * Renders the integrated-toolbar popover for choosing an outlook trimming strategy.
+ * This component owns strategy selection UI and callbacks; trimming execution remains in the workspace controller and masking utilities.
+ */
 import React from 'react';
 import { Scissors } from 'lucide-react';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
