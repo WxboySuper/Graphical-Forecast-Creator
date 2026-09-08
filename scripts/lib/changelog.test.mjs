@@ -1,5 +1,7 @@
 /**
- * Covers unreleased body extraction, minor-line heading matching, stable and beta release notes with Unreleased fallback, and next-major and stable-hotfix lane extraction.
+ * Script test contract for changelog.test.
+ *
+ * This file verifies the script or automation boundary represented by changelog.test, including its inputs, outputs, and failure behavior.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,7 @@
 /**
- * Verifies diagnostic reason codes for registry, server, and entitlement states, deterministic JSON feature ordering, and maintainer-metadata stripping in public mode.
+ * Script test contract for feature-exposure-diagnostics.test.
+ *
+ * This file verifies the script or automation boundary represented by feature-exposure-diagnostics.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

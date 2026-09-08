@@ -1,5 +1,7 @@
 /**
- * Checks that server/package.json and package-lock.json conflicts land in needsHuman with an empty autoResolvable list and fail the auto-resolve check.
+ * Script test contract for port-conflicts.test.
+ *
+ * This file verifies the script or automation boundary represented by port-conflicts.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

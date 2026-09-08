@@ -1,5 +1,7 @@
 /**
- * Verifies exposure labels derived from registry, registry-test, server-capability, and production exposure surface changes.
+ * Script test contract for pr-label-exposure.test.
+ *
+ * This file verifies the script or automation boundary represented by pr-label-exposure.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

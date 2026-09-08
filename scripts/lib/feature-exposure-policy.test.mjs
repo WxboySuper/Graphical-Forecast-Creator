@@ -1,5 +1,7 @@
 /**
- * Exercises valid and invalid feature registries across target coverage, lifecycle metadata, gated-route and navigation references, side-effect modules, client/server registry alignment and capability keys, per-feature exposure test coverage with acknowledgements, and v1.7 workstream beta and local approvals.
+ * Script test contract for feature-exposure-policy.test.
+ *
+ * This file verifies the script or automation boundary represented by feature-exposure-policy.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

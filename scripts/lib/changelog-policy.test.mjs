@@ -1,5 +1,7 @@
 /**
- * Requires exactly one impact declaration and a reason for none, the production changelog for hotfix impact, beta and hotfix entries in their own lanes with the stable lane derived from the branch name, and the declared lane to change rather than merely exist. Accepts an inherited forward-port impact, classifies waived and inherited impacts as skips, and fails a waived impact that still edits the changelog.
+ * Script test contract for changelog-policy.test.
+ *
+ * This file verifies the script or automation boundary represented by changelog-policy.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

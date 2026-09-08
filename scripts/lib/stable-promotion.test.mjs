@@ -1,5 +1,7 @@
 /**
- * Checks deriveStableVersion turns 2.0.0-beta.4 into 2.0.0 and does not collapse 2.1.0-beta.1 onto the 2.0.0 line.
+ * Script test contract for stable-promotion.test.
+ *
+ * This file verifies the script or automation boundary represented by stable-promotion.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

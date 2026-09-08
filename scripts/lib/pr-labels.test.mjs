@@ -1,5 +1,7 @@
 /**
- * Covers routing labels for stable promotion, descriptive labels by branch type and changed path, and computePrLabels merging them with changelog status and exposure labels.
+ * Script test contract for pr-labels.test.
+ *
+ * This file verifies the script or automation boundary represented by pr-labels.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

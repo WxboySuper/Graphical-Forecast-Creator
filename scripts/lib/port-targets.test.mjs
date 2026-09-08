@@ -1,5 +1,7 @@
 /**
- * Verifies that only stable merges port to main, forward-port PRs are detected by title or source reference but not by incidental mentions or port/* branches, open-port PR JSON parses defensively, and porting skips on the manual label or an existing forward-port PR.
+ * Script test contract for port-targets.test.
+ *
+ * This file verifies the script or automation boundary represented by port-targets.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
