@@ -1,8 +1,7 @@
 /**
- * File: src/auth/AuthProvider.hosted.test.tsx
- * Purpose: Verifies hosted authentication provider state, Redux integration, and signed-out behavior.
+ * Hosted auth-provider tests. Verify Firebase auth state, profile loading, and
+ * hosted account transitions exposed by the AuthProvider hook.
  */
-
 import { renderHook } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';

@@ -1,8 +1,7 @@
 /**
- * File: src/billing/pricingCopy.test.ts
- * Purpose: Checks pricing boundary copy for signed-out, free-account, and premium-account experiences.
+ * Pricing-copy tests. Verify the signed-out, free-account, and premium boundary
+ * strings stay distinct and map to the expected entitlement state.
  */
-
 import { PRICING_COPY, getBoundaryCopy } from './pricingCopy';
 
 describe('pricingCopy', () => {
