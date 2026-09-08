@@ -1,3 +1,7 @@
+/**
+ * Parses and normalizes KML geometry into GeoJSON polygon positions for forecast transfer workflows.
+ * This utility owns XML geometry interpretation and validation; file transport, forecast merging, and export orchestration remain outside it.
+ */
 import type { Feature, MultiPolygon, Polygon, Position } from 'geojson';
 
 const localTagName = (node: Element): string =>
