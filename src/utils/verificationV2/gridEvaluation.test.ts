@@ -1,3 +1,6 @@
+/**
+ * Verification grid evaluation tests. Verify grid cells are evaluated against forecast coverage and observations.
+ */
 import * as turf from '@turf/turf';
 import type { StormReport } from '../../types/stormReports';
 import {

@@ -1,3 +1,6 @@
+/**
+ * FAR discipline tests. Verify forecast area and report discipline rules used by V2 scoring.
+ */
 import type { GridEvaluation } from './gridEvaluation';
 import { scoreFalseAlarmDiscipline } from './farDiscipline';
 

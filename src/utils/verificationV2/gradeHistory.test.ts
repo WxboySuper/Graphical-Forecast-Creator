@@ -1,3 +1,6 @@
+/**
+ * Verification grade history tests. Verify grade history entries are ordered, normalized, and persisted.
+ */
 import {
   GRADE_HISTORY_LIMIT,
   accountScope,
