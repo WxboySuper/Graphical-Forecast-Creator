@@ -118,7 +118,7 @@ describe('useAutoSave', () => {
     act(() => {
       jest.advanceTimersByTime(1);
     });
-    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ serialized: true }));
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ schemaVersion: 1, workspaceId: 'severe', forecast: { serialized: true } }));
   });
 
   test('clears pending saves and silently ignores serialization failures', async () => {
