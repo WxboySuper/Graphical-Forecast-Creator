@@ -1,3 +1,8 @@
+/**
+ * E2E contract for day-rollover.spec.
+ *
+ * This file defines browser-level checks for the day-rollover.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
 
 const localDay = (date: Date) => {
