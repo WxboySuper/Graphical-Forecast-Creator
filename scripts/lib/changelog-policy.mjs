@@ -1,3 +1,7 @@
+/**
+ * Changelog metadata policy helpers. The module parses PR impact and reason
+ * trailers, validates lane rules, and reports release-note policy failures.
+ */
 import { CHANGELOG_LANE_HEADINGS } from './changelog-lanes.mjs';
 
 const IMPACT_PATTERN = /^Changelog-Impact:\s*(beta|hotfix|none|inherited)\s*$/gim;
