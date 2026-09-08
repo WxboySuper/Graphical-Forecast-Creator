@@ -1,3 +1,8 @@
+/**
+ * Monitor outlook section component.
+ *
+ * This component renders the outlook portion of the monitor view and connects it to monitor-provided data. Data loading and persistence remain in monitor hooks and services.
+ */
 import React from 'react';
 import { Shapes } from 'lucide-react';
 import type { MonitorOutlookSourceOption } from '../outlookSources';
