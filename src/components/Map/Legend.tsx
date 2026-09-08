@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/Legend.tsx
+ * Purpose: Renders the forecast map legend and translates layer metadata into user-facing labels.
+ */
+
 // skipcq: JS-W1028
 /**
  * Forecast-map legend boundary: this component translates active outlook,
