@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
 import { store } from './store';
-import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
+import { setActiveOutlookType, setEmergencyMode, setForecastWorkspace } from './store/forecastSlice';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
@@ -34,7 +34,7 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
-import { getDefaultForecastWorkspacePath, resolveForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
+import { DEFAULT_FORECAST_WORKSPACE, getDefaultForecastWorkspacePath, resolveForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -103,13 +103,19 @@ const AppHooks = () => {
   const location = useLocation();
   const { user } = useAuth();
   const userId = user?.uid;
-  const workspaceId = resolveForecastWorkspacePath(location.pathname)?.id ?? 'severe';
+  const workspaceId = resolveForecastWorkspacePath(location.pathname)?.id ?? DEFAULT_FORECAST_WORKSPACE;
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
 
   // Enable account-scoped Auto-Save
   useAutoSave(userId, workspaceId);
+
+  // Keep Redux workspace ownership aligned with the canonical URL so local
+  // history and future workspace-specific UI consume the same identity.
+  useEffect(() => {
+    dispatch(setForecastWorkspace(workspaceId));
+  }, [dispatch, workspaceId]);
 
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
