@@ -1,3 +1,9 @@
+/**
+ * Feature-exposure policy: this module defines the registry and target-aware
+ * decisions used to expose product surfaces and server-backed capabilities.
+ * It is the client policy boundary; route rendering and server authorization
+ * consume these decisions but do not duplicate them.
+ */
 import { BUILD_TARGETS, type BuildTarget, getBuildTarget } from './buildTarget';
 
 export type FeatureExposureMatrix = Record<BuildTarget, boolean>;

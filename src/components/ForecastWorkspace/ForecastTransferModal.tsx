@@ -1,3 +1,9 @@
+/**
+ * Forecast transfer modal: this component presents import/export format and
+ * scope choices for moving forecast data between cycles and files. It owns
+ * dialog state and validation feedback while serialization, parsing, and store
+ * mutations remain in their dedicated transfer and state modules.
+ */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
