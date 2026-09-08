@@ -1,3 +1,8 @@
+/**
+ * File: server/testing/autoTstm.exposure.test.js
+ * Purpose: Verifies automatic TSTM exposure routes, gating behavior, and emergency-disabled responses.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');
