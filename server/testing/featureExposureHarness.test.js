@@ -1,3 +1,8 @@
+/**
+ * File: server/testing/featureExposureHarness.test.js
+ * Purpose: Documents the shared test helpers that validate feature exposure, gated routes, and capability status.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');
