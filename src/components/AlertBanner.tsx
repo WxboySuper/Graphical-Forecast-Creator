@@ -1,3 +1,7 @@
+/**
+ * Site-wide alert banner. Loads scheduled static alert configuration and renders
+ * dismissible notices with safe internal or external links.
+ */
 import { AlertBannerLink } from './AlertBannerLink';
 import { useAlertBanner } from './useAlertBanner';
 import { isAlertBannerScheduleActive } from './alertBannerConfig';

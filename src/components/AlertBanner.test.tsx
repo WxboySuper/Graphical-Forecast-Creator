@@ -1,6 +1,6 @@
 /**
- * File: src/components/AlertBanner.test.tsx
- * Purpose: Covers alert banner rendering, links, dismissal, and asynchronous updates.
+ * Alert-banner test suite. Verifies configuration loading, visibility, dismissal,
+ * scheduling, and error handling for the site-wide alert component.
  */
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';

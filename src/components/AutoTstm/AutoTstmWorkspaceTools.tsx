@@ -1,3 +1,7 @@
+/**
+ * Auto-TSTM workspace entry point. Applies the server-backed feature gate and
+ * exposes the cached preview/apply panel from the forecast editor toolbar.
+ */
 import React from 'react';
 import { CloudLightning } from 'lucide-react';
 import { ServerBackedFeatureBoundary } from '../../features/ServerBackedFeatureBoundary';
