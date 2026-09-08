@@ -1,3 +1,6 @@
+/**
+ * Auto-TSTM hook tests. Verify automatic tropical storm and tornado message workflows and their guard conditions.
+ */
 import { act } from '@testing-library/react';
 import { AUTO_TSTM_DISABLED_MESSAGE } from '../../config/autoTstmDisable';
 import {
