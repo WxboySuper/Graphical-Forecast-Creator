@@ -4,6 +4,7 @@
  * concerns can be reviewed and tested without loading the React component.
  */
 import { jest } from '@jest/globals';
+import { apply } from 'ol-mapbox-style';
 
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
 
@@ -35,7 +36,10 @@ import {
   createLabelOverlaySource,
   createTileSource,
   hideOverlay,
+  loadOpenFreeMapLayerGroups,
+  isCurrentOpenFreeMapRequest,
 } from './openLayersMapStyles';
+import type { OpenFreeMapStyleSet } from '../../lib/openFreeMap';
 
 type FeatureStub = {
   get: (key: string) => unknown;
@@ -44,6 +48,43 @@ type FeatureStub = {
 };
 
 describe('openLayersMapStyles', () => {
+  const applyMock = jest.mocked(apply);
+
+  afterEach(() => {
+    applyMock.mockReset();
+  });
+
+  test('loads base and reference groups through the lazy style adapter', async () => {
+    applyMock.mockResolvedValue(undefined);
+    const styleSet = {
+      baseStyle: { version: 8, sources: {}, layers: [] },
+      overlayStyle: { version: 8, sources: {}, layers: [] },
+    } as OpenFreeMapStyleSet;
+
+    const result = await loadOpenFreeMapLayerGroups(styleSet);
+
+    expect(result.baseGroup).toBeTruthy();
+    expect(result.referenceGroup).toBeTruthy();
+    expect(applyMock).toHaveBeenNthCalledWith(1, result.baseGroup, styleSet.baseStyle);
+    expect(applyMock).toHaveBeenNthCalledWith(2, result.referenceGroup, styleSet.overlayStyle);
+  });
+
+  test('rejects when either style application fails', async () => {
+    const error = new Error('overlay style failed');
+    applyMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(error);
+    const styleSet = {
+      baseStyle: { version: 8, sources: {}, layers: [] },
+      overlayStyle: { version: 8, sources: {}, layers: [] },
+    } as OpenFreeMapStyleSet;
+
+    await expect(loadOpenFreeMapLayerGroups(styleSet)).rejects.toThrow(error);
+  });
+
+  test('accepts only the current style request', () => {
+    expect(isCurrentOpenFreeMapRequest(4, 4)).toBe(true);
+    expect(isCurrentOpenFreeMapRequest(4, 3)).toBe(false);
+  });
+
   test.each([
     { cigLevel: 'CIG1', strokeColor: '#000000', strokeWidth: 1, segments: 2 },
     { cigLevel: 'CIG2', strokeColor: '#111111', strokeWidth: 1.1, segments: 1 },
