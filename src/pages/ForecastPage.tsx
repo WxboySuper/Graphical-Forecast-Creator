@@ -51,6 +51,7 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
@@ -582,12 +583,14 @@ const useForecastPageWorkspace = ({
   navigate,
   mapRef,
   onSaveForecast,
+  workspaceId,
 }: {
   dispatch: ShortcutDispatch;
   addToast: AddToastFn;
   navigate: ReturnType<typeof useNavigate>;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   onSaveForecast: () => void;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const discussionDraftsByScope = useSelector((state: RootState) => state.forecast.discussionDraftsByScope);
@@ -602,7 +605,7 @@ const useForecastPageWorkspace = ({
   const { premiumActive, effectiveSource } = useEntitlement();
   const cloudCycles = useCloudCycles();
   const { currentCloud, saveCycle, markAsCurrent, clearCurrent } = cloudCycles;
-  const cloudSync = useCloudSync(cloudCycles);
+  const cloudSync = useCloudSync(cloudCycles, workspaceId);
   const { markCurrentStateSynced } = cloudSync;
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
 
@@ -656,7 +659,7 @@ const useForecastPageWorkspace = ({
     currentMapView,
     workflowMetadata,
     onCloudCycleLoaded: handleCloudCycleLoaded,
-  }, user?.uid);
+  }, user?.uid, workspaceId);
   useControllerUnsavedChangesWarning(isSaved);
 
   const workspaceController = useForecastWorkspaceController({
@@ -713,7 +716,9 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC = () => {
+export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
+  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+}) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -743,6 +748,7 @@ export const ForecastPage: React.FC = () => {
     navigate,
     mapRef,
     onSaveForecast: handleSave,
+    workspaceId,
   });
 
   if (emergencyMode) {
