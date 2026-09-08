@@ -1,3 +1,7 @@
+/**
+ * Cycle-history utility tests. Verify day summaries, data detection, and deferred
+ * close behavior used by the cycle-history dialog.
+ */
 import { getDaySummary, hasDayData, deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 import type { SavedCycle } from '../../store/forecastSlice';
 

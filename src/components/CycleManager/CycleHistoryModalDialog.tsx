@@ -1,3 +1,7 @@
+/**
+ * Cycle-history modal dialog. Composes confirmation, save, load, delete, and
+ * history-panel actions for saved forecast cycles.
+ */
 import React from 'react';
 import type { SavedCycle } from '../../store/forecastSlice';
 import type { ForecastCycle } from '../../types/outlooks';
