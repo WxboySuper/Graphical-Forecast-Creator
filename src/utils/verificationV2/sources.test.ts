@@ -1,3 +1,8 @@
+/**
+ * Verification-source test boundary: this suite verifies source availability,
+ * cloud/file forecast loading, report retrieval, account-tier resolution, and
+ * typed source failures used by Verification workflows.
+ */
 import {
   availablePackageSources,
   loadForecastFromCloud,
