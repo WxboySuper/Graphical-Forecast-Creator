@@ -1,3 +1,9 @@
+/**
+ * Home hero surface: this component renders the primary forecast-entry message,
+ * account-aware actions, and supporting product framing on the home route. It
+ * receives navigation and state callbacks from its parent and does not own
+ * authentication, persistence, or route registration.
+ */
 import React from 'react';
 import { ArrowRight, CircleUserRound, Clock3, FileText, History, Map, ShieldCheck } from 'lucide-react';
 import { Button } from '../../components/ui/button';
