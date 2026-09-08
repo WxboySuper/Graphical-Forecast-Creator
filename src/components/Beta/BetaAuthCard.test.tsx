@@ -1,3 +1,7 @@
+/**
+ * Beta-auth card tests. Verify sign-in, loading, error, and hosted beta-access
+ * presentation for the beta entry card.
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BetaAuthCard from './BetaAuthCard';
 import { useAuth } from '../../auth/AuthProvider';
