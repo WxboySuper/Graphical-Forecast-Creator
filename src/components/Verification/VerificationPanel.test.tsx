@@ -1,3 +1,8 @@
+/**
+ * Verification-panel test boundary: this suite verifies evidence display,
+ * grading controls, loading and empty states, and panel interactions at the
+ * primary Verification UI surface.
+ */
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
