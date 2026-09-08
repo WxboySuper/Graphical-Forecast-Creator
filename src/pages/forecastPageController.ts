@@ -324,13 +324,21 @@ const readLocalRestoreCandidate = (
   };
 };
 
-const restoreLocalSession = (
-  dispatch: ShortcutDispatch,
-  addToast: AddToastFn,
-  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'] },
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
-): boolean => {
+interface RestoreLocalSessionOptions {
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'] };
+  userId?: string | null;
+  workspaceId: ForecastWorkspaceId;
+}
+
+const restoreLocalSession = ({
+  dispatch,
+  addToast,
+  currentSession,
+  userId,
+  workspaceId,
+}: RestoreLocalSessionOptions): boolean => {
   if (shouldSkipLocalRestore(currentSession.forecastCycle, currentSession.discussionDraftsByScope)) return false;
   const candidate = readLocalRestoreCandidate(userId, workspaceId);
   const data = parseStoredForecastPayload(candidate.storedValue, workspaceId);
@@ -348,7 +356,7 @@ const restoreAvailableSession = (
   userId?: string | null,
   workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ) => restoreCloudSession({ dispatch, addToast, onCloudCycleLoaded: currentSession.onCloudCycleLoaded, userId, workspaceId })
-  || restoreLocalSession(dispatch, addToast, currentSession, userId, workspaceId);
+  || restoreLocalSession({ dispatch, addToast, currentSession, userId, workspaceId });
 
 export const buildRestoreKey = (userId?: string | null): string => userId || 'anonymous';
 
