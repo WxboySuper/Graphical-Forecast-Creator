@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/precisionPolygonEditing.test.ts
+ * Purpose: Covers precision polygon editing geometry, constraints, and edge cases.
+ */
+
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from './precisionPolygonEditing';
 
 describe('precisionPolygonEditing', () => {
