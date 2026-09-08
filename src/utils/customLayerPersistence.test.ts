@@ -1,3 +1,6 @@
+/**
+ * Custom layer persistence tests. Verify custom map layers serialize and restore without losing geometry.
+ */
 import forecastReducer, { addCustomLayer } from '../store/forecastSlice';
 import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
 import { asCustomLayerId } from '../lib/customProducts';
