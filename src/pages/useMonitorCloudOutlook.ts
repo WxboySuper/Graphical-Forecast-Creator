@@ -1,3 +1,8 @@
+/**
+ * Monitor cloud-outlook synchronization hook.
+ *
+ * This hook loads and saves the selected cloud outlook for monitor mode. Cloud-cycle persistence stays in cloud hooks; this file coordinates monitor state and user feedback.
+ */
 import { useEffect, useState } from 'react';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import type { AddToastFn } from '../components/Layout';
