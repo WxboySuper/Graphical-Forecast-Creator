@@ -186,6 +186,17 @@
   gap: 1rem;
 }
 
+.cloud-library-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding-top: 0.35rem;
+}
+
+.cloud-library-tab {
+  gap: 0.55rem;
+}
+
 .cloud-library-list {
   display: flex;
   flex-direction: column;
