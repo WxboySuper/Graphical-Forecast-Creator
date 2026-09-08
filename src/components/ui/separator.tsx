@@ -1,3 +1,7 @@
+/**
+ * Separator primitive. Renders horizontal or vertical structural dividers with
+ * the shared orientation, decoration, and ref-forwarding behavior.
+ */
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 
