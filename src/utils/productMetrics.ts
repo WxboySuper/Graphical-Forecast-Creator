@@ -1,3 +1,7 @@
+/**
+ * Defines product-usage metric events and queues them for the configured analytics boundary.
+ * This utility owns metric-shape normalization and dispatch; analytics transport and UI event ownership remain with callers.
+ */
 import type { User } from 'firebase/auth';
 import { isHostedAuthEnabled } from '../lib/firebase';
 
