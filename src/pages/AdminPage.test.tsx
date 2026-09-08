@@ -1,3 +1,6 @@
+/**
+ * Admin page tests. Verify administrator-only controls and account management behavior.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { AdminPage } from './AdminPage';

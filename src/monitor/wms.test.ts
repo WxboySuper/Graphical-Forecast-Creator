@@ -1,3 +1,6 @@
+/**
+ * WMS monitor tests. Verify WMS request parameters and layer configuration used by the monitor.
+ */
 import {
   buildRadarLayerConfig,
   buildSatelliteLayerConfig,
