@@ -1,3 +1,7 @@
+/**
+ * User-metrics hook. It reads the authenticated user's aggregate metrics,
+ * subscribes to updates when hosted auth is enabled, and exposes request state.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { doc, getDoc, type Timestamp } from 'firebase/firestore';
 import { db, isHostedAuthEnabled } from '../lib/firebase';
