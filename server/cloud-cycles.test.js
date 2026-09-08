@@ -1,5 +1,11 @@
 'use strict';
 
+/**
+ * Cloud-cycles server test boundary: this suite verifies validation, limits,
+ * authorization, persistence, and lifecycle behavior for hosted forecast-cycle
+ * documents without requiring the production HTTP service.
+ */
+
 const assert = require('node:assert/strict');
 const { describe, it } = require('node:test');
 
