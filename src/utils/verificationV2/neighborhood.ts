@@ -1,3 +1,9 @@
+/**
+ * Verification neighborhood calculations: this module builds the spatial
+ * neighborhoods used to compare forecast geometry with observed reports. It
+ * owns geometry selection and distance calculations while grade aggregation,
+ * persistence, and UI presentation remain in their higher-level boundaries.
+ */
 import {
   area,
   bbox,
