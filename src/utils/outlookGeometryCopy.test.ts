@@ -1,3 +1,6 @@
+/**
+ * Outlook geometry copy tests. Verify outlook geometry is duplicated without shared mutable references.
+ */
 import type { Feature, Polygon } from 'geojson';
 import {
   cloneGeometryAsFeature,

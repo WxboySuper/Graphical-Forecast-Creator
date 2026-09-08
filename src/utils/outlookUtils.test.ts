@@ -1,3 +1,6 @@
+/**
+ * Outlook utility tests. Verify outlook labels, categories, and shared normalization helpers.
+ */
 import { tornadoToCategorical, isSignificantThreat, getOutlookColor, getCategoricalRiskDisplayName, getHighestCategoricalRisk } from './outlookUtils';
 
 describe('outlookUtils', () => {
