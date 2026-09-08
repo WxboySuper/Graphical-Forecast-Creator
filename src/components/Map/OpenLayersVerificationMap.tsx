@@ -147,27 +147,35 @@ const BLANK_LAND_OUTLINE_STYLE_VERIF = new Style({
   stroke: new Stroke({ color: "#9e9585", width: 1 }),
 });
 
+const CIG_PREFIX = "CIG";
+const FALLBACK_FILL_COLOR = "#999999";
+const FALLBACK_STROKE_COLOR = "#000000";
+const CIG_STROKE_COLOR = "#111111";
+const CIG_HATCH_STROKE_WIDTH = 1.1;
+const CIG_OUTLINE_WIDTH = 1.2;
+const CIG_Z_INDEX_BASE = 1000;
+
 /** Keeps verification paint translucent so reports and geographic outlines remain visible. */
 export const buildStyle = ({ outlookType, probability }: OutlookStyleDescriptor) => {
   const style = getFeatureStyle(outlookType, probability);
-  const isCig = probability.startsWith("CIG");
+  const isCig = probability.startsWith(CIG_PREFIX);
   const fillOpacity = Math.min(resolveFillOpacity({ fillOpacity: style.fillOpacity }), 0.42);
-  const fillColor = toRgbaColor({ color: String(style.fillColor || "#999999"), alpha: fillOpacity });
+  const fillColor = toRgbaColor({ color: String(style.fillColor || FALLBACK_FILL_COLOR), alpha: fillOpacity });
   const strokeColor = toRgbaColor({
-    color: String(style.color || "#000000"),
+    color: String(style.color || FALLBACK_STROKE_COLOR),
     alpha: typeof style.opacity === "number" ? style.opacity : 1,
   });
   return new Style({
     fill: new Fill({
       color: isCig
-        ? createHatchPattern({ cigLevel: probability, strokeColor: "#111111", strokeWidth: 1.1 }) ?? "rgba(0, 0, 0, 0)"
+        ? createHatchPattern({ cigLevel: probability, strokeColor: CIG_STROKE_COLOR, strokeWidth: CIG_HATCH_STROKE_WIDTH }) ?? "rgba(0, 0, 0, 0)"
         : fillColor,
     }),
     stroke: new Stroke({
-      color: isCig ? "#111111" : strokeColor,
-      width: isCig ? 1.2 : resolveStrokeWidth({ weight: style.weight, isTopLayer: false }),
+      color: isCig ? CIG_STROKE_COLOR : strokeColor,
+      width: isCig ? CIG_OUTLINE_WIDTH : resolveStrokeWidth({ weight: style.weight, isTopLayer: false }),
     }),
-    zIndex: isCig ? 1000 + (parseInt(probability.slice(3), 10) || 0) : computeZIndex(outlookType, probability),
+    zIndex: isCig ? CIG_Z_INDEX_BASE + (parseInt(probability.slice(CIG_PREFIX.length), 10) || 0) : computeZIndex(outlookType, probability),
   });
 };
 

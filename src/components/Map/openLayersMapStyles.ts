@@ -79,6 +79,8 @@ interface HatchPatternInput {
   strokeWidth?: number;
 }
 
+const FUNCTION_COLOR_NOTATION_REGEX = /^(rgba?|hsla?)\(/i;
+
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
 const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
@@ -99,11 +101,7 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
     return `rgba(255, 255, 255, ${alpha})`;
   }
 
-  if (color.startsWith("rgba(") || color.startsWith("hsla(")) {
-    return color;
-  }
-
-  if (color.startsWith("rgb(") || color.startsWith("hsl(")) {
+  if (FUNCTION_COLOR_NOTATION_REGEX.test(color)) {
     return color;
   }
 
@@ -525,7 +523,7 @@ export const createTileSource = (
       return new XYZ({
         url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attributions:
-          "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP",
+          "Tiles &copy; Esri &mdash; Source: Esri i-cubed USDA USGS AEX GeoEye Getmapping Aerogrid IGN IGP UPR-EGP",
         maxZoom: 19,
         crossOrigin: "anonymous",
       });

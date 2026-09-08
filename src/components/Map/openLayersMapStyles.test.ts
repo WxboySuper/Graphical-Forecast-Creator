@@ -70,6 +70,7 @@ describe('openLayersMapStyles', () => {
     expect(toRgbaColor({ color: '#abc', alpha: 0.3 })).toBe('rgba(170, 187, 204, 0.3)');
     expect(toRgbaColor({ color: '#112233', alpha: 1 })).toBe('rgba(17, 34, 51, 1)');
     expect(toRgbaColor({ color: 'rgba(1,2,3,0.4)', alpha: 0.9 })).toBe('rgba(1,2,3,0.4)');
+    expect(toRgbaColor({ color: 'RGBA(1,2,3,0.4)', alpha: 0.9 })).toBe('RGBA(1,2,3,0.4)');
   });
 
   test('resolveFillOpacity defaults to 0.25 and resolveStrokeWidth honors the top layer', () => {
