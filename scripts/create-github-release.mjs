@@ -1,3 +1,7 @@
+/**
+ * GitHub release preparation script. It reads release notes and package
+ * metadata, validates prerelease policy, and creates the release payload.
+ */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
