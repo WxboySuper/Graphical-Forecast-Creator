@@ -1,3 +1,8 @@
+/**
+ * Storm-report Redux slice.
+ *
+ * This slice stores normalized storm reports and the actions that update them. Fetching, parsing, and map presentation belong to their respective services and components.
+ */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { StormReport, StormReportsState, ReportType } from '../types/stormReports';
 

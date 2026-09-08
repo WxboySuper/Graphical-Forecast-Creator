@@ -1,3 +1,8 @@
+/**
+ * Auto-TSTM generation state hook.
+ *
+ * This hook tracks request, response, and error state for automatic TSTM generation. The generation service performs network work; this file coordinates lifecycle state for React callers.
+ */
 import { useCallback, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { selectCurrentDay, selectForecastCycle } from '../store/forecastSlice';
