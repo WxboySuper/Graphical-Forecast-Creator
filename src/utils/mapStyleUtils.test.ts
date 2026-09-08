@@ -1,3 +1,6 @@
+/**
+ * Map style utility tests. Verify map style values and layer properties are normalized for rendering.
+ */
 import { sortProbabilities, getFeatureStyle } from './mapStyleUtils';
 
 describe('mapStyleUtils', () => {

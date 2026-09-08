@@ -1,3 +1,6 @@
+/**
+ * Outlook trim strategy labels. Defines human-readable labels for polygon masking strategies.
+ */
 import type { LandMaskStrategy } from './types';
 
 export const OUTLOOK_TRIM_STRATEGY_OPTIONS: Array<{
