@@ -1,3 +1,7 @@
+/**
+ * Coordinates the OpenLayers map instance used by monitor-mode overlays and reports.
+ * This hook owns map lifecycle and view synchronization; report fetching, alert filtering, and forecast state remain separate concerns.
+ */
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { useSelector } from 'react-redux';
 import type { StormReport } from '../../types/stormReports';

@@ -1,3 +1,7 @@
+/**
+ * Renders the monitor-mode storm-report controls and report display section.
+ * This component owns monitor section layout and callbacks; report loading and map state are supplied by monitor hooks and controllers.
+ */
 import React from 'react';
 import { MapPin } from 'lucide-react';
 import type { MonitorSettings } from '../types';
