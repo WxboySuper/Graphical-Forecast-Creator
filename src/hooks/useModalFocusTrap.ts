@@ -1,3 +1,8 @@
+/**
+ * Focus-management hook for modal dialogs. It traps keyboard focus while a
+ * modal is active, restores the prior element, and leaves dialog rendering to
+ * the caller.
+ */
 import { useCallback, useEffect, useRef } from 'react';
 
 export interface ModalFocusTrapOptions {
