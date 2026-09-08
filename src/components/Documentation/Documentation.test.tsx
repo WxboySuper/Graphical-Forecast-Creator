@@ -1,3 +1,7 @@
+/**
+ * Documentation-panel tests. Verify the in-app documentation surface renders its
+ * content and dismiss controls at the component boundary.
+ */
 import { render, screen } from '@testing-library/react';
 import Documentation from './Documentation';
 

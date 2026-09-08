@@ -1,3 +1,7 @@
+/**
+ * Forecast-workspace layout tests. Verify responsive toolbar composition and user
+ * interactions across the forecast editor layout variants.
+ */
 import React, { useRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
