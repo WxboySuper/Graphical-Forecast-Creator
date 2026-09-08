@@ -1,3 +1,8 @@
+/**
+ * File: src/components/CompletionValidation/CompletionValidationModal.tsx
+ * Purpose: Renders the completion validation dialog and coordinates validation details with forecast actions.
+ */
+
 // skipcq: JS-W1028
 import React, { useCallback } from 'react';
 import type { CycleValidationResult } from '../../types/workflow';
