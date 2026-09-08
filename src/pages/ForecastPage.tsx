@@ -577,7 +577,7 @@ const renderCloudToolbar = ({
 );
 
 /** Composes the forecast page's cloud, file, and shortcut hooks into a single workspace model. */
-// @codescene(disable:"Complex Method")
+// @codescene(disable:"Complex Method", disable:"Large Method")
 const useForecastPageWorkspace = ({
   dispatch,
   addToast,
