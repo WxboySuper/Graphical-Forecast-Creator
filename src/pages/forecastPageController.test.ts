@@ -1,3 +1,6 @@
+/**
+ * Forecast page controller tests. Verify forecast-page actions, prompts, and session coordination.
+ */
 import * as fileUtils from '../utils/fileUtils';
 import forecastReducer from '../store/forecastSlice';
 import type { DiscussionData } from '../types/outlooks';

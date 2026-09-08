@@ -1,3 +1,6 @@
+/**
+ * Updates lightbox tests. Verify update content opens, closes, and preserves the selected item.
+ */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import UpdatesPage from './UpdatesPage';

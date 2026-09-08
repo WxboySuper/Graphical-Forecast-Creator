@@ -1,3 +1,6 @@
+/**
+ * Pricing page tests. Verify plan presentation, entitlement messaging, and checkout entry behavior.
+ */
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router';
 import { PricingPage } from './PricingPage';
