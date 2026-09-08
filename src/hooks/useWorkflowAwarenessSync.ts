@@ -1,3 +1,9 @@
+/**
+ * Synchronizes the active workflow's lightweight awareness record with the shared
+ * service. The hook owns the lifecycle of queued writes, deletes stale records during
+ * cleanup, and derives its inputs from auth and Redux state; it does not persist forecast
+ * contents or replace the workflow's authoritative save path.
+ */
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type FC, type PropsWithChildren } from 'react';
 import { useSelector } from 'react-redux';
 import { useAuth } from '../auth/AuthProvider';
