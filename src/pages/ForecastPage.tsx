@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useOutletContext } from 'react-router';
 import type { Dispatch, UnknownAction } from 'redux';
@@ -207,6 +207,13 @@ const DayRolloverDialog: React.FC<{
       </div>
     </DialogContent>
   </Dialog>
+);
+
+const LegacyForecastNotice: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => (
+  <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground" role="status">
+    Forecast now opens in the Severe workspace at <code>/forecast/severe</code>. Update any bookmarks that still use <code>/forecast</code>.
+    <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" onClick={onDismiss}>Dismiss</Button>
+  </div>
 );
 
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
@@ -730,6 +737,9 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const [showLegacyNotice, setShowLegacyNotice] = useState(
+    () => Boolean((location.state as { legacyForecastRedirect?: boolean } | null)?.legacyForecastRedirect),
+  );
   const { addToast } = useOutletContext<PageContext>();
   const { syncedSettings, user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
@@ -771,6 +781,7 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
 
   return (
     <div className="forecast-page-shell">
+      {showLegacyNotice ? <LegacyForecastNotice onDismiss={() => setShowLegacyNotice(false)} /> : null}
       {renderForecastWorkspaceLayout(forecastUiVariant, {
         mapRef,
         controller: workspaceController,
