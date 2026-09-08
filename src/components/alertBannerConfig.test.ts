@@ -1,3 +1,7 @@
+/**
+ * Alert-banner configuration tests. Verify normalization defaults and schedule
+ * activation decisions for the site-wide alert loader.
+ */
 import {
   DEFAULT_ALERT_BANNER_CONFIG,
   isAlertBannerScheduleActive,

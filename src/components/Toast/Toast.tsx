@@ -1,3 +1,7 @@
+/**
+ * Toast primitives. Renders timed feedback messages and manages the add, update,
+ * dismissal, and automatic-expiry behavior of the shared toast collection.
+ */
 import { useCallback, useEffect } from 'react';
 import './Toast.css';
 
