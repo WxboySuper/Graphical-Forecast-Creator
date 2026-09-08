@@ -1,3 +1,7 @@
+/**
+ * Badge primitive. Provides the shared labeled status surface with the supported
+ * visual variants used throughout the application.
+ */
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 
