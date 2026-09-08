@@ -1,3 +1,7 @@
+/**
+ * Popover primitive tests. Verify trigger, content, focus, and layering behavior
+ * for the shared Radix-backed popover boundary.
+ */
 import {
   createRef,
   forwardRef as mockForwardRef,
