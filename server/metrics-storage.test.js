@@ -1,3 +1,8 @@
+/**
+ * server test contract for metrics-storage.test.
+ *
+ * This file verifies the metrics-storage.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { after, beforeEach, describe, it } = require('node:test');

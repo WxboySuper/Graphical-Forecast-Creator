@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-webhook.test.
+ *
+ * This file verifies the billing-webhook.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 /**

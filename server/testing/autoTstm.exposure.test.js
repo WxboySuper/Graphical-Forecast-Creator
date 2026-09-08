@@ -1,3 +1,8 @@
+/**
+ * server test contract for autoTstm.exposure.test.
+ *
+ * This file verifies the autoTstm.exposure.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

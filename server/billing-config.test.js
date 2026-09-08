@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-config.test.
+ *
+ * This file verifies the billing-config.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it, beforeEach } = require('node:test');

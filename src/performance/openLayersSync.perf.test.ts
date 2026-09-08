@@ -1,3 +1,8 @@
+/**
+ * src test contract for openLayersSync.perf.test.
+ *
+ * This file verifies the openLayersSync.perf.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import GeoJSON from 'ol/format/GeoJSON';
 import VectorSource from 'ol/source/Vector';
 import type { Feature as GeoJsonFeature, Polygon } from 'geojson';

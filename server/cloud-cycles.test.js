@@ -1,3 +1,8 @@
+/**
+ * server test contract for cloud-cycles.test.
+ *
+ * This file verifies the cloud-cycles.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 /**

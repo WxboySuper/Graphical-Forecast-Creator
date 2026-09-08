@@ -1,3 +1,8 @@
+/**
+ * tests test contract for firestore.rules.test.
+ *
+ * This file verifies the firestore.rules.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

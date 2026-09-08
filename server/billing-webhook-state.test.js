@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-webhook-state.test.
+ *
+ * This file verifies the billing-webhook-state.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

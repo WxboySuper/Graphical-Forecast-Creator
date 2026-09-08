@@ -1,3 +1,8 @@
+/**
+ * server test contract for metrics.test.
+ *
+ * This file verifies the metrics.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 /**

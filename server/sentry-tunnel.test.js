@@ -1,3 +1,8 @@
+/**
+ * server test contract for sentry-tunnel.test.
+ *
+ * This file verifies the sentry-tunnel.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const assert = require('node:assert/strict');

@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-error-boundary.test.
+ *
+ * This file verifies the billing-error-boundary.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it, mock } = require('node:test');

@@ -1,3 +1,8 @@
+/**
+ * server test contract for account-lifecycle.test.
+ *
+ * This file verifies the account-lifecycle.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 /**

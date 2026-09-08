@@ -1,3 +1,8 @@
+/**
+ * server test contract for nginx-security-headers.test.
+ *
+ * This file verifies the nginx-security-headers.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
