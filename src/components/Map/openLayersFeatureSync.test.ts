@@ -1,3 +1,8 @@
+/**
+ * OpenLayers feature-sync test boundary: this suite verifies reconciliation of
+ * forecast features, vector sources, visibility, and geometry updates between
+ * Redux-backed forecast state and the OpenLayers map model.
+ */
 import GeoJSON from "ol/format/GeoJSON";
 import Feature from "ol/Feature";
 import Point from "ol/geom/Point";

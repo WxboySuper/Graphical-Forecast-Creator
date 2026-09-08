@@ -1,5 +1,11 @@
 'use strict';
 
+/**
+ * Server TSTM test boundary: this suite verifies the server-side TSTM
+ * ingestion and transformation workflow, including stream handling and error
+ * reporting, without depending on a running HTTP service.
+ */
+
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');

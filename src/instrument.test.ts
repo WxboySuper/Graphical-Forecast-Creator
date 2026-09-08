@@ -1,3 +1,8 @@
+/**
+ * Instrumentation test boundary: this suite verifies Sentry initialization,
+ * route tracing, error capture, redaction, and Redux breadcrumb behavior at
+ * the client observability boundary.
+ */
 import * as Sentry from '@sentry/react';
 
 jest.mock('@sentry/react', () => ({

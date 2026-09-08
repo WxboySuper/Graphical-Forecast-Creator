@@ -1,3 +1,8 @@
+/**
+ * Forecast-grade test boundary: this suite verifies grade-input validation,
+ * component scoring, product/package aggregation, and formula-version behavior
+ * for the Verification grading entry point.
+ */
 import { gradeForecast, runForecastGrade, validateGradeInputs } from './gradeForecast';
 import { scoreToLetter, type ComponentKey, type ProductGrade } from './gradeContract';
 import { FORECAST_GRADE_FORMULA_VERSION } from './formulaVersion';
