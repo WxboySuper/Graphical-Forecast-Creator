@@ -1,3 +1,8 @@
+/**
+ * Blank forecast-cycle state factory.
+ *
+ * This module creates the canonical empty forecast state used for new cycles and resets. Redux orchestration and UI prompts are handled by callers.
+ */
 import type { WorkflowMetadata } from '../types/workflow';
 import type { DayType } from '../types/outlooks';
 import { clearHistory } from './forecastHistory';
