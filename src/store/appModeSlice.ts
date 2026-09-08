@@ -1,3 +1,6 @@
+/**
+ * Application mode slice. Stores the active GFC mode and the actions that switch between product areas.
+ */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export type AppMode = 'forecast' | 'verification';
