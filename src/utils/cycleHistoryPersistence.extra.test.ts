@@ -6,6 +6,7 @@ type SavedCycle = {
   forecastCycle?: unknown;
   forecastData?: unknown;
   stats: unknown;
+  workspaceId?: string;
 };
 
 type StoreLike = {
@@ -37,12 +38,14 @@ describe('cycleHistoryPersistence', () => {
       label: 'L',
       forecastCycle: { some: 'fc' },
       stats: { total: 1 },
+      workspaceId: 'custom',
     };
 
     expect(() => mod.saveCycleHistoryToStorage([savedCycle as never])).not.toThrow();
 
     const loaded = mod.loadCycleHistoryFromStorage();
     expect(loaded.length).toBe(1);
+    expect(loaded[0].workspaceId).toBe('custom');
     expect(loaded[0].id).toBe('1');
     expect(loaded[0].forecastCycle).toEqual({ restored: true });
 
