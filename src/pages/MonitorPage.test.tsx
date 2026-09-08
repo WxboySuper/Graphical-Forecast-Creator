@@ -1,3 +1,6 @@
+/**
+ * Monitor page tests. Verify the monitor page composes map, alert, radar, and playback behavior correctly.
+ */
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';

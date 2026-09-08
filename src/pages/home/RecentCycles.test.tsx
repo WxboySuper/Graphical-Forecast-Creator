@@ -1,3 +1,6 @@
+/**
+ * Recent cycles tests. Verify recent forecast cycle loading, display, and selection behavior.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import RecentCycles from './RecentCycles';
 import type { SavedCycle } from '../../store/forecastSlice';

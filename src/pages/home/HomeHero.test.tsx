@@ -1,3 +1,6 @@
+/**
+ * Home hero tests. Verify the primary home-page introduction and entry actions.
+ */
 import { render, screen } from '@testing-library/react';
 import HomeHero from './HomeHero';
 

@@ -1,3 +1,6 @@
+/**
+ * Updates page tests. Verify update listing, filtering, and navigation behavior.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import UpdatesPage from './UpdatesPage';
