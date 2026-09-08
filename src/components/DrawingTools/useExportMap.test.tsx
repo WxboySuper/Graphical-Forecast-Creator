@@ -1,8 +1,7 @@
 /**
- * File: src/components/DrawingTools/useExportMap.test.tsx
- * Purpose: Tests export-map capture readiness, map overlays, cleanup, and failure handling.
+ * Export-map hook tests. Verify map capture, formatted filenames, download helpers,
+ * and error handling around the drawing-tools export flow.
  */
-
 import { renderHook, act } from '@testing-library/react';
 import type { RefObject } from 'react';
 import { useExportMap } from './useExportMap';
