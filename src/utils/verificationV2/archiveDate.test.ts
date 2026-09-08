@@ -1,3 +1,8 @@
+/**
+ * Verification archive-date test boundary: this suite verifies report-date
+ * conversion, current and prior-day classification, and archive cutoffs used
+ * by Verification evidence selection.
+ */
 import {
   getCurrentSpcReportDate,
   isReachedArchiveDate,
