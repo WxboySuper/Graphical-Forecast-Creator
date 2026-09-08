@@ -1,20 +1,18 @@
 import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  selectSavedCycles,
+  selectSavedCyclesForActiveWorkspace,
   selectForecastCycle,
   saveCurrentCycle,
   loadSavedCycle,
   deleteSavedCycle,
 } from '../../store/forecastSlice';
-import type { RootState } from '../../store';
 import { useAppLayout } from '../Layout/AppLayout';
 import ModalPortal from '../ui/ModalPortal';
 import './CycleHistoryModal.css';
 import CycleHistoryModalDialog, { type CycleHistoryConfirmAction } from './CycleHistoryModalDialog';
 import { deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 import { useCycleHistoryModalKeyboard } from './useCycleHistoryModalKeyboard';
-import { DEFAULT_FORECAST_WORKSPACE, getForecastWorkspace } from '../../config/forecastWorkspaces';
 
 interface CycleHistoryModalProps {
   isOpen: boolean;
@@ -27,11 +25,7 @@ export { deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
-  const savedCycles = useSelector(selectSavedCycles);
-  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
-  const visibleSavedCycles = savedCycles.filter(
-    (cycle) => getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id === activeWorkspaceId,
-  );
+  const visibleSavedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const currentCycle = useSelector(selectForecastCycle);
 
   const [showSaveForm, setShowSaveForm] = useState(false);

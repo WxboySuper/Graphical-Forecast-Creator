@@ -1607,6 +1607,13 @@ export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   };
 /** Selects the saved forecast cycle snapshots shown in cycle history. */
 export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;
+/** Selects saved cycles owned by the active workspace, treating legacy records as Severe. */
+export const selectSavedCyclesForActiveWorkspace = (state: RootState) => {
+  const activeWorkspaceId = getForecastWorkspace(state.forecast.workspaceId)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+  return state.forecast.savedCycles.filter((cycle) =>
+    (getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE) === activeWorkspaceId,
+  );
+};
 /** Returns whether there is at least one reversible edit available. */
 export const selectCanUndo = (state: RootState) => {
   const dayHistory = state.forecast.historyByDay[state.forecast.forecastCycle.currentDay];
