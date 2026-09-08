@@ -1,8 +1,7 @@
 /**
- * File: src/components/Map/ForecastMapPerformance.test.tsx
- * Purpose: Tests forecast map performance instrumentation, render thresholds, and cleanup behavior.
+ * Forecast-map performance tests. Exercise render tracking and map-view updates
+ * around the OpenLayers adapter without requiring a live map instance.
  */
-
 
 import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';

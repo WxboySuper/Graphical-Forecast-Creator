@@ -1,8 +1,7 @@
 /**
- * File: src/components/Map/StatusOverlay.test.tsx
- * Purpose: Covers map status overlay messages, visibility, and retry interactions.
+ * Status-overlay tests. Verify selector-driven loading, error, and status content
+ * for the forecast and verification map overlays.
  */
-
 import { render, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import StatusOverlay from './StatusOverlay';
