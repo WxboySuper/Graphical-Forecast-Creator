@@ -1,3 +1,6 @@
+/**
+ * Additional discussion utility tests. Cover edge cases in discussion normalization and display helpers.
+ */
 import { compileDiscussionToText, exportDiscussionToFile } from './discussionUtils';
 
 type Discussion = {

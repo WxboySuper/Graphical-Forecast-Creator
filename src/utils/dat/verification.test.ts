@@ -1,3 +1,6 @@
+/**
+ * DAT verification tests. Verify NOAA DAT boundary data passes integrity and shape checks.
+ */
 import type { DatDamagePoint } from './types';
 import { datDamagePointToStormReport, isTornadoDamagePoint, summarizeDatEvidence } from './verification';
 
