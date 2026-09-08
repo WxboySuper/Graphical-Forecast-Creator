@@ -1,3 +1,8 @@
+/**
+ * Cycle-history persistence test boundary: this suite covers additional edge
+ * cases for saved-cycle serialization, restoration, migration, and cleanup.
+ * It complements the primary persistence tests without rendering UI.
+ */
 type SavedCycle = {
   id: string;
   timestamp: string;
@@ -387,8 +392,3 @@ describe('cycleHistoryPersistence', () => {
     expect(dispatchSpy).toHaveBeenCalled();
   });
 });
-/**
- * Cycle-history persistence test boundary: this suite covers additional edge
- * cases for saved-cycle serialization, restoration, migration, and cleanup.
- * It complements the primary persistence tests without rendering UI.
- */
