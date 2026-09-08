@@ -34,9 +34,10 @@ All notable changes to this project will be documented in this file.
 - **jest-environment-jsdom:** ^30.2.0 → ^30.5.0
 - **typescript-eslint:** ^8.66.0 → ^8.68.0
 - **vite:** ^8.2.1 → ^8.2.2
-- **@sentry/node:** ^10.69.0 → ^10.72.0 (`server`)
+- **@sentry/node:** ^10.69.0 → ^10.73.0 (`server`)
 - **firebase-admin:** ^14.2.0 → ^14.3.0 (`server`)
-- **stripe:** ^22.4.0 → ^22.6.0 (`server`)
+- **express-rate-limit:** ^8.6.2 → ^8.7.0 (`server`)
+- **stripe:** ^22.4.0 → ^22.6.1 (`server`)
 
 
 #### Added
