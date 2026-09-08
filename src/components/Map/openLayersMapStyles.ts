@@ -1,9 +1,8 @@
 /**
- * OpenLayers map-style definitions: this module builds the visual styles used
- * by forecast, verification, and preview layers. It translates forecast
- * geometry metadata into map symbols and stays independent from React state,
- * persistence, and feature-editing orchestration.
+ * File: src/components/Map/openLayersMapStyles.ts
+ * Purpose: Defines shared OpenLayers map styles for forecast and verification features.
  */
+
 import LayerGroup from "ol/layer/Group";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";

@@ -1,8 +1,8 @@
 /**
- * OpenLayers forecast-view synchronization helpers.
- *
- * This module keeps map view state aligned with forecast controls and converts between application and OpenLayers representations. Rendering and persistence remain outside this file.
+ * File: src/components/Map/openLayersForecastViewSync.ts
+ * Purpose: Synchronizes OpenLayers forecast-map view state with application selection and viewport state.
  */
+
 import type OLMap from "ol/Map";
 import { fromLonLat, toLonLat } from "ol/proj";
 import type { MutableRefObject } from "react";
