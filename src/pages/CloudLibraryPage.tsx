@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AlertCircle, Cloud, CloudOff, Download, Edit2, LoaderCircle, Lock, ShieldCheck, Trash2 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -17,9 +17,9 @@ import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
   getCloudCycleWorkspaceLabel,
+  getCloudLibraryTabFromSearchParams,
   getCloudLibraryTabs,
   getNextCloudLibraryTabId,
-  resolveActiveCloudLibraryTab,
   type CloudLibraryTab,
   type CloudLibraryTabId,
 } from './cloudLibraryWorkspace';
@@ -827,18 +827,27 @@ const useCloudLibraryActions = ({
 /** Production-facing page for loading and managing cloud-hosted cycles. */
 const CloudLibraryPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { premiumActive, effectiveSource } = useEntitlement();
   const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
-  const [activeTab, setActiveTab] = useState<CloudLibraryTabId>('all');
   const buildTarget = getBuildTarget();
   const tabs = useMemo(() => getCloudLibraryTabs(cycles, buildTarget), [cycles, buildTarget]);
-  const effectiveActiveTab = resolveActiveCloudLibraryTab(tabs, activeTab);
+  const activeTab = useMemo(() => getCloudLibraryTabFromSearchParams(searchParams, tabs), [searchParams, tabs]);
 
   const visibleCycles = useMemo(
-    () => filterCloudCyclesByWorkspace(cycles, effectiveActiveTab),
-    [effectiveActiveTab, cycles]
+    () => filterCloudCyclesByWorkspace(cycles, activeTab),
+    [activeTab, cycles]
   );
+  const handleTabChange = useCallback((tabId: CloudLibraryTabId) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (tabId === 'all') {
+      nextSearchParams.delete('workspace');
+    } else {
+      nextSearchParams.set('workspace', tabId);
+    }
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
   const {
     message,
     handleLoadCycle,
@@ -861,7 +870,7 @@ const CloudLibraryPage: React.FC = () => {
     [visibleCycles.length],
   );
   const workspaceLabel =
-    effectiveActiveTab === 'all' ? undefined : tabs.find((tab) => tab.id === effectiveActiveTab)?.label;
+    activeTab === 'all' ? undefined : tabs.find((tab) => tab.id === activeTab)?.label;
 
   if (!user) {
     return <SignedOutGate />;
@@ -881,14 +890,14 @@ const CloudLibraryPage: React.FC = () => {
           loading={loading}
           cycles={visibleCycles}
           tabs={tabs}
-          activeTab={effectiveActiveTab}
+          activeTab={activeTab}
           workspaceLabel={workspaceLabel}
           canWrite={canWrite}
           cycleCountLabel={cycleCountLabel}
           onLoadCycle={handleLoadCycle}
           onDeleteCycle={handleDeleteCycle}
           onRenameCycle={handleRenameCycle}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
         />
       </div>
     </div>
