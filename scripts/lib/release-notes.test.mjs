@@ -1,3 +1,8 @@
+/**
+ * Script test contract for release-notes.test.
+ *
+ * This file verifies the script or automation boundary represented by release-notes.test, including its inputs, outputs, and failure behavior.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { composeReleaseNotes, selectPreviousReleaseTag } from './release-notes.mjs';

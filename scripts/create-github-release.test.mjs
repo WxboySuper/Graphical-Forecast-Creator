@@ -1,3 +1,8 @@
+/**
+ * Script test contract for create-github-release.test.
+ *
+ * This file verifies the script or automation boundary represented by create-github-release.test, including its inputs, outputs, and failure behavior.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

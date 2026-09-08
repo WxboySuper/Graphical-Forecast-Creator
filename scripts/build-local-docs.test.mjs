@@ -1,3 +1,8 @@
+/**
+ * Script test contract for build-local-docs.test.
+ *
+ * This file verifies the script or automation boundary represented by build-local-docs.test, including its inputs, outputs, and failure behavior.
+ */
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { pageHtml, pageSlug, renderMarkdown } from './build-local-docs.mjs';
