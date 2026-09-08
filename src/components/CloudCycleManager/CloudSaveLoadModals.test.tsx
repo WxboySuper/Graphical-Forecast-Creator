@@ -1,3 +1,7 @@
+/**
+ * Cloud save/load modal tests. Verify loading, saving, error, cancellation, and
+ * disabled states across the cloud-cycle modal boundary.
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CloudSaveModal } from './CloudSaveLoadModals';
 

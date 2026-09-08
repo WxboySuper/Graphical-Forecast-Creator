@@ -1,3 +1,7 @@
+/**
+ * Cloud toolbar button tests. Verify feature exposure, save/load modal actions,
+ * current-cycle state, and error feedback from the toolbar control.
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CloudToolbarButton } from './CloudToolbarButton';
 
