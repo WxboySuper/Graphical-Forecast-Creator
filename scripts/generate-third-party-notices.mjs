@@ -1,3 +1,7 @@
+/**
+ * Third-party notice generator. It reads dependency license metadata, applies
+ * the repository's license policy, and writes the attribution notice artifact.
+ */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade contract definitions. It describes the versioned component
+ * score inputs and outputs shared by grading, persistence, and UI consumers.
+ */
 import { FORECAST_GRADE_FORMULA_VERSION } from './formulaVersion';
 import type { DatEvidenceSummary } from '../dat';
 
