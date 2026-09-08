@@ -6,7 +6,7 @@ import { isFeatureExposed } from '../../config/featureExposure';
 import { Button } from '../ui/button';
 import {
   selectForecastCycle,
-  selectSavedCycles,
+  selectSavedCyclesForActiveWorkspace,
   selectHasActiveWorkflow,
   selectWorkflowMetadata,
   selectWorkflowTemplate,
@@ -107,7 +107,7 @@ const getWorkflowValidationGroupings = (
 /** Finds the most relevant previous outlook for the active forecast day. */
 const usePreviousOutlookSuggestion = (): PreviousOutlookSuggestion | null => {
   const forecastCycle = useSelector(selectForecastCycle);
-  const savedCycles = useSelector(selectSavedCycles);
+  const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
 
   return useMemo(() => {
     const sourceDay = getPreviousSourceDay(forecastCycle.currentDay);
@@ -457,7 +457,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
   const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
-  const savedCycles = useSelector(selectSavedCycles);
+  const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
   const workflowTemplate = useSelector(selectWorkflowTemplate);
