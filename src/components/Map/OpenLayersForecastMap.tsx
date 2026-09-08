@@ -48,7 +48,6 @@ import type {
   Polygon,
   MultiPolygon,
 } from "geojson";
-import { apply } from "ol-mapbox-style";
 import Legend from "./Legend";
 import StatusOverlay from "./StatusOverlay";
 import CategoricalErrorBanner from "./CategoricalErrorBanner";
@@ -77,6 +76,8 @@ import {
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
   GHOST_REFERENCE_LAYER_Z_INDEX,
+  loadOpenFreeMapLayerGroups,
+  isCurrentOpenFreeMapRequest,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
 import type { CustomCategoryStyle } from "../../types/customProducts";
@@ -507,25 +508,25 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         features.forEach((feature) => {
           void (async () => {
             try {
-            if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
-              return;
-            }
-
-            if (!isCategorical) {
-              const customFeature = toUpdatedCustomFeature(feature, format);
-              if (customFeature) {
-                dispatch(updateCustomFeature(customFeature));
+              if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
                 return;
               }
-            }
 
-            const updatedFeature = toUpdatedGeoJsonFeature(feature, format, isCategorical);
-            if (!updatedFeature) {
-              return;
-            }
+              if (!isCategorical) {
+                const customFeature = toUpdatedCustomFeature(feature, format);
+                if (customFeature) {
+                  dispatch(updateCustomFeature(customFeature));
+                  return;
+                }
+              }
 
-            const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
-            dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
+              const updatedFeature = toUpdatedGeoJsonFeature(feature, format, isCategorical);
+              if (!updatedFeature) {
+                return;
+              }
+
+              const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
+              dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
             } catch (error) {
               captureException(error, { tags: { featureOperation: "modify-outlook" } });
             }
@@ -1074,27 +1075,19 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         vectorReferenceGroup.getLayers().clear();
 
         getOpenFreeMapStyleSet(baseMapStyle)
-          .then(({ baseStyle, overlayStyle }) => {
-            const nextBaseGroup = new LayerGroup();
-            const nextReferenceGroup = new LayerGroup();
-
-            return Promise.all([
-              apply(nextBaseGroup, baseStyle),
-              apply(nextReferenceGroup, overlayStyle),
-            ]).then(() => ({ nextBaseGroup, nextReferenceGroup }));
-          })
-          .then(({ nextBaseGroup, nextReferenceGroup }) => {
-            if (vectorStyleRequestRef.current !== requestId) {
+          .then(loadOpenFreeMapLayerGroups)
+          .then(({ baseGroup, referenceGroup }) => {
+            if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
               return;
             }
 
-            replaceLayerGroupLayers(vectorBaseGroup, nextBaseGroup);
-            replaceLayerGroupLayers(vectorReferenceGroup, nextReferenceGroup);
+            replaceLayerGroupLayers(vectorBaseGroup, baseGroup);
+            replaceLayerGroupLayers(vectorReferenceGroup, referenceGroup);
             vectorBaseGroup.setVisible(true);
             vectorReferenceGroup.setVisible(true);
           })
           .catch((error) => {
-            if (vectorStyleRequestRef.current !== requestId) {
+            if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
               return;
             }
 
@@ -1174,46 +1167,46 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
         void (async () => {
           try {
-          const geometry = format.writeGeometryObject(olGeometry, {
-            dataProjection: "EPSG:4326",
-            featureProjection: "EPSG:3857",
-          });
-          const customFeature = toDrawnCustomFeature(
-            geometry as unknown as Geometry,
-            activeCustomLayer,
-            activeCustomCategory,
-            customMode,
-          );
-          if (customFeature) {
-            dispatch(addCustomFeature(customFeature));
-            return;
-          }
-
-          let outlookGeometry: Polygon | MultiPolygon | null = geometry as Polygon | MultiPolygon;
-          if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
-            outlookGeometry = await trimGeometryForAutoDraw(
-              outlookGeometry,
-              outlookTrimStrategyRef.current,
-              outlookTrimAutoOnDrawRef.current,
-              outlookTrimPreviewOnlyRef.current,
+            const geometry = format.writeGeometryObject(olGeometry, {
+              dataProjection: "EPSG:4326",
+              featureProjection: "EPSG:3857",
+            });
+            const customFeature = toDrawnCustomFeature(
+              geometry as unknown as Geometry,
+              activeCustomLayer,
+              activeCustomCategory,
+              customMode,
             );
-          }
+            if (customFeature) {
+              dispatch(addCustomFeature(customFeature));
+              return;
+            }
 
-          if (!outlookGeometry) {
-            return;
-          }
+            let outlookGeometry: Polygon | MultiPolygon | null = geometry as Polygon | MultiPolygon;
+            if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
+              outlookGeometry = await trimGeometryForAutoDraw(
+                outlookGeometry,
+                outlookTrimStrategyRef.current,
+                outlookTrimAutoOnDrawRef.current,
+                outlookTrimPreviewOnlyRef.current,
+              );
+            }
 
-          const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
-            type: "Feature",
-            id: uuidv4(),
-            geometry: outlookGeometry,
-            properties: {
-              outlookType: drawingState.activeOutlookType,
-              probability: drawingState.activeProbability,
-              isSignificant: drawingState.isSignificant,
-            },
-          };
-          dispatch(addFeature({ feature, day: drawDay }));
+            if (!outlookGeometry) {
+              return;
+            }
+
+            const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
+              type: "Feature",
+              id: uuidv4(),
+              geometry: outlookGeometry,
+              properties: {
+                outlookType: drawingState.activeOutlookType,
+                probability: drawingState.activeProbability,
+                isSignificant: drawingState.isSignificant,
+              },
+            };
+            dispatch(addFeature({ feature, day: drawDay }));
           } catch (error) {
             captureException(error, { tags: { featureOperation: "draw-outlook" } });
           }
