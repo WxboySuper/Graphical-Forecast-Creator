@@ -66,6 +66,7 @@ const ForecastLegacyRedirect = () => {
   return (
     <Navigate
       to={{ pathname: getDefaultForecastWorkspacePath(), search: location.search, hash: location.hash }}
+      state={{ legacyForecastRedirect: true }}
       replace
     />
   );
