@@ -1,3 +1,9 @@
+/**
+ * Forecast completion validation: this module checks whether the active cycle
+ * contains the required outlook, grouping, and workflow content before a save
+ * or completion action. It owns pure validation rules and diagnostics, not UI
+ * prompts, Redux transitions, or persistence.
+ */
 import type {
   StandardGrouping,
   ValidationOutlookType,

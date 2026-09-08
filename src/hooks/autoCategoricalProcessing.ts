@@ -1,3 +1,9 @@
+/**
+ * Automatic categorical processing: this hook and its helpers derive the
+ * categorical outlook from probabilistic hazard geometry and preserve the
+ * editor’s update semantics. It owns pure derivation and scheduling inputs;
+ * Redux dispatch, map rendering, and persistence remain outside this boundary.
+ */
 import * as turf from '@turf/turf';
 import { v4 as uuidv4 } from 'uuid';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon, Position } from 'geojson';
