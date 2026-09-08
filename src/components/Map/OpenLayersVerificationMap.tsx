@@ -1,3 +1,11 @@
+/**
+ * OpenLayers map used by forecast verification.
+ *
+ * The component owns the verification map instance and visual presentation,
+ * while shared map-style, basemap, and feature helpers supply the policy for
+ * forecast-grade layers. Its imperative handle is limited to route-level map
+ * actions needed by the verification workspace.
+ */
 import React, {
   forwardRef,
   useEffect,
