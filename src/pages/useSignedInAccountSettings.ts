@@ -1,3 +1,8 @@
+/**
+ * Signed-in account settings hook.
+ *
+ * This hook loads and updates the authenticated user's account settings while exposing UI state. Authentication and backend transport are delegated to their service hooks.
+ */
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { useWorkflowAwareness } from "../hooks/useWorkflowAwarenessSync";

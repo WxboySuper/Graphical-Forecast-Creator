@@ -1,3 +1,8 @@
+/**
+ * Custom products dialog component.
+ *
+ * This component renders the integrated-toolbar dialog for creating and editing custom products. Product modeling and persistence come from the editor model and page actions.
+ */
 import { useState } from 'react';
 import { LibraryBig } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
