@@ -1,3 +1,7 @@
+/**
+ * Loads and manages live WMS layer configuration for monitor mode.
+ * This hook owns monitor-facing request state and notifications; WMS transport and playback timing remain in dedicated utilities.
+ */
 import { useCallback, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import type { WmsLayerConfig } from './wms';
