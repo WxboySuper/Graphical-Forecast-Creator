@@ -1,8 +1,7 @@
 /**
- * File: src/components/Map/UnofficialBadge.tsx
- * Purpose: Renders the map attribution badge for unofficial or limited data sources.
+ * Unofficial forecast badge. Provides the persistent educational-use warning shown
+ * on map surfaces without owning forecast or safety decisions.
  */
-
 import React from 'react';
 import './UnofficialBadge.css';
 

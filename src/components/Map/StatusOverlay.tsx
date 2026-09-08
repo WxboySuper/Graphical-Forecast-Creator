@@ -1,8 +1,7 @@
 /**
- * File: src/components/Map/StatusOverlay.tsx
- * Purpose: Renders status and recovery messaging over map surfaces.
+ * Low-probability status overlay. Reads forecast state and tells the editor when
+ * the active outlook is below the display threshold.
  */
-
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
