@@ -1,3 +1,7 @@
+/**
+ * Free-form discussion editor. It renders the editable discussion body and
+ * delegates content, focus, and save state to the discussion-page controller.
+ */
 import React, { useRef } from 'react';
 import './DIYDiscussionEditor.css';
 
