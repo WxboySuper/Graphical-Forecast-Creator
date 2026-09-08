@@ -31,7 +31,14 @@ describe('vendored boundary dataset validation', () => {
 
   test('verifyVendoredDatasets reports success for all checked-in files', () => {
     const results = verifyVendoredDatasets(parseDeclaredDatasets());
-    assert.ok(results.every((r) => r.ok), results.filter((r) => !r.ok).map((r) => r.error));
+    assert.ok(results.every((r) => r.ok), results.filter((r) => !r.ok).map((r) => r.error).join('\n'));
+  });
+
+  test('rejects a dataset whose bytes do not match the declared checksum', () => {
+    const dataset = { ...parseDeclaredDatasets()[0], sha256: '0'.repeat(64) };
+    const [result] = verifyVendoredDatasets([dataset]);
+    assert.equal(result.ok, false);
+    assert.match(result.error, /checksum mismatch/);
   });
 
   test('sha256Of computes the expected digest for a known file', () => {
