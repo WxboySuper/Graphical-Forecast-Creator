@@ -1,3 +1,7 @@
+/**
+ * Local custom-products repository. It persists user-defined products in local
+ * storage, validates records, and exposes the repository interface to callers.
+ */
 import { v4 as uuidv4 } from 'uuid';
 import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct } from '../types/customProducts';
 import type { CustomProductsRepository } from './customProductsRepository';
