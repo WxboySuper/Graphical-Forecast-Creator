@@ -1,7 +1,8 @@
 /**
- * Converts forecast geometry into OpenLayers-renderable features and coordinates.
- * This module owns geometry validation and feature construction helpers; map state, styling, and persistence remain with the map controllers.
+ * File: src/components/Map/openLayersRenderableGeometry.ts
+ * Purpose: Provides geometry normalization and renderability helpers for OpenLayers features.
  */
+
 import Feature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 

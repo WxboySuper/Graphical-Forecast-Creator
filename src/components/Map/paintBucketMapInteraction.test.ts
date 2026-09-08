@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/paintBucketMapInteraction.test.ts
+ * Purpose: Covers paint-bucket map interaction selection, fill behavior, and cleanup.
+ */
+
 import { handlePaintBucketMapClick } from './paintBucketMapInteraction';
 import { resolvePaintBucketEditAction } from '../../utils/paintBucket/outlookScope';
 
