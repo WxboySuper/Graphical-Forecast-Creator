@@ -1,3 +1,8 @@
+/**
+ * Custom map-layer Redux reducers.
+ *
+ * This file applies actions that add, update, and remove user-managed map layers. Layer UI and persistence dispatch actions into this reducer; they do not belong here.
+ */
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   CUSTOM_PRODUCT_LIMITS,
