@@ -1,3 +1,6 @@
+/**
+ * Alert banner hook. Loads normalized site-wide banner configuration and exposes dismissal and loading state.
+ */
 import { useEffect, useState } from 'react';
 import {
   DEFAULT_ALERT_BANNER_CONFIG,

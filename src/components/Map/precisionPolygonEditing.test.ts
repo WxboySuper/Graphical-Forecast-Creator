@@ -1,3 +1,6 @@
+/**
+ * Precision polygon editing tests. Verify vertex and geometry edits preserve the map editor's precision rules and actions.
+ */
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from './precisionPolygonEditing';
 
 describe('precisionPolygonEditing', () => {
