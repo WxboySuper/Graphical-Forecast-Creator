@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastGrade/CloudSourcePicker.tsx
+ * Purpose: Renders the premium cloud-cycle source picker and routes selected cycles to the caller.
+ */
+
 import React from 'react';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useCloudCycles } from '../../hooks/useCloudCycles';
