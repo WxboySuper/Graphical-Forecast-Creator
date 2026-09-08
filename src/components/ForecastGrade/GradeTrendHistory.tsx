@@ -1,8 +1,7 @@
 /**
- * File: src/components/ForecastGrade/GradeTrendHistory.tsx
- * Purpose: Renders historical grade trends and coordinates chart-ready history data.
+ * Grade-trend history. Renders the recent finite grade cards and delegates card
+ * selection to the forecast-grade workspace.
  */
-
 import React from 'react';
 import type { GradeCard } from '../../types/forecastGrade';
 import { formatGrade } from './gradeFormat';
