@@ -1,3 +1,7 @@
+/**
+ * Defines billing display configuration and environment-derived pricing settings.
+ * This module owns normalized billing configuration values used by server billing flows; it does not process payments or persist subscriptions.
+ */
 'use strict';
 
 const { hasFirebaseAdminConfig } = require('./firebase-admin');
