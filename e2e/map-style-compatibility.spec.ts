@@ -1,5 +1,21 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { prepareAppState } from './testSetup';
+
+const expectPaintedMapCanvas = async (viewport: Locator) => {
+  const paintedPixels = await viewport.locator('canvas').evaluateAll((canvases) =>
+    canvases.some((canvas) => {
+      if (canvas.width === 0 || canvas.height === 0) return false;
+      const context = canvas.getContext('2d');
+      if (!context) return false;
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index] !== 0) return true;
+      }
+      return false;
+    }),
+  );
+  expect(paintedPixels).toBe(true);
+};
 
 test('renders a drawn outlook in forecast and verification with shared map styles', async ({ page }, testInfo) => {
   test.setTimeout(60000);
@@ -35,37 +51,13 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await page.getByRole('button', { name: 'Base map style', exact: true }).click();
   await page.getByRole('button', { name: 'Blank (Weather)', exact: true }).click();
   await expect(verificationViewport.locator('canvas').first()).toBeVisible();
-  const paintedPixels = await verificationViewport.locator('canvas').evaluateAll((canvases) =>
-    canvases.some((canvas) => {
-      if (canvas.width === 0 || canvas.height === 0) return false;
-      const context = canvas.getContext('2d');
-      if (!context) return false;
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      for (let index = 3; index < pixels.length; index += 4) {
-        if (pixels[index] !== 0) return true;
-      }
-      return false;
-    }),
-  );
-  expect(paintedPixels).toBe(true);
+  await expectPaintedMapCanvas(verificationViewport);
   const verificationScreenshot = testInfo.outputPath('verification-style.png');
   await verificationViewport.screenshot({ path: verificationScreenshot });
   await testInfo.attach('verification-style', { path: verificationScreenshot, contentType: 'image/png' });
   await page.getByRole('button', { name: 'Switch to dark mode' }).click();
   await expect(verificationViewport.locator('canvas').first()).toBeVisible();
-  const darkPaintedPixels = await verificationViewport.locator('canvas').evaluateAll((canvases) =>
-    canvases.some((canvas) => {
-      if (canvas.width === 0 || canvas.height === 0) return false;
-      const context = canvas.getContext('2d');
-      if (!context) return false;
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      for (let index = 3; index < pixels.length; index += 4) {
-        if (pixels[index] !== 0) return true;
-      }
-      return false;
-    }),
-  );
-  expect(darkPaintedPixels).toBe(true);
+  await expectPaintedMapCanvas(verificationViewport);
   const verificationDarkScreenshot = testInfo.outputPath('verification-dark-style.png');
   await verificationViewport.screenshot({ path: verificationDarkScreenshot });
   await testInfo.attach('verification-dark-style', { path: verificationDarkScreenshot, contentType: 'image/png' });
