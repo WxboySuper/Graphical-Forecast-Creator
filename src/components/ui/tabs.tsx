@@ -1,3 +1,7 @@
+/**
+ * Tabs primitives. Wraps Radix tab roots, lists, triggers, and content with the
+ * shared styling and ref-forwarding behavior used by workspace panels.
+ */
 import * as React from 'react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { cn } from '../../lib/utils';

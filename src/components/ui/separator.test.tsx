@@ -1,3 +1,7 @@
+/**
+ * Separator primitive tests. Verify orientation, decoration semantics, and native
+ * attributes at the shared divider boundary.
+ */
 import { render, screen } from '@testing-library/react';
 import { Separator } from './separator';
 
