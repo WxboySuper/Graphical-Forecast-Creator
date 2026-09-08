@@ -1,3 +1,11 @@
+/**
+ * Forecast workspace page orchestration.
+ *
+ * This module connects route context, Redux forecast state, map actions, cycle
+ * persistence, imports/exports, and user-facing prompts. Domain reducers and
+ * persistence services stay in their own modules; this page coordinates them
+ * for the active forecast route and translates outcomes into UI feedback.
+ */
 import React, { useRef, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router';
