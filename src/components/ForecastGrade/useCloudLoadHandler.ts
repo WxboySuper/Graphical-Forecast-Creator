@@ -1,3 +1,7 @@
+/**
+ * Cloud-grade load handler hook. Loads a saved package into grade state while the
+ * sequence reference prevents stale asynchronous loads from winning.
+ */
 import { useCallback, type MutableRefObject } from 'react';
 import type { useAppLayout } from '../Layout/AppLayout';
 import type { useCloudCycles } from '../../hooks/useCloudCycles';
@@ -8,10 +12,6 @@ type AddToast = ReturnType<typeof useAppLayout>['addToast'];
 type Grade = ReturnType<typeof useForecastGrade>;
 type LoadCycle = ReturnType<typeof useCloudCycles>['loadCycle'];
 
-/**
- * Returns a stable callback that loads a cloud package into the grade state,
- * guarding against stale loads via the shared sequence ref.
- */
 export const useCloudLoadHandler = (
   packageLoadSeqRef: MutableRefObject<number>,
   addToast: AddToast,

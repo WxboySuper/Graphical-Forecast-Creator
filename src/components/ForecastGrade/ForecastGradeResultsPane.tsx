@@ -1,4 +1,8 @@
 /**
+ * Forecast-grade results pane. Composes the headline, quality, evidence, trend,
+ * progress, and product-grade sections for a completed or active verification.
+ */
+/**
  * Forecast Grade results pane. It renders grade cards, evidence summaries, and
  * detail interactions from the verification result supplied by its parent.
  */
