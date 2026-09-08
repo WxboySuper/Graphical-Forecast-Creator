@@ -1,3 +1,7 @@
+/**
+ * Hosted-auth settings synchronization. The module reads and writes the
+ * hosted user settings document and keeps it aligned with local account state.
+ */
 import React from 'react';
 import { useDispatch } from 'react-redux';
 import {
