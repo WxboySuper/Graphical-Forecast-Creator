@@ -1,3 +1,8 @@
+/**
+ * Privacy-policy modal test boundary: this suite verifies acceptance state,
+ * policy-version upgrades, modal rendering, and user actions at the privacy
+ * consent UI boundary.
+ */
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import PrivacyPolicyModal, {
   hasAcceptedPrivacyPolicy,
