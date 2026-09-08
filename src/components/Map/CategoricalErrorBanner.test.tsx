@@ -1,3 +1,7 @@
+/**
+ * Categorical-error banner tests. Verify the selector-driven empty, visible,
+ * recovery, and interaction states of the editor error message.
+ */
 import { render, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import CategoricalErrorBanner from './CategoricalErrorBanner';
