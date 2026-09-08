@@ -1,3 +1,6 @@
+/**
+ * Outlook source tests. Verify source metadata and layer inputs used by monitor outlook rendering.
+ */
 import type { ForecastCycle } from '../types/outlooks';
 import { buildMonitorOutlookOptions, resolveSelectedOutlookOption } from './outlookSources';
 
