@@ -1,3 +1,6 @@
+/**
+ * Custom cloud cycle service tests. Verify persistence and retrieval of custom cloud-cycle data.
+ */
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { getDoc, onSnapshot } from 'firebase/firestore';
 import {
