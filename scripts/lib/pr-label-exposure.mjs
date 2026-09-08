@@ -1,3 +1,8 @@
+/**
+ * Pull request label exposure helpers.
+ *
+ * This module derives and validates labels used by repository policy workflows. GitHub mutations and workflow exit handling stay with the caller.
+ */
 import { anyFileMatches } from './glob-match.mjs';
 
 /** @typedef {{ changedFiles: string[] }} ExposureContext */
