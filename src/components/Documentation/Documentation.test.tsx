@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Documentation/Documentation.test.tsx
+ * Purpose: Tests documentation page rendering, navigation, and user-facing content boundaries.
+ */
+
 import { render, screen } from '@testing-library/react';
 import Documentation from './Documentation';
 
