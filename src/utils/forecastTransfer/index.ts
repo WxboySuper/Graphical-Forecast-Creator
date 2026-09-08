@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { downloadGfcPackage, readForecastImportFile } from '../fileUtils';
+import { downloadGfcPackage, exportForecastToJson, readForecastImportFile } from '../fileUtils';
 import { downloadKmzExport } from '../kmzExport';
 import type { KmzExportStrategy } from '../kmzExport';
 import type { ForecastCycle, DayType } from '../../types/outlooks';
@@ -177,6 +177,12 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
   } = request;
 
   if (format === 'json') {
+    // Keep the established Severe download shape compatible with existing files
+    // and external consumers. New workspace products receive explicit ownership.
+    if (workspaceId === 'severe') {
+      exportForecastToJson(forecastCycle, mapView, cycleMetadata);
+      return;
+    }
     const payload = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, cycleMetadata);
     const jsonString = JSON.stringify(payload, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
