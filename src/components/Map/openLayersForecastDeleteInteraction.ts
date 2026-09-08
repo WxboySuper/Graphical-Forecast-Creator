@@ -1,3 +1,8 @@
+/**
+ * OpenLayers forecast-feature delete interaction.
+ *
+ * This module translates map delete gestures into forecast-layer updates. The forecast store owns persistence and this file manages only the map interaction boundary.
+ */
 import { click } from "ol/events/condition";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
