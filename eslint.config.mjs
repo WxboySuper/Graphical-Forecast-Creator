@@ -1,3 +1,7 @@
+/**
+ * Repository ESLint configuration. It composes JavaScript, TypeScript, React,
+ * and hook rules with the project's generated-file and test exclusions.
+ */
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';

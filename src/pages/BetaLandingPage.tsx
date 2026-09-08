@@ -1,3 +1,7 @@
+/**
+ * Beta landing route. It renders the beta access shell, authentication state,
+ * and navigation outcomes for users entering the beta experience.
+ */
 import React from 'react';
 import { Navigate } from 'react-router';
 import { Lock, LogOut } from 'lucide-react';
