@@ -15,8 +15,10 @@ import {
   selectForecastCycle,
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
-import type { GFCForecastSaveData } from '../types/outlooks';
-import { deserializeForecast, exportForecastToJson, readForecastImportFile, serializeForecast, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecast, exportForecastToJson, readForecastImportFile, serializeForecast, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { getForecastDataFromWorkspacePayload, type ForecastWorkspacePayload } from '../utils/forecastWorkspacePersistence';
 import { importForecastTransfer, type ForecastImportResult } from '../utils/forecastTransfer';
 import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
@@ -206,11 +208,15 @@ export const formatRolloverDayLabel = (value: string): string => {
     : parsedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 };
 
-export const parseStoredForecastPayload = (storedValue: string | null): GFCForecastSaveData | null => {
+export const parseStoredForecastPayload = (
+  storedValue: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): ForecastWorkspacePayload | null => {
   if (!storedValue) return null;
   try {
     const parsed = JSON.parse(storedValue) as unknown;
-    return validateForecastData(parsed) ? parsed : null;
+    const restored = deserializeForecastWorkspace(parsed);
+    return restored.workspaceId === workspaceId ? parsed as ForecastWorkspacePayload : null;
   } catch {
     return null;
   }
@@ -239,15 +245,16 @@ export const hasRestorableCloudSelection = (
 ): cloudMeta is Required<Pick<StoredCloudMeta, 'id' | 'label'>> => Boolean(cloudMeta?.id && cloudMeta.label);
 
 const restoreStoredForecastPayload = (
-  data: GFCForecastSaveData,
+  data: ForecastWorkspacePayload,
   dispatch: ShortcutDispatch,
   preserveDiscussionDrafts = false,
 ) => {
-  const deserializedCycle = deserializeForecast(data);
+  const restored = deserializeForecastWorkspace(data);
+  const deserializedCycle = restored.forecastCycle;
   dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle, true) : importForecastCycle(deserializedCycle));
-  if (data.cycleMetadata) dispatch(setWorkflowMetadata(data.cycleMetadata));
-  else if (data.cycleMetadata === null) dispatch(clearWorkflowMetadata());
-  const rawData = data as LoadedForecastPayload['rawData'];
+  const rawData = getForecastDataFromWorkspacePayload(data) as LoadedForecastPayload['rawData'];
+  if (rawData.cycleMetadata) dispatch(setWorkflowMetadata(rawData.cycleMetadata));
+  else if (rawData.cycleMetadata === null) dispatch(clearWorkflowMetadata());
   if (rawData.mapView) dispatch(setMapView(rawData.mapView));
 };
 
@@ -256,9 +263,10 @@ const restoreCloudSession = (
   addToast: AddToastFn,
   onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void,
   userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): boolean => {
   const payloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId));
-  const payload = parseStoredForecastPayload(sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null));
+  const payload = parseStoredForecastPayload(sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null), workspaceId);
   if (!payload) return false;
 
   const metaKey = getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId));
@@ -288,10 +296,13 @@ interface LocalRestoreCandidate {
   shouldMigrateLegacy: boolean;
 }
 
-const readLocalRestoreCandidate = (userId?: string | null): LocalRestoreCandidate => {
-  const scopedKey = getAutoSaveStorageKey(userId);
+const readLocalRestoreCandidate = (
+  userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): LocalRestoreCandidate => {
+  const scopedKey = getAutoSaveStorageKey(userId, workspaceId);
   const scopedValue = localStorage.getItem(scopedKey);
-  if (!userId) {
+  if (!userId || workspaceId !== DEFAULT_FORECAST_WORKSPACE) {
     return { scopedKey, storedValue: scopedValue, legacyValue: null, shouldMigrateLegacy: false };
   }
 
@@ -310,10 +321,11 @@ const restoreLocalSession = (
   addToast: AddToastFn,
   currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope'] },
   userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): boolean => {
   if (shouldSkipLocalRestore(currentSession.forecastCycle, currentSession.discussionDraftsByScope)) return false;
-  const candidate = readLocalRestoreCandidate(userId);
-  const data = parseStoredForecastPayload(candidate.storedValue);
+  const candidate = readLocalRestoreCandidate(userId, workspaceId);
+  const data = parseStoredForecastPayload(candidate.storedValue, workspaceId);
   if (!data) return false;
   if (candidate.shouldMigrateLegacy) copyLegacyAutoSaveToScopedStorage(candidate.scopedKey, candidate.legacyValue);
   restoreStoredForecastPayload(data, dispatch, true);
@@ -326,8 +338,9 @@ const restoreAvailableSession = (
   addToast: AddToastFn,
   currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope']; onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void },
   userId?: string | null,
-) => restoreCloudSession(dispatch, addToast, currentSession.onCloudCycleLoaded, userId)
-  || restoreLocalSession(dispatch, addToast, currentSession, userId);
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+) => restoreCloudSession(dispatch, addToast, currentSession.onCloudCycleLoaded, userId, workspaceId)
+  || restoreLocalSession(dispatch, addToast, currentSession, userId, workspaceId);
 
 export const buildRestoreKey = (userId?: string | null): string => userId || 'anonymous';
 
@@ -343,6 +356,7 @@ export const useSessionRestore = (
     onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
   },
   userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ) => {
   const onCloudCycleLoadedRef = useRef(currentSession.onCloudCycleLoaded);
   const forecastCycleRef = useRef(currentSession.forecastCycle);
@@ -365,9 +379,9 @@ export const useSessionRestore = (
   useEffect(() => {
     try {
       const liveSession = previousUserIdRef.current == null && userId
-        ? serializeForecast(forecastCycleRef.current, currentMapViewRef.current, workflowMetadataRef.current)
+        ? serializeForecastWorkspace(workspaceId, forecastCycleRef.current, currentMapViewRef.current, workflowMetadataRef.current)
         : undefined;
-      migrateLegacyAutoSave(userId, liveSession);
+      migrateLegacyAutoSave(userId, liveSession, workspaceId);
       previousUserIdRef.current = userId;
       const restoreKey = buildRestoreKey(userId);
       if (appliedRestoreKeyRef.current === restoreKey) {
@@ -379,13 +393,13 @@ export const useSessionRestore = (
         forecastCycle: forecastCycleRef.current,
         discussionDraftsByScope: initialDraftsRef.current,
         onCloudCycleLoaded: onCloudCycleLoadedRef.current,
-      }, userId));
+      }, userId, workspaceId));
     } catch {
       setRestoredSession(false);
     } finally {
       setRestoreAttempted(true);
     }
-  }, [addToast, dispatch, userId]);
+  }, [addToast, dispatch, userId, workspaceId]);
 
   useEffect(() => {
     if (restoreAttempted) setRestoreComplete(true);

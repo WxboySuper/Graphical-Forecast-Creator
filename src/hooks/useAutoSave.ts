@@ -2,21 +2,33 @@ import { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { selectForecastCycle } from '../store/forecastSlice';
-import { serializeForecast } from '../utils/fileUtils';
 import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
 const LOCAL_STORAGE_KEY = 'forecastData';
 
 /** Returns the autosave key for an account scope, or the legacy key anonymously. */
-export const getAutoSaveStorageKey = (userId?: string | null): string =>
-  userId ? getScopedStorageKey(LOCAL_STORAGE_KEY, getStorageScope(userId)) : LOCAL_STORAGE_KEY;
+const getWorkspaceAutoSaveBaseKey = (workspaceId: ForecastWorkspaceId): string =>
+  workspaceId === DEFAULT_FORECAST_WORKSPACE ? LOCAL_STORAGE_KEY : `${LOCAL_STORAGE_KEY}:${workspaceId}`;
+
+export const getAutoSaveStorageKey = (
+  userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): string => {
+  const baseKey = getWorkspaceAutoSaveBaseKey(workspaceId);
+  return userId ? getScopedStorageKey(baseKey, getStorageScope(userId)) : baseKey;
+};
 
 /** Clears autosave snapshots before starting a deliberately fresh forecast workflow. */
-export const clearAutoSave = (userId?: string | null): void => {
+export const clearAutoSave = (
+  userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): void => {
   try {
-    localStorage.removeItem(getAutoSaveStorageKey(userId));
-    if (userId) {
+    localStorage.removeItem(getAutoSaveStorageKey(userId, workspaceId));
+    if (userId && workspaceId === DEFAULT_FORECAST_WORKSPACE) {
       localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   } catch {
@@ -56,11 +68,16 @@ export const selectPreferredAutoSaveValue = (
  * On sign-in, reconcile live editor state with scoped storage, but never promote unscoped legacy over an
  * existing account autosave on shared browsers.
  */
-export const migrateLegacyAutoSave = (userId?: string | null, liveSession?: unknown): void => {
+export const migrateLegacyAutoSave = (
+  userId?: string | null,
+  liveSession?: unknown,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): void => {
   if (!userId) return;
 
   try {
-    const scopedKey = getAutoSaveStorageKey(userId);
+    const scopedKey = getAutoSaveStorageKey(userId, workspaceId);
+    if (workspaceId !== DEFAULT_FORECAST_WORKSPACE) return;
     const scopedValue = localStorage.getItem(scopedKey);
     const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
 
@@ -88,7 +105,10 @@ export const migrateLegacyAutoSave = (userId?: string | null, liveSession?: unkn
 };
 
 /** Debounces forecast edits into the current anonymous or account-scoped autosave. */
-export const useAutoSave = (userId?: string | null) => {
+export const useAutoSave = (
+  userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const mapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
@@ -107,8 +127,8 @@ export const useAutoSave = (userId?: string | null) => {
       saveTimeoutRef.current = null;
       if (generation !== saveGenerationRef.current) return;
       try {
-        const data = serializeForecast(forecastCycle, mapView, workflowMetadata);
-        localStorage.setItem(getAutoSaveStorageKey(userId), JSON.stringify(data));
+        const data = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, workflowMetadata);
+        localStorage.setItem(getAutoSaveStorageKey(userId, workspaceId), JSON.stringify(data));
       } catch {
         // Auto-save silently fails to avoid disrupting the user
       }
@@ -120,5 +140,5 @@ export const useAutoSave = (userId?: string | null) => {
         saveTimeoutRef.current = null;
       }
     };
-  }, [forecastCycle, mapView, userId, workflowMetadata]);
+  }, [forecastCycle, mapView, userId, workspaceId, workflowMetadata]);
 };
