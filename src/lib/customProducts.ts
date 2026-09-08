@@ -1,3 +1,8 @@
+/**
+ * Custom-product state helpers for user-defined forecast layers. The module
+ * validates layer data and provides the Redux selectors and callbacks used by
+ * the custom-products UI.
+ */
 import {
   CUSTOM_PRODUCT_LIMITS,
   CUSTOM_PRODUCTS_SCHEMA_VERSION,
