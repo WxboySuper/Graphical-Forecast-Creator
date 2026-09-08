@@ -1,3 +1,7 @@
+/**
+ * Updates-route tests. Verify beta-gated routing and the updates page handoff
+ * under the application's route configuration.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import BetaAccessGuard from './components/Beta/BetaAccessGuard';
