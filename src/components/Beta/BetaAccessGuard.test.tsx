@@ -1,3 +1,7 @@
+/**
+ * Beta-access guard tests. Verify route gating for enabled, disabled, local-bypass,
+ * and authenticated beta-access states.
+ */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Outlet, useOutletContext } from 'react-router';
