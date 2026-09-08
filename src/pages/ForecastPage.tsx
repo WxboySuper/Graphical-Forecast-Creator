@@ -64,6 +64,7 @@ import {
 } from '../utils/forecastUiVariant';
 import {
   applyForecastImportResult,
+  getForecastImportWorkspaceError,
   useForecastFileActions,
   useDayRolloverPrompt as useControllerDayRolloverPrompt,
   useSessionRestore as useControllerSessionRestore,
@@ -626,12 +627,17 @@ const useForecastPageWorkspace = ({
   });
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
+    const workspaceError = getForecastImportWorkspaceError(result, workspaceId);
+    if (workspaceError) {
+      addToast(workspaceError, 'error');
+      return;
+    }
     applyForecastImportResult(result, dispatch, mapRef);
     const warningSuffix = result.warnings.length > 0
       ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})`
       : '';
     addToast(`Forecast imported from ${result.format.toUpperCase()}!${warningSuffix}`, 'success');
-  }, [addToast, dispatch, mapRef]);
+  }, [addToast, dispatch, mapRef, workspaceId]);
 
   const handleExportComplete = useCallback((format: ForecastTransferFormat, scope: ForecastTransferScope) => {
     if (format === 'json') {

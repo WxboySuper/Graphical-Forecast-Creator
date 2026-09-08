@@ -5,6 +5,8 @@ import { buildStructuredKmlDocument } from '../kmzExport/buildKml';
 import { detectForecastTransferFormat } from './detectFormat';
 import { exportForecastTransfer, importForecastTransfer } from './index';
 import { forecastCycleFromKmlPlacemarks, parseKmlDocument } from './parseKml';
+import { serializeForecast } from '../fileUtils';
+import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 
 const square = (): Feature<Polygon> => ({
   type: 'Feature',
@@ -88,6 +90,20 @@ describe('forecastTransfer', () => {
     expect(result.format).toBe('kml');
     expect(result.warnings).toEqual([]);
     expect(result.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(2);
+    expect(result.workspaceId).toBe('severe');
+  });
+
+  test('preserves explicit workspace identity for native imports', async () => {
+    const forecast = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const payload = serializeForecastWorkspace('custom', buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const file = new File([JSON.stringify(payload)], 'custom-forecast.json', { type: 'application/json' });
+    file.arrayBuffer = async () => new TextEncoder().encode(JSON.stringify(payload)).buffer;
+
+    const result = await importForecastTransfer(file);
+
+    expect(result.workspaceId).toBe('custom');
+    expect(result.mapView).toEqual(forecast.mapView);
+    expect(result.forecastCycle.cycleDate).toBe(buildForecast().cycleDate);
   });
 
   test('rejects KMZ files whose expanded KML exceeds the import limit', async () => {

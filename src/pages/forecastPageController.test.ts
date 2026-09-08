@@ -11,16 +11,25 @@ import {
   hasRolloverForecastData,
   hasUnpublishedDiscussionDrafts,
   hasUnsavedRolloverCandidateSession,
+  getForecastImportWorkspaceError,
   parseStoredCloudMeta,
   parseStoredForecastPayload,
   runDayRolloverCloudSaveAction,
   runDayRolloverDownloadAction,
 } from './forecastPageController';
+import type { ForecastImportResult } from '../utils/forecastTransfer';
 
 const createForecastCycle = () =>
   forecastReducer(undefined, { type: '@@forecastPageController/test' }).forecastCycle;
 
 describe('forecastPageController', () => {
+  test('rejects a transfer owned by another workspace before state mutation', () => {
+    const result = { workspaceId: 'custom' } as ForecastImportResult;
+
+    expect(getForecastImportWorkspaceError(result, 'severe')).toContain('custom workspace');
+    expect(getForecastImportWorkspaceError({ ...result, workspaceId: 'severe' }, 'severe')).toBeNull();
+  });
+
   test('owns rollover labels, restore metadata parsing, and scope helpers', () => {
     expect(buildRolloverSaveLabel('2026-04-24')).toContain('Apr 24');
     expect(formatRolloverDayLabel('2026-04-24')).toContain('April 24');
