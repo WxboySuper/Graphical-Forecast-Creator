@@ -1,3 +1,9 @@
+/**
+ * Feature-exposure report library: this module assembles human-readable and
+ * machine-readable diagnostics from the client/server exposure registries.
+ * It owns report formatting and alignment checks while GitHub workflow entry
+ * points own process and filesystem side effects.
+ */
 import {
   validateClientServerExposureMatrices,
   validateClientServerRegistryAlignment,
