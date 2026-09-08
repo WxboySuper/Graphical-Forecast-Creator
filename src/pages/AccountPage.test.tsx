@@ -539,3 +539,8 @@ describe("AccountPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Deletion unavailable");
   });
 });
+/**
+ * Account-page test boundary: this suite verifies account settings, billing
+ * entitlement presentation, hosted-account actions, and navigation states at
+ * the route surface using isolated authentication and service fixtures.
+ */

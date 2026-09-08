@@ -606,3 +606,8 @@ describe('ForecastPage helpers', () => {
     expect(buildRestoreKey('user-2')).toBe('user-2');
   });
 });
+/**
+ * Forecast-page test boundary: this suite verifies page orchestration,
+ * persistence prompts, imports, rollover actions, and user-visible forecast
+ * workflows through the page's public behavior and mocked service edges.
+ */

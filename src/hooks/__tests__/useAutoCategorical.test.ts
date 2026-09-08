@@ -656,3 +656,8 @@ describe('processOutlooksToCategorical', () => {
     expect(store.getState().forecast.autoCategoricalError).toBeNull();
   });
 });
+/**
+ * Auto-categorical hook test boundary: this suite verifies derived categorical
+ * risk synchronization, debounce behavior, and dispatch decisions for forecast
+ * geometry without mounting the complete forecast editor.
+ */
