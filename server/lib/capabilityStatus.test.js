@@ -1,3 +1,8 @@
+/**
+ * File: server/lib/capabilityStatus.test.js
+ * Purpose: Defines regression coverage for capability status resolution and its boundary states.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');
