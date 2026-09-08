@@ -1,3 +1,9 @@
+/**
+ * Workflow-awareness service: this module persists and synchronizes active
+ * workflow metadata and presence across hosted clients. It owns Firebase
+ * document coordination and conflict-safe lifecycle helpers; React state,
+ * route composition, and workflow UI remain outside this service boundary.
+ */
 import {
   collection,
   deleteDoc,
