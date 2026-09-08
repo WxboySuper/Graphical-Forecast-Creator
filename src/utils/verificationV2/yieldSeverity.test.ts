@@ -1,3 +1,8 @@
+/**
+ * Verification yield-severity test boundary: this suite verifies spatial
+ * severity classification, observed-versus-drawn outcomes, and report evidence
+ * used to score yield-related forecast products.
+ */
 import * as turf from '@turf/turf';
 import type { Feature, Polygon } from 'geojson';
 import type { StormReport } from '../../types/stormReports';

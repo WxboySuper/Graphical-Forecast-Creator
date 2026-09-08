@@ -1,3 +1,8 @@
+/**
+ * Feature-exposure registry test boundary: this suite verifies registry
+ * validation, feature lookup, key enumeration, target-aware exposure, and
+ * policy invariants used by the application's capability gates.
+ */
 import {
   FEATURE_EXPOSURE_REGISTRY,
   getFeatureExposure,
