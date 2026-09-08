@@ -1,3 +1,8 @@
+/**
+ * Script test contract for generate-exposure-diagnostics.integration.test.
+ *
+ * This file verifies the script or automation boundary represented by generate-exposure-diagnostics.integration.test, including its inputs, outputs, and failure behavior.
+ */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';

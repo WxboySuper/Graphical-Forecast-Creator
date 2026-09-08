@@ -1,3 +1,8 @@
+/**
+ * Script test contract for feature-exposure-policy.test.
+ *
+ * This file verifies the script or automation boundary represented by feature-exposure-policy.test, including its inputs, outputs, and failure behavior.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { evaluateFeatureExposurePolicy } from './feature-exposure-policy.mjs';

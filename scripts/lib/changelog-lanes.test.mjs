@@ -1,3 +1,8 @@
+/**
+ * Script test contract for changelog-lanes.test.
+ *
+ * This file verifies the script or automation boundary represented by changelog-lanes.test, including its inputs, outputs, and failure behavior.
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
