@@ -1,3 +1,7 @@
+/**
+ * Monitor alert-popup rendering helpers. They format NWS alert details into
+ * the imperative DOM content attached to the OpenLayers overlay.
+ */
 import { formatNwsAlertTime, type NwsAlertDetails } from '../nwsAlertDetails';
 
 /** Clears imperative alert popup content from an OpenLayers overlay container. */
