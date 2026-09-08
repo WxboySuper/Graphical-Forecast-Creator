@@ -1,8 +1,7 @@
 /**
- * File: src/components/ForecastWorkflow/CompletionHandoff.tsx
- * Purpose: Coordinates the completion handoff dialog and its forecast workflow actions.
+ * Completion handoff dialog. Offers export, monitoring, and return actions after
+ * completion without mutating the completed forecast state.
  */
-
 import React from 'react';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './CompletionHandoff.css';
@@ -18,7 +17,6 @@ interface CompletionHandoffProps {
   onDismiss: () => void;
 }
 
-/** Offers useful next steps after a workflow is completed without changing completion state. */
 export const CompletionHandoff: React.FC<CompletionHandoffProps> = ({
   open,
   showMonitor,
