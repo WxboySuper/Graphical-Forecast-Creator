@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/forecastWorkspaceActions.test.tsx
+ * Purpose: Verifies forecast workspace action dispatches and user-driven layout transitions.
+ */
+
 import React from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
