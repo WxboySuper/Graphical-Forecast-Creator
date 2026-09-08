@@ -1,3 +1,6 @@
+/**
+ * Custom product handoff tests. Verify product handoff payloads and navigation state remain valid across workspace transitions.
+ */
 // src/lib/customProductHandoff.test.ts — GFC-WEB-Y iOS private mode hardening
 import {
   CUSTOM_PRODUCT_HANDOFF_KEY,

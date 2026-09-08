@@ -1,3 +1,6 @@
+/**
+ * Workflow metadata contract tests. Verify serialization and validation of workflow metadata at the shared boundary.
+ */
 import {
   boundWorkflowMetadataForPersistence,
   isMetadataOnlyOutlookVersion,

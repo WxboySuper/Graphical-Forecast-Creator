@@ -1,3 +1,6 @@
+/**
+ * Map contracts. Defines shared types and boundaries for map layers, features, and editing integrations.
+ */
 export type MapEngine = 'openlayers';
 
 export interface MapViewState {
