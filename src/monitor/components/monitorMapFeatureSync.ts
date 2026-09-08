@@ -1,3 +1,7 @@
+/**
+ * Monitor map-feature synchronization helpers. It reconciles alert and product
+ * features with OpenLayers sources while leaving map lifecycle to the caller.
+ */
 import GeoJSON from 'ol/format/GeoJSON';
 import Feature, { type FeatureLike } from 'ol/Feature';
 import Point from 'ol/geom/Point';
