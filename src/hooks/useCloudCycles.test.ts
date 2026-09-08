@@ -1,3 +1,6 @@
+/**
+ * Cloud cycle hook tests. Verify cloud cycle loading, saving, update state, and failure paths exposed by the hook.
+ */
 import { buildLoadedCloudForecastPayload } from './useCloudCycles';
 import type { CloudCycle } from '../types/cloudCycles';
 import type { GFCForecastSaveData } from '../types/outlooks';

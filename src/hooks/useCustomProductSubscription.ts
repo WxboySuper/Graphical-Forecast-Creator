@@ -1,3 +1,6 @@
+/**
+ * Custom product subscription hook. Tracks the user's product entitlement and keeps subscription state synchronized.
+ */
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type { HostedCustomProduct } from '../types/customProducts';
 import type { CustomProductsRepository } from '../lib/customProductsRepository';
