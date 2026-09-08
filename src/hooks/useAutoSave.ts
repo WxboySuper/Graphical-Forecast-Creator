@@ -68,16 +68,14 @@ export const selectPreferredAutoSaveValue = (
  * On sign-in, reconcile live editor state with scoped storage, but never promote unscoped legacy over an
  * existing account autosave on shared browsers.
  */
-export const migrateLegacyAutoSave = (
+const migrateSevereLegacyAutoSave = (
   userId?: string | null,
   liveSession?: unknown,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): void => {
   if (!userId) return;
 
   try {
-    const scopedKey = getAutoSaveStorageKey(userId, workspaceId);
-    if (workspaceId !== DEFAULT_FORECAST_WORKSPACE) return;
+    const scopedKey = getAutoSaveStorageKey(userId);
     const scopedValue = localStorage.getItem(scopedKey);
     const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
 
@@ -102,6 +100,16 @@ export const migrateLegacyAutoSave = (
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.
   }
+};
+
+/** Migrates only the legacy Severe snapshot; other workspaces have no legacy key to promote. */
+export const migrateLegacyAutoSave = (
+  userId?: string | null,
+  liveSession?: unknown,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): void => {
+  if (workspaceId !== DEFAULT_FORECAST_WORKSPACE) return;
+  migrateSevereLegacyAutoSave(userId, liveSession);
 };
 
 /** Debounces forecast edits into the current anonymous or account-scoped autosave. */
