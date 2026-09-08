@@ -75,8 +75,11 @@ interface StrokeWidthInput {
 
 interface HatchPatternInput {
   cigLevel: string;
-  alpha?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
 }
+
+const FUNCTION_COLOR_NOTATION_REGEX = /^(rgba?|hsla?)\(/i;
 
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
 const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
@@ -98,11 +101,7 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
     return `rgba(255, 255, 255, ${alpha})`;
   }
 
-  if (color.startsWith("rgba(") || color.startsWith("hsla(")) {
-    return color;
-  }
-
-  if (color.startsWith("rgb(") || color.startsWith("hsl(")) {
+  if (FUNCTION_COLOR_NOTATION_REGEX.test(color)) {
     return color;
   }
 
@@ -128,6 +127,8 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
 // Create canvas pattern for CIG hatching
 export const createHatchPattern = ({
   cigLevel,
+  strokeColor = "#000000",
+  strokeWidth = 1,
 }: HatchPatternInput): CanvasPattern | null => {
   const canvas = document.createElement("canvas");
   const size = 10;
@@ -137,8 +138,8 @@ export const createHatchPattern = ({
 
   if (!ctx) return null;
 
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeWidth;
 
   if (cigLevel === "CIG1") {
     // Broken diagonal lines
@@ -186,7 +187,7 @@ export const createOutlookFill = ({
     });
   }
 
-  const pattern = createHatchPattern({ cigLevel: probability, alpha: fillOpacity });
+  const pattern = createHatchPattern({ cigLevel: probability });
   if (pattern) {
     return new Fill({ color: pattern as CanvasPattern });
   }
@@ -324,6 +325,7 @@ export const createCustomFill = (style: CustomCategoryStyle): Fill => {
   context.fillRect(0, 0, 12, 12);
   context.strokeStyle = toRgbaColor({ color: style.strokeColor, alpha: style.strokeOpacity });
   context.lineWidth = Math.max(1, style.strokeWidth / 2);
+  /** Draws one hatch segment on the repeating pattern tile. */
   const line = (x1: number, y1: number, x2: number, y2: number) => {
     context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
   };
@@ -339,6 +341,7 @@ export const createCustomFill = (style: CustomCategoryStyle): Fill => {
   return new Fill({ color: pattern ?? toRgbaColor({ color: style.fillColor, alpha: style.fillOpacity }) });
 };
 
+/** Builds an OpenLayers style for a custom product category. */
 export const toCustomOlStyle = (category: CustomCategoryTemplate, isTopLayer = false, zIndex = 700 + category.order): Style => new Style({
   fill: createCustomFill(category.style),
   stroke: new Stroke({
@@ -348,6 +351,7 @@ export const toCustomOlStyle = (category: CustomCategoryTemplate, isTopLayer = f
   zIndex,
 });
 
+/** Reads the custom-layer identity fields from an OpenLayers feature. */
 export const getCustomFeatureIdentity = (feature: FeatureLike): CustomFeatureIdentity | null => {
   const featureId = feature.get("featureId") as string | undefined;
   const customLayerId = feature.get("customLayerId") as string | undefined;
@@ -356,6 +360,7 @@ export const getCustomFeatureIdentity = (feature: FeatureLike): CustomFeatureIde
   return featureId && customLayerId && categoryId && title ? { featureId, customLayerId, categoryId, title } : null;
 };
 
+/** Converts an edited custom OpenLayers feature back to the persisted polygon shape. */
 export const toUpdatedCustomFeature = (feature: FeatureLike, format: GeoJSON): CustomPolygonFeature | null => {
   const identity = getCustomFeatureIdentity(feature);
   const geometry = feature.getGeometry();
@@ -518,7 +523,7 @@ export const createTileSource = (
       return new XYZ({
         url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attributions:
-          "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP",
+          "Tiles &copy; Esri &mdash; Source: Esri i-cubed USDA USGS AEX GeoEye Getmapping Aerogrid IGN IGP UPR-EGP",
         maxZoom: 19,
         crossOrigin: "anonymous",
       });

@@ -19,6 +19,7 @@ jest.mock('../../utils/mapStyleUtils', () => ({
 }));
 
 import {
+  createHatchPattern,
   toRgbaColor,
   resolveFillOpacity,
   resolveStrokeWidth,
@@ -43,11 +44,33 @@ type FeatureStub = {
 };
 
 describe('openLayersMapStyles', () => {
+  test.each([
+    { cigLevel: 'CIG1', strokeColor: '#000000', strokeWidth: 1, segments: 2 },
+    { cigLevel: 'CIG2', strokeColor: '#111111', strokeWidth: 1.1, segments: 1 },
+    { cigLevel: 'CIG3', strokeColor: '#111111', strokeWidth: 1.1, segments: 2 },
+  ])('draws $cigLevel with the requested hatch stroke', ({ segments, ...options }) => {
+    const context = {
+      strokeStyle: '', lineWidth: 0, beginPath: jest.fn(), moveTo: jest.fn(),
+      lineTo: jest.fn(), stroke: jest.fn(), createPattern: jest.fn(() => 'hatch'),
+    };
+    const spy = jest.spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    try {
+      expect(createHatchPattern(options)).toBe('hatch');
+      expect(context.strokeStyle).toBe(options.strokeColor);
+      expect(context.lineWidth).toBe(options.strokeWidth);
+      expect(context.lineTo).toHaveBeenCalledTimes(segments);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   test('toRgbaColor normalizes hex, rgb, and empty inputs', () => {
     expect(toRgbaColor({ color: '', alpha: 0.5 })).toBe('rgba(255, 255, 255, 0.5)');
     expect(toRgbaColor({ color: '#abc', alpha: 0.3 })).toBe('rgba(170, 187, 204, 0.3)');
     expect(toRgbaColor({ color: '#112233', alpha: 1 })).toBe('rgba(17, 34, 51, 1)');
     expect(toRgbaColor({ color: 'rgba(1,2,3,0.4)', alpha: 0.9 })).toBe('rgba(1,2,3,0.4)');
+    expect(toRgbaColor({ color: 'RGBA(1,2,3,0.4)', alpha: 0.9 })).toBe('RGBA(1,2,3,0.4)');
   });
 
   test('resolveFillOpacity defaults to 0.25 and resolveStrokeWidth honors the top layer', () => {
