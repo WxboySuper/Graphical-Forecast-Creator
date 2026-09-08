@@ -1,3 +1,6 @@
+/**
+ * Workflow package tests. Verify forecast workflows export and restore as complete packages.
+ */
 import { buildWorkflowExportPackage, isWorkflowExportPackage, toSerializedWorkflowPackage } from './workflowPackage';
 
 afterEach(() => jest.restoreAllMocks());

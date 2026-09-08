@@ -1,3 +1,6 @@
+/**
+ * Spatial contingency tests. Verify spatial hits, misses, false alarms, and correct negatives are classified.
+ */
 import * as turf from '@turf/turf';
 import type { StormReport } from '../../types/stormReports';
 import { scoreSpatialContingency } from './spatialContingency';

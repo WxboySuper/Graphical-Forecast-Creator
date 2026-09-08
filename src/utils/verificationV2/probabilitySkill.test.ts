@@ -1,3 +1,6 @@
+/**
+ * Probability skill tests. Verify probability forecasts are scored with the supported skill calculation.
+ */
 import type { GridEvaluation } from './gridEvaluation';
 import { scoreProbabilitySkill } from './probabilitySkill';
 

@@ -1,3 +1,6 @@
+/**
+ * Verification tier placement tests. Verify grades map to the expected performance tier.
+ */
 import { circleContour, makeReport } from './testFixtures';
 import { scoreTierPlacement } from './tierPlacement';
 
