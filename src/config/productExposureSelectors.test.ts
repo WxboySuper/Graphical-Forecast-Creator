@@ -1,3 +1,6 @@
+/**
+ * Product exposure selector tests. Verify target-specific product availability decisions remain stable and explicit.
+ */
 import * as featureExposure from './featureExposure';
 import {
   getFirstExposedOutlookType,
