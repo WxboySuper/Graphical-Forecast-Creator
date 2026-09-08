@@ -1,3 +1,7 @@
+/**
+ * Data-quality panel. Presents report availability and missing-product status for
+ * a forecast grade, keeping quality labels tied to verification data.
+ */
 import React from 'react';
 import type { PackageGrade } from '../../utils/verificationV2';
 import { dataQualityClass } from './gradeFormat';
@@ -9,11 +13,6 @@ interface DataQualityPanelProps {
   onToggle?: () => void;
 }
 
-/**
- * The exactly-titled "Data quality" section. Reports Good / Limited / Blocked,
- * a "No reports" label on quiet days (never a fake confidence label), and a
- * Not-evaluated row per missing product with classic warning treatment.
- */
 const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ pkg, defaultOpen = false, open, onToggle }) => {
   const missing = pkg.products.filter((product) => !product.applicable);
 

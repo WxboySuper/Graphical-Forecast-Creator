@@ -1,3 +1,7 @@
+/**
+ * Grade-trend chart tests. Verify trend-card de-duplication and chart input
+ * normalization before grade history is rendered.
+ */
 import { dedupeGradeCardsByDay } from './GradeTrendChart';
 import type { GradeCard } from '../../types/forecastGrade';
 
