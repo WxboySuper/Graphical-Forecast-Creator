@@ -1,3 +1,7 @@
+/**
+ * Map-style utilities. This module maps outlook types and display settings to
+ * OpenLayers style values used by forecast and monitor map layers.
+ */
 import { OutlookType } from '../types/outlooks';
 import { colorMappings } from './outlookUtils';
 import { Feature } from 'geojson';
