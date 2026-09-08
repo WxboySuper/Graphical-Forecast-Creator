@@ -1,3 +1,6 @@
+/**
+ * Documentation page. Renders the in-app reference content and its navigation shell.
+ */
 // skipcq: JS-W1028
 import React from 'react';
 import { X } from 'lucide-react';
