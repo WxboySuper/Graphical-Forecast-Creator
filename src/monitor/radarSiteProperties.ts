@@ -1,3 +1,6 @@
+/**
+ * Radar site properties. Defines normalized metadata used to render and select NEXRAD sites.
+ */
 const readRadarProperty = (properties: Record<string, unknown>, key: string): string =>
   typeof properties[key] === 'string' ? String(properties[key]).trim() : '';
 

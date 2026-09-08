@@ -1,3 +1,6 @@
+/**
+ * Outlook layer definitions. Builds monitor map layers for forecast outlook categories.
+ */
 import type { Feature as GeoJsonFeature } from 'geojson';
 import type { MonitorOutlookLayerType } from './types';
 import type { OutlookData, OutlookType } from '../types/outlooks';
