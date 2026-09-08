@@ -1,3 +1,7 @@
+/**
+ * Toast tests. Verify message rendering, dismissal timing, and the toast manager's
+ * add, update, and remove behavior.
+ */
 import { render, screen, act } from '@testing-library/react';
 import Toast, { ToastManager } from './Toast';
 
