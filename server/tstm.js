@@ -1,3 +1,9 @@
+/**
+ * Auto-TSTM generation service: this module builds and validates severe-weather
+ * guidance from upstream inputs and configured model providers. It owns
+ * generation and normalization policy; HTTP transport, caching, and client UI
+ * are handled by their surrounding boundaries.
+ */
 'use strict';
 
 const { spawn } = require('child_process');
