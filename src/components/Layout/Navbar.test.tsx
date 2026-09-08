@@ -1,3 +1,7 @@
+/**
+ * Navbar test suite. Covers navigation rendering, theme controls, responsive actions,
+ * and authenticated state behavior for the application header.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';

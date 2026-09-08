@@ -1,3 +1,7 @@
+/**
+ * App-layout test suite. Verifies provider wiring, route-aware layout behavior,
+ * theme handling, and forecast shell interactions.
+ */
 import mockReact from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
