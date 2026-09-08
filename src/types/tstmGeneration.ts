@@ -1,3 +1,6 @@
+/**
+ * TSTM generation types. Defines the typed request and result shapes for automated TSTM generation.
+ */
 import type { Feature } from 'geojson';
 import type { DayType } from './outlooks';
 

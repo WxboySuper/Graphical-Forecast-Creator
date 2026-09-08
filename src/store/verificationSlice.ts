@@ -1,3 +1,6 @@
+/**
+ * Verification slice. Stores forecast verification results, grading state, and review workflow actions.
+ */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { ForecastCycle, OutlookData, DayType } from '../types/outlooks';
 import { RootState } from './index';
