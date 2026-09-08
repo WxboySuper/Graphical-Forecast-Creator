@@ -1,7 +1,6 @@
 /**
- * Cycle-history modal dialog component.
- *
- * This component renders the cycle-history dialog and delegates cycle selection and actions to supplied callbacks. It does not load or persist cycle data.
+ * Cycle-history modal dialog. Composes confirmation, save, load, delete, and
+ * history-panel actions for saved forecast cycles.
  */
 import React from 'react';
 import type { SavedCycle } from '../../store/forecastSlice';
