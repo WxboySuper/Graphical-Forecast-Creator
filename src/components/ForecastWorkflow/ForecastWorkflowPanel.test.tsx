@@ -8,6 +8,7 @@ import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForeca
 import forecastReducer, {
   addFeature,
   setForecastDay,
+  setCycleDate,
   setForecastWorkspace,
   saveCurrentCycle,
   startBlankCycle,
@@ -111,7 +112,8 @@ describe('ForecastWorkflowPanel completion review', () => {
     store.dispatch(setForecastWorkspace('custom'));
     store.dispatch(setForecastDay(2));
     store.dispatch(addFeature({ feature: createFeature('custom-source', 0, 'tornado', '2%') }));
-    store.dispatch(saveCurrentCycle({ label: 'Custom source', cycleDate: getYesterday() }));
+    store.dispatch(setCycleDate(getYesterday()));
+    store.dispatch(saveCurrentCycle({ label: 'Custom source' }));
     store.dispatch(setForecastWorkspace('severe'));
     store.dispatch(setForecastDay(1));
 
