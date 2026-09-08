@@ -1,3 +1,7 @@
+/**
+ * Hosted-auth profile synchronization helpers. The module reads and writes the
+ * hosted user settings document and exposes typed actions for account state.
+ */
 import type { User } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';

@@ -1,3 +1,7 @@
+/**
+ * Worker bridge for automatic categorical derivation. It coordinates the web
+ * worker, tracks requests, and exposes typed results to the hook layer.
+ */
 import type { OutlookData } from '../types/outlooks';
 import type { AutoCategoricalWorkerResponse } from './autoCategorical.worker';
 import AutoCategoricalWorker from './autoCategorical.worker?worker';
