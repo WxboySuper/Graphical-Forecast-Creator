@@ -1,3 +1,6 @@
+/**
+ * Forecast selector tests. Verify derived forecast state remains consistent with stored edits and active layers.
+ */
 import type { DayType } from '../types/outlooks';
 import reducer, {
   selectCurrentOutlooks,
