@@ -56,3 +56,8 @@ export const reportComparison = (
       + `${direction} (${speedup.toFixed(2)}x baseline)`,
   );
 };
+/**
+ * Test benchmark utility helpers.
+ *
+ * This module provides shared timing and measurement helpers for performance-oriented tests. It does not define application behavior or production metrics collection.
+ */
