@@ -1,3 +1,7 @@
+/**
+ * Renders the structured guided discussion editor used alongside a forecast.
+ * This component owns field layout and change callbacks; discussion persistence and domain validation belong to its callers and shared types.
+ */
 import React from 'react';
 import { GuidedDiscussionData } from '../../types/outlooks';
 import './GuidedDiscussionEditor.css';
