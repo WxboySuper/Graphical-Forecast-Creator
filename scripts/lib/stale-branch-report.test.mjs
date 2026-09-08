@@ -1,3 +1,8 @@
+/**
+ * Script test contract for stale-branch-report.test.
+ *
+ * This file verifies the script or automation boundary represented by stale-branch-report.test, including its inputs, outputs, and failure behavior.
+ */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
