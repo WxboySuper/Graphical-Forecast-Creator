@@ -1,3 +1,9 @@
+/**
+ * Dependabot changelog helper: this module identifies dependency-update lanes
+ * and prepares the changelog metadata consumed by repository automation. It
+ * owns parsing and declaration generation, not PR orchestration or GitHub API
+ * calls.
+ */
 import { execFileSync } from 'node:child_process';
 import { findChangelogLaneBounds } from './changelog-lanes.mjs';
 
