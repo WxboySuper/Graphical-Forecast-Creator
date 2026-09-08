@@ -1,3 +1,6 @@
+/**
+ * Discussion form state tests. Verify draft editing, validation, and submission state transitions.
+ */
 import { act, renderHook } from '@testing-library/react';
 import useDiscussionFormState, { getDiscussionFormDefaults } from './useDiscussionFormState';
 import type { DiscussionData } from '../types/outlooks';
