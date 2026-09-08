@@ -1,3 +1,7 @@
+/**
+ * Forecast-workflow panel tests. Cover completion eligibility, handoff rendering,
+ * workflow actions, and the controller-driven forecast panel behavior.
+ */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';

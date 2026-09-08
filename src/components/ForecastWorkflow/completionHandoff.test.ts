@@ -1,3 +1,7 @@
+/**
+ * Completion-handoff policy tests. Verify supported workflows, completion statuses,
+ * identity keys, and monitor eligibility decisions.
+ */
 import { getCompletionHandoffEligibility, getCompletionHandoffIdentity } from './completionHandoffPolicy';
 import type { CycleMetadata, WorkflowMetadata } from '../../types/workflow';
 

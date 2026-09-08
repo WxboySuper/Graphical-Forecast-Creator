@@ -1,3 +1,7 @@
+/**
+ * Completion-handoff component tests. Verify available export, monitor, return,
+ * dismiss, and disabled states after a forecast workflow completes.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CompletionHandoff } from './CompletionHandoff';
 
