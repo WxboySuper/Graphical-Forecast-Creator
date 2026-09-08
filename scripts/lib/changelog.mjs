@@ -1,3 +1,7 @@
+/**
+ * Provides changelog extraction and release-version helpers for repository automation.
+ * This module owns script-level changelog composition; release publication, GitHub mutation, and package metadata updates are handled by callers.
+ */
 import { deriveStableVersion, hasBetaPrerelease } from './package-version.mjs';
 import { extractLaneReleaseNotes } from './changelog-lanes.mjs';
 

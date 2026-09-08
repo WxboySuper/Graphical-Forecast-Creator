@@ -1,3 +1,7 @@
+/**
+ * Defines the configuration contract for user-facing alert banners.
+ * This module owns alert-banner types and defaults; rendering, dismissal, and persistence are handled by the alert components and callers.
+ */
 export type AlertBannerType = 'info' | 'warning' | 'error';
 
 export interface AlertBannerConfig {
