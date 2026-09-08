@@ -1,3 +1,8 @@
+/**
+ * E2E contract for forecast-layout-compatibility.spec.
+ *
+ * This file defines browser-level checks for the forecast-layout-compatibility.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 
