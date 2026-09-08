@@ -6,6 +6,30 @@ should follow today. Documents under **Historical and exploratory material**
 preserve release context or investigation results; they are references, not
 current implementation contracts.
 
+## Code boundary guides
+
+The source tree has one short guide per broad code area. Read the guide before
+moving a module or adding a new cross-cutting dependency:
+
+- [Frontend source](../src/README.md) - page, component, hook, store, utility, and feature ownership.
+- [Pages](../src/pages/README.md) - route-level composition and navigation.
+- [Monitor](../src/monitor/README.md) - weather sources, normalization, layers, and monitor state.
+- [Store](../src/store/README.md) - Redux state ownership and transitions.
+- [Utilities](../src/utils/README.md) - pure transformations, serialization, persistence, and exports.
+- [Server](../server/README.md) - hosted services and server-side boundaries.
+
+When a change crosses one of these boundaries, update the relevant architecture
+or operations document in the same pull request. Keep generated inventories and
+one-off investigation notes under `docs/personal` or the archive sections.
+
+## Choosing a document
+
+| If you are changing... | Start with... |
+| --- | --- |
+| route composition, state ownership, or feature exposure | [Repository map](./architecture/codebase-inventory.md) and [workspace boundaries](./architecture/forecast-workspace-boundaries.md) |
+| release, rollout, or support behavior | [Operations guides](./operations/release-workflow.md) |
+| product rules or export formats | [Product guides](./product/outlook-info.md) |
+| tests or test cleanup | [Current testing guidance](#current-guidance-testing) and the module's colocated tests |
 ## Architecture
 
 - [Repository map and architecture overview](./architecture/codebase-inventory.md) - product surfaces, boundaries, entry points, and safe future move direction.
