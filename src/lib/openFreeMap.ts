@@ -16,7 +16,7 @@ interface OpenFreeMapStyle {
   [key: string]: unknown;
 }
 
-interface OpenFreeMapStyleSet {
+export interface OpenFreeMapStyleSet {
   baseStyle: OpenFreeMapStyle;
   overlayStyle: OpenFreeMapStyle;
 }

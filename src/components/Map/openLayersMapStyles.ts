@@ -8,6 +8,7 @@ import type { FeatureLike } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { v4 as uuidv4 } from "uuid";
 import type { BaseMapStyle } from "../../store/overlaysSlice";
+import type { OpenFreeMapStyleSet } from "../../lib/openFreeMap";
 import { getFeatureStyle, computeZIndex } from "../../utils/mapStyleUtils";
 import type {
   Feature as GeoJsonFeature,
@@ -23,6 +24,24 @@ type EditableOutlookType =
   | "hail"
   | "totalSevere"
   | "day4-8";
+
+/** Loads the two OpenFreeMap layer groups used by both forecast and verification maps. */
+export const loadOpenFreeMapLayerGroups = async (
+  styleSet: OpenFreeMapStyleSet,
+): Promise<{ baseGroup: LayerGroup; referenceGroup: LayerGroup }> => {
+  const { apply } = await import("ol-mapbox-style");
+  const baseGroup = new LayerGroup();
+  const referenceGroup = new LayerGroup();
+  await Promise.all([
+    apply(baseGroup, styleSet.baseStyle),
+    apply(referenceGroup, styleSet.overlayStyle),
+  ]);
+  return { baseGroup, referenceGroup };
+};
+
+/** Keeps a completed style request from replacing a newer basemap selection. */
+export const isCurrentOpenFreeMapRequest = (currentRequestId: number, requestId: number): boolean =>
+  currentRequestId === requestId;
 
 interface FeatureIdentity {
   featureId: string;
