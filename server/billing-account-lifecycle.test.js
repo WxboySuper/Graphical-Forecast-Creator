@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-account-lifecycle.test.
+ *
+ * This file verifies the billing-account-lifecycle.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const test = require('node:test');

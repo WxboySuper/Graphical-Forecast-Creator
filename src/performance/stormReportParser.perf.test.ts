@@ -1,3 +1,8 @@
+/**
+ * src test contract for stormReportParser.perf.test.
+ *
+ * This file verifies the stormReportParser.perf.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import type { ReportType, StormReport } from '../types/stormReports';
 import { splitCsvLine } from '../utils/stormReportCsv';
 import { parseTodayCsvRow, TODAY_SECTION_HEADERS } from '../utils/stormReportRows';

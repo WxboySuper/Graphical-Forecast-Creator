@@ -1,3 +1,8 @@
+/**
+ * server test contract for qs-dos.test.
+ *
+ * This file verifies the qs-dos.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

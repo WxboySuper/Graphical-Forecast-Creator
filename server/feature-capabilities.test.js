@@ -1,3 +1,8 @@
+/**
+ * server test contract for feature-capabilities.test.
+ *
+ * This file verifies the feature-capabilities.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const test = require('node:test');

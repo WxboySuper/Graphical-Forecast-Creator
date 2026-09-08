@@ -1,3 +1,8 @@
+/**
+ * src test contract for useModalFocusTrap.test.
+ *
+ * This file verifies the useModalFocusTrap.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useModalFocusTrap } from './useModalFocusTrap';

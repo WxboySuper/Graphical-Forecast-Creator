@@ -1,3 +1,8 @@
+/**
+ * src test contract for categoricalWorker.worker.test.
+ *
+ * This file verifies the categoricalWorker.worker.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import { createDerivationController, type DerivationController } from './categoricalWorker';
 import type { OutlookData } from '../types/outlooks';
 

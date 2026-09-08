@@ -1,3 +1,8 @@
+/**
+ * src test contract for forecastClone.perf.test.
+ *
+ * This file verifies the forecastClone.perf.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import type { Feature } from 'geojson';
 import { cloneJsonValue } from '../store/cloneJsonValue';
 import forecastReducer, { addFeature, setOutlookOpacity } from '../store/forecastSlice';

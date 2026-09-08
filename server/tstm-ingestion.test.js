@@ -1,3 +1,8 @@
+/**
+ * server test contract for tstm-ingestion.test.
+ *
+ * This file verifies the tstm-ingestion.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it, beforeEach, afterEach } = require('node:test');

@@ -1,3 +1,8 @@
+/**
+ * src test contract for forecastDeterminism.test.
+ *
+ * This file verifies the forecastDeterminism.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import type { UnknownAction } from '@reduxjs/toolkit';
 import reducer, {
   addFeature,

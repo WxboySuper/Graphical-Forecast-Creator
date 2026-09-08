@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-entitlement-builders.test.
+ *
+ * This file verifies the billing-entitlement-builders.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {

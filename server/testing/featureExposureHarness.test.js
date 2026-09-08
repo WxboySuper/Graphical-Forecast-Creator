@@ -1,3 +1,8 @@
+/**
+ * server test contract for featureExposureHarness.test.
+ *
+ * This file verifies the featureExposureHarness.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

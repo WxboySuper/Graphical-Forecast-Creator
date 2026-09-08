@@ -1,3 +1,8 @@
+/**
+ * src test contract for outlookPolygonMasking.test.
+ *
+ * This file verifies the outlookPolygonMasking.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 import * as turf from '@turf/turf';
 import { buildLandMask } from './buildLandMask';
 import { clipOutlookToLandMask } from './clipOutlookPolygon';

@@ -1,3 +1,8 @@
+/**
+ * server test contract for server-stack.test.
+ *
+ * This file verifies the server-stack.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it, after } = require('node:test');

@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-webhook-resolvers.test.
+ *
+ * This file verifies the billing-webhook-resolvers.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {

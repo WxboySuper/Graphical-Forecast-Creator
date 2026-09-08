@@ -1,3 +1,8 @@
+/**
+ * server test contract for tstm.test.
+ *
+ * This file verifies the tstm.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 /**

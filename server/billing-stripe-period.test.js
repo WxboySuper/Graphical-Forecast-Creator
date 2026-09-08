@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-stripe-period.test.
+ *
+ * This file verifies the billing-stripe-period.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

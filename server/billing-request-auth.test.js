@@ -1,3 +1,8 @@
+/**
+ * server test contract for billing-request-auth.test.
+ *
+ * This file verifies the billing-request-auth.test boundary, including its supported inputs, outputs, and failure behavior.
+ */
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { verifyRequestUser } = require('./billingRequestAuth');
