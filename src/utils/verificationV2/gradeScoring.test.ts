@@ -1,3 +1,6 @@
+/**
+ * Verification grade scoring tests. Verify V2 scoring converts forecast and observed values into grades.
+ */
 import {
   clamp,
   composeComponents,
