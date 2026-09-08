@@ -1,3 +1,6 @@
+/**
+ * Store exports. Defines the public Redux store, reducers, and state helpers used by the application.
+ */
 import '../immerSetup';
 import { configureStore } from '@reduxjs/toolkit';
 import { createSentryReduxEnhancer } from './sentryEnhancer';
@@ -60,4 +63,3 @@ export const store = configureStore({
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
-

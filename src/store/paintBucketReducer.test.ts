@@ -1,3 +1,6 @@
+/**
+ * Paint bucket reducer tests. Verify paint-bucket edits update forecast geometry without mutating prior state.
+ */
 import type { Feature, Polygon } from 'geojson';
 import reducer, {
   addFeature,
