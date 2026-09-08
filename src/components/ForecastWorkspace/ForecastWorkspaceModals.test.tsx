@@ -1,3 +1,8 @@
+/**
+ * Forecast-workspace modal test boundary: this suite verifies modal opening,
+ * dismissal, cycle-history actions, and controller-driven dialog state at the
+ * workspace shell boundary.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
