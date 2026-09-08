@@ -30,6 +30,11 @@ import {
   countCopyableSourceFeatures,
   type CopyOutlookGeometryOptions,
 } from '../utils/outlookGeometryCopy';
+import {
+  DEFAULT_FORECAST_WORKSPACE,
+  getForecastWorkspace,
+  type ForecastWorkspaceId,
+} from '../config/forecastWorkspaces';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -44,6 +49,8 @@ export interface SavedCycle {
   label?: string;
   forecastCycle: ForecastCycle;
   stats: SavedCycleStats;
+  /** Product workspace that owns this local saved cycle. Legacy records default to Severe. */
+  workspaceId?: ForecastWorkspaceId;
   /** v2 workflow metadata for the cycle (optional, present for workflow-imported cycles). */
   workflowMetadata?: CycleMetadata;
 }
@@ -61,6 +68,8 @@ export interface LifetimeCycleStats {
 }
 
 export interface ForecastState {
+  /** Product workspace currently owning the active forecast state. */
+  workspaceId: ForecastWorkspaceId;
   forecastCycle: ForecastCycle;
   drawingState: DrawingState;
   customEditor: {
@@ -333,6 +342,7 @@ const sharedEmptyOutlookData = (day: DayType): OutlookData | null => {
 };
 
 const initialState: ForecastState = {
+  workspaceId: DEFAULT_FORECAST_WORKSPACE,
   forecastCycle: {
     days: {
       1: createEmptyOutlook(1, INITIAL_TIMESTAMP)
@@ -1006,6 +1016,12 @@ export const forecastSlice = createSlice({
     },
 
     // Cycle History Management
+    setForecastWorkspace: (state, action: PayloadAction<ForecastWorkspaceId>) => {
+      if (getForecastWorkspace(action.payload)) {
+        state.workspaceId = action.payload;
+      }
+    },
+
     saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {
       const forecastCycleSnapshot = cloneForecastCycle(state.forecastCycle);
       const now = readActionTimestamp(action);
@@ -1016,6 +1032,7 @@ export const forecastSlice = createSlice({
         label: action.payload.label,
         forecastCycle: forecastCycleSnapshot,
         stats: countForecastMetrics(forecastCycleSnapshot),
+        workspaceId: state.workspaceId,
         workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
@@ -1525,6 +1542,7 @@ export const {
   setForecastDay,
   setCycleDate,
   setEmergencyMode,
+  setForecastWorkspace,
   updateDiscussionDraft,
   migrateDiscussionDrafts,
   updateDiscussion,
