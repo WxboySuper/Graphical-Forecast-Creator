@@ -1,3 +1,6 @@
+/**
+ * Update content types. Defines the typed shape used by release and in-app update entries.
+ */
 export interface UpdateScreenshot {
   src: string;
   alt: string;
