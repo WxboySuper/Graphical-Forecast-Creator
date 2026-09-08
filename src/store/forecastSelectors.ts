@@ -1,3 +1,8 @@
+/**
+ * Forecast Redux selectors.
+ *
+ * This module exposes derived reads from forecast state for pages and components. State mutation belongs to forecast reducers and side effects belong to hooks or services.
+ */
 import type { OutlookType } from '../types/outlooks';
 import type { RootState } from './index';
 
