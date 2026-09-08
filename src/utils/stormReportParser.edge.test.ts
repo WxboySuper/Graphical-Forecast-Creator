@@ -1,3 +1,6 @@
+/**
+ * Storm report parser edge tests. Cover malformed and boundary report inputs without losing valid records.
+ */
 type FetchMock = jest.Mock<Promise<{ ok: boolean; text: () => Promise<string> }>, []>;
 
 jest.setTimeout(10000);

@@ -1,3 +1,6 @@
+/**
+ * Additional verification utility tests. Cover edge cases in verification normalization and display helpers.
+ */
 import { polygon as turfPolygon } from '@turf/turf';
 import {
   analyzeVerification,

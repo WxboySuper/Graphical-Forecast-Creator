@@ -1,3 +1,6 @@
+/**
+ * Storm report parser tests. Verify report text becomes normalized storm report records.
+ */
 import { formatReportDate, parseReportDate } from './stormReportParser';
 
 describe('stormReportParser', () => {

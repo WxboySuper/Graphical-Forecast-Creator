@@ -1,3 +1,6 @@
+/**
+ * Storm report CSV tests. Verify report rows serialize and parse using the supported CSV contract.
+ */
 import { buildCsvRow, extractStormReportMagnitude, splitCsvLine } from './stormReportCsv';
 
 describe('stormReportCsv', () => {
