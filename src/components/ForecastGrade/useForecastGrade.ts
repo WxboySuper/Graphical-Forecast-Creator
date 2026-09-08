@@ -1,3 +1,9 @@
+/**
+ * Forecast-grade orchestration hook: this module loads verification evidence,
+ * computes grade results, tracks source and account state, and exposes the
+ * loading/error lifecycle to grade surfaces. Scoring contracts live under
+ * `src/utils/verificationV2`; this hook coordinates them without owning map UI.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useAuth } from '../../auth/AuthProvider';
