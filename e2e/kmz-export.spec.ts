@@ -1,3 +1,8 @@
+/**
+ * E2E contract for kmz-export.spec.
+ *
+ * This file defines browser-level checks for the kmz-export.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';

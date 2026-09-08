@@ -1,3 +1,8 @@
+/**
+ * E2E contract for discussion.spec.
+ *
+ * This file defines browser-level checks for the discussion.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 
