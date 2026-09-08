@@ -29,7 +29,6 @@ to each.
 - **@turf/turf** ^7.4.0 (root (pnpm)) — MIT — allowed
 - **@types/geojson** ^7946.0.16 (root (pnpm)) — MIT — allowed
 - **@types/jest** ^30.0.0 (root (pnpm)) — MIT — allowed
-- **@types/leaflet** ^1.9.22 (root (pnpm)) — MIT — allowed
 - **@types/node** ^26.4.0 (root (pnpm)) — MIT — allowed
 - **@types/react** 19.2.18 (root (pnpm)) — MIT — allowed
 - **@types/react-dom** 19.2.5 (root (pnpm)) — MIT — allowed
@@ -57,7 +56,6 @@ to each.
 - **jest** ^30.5.0 (root (pnpm)) — MIT — allowed
 - **jest-environment-jsdom** ^30.5.0 (root (pnpm)) — MIT — allowed
 - **jszip** ^3.10.1 (root (pnpm)) — (MIT OR GPL-3.0-or-later) — allowed
-- **leaflet** ^1.9.4 (root (pnpm)) — BSD-2-Clause — allowed
 - **lucide-react** ^1.35.0 (root (pnpm)) — ISC — allowed
 - **ol** ^10.10.0 (root (pnpm)) — BSD-2-Clause — allowed
 - **ol-mapbox-style** ^13.4.3 (root (pnpm)) — BSD-2-Clause — allowed

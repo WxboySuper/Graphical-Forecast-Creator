@@ -8,7 +8,6 @@ import { resolveBuildTarget } from './src/config/buildTarget';
 /** Vendor chunk families matched by package substrings, in priority order. */
 const VENDOR_CHUNK_RULES: Array<{ family: string; markers: string[] }> = [
   { family: 'openlayers', markers: ['node_modules/ol/', 'node_modules/ol-mapbox-style/'] },
-  { family: 'leaflet', markers: ['node_modules/leaflet/'] },
   { family: 'turf', markers: ['node_modules/@turf/'] },
   { family: 'firebase', markers: ['node_modules/firebase/', 'node_modules/@firebase/'] },
   { family: 'react', markers: ['node_modules/react/', 'node_modules/react-dom/'] },

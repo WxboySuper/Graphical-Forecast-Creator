@@ -441,62 +441,6 @@
   color: var(--text-tertiary);
 }
 
-/* Leaflet map controls in dark mode */
-.dark-mode .leaflet-control-layers {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border-color: var(--border-color);
-}
-
-.dark-mode .leaflet-control-layers-list {
-  color: var(--text-primary);
-}
-
-.dark-mode .leaflet-control-layers-base label,
-.dark-mode .leaflet-control-layers-overlays label {
-  color: var(--text-primary);
-}
-
-.dark-mode .leaflet-control-layers-expanded {
-  background-color: var(--bg-secondary);
-  border-color: var(--border-color);
-}
-
-.dark-mode .leaflet-control-zoom a {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border-color: var(--border-color);
-}
-
-.dark-mode .leaflet-control-zoom a:hover {
-  background-color: var(--bg-tertiary);
-}
-
-.dark-mode .leaflet-bar {
-  border-color: var(--border-color);
-}
-
-.dark-mode .leaflet-bar a {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border-bottom-color: var(--border-color);
-}
-
-.dark-mode .leaflet-bar a:hover {
-  background-color: var(--bg-tertiary);
-}
-
-/* Leaflet PM Toolbar */
-.dark-mode .leaflet-pm-toolbar {
-  background-color: var(--bg-secondary);
-  border-color: var(--border-color);
-}
-
-.dark-mode .leaflet-pm-actions-container {
-  background-color: var(--bg-secondary);
-  border-color: var(--border-color);
-}
-
 /* Legend in dark mode */
 .dark-mode .legend,
 .dark-mode .map-legend {
@@ -519,12 +463,6 @@
 .dark-mode .feature-tooltip {
   background-color: rgba(29, 29, 29, 0.95) !important;
   color: var(--text-primary) !important;
-}
-
-.dark-mode .leaflet-tooltip {
-  background-color: rgba(29, 29, 29, 0.95);
-  color: var(--text-primary);
-  border-color: var(--border-color);
 }
 
 /* Code blocks */
