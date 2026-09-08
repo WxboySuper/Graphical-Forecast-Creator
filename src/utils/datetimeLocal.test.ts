@@ -1,3 +1,6 @@
+/**
+ * Local datetime tests. Verify local date-time parsing and formatting preserve user-entered values.
+ */
 import { toDatetimeLocal, fromDatetimeLocal, isoToDatetimeLocal } from './datetimeLocal';
 
 describe('datetimeLocal', () => {
