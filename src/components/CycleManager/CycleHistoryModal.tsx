@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  selectSavedCycles,
+  selectSavedCyclesForActiveWorkspace,
   selectForecastCycle,
   saveCurrentCycle,
   loadSavedCycle,
@@ -25,7 +25,7 @@ export { deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
-  const savedCycles = useSelector(selectSavedCycles);
+  const visibleSavedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const currentCycle = useSelector(selectForecastCycle);
 
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -124,7 +124,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
       <CycleHistoryModalDialog
         modalRef={modalRef}
         currentCycle={currentCycle}
-        savedCycles={savedCycles}
+        savedCycles={visibleSavedCycles}
         showSaveForm={showSaveForm}
         newLabel={newLabel}
         confirmAction={confirmAction}
