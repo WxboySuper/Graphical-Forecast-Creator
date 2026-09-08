@@ -1,3 +1,6 @@
+/**
+ * Outlook map coercion tests. Verify map feature values are converted into the outlook model safely.
+ */
 import {
   coerceOutlookProbabilityMap,
   normalizeForecastCycle,
