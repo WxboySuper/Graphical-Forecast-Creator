@@ -1,3 +1,9 @@
+/**
+ * Verification panel: this component presents storm-report evidence, filters,
+ * summaries, and verification actions for the active forecast. It owns panel
+ * composition and user interaction wiring while spatial analysis and forecast
+ * state remain in their dedicated utilities and store modules.
+ */
 import React, { useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
