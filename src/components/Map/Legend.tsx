@@ -1,4 +1,9 @@
 // skipcq: JS-W1028
+/**
+ * Forecast-map legend boundary: this component translates active outlook,
+ * custom-layer, and storm-report selections into the visual legend shown
+ * beside the map. It owns legend presentation and filters, not map geometry.
+ */
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
