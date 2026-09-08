@@ -1,3 +1,7 @@
+/**
+ * Gates server-backed UI children according to feature exposure and runtime capability state.
+ * This component owns exposure-boundary rendering; server capability detection and feature policy remain delegated to configuration and runtime hooks.
+ */
 import type { ReactNode } from 'react';
 import { getFeatureExposure, isFeatureExposed, type FeatureKey } from '../config/featureExposure';
 import {
