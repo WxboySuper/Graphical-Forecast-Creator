@@ -1,3 +1,7 @@
+/**
+ * Custom-product and custom-layer type contracts. It defines the serialized
+ * shapes, identifiers, and access metadata shared by local, hosted, and UI code.
+ */
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
 
 /** Serialized schema version for custom layer/product data. */
