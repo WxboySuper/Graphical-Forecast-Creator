@@ -1,3 +1,6 @@
+/**
+ * User metrics hook tests. Verify metric events are recorded and exposed with the expected user context.
+ */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthProvider';

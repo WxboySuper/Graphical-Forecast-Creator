@@ -1,3 +1,6 @@
+/**
+ * Custom style preset tests. Verify user-defined forecast styling presets normalize and persist correctly.
+ */
 import { isCustomCategoryList } from './customProducts';
 import { listCustomStylePresets } from './customStylePresets';
 
