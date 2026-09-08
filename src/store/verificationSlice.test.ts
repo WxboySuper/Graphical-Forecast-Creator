@@ -1,3 +1,6 @@
+/**
+ * Verification slice tests. Verify grading and verification state transitions for completed forecasts.
+ */
 import type { RootState } from './index';
 import {
   selectVerificationOutlooksForDay,

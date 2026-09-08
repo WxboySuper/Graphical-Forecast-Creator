@@ -1,3 +1,6 @@
+/**
+ * Paint bucket reference tests. Verify reference geometry is tracked and resolved for paint-bucket actions.
+ */
 import forecastReducer, {
   addFeature,
   applyPaintBucketEdit,

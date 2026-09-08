@@ -1,3 +1,6 @@
+/**
+ * Overlay slice tests. Verify overlay actions and reducers preserve map overlay state.
+ */
 import reducer, { applyOverlaySettings, normalizeBaseMapStyle, setBaseMapStyle } from './overlaysSlice';
 
 describe('overlaysSlice', () => {
