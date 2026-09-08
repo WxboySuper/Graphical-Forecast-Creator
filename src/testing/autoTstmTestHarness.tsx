@@ -1,3 +1,7 @@
+/**
+ * Supplies React and Redux test harness helpers for automatic TSTM workflows.
+ * This test-support module owns deterministic provider and render setup; production TSTM behavior remains in the application hooks.
+ */
 import React from 'react';
 import { Provider } from 'react-redux';
 import { act, renderHook, waitFor } from '@testing-library/react';
