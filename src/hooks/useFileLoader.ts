@@ -1,3 +1,7 @@
+/**
+ * Forecast-file loading hook. It reads user-selected files, validates imported
+ * forecast packages, and reports load or parse state to the calling page.
+ */
 import { exportForecastToJson, deserializeForecast, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
 import { isWorkflowExportPackage } from '../utils/workflowPackage';
 import {
