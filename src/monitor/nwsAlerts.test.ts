@@ -1,3 +1,6 @@
+/**
+ * NWS alert tests. Verify alert fetching, filtering, and state updates used by the monitor.
+ */
 import {
   classifyNwsAlert,
   filterNwsAlertCollection,

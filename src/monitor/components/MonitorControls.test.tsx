@@ -1,3 +1,6 @@
+/**
+ * Monitor controls tests. Verify forecast-monitor controls expose the expected actions and state.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import MonitorControls from './MonitorControls';
 import { DEFAULT_MONITOR_SETTINGS } from '../types';

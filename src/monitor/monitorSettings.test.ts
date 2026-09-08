@@ -1,3 +1,6 @@
+/**
+ * Monitor settings tests. Verify monitor preferences normalize, persist, and restore correctly.
+ */
 import { DEFAULT_MONITOR_SETTINGS, MONITOR_OUTLOOK_LAYER_TYPES } from './types';
 import { normalizeMonitorSettings } from './monitorSettingsNormalize';
 import monitorReducer, { setRadarMode, setRadarSite } from '../store/monitorSlice';

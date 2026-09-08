@@ -1,3 +1,6 @@
+/**
+ * Monitor map layer utility tests. Verify layer selection and visibility helpers used by the monitor map.
+ */
 import {
   ALERTS_LAYER_Z_INDEX,
   MONITOR_LAYER_Z_ORDER,
