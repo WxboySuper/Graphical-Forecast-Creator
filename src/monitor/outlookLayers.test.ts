@@ -1,3 +1,6 @@
+/**
+ * Outlook layer tests. Verify monitor outlook layers map forecast data to the expected display configuration.
+ */
 import type { OutlookData } from '../types/outlooks';
 import {
   flattenMonitorOutlookFeatures,

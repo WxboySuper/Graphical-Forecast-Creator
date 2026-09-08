@@ -1,3 +1,6 @@
+/**
+ * Radar site tests. Verify radar site lists, selection, and property normalization.
+ */
 import { fetchRadarSiteOptions, resetRadarSiteCacheForTests } from './radarSites';
 
 describe('radarSites', () => {

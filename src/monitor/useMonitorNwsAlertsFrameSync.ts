@@ -1,3 +1,6 @@
+/**
+ * NWS alert frame synchronization hook. Keeps selected alert frames aligned with monitor playback state.
+ */
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 
 export const useMonitorNwsAlertsFrameSync = (
