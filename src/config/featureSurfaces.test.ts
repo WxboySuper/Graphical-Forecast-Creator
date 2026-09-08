@@ -1,3 +1,6 @@
+/**
+ * Feature surface tests. Verify route loaders and side-effect modules remain aligned with feature exposure boundaries.
+ */
 import { GATED_ROUTE_DEFINITIONS, FEATURE_SIDE_EFFECT_MODULES } from './featureSurfaces';
 
 describe('featureSurfaces', () => {

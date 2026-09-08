@@ -1,3 +1,6 @@
+/**
+ * Feature navigation tests. Verify exposed feature keys map to navigation behavior and unavailable features stay hidden.
+ */
 import {
   assertNavigationHidden,
   mockFeatureExposureOnTarget,
