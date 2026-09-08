@@ -1,3 +1,7 @@
+/**
+ * Local documentation build script. It gathers source and Markdown references,
+ * then writes the local-only maintainer documentation bundle.
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
