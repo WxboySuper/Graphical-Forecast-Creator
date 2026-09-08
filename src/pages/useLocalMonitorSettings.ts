@@ -1,3 +1,6 @@
+/**
+ * Local monitor settings hook. Loads and persists monitor preferences for the current local workspace.
+ */
 import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../store';

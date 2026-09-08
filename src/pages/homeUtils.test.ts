@@ -1,3 +1,6 @@
+/**
+ * Home utility tests. Verify recent-cycle and home-page data helpers return normalized results.
+ */
 import { computeHomeStats, formatCycleDate } from './homeUtils';
 import type { ForecastCycle, OutlookData } from '../types/outlooks';
 import type { SavedCycle } from '../store/forecastSlice';
