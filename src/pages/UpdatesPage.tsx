@@ -1,3 +1,8 @@
+/**
+ * Updates route: this page selects and renders the public product-update entry
+ * with navigation, loading, and local presentation state. It owns route-level
+ * composition while versioned content remains declarative under `src/content`.
+ */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { v17Update } from '../content/updates/v1.7';
