@@ -1,3 +1,7 @@
+/**
+ * Renders map-layer visibility controls for the Forecast Grade screen.
+ * This component owns control presentation and callbacks; verification data, map rendering, and persistence remain with their callers.
+ */
 import React from 'react';
 import { Eye, EyeOff, MapPinned } from 'lucide-react';
 import type { DayType } from '../../types/outlooks';

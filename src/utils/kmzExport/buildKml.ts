@@ -1,3 +1,7 @@
+/**
+ * Builds escaped KML markup from normalized forecast features for KMZ export.
+ * This utility owns document assembly and serialization; feature collection, geometry conversion, and file writing are delegated to neighboring modules.
+ */
 import { escapeXml, hexToKmlColor } from './color';
 import { geometryToKml } from './geometry';
 import { collectKmzExportFeatures, getOutlookLabel, groupFeaturesByDay, groupFeaturesByOutlook } from './collectFeatures';

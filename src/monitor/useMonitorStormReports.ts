@@ -1,3 +1,7 @@
+/**
+ * Coordinates loading and presentation of today’s storm reports in monitor mode.
+ * This hook owns monitor-facing request state and notifications; report parsing and server transport remain shared utility responsibilities.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import type { MonitorOutlookLayerType } from './types';
