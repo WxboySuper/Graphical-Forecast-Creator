@@ -1,3 +1,7 @@
+/**
+ * Beta-invite route. It reads the invite token and account state, then renders
+ * the beta access form, success state, or the appropriate redirect.
+ */
 import React, { useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { CheckCircle2, KeyRound, LoaderCircle, LockKeyhole } from 'lucide-react';
