@@ -24,6 +24,33 @@ The destination shows a temporary notice explaining the URL change. The
 workspace ID comes from the URL, not from a global "current workspace" value in
 Redux. That makes refresh, browser history, and shared links deterministic.
 
+## Workspace switching and sharing
+
+The Forecast shell will present exposed workspaces as tabs. A tab is a link to the
+workspace's canonical route, not a mode toggle inside one shared forecast editor.
+Selecting a tab therefore changes the product boundary and loads that workspace's
+own session. Shared shell infrastructure may be reused, but domain state,
+discussions, editors, and save lifecycles remain independent.
+
+The switcher must hide unexposed workspaces and may show them as unavailable only
+when the product has an intentional gated-state design. It must never initialize a
+future workspace's provider, repository, or editor as a side effect of rendering
+the Severe workspace.
+
+Opening a saved or shared item follows the same ownership rule as tab navigation:
+the payload is classified before state mutation, its owning workspace is selected,
+and the user is sent to that workspace's canonical URL. If the active workspace
+has unsaved work, navigation shows the workspace-specific save/discard prompt.
+For Custom, denying that confirmation cancels the navigation; accepting discard
+explicitly loses the unsaved session by user choice. A premium cloud-save failure
+keeps the local autosave and offers retry or leave without pretending the cloud
+copy exists.
+
+Canonical workspace URLs are the share and bookmark contract. Query parameters,
+hashes, and a validated saved-item handoff may be carried into the destination,
+but a legacy or ambiguous `/forecast` URL is first redirected to Severe and marked
+for the temporary migration notice.
+
 `src/App.tsx` registers the current Severe route and its legacy redirect.
 `src/config/featureSurfaces.ts` owns the actual gated route definitions, which
 `src/routing/buildFeatureGatedRoutes.tsx` filters by exposure. The planned paths
