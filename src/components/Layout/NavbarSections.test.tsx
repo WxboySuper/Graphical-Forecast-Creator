@@ -1,3 +1,7 @@
+/**
+ * Navbar-section tests. Verifies the brand, main-tab, and right-action sections
+ * render their route and authentication states correctly.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { BrandSection, MainTabs, RightActions } from './NavbarSections';
