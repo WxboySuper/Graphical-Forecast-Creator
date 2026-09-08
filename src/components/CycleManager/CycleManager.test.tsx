@@ -48,6 +48,7 @@ jest.mock('../../utils/fileUtils', () => ({
 const mockValidateForecastData = jest.requireMock('../../utils/fileUtils').validateForecastData as jest.Mock;
 
 type ForecastStateOverrides = {
+  workspaceId?: ForecastState['workspaceId'];
   forecastCycle?: Partial<ForecastState['forecastCycle']>;
   drawingState?: Partial<ForecastState['drawingState']>;
   currentMapView?: Partial<ForecastState['currentMapView']>;
@@ -230,6 +231,34 @@ describe('CycleManager Components', () => {
       fireEvent.click(screen.getByText('Confirm'));
       expect(mockAddToast).toHaveBeenCalledWith('Cycle loaded!', 'success');
       await waitFor(() => expect(onClose).toHaveBeenCalled());
+    });
+
+    it('shows only saved cycles owned by the active workspace', () => {
+      const savedCycles: ForecastState['savedCycles'] = [
+        {
+          id: 'severe-cycle',
+          timestamp: '2026-04-20T10:00:00Z',
+          cycleDate: '2026-04-20',
+          label: 'Severe Cycle',
+          forecastCycle: { currentDay: 1, cycleDate: '2026-04-20', days: {} },
+          stats: { forecastDays: 1, totalOutlooks: 1, totalFeatures: 1 },
+          workspaceId: 'severe' as const,
+        },
+        {
+          id: 'custom-cycle',
+          timestamp: '2026-04-20T11:00:00Z',
+          cycleDate: '2026-04-20',
+          label: 'Custom Cycle',
+          forecastCycle: { currentDay: 1, cycleDate: '2026-04-20', days: {} },
+          stats: { forecastDays: 1, totalOutlooks: 1, totalFeatures: 1 },
+          workspaceId: 'custom' as const,
+        },
+      ];
+
+      renderCycleHistoryModal({}, { workspaceId: 'custom', savedCycles });
+
+      expect(screen.getByText('Custom Cycle')).toBeInTheDocument();
+      expect(screen.queryByText('Severe Cycle')).not.toBeInTheDocument();
     });
 
     it('renders cycle with single day summary', () => {
