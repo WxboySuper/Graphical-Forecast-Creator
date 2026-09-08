@@ -1,3 +1,8 @@
+/**
+ * Server environment loading helpers.
+ *
+ * This file loads and normalizes server environment variables before service startup. Individual services validate their own required settings after loading.
+ */
 'use strict';
 
 const fs = require('fs');

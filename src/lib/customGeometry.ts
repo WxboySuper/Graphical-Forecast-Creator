@@ -1,3 +1,8 @@
+/**
+ * Custom forecast geometry helpers.
+ *
+ * This module creates and transforms user-drawn geometry for forecast products. Map interactions supply coordinates; persistence and rendering remain outside this library.
+ */
 import type { Geometry, Position } from 'geojson';
 import {
   CUSTOM_PRODUCT_LIMITS,
