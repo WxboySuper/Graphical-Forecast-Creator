@@ -1,3 +1,7 @@
+/**
+ * Translates Stripe customer and subscription data into GFC entitlement records.
+ * This module owns billing entitlement normalization; it does not call Stripe or write entitlement storage.
+ */
 'use strict';
 
 const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');

@@ -1,3 +1,7 @@
+/**
+ * Provides the current-day outlook trimming workflow used by forecast editing screens.
+ * This hook owns UI state, store selection, and toast coordination; geometry trimming and land-mask calculation remain utility responsibilities.
+ */
 import { useCallback, useState } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';

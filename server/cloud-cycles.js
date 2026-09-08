@@ -1,3 +1,7 @@
+/**
+ * Exposes authenticated server handlers for saving, listing, and deleting cloud forecast cycles.
+ * This module owns request validation and Firebase boundary coordination; metadata normalization and token verification are delegated to shared helpers.
+ */
 'use strict';
 
 const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
