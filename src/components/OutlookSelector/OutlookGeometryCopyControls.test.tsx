@@ -1,3 +1,7 @@
+/**
+ * Outlook geometry-copy control tests. Verify copy-action availability, callbacks,
+ * and disabled states for forecast geometry transfer.
+ */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
