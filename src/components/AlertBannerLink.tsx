@@ -1,3 +1,7 @@
+/**
+ * Alert-banner link renderer. Chooses internal router navigation or a validated
+ * external link and suppresses unsafe destinations.
+ */
 import { Link } from 'react-router';
 import { isSafeBannerLinkUrl } from '../utils/bannerLinkUrl';
 
