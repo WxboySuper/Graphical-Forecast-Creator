@@ -1,3 +1,8 @@
+/**
+ * Integrated-toolbar test boundary: this suite verifies tab navigation,
+ * forecast actions, responsive controls, and toolbar state integration across
+ * the shared editor toolbar surface.
+ */
 import React, { useRef } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
