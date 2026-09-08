@@ -1,3 +1,6 @@
+/**
+ * Feature surface registry. Defines gated routes and side-effect modules that must follow feature exposure policy.
+ */
 import type { ComponentType } from 'react';
 import type { FeatureKey } from './featureExposure';
 
