@@ -1,3 +1,7 @@
+/**
+ * Population-estimate beta tests. Verify map-feature selection, WorldPop lookup,
+ * loading, and result presentation in the experimental estimate panel.
+ */
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';

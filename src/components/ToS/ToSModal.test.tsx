@@ -1,3 +1,7 @@
+/**
+ * Terms-of-service modal tests. Verify persisted acceptance, checkbox gating, and
+ * the accept callback at the account entry boundary.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import ToSModal, { hasAcceptedToS } from './ToSModal';
 
