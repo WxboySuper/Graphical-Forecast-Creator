@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/StatusOverlay.tsx
+ * Purpose: Renders status and recovery messaging over map surfaces.
+ */
+
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
