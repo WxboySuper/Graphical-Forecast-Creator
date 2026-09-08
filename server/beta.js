@@ -1,3 +1,7 @@
+/**
+ * Beta server entry point. It configures the beta Express app, Firebase auth,
+ * feature exposure, and request routes used by the beta deployment.
+ */
 'use strict';
 
 const crypto = require('node:crypto');
