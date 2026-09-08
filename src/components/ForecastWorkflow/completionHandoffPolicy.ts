@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkflow/completionHandoffPolicy.ts
+ * Purpose: Defines eligibility rules for completion handoff and monitor transitions.
+ */
+
 import type { CycleMetadata, WorkflowMetadata } from '../../types/workflow';
 
 export interface CompletionHandoffEligibility { showHandoff: boolean; showMonitor: boolean; }
