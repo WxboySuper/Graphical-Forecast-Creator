@@ -1,3 +1,8 @@
+/**
+ * Script test contract for build-local-docs.test.
+ *
+ * This file verifies the script or automation boundary represented by build-local-docs.test, including its inputs, outputs, and failure behavior.
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -125,7 +130,6 @@ describe('local documentation renderer', () => {
     assert.doesNotMatch(pageHtml('Plain', 'plain.md', '<p>Text</p>'), /mermaid\.esm/);
     assert.match(pageHtml('Diagram', 'diagram.md', '<pre class="mermaid">graph TD</pre>'), /mermaid\.esm/);
   });
-
   test('stamps heading anchors and suffixes duplicate headings', () => {
     const html = renderMarkdown('# Current guidance: Testing\n\nIntro.\n\n## Notes\n\nFirst.\n\n## Notes\n\nSecond.');
     assert.match(html, /<h1 id="current-guidance-testing">Current guidance: Testing<\/h1>/);
