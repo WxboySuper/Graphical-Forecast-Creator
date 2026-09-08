@@ -3,8 +3,10 @@ import {
   getCloudLibraryTabs,
   getCloudCycleWorkspaceId,
   filterCloudCyclesByWorkspace,
+  createCloudCycleEditorHandoff,
 } from './cloudLibraryWorkspace';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
+import type { GFCForecastSaveData } from '../types/outlooks';
 
 const makeCycle = (id: string, workspaceId?: CloudCycleMetadata['workspaceId']): CloudCycleMetadata => ({
   id,
@@ -50,5 +52,15 @@ describe('cloud library workspace boundaries', () => {
     expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=custom'), tabs)).toBe('custom');
     expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=mesoscale'), tabs)).toBe('all');
     expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=unknown'), tabs)).toBe('all');
+  });
+
+  it('hands cloud payloads to the owning canonical workspace', () => {
+    const payload = { forecastCycle: {}, mapView: { center: [0, 0] as [number, number], zoom: 4 } } as GFCForecastSaveData;
+    const handoff = createCloudCycleEditorHandoff(makeCycle('custom', 'custom'), payload);
+
+    expect(handoff.workspaceId).toBe('custom');
+    expect(handoff.path).toBe('/forecast/custom');
+    expect(handoff.payload).toEqual({ schemaVersion: 1, workspaceId: 'custom', forecast: payload });
+    expect(handoff.metadata.workspaceId).toBe('custom');
   });
 });
