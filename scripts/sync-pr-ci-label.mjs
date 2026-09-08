@@ -1,3 +1,7 @@
+/**
+ * Synchronizes pull-request CI labels from GitHub check-run state for repository automation.
+ * This script owns label derivation and GitHub update orchestration; check execution and release policy remain outside it.
+ */
 import { fetchAllPages, GITHUB_PAGE_SIZE } from './lib/github-paginate.mjs';
 import { ciLabelFromCheckRuns, diffCiLabels, parsePrNumbers } from './lib/pr-ci-label-state.mjs';
 

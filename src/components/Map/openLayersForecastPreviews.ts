@@ -1,3 +1,7 @@
+/**
+ * Builds preview features and sources for in-progress OpenLayers forecast drawings.
+ * This module owns preview geometry conversion and source updates; committed forecast edits and map lifecycle are outside its boundary.
+ */
 import GeoJSON from "ol/format/GeoJSON";
 import type { default as OLFeature, FeatureLike } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
