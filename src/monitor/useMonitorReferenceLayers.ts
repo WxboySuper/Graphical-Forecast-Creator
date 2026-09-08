@@ -1,3 +1,9 @@
+/**
+ * Monitor reference-layer hook: this module loads, caches, and exposes source
+ * state for Monitor reference overlays while reporting expected upstream
+ * failures to instrumentation and the user. It owns lifecycle coordination;
+ * source contracts and map rendering remain in separate boundaries.
+ */
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { captureExpectedMonitorReferenceFailure } from '../instrument';

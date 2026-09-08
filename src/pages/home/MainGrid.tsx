@@ -1,3 +1,9 @@
+/**
+ * Home dashboard grid: this component renders the primary signed-in forecast
+ * cards, cycle actions, and supporting status surfaces on the home route. It
+ * receives state and callbacks from the page and does not own persistence,
+ * navigation policy, or forecast mutations.
+ */
 import React from 'react';
 import { AlertTriangle, Calendar, CheckCircle2, Clock3, History, Layers3, Map, Save, Upload } from 'lucide-react';
 import type { DayType, ForecastCycle } from '../../types/outlooks';
