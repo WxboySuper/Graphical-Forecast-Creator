@@ -1,3 +1,7 @@
+/**
+ * Normalizes deployment configuration values and validates environment-key maps for release scripts.
+ * This helper owns deployment-config shape validation; environment loading, provisioning, and publication are handled by callers.
+ */
 const ENV_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 /** Returns true when value is a plain object map rather than an array or primitive. */
