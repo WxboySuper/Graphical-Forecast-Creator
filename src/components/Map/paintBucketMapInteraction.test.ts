@@ -1,8 +1,7 @@
 /**
- * File: src/components/Map/paintBucketMapInteraction.test.ts
- * Purpose: Covers paint-bucket map interaction selection, fill behavior, and cleanup.
+ * Paint-bucket interaction tests. Verify assign and step gestures resolve to the
+ * expected forecast edits and dispatch the correct map action.
  */
-
 import { handlePaintBucketMapClick } from './paintBucketMapInteraction';
 import { resolvePaintBucketEditAction } from '../../utils/paintBucket/outlookScope';
 

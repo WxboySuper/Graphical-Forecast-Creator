@@ -1,8 +1,7 @@
 /**
- * File: src/components/Map/pickTopmostPaintBucketFeature.test.ts
- * Purpose: Tests topmost paint-bucket feature selection and overlapping-feature resolution.
+ * Paint-bucket feature-selection tests. Verify the topmost eligible feature wins
+ * across outlook type, probability, and layer ordering.
  */
-
 import type OLFeature from 'ol/Feature';
 import type Geometry from 'ol/geom/Geometry';
 import { pickTopmostPaintBucketFeature } from './pickTopmostPaintBucketFeature';
