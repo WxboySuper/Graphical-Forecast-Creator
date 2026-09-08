@@ -1,3 +1,8 @@
+/**
+ * Client product-analytics definitions and event helpers. This module names
+ * supported events, validates their properties, and queues telemetry while
+ * respecting the user's analytics preference and current host.
+ */
 export const PRODUCT_ANALYTICS_PREFERENCE_KEY = 'gfc-analytics-enabled';
 const LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY = 'gfc-workflow-analytics-enabled';
 
