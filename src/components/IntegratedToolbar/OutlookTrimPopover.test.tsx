@@ -1,3 +1,7 @@
+/**
+ * Outlook-trim popover tests. Verify strategy options, selection callbacks, and
+ * controller state for the integrated toolbar popover.
+ */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import OutlookTrimPopover from './OutlookTrimPopover';
