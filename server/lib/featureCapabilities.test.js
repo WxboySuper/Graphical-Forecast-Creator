@@ -1,3 +1,8 @@
+/**
+ * File: server/lib/featureCapabilities.test.js
+ * Purpose: Covers feature capability definitions and the server-side exposure decisions they drive.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');
