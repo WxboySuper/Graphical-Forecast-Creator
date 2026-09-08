@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AlertCircle, Cloud, CloudOff, Download, Edit2, LoaderCircle, Lock, ShieldCheck, Trash2 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -14,6 +14,7 @@ import { getBuildTarget } from '../config/buildTarget';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
+  getCloudLibraryTabFromSearchParams,
   getCloudLibraryTabs,
   type CloudLibraryTab,
   type CloudLibraryTabId,
@@ -773,12 +774,22 @@ const useCloudLibraryActions = ({
 /** Production-facing page for loading and managing cloud-hosted cycles. */
 const CloudLibraryPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { premiumActive, effectiveSource } = useEntitlement();
   const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
-  const [activeTab, setActiveTab] = useState<CloudLibraryTabId>('all');
   const tabs = useMemo(() => getCloudLibraryTabs(cycles, getBuildTarget()), [cycles]);
+  const activeTab = useMemo(() => getCloudLibraryTabFromSearchParams(searchParams, tabs), [searchParams, tabs]);
   const visibleCycles = useMemo(() => filterCloudCyclesByWorkspace(cycles, activeTab), [activeTab, cycles]);
+  const handleTabChange = useCallback((tabId: CloudLibraryTabId) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (tabId === 'all') {
+      nextSearchParams.delete('workspace');
+    } else {
+      nextSearchParams.set('workspace', tabId);
+    }
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
   const {
     message,
     handleLoadCycle,
@@ -827,7 +838,7 @@ const CloudLibraryPage: React.FC = () => {
           onLoadCycle={handleLoadCycle}
           onDeleteCycle={handleDeleteCycle}
           onRenameCycle={handleRenameCycle}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
         />
       </div>
     </div>
