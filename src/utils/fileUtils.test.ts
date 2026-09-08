@@ -1,3 +1,8 @@
+/**
+ * File-utilities test boundary: this suite verifies forecast serialization,
+ * deserialization, import-file reading, structured validation, and workflow
+ * package export contracts for persisted forecast data.
+ */
 import JSZip from 'jszip';
 import type { Feature } from 'geojson';
 import { serializeForecast, deserializeForecast, readForecastImportFile, validateForecastData } from './fileUtils';
