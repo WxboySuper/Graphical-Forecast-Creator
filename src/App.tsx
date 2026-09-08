@@ -33,7 +33,7 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
-import { getDefaultForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
+import { getDefaultForecastWorkspacePath, resolveForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -75,14 +75,16 @@ const BETA_MODE = __GFC_BETA_MODE__;
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const { user } = useAuth();
   const userId = user?.uid;
+  const workspaceId = resolveForecastWorkspacePath(location.pathname)?.id ?? 'severe';
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
 
   // Enable account-scoped Auto-Save
-  useAutoSave(userId);
+  useAutoSave(userId, workspaceId);
 
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
