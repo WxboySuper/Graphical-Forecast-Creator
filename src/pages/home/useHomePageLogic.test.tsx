@@ -1,3 +1,8 @@
+/**
+ * Home-page logic test boundary: this suite verifies recent-cycle loading,
+ * restore/delete actions, route decisions, and user-facing state transitions
+ * exposed by the home-page orchestration hook.
+ */
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';

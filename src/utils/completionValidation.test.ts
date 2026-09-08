@@ -1,3 +1,8 @@
+/**
+ * Cycle-completion validation test boundary: this suite verifies required
+ * outlook content, discussion rules, day coverage, and completion failures
+ * before a forecast cycle can be finalized.
+ */
 import { validateCycleCompletion } from './completionValidation';
 import type { ForecastCycle, DayType, OutlookType } from '../types/outlooks';
 
