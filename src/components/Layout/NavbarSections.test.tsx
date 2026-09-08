@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Layout/NavbarSections.test.tsx
+ * Purpose: Covers navigation section visibility, grouping, and accessible labels.
+ */
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { BrandSection, MainTabs, RightActions } from './NavbarSections';
