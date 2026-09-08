@@ -1,3 +1,7 @@
+/**
+ * Application performance tests. Exercise forecast-shell map-view updates through
+ * the Redux provider and browser-router boundary.
+ */
 import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore, EnhancedStore } from '@reduxjs/toolkit';
