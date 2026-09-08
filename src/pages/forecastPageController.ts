@@ -258,13 +258,21 @@ const restoreStoredForecastPayload = (
   if (rawData.mapView) dispatch(setMapView(rawData.mapView));
 };
 
-const restoreCloudSession = (
-  dispatch: ShortcutDispatch,
-  addToast: AddToastFn,
-  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void,
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
-): boolean => {
+interface RestoreCloudSessionOptions {
+  dispatch: ShortcutDispatch;
+  addToast: AddToastFn;
+  onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void;
+  userId?: string | null;
+  workspaceId: ForecastWorkspaceId;
+}
+
+const restoreCloudSession = ({
+  dispatch,
+  addToast,
+  onCloudCycleLoaded,
+  userId,
+  workspaceId,
+}: RestoreCloudSessionOptions): boolean => {
   const payloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId));
   const payload = parseStoredForecastPayload(sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null), workspaceId);
   if (!payload) return false;
@@ -339,7 +347,7 @@ const restoreAvailableSession = (
   currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope']; onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void },
   userId?: string | null,
   workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
-) => restoreCloudSession(dispatch, addToast, currentSession.onCloudCycleLoaded, userId, workspaceId)
+) => restoreCloudSession({ dispatch, addToast, onCloudCycleLoaded: currentSession.onCloudCycleLoaded, userId, workspaceId })
   || restoreLocalSession(dispatch, addToast, currentSession, userId, workspaceId);
 
 export const buildRestoreKey = (userId?: string | null): string => userId || 'anonymous';
