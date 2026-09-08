@@ -1,3 +1,6 @@
+/**
+ * Firebase integration tests. Verify the shared Firebase setup and boundary helpers expose the expected client contract.
+ */
 describe('firebase configuration', () => {
   beforeEach(() => {
     jest.resetModules();
