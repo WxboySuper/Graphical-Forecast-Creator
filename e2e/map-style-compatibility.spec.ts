@@ -1,3 +1,8 @@
+/**
+ * E2E contract for map-style-compatibility.spec.
+ *
+ * This file defines browser-level checks for the map-style-compatibility.spec workflow and its user-visible behavior.
+ */
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';

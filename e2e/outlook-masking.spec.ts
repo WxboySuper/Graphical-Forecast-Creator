@@ -1,3 +1,8 @@
+/**
+ * E2E contract for outlook-masking.spec.
+ *
+ * This file defines browser-level checks for the outlook-masking.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
 
 test('exposes the land-masking controls on the beta forecast workflow', async ({ page }) => {
