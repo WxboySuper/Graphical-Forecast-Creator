@@ -1,3 +1,8 @@
+/**
+ * Beta-access guard component.
+ *
+ * This component gates beta-only content based on the access state supplied by its caller. Authentication and entitlement loading remain outside the rendering boundary.
+ */
 import React from 'react';
 import { Navigate, Outlet, useLocation, useOutletContext } from 'react-router';
 import type { AddToastFn } from '../Layout/AppLayout';

@@ -1,3 +1,8 @@
+/**
+ * Current-cycle history section.
+ *
+ * This component renders the active cycle entry within cycle history and delegates selection and persistence callbacks to its parent. Cycle data loading remains outside the presentation layer.
+ */
 import React from 'react';
 import type { ForecastCycle } from '../../types/outlooks';
 
