@@ -1,3 +1,7 @@
+/**
+ * Forecast-history snapshot helpers. It clones and compares outlook and custom
+ * layer state for undo, redo, and history persistence boundaries.
+ */
 import type { CustomLayerCollection } from '../types/customProducts';
 import type { DayType, OutlookData, OutlookType } from '../types/outlooks';
 import { cloneCustomLayers, cloneOutlookData } from './forecastSnapshotHelpers';

@@ -1,3 +1,7 @@
+/**
+ * KMZ export feature collection helpers. It selects forecast features and
+ * metadata for conversion into KML/KMZ output without writing files itself.
+ */
 import type { DayType, ForecastCycle, OutlookType } from '../../types/outlooks';
 import { colorMappings, getOutlookColor, isSignificantThreat } from '../outlookUtils';
 import { geometryToKml } from './geometry';
