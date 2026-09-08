@@ -1,3 +1,7 @@
+/**
+ * Keyboard behavior hook for the cycle-history modal. It handles escape and
+ * navigation keys while leaving modal rendering and history state to callers.
+ */
 import React, { useCallback, useEffect } from 'react';
 
 /** Returns focusable controls inside the modal dialog root. */
