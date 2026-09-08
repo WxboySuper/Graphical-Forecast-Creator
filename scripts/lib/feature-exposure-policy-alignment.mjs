@@ -1,3 +1,8 @@
+/**
+ * Feature exposure policy alignment checks.
+ *
+ * These helpers compare client and server feature registries and append violations to the supplied error list. The workflow owns reporting and exit status.
+ */
 const BUILD_TARGET_LIST = ['local', 'beta', 'staging', 'production'];
 
 /** Reports server registry keys that are absent from the client registry. */
