@@ -1,4 +1,7 @@
-/** Covers verification-specific paint and the mobile legend control. */
+/**
+ * File: src/components/Map/OpenLayersVerificationMap.test.ts
+ * Purpose: Tests the OpenLayers verification map setup, layers, interactions, and lifecycle.
+ */
 
 import React from 'react';
 
