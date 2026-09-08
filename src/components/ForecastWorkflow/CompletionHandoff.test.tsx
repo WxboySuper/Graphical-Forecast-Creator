@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkflow/CompletionHandoff.test.tsx
+ * Purpose: Covers completion handoff rendering, actions, validation state, and workflow transitions.
+ */
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CompletionHandoff } from './CompletionHandoff';
 
