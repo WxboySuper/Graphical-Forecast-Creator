@@ -1,3 +1,7 @@
+/**
+ * Monitor-settings normalization helpers. They apply defaults and canonicalize
+ * persisted settings before the monitor page and map layers consume them.
+ */
 import {
   DEFAULT_MONITOR_SETTINGS,
   MONITOR_OUTLOOK_LAYER_TYPES,
