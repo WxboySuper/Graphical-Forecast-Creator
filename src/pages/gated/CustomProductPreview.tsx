@@ -1,3 +1,6 @@
+/**
+ * Custom product preview. Renders a gated preview of a configured custom forecast product.
+ */
 import type { CustomCategoryTemplate } from '../../types/customProducts';
 import { categoryPreviewStyle } from './customProductEditorModel';
 
