@@ -1,3 +1,7 @@
+/**
+ * Exposes the forecast transfer import, export, and package-download API.
+ * This module owns the public transfer boundary and re-exports; format-specific serialization and validation remain in dedicated helpers.
+ */
 import {
   exportForecastToJson,
   downloadGfcPackage,

@@ -1,3 +1,7 @@
+/**
+ * Provides the shared page layout and card structure for beta-access screens.
+ * This component owns beta-page presentation; access policy, routing, and feature state are supplied by its callers.
+ */
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import '../../pages/BetaAccess.css';
