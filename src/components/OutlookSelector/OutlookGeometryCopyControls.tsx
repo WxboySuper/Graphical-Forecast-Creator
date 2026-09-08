@@ -1,3 +1,7 @@
+/**
+ * Outlook geometry-copy controls. It renders copy actions for probabilistic
+ * hazard geometry and delegates mutations to the outlook selector controller.
+ */
 import React, { memo } from 'react';
 import { Copy } from 'lucide-react';
 import type { ProbabilisticHazardType } from '../../utils/outlookGeometryCopy';

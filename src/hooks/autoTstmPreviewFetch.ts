@@ -1,3 +1,7 @@
+/**
+ * Auto-TSTM preview fetch hook. It builds generation requests for the active
+ * cycle, handles cancellation and response state, and exposes preview data.
+ */
 import type { MutableRefObject } from 'react';
 import type { DayType, ForecastCycle } from '../types/outlooks';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
