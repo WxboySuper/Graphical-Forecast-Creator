@@ -1,3 +1,7 @@
+/**
+ * OpenLayers forecast feature handlers. Converts edited map features into forecast
+ * or custom-feature updates while delegating geometry changes to map helpers.
+ */
 import { captureException } from "@sentry/react";
 import GeoJSON from "ol/format/GeoJSON";
 import type OLFeature from "ol/Feature";
@@ -15,7 +19,6 @@ export interface ModifiedFeatureHandlerOptions {
   trimStoredOutlookFeature: (feature: GeoJsonFeature) => Promise<GeoJsonFeature>;
 }
 
-/** Converts edited OpenLayers features and sends the resulting forecast updates to Redux. */
 export const handleModifiedFeatures = (
   features: OLFeature<Geometry>[],
   isCategorical: boolean,

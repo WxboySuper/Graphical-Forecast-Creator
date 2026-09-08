@@ -1,3 +1,7 @@
+/**
+ * Paint-bucket feature picker. Finds the highest-rendered eligible forecast feature
+ * at a map pixel for subsequent editing.
+ */
 import type OLMap from 'ol/Map';
 import { type default as OLFeature, type FeatureLike } from 'ol/Feature';
 import type Geometry from 'ol/geom/Geometry';
