@@ -1,3 +1,6 @@
+/**
+ * Verification utility tests. Verify shared forecast grading and verification helpers.
+ */
 import { calculatePOD, formatOutlookVerificationSummary } from './verificationUtils';
 
 describe('verificationUtils', () => {
