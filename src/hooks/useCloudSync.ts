@@ -1,3 +1,11 @@
+/**
+ * Debounced cloud synchronization for the active forecast cycle.
+ *
+ * The hook serializes the current Redux forecast, schedules saves only when
+ * the user is allowed to sync, and exposes manual save/scheduling operations.
+ * Account and cycle identity checks belong at this boundary so late work from
+ * an earlier selection cannot update the current cycle's state.
+ */
 import { useEffect, useRef, useCallback, useMemo, useState, type MutableRefObject } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';

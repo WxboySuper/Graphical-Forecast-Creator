@@ -1,3 +1,11 @@
+/**
+ * Cloud-cycle persistence and selection state for the forecast workspace.
+ *
+ * This hook owns the current cycle reference, list subscription, save/load/
+ * rename/delete commands, and their user-visible sync status. It keeps hosted
+ * service calls behind the cloud-cycle service and leaves forecast mutations
+ * to the page/store consumers.
+ */
 import { useEffect, useLayoutEffect, useState, useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
@@ -292,7 +300,7 @@ function useCloudCycleMutation<TArgs extends unknown[]>({
     async (...args: TArgs): Promise<boolean> => {
       if (!isCloudMutationAllowed({ userId, canWrite, localFixtureActive })) {
         setError(blockedMessage);
-        return false;
+        return Promise.resolve(false);
       }
 
       setError(null);
