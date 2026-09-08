@@ -1,3 +1,7 @@
+/**
+ * Places verification components into account-tier and evaluation-result buckets.
+ * This utility owns deterministic tier-placement decisions; score computation, UI rendering, and persistence remain outside it.
+ */
 import type { StormReport } from '../../types/stormReports';
 import {
   notEvaluatedComponent,
