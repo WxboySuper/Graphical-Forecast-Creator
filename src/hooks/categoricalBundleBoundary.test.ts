@@ -1,3 +1,6 @@
+/**
+ * Categorical bundle boundary tests. Verify worker payloads stay within the supported categorical forecast contract.
+ */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

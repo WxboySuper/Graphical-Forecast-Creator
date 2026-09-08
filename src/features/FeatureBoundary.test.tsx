@@ -1,3 +1,6 @@
+/**
+ * Feature boundary tests. Verify gated UI renders only when the requested feature is exposed.
+ */
 import { render, screen } from '@testing-library/react';
 import { FEATURE_EXPOSURE_REGISTRY } from '../config/featureExposure';
 import { FeatureBoundary } from './FeatureBoundary';

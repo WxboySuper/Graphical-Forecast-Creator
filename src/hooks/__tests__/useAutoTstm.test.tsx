@@ -1,3 +1,6 @@
+/**
+ * Auto-TSTM hook tests. Verify automatic tropical storm and tornado message workflows and their guard conditions.
+ */
 import { act, waitFor } from '@testing-library/react';
 import { replaceTstmFeatures, setForecastDay } from '../../store/forecastSlice';
 import {
