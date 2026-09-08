@@ -1,3 +1,7 @@
+/**
+ * Paint-bucket interaction tests. Verify assign and step gestures resolve to the
+ * expected forecast edits and dispatch the correct map action.
+ */
 import { handlePaintBucketMapClick } from './paintBucketMapInteraction';
 import { resolvePaintBucketEditAction } from '../../utils/paintBucket/outlookScope';
 
