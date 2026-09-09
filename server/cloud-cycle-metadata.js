@@ -37,6 +37,7 @@ const metadataValidators = new Map([
   ...['forecastDays', 'totalOutlooks', 'totalFeatures'].map((key) => [key, isBoundedCount]),
   ['isReadOnly', (value) => typeof value === 'boolean'],
   ['workflowMetadata', isValidWorkflowMetadata],
+  ['workspaceId', (value) => ['severe', 'mesoscale', 'custom', 'tropical', 'winter'].includes(value)],
 ]);
 
 const isValidMetadataValue = (key, value) => metadataValidators.get(key)?.(value) ?? false;
