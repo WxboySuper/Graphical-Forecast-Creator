@@ -127,6 +127,14 @@ export const applyForecastImportResult = (
   }
 };
 
+/** Returns an error when a native transfer belongs to another forecast workspace. */
+export const getForecastImportWorkspaceError = (
+  result: ForecastImportResult,
+  workspaceId: ForecastWorkspaceId,
+): string | null => result.workspaceId === workspaceId
+  ? null
+  : `This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`;
+
 const useForecastSaveAction = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,

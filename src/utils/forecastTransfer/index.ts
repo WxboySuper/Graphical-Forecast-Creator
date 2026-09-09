@@ -1,11 +1,5 @@
 import JSZip from 'jszip';
-import {
-  deserializeForecast,
-  exportForecastToJson,
-  downloadGfcPackage,
-  readForecastImportFile,
-  validateForecastDataReason,
-} from '../fileUtils';
+import { exportForecastToJson, downloadGfcPackage, readForecastImportFile } from '../fileUtils';
 import { downloadKmzExport } from '../kmzExport';
 import type { KmzExportStrategy } from '../kmzExport';
 import type { ForecastCycle, DayType } from '../../types/outlooks';
@@ -22,6 +16,8 @@ import type {
 } from './types';
 import { isWorkflowExportPackage } from '../workflowPackage';
 import { MAX_IMPORT_BYTES, MAX_KML_IMPORT_BYTES, validateImportFileBytes } from '../forecastImportValidation';
+import { deserializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
+import { getForecastDataFromWorkspacePayload } from '../forecastWorkspacePersistence';
 
 const triggerBlobDownload = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
@@ -117,6 +113,7 @@ const importKmlTransfer = async (
   const { placemarks, warnings } = parseKmlDocument(kml, options?.defaultDay ?? options?.baseCycle?.currentDay ?? 1);
   return {
     forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle),
+    workspaceId: 'severe',
     warnings,
     format,
   };
@@ -127,19 +124,18 @@ const importNativeTransfer = async (
   format: 'json' | 'package',
 ): Promise<ForecastImportResult> => {
   const data = await readForecastImportFile(file);
-  const validationError = validateForecastDataReason(data);
-  if (validationError) {
-    throw new Error(validationError);
-  }
-
-  const rawData = data as {
+  const restored = deserializeForecastWorkspace(data);
+  const rawData = getForecastDataFromWorkspacePayload(
+    data as Parameters<typeof getForecastDataFromWorkspacePayload>[0],
+  ) as {
     mapView?: ForecastTransferMapView;
     cycleMetadata?: CycleMetadata | null;
     metadata?: CycleMetadata;
   };
 
   return {
-    forecastCycle: deserializeForecast(data),
+    forecastCycle: restored.forecastCycle,
+    workspaceId: restored.workspaceId,
     mapView: rawData.mapView,
     cycleMetadata: isWorkflowExportPackage(data) ? rawData.metadata : rawData.cycleMetadata,
     warnings: [],
