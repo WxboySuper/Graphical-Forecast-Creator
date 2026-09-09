@@ -3,27 +3,13 @@ import {
   type CustomCategoryStyle,
   type CustomCategoryTemplate,
 } from '../types/customProducts';
+import { hasOnlyKeys, isBoundedText, isNonNegativeInteger, isRecord } from './customValidationPrimitives';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const HATCH_PATTERNS = new Set(['none', 'diagonal', 'reverse-diagonal', 'crosshatch']);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value && typeof value === 'object' && !Array.isArray(value));
-
-const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
-  Object.keys(value).every((key) => keys.includes(key));
-
-const isBoundedText = (value: unknown): value is string =>
-  typeof value === 'string'
-  && value.trim() === value
-  && value.length > 0
-  && value.length <= CUSTOM_PRODUCT_LIMITS.labelLength;
-
 const isUnitInterval = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
-
-const isNonNegativeInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 
 const isHexColor = (value: unknown): value is string =>
   typeof value === 'string' && HEX_COLOR.test(value);
@@ -49,8 +35,8 @@ export const isCustomCategoryStyle = (value: unknown): value is CustomCategorySt
 /** Validates one bounded ordered category definition. */
 export const isCustomCategoryTemplate = (value: unknown): value is CustomCategoryTemplate => {
   if (!isRecord(value) || !hasOnlyKeys(value, ['id', 'label', 'order', 'style'])) return false;
-  return isBoundedText(value.id)
-    && isBoundedText(value.label)
+  return isBoundedText(value.id, CUSTOM_PRODUCT_LIMITS.labelLength)
+    && isBoundedText(value.label, CUSTOM_PRODUCT_LIMITS.labelLength)
     && isNonNegativeInteger(value.order)
     && isCustomCategoryStyle(value.style);
 };
