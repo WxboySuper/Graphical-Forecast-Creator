@@ -7,6 +7,10 @@ import ForecastWorkflowPanel from './ForecastWorkflowPanel';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, {
   addFeature,
+  setForecastDay,
+  setCycleDate,
+  setForecastWorkspace,
+  saveCurrentCycle,
   startBlankCycle,
   updateDiscussion,
 } from '../../store/forecastSlice';
@@ -72,6 +76,12 @@ const renderPanel = (context: 'forecast' | 'discussion', controller?: ForecastWo
   );
 };
 
+const getYesterday = (): string => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return yesterday.toISOString().slice(0, 10);
+};
+
 describe('ForecastWorkflowPanel completion review', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -95,5 +105,26 @@ describe('ForecastWorkflowPanel completion review', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByText('Ready for export')).not.toBeInTheDocument());
+  });
+
+  it('does not suggest a previous outlook from another workspace', () => {
+    const store = createCompleteWorkflowStore();
+    store.dispatch(setForecastWorkspace('custom'));
+    store.dispatch(setForecastDay(2));
+    store.dispatch(addFeature({ feature: createFeature('custom-source', 0, 'tornado', '2%') }));
+    store.dispatch(setCycleDate(getYesterday()));
+    store.dispatch(saveCurrentCycle({ label: 'Custom source' }));
+    store.dispatch(setForecastWorkspace('severe'));
+    store.dispatch(setForecastDay(1));
+
+    render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastWorkflowPanel context="forecast" />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('button', { name: /Use .* Day 2/ })).not.toBeInTheDocument();
   });
 });
