@@ -1,15 +1,7 @@
 import { AlertBannerLink } from './AlertBannerLink';
 import { useAlertBanner } from './useAlertBanner';
+import { isAlertBannerScheduleActive } from './alertBannerConfig';
 import './AlertBanner.css';
-
-export interface AlertConfig {
-  enabled: boolean;
-  message: string;
-  type: 'info' | 'warning' | 'error';
-  dismissible: boolean;
-  linkUrl?: string;
-  linkLabel?: string;
-}
 
 interface AlertBannerProps {
   configPath?: string;
@@ -19,7 +11,7 @@ interface AlertBannerProps {
 export function AlertBanner({ configPath = '/alert-banner.json' }: AlertBannerProps) {
   const { config, dismissed, dismiss } = useAlertBanner(configPath);
 
-  if (!config.enabled || dismissed) {
+  if (!isAlertBannerScheduleActive(config) || dismissed) {
     return null;
   }
 
