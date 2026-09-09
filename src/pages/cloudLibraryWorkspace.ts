@@ -6,6 +6,9 @@ import {
 } from '../config/forecastWorkspaces';
 import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
+import type { GFCForecastSaveData } from '../types/outlooks';
+import { getForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
+import { createForecastWorkspaceSave, type ForecastWorkspaceSaveEnvelope } from '../utils/forecastWorkspacePersistence';
 
 export type CloudLibraryTabId = 'all' | ForecastWorkspaceId;
 
@@ -13,6 +16,17 @@ export interface CloudLibraryTab {
   id: CloudLibraryTabId;
   label: string;
   cycleCount: number;
+}
+
+export interface CloudCycleEditorHandoff {
+  workspaceId: ForecastWorkspaceId;
+  path: string;
+  payload: ForecastWorkspaceSaveEnvelope;
+  metadata: {
+    id: string;
+    label: string;
+    workspaceId: ForecastWorkspaceId;
+  };
 }
 
 /** Reads a shareable workspace tab from the cloud-library query string. */
@@ -27,6 +41,24 @@ export const getCloudLibraryTabFromSearchParams = (
 /** Resolves legacy or malformed cloud metadata to the Severe workspace boundary. */
 export const getCloudCycleWorkspaceId = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): ForecastWorkspaceId =>
   getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+
+/** Wraps a cloud payload with its metadata-owned workspace before handing it to the editor. */
+export const createCloudCycleEditorHandoff = (
+  cycle: Pick<CloudCycleMetadata, 'id' | 'label' | 'workspaceId'>,
+  payload: GFCForecastSaveData,
+): CloudCycleEditorHandoff => {
+  const workspaceId = getCloudCycleWorkspaceId(cycle);
+  return {
+    workspaceId,
+    path: getForecastWorkspacePath(workspaceId),
+    payload: createForecastWorkspaceSave(workspaceId, payload),
+    metadata: {
+      id: cycle.id,
+      label: cycle.label,
+      workspaceId,
+    },
+  };
+};
 
 /** Returns the cycles owned by one workspace, treating legacy records as Severe. */
 export const filterCloudCyclesByWorkspace = (
