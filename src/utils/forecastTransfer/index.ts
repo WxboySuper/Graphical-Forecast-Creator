@@ -162,68 +162,62 @@ const prepareImport = async (file: File): Promise<{ bytes: Uint8Array | undefine
   return { bytes, format };
 };
 
-/** Exports a forecast using the requested transfer format and scope. */
-export const exportForecastTransfer = async (request: ForecastExportRequest): Promise<void> => {
-  const {
-    format,
+const exportJsonTransfer = (request: ForecastExportRequest): void => {
+  const { workspaceId, forecastCycle, mapView, cycleMetadata } = request;
+  if (workspaceId === 'severe') {
+    exportForecastToJson(forecastCycle, mapView, cycleMetadata);
+    return;
+  }
+
+  const payload = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, cycleMetadata);
+  const jsonString = JSON.stringify(payload, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  triggerBlobDownload(blob, `gfc-${workspaceId}-forecast-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`);
+};
+
+const exportPackageTransfer = async (request: ForecastExportRequest): Promise<void> => {
+  await downloadGfcPackage(
+    request.forecastCycle,
+    request.mapView,
+    request.cycleMetadata,
+    toWorkflowScope(request.scope),
+  );
+};
+
+const exportKmlTransfer = async (request: ForecastExportRequest): Promise<void> => {
+  const scope = toKmlScope(request.scope);
+  const options = {
     scope,
-    workspaceId,
-    forecastCycle,
-    mapView,
-    cycleMetadata,
-    day,
-    kmlStrategy,
-    outlookTypes,
-  } = request;
-
-  if (format === 'json') {
-    // Keep the established Severe download shape compatible with existing files
-    // and external consumers. New workspace products receive explicit ownership.
-    if (workspaceId === 'severe') {
-      exportForecastToJson(forecastCycle, mapView, cycleMetadata);
-      return;
-    }
-    const payload = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, cycleMetadata);
-    const jsonString = JSON.stringify(payload, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `gfc-${workspaceId}-forecast-${timestamp}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-    return;
-  }
-
-  if (format === 'package') {
-    await downloadGfcPackage(forecastCycle, mapView, cycleMetadata, toWorkflowScope(scope));
-    return;
-  }
-
-  const kmlScope = toKmlScope(scope);
-  const kmlOptions = {
-    scope: kmlScope,
-    day: kmlScope === 'current-day' ? (day ?? forecastCycle.currentDay) : undefined,
-    strategy: toKmzStrategy(kmlStrategy),
-    outlookTypes,
+    day: scope === 'current-day' ? (request.day ?? request.forecastCycle.currentDay) : undefined,
+    strategy: toKmzStrategy(request.kmlStrategy),
+    outlookTypes: request.outlookTypes,
   };
 
-  if (format === 'kml') {
+  if (request.format === 'kml') {
     const { buildStructuredKmlDocument } = await import('../kmzExport/buildKml');
-    const kml = buildStructuredKmlDocument({ forecastCycle, options: kmlOptions });
+    const kml = buildStructuredKmlDocument({ forecastCycle: request.forecastCycle, options });
     triggerBlobDownload(
       new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }),
-      buildFilename(forecastCycle, scope, day, 'kml'),
+      buildFilename(request.forecastCycle, request.scope, request.day, 'kml'),
     );
     return;
   }
 
-  await downloadKmzExport(forecastCycle, kmlOptions, kmlOptions.strategy);
+  await downloadKmzExport(request.forecastCycle, options, options.strategy);
 };
 
+/** Exports a forecast using the requested transfer format and scope. */
+export const exportForecastTransfer = async (request: ForecastExportRequest): Promise<void> => {
+  if (request.format === 'json') {
+    exportJsonTransfer(request);
+    return;
+  }
+  if (request.format === 'package') {
+    await exportPackageTransfer(request);
+    return;
+  }
+  await exportKmlTransfer(request);
+};
 /** Imports a forecast file and adapts supported formats to the GFC schema. */
 export const importForecastTransfer = async (
   file: File,
