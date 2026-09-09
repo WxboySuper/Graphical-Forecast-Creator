@@ -80,6 +80,31 @@ test('flushes a queued route as a native Umami page view after the tracker loads
   expect(track).not.toHaveBeenCalledWith('page_view', expect.anything());
 });
 
+test('bounds queued events and keeps the most recent telemetry', () => {
+  setProductAnalyticsEnabled(true);
+  initProductAnalytics('gfc.weatherboysuper.com');
+  for (let index = 0; index < 105; index += 1) {
+    trackProductEvent('cloud_save_completed', undefined, 'gfc.weatherboysuper.com');
+  }
+
+  const track = jest.fn();
+  window.umami = { track };
+  document.querySelector<HTMLScriptElement>('script[data-gfc-umami="true"]')?.dispatchEvent(new Event('load'));
+
+  expect(track).toHaveBeenCalledTimes(100);
+});
+
+test('removes a failed tracker script so a later initialization can retry', () => {
+  setProductAnalyticsEnabled(true);
+  initProductAnalytics('gfc.weatherboysuper.com');
+  const failedScript = document.querySelector<HTMLScriptElement>('script[data-gfc-umami="true"]');
+  failedScript?.dispatchEvent(new Event('error'));
+
+  expect(document.querySelector('script[data-gfc-umami="true"]')).toBeNull();
+  initProductAnalytics('gfc.weatherboysuper.com');
+  expect(document.querySelectorAll('script[data-gfc-umami="true"]')).toHaveLength(1);
+});
+
 test('tears down tracker even when localStorage.setItem throws on disable', () => {
   setProductAnalyticsEnabled(true);
   initProductAnalytics('gfc.weatherboysuper.com');
