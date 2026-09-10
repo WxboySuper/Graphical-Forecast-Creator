@@ -1,3 +1,7 @@
+/**
+ * Release update content for GFC version 1.7. It defines the user-facing
+ * changelog copy and screenshot metadata rendered by the updates page.
+ */
 import type { ReleaseUpdate, UpdateScreenshot } from './types';
 
 const image = (fileName: string, alt: string, caption: string): UpdateScreenshot => ({
