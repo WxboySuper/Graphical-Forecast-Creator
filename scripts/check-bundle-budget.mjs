@@ -1,3 +1,8 @@
+/**
+ * Build bundle-budget check.
+ *
+ * This script compares generated bundle sizes with the repository budget and reports regressions in CI. Build generation and artifact cleanup are handled by the surrounding workflow.
+ */
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
