@@ -1,3 +1,7 @@
+/**
+ * Monitor map-layer orchestration helpers. It builds and updates radar,
+ * satellite, alert, and forecast layers without owning the monitor map shell.
+ */
 import type React from 'react';
 import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
