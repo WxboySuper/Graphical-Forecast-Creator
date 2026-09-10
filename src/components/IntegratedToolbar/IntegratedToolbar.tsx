@@ -1,3 +1,9 @@
+/**
+ * Integrated forecast toolbar: this component composes tabbed editing,
+ * selection, drawing, map-overlay, and workflow actions for the forecast
+ * workspace. It receives state and callbacks from its owner; reducers and map
+ * handlers remain responsible for mutations and OpenLayers lifecycle details.
+ */
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
