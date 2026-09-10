@@ -1,3 +1,8 @@
+/**
+ * Cloud-cycle metadata normalization helpers.
+ *
+ * This server module validates and normalizes metadata attached to cloud forecast cycles. Request authentication and persistence are owned by the route and repository layers.
+ */
 'use strict';
 
 const MAX_METADATA_BYTES = 16 * 1024;
