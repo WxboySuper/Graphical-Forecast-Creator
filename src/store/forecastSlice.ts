@@ -81,6 +81,7 @@ import { applyLegacyForecastImport } from './forecastLegacyImport';
 import { applyCopyFeaturesFromPrevious } from './forecastCopy';
 import { restoreSavedCycle } from './forecastSavedCycle';
 import { hydrateForecastCycle } from './forecastCycleHydration';
+import { applyWorkflowPackageImport } from './forecastWorkflowImport';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -583,23 +584,7 @@ export const forecastSlice = createSlice({
     },
 
     importWorkflowPackage: (state, action: PayloadAction<Package>) => {
-      const pkg = action.payload;
-      // Import the first cycle's metadata (packages typically have one cycle)
-      if (pkg.cycles.length > 0) {
-        state.workflowMetadata = pkg.cycles[0];
-        state.isWorkflowActive = true;
-      }
-      if (pkg.metadata) {
-        state.workflowTemplate = getWorkflowTemplateById(pkg.metadata.workflowId) || {
-          id: pkg.metadata.workflowId,
-          label: pkg.metadata.workflowId,
-          groupings: [],
-        };
-      }
-      state.discussionDraftsByScope = {};
-      clearHistory(state);
-      state.isSaved = true;
-      state.outlookVersionSnapshots = [];
+      applyWorkflowPackageImport(state, action.payload);
     },
 
     // Completion validation (WF-03)
