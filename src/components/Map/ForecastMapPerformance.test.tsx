@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/ForecastMapPerformance.test.tsx
+ * Purpose: Tests forecast map performance instrumentation, render thresholds, and cleanup behavior.
+ */
+
 
 import { render, act } from '@testing-library/react';
 import { Provider } from 'react-redux';

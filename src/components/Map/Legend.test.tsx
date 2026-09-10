@@ -1,8 +1,8 @@
 /**
- * Map-legend test boundary: this suite verifies outlook, custom-layer, and
- * storm-report legend content, filters, labels, and Redux-driven visibility at
- * the forecast-map legend surface.
+ * File: src/components/Map/Legend.test.tsx
+ * Purpose: Covers map legend rendering, labels, categories, and accessibility behavior.
  */
+
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
