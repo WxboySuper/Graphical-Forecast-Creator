@@ -82,6 +82,7 @@ import { applyCopyFeaturesFromPrevious } from './forecastCopy';
 import { restoreSavedCycle } from './forecastSavedCycle';
 import { hydrateForecastCycle } from './forecastCycleHydration';
 import { applyWorkflowPackageImport } from './forecastWorkflowImport';
+import { startBlankForecastCycle } from './forecastBlankCycle';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -179,14 +180,6 @@ const createSavedCycleId = (state: ForecastState, now: string): string => {
     return Number.isFinite(sequence) && sequence > max ? sequence : max;
   }, 0);
   return `cycle-${now}-${highest + 1}`;
-};
-
-/** Resolves the starting forecast day implied by a workflow template's first grouping, defaulting to day 1. */
-const getWorkflowStartDay = (template?: WorkflowMetadata): DayType => {  const firstGrouping = template?.groupings[0];
-  if (firstGrouping === 'day2') return 2;
-  if (firstGrouping === 'day3') return 3;
-  if (firstGrouping === 'day4-8') return 4;
-  return 1;
 };
 
 /** Filters a template's groupings to the standard set used by completion validation, returning undefined when none qualify. */
@@ -654,44 +647,13 @@ export const forecastSlice = createSlice({
       workflowTemplate?: WorkflowMetadata;
       cycleDate?: string;
     }>) => {
-      const { workflowTemplate, cycleDate } = action.payload;
-      clearHistory(state);
-      state.discussionDraftsByScope = {};
-      const now = readActionTimestamp(action);
-      const today = cycleDate || getActionLocalCalendarDate(action);
-      const startDay = getWorkflowStartDay(workflowTemplate);
-      const newCycle: ForecastCycle = {
-        days: { [startDay]: createEmptyOutlook(startDay, now) },
-        currentDay: startDay,
-        cycleDate: today
-      };
-      state.forecastCycle = newCycle;
-      state.isSaved = false;
-      state.outlookVersionSnapshots = [];
-      
-      if (workflowTemplate) {
-        state.workflowTemplate = workflowTemplate;
-        // Create initial cycle metadata
-        state.workflowMetadata = {
-          id: `WF-${workflowTemplate.id}-${today}`,
-          workflowId: workflowTemplate.id,
-          cycleDate: today,
-          status: 'in-progress',
-          outlookVersions: [{
-            version: 1,
-            status: 'in-progress',
-            createdAt: now,
-          }],
-          createdAt: now,
-          updatedAt: now,
-        };
-        state.isWorkflowActive = true;
-      } else {
-        // Clear stale workflow state when starting without a template
-        state.workflowTemplate = undefined;
-        state.workflowMetadata = undefined;
-        state.isWorkflowActive = false;
-      }
+      const timestamp = readActionTimestamp(action);
+      startBlankForecastCycle(state, {
+        workflowTemplate: action.payload.workflowTemplate,
+        cycleDate: action.payload.cycleDate,
+        today: getActionLocalCalendarDate(action),
+        timestamp,
+      });
     },
 
     /** Resume an incomplete cycle from a saved snapshot, restoring workflow metadata. */
