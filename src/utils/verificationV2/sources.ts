@@ -1,3 +1,9 @@
+/**
+ * Verification source resolution: this module selects and normalizes forecast,
+ * observation, and account-tier sources for the grading pipeline. It owns
+ * source precedence and availability rules while spatial scoring and UI state
+ * live in separate modules.
+ */
 import type { ForecastCycle } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
 import type {
