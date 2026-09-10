@@ -30,6 +30,23 @@ current implementation contracts.
 - [Custom products beta tester checklist](./operations/custom-products-beta-test-plan.md) - a short Forecast-editor test for custom layers and saved products.
 - [Monitor reference-layer source research](./operations/monitor-reference-sources.md) - official short-term forecast and SPC mesoscale discussion sources.
 
+## Current guidance: Testing
+
+- Unit and component tests live beside the protected module under `src/` and
+  use Jest with Testing Library. Keep behavior groups together, but split a
+  file when unrelated concerns make failures hard to locate.
+- Server tests live beside their route or service under `server/` and run with
+  the analytics server test command used by CI.
+- Browser workflows live under `e2e/` and exercise user-visible route,
+  persistence, map, and hosted-capability behavior with Playwright.
+- Run `pnpm test --runInBand <path>` for a focused unit/component change,
+  `pnpm run test:e2e` for browser behavior, and the full CI build/test matrix
+  before treating a cross-cutting cleanup as complete.
+- Test cleanup must preserve coverage of user-visible behavior and security
+  boundaries. Remove a test only with evidence that its behavior is covered
+  elsewhere; do not replace workflow coverage with implementation-shaped
+  assertions.
+
 ## Historical and exploratory material
 
 These documents describe a release, experiment, or planning decision at a
