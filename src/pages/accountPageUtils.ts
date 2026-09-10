@@ -1,3 +1,7 @@
+/**
+ * Provides account-page display and entitlement helpers for subscription and profile surfaces.
+ * This module owns account presentation data shaping; authentication, billing state, and navigation remain provider or page responsibilities.
+ */
 import { PRICING_COPY } from '../billing/pricingCopy';
 import type { useAuth } from '../auth/AuthProvider';
 import type { useEntitlement } from '../billing/EntitlementProvider';

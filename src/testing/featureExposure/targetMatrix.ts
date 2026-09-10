@@ -1,3 +1,7 @@
+/**
+ * Defines feature-exposure target matrices used to validate build-target policy behavior.
+ * This test-support module owns deterministic policy fixtures and matrix construction; production exposure decisions remain in the config module.
+ */
 import { BUILD_TARGETS, type BuildTarget } from '../../config/buildTarget';
 import * as featureExposureModule from '../../config/featureExposure';
 import {
