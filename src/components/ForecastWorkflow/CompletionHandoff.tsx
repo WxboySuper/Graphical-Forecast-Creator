@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkflow/CompletionHandoff.tsx
+ * Purpose: Coordinates the completion handoff dialog and its forecast workflow actions.
+ */
+
 import React from 'react';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './CompletionHandoff.css';

@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastGrade/RunProgress.tsx
+ * Purpose: Renders the accessible progress meter for forecast-grade execution state.
+ */
+
 import React from 'react';
 import type { GradeProgress } from '../../utils/verificationV2';
 
