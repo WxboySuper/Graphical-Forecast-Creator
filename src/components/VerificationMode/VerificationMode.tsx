@@ -1,3 +1,9 @@
+/**
+ * Verification-mode workspace: this component composes the isolated forecast
+ * review layout, report loading controls, map overlays, and verification
+ * panels. It owns presentation and interaction wiring while spatial analysis,
+ * Redux state, and persistence remain outside the surface.
+ */
 import React, { useRef, useState, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { Eye, FileUp, Layers3 } from 'lucide-react';
