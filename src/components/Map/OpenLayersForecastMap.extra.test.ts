@@ -51,9 +51,6 @@ describe('OpenLayersForecastMap additional helpers', () => {
     const s1 = createLabelOverlaySource('osm');
     expect(s1).toBeTruthy();
 
-    const s2 = createLabelOverlaySource('carto-dark');
-    expect(s2).toBeTruthy();
-
     const s3 = createLabelOverlaySource('esri-satellite');
     expect(s3).toBeTruthy();
 

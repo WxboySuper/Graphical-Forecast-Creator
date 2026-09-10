@@ -189,7 +189,7 @@ service cloud.firestore {
     function hasValidClientSettingsFields(data) {
       return (!('darkMode' in data) || data.darkMode is bool) &&
         (!('baseMapStyle' in data) ||
-          ['osm', 'carto-light', 'carto-dark', 'esri-satellite', 'blank'].hasAny([data.baseMapStyle])) &&
+          ['osm', 'carto-light', 'esri-satellite', 'blank'].hasAny([data.baseMapStyle])) &&
         (!('stateBorders' in data) || data.stateBorders is bool) &&
         (!('counties' in data) || data.counties is bool) &&
         (!('ghostOutlooks' in data) || isValidGhostOutlooks(data.ghostOutlooks)) &&

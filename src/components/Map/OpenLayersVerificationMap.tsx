@@ -187,13 +187,6 @@ const createVerificationLabelOverlaySource = (
         maxZoom: 19,
         crossOrigin: "anonymous",
       });
-    case "carto-dark":
-      return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",
-        attributions: "&copy; OpenStreetMap &copy; CARTO",
-        maxZoom: 19,
-        crossOrigin: "anonymous",
-      });
     case "esri-satellite":
       return new XYZ({
         url: "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
@@ -222,14 +215,6 @@ export const createVerifTileSource = (
     case "carto-light":
       return new XYZ({
         url: "https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-        attributions:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        maxZoom: 19,
-        crossOrigin: "anonymous",
-      });
-    case "carto-dark":
-      return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
         attributions:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
@@ -455,7 +440,6 @@ const VerifMapStylePicker: React.FC<{
         { value: "blank", label: "Blank (Weather)" },
         { value: "osm", label: "OpenStreetMap" },
         { value: "carto-light", label: "Light" },
-        { value: "carto-dark", label: "Dark" },
         { value: "esri-satellite", label: "Satellite" },
       ] as { value: BaseMapStyle; label: string }[]
     ).map(({ value, label }) => (

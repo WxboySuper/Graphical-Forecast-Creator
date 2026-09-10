@@ -108,7 +108,6 @@ describe('openLayersMapStyles', () => {
 
   test('createLabelOverlaySource and createTileSource return sources for known styles', () => {
     expect(createLabelOverlaySource('osm')).toBeTruthy();
-    expect(createLabelOverlaySource('carto-dark')).toBeTruthy();
     expect(createTileSource('osm')).toBeTruthy();
     expect(createTileSource('esri-satellite')).toBeTruthy();
     expect(createTileSource('unknown' as never)).toBeTruthy(); // falls back to OSM

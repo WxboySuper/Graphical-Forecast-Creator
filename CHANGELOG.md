@@ -111,7 +111,7 @@ Work toward the next major release continues in the beta channel while the final
 
 #### Fixed
 
-- **Basemap availability:** Remove the broken Carto dark basemap and redirect saved dark-map settings to the supported light basemap.
+- **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
 - **Custom product handoff:** Handle unavailable sessionStorage safely and avoid consuming a handoff when its removal fails.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical worker recovery:** Reset failed or timed-out workers, preserve the last good categorical geometry, and allow later edits to derive again instead of repeating the same Redux error.
