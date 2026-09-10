@@ -1,3 +1,7 @@
+/**
+ * Renders gated custom-product cards and their management actions.
+ * This component owns product-card presentation and action callbacks; product persistence, entitlement checks, and routing are delegated to callers.
+ */
 import { useState } from 'react';
 import { Archive, Copy, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';

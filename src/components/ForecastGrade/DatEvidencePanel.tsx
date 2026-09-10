@@ -1,3 +1,7 @@
+/**
+ * Renders DAT evidence details within the Forecast Grade workflow.
+ * This component owns evidence presentation and derived display values; DAT parsing and grading decisions remain in utilities and callers.
+ */
 import React, { useMemo } from 'react';
 import type { DatEvidence } from '../../utils/dat';
 
