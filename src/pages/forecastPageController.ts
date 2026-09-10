@@ -1,3 +1,10 @@
+/**
+ * Forecast route orchestration: this module connects the forecast page to
+ * Redux, persistence, imports/exports, cloud-cycle actions, and day rollover.
+ * It owns page-level coordination and delegates domain transformations to the
+ * store, hooks, and utilities; it does not define map rendering or persistence
+ * formats.
+ */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, UnknownAction } from 'redux';
 import type { ForecastMapHandle } from '../components/Map/ForecastMap';
