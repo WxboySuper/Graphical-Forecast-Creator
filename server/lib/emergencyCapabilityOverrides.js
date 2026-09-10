@@ -1,3 +1,7 @@
+/**
+ * Emergency server-capability override parser. It reads the environment-based
+ * disable list, validates known capability keys, and exposes safe overrides.
+ */
 'use strict';
 
 const { KNOWN_SERVER_CAPABILITY_KEYS } = require('./serverFeatureExposure');
