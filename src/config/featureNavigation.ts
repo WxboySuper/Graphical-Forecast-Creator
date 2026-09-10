@@ -1,3 +1,8 @@
+/**
+ * Feature navigation configuration.
+ *
+ * This module maps feature identifiers to the navigation metadata used by GFC surfaces. Route components own rendering and access decisions; this file defines the shared configuration.
+ */
 import { getBuildTarget, type BuildTarget } from './buildTarget';
 import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
 
