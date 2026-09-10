@@ -1,3 +1,7 @@
+/**
+ * Selects product exposure state for the active build target and outlook context.
+ * This module owns pure exposure-query helpers; feature registry configuration and UI rendering remain outside it.
+ */
 import { type BuildTarget, getBuildTarget } from './buildTarget';
 import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
 import type { OutlookType } from '../types/outlooks';
