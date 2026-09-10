@@ -1,3 +1,7 @@
+/**
+ * Provides signed-out account authentication form state and submit behavior for page-level auth surfaces.
+ * This hook owns local form state and auth-provider calls; routing, toasts, and signed-in session management remain with its callers.
+ */
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth } from "../auth/AuthProvider";
