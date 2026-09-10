@@ -1,3 +1,7 @@
+/**
+ * OpenFreeMap layer configuration. It maps the selected base-map style to
+ * tile-source URLs and attribution used by OpenLayers map setup.
+ */
 import type { BaseMapStyle } from '../store/overlaysSlice';
 
 interface OpenFreeMapLayer {
