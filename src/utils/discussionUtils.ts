@@ -1,3 +1,7 @@
+/**
+ * Forecast-discussion formatting helpers. It converts discussion data and
+ * guided prompts into the text structure used by the discussion editor/export.
+ */
 import { DiscussionData, GuidedDiscussionData, DayType } from '../types/outlooks';
 
 /**

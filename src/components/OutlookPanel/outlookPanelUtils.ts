@@ -1,3 +1,7 @@
+/**
+ * Outlook-panel display helpers. It maps outlook types to constraints, labels,
+ * and probability choices used by the forecast editor controls.
+ */
 import { OutlookType, CategoricalRiskLevel, TornadoProbability, WindProbability, HailProbability, TotalSevereProbability, Day48Probability, CIGLevel, DayType } from '../../types/outlooks';
 import { colorMappings, getOutlookConstraints } from '../../utils/outlookUtils';
 
