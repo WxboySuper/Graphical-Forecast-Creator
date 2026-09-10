@@ -56,3 +56,8 @@ export const refreshHostedBetaAccess = async ({
     }
   }
 };
+/**
+ * Hosted beta-access resolution helpers.
+ *
+ * This module determines beta access from hosted authentication and entitlement data. UI guards consume the result; identity and billing services own the underlying records.
+ */

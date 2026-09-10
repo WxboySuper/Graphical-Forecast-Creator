@@ -1,3 +1,8 @@
+/**
+ * Forecast-slice test boundary: this suite exercises reducer transitions,
+ * imports, history operations, and forecast-cycle serialization contracts.
+ * It verifies state behavior through public actions rather than UI rendering.
+ */
 import type { Feature, Polygon } from 'geojson';
 import type { DayType } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';

@@ -1,4 +1,9 @@
 // skipcq: JS-W1028
+/**
+ * Documentation content boundary: this module renders the static in-app
+ * guidance tables and examples used by the Documentation surface. It owns
+ * presentation helpers and explanatory content, not routing or domain state.
+ */
 import React from 'react';
 import { colorMappings } from '../../utils/outlookUtils';
 

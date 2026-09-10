@@ -55,3 +55,8 @@ export interface CloudOperationResult<T = void> {
   data?: T;
   error?: string;
 }
+/**
+ * Cloud-cycle domain types.
+ *
+ * This file defines the shared TypeScript shapes for saved cloud cycles, sync state, and related metadata. Runtime persistence and validation live in cloud-cycle services.
+ */

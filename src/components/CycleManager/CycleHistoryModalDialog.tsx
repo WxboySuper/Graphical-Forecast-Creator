@@ -55,3 +55,8 @@ const CycleHistoryModalDialog: React.FC<CycleHistoryModalDialogProps> = ({
 
 export default CycleHistoryModalDialog;
 export type { CycleHistoryConfirmAction };
+/**
+ * Cycle-history modal dialog component.
+ *
+ * This component renders the cycle-history dialog and delegates cycle selection and actions to supplied callbacks. It does not load or persist cycle data.
+ */
