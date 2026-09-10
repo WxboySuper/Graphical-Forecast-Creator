@@ -1,3 +1,7 @@
+/**
+ * Paint-bucket test boundary: this suite verifies probability-scope detection,
+ * target-probability resolution, and edit-action strategies for map painting.
+ */
 import {
   applyPaintBucketStrategy,
   resolveTargetProbability,
