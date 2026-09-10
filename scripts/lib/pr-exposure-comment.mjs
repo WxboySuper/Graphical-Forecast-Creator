@@ -1,3 +1,7 @@
+/**
+ * Pull-request feature-exposure comment helpers. It gathers changed-file
+ * exposure data and formats the promotion report posted by release tooling.
+ */
 import { formatFeatureList } from './feature-exposure-report.mjs';
 import { githubRequest } from './github-api.mjs';
 import { fetchAllPages, GITHUB_PAGE_SIZE } from './github-paginate.mjs';
