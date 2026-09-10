@@ -1,3 +1,7 @@
+/**
+ * Defines reusable custom-product style presets and their normalized presentation values.
+ * This module owns preset identifiers and templates; product persistence, selection UI, and rendering are outside its boundary.
+ */
 import type { CustomCategoryId, CustomCategoryTemplate } from '../types/customProducts';
 
 export type CustomStylePresetId = 'rainfall' | 'tropical-aoi';
