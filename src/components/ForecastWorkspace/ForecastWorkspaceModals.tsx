@@ -1,3 +1,7 @@
+/**
+ * Renders modal dialogs used by the forecast workspace for secondary workflows.
+ * This component owns modal composition and event wiring; workspace state and domain operations are supplied by its controller props.
+ */
 import React from 'react';
 import {
   Dialog,
