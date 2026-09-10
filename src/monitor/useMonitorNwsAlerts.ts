@@ -1,3 +1,7 @@
+/**
+ * Coordinates filtered NWS alert state and playback data for monitor mode.
+ * This hook owns monitor-facing selection and loading composition; alert transport, filtering, and playback helpers remain separate boundaries.
+ */
 import { useMemo, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { filterNwsAlertCollection, type NwsAlertFeatureCollection } from './nwsAlerts';
