@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Beta/BetaAuthCard.test.tsx
+ * Purpose: Tests beta authentication card messaging, sign-in actions, and account transitions.
+ */
+
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BetaAuthCard from './BetaAuthCard';
 import { useAuth } from '../../auth/AuthProvider';

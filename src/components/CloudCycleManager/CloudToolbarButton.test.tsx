@@ -1,3 +1,8 @@
+/**
+ * File: src/components/CloudCycleManager/CloudToolbarButton.test.tsx
+ * Purpose: Tests cloud toolbar button visibility, labels, and interaction states.
+ */
+
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CloudToolbarButton } from './CloudToolbarButton';
 
