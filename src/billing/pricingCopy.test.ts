@@ -1,3 +1,8 @@
+/**
+ * File: src/billing/pricingCopy.test.ts
+ * Purpose: Checks pricing boundary copy for signed-out, free-account, and premium-account experiences.
+ */
+
 import { PRICING_COPY, getBoundaryCopy } from './pricingCopy';
 
 describe('pricingCopy', () => {
