@@ -1,3 +1,11 @@
+/**
+ * Firestore gateway for hosted forecast cycles.
+ *
+ * This module translates cloud-cycle records to and from the Firestore schema,
+ * scopes every operation to the authenticated user, and exposes save/load/
+ * rename/delete/list/subscribe primitives. UI hooks own permission and status
+ * policy; this service owns transport and record-shape boundaries.
+ */
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { auth, db } from './firebase';
