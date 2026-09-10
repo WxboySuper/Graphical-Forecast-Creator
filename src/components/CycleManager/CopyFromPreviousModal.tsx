@@ -1,3 +1,9 @@
+/**
+ * Copy-from-previous-cycle modal: this component lets users choose a source
+ * cycle/day and confirm copying forecast features into the active editor. It
+ * owns dialog selection and feedback while copy semantics and Redux mutation
+ * remain in the store boundary.
+ */
 import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';

@@ -1,3 +1,9 @@
+/**
+ * Custom-drawing toolbar panel: this component presents custom-layer creation,
+ * ordering, editing, and deletion controls inside the integrated forecast
+ * toolbar. It owns local panel interaction while Redux, map drawing, and
+ * product exposure policy remain in their dedicated boundaries.
+ */
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { ArrowDown, ArrowUp, Check, ChevronDown, Plus, Trash2 } from 'lucide-react';
