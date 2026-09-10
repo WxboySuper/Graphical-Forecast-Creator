@@ -1,3 +1,7 @@
+/**
+ * Discussion-form controller hook. It manages draft text, mode changes, date
+ * fields, and Redux synchronization for the discussion editor page.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { updateDiscussionDraft } from '../store/forecastSlice';
 import type { DiscussionData, DiscussionMode } from '../types/outlooks';
