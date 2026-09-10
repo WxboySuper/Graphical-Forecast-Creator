@@ -1,3 +1,7 @@
+/**
+ * Outlook-panel controller hook. It coordinates selected outlook state, edit
+ * actions, validation, and panel effects for the forecast editor UI.
+ */
 import { useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';

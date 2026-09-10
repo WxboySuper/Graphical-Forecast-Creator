@@ -1,3 +1,7 @@
+/**
+ * Home-page controller hook. It selects forecast and account state, builds the
+ * home view's derived values, and exposes navigation and toast actions.
+ */
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router';

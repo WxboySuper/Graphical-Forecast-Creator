@@ -1,3 +1,7 @@
+/**
+ * GitHub client helpers for stale-branch maintenance scripts. It reads branch
+ * policy and wraps paginated GitHub requests used to report stale branches.
+ */
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
