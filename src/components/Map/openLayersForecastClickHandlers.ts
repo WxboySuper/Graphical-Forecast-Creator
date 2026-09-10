@@ -1,7 +1,8 @@
 /**
- * Handles forecast-map click interactions for selecting and editing rendered outlook features.
- * This module owns click-to-action translation and overlay coordination; it delegates paint-bucket mutations and store updates to their boundaries.
+ * File: src/components/Map/openLayersForecastClickHandlers.ts
+ * Purpose: Defines OpenLayers forecast-map click handlers and feature-selection behavior.
  */
+
 import OLMap from "ol/Map";
 import Overlay from "ol/Overlay";
 import VectorLayer from "ol/layer/Vector";
