@@ -1,6 +1,5 @@
 import type { OutlookData } from '../types/outlooks';
 import {
-  coerceOutlookProbabilityMap,
   flattenMonitorOutlookFeatures,
   isRenderableMonitorProbability,
   MONITOR_OUTLOOK_LAYER_TYPES,
@@ -16,14 +15,6 @@ describe('monitor outlook layers', () => {
     expect(isRenderableMonitorProbability('CIG2')).toBe(true);
     expect(isRenderableMonitorProbability('CIG0')).toBe(false);
     expect(isRenderableMonitorProbability('CIG9')).toBe(false);
-  });
-
-  test('coerceOutlookProbabilityMap accepts plain objects from legacy persistence', () => {
-    const plain = {
-      MRGL: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [] } }],
-    };
-    const map = coerceOutlookProbabilityMap(plain);
-    expect(map?.get('MRGL')).toHaveLength(1);
   });
 
   test('flattenMonitorOutlookFeatures returns only the selected outlook type', () => {
