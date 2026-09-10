@@ -1,3 +1,11 @@
+/**
+ * Debounced cloud synchronization for the active forecast cycle.
+ *
+ * The hook serializes the current Redux forecast, schedules saves only when
+ * the user is allowed to sync, and exposes manual save/scheduling operations.
+ * Account and cycle identity checks belong at this boundary so late work from
+ * an earlier selection cannot update the current cycle's state.
+ */
 import { useEffect, useRef, useCallback, useMemo, useState, type MutableRefObject } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -120,6 +128,7 @@ const syncCurrentCloudCycle = async ({
 
 type CloudSyncInput = Pick<UseCloudCyclesResult, 'currentCloud' | 'updateSyncState' | 'saveCycle'>;
 
+/** Builds manual and automatic sync commands for the active forecast state. */
 const useCloudSyncOperations = ({
   canSync,
   currentCloud,
@@ -183,7 +192,8 @@ const useCloudSyncOperations = ({
   };
 };
 
-const useCloudSyncScheduling = ({
+/** Schedules a debounced save when the active cloud cycle becomes dirty. */
+function useCloudSyncScheduling({
   canSync,
   currentCloudId,
   currentHash,
@@ -197,7 +207,7 @@ const useCloudSyncScheduling = ({
   lastSyncedState: { cloudId: string; hash: string } | null;
   performSync: () => Promise<void>;
   syncTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-}) => {
+}) {
   useEffect(() => {
     if (!canSync || !currentCloudId || (lastSyncedState?.cloudId === currentCloudId && isCurrentStateSynced(lastSyncedState.hash, currentHash))) {
       clearSyncTimeout(syncTimeoutRef);
@@ -215,7 +225,7 @@ const useCloudSyncScheduling = ({
       clearSyncTimeout(syncTimeoutRef);
     };
   }, [canSync, currentCloudId, currentHash, lastSyncedState, performSync, syncTimeoutRef]);
-};
+}
 
 /** Hook for managing automatic sync of the current forecast to cloud. */
 export const useCloudSync = (cloud: CloudSyncInput) => {
