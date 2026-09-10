@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastGrade/DataQualityPanel.tsx
+ * Purpose: Renders data-quality status and explanatory details for forecast-grade packages.
+ */
+
 import React from 'react';
 import type { PackageGrade } from '../../utils/verificationV2';
 import { dataQualityClass } from './gradeFormat';

@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkflow/ForecastWorkflowPanel.test.tsx
+ * Purpose: Covers forecast workflow panel rendering, validation, persistence actions, and cloud handoff states.
+ */
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
