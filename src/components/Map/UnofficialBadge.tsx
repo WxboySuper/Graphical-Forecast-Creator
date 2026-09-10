@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/UnofficialBadge.tsx
+ * Purpose: Renders the map attribution badge for unofficial or limited data sources.
+ */
+
 import React from 'react';
 import './UnofficialBadge.css';
 
