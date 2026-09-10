@@ -1,3 +1,7 @@
+/**
+ * Server-side Sentry tunnel endpoint helpers. The module validates configured
+ * Sentry DSNs and proxies event requests with bounded upstream timeouts.
+ */
 'use strict';
 
 const SENTRY_DSN_PATTERN =
