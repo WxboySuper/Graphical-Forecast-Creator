@@ -1,3 +1,7 @@
+/**
+ * Action group for the integrated forecast toolbar's tabs. It renders the
+ * controls associated with the active tab and delegates state changes upward.
+ */
 import React from 'react';
 import {
   ArrowDownUp,

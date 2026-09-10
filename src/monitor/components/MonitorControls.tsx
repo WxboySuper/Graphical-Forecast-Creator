@@ -1,3 +1,7 @@
+/**
+ * Monitor controls panel. It renders radar, satellite, alert, and refresh
+ * controls and reports user selections to the monitor page controller.
+ */
 import React from 'react';
 import { RefreshCcw } from 'lucide-react';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
