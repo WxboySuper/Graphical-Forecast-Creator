@@ -4,6 +4,10 @@ import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 
 export type BaseMapStyle = 'osm' | 'carto-light' | 'carto-dark' | 'esri-satellite' | 'blank';
 
+/** Redirects the retired Carto dark basemap to the supported light style. */
+export const normalizeBaseMapStyle = (style: BaseMapStyle): BaseMapStyle =>
+  style === 'carto-dark' ? 'carto-light' : style;
+
 export interface OverlaysState {
   stateBorders: boolean;
   counties: boolean;
@@ -55,7 +59,7 @@ const overlaysSlice = createSlice({
       state[action.payload.layer] = action.payload.visible;
     },
     setBaseMapStyle: (state, action: PayloadAction<BaseMapStyle>) => {
-      state.baseMapStyle = action.payload;
+      state.baseMapStyle = normalizeBaseMapStyle(action.payload);
     },
     toggleGhostOutlook: (state, action: PayloadAction<OutlookType>) => {
       const outlookType = action.payload;
@@ -101,7 +105,7 @@ const overlaysSlice = createSlice({
       }
 
       if (baseMapStyle) {
-        state.baseMapStyle = baseMapStyle;
+        state.baseMapStyle = normalizeBaseMapStyle(baseMapStyle);
       }
 
       if (outlookTrimStrategy) {
