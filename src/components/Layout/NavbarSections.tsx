@@ -1,3 +1,9 @@
+/**
+ * Navigation section definitions: this module builds the grouped navigation
+ * items rendered by the application shell, including route, entitlement, and
+ * feature-exposure checks. It supplies presentation metadata and does not own
+ * route registration or authorization policy.
+ */
 import type { FC, ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import {
