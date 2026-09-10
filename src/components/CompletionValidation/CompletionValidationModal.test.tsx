@@ -1,3 +1,8 @@
+/**
+ * File: src/components/CompletionValidation/CompletionValidationModal.test.tsx
+ * Purpose: Tests completion validation modal states, messages, actions, and dismissal behavior.
+ */
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import CompletionValidationModal from './CompletionValidationModal';
 import type { CycleValidationResult } from '../../types/workflow';

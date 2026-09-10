@@ -1,3 +1,8 @@
+/**
+ * File: src/components/CycleManager/CycleHistoryModalDialog.tsx
+ * Purpose: Coordinates cycle history dialog state, confirmation actions, and history panel rendering.
+ */
+
 import React from 'react';
 import type { SavedCycle } from '../../store/forecastSlice';
 import type { ForecastCycle } from '../../types/outlooks';
