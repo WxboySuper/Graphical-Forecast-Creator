@@ -1015,6 +1015,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       )
         return;
 
+      // Every style change invalidates any OpenFreeMap request started by a
+      // previous selection, including a switch back to a raster or blank map.
+      const requestId = vectorStyleRequestRef.current + 1;
+      vectorStyleRequestRef.current = requestId;
+
       /** Ensure state boundaries remain available above outlook polygons in every map style. */
       const loadUsStatesBoundaries = () => {
         ensureBlankLayerLoaded(createBlankLayerConfig("usStates", landSourceRef.current)).catch(() => {
@@ -1059,9 +1064,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       }
 
       if (isOpenFreeMapStyle(baseMapStyle)) {
-        const requestId = vectorStyleRequestRef.current + 1;
-        vectorStyleRequestRef.current = requestId;
-
         tile.setVisible(false);
         world.setVisible(false);
         lakes.setVisible(false);
