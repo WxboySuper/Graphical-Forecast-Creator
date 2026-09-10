@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/pickTopmostPaintBucketFeature.ts
+ * Purpose: Selects the topmost paint-bucket feature at a map coordinate.
+ */
+
 import type OLMap from 'ol/Map';
 import { type default as OLFeature, type FeatureLike } from 'ol/Feature';
 import type Geometry from 'ol/geom/Geometry';
