@@ -1,7 +1,6 @@
 /**
- * Focused tests for the extracted OpenLayers map styling/geometry seam.
- * These helpers were moved out of OpenLayersForecastMap.tsx so map styling
- * concerns can be reviewed and tested without loading the React component.
+ * File: src/components/Map/openLayersMapStyles.test.ts
+ * Purpose: Tests OpenLayers map style construction and style-state edge cases.
  */
 
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
