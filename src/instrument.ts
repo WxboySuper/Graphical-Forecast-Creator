@@ -1,3 +1,9 @@
+/**
+ * Client instrumentation boundary: this module configures Sentry, error
+ * capture, navigation tracing, and Redux breadcrumbs for supported deployment
+ * targets. It owns observability setup and redaction, not product state,
+ * authentication, or server-side monitoring.
+ */
 import * as Sentry from '@sentry/react';
 import React from 'react';
 import {

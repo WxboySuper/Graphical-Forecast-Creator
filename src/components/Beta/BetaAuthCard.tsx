@@ -1,3 +1,9 @@
+/**
+ * Beta authentication card: this component presents local and hosted sign-in
+ * states, invite/access messaging, and the user actions used to enter beta
+ * surfaces. It owns presentation and form lifecycle while AuthProvider and
+ * hosted access policy own identity and authorization decisions.
+ */
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
 import { Button } from '../ui/button';

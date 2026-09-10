@@ -1,3 +1,9 @@
+/**
+ * Application shell: this module composes providers, global lifecycle hooks,
+ * route definitions, lazy page boundaries, and top-level error handling. It
+ * owns application composition but delegates state, feature exposure, auth,
+ * and page behavior to their dedicated modules.
+ */
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
