@@ -33,7 +33,6 @@ import { createForecastOutlookReducers } from './forecastOutlookReducers';
 import { readActionTimestamp } from './timestampMiddleware';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
-import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import {
@@ -82,6 +81,7 @@ import { hydrateForecastCycle } from './forecastCycleHydration';
 import { applyWorkflowPackageImport } from './forecastWorkflowImport';
 import { startBlankForecastCycle } from './forecastBlankCycle';
 import { saveForecastCycle, SAVED_CYCLES_LIMIT } from './forecastCyclePersistence';
+import { applyCompletionValidation, applyCompleteCycle, applyCompleteWithOmissions } from './forecastCompletion';
 export { SAVED_CYCLES_LIMIT } from './forecastCyclePersistence';
 
 export interface SavedCycleStats {
@@ -545,13 +545,7 @@ export const forecastSlice = createSlice({
 
     // Completion validation (WF-03)
     validateCompletion: (state) => {
-      const result = validateCycleCompletion(
-        state.forecastCycle,
-        getWorkflowValidationGroupings(state.workflowTemplate),
-      );
-      state.completionValidation.lastResult = result;
-      state.completionValidation.omittedDays = {};
-      state.completionValidation.showCompletionModal = true;
+      applyCompletionValidation(state, getWorkflowValidationGroupings(state.workflowTemplate));
     },
 
     dismissCompletionModal: (state) => {
@@ -566,37 +560,11 @@ export const forecastSlice = createSlice({
     },
 
     completeCycle: (state, action: UnknownAction) => {
-      const completedAt = readActionTimestamp(action);
-      state.forecastCycle.completionAcknowledgedAt = completedAt;
-      if (state.workflowMetadata) {
-        state.workflowMetadata.status = 'completed';
-        state.workflowMetadata.updatedAt = completedAt;
-        const currentVersion = state.workflowMetadata.outlookVersions[state.workflowMetadata.outlookVersions.length - 1];
-        if (currentVersion?.status === 'in-progress') currentVersion.status = 'completed';
-      }
-      delete state.forecastCycle.omittedDayReasons;
-      delete state.forecastCycle.updateInProgressVersion;
-      state.completionValidation.showCompletionModal = false;
-      state.completionValidation.lastResult = null;
-      state.completionValidation.omittedDays = {};
-      state.isSaved = false;
+      applyCompleteCycle(state, readActionTimestamp(action));
     },
 
     completeWithOmissions: (state, action: UnknownAction) => {
-      const completedAt = readActionTimestamp(action);
-      state.forecastCycle.completionAcknowledgedAt = completedAt;
-      if (state.workflowMetadata) {
-        state.workflowMetadata.status = 'completed-with-omissions';
-        state.workflowMetadata.updatedAt = completedAt;
-        const currentVersion = state.workflowMetadata.outlookVersions[state.workflowMetadata.outlookVersions.length - 1];
-        if (currentVersion?.status === 'in-progress') currentVersion.status = 'omitted';
-      }
-      state.forecastCycle.omittedDayReasons = { ...state.completionValidation.omittedDays };
-      delete state.forecastCycle.updateInProgressVersion;
-      state.completionValidation.showCompletionModal = false;
-      state.completionValidation.lastResult = null;
-      state.completionValidation.omittedDays = {};
-      state.isSaved = false;
+      applyCompleteWithOmissions(state, readActionTimestamp(action));
     },
 
     clearOmittedDays: (state) => {
