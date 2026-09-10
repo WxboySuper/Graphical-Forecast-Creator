@@ -97,9 +97,9 @@ describe('OpenLayersForecastMap additional helpers', () => {
     const lakes = createBlankLayerConfig('lakes', source as never);
     const states = createBlankLayerConfig('usStates', source as never);
 
-    expect(world.url).toBe('geodata/ne_110m_admin_0_countries.geojson');
-    expect(lakes.url).toBe('geodata/ne_110m_lakes.geojson');
-    expect(states.url).toBe('geodata/us-states.json');
+    expect(world.url).toBe('/geodata/ne_110m_admin_0_countries.geojson');
+    expect(lakes.url).toBe('/geodata/ne_110m_lakes.geojson');
+    expect(states.url).toBe('/geodata/us-states.json');
     expect(world.style).toBe(BLANK_WORLD_STYLE);
     expect(lakes.style).toBe(BLANK_LAKE_STYLE);
     expect(states.style).toBeUndefined();
