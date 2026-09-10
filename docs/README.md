@@ -53,7 +53,7 @@ specific point in time. Check the current architecture and operations guides
 before using them to make a code or deployment decision.
 
 - [v1.4.0 plan](./releases/v1.4.0-plan.md) - hosted accounts, sync, billing, and sustainability plan.
-- [v1.3.0 notes](./releases/v1.3.0-draft.md) - workflow polish and visibility notes.
+- [v1.3.0 notes](./releases/v1.3.0.md) - workflow polish and visibility notes.
 - [v1.2.0 notes](./releases/v1.2.0-launch.md) - editing safety nets launch notes.
 - [Paint-bucket investigation](./product/paint-bucket-tool-investigation.md) - product investigation and design evidence.
 - [Outlook polygon masking investigation](./architecture/outlook-polygon-masking-investigation.md) - implementation research and tradeoffs.
