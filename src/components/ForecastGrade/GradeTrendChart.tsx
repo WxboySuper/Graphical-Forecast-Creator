@@ -1,3 +1,7 @@
+/**
+ * Renders historical Forecast Grade trends and product-level comparisons.
+ * This component owns chart presentation and local selection state; score computation and trend data preparation are supplied by shared verification utilities.
+ */
 import React, { useMemo, useState } from 'react';
 import type { GradeCard } from '../../types/forecastGrade';
 import { PRODUCT_KINDS, PRODUCT_LABELS, type ProductKind } from '../../utils/verificationV2';

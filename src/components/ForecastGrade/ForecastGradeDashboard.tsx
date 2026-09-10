@@ -1,3 +1,7 @@
+/**
+ * Composes the Forecast Grade dashboard and coordinates its map, score, and history surfaces.
+ * This component owns dashboard layout and local view state; grade calculations, persistence, and map internals remain delegated to their modules.
+ */
 import React, { useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { VerificationMapHandle } from '../Map/VerificationMap';

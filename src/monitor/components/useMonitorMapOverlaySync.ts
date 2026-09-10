@@ -1,3 +1,7 @@
+/**
+ * Synchronizes monitor map overlays with current storm reports, alerts, and map projection state.
+ * This hook owns overlay lifecycle coordination; report loading, alert filtering, and map rendering are separate responsibilities.
+ */
 import { useEffect } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
