@@ -1,7 +1,8 @@
 /**
- * Constructs the primary OpenLayers basemap layer group used by forecast maps.
- * This module owns basemap source and layer wiring; map state, overlays, and user interactions remain with map controllers.
+ * File: src/components/Map/openLayersBasemap.ts
+ * Purpose: Defines OpenLayers basemap construction and source configuration for map surfaces.
  */
+
 import type { MutableRefObject } from "react";
 import LayerGroup from "ol/layer/Group";
 import TileLayer from "ol/layer/Tile";

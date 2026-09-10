@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/VerificationMap.test.ts
+ * Purpose: Covers verification map rendering, controls, layers, and lifecycle behavior.
+ */
+
 import VerificationMap from './VerificationMap';
 import OpenLayersVerificationMap from './OpenLayersVerificationMap';
 

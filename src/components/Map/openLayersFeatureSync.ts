@@ -1,9 +1,8 @@
 /**
- * OpenLayers feature synchronization: this module reconciles forecast feature
- * collections with vector sources while preserving stable identities and map
- * metadata. It owns source synchronization mechanics and does not define
- * forecast state, geometry policy, or React lifecycle orchestration.
+ * File: src/components/Map/openLayersFeatureSync.ts
+ * Purpose: Synchronizes forecast features and layer state between application data and OpenLayers.
  */
+
 import Feature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import type VectorSource from "ol/source/Vector";
