@@ -1,3 +1,7 @@
+/**
+ * Stable-hotfix pull-request validator. It checks changed files, release
+ * metadata, and policy trailers before a hotfix can be promoted.
+ */
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import {
