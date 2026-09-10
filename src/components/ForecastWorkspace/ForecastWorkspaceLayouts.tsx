@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/ForecastWorkspaceLayouts.tsx
+ * Purpose: Renders selectable forecast workspace layouts and their layout-specific regions.
+ */
+
 import React from 'react';
 import type { Feature } from 'geojson';
 import ForecastMap, { ForecastMapHandle } from '../Map/ForecastMap';
