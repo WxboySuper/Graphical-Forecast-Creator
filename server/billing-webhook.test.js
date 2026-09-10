@@ -1,5 +1,11 @@
 'use strict';
 
+/**
+ * Billing-webhook server test boundary: this suite verifies webhook parsing,
+ * signature and entitlement updates, metrics effects, and failure handling at
+ * the Stripe-to-account billing boundary.
+ */
+
 const { after, beforeEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 

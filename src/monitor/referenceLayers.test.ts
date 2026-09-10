@@ -1,3 +1,8 @@
+/**
+ * Monitor reference-layer test boundary: this suite verifies reference-data
+ * fixture loading, SPC discussion query construction, fetch normalization, and
+ * monitor-layer error handling.
+ */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
