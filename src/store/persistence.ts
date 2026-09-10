@@ -1,3 +1,7 @@
+/**
+ * Restores and persists selected forecast and theme settings across browser sessions.
+ * This module owns storage-boundary effects and store integration; slice definitions and UI preferences remain in their respective modules.
+ */
 import { setWorkflowActive, WORKFLOW_ACTIVE_STORAGE_KEY } from './forecastSlice';
 import { setDarkMode } from './themeSlice';
 import { store } from './index';
