@@ -1,3 +1,9 @@
+/**
+ * Monitor map bootstrap hook: this module creates and configures the OpenLayers
+ * map for the Monitor surface, including view, layers, and teardown lifecycle.
+ * It owns map initialization wiring while upstream data, normalized settings,
+ * and feature policy are supplied by monitor services and hooks.
+ */
 import { useEffect, type RefObject } from 'react';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
