@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastGrade/GradeTrendSvg.tsx
+ * Purpose: Renders the SVG trend visualization and its accessible chart metadata.
+ */
+
 import React from 'react';
 import type { GradeCard } from '../../types/forecastGrade';
 import { formatGrade } from './gradeFormat';
