@@ -1,3 +1,8 @@
+/**
+ * Auto-categorical hook test boundary: this suite verifies derived categorical
+ * risk synchronization, debounce behavior, and dispatch decisions for forecast
+ * geometry without mounting the complete forecast editor.
+ */
 import React from 'react';
 import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
