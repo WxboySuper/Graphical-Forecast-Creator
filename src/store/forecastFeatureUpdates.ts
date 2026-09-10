@@ -1,3 +1,7 @@
+/**
+ * Defines forecast feature-update shapes and pure helpers for applying geometry or outlook changes.
+ * This module owns feature-update normalization for the forecast store; UI event handling and persistence are outside its boundary.
+ */
 import type { Feature } from 'geojson';
 import type { DayType, OutlookData, OutlookType } from '../types/outlooks';
 import type { ForecastState } from './forecastSlice';
