@@ -1,3 +1,10 @@
+/**
+ * Account settings and subscription surface.
+ *
+ * The page renders identity, profile/settings, entitlement, billing, and
+ * account-deletion sections from provider state. It delegates mutations to
+ * auth and billing hooks so the page remains a route-level composition layer.
+ */
 import React, { useMemo } from "react";
 import { useSelector } from "react-redux";
 import { Link } from "react-router";
