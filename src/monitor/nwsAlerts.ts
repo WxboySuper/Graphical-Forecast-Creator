@@ -14,6 +14,7 @@ export interface NwsAlertFeatureCollection extends FeatureCollection {
   }>;
 }
 
+/** Classifies an NWS event label for display filtering and styling. */
 export const classifyNwsAlert = (event: string): NwsAlertCategory => {
   const normalized = event.trim().toLowerCase();
   if (normalized.includes('watch')) {
@@ -31,6 +32,7 @@ export const classifyNwsAlert = (event: string): NwsAlertCategory => {
   return 'other';
 };
 
+/** Filters alert polygons according to the Monitor category toggles. */
 export const filterNwsAlertCollection = (
   collection: NwsAlertFeatureCollection,
   options: {
@@ -75,6 +77,7 @@ const alertColors: Record<NwsAlertCategory, { fill: string; stroke: string }> = 
   other: { fill: 'rgba(148, 163, 184, 0.18)', stroke: 'rgba(71, 85, 105, 0.85)' },
 };
 
+/** Builds the OpenLayers style associated with an NWS event category. */
 export const buildNwsAlertStyle = (event: string): Style => {
   const category = classifyNwsAlert(event);
   const colors = alertColors[category];
@@ -85,6 +88,7 @@ export const buildNwsAlertStyle = (event: string): Style => {
   });
 };
 
+/** Fetches and bounds the active NWS alert collection. */
 export const fetchActiveNwsAlerts = async (): Promise<NwsAlertFeatureCollection> => {
   const response = await fetch(NWS_ACTIVE_ALERTS_URL, {
     headers: {
@@ -104,6 +108,7 @@ export const fetchActiveNwsAlerts = async (): Promise<NwsAlertFeatureCollection>
   };
 };
 
+/** Extracts stable identity/version tokens for alert snapshot comparisons. */
 const alertSnapshotTokens = (collection: NwsAlertFeatureCollection): string[] =>
   collection.features.map((feature) => {
     const id = feature.id ?? feature.properties?.id ?? '';
@@ -151,4 +156,15 @@ export const snapshotCollectionsEqual = (
     rightCounts.set(token, count - 1);
     return true;
   });
+};
+
+/** Appends a changed alert snapshot while retaining only the animation frame window. */
+export const appendAlertSnapshotFrame = (
+  current: NwsAlertFeatureCollection[],
+  collection: NwsAlertFeatureCollection,
+  maxFrames: number,
+): NwsAlertFeatureCollection[] => {
+  const last = current[current.length - 1];
+  if (last && snapshotCollectionsEqual(last, collection)) return current;
+  return [...current, collection].slice(-maxFrames);
 };
