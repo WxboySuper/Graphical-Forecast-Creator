@@ -302,7 +302,7 @@ export const useMonitorMapBootstrap = ({
       return undefined;
     }
 
-    baseLayer.setSource(createBaseSource(darkMode));
+    baseLayer.setSource(createBaseSource());
     return undefined;
   }, [darkMode, refs.baseLayerRef]);
 };

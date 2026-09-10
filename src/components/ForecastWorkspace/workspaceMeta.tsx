@@ -47,7 +47,6 @@ export const FORECAST_BASE_MAP_OPTIONS: Array<{
   { value: 'blank', label: 'Weather Blank', shortLabel: 'Weather' },
   { value: 'osm', label: 'OpenStreetMap', shortLabel: 'Streets' },
   { value: 'carto-light', label: 'Light', shortLabel: 'Light' },
-  { value: 'carto-dark', label: 'Dark', shortLabel: 'Dark' },
   { value: 'esri-satellite', label: 'Satellite', shortLabel: 'Sat' },
 ];
 
