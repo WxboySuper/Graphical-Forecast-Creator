@@ -1,3 +1,7 @@
+/**
+ * National Weather Service alert helpers for Monitor. It defines alert data
+ * types and converts NWS feature collections into normalized monitor records.
+ */
 import type { FeatureCollection } from 'geojson';
 import { Fill, Stroke, Style } from 'ol/style';
 
