@@ -1,3 +1,9 @@
+/**
+ * Admin route: this module gates the maintainer metrics view and coordinates
+ * its authenticated fetch, time-window selection, summary cards, and daily
+ * charts. It owns route presentation and access-state handling; server metrics
+ * authorization and aggregation remain server-side concerns.
+ */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { Activity, Lock, TrendingUp } from 'lucide-react';
