@@ -1,3 +1,8 @@
+/**
+ * Custom-products page test boundary: this suite verifies gated-route access,
+ * product creation and editing, category controls, and user-facing fallback
+ * states through the page contract with isolated hooks and routing.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';

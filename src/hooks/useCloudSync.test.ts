@@ -1,3 +1,8 @@
+/**
+ * Cloud-sync hook test boundary: this suite verifies entitlement-aware sync
+ * eligibility, serialized forecast payloads, metric accounting, and cloud-save
+ * lifecycle state without mounting the full forecast page.
+ */
 import { act, renderHook } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import { useEntitlement } from '../billing/EntitlementProvider';
