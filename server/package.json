@@ -9,11 +9,11 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@sentry/node": "^10.72.0",
+    "@sentry/node": "^10.73.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.6.2",
+    "express-rate-limit": "^8.7.0",
     "firebase-admin": "^14.3.0",
-    "stripe": "^22.6.0"
+    "stripe": "^22.6.1"
   },
   "overrides": {
     "http-proxy-agent": "^7.0.2",
