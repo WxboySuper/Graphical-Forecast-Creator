@@ -79,6 +79,7 @@ import { applyCreateOutlookUpdate } from './forecastVersioning';
 import { applyDiscussionDraftMigrations } from './forecastDiscussionDrafts';
 import { applyLegacyForecastImport } from './forecastLegacyImport';
 import { applyCopyFeaturesFromPrevious } from './forecastCopy';
+import { restoreSavedCycle } from './forecastSavedCycle';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -449,27 +450,7 @@ export const forecastSlice = createSlice({
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
       if (savedCycle) {
-        state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
-        clearHistory(state);
-      state.discussionDraftsByScope = {};
-        state.isSaved = true;
-        state.outlookVersionSnapshots = [];
-        
-        // Restore or clear workflow metadata
-        if (savedCycle.workflowMetadata) {
-          state.workflowMetadata = savedCycle.workflowMetadata;
-          // Restore the workflow template from the workflowId
-          state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
-            id: savedCycle.workflowMetadata.workflowId,
-            label: savedCycle.workflowMetadata.workflowId,
-            groupings: [],
-          };
-          state.isWorkflowActive = true;
-        } else {
-          state.workflowMetadata = undefined;
-          state.workflowTemplate = undefined;
-          state.isWorkflowActive = false;
-        }
+        restoreSavedCycle(state, savedCycle);
       }
     },
 
@@ -748,27 +729,7 @@ export const forecastSlice = createSlice({
       const savedCycle = state.savedCycles.find((c) => c.id === cycleId);
       if (!savedCycle) return;
 
-      clearHistory(state);
-      state.discussionDraftsByScope = {};
-      state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
-      state.isSaved = true;
-      state.outlookVersionSnapshots = [];
-      
-      // Restore or clear workflow metadata
-      if (savedCycle.workflowMetadata) {
-        state.workflowMetadata = savedCycle.workflowMetadata;
-        // Restore the workflow template from the workflowId
-        state.workflowTemplate = getWorkflowTemplateById(savedCycle.workflowMetadata.workflowId) || {
-          id: savedCycle.workflowMetadata.workflowId,
-          label: savedCycle.workflowMetadata.workflowId,
-          groupings: [],
-        };
-        state.isWorkflowActive = true;
-      } else {
-        state.workflowMetadata = undefined;
-        state.workflowTemplate = undefined;
-        state.isWorkflowActive = false;
-      }
+      restoreSavedCycle(state, savedCycle);
     },
 
     /** Create a new outlook version within the current cycle (same-cycle update). */
