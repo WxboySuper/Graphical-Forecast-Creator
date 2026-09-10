@@ -60,11 +60,7 @@ import {
   applyPaintBucketStrategy,
   type PaintBucketEditAction,
 } from '../utils/paintBucket';
-import {
-  copyOutlookGeometry,
-  countCopyableSourceFeatures,
-  type CopyOutlookGeometryOptions,
-} from '../utils/outlookGeometryCopy';
+import type { CopyOutlookGeometryOptions } from '../utils/outlookGeometryCopy';
 import {
   createEmptyOutlook,
   getFallbackOutlookData,
@@ -82,6 +78,7 @@ import { applyWorkflowPackageImport } from './forecastWorkflowImport';
 import { startBlankForecastCycle } from './forecastBlankCycle';
 import { saveForecastCycle, SAVED_CYCLES_LIMIT } from './forecastCyclePersistence';
 import { applyCompletionValidation, applyCompleteCycle, applyCompleteWithOmissions } from './forecastCompletion';
+import { applyCopyOutlookGeometryBetweenHazards } from './forecastGeometryCopy';
 export { SAVED_CYCLES_LIMIT } from './forecastCyclePersistence';
 
 export interface SavedCycleStats {
@@ -468,50 +465,7 @@ export const forecastSlice = createSlice({
 
     // @codescene(disable:"Complex Method")
     copyOutlookGeometryBetweenHazards: (state, action: PayloadAction<CopyOutlookGeometryOptions>) => {
-      const day = state.forecastCycle.currentDay;
-      if (day !== 1 && day !== 2) {
-        return;
-      }
-
-      const { sourceType, targetType } = action.payload;
-      if (sourceType === targetType) {
-        return;
-      }
-
-      const dayData = state.forecastCycle.days[day];
-      if (!dayData) {
-        return;
-      }
-
-      const sourceMap = dayData.data[sourceType];
-      const targetMap = dayData.data[targetType];
-      if (!sourceMap || !targetMap) {
-        return;
-      }
-
-      const copyableCount = countCopyableSourceFeatures({
-        sourceMap,
-        sourceType,
-        targetType,
-        day,
-        probabilityFilter: action.payload.probabilityFilter,
-      });
-      if (copyableCount === 0) {
-        return;
-      }
-
-      pushUndoSnapshot(state);
-      copyOutlookGeometry(sourceMap, targetMap, action.payload, day);
-
-      if (dayData.metadata.lowProbabilityOutlooks) {
-        dayData.metadata.lowProbabilityOutlooks = dayData.metadata.lowProbabilityOutlooks.filter(
-          (type) => type !== targetType,
-        );
-      }
-
-      dayData.metadata.lastModified = readActionTimestamp(action);
-      invalidateCompletionAcknowledgement(state);
-      state.isSaved = false;
+      applyCopyOutlookGeometryBetweenHazards(state, action.payload, readActionTimestamp(action));
     },
 
     undoLastEdit: (state, action: UnknownAction) => {
