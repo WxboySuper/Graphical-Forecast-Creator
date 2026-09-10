@@ -1,14 +1,16 @@
 # Documentation
 
-Use this page as the starting point for repository documentation. Architecture
-docs explain code ownership and boundaries, while operational docs explain
-repeatable workflows.
+Use this page as the starting point for repository documentation. Documents
+listed under **Current guidance** describe the behavior or workflow contributors
+should follow today. Documents under **Historical and exploratory material**
+preserve release context or investigation results; they are references, not
+current implementation contracts.
 
 ## Architecture
 
 - [Repository map and architecture overview](./architecture/codebase-inventory.md) - product surfaces, boundaries, entry points, and safe future move direction.
 
-## Operations
+## Current guidance: Operations
 
 - [Release workflow](./operations/release-workflow.md) - release and deployment procedures.
 - [Hosted rollout](./operations/hosted-rollout.md) - VPS rollout and troubleshooting.
@@ -28,17 +30,26 @@ repeatable workflows.
 - [Custom products beta tester checklist](./operations/custom-products-beta-test-plan.md) - a short Forecast-editor test for custom layers and saved products.
 - [Monitor reference-layer source research](./operations/monitor-reference-sources.md) - official short-term forecast and SPC mesoscale discussion sources.
 
+## Historical and exploratory material
+
+These documents describe a release, experiment, or planning decision at a
+specific point in time. Check the current architecture and operations guides
+before using them to make a code or deployment decision.
+
+- [v1.4.0 plan](./releases/v1.4.0-plan.md) - hosted accounts, sync, billing, and sustainability plan.
+- [v1.3.0 notes](./releases/v1.3.0-draft.md) - workflow polish and visibility notes.
+- [v1.2.0 notes](./releases/v1.2.0-launch.md) - editing safety nets launch notes.
+- [Paint-bucket investigation](./product/paint-bucket-tool-investigation.md) - product investigation and design evidence.
+- [Outlook polygon masking investigation](./architecture/outlook-polygon-masking-investigation.md) - implementation research and tradeoffs.
+
 ## Product
 
 - [Outlook information](./product/outlook-info.md) - risk levels, probability values, and categorical conversion rules.
 - [Built-in specialty styles](./product/specialty-style-policy.md) - the approved relationship between visual presets and custom products.
 
-## Releases
+## Current release reference
 
 - [v1.7.0 release notes](./releases/v1.7.0.md) - v1.7 product scope, boundaries, privacy notes, and promotion evidence.
-- [v1.4.0 plan](./releases/v1.4.0-plan.md) - hosted accounts, sync, billing, and sustainability plan.
-- [v1.3.0 notes](./releases/v1.3.0-draft.md) - workflow polish and visibility notes.
-- [v1.2.0 notes](./releases/v1.2.0-launch.md) - editing safety nets launch notes.
 
 ## Archive Review
 
