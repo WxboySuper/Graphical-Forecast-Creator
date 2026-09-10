@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastUtilityHelpers.ts
+ * Purpose: Provides shared utility helpers for OpenLayers forecast-map operations and geometry handling.
+ */
+
 import type { default as OLMap } from "ol/Map";
 import type { Draw } from "ol/interaction";
 import type { CustomCategoryStyle } from "../../types/customProducts";
