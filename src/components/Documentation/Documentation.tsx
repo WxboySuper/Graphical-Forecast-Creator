@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Documentation/Documentation.tsx
+ * Purpose: Renders the in-app documentation page and its navigation structure.
+ */
+
 // skipcq: JS-W1028
 import React from 'react';
 import { X } from 'lucide-react';
