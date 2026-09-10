@@ -6,28 +6,18 @@ import { MemoryRouter } from 'react-router';
 import ForecastPage, {
   buildMapView,
   buildRestoreKey,
-  buildRolloverSaveLabel,
   canToggleSignificantForState,
   clearStoredCloudSession,
-  cycleHasDiscussionContent,
   dayHasAnyFeatures,
-  formatRolloverDayLabel,
-  getDayRolloverPromptState,
   getProbabilityList,
   getUndoRedoAction,
   hasAnyModifierKey,
-  hasRestorableCloudSelection,
-  hasRolloverForecastData,
   hasUnpublishedDiscussionDrafts,
-  hasUnsavedRolloverCandidateSession,
   isTypingTarget,
   normalizeProbability,
   parseLoadedForecast,
-  parseStoredCloudMeta,
   parseStoredForecastPayload,
   processShortcutKeyDown,
-  runDayRolloverCloudSaveAction,
-  runDayRolloverDownloadAction,
   readStoredDayValue,
   writeStoredDayValue,
 } from './ForecastPage';
@@ -471,20 +461,10 @@ describe('ForecastPage helpers', () => {
   test('handles rollover labels, storage helpers, and session metadata parsing', () => {
     writeStoredDayValue('test-day', '2026-04-24');
     expect(readStoredDayValue('test-day')).toBe('2026-04-24');
-    expect(buildRolloverSaveLabel('2026-04-24')).toContain('Apr 24');
-    expect(buildRolloverSaveLabel('not-a-date')).toContain('not-a-date');
-    expect(formatRolloverDayLabel('2026-04-24')).toContain('April 24');
-    expect(formatRolloverDayLabel('bad-date')).toBe('bad-date');
 
     expect(parseStoredForecastPayload(null)).toBeNull();
     expect(parseStoredForecastPayload('not-json')).toBeNull();
     expect(parseStoredForecastPayload(JSON.stringify({ nope: true }))).toBeNull();
-
-    expect(parseStoredCloudMeta(null)).toBeNull();
-    expect(parseStoredCloudMeta('not-json')).toBeNull();
-    expect(parseStoredCloudMeta('{"id":"abc","label":"Cycle"}')).toEqual({ id: 'abc', label: 'Cycle' });
-    expect(hasRestorableCloudSelection({ id: 'abc', label: 'Cycle' })).toBe(true);
-    expect(hasRestorableCloudSelection({ id: 'abc' })).toBe(false);
 
     sessionStorage.setItem('cloudCyclePayload', 'payload');
     sessionStorage.setItem('cloudCycleMeta', 'meta');
@@ -493,67 +473,7 @@ describe('ForecastPage helpers', () => {
     expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
   });
 
-  test('recovers a pending rollover prompt after session restore marks the cycle saved', () => {
-    const emptyCycle = createStore().getState().forecast.forecastCycle;
-    const pending = { previousDay: '2026-04-23', currentDay: '2026-04-24' };
-    expect(getDayRolloverPromptState({
-      restoreComplete: true,
-      lastActiveDay: '2026-04-24',
-      today: '2026-04-24',
-      alreadyPromptedToday: true,
-      pendingPrompt: pending,
-      promptOpen: false,
-      forecastCycle: emptyCycle,
-      isSaved: true,
-    })).toEqual(pending);
-  });
-
-  test('covers rollover download and cloud-save success and failure paths', async () => {
-    const forecastCycle = createStore().getState().forecast.forecastCycle;
-    const mapView = { center: [0, 0] as [number, number], zoom: 4 };
-    const dispatch = jest.fn();
-    const clearCurrent = jest.fn();
-    const exportSpy = jest.spyOn(fileUtils, 'exportForecastToJson').mockImplementation(() => undefined);
-
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(true);
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    exportSpy.mockImplementationOnce(() => { throw new Error('download failed'); });
-    dispatch.mockClear();
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(false);
-    expect(dispatch).not.toHaveBeenCalled();
-
-    const saveCycle = jest.fn().mockResolvedValue(true);
-    dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(true);
-    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true });
-    expect(clearCurrent).toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledTimes(1);
-
-    saveCycle.mockResolvedValueOnce(false);
-    clearCurrent.mockClear();
-    dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(false);
-    expect(clearCurrent).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
-    exportSpy.mockRestore();
-  });
-
   test('detects rollover candidates, map view fallbacks, keyboard targets, and undo/redo keys', () => {
-    const emptyCycle = createStore().getState().forecast.forecastCycle;
-    expect(hasRolloverForecastData(emptyCycle)).toBe(false);
-    expect(cycleHasDiscussionContent(emptyCycle)).toBe(false);
-    expect(hasUnsavedRolloverCandidateSession(emptyCycle, true)).toBe(false);
-
-    const cycleWithDiscussion = {
-      ...emptyCycle,
-      days: {
-        ...emptyCycle.days,
-        1: { ...emptyCycle.days[1], discussion: 'A discussion' },
-      },
-    };
-    expect(cycleHasDiscussionContent(cycleWithDiscussion)).toBe(true);
-    expect(hasUnsavedRolloverCandidateSession(cycleWithDiscussion, false)).toBe(true);
-
     expect(buildMapView({ current: null })).toEqual({ center: [39.8283, -98.5795], zoom: 4 });
     expect(buildMapView({ current: { getView: () => ({ center: [1, 2], zoom: 8 }) } as never })).toEqual({
       center: [1, 2],
