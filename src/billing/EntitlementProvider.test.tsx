@@ -1,3 +1,8 @@
+/**
+ * Entitlement-provider test boundary: this suite verifies authentication-aware
+ * entitlement loading, local-account behavior, Firestore updates, and exposed
+ * billing state consumed by gated UI.
+ */
 import { renderHook, act } from '@testing-library/react';
 import { EntitlementProvider, useEntitlement } from './EntitlementProvider';
 import { useAuth } from '../auth/AuthProvider';

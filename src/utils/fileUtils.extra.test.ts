@@ -1,3 +1,8 @@
+/**
+ * File-utilities edge-case test boundary: this suite covers additional import,
+ * migration, serialization, and malformed-payload cases that complement the
+ * primary file-utils contract tests.
+ */
 jest.setTimeout(20000);
 
 type ForecastCycle = {
