@@ -1,3 +1,7 @@
+/**
+ * Builds deterministic initial and normalized forecast state values.
+ * This module owns state-shape construction helpers for the forecast store; it does not manage Redux dispatch or persistence.
+ */
 import type {
   DayType,
   OutlookData,
