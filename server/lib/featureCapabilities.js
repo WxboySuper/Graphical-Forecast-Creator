@@ -1,3 +1,7 @@
+/**
+ * Resolves server-side feature capability metadata for the active deployment target.
+ * This module owns capability normalization and target lookup; feature policy decisions and request handling belong to their callers.
+ */
 'use strict';
 
 const { getServerTarget } = require('./serverTarget');
