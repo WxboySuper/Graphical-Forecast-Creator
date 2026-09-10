@@ -1,6 +1,7 @@
 /**
  * Firestore sleep-recovery hook. It restores network connectivity and retries
- * pending writes after tab suspension or browser sleep interrupts Firestore.
+ * pending writes after tab suspension or browser sleep interrupts Firestore. It
+ * owns recovery timing, but delegates data persistence to the Firestore client.
  */
 import { useEffect } from 'react';
 import {

@@ -1,6 +1,7 @@
 /**
  * Auto-TSTM action hook. It builds generation actions, commits accepted preview
- * results, and exposes typed callbacks for the Auto-TSTM panel.
+ * results, and exposes typed callbacks for the Auto-TSTM panel. It owns action
+ * callbacks, but delegates request effects and state definitions to companion modules.
  */
 import { useCallback, type MutableRefObject } from 'react';
 import type { Dispatch } from '@reduxjs/toolkit';
