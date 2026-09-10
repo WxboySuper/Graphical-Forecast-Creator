@@ -1,3 +1,8 @@
+/**
+ * Forecast-import validation test boundary: this suite verifies byte limits,
+ * file-shape checks, structured forecast validation, and rejection errors at
+ * the import safety boundary.
+ */
 import {
   validateForecastImport,
   validateImportFileBytes,

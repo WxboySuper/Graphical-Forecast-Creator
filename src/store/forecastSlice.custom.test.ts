@@ -1,3 +1,8 @@
+/**
+ * Forecast custom-layer test boundary: this suite verifies reducer behavior
+ * for custom products, custom geometry, schema-version handling, and copying
+ * custom features across forecast cycles.
+ */
 import type { Polygon } from 'geojson';
 import { CUSTOM_PRODUCTS_SCHEMA_VERSION, type OneOffCustomLayer, type CustomPolygonFeature } from '../types/customProducts';
 import { asCustomLayerId } from '../lib/customProducts';
