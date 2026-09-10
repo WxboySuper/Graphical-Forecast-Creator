@@ -1,3 +1,8 @@
+/**
+ * File-loader hook test boundary: this suite verifies import handlers,
+ * deserialization, validation errors, JSON export, and user-facing file-load
+ * callbacks at the forecast file boundary.
+ */
 import { createFileHandlers } from './useFileLoader';
 import { waitFor } from '@testing-library/react';
 import { deserializeForecast, exportForecastToJson, readForecastImportFile, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';

@@ -1,3 +1,8 @@
+/**
+ * Export-utilities edge-case test boundary: this suite verifies cleanup of
+ * render waits across success and timeout paths, complementing the primary
+ * browser-export pipeline tests.
+ */
 jest.setTimeout(10000);
 
 import { waitForMapRender } from './exportUtils';

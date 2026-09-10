@@ -1,3 +1,8 @@
+/**
+ * Export-utilities test boundary: this suite verifies browser capture,
+ * download formatting, map-render readiness, overlays, and cleanup in the
+ * shared forecast-export pipeline.
+ */
 jest.mock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
 jest.mock('html2canvas', () => jest.fn(() => Promise.resolve({ toDataURL: () => 'data:image/png;base64,FAKE' })));
 
