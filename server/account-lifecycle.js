@@ -1,3 +1,9 @@
+/**
+ * Account lifecycle service: this module coordinates hosted account cleanup,
+ * retention, and deletion work across Firebase-backed user data. It owns the
+ * lifecycle operation and failure handling; HTTP authentication and billing
+ * authorization are enforced by the route layer.
+ */
 'use strict';
 
 const Stripe = require('stripe');
