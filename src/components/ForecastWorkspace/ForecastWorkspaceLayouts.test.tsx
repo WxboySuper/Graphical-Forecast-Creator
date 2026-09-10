@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/ForecastWorkspaceLayouts.test.tsx
+ * Purpose: Tests forecast workspace layout selection, responsive arrangements, and persisted layout behavior.
+ */
+
 import React, { useRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

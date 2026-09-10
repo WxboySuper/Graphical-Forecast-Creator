@@ -1,3 +1,8 @@
+/**
+ * File: src/components/IntegratedToolbar/OutlookTrimPopover.test.tsx
+ * Purpose: Covers outlook trim popover rendering, selection, and dismissal behavior.
+ */
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import OutlookTrimPopover from './OutlookTrimPopover';

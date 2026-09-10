@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Layout/AppLayout.test.tsx
+ * Purpose: Tests application layout composition, navigation regions, and responsive shell behavior.
+ */
+
 import mockReact from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
