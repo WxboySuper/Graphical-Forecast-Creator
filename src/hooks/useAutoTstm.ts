@@ -1,3 +1,7 @@
+/**
+ * Composes the automatic TSTM hook API for forecast editing and preview workflows.
+ * This hook owns application-level Auto-TSTM wiring; request effects, actions, state, and stale-context guards remain in companion modules.
+ */
 import type { Feature } from 'geojson';
 import { useDispatch } from 'react-redux';
 import { useAutoTstmActions } from './useAutoTstmActions';
