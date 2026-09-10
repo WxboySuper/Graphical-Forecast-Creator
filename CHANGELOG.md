@@ -51,7 +51,7 @@ All notable changes to this project will be documented in this file.
 
 #### Fixed
 
-- **Basemap availability:** Remove the broken Carto dark basemap and redirect saved dark-map settings to the supported light basemap.
+- **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
 - **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical recovery:** Reset timed-out geometry workers, preserve the newest probabilistic edit for a follow-up derivation, and prevent repeated retries of unchanged failed geometry.

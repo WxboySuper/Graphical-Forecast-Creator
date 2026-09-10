@@ -172,10 +172,14 @@ describe('openLayersMapStyles', () => {
 
   test('createLabelOverlaySource and createTileSource return sources for known styles', () => {
     expect(createLabelOverlaySource('osm')).toBeTruthy();
-    expect(createLabelOverlaySource('carto-dark')).toBeTruthy();
     expect(createTileSource('osm')).toBeTruthy();
     expect(createTileSource('esri-satellite')).toBeTruthy();
     expect(createTileSource('unknown' as never)).toBeTruthy(); // falls back to OSM
+  });
+
+  test('routes the retired dark style to Carto light sources', () => {
+    expect(createLabelOverlaySource('carto-dark')?.getUrls()?.[0]).toContain('light_only_labels');
+    expect(createTileSource('carto-dark').getUrls()?.[0]).toContain('light_nolabels');
   });
 
   test('hideOverlay clears the overlay position', () => {
