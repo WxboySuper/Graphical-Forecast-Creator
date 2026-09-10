@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import AlertBanner from './AlertBanner';
 
@@ -18,8 +18,13 @@ describe('AlertBanner', () => {
   };
 
   beforeEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
     global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   test('renders alert when enabled', async () => {
@@ -51,19 +56,89 @@ describe('AlertBanner', () => {
   });
 
   test('hides banner before startsAt', async () => {
-    mockBannerFetch({
-      enabled: true,
-      message: 'Future alert',
-      type: 'info',
-      dismissible: true,
-      startsAt: '2099-01-01T00:00:00.000Z',
+    let resolveConfig!: (config: unknown) => void;
+    const configPromise = new Promise<unknown>((resolve) => {
+      resolveConfig = resolve;
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => configPromise,
     });
 
     renderBanner();
 
-    await waitFor(() => {
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await act(async () => {
+      resolveConfig({
+        enabled: true,
+        message: 'Future alert',
+        type: 'info',
+        dismissible: true,
+        startsAt: '2099-01-01T00:00:00.000Z',
+      });
+      await configPromise;
     });
+
+    expect(screen.queryByText('Future alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('updates visibility at schedule boundaries', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-10T12:00:00.000Z'));
+    mockBannerFetch({
+      enabled: true,
+      message: 'Scheduled alert',
+      type: 'info',
+      dismissible: true,
+      startsAt: '2026-09-10T12:00:01.000Z',
+      expiresAt: '2026-09-10T12:00:02.000Z',
+    });
+
+    renderBanner();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByText('Scheduled alert')).toBeInTheDocument();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  test('hides the previous alert when a replacement load fails', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        enabled: true,
+        message: 'Old alert',
+        type: 'info',
+        dismissible: true,
+      }),
+    });
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Fetch failed'));
+
+    const view = render(
+      <MemoryRouter>
+        <AlertBanner configPath="/old-alert.json" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Old alert')).toBeInTheDocument();
+
+    view.rerender(
+      <MemoryRouter>
+        <AlertBanner configPath="/new-alert.json" />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
   });
 
   it.each([
