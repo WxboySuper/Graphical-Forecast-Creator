@@ -146,7 +146,7 @@ const readEntitlementDocument = (value: Partial<UserEntitlementDocument> | undef
   return {
     uid: normalizeNullableString(value.uid) ?? '',
     premiumActive: Boolean(value.premiumActive) || betaOverrideActive,
-    effectiveSource: effectiveSource === 'none' && betaOverrideActive ? 'beta_override' : effectiveSource,
+    effectiveSource: betaOverrideActive ? 'beta_override' : effectiveSource,
     planInterval: normalizePlanInterval(value.planInterval),
     billingStatus: normalizeNullableString(value.billingStatus) ?? 'inactive',
     stripeCustomerId: normalizeNullableString(value.stripeCustomerId),
@@ -195,11 +195,11 @@ const createEntitlementListenerState = (snapshotData: Partial<UserEntitlementDoc
   };
 };
 
-/** Keeps a missing entitlement record from looking like a valid free plan. */
+/** Keeps a missing entitlement record on the safe free tier while making the missing record observable. */
 const createMissingEntitlementState = (): EntitlementListenerState => ({
   entitlement: DEFAULT_ENTITLEMENT,
-  status: 'error',
-  error: 'No entitlement record was found for this signed-in account.',
+  status: 'free',
+  error: null,
 });
 
 /** Starts the Firestore listener that mirrors hosted entitlement state into the client. */
@@ -217,6 +217,7 @@ const subscribeToEntitlements = (
     entitlementRef,
     (snapshot) => {
       if (!snapshot.exists()) {
+        console.warn('No entitlement record was found for this signed-in account; using the free tier.');
         const missingState = createMissingEntitlementState();
         handlers.setEntitlement(missingState.entitlement);
         handlers.setEntitlementStatus(missingState.status);

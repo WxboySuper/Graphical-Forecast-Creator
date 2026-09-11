@@ -80,6 +80,77 @@ describe('EntitlementProvider', () => {
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
+  test('treats an active beta override as premium and gives it source precedence', async () => {
+    const mockUnsubscribe = jest.fn();
+    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
+      onNext({
+        exists: () => true,
+        data: () => ({
+          uid: 'user-123',
+          betaOverrideActive: true,
+          premiumActive: false,
+          effectiveSource: 'stripe',
+        }),
+      });
+      return mockUnsubscribe;
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ billingEnabled: true }),
+    });
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.entitlementStatus).toBe('premium');
+    expect(result.current.premiumActive).toBe(true);
+    expect(result.current.betaOverrideActive).toBe(true);
+    expect(result.current.effectiveSource).toBe('beta_override');
+  });
+
+  test('keeps a user without an entitlement document on the free tier', async () => {
+    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
+      onNext({ exists: () => false });
+      return jest.fn();
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ billingEnabled: true }),
+    });
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.entitlementStatus).toBe('free');
+    expect(result.current.premiumActive).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'No entitlement record was found for this signed-in account; using the free tier.'
+    );
+    warnSpy.mockRestore();
+  });
+
   test('openCheckout calls API', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       hostedAuthEnabled: true,
