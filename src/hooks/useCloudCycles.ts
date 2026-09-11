@@ -16,6 +16,7 @@ import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { trackProductEvent } from '../lib/productAnalytics';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export interface UseCloudCyclesResult {
   cycles: CloudCycleMetadata[];
@@ -28,7 +29,7 @@ export interface UseCloudCyclesResult {
     stats: SavedCycleStats,
     payload: GFCForecastSaveData,
     workflowMetadata?: CycleMetadata,
-    options?: { saveAsNew?: boolean },
+    options?: { saveAsNew?: boolean; workspaceId?: ForecastWorkspaceId },
   ) => Promise<boolean>;
   loadCycle: (cycleId: string) => Promise<GFCForecastSaveData | null>;
   deleteCycle: (cycleId: string) => Promise<boolean>;
@@ -332,7 +333,7 @@ function useCloudSaveCycle({
       stats: SavedCycleStats,
       payload: GFCForecastSaveData,
       workflowMetadata?: CycleMetadata,
-      options?: { saveAsNew?: boolean },
+      options?: { saveAsNew?: boolean; workspaceId?: ForecastWorkspaceId },
     ): Promise<boolean> => {
       if (!canSaveCloudCycle({ userId, canWrite, localFixtureActive })) {
         setError(getCloudWriteBlockedMessage({ userId, canWrite, localFixtureActive }));
@@ -349,6 +350,7 @@ function useCloudSaveCycle({
         cycleDate,
         stats,
         payload,
+        workspaceId: options?.workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
         workflowMetadata,
         existingId: options?.saveAsNew ? undefined : currentCloudRef.current?.id,
       });
