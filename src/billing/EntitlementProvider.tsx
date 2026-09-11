@@ -140,17 +140,20 @@ const readEntitlementDocument = (value: Partial<UserEntitlementDocument> | undef
     return DEFAULT_ENTITLEMENT;
   }
 
+  const betaOverrideActive = Boolean(value.betaOverrideActive);
+  const effectiveSource = normalizeEffectiveSource(value.effectiveSource);
+
   return {
     uid: normalizeNullableString(value.uid) ?? '',
-    premiumActive: Boolean(value.premiumActive),
-    effectiveSource: normalizeEffectiveSource(value.effectiveSource),
+    premiumActive: Boolean(value.premiumActive) || betaOverrideActive,
+    effectiveSource: betaOverrideActive ? 'beta_override' : effectiveSource,
     planInterval: normalizePlanInterval(value.planInterval),
     billingStatus: normalizeNullableString(value.billingStatus) ?? 'inactive',
     stripeCustomerId: normalizeNullableString(value.stripeCustomerId),
     stripeSubscriptionId: normalizeNullableString(value.stripeSubscriptionId),
     cancelAtPeriodEnd: Boolean(value.cancelAtPeriodEnd),
     currentPeriodEnd: value.currentPeriodEnd ?? null,
-    betaOverrideActive: Boolean(value.betaOverrideActive),
+    betaOverrideActive,
     updatedAt: value.updatedAt ?? null,
   };
 };
@@ -192,6 +195,13 @@ const createEntitlementListenerState = (snapshotData: Partial<UserEntitlementDoc
   };
 };
 
+/** Keeps a missing entitlement record on the safe free tier while making the missing record observable. */
+const createMissingEntitlementState = (): EntitlementListenerState => ({
+  entitlement: DEFAULT_ENTITLEMENT,
+  status: 'free',
+  error: null,
+});
+
 /** Starts the Firestore listener that mirrors hosted entitlement state into the client. */
 const subscribeToEntitlements = (
   userId: string,
@@ -206,6 +216,15 @@ const subscribeToEntitlements = (
   return onSnapshot(
     entitlementRef,
     (snapshot) => {
+      if (!snapshot.exists()) {
+        console.warn('No entitlement record was found for this signed-in account; using the free tier.');
+        const missingState = createMissingEntitlementState();
+        handlers.setEntitlement(missingState.entitlement);
+        handlers.setEntitlementStatus(missingState.status);
+        handlers.setError(missingState.error);
+        return;
+      }
+
       const nextState = createEntitlementListenerState(
         snapshot.data() as Partial<UserEntitlementDocument> | undefined
       );
