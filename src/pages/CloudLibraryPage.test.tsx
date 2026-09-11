@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
@@ -75,5 +75,28 @@ describe("CloudLibraryPage", () => {
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ error: "Failed to load cloud cycles" }));
     renderPage();
     expect(screen.getByText(/failed to load cloud cycles/i)).toBeTruthy();
+  });
+
+  it("separates saved cycles into workspace tabs", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+
+    renderPage();
+    expect(screen.getByRole("tab", { name: /All 2/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Severe 1/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Custom 1/i })).toBeInTheDocument();
+    expect(screen.getByText("Severe save")).toBeInTheDocument();
+    expect(screen.getByText("Custom save")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
+    expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
+    expect(screen.getByText("Custom save")).toBeInTheDocument();
   });
 });
