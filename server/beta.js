@@ -1,7 +1,8 @@
 'use strict';
 
 const rateLimit = require('express-rate-limit');
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { verifyFirebaseToken } = require('./firebase-auth');
 
 const BETA_CLAIM_RATE_LIMIT = rateLimit({
   windowMs: 60 * 1000,
@@ -21,20 +22,8 @@ const getBetaInviteToken = () => process.env.BETA_INVITE_TOKEN || '';
 const getBetaInvitePath = () => (process.env.BETA_INVITE_PATH || '').trim();
 
 /** Returns the verified Firebase user for authenticated beta-claim requests. */
-const verifyRequestUser = async (req) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  const adminAuth = getAdminAuth();
-
-  if (!adminAuth || !token) {
-    return null;
-  }
-
-  try {
-    return await adminAuth.verifyIdToken(token);
-  } catch {
-    return null;
-  }
+const verifyRequestUser = (req) => {
+  return verifyFirebaseToken(req);
 };
 
 /** True when the beta-claim endpoint is ready to accept requests on this deployment. */

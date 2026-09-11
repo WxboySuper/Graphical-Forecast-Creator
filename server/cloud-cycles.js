@@ -1,23 +1,26 @@
 'use strict';
 
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { verifyFirebaseToken } = require('./firebase-auth');
 const { normalizeMetadata } = require('./cloud-cycle-metadata');
 const MAX_CLOUD_CYCLES = 100;
 const MAX_PAYLOAD_BYTES = 750000;
 
-const verifyUser = async (req) => {
-  const token = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '';
-  const auth = getAdminAuth();
-  if (!auth || !token) return null;
-  try { return await auth.verifyIdToken(token); } catch { return null; }
+/** Returns the Firebase user for an authenticated cloud-cycle request. */
+const verifyUser = (req) => {
+  return verifyFirebaseToken(req);
 };
 
+/** Validates that a cloud-cycle identity belongs to the verified user. */
 const hasValidCycleIdentity = ({ userId, id, label }, uid) => userId === uid && typeof id === 'string' && id.length <= 128 && typeof label === 'string' && label.length > 0 && label.length <= 200;
+/** Returns the UTF-8 byte length of a serialized cloud-cycle payload. */
 const getPayloadBytes = (payloadJson) => Buffer.byteLength(payloadJson, 'utf8');
+/** Validates the bounded payload fields accepted by the cloud-cycle API. */
 const hasValidCyclePayload = ({ cycleDate, payloadJson }) => {
   const bytes = typeof payloadJson === 'string' ? getPayloadBytes(payloadJson) : -1;
   return typeof cycleDate === 'string' && cycleDate.length <= 32 && typeof payloadJson === 'string' && bytes <= MAX_PAYLOAD_BYTES;
 };
+/** Reads and normalizes a cloud-cycle request body for persistence. */
 const readCloudCycleRequest = (body, uid) => {
   const { id, userId, label, cycleDate, payloadJson, metadata } = body || {};
   if (!hasValidCycleIdentity({ userId, id, label }, uid)) return null;
@@ -27,6 +30,7 @@ const readCloudCycleRequest = (body, uid) => {
   return { id, label, cycleDate, payloadJson, payloadBytes: getPayloadBytes(payloadJson), metadata: normalizedMetadata };
 };
 
+/** Persists a cloud cycle and its payload atomically. */
 const saveCloudCycle = async (db, uid, cycle) => {
   const cycleRef = db.collection('cloudCycles').doc(cycle.id);
   const payloadRef = cycleRef.collection('payload').doc('payload');
@@ -50,6 +54,7 @@ const saveCloudCycle = async (db, uid, cycle) => {
   });
 };
 
+/** Handles a validated cloud-cycle save request. */
 const handleCloudCycleSave = async (req, res) => {
   if (!hasFirebaseAdminConfig()) return res.status(503).json({ error: 'Cloud storage is unavailable.' });
   const user = await verifyUser(req);
@@ -63,6 +68,7 @@ const handleCloudCycleSave = async (req, res) => {
   return res.status(200).json({ success: true, data: cycle.id });
 };
 
+/** Sends the stable public response for a cloud-cycle save failure. */
 const sendCloudCycleSaveError = (res, error) => {
   if (error?.code === 'CLOUD_QUOTA_EXCEEDED' || error?.message === 'CLOUD_QUOTA_EXCEEDED') {
     return res.status(409).json({ error: 'Cloud storage quota reached.' });
@@ -74,6 +80,7 @@ const sendCloudCycleSaveError = (res, error) => {
   return res.status(500).json({ error: 'Unable to save cloud cycle.' });
 };
 
+/** Registers the cloud-cycle API routes on the application. */
 const registerCloudCycleRoutes = (app, express, rateLimit) => {
   const saveRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
   app.post('/api/cloud-cycles', saveRateLimit, express.json({ limit: '800kb' }), async (req, res) => {
