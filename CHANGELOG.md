@@ -52,6 +52,8 @@ All notable changes to this project will be documented in this file.
 
 #### Fixed
 
+- **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
+
 - **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
 - **Forecast map basemap:** Restore vendored weather-map geometry on nested forecast routes and prevent delayed basemap loads from undoing a newer map selection.
 - **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.
