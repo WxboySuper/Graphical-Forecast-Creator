@@ -49,8 +49,6 @@ Work toward the next major release continues in the beta channel while the final
 
 #### Fixed
 
-- **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
-
 - **Custom product handoff:** Handle unavailable sessionStorage safely and avoid consuming a handoff when its removal fails.
 - **Workflow review and Tropical AOI:** Restore review-package visibility and Discussion-page modal controls, and align Tropical AOI with the three probability-band colors used by the reference product.
 - **Forecast reliability:** Repair legacy serialized map shapes, auto-categorical restoration, export sizing, map popup teardown, keyboard shortcuts, and Safari Firestore sleep/reconnect behavior.
@@ -113,6 +111,7 @@ Work toward the next major release continues in the beta channel while the final
 
 #### Fixed
 
+- **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
 - **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
 - **Custom product handoff:** Handle unavailable sessionStorage safely and avoid consuming a handoff when its removal fails.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
