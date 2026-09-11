@@ -12,6 +12,7 @@ import {
   selectHasActiveWorkflow,
   startBlankCycle,
   createOutlookUpdate,
+  selectSavedCyclesForActiveWorkspace,
 } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 import type { WorkflowMetadata } from '../../types/workflow';
@@ -42,7 +43,7 @@ const useHomePageLogic = () => {
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
-  const savedCycles = useSelector((state: RootState) => state.forecast.savedCycles);
+  const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
   const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
 

@@ -33,6 +33,7 @@ import reducer, {
   startFromPreviousCycle,
   saveCurrentCycle,
   setForecastWorkspace,
+  selectSavedCyclesForActiveWorkspace,
   deleteSavedCycle,
   loadCycleHistory,
   SAVED_CYCLES_LIMIT,
@@ -323,6 +324,21 @@ describe('forecastSlice undo/redo', () => {
 
     expect(state.workspaceId).toBe('custom');
     expect(state.savedCycles[0]?.workspaceId).toBe('custom');
+  });
+
+  test('selects only cycles owned by the active workspace', () => {
+    const severeCycle = reducer(undefined, saveCurrentCycle({ label: 'Severe cycle' })).savedCycles[0]!;
+    let customState = reducer(undefined, setForecastWorkspace('custom'));
+    customState = reducer(customState, saveCurrentCycle({ label: 'Custom cycle' }));
+
+    const state = {
+      forecast: {
+        ...customState,
+        savedCycles: [severeCycle, ...customState.savedCycles],
+      },
+    } as Parameters<typeof selectSavedCyclesForActiveWorkspace>[0];
+
+    expect(selectSavedCyclesForActiveWorkspace(state).map((cycle) => cycle.label)).toEqual(['Custom cycle']);
   });
 
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
