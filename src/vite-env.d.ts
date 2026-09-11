@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 
-declare const __GFC_COMING_SOON__: boolean;
 declare const __GFC_APP_VERSION__: string;
 declare const __GFC_BUILD_TARGET__: import('./config/buildTarget').BuildTarget;
 declare const __GFC_DEV_MODE__: boolean;
@@ -34,7 +33,6 @@ interface ImportMeta {
 }
 
 declare global {
-  var __GFC_COMING_SOON__: boolean;
   var __GFC_APP_VERSION__: string;
   var __GFC_BUILD_TARGET__: import('./config/buildTarget').BuildTarget;
   var __GFC_DEV_MODE__: boolean;

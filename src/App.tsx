@@ -21,7 +21,6 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 // New UI components
 import { AppLayout } from './components/Layout';
 import HomePage from './pages/HomePage';
-import { ComingSoonPage } from './pages/ComingSoonPage';
 import AccountPage from './pages/AccountPage';
 import PricingPage from './pages/PricingPage';
 import { UpdatesPage } from './pages/UpdatesPage';
@@ -70,31 +69,7 @@ const ForecastLegacyRedirect = () => {
   );
 };
 
-// Launch gate: set VITE_COMING_SOON=true in the public build to enable pre-launch mode.
-// The app auto-unlocks at the launch date/time regardless of the env var.
-const LAUNCH_TIME = new Date('2026-03-01T18:00:00.000Z').getTime(); // noon CST
-const COMING_SOON_MODE = __GFC_COMING_SOON__;
 const BETA_MODE = __GFC_BETA_MODE__;
-
-// Custom hook to manage the launch gate, which checks the current date against a predefined launch time and returns whether the app has launched. It also sets up a timer to update the launched state when the launch time is reached, allowing for real-time transition from coming soon mode to live mode without needing a page refresh.
-function useLaunchGate(): boolean {
-  const [launched, setLaunched] = useState(() => Date.now() >= LAUNCH_TIME);
-  useEffect(() => {
-    let launchTimer: ReturnType<typeof setTimeout> | undefined;
-
-    if (!launched) {
-      const delay = Math.max(0, LAUNCH_TIME - Date.now());
-      launchTimer = setTimeout(() => setLaunched(true), delay);
-    }
-
-    return () => {
-      if (launchTimer) {
-        clearTimeout(launchTimer);
-      }
-    };
-  }, [launched]);
-  return launched;
-}
 
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
@@ -139,21 +114,8 @@ const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
   </Provider>
 );
 
-interface AppRoutesProps {
-  showComingSoon: boolean;
-}
-
-/** Selects between the public launch gate routes and the full application routes. */
-const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
-  if (showComingSoon) {
-    return (
-      <Routes>
-        <Route index element={<ComingSoonPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    );
-  }
-
+/** Renders the full application route tree. */
+const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="beta" element={<BetaLandingPage />} />
@@ -191,10 +153,6 @@ const AppRoutes: React.FC<AppRoutesProps> = ({ showComingSoon }) => {
   );
 };
 
-interface AgreementGateProps {
-  showComingSoon: boolean;
-}
-
 /** Reads agreement acceptance, including the development-only beta bypass. */
 const getAgreementState = (localBetaBypass: boolean) => ({
   tosAccepted: localBetaBypass || hasAcceptedToS(),
@@ -202,36 +160,34 @@ const getAgreementState = (localBetaBypass: boolean) => ({
 });
 
 /** Starts providers and shared hooks after the required agreements are accepted. */
-const AcceptedApplication: React.FC<{ showComingSoon: boolean }> = ({ showComingSoon }) => (
+const AcceptedApplication: React.FC = () => (
   <AppProviders>
     <AppHooks />
     <ProductAnalyticsRouteTracker />
-    <AppRoutes showComingSoon={showComingSoon} />
+    <AppRoutes />
   </AppProviders>
 );
 
-/** Refreshes agreement state when the launch gate opens and initializes consented analytics. */
-const useAgreementState = (showComingSoon: boolean) => {
+/** Reads agreement state and initializes consented analytics. */
+const useAgreementState = () => {
   const localBetaBypass = __GFC_DEV_MODE__ && new URLSearchParams(window.location.search).get('localBetaBypass') === 'true';
   const initial = getAgreementState(localBetaBypass);
   const [tosAccepted, setTosAccepted] = useState(initial.tosAccepted);
   const [privacyAccepted, setPrivacyAccepted] = useState(initial.privacyAccepted);
   useEffect(() => {
-    if (privacyAccepted && !showComingSoon) initProductAnalytics();
-  }, [privacyAccepted, showComingSoon]);
+    if (privacyAccepted) initProductAnalytics();
+  }, [privacyAccepted]);
   useEffect(() => {
-    if (!showComingSoon) {
-      const next = getAgreementState(localBetaBypass);
-      setTosAccepted(next.tosAccepted);
-      setPrivacyAccepted(next.privacyAccepted);
-    }
-  }, [localBetaBypass, showComingSoon]);
+    const next = getAgreementState(localBetaBypass);
+    setTosAccepted(next.tosAccepted);
+    setPrivacyAccepted(next.privacyAccepted);
+  }, [localBetaBypass]);
   return { tosAccepted, privacyAccepted, setTosAccepted, setPrivacyAccepted };
 };
 
-/** Handles the launch-dependent agreement flow before the main app is allowed to initialize. */
-const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
-  const { tosAccepted, privacyAccepted, setTosAccepted, setPrivacyAccepted } = useAgreementState(showComingSoon);
+/** Handles the agreement flow before the main app is allowed to initialize. */
+const AgreementGate: React.FC = () => {
+  const { tosAccepted, privacyAccepted, setTosAccepted, setPrivacyAccepted } = useAgreementState();
 
   const handleAcceptToS = useCallback(() => {
     setTosAccepted(true);
@@ -241,9 +197,7 @@ const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
     setPrivacyAccepted(true);
   }, [setPrivacyAccepted]);
 
-  if (showComingSoon || !tosAccepted) {
-    return showComingSoon ? <AppRoutes showComingSoon /> : <ToSModal onAccept={handleAcceptToS} />;
-  }
+  if (!tosAccepted) return <ToSModal onAccept={handleAcceptToS} />;
 
   if (!privacyAccepted) {
     return <PrivacyPolicyModal onAccept={handleAcceptPrivacyPolicy} />;
@@ -252,27 +206,20 @@ const AgreementGate: React.FC<AgreementGateProps> = ({ showComingSoon }) => {
   // Keep the routed product tree behind the agreement boundary. Previously the
   // modal was rendered beside AppRoutes, so pages, providers, and global hooks
   // were live in the DOM before the user accepted the policies.
-  return <AcceptedApplication showComingSoon={showComingSoon} />;
+  return <AcceptedApplication />;
 };
 
 // Main App with Router
-interface AppContentProps {
-  showComingSoon: boolean;
-}
-
 /** Renders the routed application inside the shared providers. */
-const AppContent: React.FC<AppContentProps> = ({ showComingSoon }) => (
+const AppContent: React.FC = () => (
   <BrowserRouter>
-    <AgreementGate showComingSoon={showComingSoon} />
+    <AgreementGate />
   </BrowserRouter>
 );
 
 /** Renders the authenticated application shell and route tree. */
 function App() {
-  const isLaunched = useLaunchGate();
-  const showComingSoon = COMING_SOON_MODE && !isLaunched;
-
-  return <AppContent showComingSoon={showComingSoon} />;
+  return <AppContent />;
 }
 
 export default App;
