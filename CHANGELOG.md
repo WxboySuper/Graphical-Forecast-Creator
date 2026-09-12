@@ -52,6 +52,7 @@ All notable changes to this project will be documented in this file.
 
 #### Fixed
 
+- **Production deployment action fallback:** Treat the manual workflow's `auto` option as a request to use the release manifest instead of rejecting it as an invalid deploy action.
 - **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
 - **Forecast map basemap:** Restore vendored weather-map geometry on nested forecast routes and prevent delayed basemap loads from undoing a newer map selection.
 - **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.

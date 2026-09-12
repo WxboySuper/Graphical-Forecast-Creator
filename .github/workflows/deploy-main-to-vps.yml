@@ -146,7 +146,7 @@ jobs:
       - name: Validate production release manifest
         id: manifest
         env:
-          DEPLOY_ACTION: ${{ github.event.inputs.deploy_action == 'auto' && '' || github.event.inputs.deploy_action }}
+          DEPLOY_ACTION: ${{ github.event.inputs.deploy_action }}
           DEPLOY_FORCE: ${{ github.event.inputs.force && 'true' || 'false' }}
         run: |
           PREVIOUS_RELEASE_ID=$(ssh -o StrictHostKeyChecking=yes \
