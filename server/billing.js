@@ -694,12 +694,14 @@ const handleEntitlementDiagnostic = async (req, res) => {
   const data = snapshot.data() || {};
   const visibleEntitlements = await db.collection('userEntitlements').limit(5).get();
   const databaseId = db._settings?.databaseId || null;
+  const visibleEntitlementIdMeta = visibleEntitlements.docs.map((doc) => ({ length: doc.id.length, matchesRequestedUid: doc.id === decodedToken.uid, trimMatches: doc.id.trim() === decodedToken.uid.trim(), lastCharCode: doc.id.charCodeAt(doc.id.length - 1) }));
   res.json({
     uid: decodedToken.uid,
     adminProjectId: process.env.FIREBASE_ADMIN_PROJECT_ID || null,
     path: ref.path,
     databaseId,
     visibleEntitlementCount: visibleEntitlements.size,
+    visibleEntitlementIdMeta,
     exists: snapshot.exists,
     premiumActive: snapshot.exists ? data.premiumActive === true : null,
     betaOverrideActive: snapshot.exists ? data.betaOverrideActive === true : null,
