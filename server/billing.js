@@ -694,6 +694,7 @@ const handleEntitlementDiagnostic = async (req, res) => {
   const data = snapshot.data() || {};
   res.json({
     uid: decodedToken.uid,
+    adminProjectId: process.env.FIREBASE_ADMIN_PROJECT_ID || null,
     path: ref.path,
     exists: snapshot.exists,
     premiumActive: snapshot.exists ? data.premiumActive === true : null,
