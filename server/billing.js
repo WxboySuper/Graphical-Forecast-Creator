@@ -702,6 +702,7 @@ const handleEntitlementDiagnostic = async (req, res) => {
 };
 const registerBillingRoutes = (app, express) => {
   app.get('/api/billing/config', handleBillingConfig);
+  app.get('/api/debug/entitlement', handleEntitlementDiagnostic);
   app.post(
     '/api/billing/webhook',
     webhookRateLimit,
