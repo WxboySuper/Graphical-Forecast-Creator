@@ -678,6 +678,28 @@ const wrapBillingJsonRoute = ({ handler, fallbackMessage }) => async (req, res) 
 };
 
 /** Registers the billing endpoints on the existing hosted-service Express app. */
+/** Returns a minimal authenticated Admin-side entitlement visibility check for diagnostics. */
+const handleEntitlementDiagnostic = async (req, res) => {
+  const decodedToken = await verifyRequestUser(req, res);
+  if (!decodedToken) return;
+
+  const db = getAdminDb();
+  if (!db) {
+    res.status(503).json({ error: 'Firebase Admin is not configured on this deployment.' });
+    return;
+  }
+
+  const ref = db.collection('userEntitlements').doc(decodedToken.uid);
+  const snapshot = await ref.get();
+  const data = snapshot.data() || {};
+  res.json({
+    uid: decodedToken.uid,
+    path: ref.path,
+    exists: snapshot.exists,
+    premiumActive: snapshot.exists ? data.premiumActive === true : null,
+    betaOverrideActive: snapshot.exists ? data.betaOverrideActive === true : null,
+  });
+};
 const registerBillingRoutes = (app, express) => {
   app.get('/api/billing/config', handleBillingConfig);
   app.post(
