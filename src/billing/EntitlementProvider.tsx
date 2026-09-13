@@ -217,7 +217,12 @@ const subscribeToEntitlements = (
     entitlementRef,
     (snapshot) => {
       if (!snapshot.exists()) {
-        console.warn('No entitlement record was found for this signed-in account; using the free tier.');
+        console.warn('[entitlements] missing document', {
+          path: entitlementRef.path,
+          userId,
+          fromCache: snapshot.metadata.fromCache,
+          hasPendingWrites: snapshot.metadata.hasPendingWrites,
+        });
         const missingState = createMissingEntitlementState();
         handlers.setEntitlement(missingState.entitlement);
         handlers.setEntitlementStatus(missingState.status);
@@ -233,6 +238,12 @@ const subscribeToEntitlements = (
       handlers.setError(nextState.error);
     },
     (nextError) => {
+      console.error('[entitlements] listener failed', {
+        path: entitlementRef.path,
+        userId,
+        code: nextError.code,
+        message: nextError.message,
+      });
       handlers.setEntitlement(DEFAULT_ENTITLEMENT);
       handlers.setEntitlementStatus('error');
       handlers.setError(nextError.message);
