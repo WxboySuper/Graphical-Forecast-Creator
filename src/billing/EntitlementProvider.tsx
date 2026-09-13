@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
-import { db, requireDb } from '../lib/firebase';
+import { db, requireAuth, requireDb } from '../lib/firebase';
 import { useAuth } from '../auth/AuthProvider';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 
@@ -217,7 +217,20 @@ const subscribeToEntitlements = (
     entitlementRef,
     (snapshot) => {
       if (!snapshot.exists()) {
-        console.warn('[entitlements] missing document path=' + entitlementRef.path + ' uid=' + userId + ' fromCache=' + snapshot.metadata.fromCache + ' pendingWrites=' + snapshot.metadata.hasPendingWrites);
+        console.warn('[entitlements] missing document path=' + entitlementRef.path + ' uid=' + userId + ' fromCache=' + snapshot.metadata.fromCache + ' pendingWrites=' + snapshot.metadata.hasPendingWrites);        void (async () => {
+          try {
+            const currentUser = requireAuth().currentUser;
+            if (!currentUser) return;
+            const token = await currentUser.getIdToken();
+            const response = await fetch('/api/debug/entitlement', {
+              headers: { Authorization: 'Bearer ' + token },
+            });
+            const data = await response.json().catch(() => ({}));
+            console.warn('[entitlements] Admin check status=' + response.status + ' data=' + JSON.stringify(data));
+          } catch (error) {
+            console.error('[entitlements] Admin check failed', error);
+          }
+        })();
         const missingState = createMissingEntitlementState();
         handlers.setEntitlement(missingState.entitlement);
         handlers.setEntitlementStatus(missingState.status);
