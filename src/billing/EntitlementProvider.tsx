@@ -217,7 +217,7 @@ const subscribeToEntitlements = (
     entitlementRef,
     (snapshot) => {
       if (!snapshot.exists()) {
-        console.warn([entitlements] missing document path= uid= fromCache= pendingWrites=);
+        console.warn('[entitlements] missing document path=' + entitlementRef.path + ' uid=' + userId + ' fromCache=' + snapshot.metadata.fromCache + ' pendingWrites=' + snapshot.metadata.hasPendingWrites);
         const missingState = createMissingEntitlementState();
         handlers.setEntitlement(missingState.entitlement);
         handlers.setEntitlementStatus(missingState.status);
