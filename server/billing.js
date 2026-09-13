@@ -692,10 +692,14 @@ const handleEntitlementDiagnostic = async (req, res) => {
   const ref = db.collection('userEntitlements').doc(decodedToken.uid);
   const snapshot = await ref.get();
   const data = snapshot.data() || {};
+  const visibleEntitlements = await db.collection('userEntitlements').limit(5).get();
+  const databaseId = db._settings?.databaseId || null;
   res.json({
     uid: decodedToken.uid,
     adminProjectId: process.env.FIREBASE_ADMIN_PROJECT_ID || null,
     path: ref.path,
+    databaseId,
+    visibleEntitlementCount: visibleEntitlements.size,
     exists: snapshot.exists,
     premiumActive: snapshot.exists ? data.premiumActive === true : null,
     betaOverrideActive: snapshot.exists ? data.betaOverrideActive === true : null,
