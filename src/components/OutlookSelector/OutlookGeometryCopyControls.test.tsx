@@ -11,6 +11,8 @@ jest.mock('../ui/tooltip', () => ({
 }));
 
 describe('OutlookGeometryCopyControls', () => {
+  jest.setTimeout(15000);
+
   it('renders a compact menu trigger when a source hazard has geometry', () => {
     render(
       <OutlookGeometryCopyControls

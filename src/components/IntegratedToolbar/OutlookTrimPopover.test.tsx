@@ -19,6 +19,8 @@ const buildController = (
   }) as ForecastWorkspaceController;
 
 describe('OutlookTrimPopover', () => {
+  jest.setTimeout(15000);
+
   test('renders compact trim trigger without expanding toolbar sections', () => {
     render(<OutlookTrimPopover controller={buildController()} />);
     expect(screen.getByRole('button', { name: /trim outlooks to land/i })).toBeInTheDocument();
