@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
-import { selectCurrentOutlooks, trimCurrentDayOutlooksToLand } from '../store/forecastSlice';
+import { selectCurrentOutlooks } from '../store/forecastSlice';
+import { trimCurrentDayOutlooksToLand } from '../store/forecastTrimThunks';
 import type { AddToastFn } from '../components/Layout';
 import { ensureLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
 import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
@@ -41,7 +42,7 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
         return;
       }
 
-      dispatch(trimCurrentDayOutlooksToLand({ strategy, day: trimDay }));
+      await dispatch(trimCurrentDayOutlooksToLand({ strategy, day: trimDay }));
       const result = store.getState().forecast.lastTrimResult;
       if (!result || result.failedCount > 0) {
         addToast(
