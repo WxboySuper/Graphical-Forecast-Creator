@@ -18,11 +18,10 @@ The planned Forecast routes are:
 | Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
 | Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
 
-`/forecast` is a compatibility entry point. It redirects to
-`/forecast/severe` while preserving compatible query parameters and the hash.
-The destination shows a temporary notice explaining the URL change. The
-workspace ID comes from the URL, not from a global "current workspace" value in
-Redux. That makes refresh, browser history, and shared links deterministic.
+`/forecast` is a compatibility entry point for the Severe workspace. The route
+contract preserves compatible query parameters and the hash when the routing
+follow-up redirects it to `/forecast/severe`. The workspace ID comes from the
+URL, not from a global "current workspace" value in Redux.
 
 `src/App.tsx` registers the current Severe route and its legacy redirect.
 `src/config/featureSurfaces.ts` owns the actual gated route definitions, which
@@ -91,9 +90,10 @@ New workspace payloads should use an optional envelope field such as
 must not replace `forecastCycle` or change the legacy `version` meaning. The
 envelope rules are:
 
-- a missing workspace id is classified as Severe only when the payload matches
-  the valid legacy Severe schema;
-- otherwise the payload is checked against the valid Custom schema;
+- a missing workspace id is classified as Severe only when the payload passes
+  the existing `GFCForecastSaveData` validation;
+- if it does not pass that validation, the importer checks the Custom schema
+  owned by #915;
 - an unknown workspace id is malformed and must not be silently treated as a
   different workspace;
 - a known but disabled workspace is not opened from an import; the user gets a
@@ -107,8 +107,8 @@ envelope rules are:
 
 Cloud product records follow the same rule. `workspaceId` is required for new
 records and is used for filtering, restore, and product-specific rendering.
-Premium users get automatic Firebase sync attempts after local autosave. A
-failed sync preserves the local copy and requires an explicit retry or leave
+The cloud-save follow-up must attempt sync after local autosave, preserve the
+local copy after a failed sync, and require an explicit retry or leave
 confirmation before workspace navigation. Monitor and Verification read saved
 results. They never mutate workspace-owned editing state.
 

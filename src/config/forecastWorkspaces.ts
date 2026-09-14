@@ -40,15 +40,6 @@ export const FORECAST_WORKSPACES = [
     legacyPaths: [],
   },
   {
-    id: 'custom',
-    path: '/forecast/custom',
-    label: 'Custom',
-    productType: 'custom',
-    status: 'gated',
-    exposureKey: 'customProducts',
-    legacyPaths: ['/custom-products'],
-  },
-  {
     id: 'tropical',
     path: '/forecast/tropical',
     label: 'Tropical',
@@ -66,6 +57,15 @@ export const FORECAST_WORKSPACES = [
     exposureKey: 'winterWorkspace',
     legacyPaths: [],
   },
+  {
+    id: 'custom',
+    path: '/forecast/custom',
+    label: 'Custom',
+    productType: 'custom',
+    status: 'gated',
+    exposureKey: 'customProducts',
+    legacyPaths: ['/custom-products'],
+  },
 ] as const satisfies readonly ForecastWorkspaceDefinition[];
 
 export const DEFAULT_FORECAST_WORKSPACE: ForecastWorkspaceId = 'severe';
@@ -78,6 +78,12 @@ const WORKSPACES_BY_PATH = new Map(
   FORECAST_WORKSPACES.map((workspace) => [workspace.path, workspace] as const),
 );
 
+const WORKSPACES_BY_LEGACY_PATH = new Map(
+  FORECAST_WORKSPACES.flatMap((workspace) =>
+    workspace.legacyPaths.map((path) => [path, workspace] as const),
+  ),
+);
+
 /** Returns the registered workspace for an ID, or undefined for malformed input. */
 export const getForecastWorkspace = (id: string): ForecastWorkspaceDefinition | undefined =>
   WORKSPACES_BY_ID.get(id as ForecastWorkspaceId);
@@ -85,6 +91,11 @@ export const getForecastWorkspace = (id: string): ForecastWorkspaceDefinition | 
 /** Returns the registered workspace for a canonical path, or undefined for malformed input. */
 export const getForecastWorkspaceByPath = (path: string): ForecastWorkspaceDefinition | undefined =>
   WORKSPACES_BY_PATH.get(path as `/forecast/${ForecastWorkspaceId}`);
+
+/** Returns the registered workspace for a compatibility path, or undefined for malformed input. */
+export const getForecastWorkspaceByLegacyPath = (
+  path: string,
+): ForecastWorkspaceDefinition | undefined => WORKSPACES_BY_LEGACY_PATH.get(path);
 
 /** Returns whether a workspace may be registered for the selected build target. */
 export const isForecastWorkspaceExposed = (
