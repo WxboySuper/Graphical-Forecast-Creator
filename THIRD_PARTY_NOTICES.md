@@ -72,11 +72,11 @@ to each.
 - **typescript-eslint** ^8.70.0 (root (pnpm)) — MIT — allowed
 - **uuid** ^14.0.2 (root (pnpm)) — MIT — allowed
 - **vite** ^8.3.0 (root (pnpm)) — MIT — allowed
-- **@sentry/node** ^10.73.0 (server (npm)) — MIT — allowed
+- **@sentry/node** ^10.74.0 (server (npm)) — MIT — allowed
 - **express** ^5.2.1 (server (npm)) — MIT — allowed
 - **express-rate-limit** ^8.7.0 (server (npm)) — MIT — allowed
-- **firebase-admin** ^14.3.0 (server (npm)) — Apache-2.0 — allowed
-- **stripe** ^22.6.1 (server (npm)) — MIT — allowed
+- **firebase-admin** ^14.4.0 (server (npm)) — Apache-2.0 — allowed
+- **stripe** ^22.6.2 (server (npm)) — MIT — allowed
 - **cfgrib** 0.9.15.1 (server (python)) — Apache-2.0 — allowed
 - **numpy** 2.4.1 (server (python)) — BSD-3-Clause — allowed
 - **scikit-image** 0.26.0 (server (python)) — BSD-3-Clause — allowed
