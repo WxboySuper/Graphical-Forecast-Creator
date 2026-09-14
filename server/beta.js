@@ -22,9 +22,7 @@ const getBetaInviteToken = () => process.env.BETA_INVITE_TOKEN || '';
 const getBetaInvitePath = () => (process.env.BETA_INVITE_PATH || '').trim();
 
 /** Returns the verified Firebase user for authenticated beta-claim requests. */
-const verifyRequestUser = (req) => {
-  return verifyFirebaseToken(req);
-};
+const verifyRequestUser = (req) => verifyFirebaseToken(req);
 
 /** True when the beta-claim endpoint is ready to accept requests on this deployment. */
 const isBetaClaimConfigured = () => hasFirebaseAdminConfig() && Boolean(getBetaInviteToken());
