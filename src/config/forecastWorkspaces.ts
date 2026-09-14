@@ -78,7 +78,7 @@ const WORKSPACES_BY_PATH = new Map(
   FORECAST_WORKSPACES.map((workspace) => [workspace.path, workspace] as const),
 );
 
-const WORKSPACES_BY_LEGACY_PATH = new Map(
+const WORKSPACES_BY_LEGACY_PATH = new Map<string, ForecastWorkspaceDefinition>(
   FORECAST_WORKSPACES.flatMap((workspace) =>
     workspace.legacyPaths.map((path) => [path, workspace] as const),
   ),
