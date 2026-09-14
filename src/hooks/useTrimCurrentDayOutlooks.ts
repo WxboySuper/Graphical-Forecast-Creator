@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
-import { selectCurrentOutlooks, trimCurrentDayOutlooksToLand } from '../store/forecastSlice';
+import { selectCurrentOutlooks } from '../store/forecastSlice';
+import { trimCurrentDayOutlooksToLand } from '../store/forecastTrimThunks';
 import type { AddToastFn } from '../components/Layout';
 import { ensureLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
 import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
