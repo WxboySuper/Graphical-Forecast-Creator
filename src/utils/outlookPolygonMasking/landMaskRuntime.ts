@@ -1,4 +1,3 @@
-import { buildLandMask } from './buildLandMask';
 import { fetchBoundaryGeoBundle } from './fetchBoundaryGeoBundle';
 import type { LandMaskFeature, LandMaskStrategy } from './types';
 
@@ -38,8 +37,11 @@ export const ensureLandMask = async (
   }
 
   const generation = runtimeGeneration;
-  const request = fetchBoundaryGeoBundle()
-    .then((boundaries) => buildLandMask(strategy, boundaries))
+  const request = Promise.all([
+    import('./buildLandMask'),
+    fetchBoundaryGeoBundle(),
+  ])
+    .then(([{ buildLandMask }, boundaries]) => buildLandMask(strategy, boundaries))
     .then((mask) => {
       if (generation === runtimeGeneration) {
         cachedStrategy = strategy;

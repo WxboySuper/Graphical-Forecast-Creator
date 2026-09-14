@@ -41,7 +41,7 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
         return;
       }
 
-      dispatch(trimCurrentDayOutlooksToLand({ strategy, day: trimDay }));
+      await dispatch(trimCurrentDayOutlooksToLand({ strategy, day: trimDay }));
       const result = store.getState().forecast.lastTrimResult;
       if (!result || result.failedCount > 0) {
         addToast(

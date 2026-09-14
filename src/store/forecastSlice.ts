@@ -1,5 +1,5 @@
 import '../immerSetup';
-import { isDraft, original } from 'immer';
+import { isDraft, original, produce } from 'immer';
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
@@ -20,9 +20,9 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
-import { getCachedLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
-import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
+import type { TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
+import type { ThunkAction } from '@reduxjs/toolkit';
 import {
   applyPaintBucketStrategy,
   type PaintBucketEditAction,
@@ -830,22 +830,22 @@ export const forecastSlice = createSlice({
       state.isSaved = false;
     },
 
-    trimCurrentDayOutlooksToLand: (
+    applyTrimmedCurrentDayOutlooks: (
       state,
-      action: PayloadAction<{ strategy: LandMaskStrategy; day?: DayType }>,
+      action: PayloadAction<{
+        day: DayType;
+        data: OutlookData;
+        result: TrimOutlookDataResult;
+      }>,
     ) => {
-      const landMask = getCachedLandMask(action.payload.strategy);
-      if (!landMask) {
-        return;
-      }
-
-      const dayData = state.forecastCycle.days[action.payload.day ?? state.forecastCycle.currentDay];
+      const dayData = state.forecastCycle.days[action.payload.day];
       if (!dayData) {
         return;
       }
 
       pushUndoSnapshot(state);
-      state.lastTrimResult = trimOutlookDataInPlace(dayData.data, landMask, action.payload.strategy);
+      dayData.data = action.payload.data;
+      state.lastTrimResult = action.payload.result;
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
@@ -1513,7 +1513,7 @@ export const {
   updateFeaturesBatch,
   removeFeature,
   applyPaintBucketEdit,
-  trimCurrentDayOutlooksToLand,
+  applyTrimmedCurrentDayOutlooks,
   resetCategorical,
   setOutlookMap,
   applyAutoCategoricalSync,
@@ -1560,6 +1560,39 @@ export const {
   setAutoCategoricalError,
   setWorkflowActive,
 } = forecastSlice.actions;
+
+/** Trims the active day after loading the geometry code on demand. */
+export const trimCurrentDayOutlooksToLand = ({
+  strategy,
+  day,
+}: {
+  strategy: LandMaskStrategy;
+  day?: DayType;
+}): ThunkAction<Promise<void>, RootState, unknown, UnknownAction> => async (dispatch, getState) => {
+  const targetDay = day ?? getState().forecast.forecastCycle.currentDay;
+  const dayData = getState().forecast.forecastCycle.days[targetDay];
+  if (!dayData) {
+    return;
+  }
+
+  const [{ getCachedLandMask }, { trimOutlookDataInPlace }] = await Promise.all([
+    import('../utils/outlookPolygonMasking/landMaskRuntime'),
+    import('../utils/outlookPolygonMasking/trimOutlookData'),
+  ]);
+  const landMask = getCachedLandMask(strategy);
+  if (!landMask) {
+    return;
+  }
+
+  let result: TrimOutlookDataResult | null = null;
+  const data = produce(dayData.data, (draft) => {
+    result = trimOutlookDataInPlace(draft as unknown as OutlookData, landMask, strategy);
+  });
+
+  if (result) {
+    dispatch(applyTrimmedCurrentDayOutlooks({ day: targetDay, data, result }));
+  }
+};
 
 /** Selects the full forecast slice. */
 export const selectForecast = (state: RootState) => state.forecast;
