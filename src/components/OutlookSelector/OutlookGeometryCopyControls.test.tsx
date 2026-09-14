@@ -1,6 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen } from '@testing-library/react';
 import OutlookGeometryCopyControls from './OutlookGeometryCopyControls';
 
 jest.mock('../ui/tooltip', () => ({
@@ -10,9 +9,32 @@ jest.mock('../ui/tooltip', () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-describe('OutlookGeometryCopyControls', () => {
-  jest.setTimeout(20000);
+jest.mock('../ui/dropdown-menu', () => {
+  const React = require('react') as typeof import('react');
+  const MenuContext = React.createContext<{ open: boolean; setOpen: (open: boolean) => void } | null>(null);
+  const DropdownMenu = ({ children }: { children: React.ReactNode }) => {
+    const [open, setOpen] = React.useState(false);
+    return <MenuContext.Provider value={{ open, setOpen }}>{children}</MenuContext.Provider>;
+  };
+  const DropdownMenuTrigger = ({ children }: { children: React.ReactElement }) => {
+    const context = React.useContext(MenuContext);
+    return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
+      onClick: () => context?.setOpen(true),
+    });
+  };
+  const DropdownMenuContent = ({ children }: { children: React.ReactNode }) => {
+    const context = React.useContext(MenuContext);
+    return context?.open ? <div role="menu">{children}</div> : null;
+  };
+  const DropdownMenuItem = ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) => (
+    <button type="button" role="menuitem" onClick={onSelect}>{children}</button>
+  );
+  const DropdownMenuLabel = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const DropdownMenuSeparator = () => <hr />;
+  return { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator };
+});
 
+describe('OutlookGeometryCopyControls', () => {
   it('renders a compact menu trigger when a source hazard has geometry', () => {
     render(
       <OutlookGeometryCopyControls
@@ -47,8 +69,6 @@ describe('OutlookGeometryCopyControls', () => {
   });
 
   it('shows source hazards in the dropdown menu', async () => {
-    const user = userEvent.setup();
-
     render(
       <OutlookGeometryCopyControls
         activeHazard="tornado"
@@ -61,7 +81,8 @@ describe('OutlookGeometryCopyControls', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('Match geometry from another hazard'));
+    const trigger = screen.getByLabelText('Match geometry from another hazard');
+    fireEvent.click(trigger);
 
     expect(screen.getByText('Match to Tornado')).toBeInTheDocument();
     expect(screen.getByText('From Wind')).toBeInTheDocument();
@@ -69,7 +90,6 @@ describe('OutlookGeometryCopyControls', () => {
   });
 
   it('invokes the selected copy mode without requiring a nested submenu', async () => {
-    const user = userEvent.setup();
     const onCopyAllFrom = jest.fn();
     const onCopyProbabilityFrom = jest.fn();
 
@@ -85,12 +105,13 @@ describe('OutlookGeometryCopyControls', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('Match geometry from another hazard'));
-    await user.click(screen.getByRole('menuitem', { name: 'All levels' }));
+    const trigger = screen.getByLabelText('Match geometry from another hazard');
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'All levels' }));
     expect(onCopyAllFrom).toHaveBeenCalledWith('wind');
 
-    await user.click(screen.getByLabelText('Match geometry from another hazard'));
-    await user.click(screen.getByRole('menuitem', { name: '15% only' }));
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: '15% only' }));
     expect(onCopyProbabilityFrom).toHaveBeenCalledWith('wind');
   });
 });
