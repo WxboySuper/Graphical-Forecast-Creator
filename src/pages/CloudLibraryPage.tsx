@@ -15,6 +15,7 @@ import {
   filterCloudCyclesByWorkspace,
   getCloudLibraryTabFromSearchParams,
   getCloudLibraryTabs,
+  createCloudCycleEditorHandoff,
   type CloudLibraryTab,
   type CloudLibraryTabId,
 } from './cloudLibraryWorkspace';
@@ -684,14 +685,13 @@ const useCloudLibraryActions = ({
   const [message, setMessage] = useState<string | null>(null);
 
   const persistCloudCycleToSession = useCallback(
-    (cycleId: string, label: string, payload: unknown): boolean => {
+    (handoff: ReturnType<typeof createCloudCycleEditorHandoff>): boolean => {
       try {
-        sessionStorage.setItem(payloadKey, JSON.stringify(payload));
+        sessionStorage.setItem(payloadKey, JSON.stringify(handoff.payload));
         sessionStorage.setItem(
           metaKey,
           JSON.stringify({
-            id: cycleId,
-            label,
+            ...handoff.metadata,
           })
         );
         return true;
@@ -712,11 +712,16 @@ const useCloudLibraryActions = ({
     }
 
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
-    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
+    if (!selectedCycle) {
+      setMessage('That cloud cycle is no longer available. Please refresh the library and try again.');
+      return;
+    }
+    const handoff = createCloudCycleEditorHandoff(selectedCycle, payload);
+    if (!persistCloudCycleToSession(handoff)) {
       return;
     }
 
-    navigate('/forecast');
+    navigate(handoff.path);
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
