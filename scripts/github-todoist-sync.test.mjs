@@ -17,10 +17,12 @@ test("PR task names use the required review format", () => {
   assert.equal(taskContent({ ...base, type: "pr", title: "Improve radar", number: 13 }), "Review PR #13 — Improve radar");
 });
 
-test("draft PRs do not create tasks, but existing tasks can still be updated", () => {
+test("only recent ready work creates tasks, while existing tasks remain updateable", () => {
   const draft = { ...base, type: "pr", title: "WIP radar", number: 14, isDraft: true };
-  assert.equal(shouldCreateTask(draft, undefined), false);
-  assert.equal(shouldCreateTask(draft, { id: "existing" }), true);
+  assert.equal(shouldCreateTask({ ...draft, updatedAt: "2026-09-15T00:00:00Z" }, undefined, Date.parse("2026-09-16T00:00:00Z")), false);
+  assert.equal(shouldCreateTask({ ...base, updatedAt: "2026-09-15T00:00:00Z" }, undefined, Date.parse("2026-09-16T00:00:00Z")), true);
+  assert.equal(shouldCreateTask({ ...base, state: "CLOSED", updatedAt: "2020-01-01T00:00:00Z" }, { id: "existing" }), true);
+  assert.equal(shouldCreateTask({ ...base, updatedAt: "2020-01-01T00:00:00Z" }, undefined, Date.parse("2026-09-16T00:00:00Z")), false);
 });
 
 test("routes labels and milestones before the default", () => {

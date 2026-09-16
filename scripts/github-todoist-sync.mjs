@@ -49,6 +49,12 @@ function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function parsePositiveIntEnv(name, fallback) {
+  const value = Number.parseInt(process.env[name] || String(fallback), 10);
+  if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
+  return value;
+}
+
 export function parseMetadata(description = "") {
   const line = description.split("\n").find((entry) => entry.startsWith(METADATA_PREFIX));
   if (!line) return null;
@@ -94,8 +100,12 @@ export function taskContent(item) {
   return `${issueAction(item)}: ${item.title}`;
 }
 
-export function shouldCreateTask(item, existingTask) {
-  return !(item.type === "pr" && item.isDraft && !existingTask);
+export function shouldCreateTask(item, existingTask, now = Date.now(), relevanceDays = 90) {
+  if (existingTask) return true;
+  if (item.type === "pr" && item.isDraft) return false;
+  if (normalize(item.state) !== "open" || !item.updatedAt) return false;
+  const updatedAt = Date.parse(item.updatedAt);
+  return Number.isFinite(updatedAt) && now - updatedAt <= relevanceDays * 24 * 60 * 60 * 1000;
 }
 
 export function taskDescription(item, relationships) {
@@ -208,6 +218,7 @@ async function sync() {
   const config = {
     defaultProjectId: required("TODOIST_DEFAULT_PROJECT_ID"),
     routes: parseJsonEnv("TODOIST_PROJECT_ROUTES_JSON", []),
+    relevanceDays: parsePositiveIntEnv("TODOIST_RELEVANCE_DAYS", 90),
   };
   const github = await collectGithubItems(githubToken, owner, name);
   const issues = github.issues.map((item) => toItem(item, "issue", owner, name));
@@ -220,9 +231,9 @@ async function sync() {
     const metadata = parseMetadata(task.description);
     if (metadata?.key) existing.set(metadata.key, task);
   }
-  const wanted = [...issues, ...prs].filter((item) => normalize(item.state) === "open" || existing.has(item.key));
+  const now = Date.now();
+  const wanted = [...issues, ...prs].filter((item) => shouldCreateTask(item, existing.get(item.key), now, config.relevanceDays));
   for (const item of wanted) {
-    if (!shouldCreateTask(item, existing.get(item.key))) continue;
     const payload = {
       content: taskContent(item),
       description: taskDescription(item, relationships),

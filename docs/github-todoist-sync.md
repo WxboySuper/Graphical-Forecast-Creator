@@ -74,6 +74,6 @@ The sync never completes or deletes Todoist tasks. A closed or merged GitHub obj
 
 Issue events, the hourly schedule, and `workflow_dispatch` run the sync. Pull request workflow runs are intentionally skipped because pull request jobs do not reliably receive repository secrets, so PR lifecycle changes such as ready-for-review, merge, reopen, label, and milestone changes are reconciled within the next hour or by manual dispatch.
 
-The reconciliation reads all GitHub issues and pull requests so it can resolve relationship data, but its inclusion rule limits task creation to open issues and open, ready-for-review PRs. Closed issues and merged or closed PRs are only updated when a matching Todoist task already exists. The first run therefore does not import the repository's historical archive.
+The reconciliation reads all GitHub issues and pull requests so it can resolve relationship data, but its inclusion rule limits new task creation to open, ready-for-review objects updated in the last 90 days. Closed issues and merged or closed PRs are only updated when a matching Todoist task already exists. The first run therefore does not import the repository's historical archive or old inactive work.
 
 The implementation has no database or service. GitHub Actions and the stable description line provide the state needed for safe reruns.
