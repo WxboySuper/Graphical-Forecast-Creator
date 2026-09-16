@@ -20,6 +20,10 @@ concurrency:
 
 jobs:
   sync:
+    # Pull request workflows run with restricted secrets. The hourly, issue-event,
+    # and manual reconciliation runs perform the sync after repository settings
+    # are configured.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
