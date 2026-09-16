@@ -194,21 +194,49 @@ function buildRelationships(issues, prs) {
   const relationships = {};
   const ensure = (key) => (relationships[key] ||= { closing: [], closedBy: [] });
   const refKey = (type, number) => `${issues[0]?.key.split(":")[0] || prs[0]?.key.split(":")[0]}:${type}#${number}`;
-  for (const issue of issues) {
-    const issueKey = issue.key;
-    ensure(issueKey).closedBy = issue.closedByPullRequestsReferences.nodes;
-    for (const pr of issue.closedByPullRequestsReferences.nodes) {
-      ensure(refKey("pr", pr.number)).closing.push(issue);
-    }
-  }
-  for (const pr of prs) {
-    const prKey = pr.key;
-    ensure(prKey).closing = pr.closingIssuesReferences.nodes;
-    for (const issue of pr.closingIssuesReferences.nodes) {
-      ensure(refKey("issue", issue.number)).closedBy.push(pr);
-    }
-  }
+  const addIssue = (issue) => {
+    const closingPrs = issue.closedByPullRequestsReferences.nodes;
+    ensure(issue.key).closedBy = closingPrs;
+    for (const pr of closingPrs) ensure(refKey("pr", pr.number)).closing.push(issue);
+  };
+  const addPr = (pr) => {
+    const closingIssues = pr.closingIssuesReferences.nodes;
+    ensure(pr.key).closing = closingIssues;
+    for (const issue of closingIssues) ensure(refKey("issue", issue.number)).closedBy.push(pr);
+  };
+  issues.forEach(addIssue);
+  prs.forEach(addPr);
   return relationships;
+}
+
+async function loadExistingTasks(token) {
+  const existing = new Map();
+  for (const task of await listTodoistTasks(token)) {
+    const metadata = parseMetadata(task.description);
+    if (metadata?.key) existing.set(metadata.key, task);
+  }
+  return existing;
+}
+
+function taskPayload(item, relationships, config) {
+  return {
+    content: taskContent(item),
+    description: taskDescription(item, relationships),
+    project_id: routeProjectId(item, config),
+  };
+}
+
+async function upsertTask(token, item, existingTask, payload) {
+  if (!existingTask) {
+    await todoistRequest(token, "/tasks", { method: "POST", body: JSON.stringify(payload) });
+    return "created";
+  }
+  const changed = existingTask.content !== payload.content ||
+    existingTask.description !== payload.description ||
+    String(existingTask.project_id) !== payload.project_id;
+  if (!changed) return "unchanged";
+  await todoistRequest(token, `/tasks/${existingTask.id}`, { method: "POST", body: JSON.stringify(payload) });
+  return "updated";
 }
 
 async function sync() {
@@ -224,31 +252,15 @@ async function sync() {
   const issues = github.issues.map((item) => toItem(item, "issue", owner, name));
   const prs = github.prs.map((item) => toItem(item, "pr", owner, name));
   const relationships = buildRelationships(issues, prs);
-  let created = 0;
-  let updated = 0;
-  const existing = new Map();
-  for (const task of await listTodoistTasks(todoistToken)) {
-    const metadata = parseMetadata(task.description);
-    if (metadata?.key) existing.set(metadata.key, task);
-  }
+  const existing = await loadExistingTasks(todoistToken);
   const now = Date.now();
   const wanted = [...issues, ...prs].filter((item) => shouldCreateTask(item, existing.get(item.key), now, config.relevanceDays));
+  const counts = { created: 0, updated: 0 };
   for (const item of wanted) {
-    const payload = {
-      content: taskContent(item),
-      description: taskDescription(item, relationships),
-      project_id: routeProjectId(item, config),
-    };
-    const task = existing.get(item.key);
-    if (!task) {
-      await todoistRequest(todoistToken, "/tasks", { method: "POST", body: JSON.stringify(payload) });
-      created += 1;
-    } else if (task.content !== payload.content || task.description !== payload.description || String(task.project_id) !== payload.project_id) {
-      await todoistRequest(todoistToken, `/tasks/${task.id}`, { method: "POST", body: JSON.stringify(payload) });
-      updated += 1;
-    }
+    const result = await upsertTask(todoistToken, item, existing.get(item.key), taskPayload(item, relationships, config));
+    if (result === "created" || result === "updated") counts[result] += 1;
   }
-  console.log(`GitHub to Todoist sync complete. Created ${created}, updated ${updated}, considered ${wanted.length}.`);
+  console.log(`GitHub to Todoist sync complete. Created ${counts.created}, updated ${counts.updated}, considered ${wanted.length}.`);
 }
 
 if (import.meta.url === `file://${process.argv[1].replaceAll("\\", "/")}`) {
