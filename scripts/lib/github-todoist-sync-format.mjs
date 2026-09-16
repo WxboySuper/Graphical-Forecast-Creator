@@ -1,5 +1,4 @@
 const METADATA_PREFIX = "GFC-GitHub:";
-
 const normalize = (value) => String(value || "").trim().toLowerCase();
 
 export function parseMetadata(description = "") {
@@ -37,14 +36,6 @@ export function taskContent(item) {
   return `${issueAction(item)}: ${item.title}`;
 }
 
-export function shouldCreateTask(item, existingTask, now = Date.now(), relevanceDays = 90) {
-  if (existingTask) return true;
-  if (item.type === "pr" && item.isDraft) return false;
-  if (normalize(item.state) !== "open" || !item.updatedAt) return false;
-  const updatedAt = Date.parse(item.updatedAt);
-  return Number.isFinite(updatedAt) && now - updatedAt <= relevanceDays * 24 * 60 * 60 * 1000;
-}
-
 export function taskDescription(item, relationships) {
   const related = relationships[item.key] || {};
   const closing = (related.closing || []).map((entry) => `#${entry.number}`).join(", ") || "none";
@@ -59,24 +50,4 @@ export function taskDescription(item, relationships) {
     `Closed by PRs: ${closedBy}`,
     "Todoist task stays open until a person completes the work and checks it off.",
   ].join("\n");
-}
-
-export function buildRelationships(issues, prs) {
-  const relationships = {};
-  const ensure = (key) => (relationships[key] ||= { closing: [], closedBy: [] });
-  const repository = issues[0]?.key.split(":")[0] || prs[0]?.key.split(":")[0];
-  const refKey = (type, number) => `${repository}:${type}#${number}`;
-  const addIssue = (issue) => {
-    const closingPrs = issue.closedByPullRequestsReferences.nodes;
-    ensure(issue.key).closedBy = closingPrs;
-    closingPrs.forEach((pr) => ensure(refKey("pr", pr.number)).closing.push(issue));
-  };
-  const addPr = (pr) => {
-    const closingIssues = pr.closingIssuesReferences.nodes;
-    ensure(pr.key).closing = closingIssues;
-    closingIssues.forEach((issue) => ensure(refKey("issue", issue.number)).closedBy.push(pr));
-  };
-  issues.forEach(addIssue);
-  prs.forEach(addPr);
-  return relationships;
 }

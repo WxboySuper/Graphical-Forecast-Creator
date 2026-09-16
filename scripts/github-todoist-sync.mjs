@@ -2,8 +2,12 @@
 
 const GITHUB_API = "https://api.github.com/graphql";
 const TODOIST_API = "https://api.todoist.com/api/v1";
-import { buildRelationships, parseMetadata, routeProjectId, shouldCreateTask, taskContent, taskDescription } from "./lib/github-todoist-sync-helpers.mjs";
-export { buildRelationships, parseMetadata, routeProjectId, shouldCreateTask, taskContent, taskDescription } from "./lib/github-todoist-sync-helpers.mjs";
+import { parseMetadata, routeProjectId, taskContent, taskDescription } from "./lib/github-todoist-sync-format.mjs";
+import { shouldCreateTask } from "./lib/github-todoist-sync-eligibility.mjs";
+import { buildRelationships } from "./lib/github-todoist-sync-relationships.mjs";
+export { parseMetadata, routeProjectId, taskContent, taskDescription } from "./lib/github-todoist-sync-format.mjs";
+export { shouldCreateTask } from "./lib/github-todoist-sync-eligibility.mjs";
+export { buildRelationships } from "./lib/github-todoist-sync-relationships.mjs";
 
 const githubQuery = `
   query($owner: String!, $name: String!, $issueCursor: String, $prCursor: String) {
