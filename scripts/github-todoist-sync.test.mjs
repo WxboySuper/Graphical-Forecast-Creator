@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseMetadata, routeProjectId, taskContent, taskDescription } from "./github-todoist-sync.mjs";
+import { parseMetadata, routeProjectId, shouldCreateTask, taskContent, taskDescription } from "./github-todoist-sync.mjs";
 
 const base = { key: "owner/repo:issue#12", number: 12, title: "Repair radar loading", url: "https://github.com/owner/repo/issues/12", type: "issue", state: "OPEN", labels: ["bug"], milestone: { title: "v1.8" } };
 
@@ -17,8 +17,10 @@ test("PR task names use the required review format", () => {
   assert.equal(taskContent({ ...base, type: "pr", title: "Improve radar", number: 13 }), "Review PR #13 — Improve radar");
 });
 
-test("draft PRs are tracked without calling them reviews", () => {
-  assert.equal(taskContent({ ...base, type: "pr", title: "WIP radar", number: 14, isDraft: true }), "Draft PR #14 — WIP radar");
+test("draft PRs do not create tasks, but existing tasks can still be updated", () => {
+  const draft = { ...base, type: "pr", title: "WIP radar", number: 14, isDraft: true };
+  assert.equal(shouldCreateTask(draft, undefined), false);
+  assert.equal(shouldCreateTask(draft, { id: "existing" }), true);
 });
 
 test("routes labels and milestones before the default", () => {

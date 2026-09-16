@@ -90,9 +90,12 @@ function stateText(item) {
 }
 
 export function taskContent(item) {
-  if (item.type === "pr" && item.isDraft) return `Draft PR #${item.number} — ${item.title}`;
   if (item.type === "pr") return `Review PR #${item.number} — ${item.title}`;
   return `${issueAction(item)}: ${item.title}`;
+}
+
+export function shouldCreateTask(item, existingTask) {
+  return !(item.type === "pr" && item.isDraft && !existingTask);
 }
 
 export function taskDescription(item, relationships) {
@@ -210,15 +213,16 @@ async function sync() {
   const issues = github.issues.map((item) => toItem(item, "issue", owner, name));
   const prs = github.prs.map((item) => toItem(item, "pr", owner, name));
   const relationships = buildRelationships(issues, prs);
+  let created = 0;
+  let updated = 0;
   const existing = new Map();
   for (const task of await listTodoistTasks(todoistToken)) {
     const metadata = parseMetadata(task.description);
     if (metadata?.key) existing.set(metadata.key, task);
   }
-  const wanted = [...issues, ...prs];
-  let created = 0;
-  let updated = 0;
+  const wanted = [...issues, ...prs].filter((item) => normalize(item.state) === "open" || existing.has(item.key));
   for (const item of wanted) {
+    if (!shouldCreateTask(item, existing.get(item.key))) continue;
     const payload = {
       content: taskContent(item),
       description: taskDescription(item, relationships),

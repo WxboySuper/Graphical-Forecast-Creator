@@ -55,7 +55,7 @@ Investigate and resolve issue #45: Clarify the forecast export flow
 
 No Todoist due date is sent. Routing uses the issue or PR milestone and labels.
 
-Draft PRs get a tracking task titled `Draft PR #42 — Improve radar loading`. That task is not presented as a review task. Once the PR becomes ready for review, the next event, hourly run, or manual reconciliation changes the same task to `Review PR #42 — Improve radar loading`. If an existing review task is moved back to draft, its title changes back to the draft form and its description changes to `GitHub state: draft`; it is not deleted.
+Draft PRs are scanned so their relationships can update issue descriptions, but they do not create Todoist tasks. When a draft becomes ready, the next hourly reconciliation or manual dispatch creates `Review PR #42 — Improve radar loading`.
 
 ## Issue to linked PR to completion
 
@@ -83,6 +83,8 @@ The sync never completes or deletes Todoist tasks. A closed or merged GitHub obj
 
 ## Running it
 
-The workflow runs for issue and PR changes, once per hour, and from `workflow_dispatch`. Manual dispatch is the reconciliation run. It scans all GitHub issues and pull requests, compares them with the metadata in active Todoist tasks, then repairs missing tasks, changed descriptions, and changed project routing.
+Issue events, the hourly schedule, and `workflow_dispatch` run the sync. Pull request workflow runs are intentionally skipped because pull request jobs do not reliably receive repository secrets, so PR lifecycle changes such as ready-for-review, merge, reopen, label, and milestone changes are reconciled within the next hour or by manual dispatch.
+
+The reconciliation reads all GitHub issues and pull requests so it can resolve relationship data, but its inclusion rule limits task creation to open issues and open, ready-for-review PRs. Closed issues and merged or closed PRs are only updated when a matching Todoist task already exists. The first run therefore does not import the repository's historical archive.
 
 The implementation has no database or service. GitHub Actions and the stable description line provide the state needed for safe reruns.
