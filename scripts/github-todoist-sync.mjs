@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const GITHUB_API = "https://api.github.com/graphql";
-const TODOIST_API = "https://api.todoist.com/rest/v2";
+const TODOIST_API = "https://api.todoist.com/api/v1";
 const METADATA_PREFIX = "GFC-GitHub:";
 
 const githubQuery = `
