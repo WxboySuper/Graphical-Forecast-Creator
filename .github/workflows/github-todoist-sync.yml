@@ -34,6 +34,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
-          TODOIST_DEFAULT_PROJECT_ID: ${{ vars.TODOIST_MAINTENANCE_PROJECT_ID }}
-          TODOIST_PROJECT_ROUTES_JSON: ${{ vars.TODOIST_PROJECT_ROUTES_JSON }}
+          TODOIST_DEFAULT_PROJECT_ID: 6hWfhw6hPHWxf5Hw
+          TODOIST_PROJECT_ROUTES_JSON: '[{"projectId":"6hWfhw4gMqJGQH23","labels":["infrastructure"]}]'
         run: node scripts/github-todoist-sync.mjs

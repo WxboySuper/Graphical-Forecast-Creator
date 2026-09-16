@@ -10,23 +10,12 @@ Secret:
 
 - `TODOIST_API_TOKEN`: a Todoist API token with access to the GFC workspace.
 
-Repository variables:
+The workflow hardcodes the two ongoing GFC subproject IDs:
 
-- `TODOIST_MAINTENANCE_PROJECT_ID`: the Todoist subproject ID for Maintenance. This is the fallback route.
-- `TODOIST_PROJECT_ROUTES_JSON`: the route list, including the other three Todoist project IDs.
+- Maintenance: `6hWfhw6hPHWxf5Hw`, used as the fallback route.
+- Infrastructure: `6hWfhw4gMqJGQH23`, used for the `infrastructure` label.
 
-Set `TODOIST_PROJECT_ROUTES_JSON` to a JSON array. Replace the placeholders with the Todoist subproject IDs. Change the labels or milestone names when the GitHub taxonomy changes.
-
-```json
-[
-  {"projectId":"<Repo Audit ID>","labels":["repo-audit","audit"]},
-  {"projectId":"<v1.8 ID>","milestones":["v1.8"]},
-  {"projectId":"<Infrastructure ID>","labels":["infrastructure"]},
-  {"projectId":"<Maintenance ID>","labels":["maintenance"]}
-]
-```
-
-The first matching route wins. A task with no matching label or milestone goes to Maintenance. Todoist project IDs are configuration only. They are never committed as source values.
+Repo Audit and v1.8 are intentionally not hardcoded because they are temporary projects. Add a route in the workflow if a future sync needs to target another temporary project. The first matching route wins. A task with no matching label goes to Maintenance.
 
 ## What appears in Todoist
 
