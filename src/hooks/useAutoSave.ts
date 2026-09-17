@@ -116,47 +116,19 @@ const migrateSevereLegacyAutoSave = (
   }
 };
 
-/** Migrates a non-Severe anonymous snapshot into the matching account scope. */
-const migrateWorkspaceAutoSave = (
-  userId?: string | null,
-  liveSession?: unknown,
-  workspaceId: ForecastWorkspaceId,
-): void => {
-  if (!userId) return;
-
-  try {
-    const scopedKey = getAutoSaveStorageKey(userId, workspaceId);
-    const anonymousKey = getAutoSaveStorageKey(null, workspaceId);
-    const scopedValue = localStorage.getItem(scopedKey);
-    const anonymousValue = localStorage.getItem(anonymousKey);
-
-    if (liveSession !== undefined && scopedValue === null) {
-      const preferred = pickNewestAutoSaveValue(anonymousValue, JSON.stringify(liveSession));
-      if (preferred) localStorage.setItem(scopedKey, preferred);
-      if (anonymousValue !== null) localStorage.removeItem(anonymousKey);
-      return;
-    }
-
-    if (scopedValue === null && anonymousValue !== null) {
-      localStorage.setItem(scopedKey, anonymousValue);
-      localStorage.removeItem(anonymousKey);
-    }
-  } catch {
-    // Ignore storage failures so sign-in never disrupts editing.
-  }
-};
-
-/** Migrates the anonymous snapshot for the active workspace into the account scope. */
+/**
+ * Migrates the legacy Severe snapshot into the account scope.
+ * Non-Severe workspace migration remains disabled until those workspaces have
+ * an explicit account migration contract, preventing accidental promotion of
+ * an anonymous snapshot into the wrong account scope.
+ */
 export const migrateLegacyAutoSave = (
   userId?: string | null,
   liveSession?: unknown,
   workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): void => {
-  if (workspaceId === DEFAULT_FORECAST_WORKSPACE) {
-    migrateSevereLegacyAutoSave(userId, liveSession);
-    return;
-  }
-  migrateWorkspaceAutoSave(userId, liveSession, workspaceId);
+  if (workspaceId !== DEFAULT_FORECAST_WORKSPACE) return;
+  migrateSevereLegacyAutoSave(userId, liveSession);
 };
 
 /** Debounces forecast edits into the current anonymous or account-scoped autosave. */
