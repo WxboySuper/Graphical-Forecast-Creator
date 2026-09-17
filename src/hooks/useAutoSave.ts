@@ -116,18 +116,13 @@ const migrateSevereLegacyAutoSave = (
   }
 };
 
-/** Migrates the anonymous snapshot for the active workspace into the account scope. */
-export const migrateLegacyAutoSave = (
+/** Migrates a non-Severe anonymous snapshot into the matching account scope. */
+const migrateWorkspaceAutoSave = (
   userId?: string | null,
   liveSession?: unknown,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+  workspaceId: ForecastWorkspaceId,
 ): void => {
   if (!userId) return;
-
-  if (workspaceId === DEFAULT_FORECAST_WORKSPACE) {
-    migrateSevereLegacyAutoSave(userId, liveSession);
-    return;
-  }
 
   try {
     const scopedKey = getAutoSaveStorageKey(userId, workspaceId);
@@ -149,6 +144,19 @@ export const migrateLegacyAutoSave = (
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.
   }
+};
+
+/** Migrates the anonymous snapshot for the active workspace into the account scope. */
+export const migrateLegacyAutoSave = (
+  userId?: string | null,
+  liveSession?: unknown,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): void => {
+  if (workspaceId === DEFAULT_FORECAST_WORKSPACE) {
+    migrateSevereLegacyAutoSave(userId, liveSession);
+    return;
+  }
+  migrateWorkspaceAutoSave(userId, liveSession, workspaceId);
 };
 
 /** Debounces forecast edits into the current anonymous or account-scoped autosave. */
