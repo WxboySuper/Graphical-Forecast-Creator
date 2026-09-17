@@ -58,6 +58,7 @@ type ForecastStateOverrides = {
 };
 
 const baseForecastState: ForecastState = {
+  workspaceId: 'severe',
   forecastCycle: {
     currentDay: 1,
     cycleDate: '2026-04-20',
