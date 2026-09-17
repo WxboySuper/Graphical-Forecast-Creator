@@ -46,6 +46,9 @@ All notable changes to this project will be documented in this file.
 - **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical recovery:** Reset timed-out geometry workers, preserve the newest probabilistic edit for a follow-up derivation, and prevent repeated retries of unchanged failed geometry.
+- Precision polygon editing now scopes vertex changes to the selected outlook tier and records multi-vertex edits as one undo step.
+- **Beta invite claims:** Activate premium access atomically when users claim a beta invite, preserve existing Stripe fields, and repair entitlement records for users already marked as beta-enabled.
+
 - **jszip:** ^3.10.1 → ^3.10.2
 - **react:** ^19.2.8 → ^19.3.0
 - **react-dom:** ^19.2.8 → ^19.3.0
@@ -57,7 +60,6 @@ All notable changes to this project will be documented in this file.
 - **autoprefixer:** ^10.5.4 → ^10.5.6
 - **postcss:** 8.5.26 → 8.5.28
 
-#
 ## v1.7.0
 
 #### Dependencies
