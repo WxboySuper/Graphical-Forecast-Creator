@@ -133,7 +133,7 @@ const AppRoutes: React.FC = () => {
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
         <Route path="forecast">
           <Route index element={<ForecastLegacyRedirect />} />
-          <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage /></Suspense>} />
+          <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId="severe" /></Suspense>} />
         </Route>
         <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
