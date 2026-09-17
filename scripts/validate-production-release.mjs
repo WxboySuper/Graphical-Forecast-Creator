@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { deriveStableVersion } from './lib/package-version.mjs';
 import { normalizeProductionDeployAction } from './lib/production-deploy-action.mjs';
+import { normalizeProductionDeployAction } from './lib/production-deploy-action.mjs';
 import {
   normalizeProductionReleaseConfig,
   validateProductionReleaseForDeploy,
