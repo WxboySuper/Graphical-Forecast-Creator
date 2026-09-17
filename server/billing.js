@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getBearerToken } = require('./firebase-auth');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
 const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
@@ -237,8 +238,7 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
 
 /** Extracts a verified Firebase user from the Authorization header. */
 const verifyRequestUser = async (req, res) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const token = getBearerToken(req);
   const adminAuth = getAdminAuth();
 
   if (!adminAuth || !hasFirebaseAdminConfig()) {

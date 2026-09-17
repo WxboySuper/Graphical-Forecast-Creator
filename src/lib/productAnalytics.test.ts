@@ -80,6 +80,45 @@ test('flushes a queued route as a native Umami page view after the tracker loads
   expect(track).not.toHaveBeenCalledWith('page_view', expect.anything());
 });
 
+test('bounds queued events and keeps the most recent telemetry', () => {
+  setProductAnalyticsEnabled(true);
+  initProductAnalytics('gfc.weatherboysuper.com');
+  const dayGroupings = ['day1', 'day2', 'day3', 'day4-8', 'full-cycle'] as const;
+  const accountTiers = ['signed-out', 'free', 'premium'] as const;
+  const entryPaths = ['home', 'forecast', 'cloud-library', 'forecast-workspace', 'rollover'] as const;
+  const packageScopes = ['workflow', 'cycle'] as const;
+  const results = ['success', 'failure', 'cancelled'] as const;
+  const queuedEvents = Array.from({ length: 105 }, (_, index) => ({
+    dayGrouping: dayGroupings[index % dayGroupings.length],
+    accountTier: accountTiers[Math.floor(index / dayGroupings.length) % accountTiers.length],
+    entryPath: entryPaths[Math.floor(index / (dayGroupings.length * accountTiers.length)) % entryPaths.length],
+    packageScope: packageScopes[Math.floor(index / (dayGroupings.length * accountTiers.length * entryPaths.length)) % packageScopes.length],
+    result: results[Math.floor(index / (dayGroupings.length * accountTiers.length * entryPaths.length * packageScopes.length)) % results.length],
+  }));
+
+  queuedEvents.forEach((properties) => {
+    trackProductEvent('workflow_start', properties, 'gfc.weatherboysuper.com');
+  });
+
+  const track = jest.fn();
+  window.umami = { track };
+  document.querySelector<HTMLScriptElement>('script[data-gfc-umami="true"]')?.dispatchEvent(new Event('load'));
+
+  expect(track).toHaveBeenCalledTimes(100);
+  expect(track.mock.calls).toEqual(queuedEvents.slice(5).map((properties) => ['workflow_start', properties]));
+});
+
+test('removes a failed tracker script so a later initialization can retry', () => {
+  setProductAnalyticsEnabled(true);
+  initProductAnalytics('gfc.weatherboysuper.com');
+  const failedScript = document.querySelector<HTMLScriptElement>('script[data-gfc-umami="true"]');
+  failedScript?.dispatchEvent(new Event('error'));
+
+  expect(document.querySelector('script[data-gfc-umami="true"]')).toBeNull();
+  initProductAnalytics('gfc.weatherboysuper.com');
+  expect(document.querySelectorAll('script[data-gfc-umami="true"]')).toHaveLength(1);
+});
+
 test('tears down tracker even when localStorage.setItem throws on disable', () => {
   setProductAnalyticsEnabled(true);
   initProductAnalytics('gfc.weatherboysuper.com');
