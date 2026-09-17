@@ -22,12 +22,14 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
   const strategy = useSelector((state: RootState) => state.overlays.outlookTrimStrategy);
   const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
   const cycleDate = useSelector((state: RootState) => state.forecast.forecastCycle.cycleDate);
+  const cycleGeneration = useSelector((state: RootState) => state.forecast.cycleGeneration);
   const currentOutlooks = useSelector(selectCurrentOutlooks);
   const [isTrimming, setIsTrimming] = useState(false);
 
   const trimCurrentDayOutlooks = useCallback(async () => {
     const trimDay = currentDay;
     const trimCycleDate = cycleDate;
+    const trimCycleGeneration = cycleGeneration;
     setIsTrimming(true);
     try {
       const landMask = await ensureLandMask(strategy);
@@ -36,8 +38,12 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
         return;
       }
 
-      const latestCycle = store.getState().forecast.forecastCycle;
-      if (latestCycle.cycleDate !== trimCycleDate || latestCycle.currentDay !== trimDay) {
+      const latestCycle = store.getState().forecast;
+      if (
+        latestCycle.cycleGeneration !== trimCycleGeneration ||
+        latestCycle.forecastCycle.cycleDate !== trimCycleDate ||
+        latestCycle.forecastCycle.currentDay !== trimDay
+      ) {
         addToast('Forecast changed while the land mask was loading. Try trimming again.', 'info');
         return;
       }
@@ -73,7 +79,7 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
     } finally {
       setIsTrimming(false);
     }
-  }, [addToast, currentDay, currentOutlooks, cycleDate, dispatch, store, strategy]);
+  }, [addToast, currentDay, currentOutlooks, cycleDate, cycleGeneration, dispatch, store, strategy]);
 
   return { trimCurrentDayOutlooks, isTrimming };
 };

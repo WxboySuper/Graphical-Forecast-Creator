@@ -62,6 +62,8 @@ export interface LifetimeCycleStats {
 
 export interface ForecastState {
   forecastCycle: ForecastCycle;
+  /** Bumps on every whole-cycle replacement so async work can detect the active document changed. */
+  cycleGeneration: number;
   drawingState: DrawingState;
   customEditor: {
     mode: 'severe' | 'custom';
@@ -332,7 +334,13 @@ const sharedEmptyOutlookData = (day: DayType): OutlookData | null => {
   return null;
 };
 
+/** Bumps the cycle generation when the active forecast document is fully replaced. */
+const advanceCycleGeneration = (state: ForecastState) => {
+  state.cycleGeneration = (state.cycleGeneration ?? 0) + 1;
+};
+
 const initialState: ForecastState = {
+  cycleGeneration: 1,
   forecastCycle: {
     days: {
       1: createEmptyOutlook(1, INITIAL_TIMESTAMP)
@@ -700,6 +708,7 @@ const applyRolloverFromPreviousCycle = (state: ForecastState, args: ApplyRollove
   clearHistory(state);
   state.discussionDraftsByScope = {};
   state.forecastCycle = buildRolloverCycle({ ...args, now });
+  advanceCycleGeneration(state);
   state.isSaved = false;
   state.outlookVersionSnapshots = [];
   applyRolloverWorkflowState(state, args, now);
@@ -852,7 +861,7 @@ export const forecastSlice = createSlice({
 
     resetForecasts: (state, action: UnknownAction) => {
       clearHistory(state);
-      state.discussionDraftsByScope = {};
+        state.discussionDraftsByScope = {};
 
       // Generate today's local date so rollover prompts and resets stay aligned.
       const today = getActionLocalCalendarDate(action);
@@ -863,10 +872,11 @@ export const forecastSlice = createSlice({
           1: createEmptyOutlook(1, readActionTimestamp(action))
         },
         currentDay: 1,
-        cycleDate: today
+        cycleDate: today,
       };
 
       state.forecastCycle = newCycle;
+      advanceCycleGeneration(state);
       state.isSaved = false;
       state.outlookVersionSnapshots = [];
       state.workflowMetadata = undefined;
@@ -882,6 +892,7 @@ export const forecastSlice = createSlice({
     restoreForecastCycle: {
       reducer: (state, action: PayloadAction<{ cycle: ForecastCycle; preserveDiscussionDrafts?: boolean }>) => {
         state.forecastCycle = action.payload.cycle;
+        advanceCycleGeneration(state);
         if (!action.payload.preserveDiscussionDrafts) {
           state.discussionDraftsByScope = {};
         }
@@ -900,6 +911,7 @@ export const forecastSlice = createSlice({
     // Import forecast data: Now handles Cycle
     importForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
       state.forecastCycle = action.payload;
+      advanceCycleGeneration(state);
       state.discussionDraftsByScope = {};
       clearHistory(state);
       state.isSaved = true;
@@ -1047,8 +1059,9 @@ export const forecastSlice = createSlice({
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
       if (savedCycle) {
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
+        advanceCycleGeneration(state);
         clearHistory(state);
-      state.discussionDraftsByScope = {};
+        state.discussionDraftsByScope = {};
         state.isSaved = true;
         state.outlookVersionSnapshots = [];
         
@@ -1328,9 +1341,10 @@ export const forecastSlice = createSlice({
       const newCycle: ForecastCycle = {
         days: { [startDay]: createEmptyOutlook(startDay, now) },
         currentDay: startDay,
-        cycleDate: today
+        cycleDate: today,
       };
       state.forecastCycle = newCycle;
+      advanceCycleGeneration(state);
       state.isSaved = false;
       state.outlookVersionSnapshots = [];
       
@@ -1368,6 +1382,7 @@ export const forecastSlice = createSlice({
       clearHistory(state);
       state.discussionDraftsByScope = {};
       state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
+      advanceCycleGeneration(state);
       state.isSaved = true;
       state.outlookVersionSnapshots = [];
       

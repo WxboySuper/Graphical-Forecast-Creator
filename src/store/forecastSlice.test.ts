@@ -56,7 +56,6 @@ const createPolygon = (offset: number): Polygon => ({
     [offset, offset],
   ]],
 });
-
 interface FeatureOptions {
   outlookType: string;
   probability: string;
@@ -1249,6 +1248,38 @@ describe('forecastSlice undo/redo', () => {
     });
   });
 
+  describe('cycle session identity', () => {
+    it('advances the cycle generation every time the whole cycle is replaced', () => {
+      const first = reducer(undefined, createOutlookUpdate());
+      const restored = reducer(first, restoreForecastCycle(first.forecastCycle));
+      const imported = reducer(restored, resetForecasts());
+      const started = reducer(imported, startBlankCycle({}));
+
+      expect(restored.cycleGeneration).toBe(2);
+      expect(imported.cycleGeneration).toBe(3);
+      expect(started.cycleGeneration).toBe(4);
+    });
+
+    it('does not advance the generation for ordinary day edits', () => {
+      let state = reducer(undefined, resetForecasts());
+      state = reducer(state, setForecastDay(1));
+      const generation = state.cycleGeneration;
+      state = reducer(state, setForecastDay(2));
+
+      expect(state.cycleGeneration).toBe(generation);
+    });
+
+    it('advances the generation on saved-cycle loads', () => {
+      let state = reducer(undefined, setForecastDay(1));
+      state = reducer(state, resetForecasts());
+      state = reducer(state, saveCurrentCycle({}));
+      const generation = state.cycleGeneration;
+      state = reducer(state, resumeIncompleteCycle({ cycleId: state.savedCycles[0].id }));
+
+      expect(state.cycleGeneration).toBe(generation + 1);
+    });
+  });
+
   describe('selector referential stability', () => {
     const withForecast = (forecastState: ReturnType<typeof reducer>) => ({ forecast: forecastState } as Parameters<typeof selectCurrentOutlooks>[0]);
 
@@ -1317,3 +1348,4 @@ describe('forecastSlice undo/redo', () => {
     });
   });
 });
+
