@@ -64,7 +64,6 @@ All notable changes to this project will be documented in this file.
 - **autoprefixer:** ^10.5.4 → ^10.5.6
 - **postcss:** 8.5.26 → 8.5.28
 
-#
 ## v1.7.0
 
 #### Dependencies
