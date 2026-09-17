@@ -40,6 +40,13 @@ All notable changes to this project will be documented in this file.
 - **stripe:** ^22.4.0 → ^22.6.1 (`server`)
 - **Paint bucket editing prototype:** Add beta-gated Step and Set editing for existing probabilistic outlook polygons, with undo/redo support.
 - **Population estimate prototype:** Add a beta-gated WorldPop estimate for the population inside the active day's active-hazard outlook polygons.
+
+<!-- Continue next-major work here after this stable line is cut. -->
+
+
+#### Fixed
+
+- **Production deployment action fallback:** Treat the manual workflow's `auto` option as a request to use the release manifest instead of rejecting it as an invalid deploy action.
 - **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
 - **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
 - **Forecast map basemap:** Restore vendored weather-map geometry on nested forecast routes and prevent delayed basemap loads from undoing a newer map selection.

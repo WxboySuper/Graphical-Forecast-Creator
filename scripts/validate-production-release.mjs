@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { deriveStableVersion } from './lib/package-version.mjs';
+import { normalizeProductionDeployAction } from './lib/production-deploy-action.mjs';
 import {
   normalizeProductionReleaseConfig,
   validateProductionReleaseForDeploy,
@@ -14,7 +15,7 @@ import {
 const manifestPath = resolve('deploy/production-release.json');
 const packageVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
 const expectedVersion = deriveStableVersion(packageVersion) ?? packageVersion;
-const deployAction = process.env.DEPLOY_ACTION?.trim() || '';
+const deployAction = normalizeProductionDeployAction(process.env.DEPLOY_ACTION);
 const force = process.env.DEPLOY_FORCE === 'true';
 const previousReleaseId = process.env.PREVIOUS_RELEASE_ID?.trim() || '';
 const previousVpsStatus = process.env.PREVIOUS_VPS_STATUS?.trim() || '';
