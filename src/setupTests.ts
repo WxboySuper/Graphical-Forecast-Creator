@@ -6,7 +6,6 @@ import '@testing-library/jest-dom';
 import { TextDecoder, TextEncoder } from 'util';
 
 const globalScope = globalThis as typeof globalThis & {
-  __GFC_COMING_SOON__?: boolean;
   __GFC_BETA_MODE__?: boolean;
   __GFC_BETA_INVITE_PATH__?: string;
   __GFC_BUILD_TARGET__?: import('./config/buildTarget').BuildTarget;
@@ -29,10 +28,6 @@ if (!globalScope.TextEncoder) {
 }
 if (!globalScope.TextDecoder) {
   globalScope.TextDecoder = TextDecoder as typeof globalScope.TextDecoder;
-}
-
-if (typeof globalScope.__GFC_COMING_SOON__ === 'undefined') {
-  globalScope.__GFC_COMING_SOON__ = false;
 }
 
 if (typeof globalScope.__GFC_BETA_MODE__ === 'undefined') {
