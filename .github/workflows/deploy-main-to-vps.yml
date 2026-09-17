@@ -160,15 +160,8 @@ jobs:
           export PREVIOUS_RELEASE_ID
           export PREVIOUS_VPS_STATUS
           set -euo pipefail
-          set -euo pipefail
           node scripts/validate-production-release.mjs | tee /tmp/validate-release.txt
-          ACTION=$(node -e "
-            const fs=require('fs');
-            const input=process.env.DEPLOY_ACTION||'';
-            const raw=JSON.parse(fs.readFileSync('deploy/production-release.json','utf8'));
-            const action=input||raw.action||'live';
-            console.log(action);
-          ")
+          ACTION=$(node scripts/resolve-production-deploy-action.mjs)
           echo "action=$ACTION" >> "$GITHUB_OUTPUT"
           if [ "$ACTION" = "none" ]; then
             echo "Deploy skipped (action=none)."
