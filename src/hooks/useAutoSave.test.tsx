@@ -69,6 +69,14 @@ describe('useAutoSave', () => {
     expect(pickNewestAutoSaveValue(scoped, legacy, JSON.stringify({ live: true, timestamp: '2026-07-14T11:00:00.000Z' }))).toBe(legacy);
   });
 
+  test('ignores snapshots with malformed timestamps when choosing the newest value', () => {
+    const invalid = JSON.stringify({ invalid: true, timestamp: 'not-a-date' });
+    const valid = JSON.stringify({ valid: true, timestamp: '2026-07-14T12:00:00.000Z' });
+
+    expect(pickNewestAutoSaveValue(invalid, valid)).toBe(valid);
+    expect(pickNewestAutoSaveValue(invalid)).toBeNull();
+  });
+
   test('clears the active account autosave and legacy fallback for a fresh workflow', () => {
     localStorage.setItem('forecastData:user-user-1', JSON.stringify({ account: true }));
     localStorage.setItem('forecastData', JSON.stringify({ legacy: true }));
