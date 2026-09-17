@@ -9,7 +9,7 @@ import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenc
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
 const LOCAL_STORAGE_KEY = 'forecastData';
 
-/** Returns the autosave key for an account scope, or the legacy key anonymously. */
+/** Returns the autosave key for an account scope, or the workspace key anonymously. */
 const getWorkspaceAutoSaveBaseKey = (workspaceId: ForecastWorkspaceId): string =>
   workspaceId === DEFAULT_FORECAST_WORKSPACE ? LOCAL_STORAGE_KEY : `${LOCAL_STORAGE_KEY}:${workspaceId}`;
 
@@ -116,14 +116,39 @@ const migrateSevereLegacyAutoSave = (
   }
 };
 
-/** Migrates only the legacy Severe snapshot; other workspaces have no legacy key to promote. */
+/** Migrates the anonymous snapshot for the active workspace into the account scope. */
 export const migrateLegacyAutoSave = (
   userId?: string | null,
   liveSession?: unknown,
   workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): void => {
-  if (workspaceId !== DEFAULT_FORECAST_WORKSPACE) return;
-  migrateSevereLegacyAutoSave(userId, liveSession);
+  if (!userId) return;
+
+  if (workspaceId === DEFAULT_FORECAST_WORKSPACE) {
+    migrateSevereLegacyAutoSave(userId, liveSession);
+    return;
+  }
+
+  try {
+    const scopedKey = getAutoSaveStorageKey(userId, workspaceId);
+    const anonymousKey = getAutoSaveStorageKey(null, workspaceId);
+    const scopedValue = localStorage.getItem(scopedKey);
+    const anonymousValue = localStorage.getItem(anonymousKey);
+
+    if (liveSession !== undefined && scopedValue === null) {
+      const preferred = pickNewestAutoSaveValue(anonymousValue, JSON.stringify(liveSession));
+      if (preferred) localStorage.setItem(scopedKey, preferred);
+      if (anonymousValue !== null) localStorage.removeItem(anonymousKey);
+      return;
+    }
+
+    if (scopedValue === null && anonymousValue !== null) {
+      localStorage.setItem(scopedKey, anonymousValue);
+      localStorage.removeItem(anonymousKey);
+    }
+  } catch {
+    // Ignore storage failures so sign-in never disrupts editing.
+  }
 };
 
 /** Debounces forecast edits into the current anonymous or account-scoped autosave. */

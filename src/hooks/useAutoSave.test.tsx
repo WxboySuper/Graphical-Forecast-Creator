@@ -2,7 +2,7 @@ import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView, setCycleDate } from '../store/forecastSlice';
-import { clearAutoSave, migrateLegacyAutoSave, pickNewestAutoSaveValue, selectPreferredAutoSaveValue, useAutoSave } from './useAutoSave';
+import { clearAutoSave, getAutoSaveStorageKey, migrateLegacyAutoSave, pickNewestAutoSaveValue, selectPreferredAutoSaveValue, useAutoSave } from './useAutoSave';
 import { serializeForecast } from '../utils/fileUtils';
 
 jest.mock('../utils/fileUtils', () => ({
@@ -39,6 +39,35 @@ describe('useAutoSave', () => {
 
     expect(localStorage.getItem('forecastData')).toBeNull();
     expect(localStorage.getItem('forecastData:user-user%2F1')).toBe(JSON.stringify({ legacy: true }));
+  });
+
+  test('keeps workspace autosaves in separate anonymous and account scopes', () => {
+    expect(getAutoSaveStorageKey(null, 'custom')).toBe('forecastData:custom');
+    expect(getAutoSaveStorageKey('user-1', 'custom')).toBe('forecastData:custom:user-user-1');
+    expect(getAutoSaveStorageKey('user-1', 'severe')).toBe('forecastData:user-user-1');
+  });
+
+  test('migrates a non-Severe anonymous autosave into its account scope', () => {
+    const anonymousKey = getAutoSaveStorageKey(null, 'custom');
+    const scopedKey = getAutoSaveStorageKey('user-1', 'custom');
+    localStorage.setItem(anonymousKey, JSON.stringify({ custom: true }));
+
+    migrateLegacyAutoSave('user-1', undefined, 'custom');
+
+    expect(localStorage.getItem(anonymousKey)).toBeNull();
+    expect(localStorage.getItem(scopedKey)).toBe(JSON.stringify({ custom: true }));
+  });
+
+  test('does not overwrite a non-Severe account autosave during migration', () => {
+    const anonymousKey = getAutoSaveStorageKey(null, 'custom');
+    const scopedKey = getAutoSaveStorageKey('user-1', 'custom');
+    localStorage.setItem(anonymousKey, JSON.stringify({ anonymous: true }));
+    localStorage.setItem(scopedKey, JSON.stringify({ account: true }));
+
+    migrateLegacyAutoSave('user-1', undefined, 'custom');
+
+    expect(localStorage.getItem(anonymousKey)).toBe(JSON.stringify({ anonymous: true }));
+    expect(localStorage.getItem(scopedKey)).toBe(JSON.stringify({ account: true }));
   });
 
   test('persists live in-memory edits instead of migrating a stale legacy snapshot', () => {
@@ -85,6 +114,17 @@ describe('useAutoSave', () => {
 
     expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
     expect(localStorage.getItem('forecastData')).toBeNull();
+  });
+
+  test('clears only the selected non-Severe workspace autosave', () => {
+    const customKey = getAutoSaveStorageKey('user-1', 'custom');
+    localStorage.setItem(customKey, JSON.stringify({ custom: true }));
+    localStorage.setItem('forecastData', JSON.stringify({ severe: true }));
+
+    clearAutoSave('user-1', 'custom');
+
+    expect(localStorage.getItem(customKey)).toBeNull();
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ severe: true }));
   });
 
   test('does not overwrite an existing signed-in autosave during migration', () => {
