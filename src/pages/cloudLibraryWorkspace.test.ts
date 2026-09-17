@@ -1,4 +1,9 @@
-import { getCloudLibraryTabs, getCloudCycleWorkspaceId, filterCloudCyclesByWorkspace } from './cloudLibraryWorkspace';
+import {
+  getCloudLibraryTabFromSearchParams,
+  getCloudLibraryTabs,
+  getCloudCycleWorkspaceId,
+  filterCloudCyclesByWorkspace,
+} from './cloudLibraryWorkspace';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 
 const makeCycle = (id: string, workspaceId?: CloudCycleMetadata['workspaceId']): CloudCycleMetadata => ({
@@ -37,5 +42,13 @@ describe('cloud library workspace boundaries', () => {
       { id: 'severe', label: 'Severe', cycleCount: 1 },
       { id: 'custom', label: 'Custom', cycleCount: 1 },
     ]);
+  });
+
+  it('accepts only tabs present in the current exposed tab set', () => {
+    const tabs = getCloudLibraryTabs([makeCycle('legacy')], 'production');
+
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=custom'), tabs)).toBe('custom');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=mesoscale'), tabs)).toBe('all');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=unknown'), tabs)).toBe('all');
   });
 });
