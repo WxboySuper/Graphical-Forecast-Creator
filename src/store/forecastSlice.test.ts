@@ -32,6 +32,7 @@ import reducer, {
   createOutlookUpdate,
   startFromPreviousCycle,
   saveCurrentCycle,
+  setForecastWorkspace,
   deleteSavedCycle,
   loadCycleHistory,
   SAVED_CYCLES_LIMIT,
@@ -316,6 +317,14 @@ const getRedoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
 
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module", disable:"Code Duplication")
 describe('forecastSlice undo/redo', () => {
+  test('records the active workspace on saved cycles', () => {
+    let state = reducer(undefined, setForecastWorkspace('custom'));
+    state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
+
+    expect(state.workspaceId).toBe('custom');
+    expect(state.savedCycles[0]?.workspaceId).toBe('custom');
+  });
+
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
     let state = reducer(undefined, { type: 'test/init' });
     for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {
