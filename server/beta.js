@@ -83,8 +83,8 @@ const grantBetaAccess = async (uid) => {
       profileRef,
       {
         betaAccess: true,
-        betaGrantedAt: profileData.betaGrantedAt || now,
-        betaInviteSource: profileData.betaInviteSource || 'discord',
+        betaGrantedAt: profileData.betaGrantedAt ?? now,
+        betaInviteSource: profileData.betaInviteSource ?? 'discord',
       },
       { merge: true }
     );

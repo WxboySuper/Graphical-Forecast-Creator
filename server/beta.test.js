@@ -70,6 +70,7 @@ after(() => {
 
 describe('beta entitlement grants', () => {
   it('activates premium while preserving existing Stripe entitlement fields', async () => {
+    const startedAt = Date.now();
     documents.set('userProfiles/user-1', {
       betaGrantedAt: 'existing-date',
       betaInviteSource: 'existing-source',
@@ -89,7 +90,8 @@ describe('beta entitlement grants', () => {
       betaInviteSource: 'existing-source',
       betaAccess: true,
     });
-    assert.deepEqual(documents.get('userEntitlements/user-1'), {
+    const { updatedAt, ...entitlementWithoutTimestamp } = documents.get('userEntitlements/user-1');
+    assert.deepEqual(entitlementWithoutTimestamp, {
       uid: 'user-1',
       billingStatus: 'inactive',
       stripeCustomerId: 'cus_existing',
@@ -100,17 +102,44 @@ describe('beta entitlement grants', () => {
       effectiveSource: 'beta_override',
       cancelAtPeriodEnd: false,
       currentPeriodEnd: null,
-      updatedAt: documents.get('userEntitlements/user-1').updatedAt,
     });
-    assert.ok(documents.get('userEntitlements/user-1').updatedAt instanceof Date);
+    assert.ok(updatedAt instanceof Date);
+    assert.ok(updatedAt.getTime() >= startedAt);
+    assert.ok(updatedAt.getTime() <= Date.now());
   });
 
   it('repairs an entitlement when the profile was already granted beta access', async () => {
-    documents.set('userProfiles/user-2', { betaAccess: true });
+    documents.set('userProfiles/user-2', {
+      betaAccess: true,
+      betaGrantedAt: 'existing-date',
+      betaInviteSource: 'existing-source',
+    });
+    documents.set('userEntitlements/user-2', {
+      uid: 'user-2',
+      stripeCustomerId: 'cus_existing',
+      stripeSubscriptionId: 'sub_existing',
+    });
 
     await __testing.grantBetaAccess('user-2');
 
-    assert.equal(documents.get('userEntitlements/user-2').premiumActive, true);
-    assert.equal(documents.get('userEntitlements/user-2').effectiveSource, 'beta_override');
+    assert.deepEqual(documents.get('userProfiles/user-2'), {
+      betaAccess: true,
+      betaGrantedAt: 'existing-date',
+      betaInviteSource: 'existing-source',
+    });
+    const { updatedAt, ...entitlementWithoutTimestamp } = documents.get('userEntitlements/user-2');
+    assert.deepEqual(entitlementWithoutTimestamp, {
+      uid: 'user-2',
+      stripeCustomerId: 'cus_existing',
+      stripeSubscriptionId: 'sub_existing',
+      betaOverrideActive: true,
+      premiumActive: true,
+      effectiveSource: 'beta_override',
+      planInterval: null,
+      billingStatus: 'inactive',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+    });
+    assert.ok(updatedAt instanceof Date);
   });
 });
