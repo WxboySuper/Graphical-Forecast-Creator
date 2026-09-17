@@ -160,6 +160,7 @@ jobs:
           export PREVIOUS_RELEASE_ID
           export PREVIOUS_VPS_STATUS
           set -euo pipefail
+          set -euo pipefail
           node scripts/validate-production-release.mjs | tee /tmp/validate-release.txt
           ACTION=$(node -e "
             const fs=require('fs');
