@@ -1,3 +1,7 @@
+/**
+ * Saved-cycle history modal. It selects cycle history, renders the list and
+ * detail actions, and reports open, restore, and delete events to its parent.
+ */
 import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
