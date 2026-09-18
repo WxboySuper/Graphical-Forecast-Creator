@@ -1,3 +1,7 @@
+/**
+ * Storm-report parsing entry point. It combines archive and current-day row
+ * parsers and exposes normalized storm-report records to monitor and grading.
+ */
 import { StormReport, ReportType } from '../types/stormReports';
 import { parseArchiveCsvRow } from './stormReportRows';
 import { parseTodayStormReportCsv } from './stormReportTodayCsv';
