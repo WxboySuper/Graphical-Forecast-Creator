@@ -1,3 +1,9 @@
+/**
+ * Feature-exposure test harness: this module provides reusable render, route,
+ * target, and assertion helpers for exposure-gated React tests. It owns test
+ * setup and deterministic fixtures, not production feature policy or runtime
+ * application behavior.
+ */
 import { render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { MemoryRouter, Routes } from 'react-router';
 import type { ReactElement } from 'react';
