@@ -2,7 +2,11 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { registerMetricsRoutes } = require('./metricsRoutes');
+const {
+  ADMIN_RATE_LIMIT_OPTIONS,
+  METRICS_RATE_LIMIT_OPTIONS,
+  registerMetricsRoutes,
+} = require('./metricsRoutes');
 
 describe('metrics route adapter', () => {
   it('registers both endpoints with the supplied handlers and limits', async () => {
@@ -36,5 +40,22 @@ describe('metrics route adapter', () => {
     await routes[1][3]({}, {});
     assert.equal(metricCalls, 1);
     assert.equal(adminCalls, 1);
+  });
+
+  it('keeps the documented rate limits attached to each endpoint', () => {
+    assert.deepEqual(METRICS_RATE_LIMIT_OPTIONS, {
+      windowMs: 60 * 1000,
+      max: 120,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many metrics events right now. Please wait a moment and try again.' },
+    });
+    assert.deepEqual(ADMIN_RATE_LIMIT_OPTIONS, {
+      windowMs: 60 * 1000,
+      max: 30,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many admin metric requests right now. Please wait a moment and try again.' },
+    });
   });
 });
