@@ -1,3 +1,9 @@
+/**
+ * Legacy verification geometry helpers: this module provides report-to-outlook
+ * spatial checks and summary utilities retained for compatibility surfaces.
+ * New grade scoring belongs under `verificationV2`; this boundary stays pure
+ * and does not own Redux, network, or rendering behavior.
+ */
 import { bbox, booleanPointInPolygon, feature as turfFeature, point } from '@turf/turf';
 import type { Feature, Polygon, MultiPolygon, Geometry, GeoJsonProperties } from 'geojson';
 import { StormReport, ReportType } from '../types/stormReports';
