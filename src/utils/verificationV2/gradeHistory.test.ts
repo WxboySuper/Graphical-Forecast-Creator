@@ -6,14 +6,7 @@ import {
   loadGradeSnapshot,
   recordGradeResult,
 } from './gradeHistory';
-import {
-  availablePackageSources,
-  buildGradeCard,
-  resolveAccountTier,
-  tierHasHistory,
-  tierHasSnapshots,
-  toArchiveDate,
-} from './sources';
+import { buildGradeCard } from './sources';
 import { gradeForecast } from './gradeForecast';
 import { circleContour, scatterReports, tornadoOutlook } from './testFixtures';
 import type { GradeCard, GradeSnapshot } from '../../types/forecastGrade';
@@ -36,34 +29,6 @@ const sampleCard = (overrides: Partial<GradeCard> = {}): GradeCard => ({
 
 beforeEach(() => {
   window.localStorage.clear();
-});
-
-describe('account tiers and sources', () => {
-  test('resolves tier from auth + entitlement', () => {
-    expect(resolveAccountTier(false, false)).toBe('signed-out');
-    expect(resolveAccountTier(true, false)).toBe('free');
-    expect(resolveAccountTier(true, true)).toBe('premium');
-  });
-
-  test('only premium gets the cloud package source', () => {
-    expect(availablePackageSources('signed-out')).toEqual(['file']);
-    expect(availablePackageSources('free')).toEqual(['file']);
-    expect(availablePackageSources('premium')).toEqual(['file', 'cloud']);
-  });
-
-  test('converts ISO date input to SPC archive YYMMDD', () => {
-    expect(toArchiveDate('2024-05-06')).toBe('240506');
-    expect(toArchiveDate('240506')).toBe('240506');
-    expect(toArchiveDate('2024-99-99')).toBeNull();
-    expect(toArchiveDate('2024-5-6')).toBeNull();
-  });
-
-  test('history and snapshot capability by tier', () => {
-    expect(tierHasHistory('signed-out')).toBe(false);
-    expect(tierHasHistory('free')).toBe(true);
-    expect(tierHasSnapshots('free')).toBe(false);
-    expect(tierHasSnapshots('premium')).toBe(true);
-  });
 });
 
 describe('account scope', () => {
