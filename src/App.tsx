@@ -33,7 +33,7 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
-import { DEFAULT_FORECAST_WORKSPACE, getDefaultForecastWorkspacePath, resolveForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
+import { DEFAULT_FORECAST_WORKSPACE, getDefaultForecastWorkspacePath, resolveExposedForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -78,7 +78,7 @@ const AppHooks = () => {
   const location = useLocation();
   const { user } = useAuth();
   const userId = user?.uid;
-  const workspaceId = resolveForecastWorkspacePath(location.pathname)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+  const workspaceId = resolveExposedForecastWorkspacePath(location.pathname)?.id ?? DEFAULT_FORECAST_WORKSPACE;
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();

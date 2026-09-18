@@ -5,6 +5,7 @@ import {
   getForecastWorkspace,
   getForecastWorkspaceByPath,
   getExposedForecastWorkspaces,
+  isForecastWorkspaceExposed,
   type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
@@ -23,6 +24,15 @@ export const getDefaultForecastWorkspacePath = (): string =>
 /** Resolves a canonical workspace route without applying exposure rules. */
 export const resolveForecastWorkspacePath = (path: string): ForecastWorkspaceDefinition | undefined =>
   getForecastWorkspaceByPath(path);
+
+/** Resolves a canonical workspace route only when its build target exposes it. */
+export const resolveExposedForecastWorkspacePath = (
+  path: string,
+  target?: BuildTarget,
+): ForecastWorkspaceDefinition | undefined => {
+  const workspace = resolveForecastWorkspacePath(path);
+  return workspace && isForecastWorkspaceExposed(workspace, target) ? workspace : undefined;
+};
 
 /** Resolves a legacy path to its owning workspace without applying exposure rules. */
 export const resolveLegacyForecastWorkspacePath = (path: string): ForecastWorkspaceDefinition | undefined =>

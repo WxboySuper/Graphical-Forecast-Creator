@@ -1,5 +1,6 @@
 import * as fileUtils from '../utils/fileUtils';
 import forecastReducer from '../store/forecastSlice';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import type { DiscussionData } from '../types/outlooks';
 import {
   buildRestoreKey,
@@ -27,6 +28,10 @@ describe('forecastPageController', () => {
     expect(formatRolloverDayLabel('bad-date')).toBe('bad-date');
     expect(parseStoredForecastPayload(null)).toBeNull();
     expect(parseStoredForecastPayload('not-json')).toBeNull();
+    const cycle = createForecastCycle();
+    const customPayload = serializeForecastWorkspace('custom', cycle, { center: [0, 0], zoom: 4 });
+    expect(parseStoredForecastPayload(JSON.stringify(customPayload), 'custom')).toEqual(customPayload);
+    expect(parseStoredForecastPayload(JSON.stringify(customPayload), 'severe')).toBeNull();
     expect(parseStoredCloudMeta('{"id":"abc","label":"Cycle"}')).toEqual({
       id: 'abc',
       label: 'Cycle',
@@ -35,6 +40,7 @@ describe('forecastPageController', () => {
     expect(hasRestorableCloudSelection({ id: 'abc' })).toBe(false);
     expect(buildRestoreKey(null)).toBe('anonymous');
     expect(buildRestoreKey('user-1')).toBe('user-1');
+    expect(buildRestoreKey('user-1', 'custom')).toBe('user-1:custom');
   });
 
   test('derives rollover candidates and preserves pending prompts', () => {
@@ -94,7 +100,16 @@ describe('forecastPageController', () => {
       saveCycle,
       clearCurrent,
       dispatch,
+      workspaceId: 'custom',
     })).toBe(true);
+    expect(saveCycle).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Object),
+      undefined,
+      { saveAsNew: true, workspaceId: 'custom' },
+    );
     expect(clearCurrent).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledTimes(1);
 

@@ -526,7 +526,7 @@ describe('ForecastPage helpers', () => {
     const saveCycle = jest.fn().mockResolvedValue(true);
     dispatch.mockClear();
     expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(true);
-    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true });
+    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true, workspaceId: 'severe' });
     expect(clearCurrent).toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledTimes(1);
 

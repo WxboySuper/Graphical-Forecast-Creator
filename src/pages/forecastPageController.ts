@@ -358,7 +358,12 @@ const restoreAvailableSession = (
 ) => restoreCloudSession({ dispatch, addToast, onCloudCycleLoaded: currentSession.onCloudCycleLoaded, userId, workspaceId })
   || restoreLocalSession({ dispatch, addToast, currentSession, userId, workspaceId });
 
-export const buildRestoreKey = (userId?: string | null): string => userId || 'anonymous';
+export const buildRestoreKey = (
+  userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): string => workspaceId === DEFAULT_FORECAST_WORKSPACE
+  ? userId || 'anonymous'
+  : `${userId || 'anonymous'}:${workspaceId}`;
 
 /** Restores the pending cloud or local session once per signed-in storage scope. */
 export const useSessionRestore = (
@@ -399,7 +404,7 @@ export const useSessionRestore = (
         : undefined;
       migrateLegacyAutoSave(userId, liveSession, workspaceId);
       previousUserIdRef.current = userId;
-      const restoreKey = buildRestoreKey(userId);
+      const restoreKey = buildRestoreKey(userId, workspaceId);
       if (appliedRestoreKeyRef.current === restoreKey) {
         setRestoreAttempted(true);
         return;
@@ -578,9 +583,9 @@ export const runDayRolloverDownloadAction = ({ forecastCycle, mapView, dispatch,
   }
 };
 
-export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch }: { forecastCycle: ReturnType<typeof selectForecastCycle>; currentMapView: RootState['forecast']['currentMapView']; saveCycle: UseCloudCyclesResult['saveCycle']; clearCurrent: UseCloudCyclesResult['clearCurrent']; dispatch: ShortcutDispatch }): Promise<boolean> => {
+export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch, workspaceId }: { forecastCycle: ReturnType<typeof selectForecastCycle>; currentMapView: RootState['forecast']['currentMapView']; saveCycle: UseCloudCyclesResult['saveCycle']; clearCurrent: UseCloudCyclesResult['clearCurrent']; dispatch: ShortcutDispatch; workspaceId?: ForecastWorkspaceId }): Promise<boolean> => {
   try {
-    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true });
+    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true, workspaceId: workspaceId ?? DEFAULT_FORECAST_WORKSPACE });
     if (!success) return false;
     clearCurrent();
     dispatch(resetForecasts());
@@ -602,6 +607,7 @@ interface DayRolloverPromptArgs {
   canSaveToCloud: boolean;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   clearCurrent: UseCloudCyclesResult['clearCurrent'];
+  workspaceId?: ForecastWorkspaceId;
 }
 
 type PromptStateSetter = (value: DayRolloverPromptState | null) => void;
@@ -683,7 +689,7 @@ const useDayRolloverDetection = ({ restoreComplete, userId, runtimeRefs, setProm
   }, [detectDayRollover]);
 };
 
-const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, setActionError, setIsBusy, saveCycle }: Pick<DayRolloverPromptArgs, 'addToast' | 'clearCurrent' | 'currentMapView' | 'dispatch' | 'forecastCycle' | 'saveCycle'> & {
+const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, setActionError, setIsBusy, saveCycle, workspaceId }: Pick<DayRolloverPromptArgs, 'addToast' | 'clearCurrent' | 'currentMapView' | 'dispatch' | 'forecastCycle' | 'saveCycle' | 'workspaceId'> & {
   completeRollover: () => void;
   setActionError: ActionErrorSetter;
   setIsBusy: BusyStateSetter;
@@ -701,7 +707,7 @@ const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, curre
     setIsBusy(true);
     setActionError(null);
     try {
-      const success = await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch });
+      const success = await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch, workspaceId });
       if (!success) {
         setActionError('Unable to save this session to the cloud. Your current forecast is still open.');
         return;
@@ -711,7 +717,7 @@ const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, curre
     } finally {
       setIsBusy(false);
     }
-  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy]);
+  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy, workspaceId]);
   const handleReplaceWithoutSaving = useCallback(() => {
     clearCurrent();
     dispatch(resetForecasts());
@@ -723,7 +729,7 @@ const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, curre
 };
 
 /** Owns day-rollover detection and the save/download/replace actions for the page. */
-export const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addToast, forecastCycle, currentMapView, isSaved, userId, canSaveToCloud, saveCycle, clearCurrent }: DayRolloverPromptArgs) => {
+export const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addToast, forecastCycle, currentMapView, isSaved, userId, canSaveToCloud, saveCycle, clearCurrent, workspaceId }: DayRolloverPromptArgs) => {
   const [promptState, setPromptState] = useState<DayRolloverPromptState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -735,7 +741,7 @@ export const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatc
     setPromptState(null);
     setActionError(null);
   }, [setActionError, setPromptState, userId]);
-  const actions = useDayRolloverActions({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy });
+  const actions = useDayRolloverActions({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy, workspaceId });
 
   return { promptState, canSaveToCloud, isBusy, error: actionError, ...actions };
 };
