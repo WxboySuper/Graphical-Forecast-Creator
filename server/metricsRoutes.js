@@ -2,20 +2,22 @@
 
 const rateLimit = require('express-rate-limit');
 
-const METRICS_RATE_LIMIT = rateLimit({
+const METRICS_RATE_LIMIT_OPTIONS = {
   windowMs: 60 * 1000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many metrics events right now. Please wait a moment and try again.' },
-});
-const ADMIN_RATE_LIMIT = rateLimit({
+};
+const ADMIN_RATE_LIMIT_OPTIONS = {
   windowMs: 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many admin metric requests right now. Please wait a moment and try again.' },
-});
+};
+const METRICS_RATE_LIMIT = rateLimit(METRICS_RATE_LIMIT_OPTIONS);
+const ADMIN_RATE_LIMIT = rateLimit(ADMIN_RATE_LIMIT_OPTIONS);
 
 /** Registers product-metrics and private admin-metrics endpoints. */
 const registerMetricsRoutes = ({
@@ -43,4 +45,8 @@ const registerMetricsRoutes = ({
   });
 };
 
-module.exports = { registerMetricsRoutes };
+module.exports = {
+  ADMIN_RATE_LIMIT_OPTIONS,
+  METRICS_RATE_LIMIT_OPTIONS,
+  registerMetricsRoutes,
+};
