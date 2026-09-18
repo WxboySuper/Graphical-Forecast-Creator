@@ -20,12 +20,13 @@ const METRICS_RATE_LIMIT = rateLimit(METRICS_RATE_LIMIT_OPTIONS);
 const ADMIN_RATE_LIMIT = rateLimit(ADMIN_RATE_LIMIT_OPTIONS);
 
 /** Registers product-metrics and private admin-metrics endpoints. */
-const registerMetricsRoutes = ({
-  app,
-  express,
-  handleMetricEvent,
-  handleAdminMetrics,
-}) => {
+const registerMetricsRoutes = (dependencies) => {
+  const {
+    app,
+    express,
+    handleMetricEvent,
+    handleAdminMetrics,
+  } = dependencies;
   app.post('/api/metrics/event', METRICS_RATE_LIMIT, express.json({ limit: '2kb' }), async (req, res) => {
     try {
       await handleMetricEvent(req, res);
