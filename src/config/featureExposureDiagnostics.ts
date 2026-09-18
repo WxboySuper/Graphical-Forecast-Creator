@@ -1,3 +1,9 @@
+/**
+ * Feature-exposure diagnostics: this module explains target-aware exposure
+ * decisions and produces developer-facing diagnostics for client/server
+ * alignment. It owns observability of policy, not the policy registry, route
+ * rendering, or server authorization itself.
+ */
 import { type BuildTarget, getBuildTarget } from './buildTarget';
 import {
   getFeatureExposure,
