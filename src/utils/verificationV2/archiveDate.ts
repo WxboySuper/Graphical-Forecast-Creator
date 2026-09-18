@@ -1,3 +1,7 @@
+/**
+ * Verification archive-date helpers. This module validates calendar dates and
+ * formats the archive timestamps used by Forecast Grade history.
+ */
 const isValidCalendarDate = (year: number, month: number, day: number): boolean => {
   const date = new Date(Date.UTC(year, month - 1, day));
   return (
