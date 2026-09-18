@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade score-breakdown component. It renders per-component scores
+ * and formatted totals while leaving grade calculation to verification utils.
+ */
 import React from 'react';
 import type { ComponentKey, ComponentScore, ProductGrade } from '../../utils/verificationV2';
 import { formatGrade, formatScore } from './gradeFormat';
