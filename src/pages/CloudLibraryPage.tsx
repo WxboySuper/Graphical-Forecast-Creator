@@ -1,3 +1,11 @@
+/**
+ * Hosted forecast-cycle library route.
+ *
+ * This page presents the signed-in user's cloud cycles and coordinates load,
+ * rename, delete, and local-export actions. Cloud access checks and persistence
+ * stay in the cloud-cycle hook/service boundary; the page owns route feedback
+ * and the library's interactive presentation.
+ */
 import React, { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { AlertCircle, Cloud, CloudOff, Download, Edit2, LoaderCircle, Lock, ShieldCheck, Trash2 } from 'lucide-react';
