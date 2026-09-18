@@ -6,7 +6,7 @@ import {
   formatOutlookVerificationSummary,
 } from './verificationUtils';
 
-describe('verificationUtils', () => {
+describe('verificationUtils geometry and summary cases', () => {
   test('analyzeVerification counts hits and byRiskLevel correctly', () => {
     // Create a small square polygon that contains the report point
     const polygon = turfPolygon([[[-97.21, 33.49], [-97.19, 33.49], [-97.19, 33.51], [-97.21, 33.51], [-97.21, 33.49]]]);
