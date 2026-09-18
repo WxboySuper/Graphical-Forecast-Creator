@@ -1,4 +1,12 @@
 // @codescene(disable:"Code Duplication")
+/**
+ * OpenLayers implementation of the forecast editor map.
+ *
+ * The component owns the live map instance and its interaction lifecycle while
+ * delegating feature conversion, source reconciliation, layer construction,
+ * and interaction policies to adjacent helpers. The forwarded handle exposes
+ * the small imperative surface needed by the forecast page.
+ */
 import {
   forwardRef,
   useEffect,
