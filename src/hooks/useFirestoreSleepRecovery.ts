@@ -1,3 +1,7 @@
+/**
+ * Firestore sleep-recovery hook. It restores network connectivity and retries
+ * pending writes after tab suspension or browser sleep interrupts Firestore.
+ */
 import { useEffect } from 'react';
 import {
   disableNetwork,
