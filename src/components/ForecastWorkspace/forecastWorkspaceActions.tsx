@@ -1,3 +1,7 @@
+/**
+ * Forecast-workspace action helpers. It binds toolbar actions to forecast
+ * state updates and navigation callbacks without owning the workspace layout.
+ */
 import React, { useCallback } from 'react';
 import {
   redoLastEdit,
