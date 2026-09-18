@@ -1,3 +1,7 @@
+/**
+ * Gated custom-products workspace. It checks account access, manages selected
+ * layer state, and renders the custom-product editor.
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Layers3, Plus } from 'lucide-react';
