@@ -43,6 +43,23 @@ describe('forecastPageController', () => {
     expect(buildRestoreKey('user-1', 'custom')).toBe('user-1:custom');
   });
 
+  test('accepts matching envelopes and rejects cross-workspace envelopes', () => {
+    const forecast = fileUtils.serializeForecast(createForecastCycle(), {
+      center: [0, 0],
+      zoom: 4,
+    });
+    const customPayload = JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'custom',
+      forecast,
+    });
+
+    expect(parseStoredForecastPayload(customPayload, 'custom')).toEqual(JSON.parse(customPayload));
+    expect(parseStoredForecastPayload(customPayload, 'severe')).toBeNull();
+    expect(parseStoredForecastPayload(JSON.stringify(forecast), 'custom')).toBeNull();
+    expect(parseStoredForecastPayload(JSON.stringify(forecast), 'severe')).toEqual(forecast);
+  });
+
   test('derives rollover candidates and preserves pending prompts', () => {
     const emptyCycle = createForecastCycle();
     const cycleWithDiscussion = {

@@ -3,7 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import type { Feature, Polygon } from 'geojson';
-import ForecastWorkflowPanel from './ForecastWorkflowPanel';
+import ForecastWorkflowPanel, { getYesterdayLocalDate } from './ForecastWorkflowPanel';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, {
   addFeature,
@@ -95,5 +95,15 @@ describe('ForecastWorkflowPanel completion review', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByText('Ready for export')).not.toBeInTheDocument());
+  });
+});
+
+describe('getYesterdayLocalDate', () => {
+  it('uses the previous local calendar date across a month boundary', () => {
+    expect(getYesterdayLocalDate(new Date(2026, 0, 1, 12))).toBe('2025-12-31');
+  });
+
+  it('keeps the local calendar date across the spring DST transition', () => {
+    expect(getYesterdayLocalDate(new Date(2026, 2, 9, 12))).toBe('2026-03-08');
   });
 });

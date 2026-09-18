@@ -72,10 +72,9 @@ const dayHasPackageWork = (day: NonNullable<ReturnType<typeof selectForecastCycl
 };
 
 /** Returns yesterday's local calendar date as YYYY-MM-DD. */
-const getYesterdayLocalDate = (): string => {
-  const today = new Date(`${getLocalCalendarDate()}T00:00:00`);
-  today.setDate(today.getDate() - 1);
-  return today.toISOString().slice(0, 10);
+export const getYesterdayLocalDate = (now = new Date()): string => {
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12);
+  return getLocalCalendarDate(yesterday);
 };
 
 /** Maps yesterday's forecast day to the current day's useful starting point. */
