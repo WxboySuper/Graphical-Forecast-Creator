@@ -1,3 +1,7 @@
+/**
+ * Account billing card. It renders entitlement and subscription actions, tracks
+ * request state, and delegates billing operations to the account controller.
+ */
 import React, { useState } from 'react';
 import { Crown, LoaderCircle } from 'lucide-react';
 import { Link } from 'react-router';

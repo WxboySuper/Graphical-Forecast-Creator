@@ -1,3 +1,7 @@
+/**
+ * Forecast auto-save hook. It watches the active cycle, serializes changes,
+ * and schedules persistence through the configured local or cloud callback.
+ */
 import { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
