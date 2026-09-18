@@ -1,3 +1,7 @@
+/**
+ * Beta population-estimate panel. It reads the active forecast geometry and
+ * renders the estimate controls and result states for the beta workflow.
+ */
 import React from 'react';
 import { Calculator, Loader2, Users } from 'lucide-react';
 import { useSelector } from 'react-redux';
