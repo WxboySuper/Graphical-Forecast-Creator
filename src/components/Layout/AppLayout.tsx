@@ -1,3 +1,7 @@
+/**
+ * Top-level application layout. It owns the shared navigation shell, outlet
+ * context, responsive layout state, and global UI actions around page content.
+ */
 import React, { useState, useCallback, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router';
 import { useSelector } from 'react-redux';
