@@ -825,6 +825,7 @@ async function localCredentialAction(
   deps: LocalAuthDeps
 ) {
   const failureMessage = action === 'signin' ? 'Sign in failed' : 'Sign up failed';
+  deps.setError(null);
   const resp = await fetch(`/api/local/${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
