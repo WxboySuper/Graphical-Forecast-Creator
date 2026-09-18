@@ -1,4 +1,4 @@
-import { buildLoadedCloudForecastPayload } from './useCloudCycles';
+import { buildLoadedCloudForecastPayload, canApplyCloudSaveSelection } from './useCloudCycles';
 import type { CloudCycle } from '../types/cloudCycles';
 import type { GFCForecastSaveData } from '../types/outlooks';
 
@@ -76,5 +76,17 @@ describe('buildLoadedCloudForecastPayload', () => {
 
     const loaded = buildLoadedCloudForecastPayload({ payload: cloudPayload } as CloudCycle);
     expect(loaded.forecastCycle?.days[1]?.customLayers).toEqual(customLayers);
+  });
+});
+
+describe('canApplyCloudSaveSelection', () => {
+  test('rejects a late save-as-new completion after the selected cycle changes', () => {
+    expect(canApplyCloudSaveSelection('cycle-1', 'cycle-2')).toBe(false);
+    expect(canApplyCloudSaveSelection(null, 'cycle-2')).toBe(false);
+  });
+
+  test('accepts a completion when the selection is unchanged', () => {
+    expect(canApplyCloudSaveSelection('cycle-1', 'cycle-1')).toBe(true);
+    expect(canApplyCloudSaveSelection(null, undefined)).toBe(true);
   });
 });
