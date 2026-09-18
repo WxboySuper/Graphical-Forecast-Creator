@@ -1,5 +1,6 @@
 'use strict';
 
+const rateLimit = require('express-rate-limit');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { registerMetricsRoutes: registerMetricsRoutesImpl } = require('./metricsRoutes');
 
@@ -13,6 +14,20 @@ const METRIC_EVENT_TYPES = new Set([
   'cloud_cycle_loaded',
 ]);
 const ADMIN_WINDOW_OPTIONS = new Set([7, 30]);
+const METRICS_RATE_LIMIT = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many metrics events right now. Please wait a moment and try again.' },
+});
+const ADMIN_RATE_LIMIT = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many admin metric requests right now. Please wait a moment and try again.' },
+});
 const STORAGE_COLLECTIONS = [
   'cloudCycles',
   'userProfiles',
@@ -656,6 +671,8 @@ const registerMetricsRoutes = (app, express) => {
   registerMetricsRoutesImpl({
     app,
     express,
+    metricsRateLimit: METRICS_RATE_LIMIT,
+    adminRateLimit: ADMIN_RATE_LIMIT,
     handleMetricEvent,
     handleAdminMetrics,
   });
