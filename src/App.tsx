@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
 import { store } from './store';
-import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
+import { setActiveOutlookType, setEmergencyMode, setForecastWorkspace } from './store/forecastSlice';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
@@ -34,8 +34,9 @@ import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
+  DEFAULT_FORECAST_WORKSPACE,
   getDefaultForecastWorkspacePath,
-  resolveForecastWorkspacePath,
+  resolveExposedForecastWorkspacePath,
   resolveLegacyForecastWorkspacePath,
 } from './routing/forecastWorkspaceRoutes';
 
@@ -83,15 +84,21 @@ const AppHooks = () => {
   const { user } = useAuth();
   const userId = user?.uid;
   const workspaceId = (
-    resolveForecastWorkspacePath(location.pathname)
+    resolveExposedForecastWorkspacePath(location.pathname)
     ?? resolveLegacyForecastWorkspacePath(location.pathname)
-  )?.id ?? 'severe';
+  )?.id ?? DEFAULT_FORECAST_WORKSPACE;
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
 
   // Enable account-scoped Auto-Save
   useAutoSave(userId, workspaceId);
+
+  // Keep Redux workspace ownership aligned with the canonical URL so local
+  // history and future workspace-specific UI consume the same identity.
+  useEffect(() => {
+    dispatch(setForecastWorkspace(workspaceId));
+  }, [dispatch, workspaceId]);
 
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();

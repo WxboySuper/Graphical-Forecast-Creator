@@ -9,7 +9,7 @@ import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenc
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
 const LOCAL_STORAGE_KEY = 'forecastData';
 
-/** Returns the autosave key for an account scope, or the workspace key anonymously. */
+/** Returns the autosave key for an account scope, or the legacy key anonymously. */
 const getWorkspaceAutoSaveBaseKey = (workspaceId: ForecastWorkspaceId): string =>
   workspaceId === DEFAULT_FORECAST_WORKSPACE ? LOCAL_STORAGE_KEY : `${LOCAL_STORAGE_KEY}:${workspaceId}`;
 
@@ -116,12 +116,7 @@ const migrateSevereLegacyAutoSave = (
   }
 };
 
-/**
- * Migrates the legacy Severe snapshot into the account scope.
- * Non-Severe workspace migration remains disabled until those workspaces have
- * an explicit account migration contract, preventing accidental promotion of
- * an anonymous snapshot into the wrong account scope.
- */
+/** Migrates only the legacy Severe snapshot; other workspaces have no legacy key to promote. */
 export const migrateLegacyAutoSave = (
   userId?: string | null,
   liveSession?: unknown,

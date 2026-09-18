@@ -10,11 +10,15 @@ import { useEntitlement } from '../billing/EntitlementProvider';
 import { PRICING_COPY } from '../billing/pricingCopy';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
+import type { GFCForecastSaveData } from '../types/outlooks';
 import { getBuildTarget } from '../config/buildTarget';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { createForecastWorkspaceSave } from '../utils/forecastWorkspacePersistence';
 import {
   filterCloudCyclesByWorkspace,
   getCloudLibraryTabFromSearchParams,
   getCloudLibraryTabs,
+  getCloudCycleWorkspaceId,
   type CloudLibraryTab,
   type CloudLibraryTabId,
 } from './cloudLibraryWorkspace';
@@ -684,9 +688,10 @@ const useCloudLibraryActions = ({
   const [message, setMessage] = useState<string | null>(null);
 
   const persistCloudCycleToSession = useCallback(
-    (cycleId: string, label: string, payload: unknown): boolean => {
+    (cycleId: string, label: string, workspaceId: ForecastWorkspaceId, payload: unknown): boolean => {
       try {
-        sessionStorage.setItem(payloadKey, JSON.stringify(payload));
+        const workspacePayload = createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+        sessionStorage.setItem(payloadKey, JSON.stringify(workspacePayload));
         sessionStorage.setItem(
           metaKey,
           JSON.stringify({
@@ -712,11 +717,12 @@ const useCloudLibraryActions = ({
     }
 
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
-    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
+    const workspaceId = getCloudCycleWorkspaceId(selectedCycle ?? { workspaceId: DEFAULT_FORECAST_WORKSPACE });
+    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', workspaceId, payload)) {
       return;
     }
 
-    navigate('/forecast');
+    navigate(`/forecast/${workspaceId}`);
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */

@@ -3,6 +3,7 @@ import {
   getDefaultForecastWorkspacePath,
   getExposedForecastWorkspacePaths,
   getForecastWorkspacePath,
+  resolveExposedForecastWorkspacePath,
   resolveForecastWorkspacePath,
   resolveLegacyForecastWorkspacePath,
 } from './forecastWorkspaceRoutes';
@@ -30,5 +31,10 @@ describe('forecast workspace route contract', () => {
       '/forecast/severe',
       '/forecast/custom',
     ]);
+  });
+
+  test('does not assign state ownership to a disabled workspace route', () => {
+    expect(resolveExposedForecastWorkspacePath('/forecast/mesoscale', 'production')).toBeUndefined();
+    expect(resolveExposedForecastWorkspacePath('/forecast/severe', 'production')?.id).toBe('severe');
   });
 });

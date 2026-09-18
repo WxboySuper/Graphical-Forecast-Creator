@@ -504,6 +504,7 @@ const useCloudForecastActions = ({
   saveCycle,
   userId,
   workflowMetadata,
+  workspaceId,
 }: {
   addToast: AddToastFn;
   currentMapView: RootState['forecast']['currentMapView'];
@@ -513,6 +514,7 @@ const useCloudForecastActions = ({
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
   workflowMetadata?: import('../types/workflow').CycleMetadata;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const handleCloudCycleLoaded = useCallback(
     (cloudCycle: { id: string; label: string }) => {
@@ -530,7 +532,7 @@ const useCloudForecastActions = ({
 
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');
@@ -539,7 +541,7 @@ const useCloudForecastActions = ({
       markCurrentStateSynced();
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
+    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata, workspaceId]
   );
 
   return {
@@ -623,6 +625,7 @@ const useForecastPageWorkspace = ({
     saveCycle,
     userId: user?.uid,
     workflowMetadata,
+    workspaceId,
   });
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
@@ -704,6 +707,7 @@ const useForecastPageWorkspace = ({
     canSaveToCloud: premiumActive,
     saveCycle,
     clearCurrent,
+    workspaceId,
   });
 
   return {
