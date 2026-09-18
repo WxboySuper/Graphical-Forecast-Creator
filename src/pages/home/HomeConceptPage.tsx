@@ -1,3 +1,9 @@
+/**
+ * Home forecast concept surface: this component presents the signed-in and
+ * signed-out forecast workspace entry states, recent-cycle actions, and
+ * workflow launch affordances. It renders data and callbacks supplied by the
+ * home page and does not own routing, persistence, or forecast mutations.
+ */
 import React from 'react';
 import {
   ArrowRight,
