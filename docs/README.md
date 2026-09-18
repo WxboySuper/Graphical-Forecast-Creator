@@ -14,7 +14,6 @@ current implementation contracts.
 
 - [Release workflow](./operations/release-workflow.md) - release and deployment procedures.
 - [Hosted rollout](./operations/hosted-rollout.md) - VPS rollout and troubleshooting.
-- [Timed production rollout](./operations/timed-production-rollout.md) - scheduled promotion design.
 - [Alert banner](./operations/alert-banner.md) - runtime banner shape and timed-release banner behavior.
 - [Emergency feature disable](./operations/emergency-feature-disable.md) - server-side emergency shutoff for server-backed beta capabilities.
 - [Feature exposure workstreams](./operations/feature-exposure-workstreams.md) - v1.7 rollout registry adoption manifest.
