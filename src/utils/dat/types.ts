@@ -1,3 +1,7 @@
+/**
+ * DAT evidence type definitions. It describes track, damage, and observation
+ * geometry exchanged by the verification evidence and import pipelines.
+ */
 import type { Feature, LineString, MultiLineString, MultiPolygon, Point, Polygon } from 'geojson';
 
 export type DatTrackGeometry = LineString | MultiLineString;
