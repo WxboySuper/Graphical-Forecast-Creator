@@ -1,3 +1,9 @@
+/**
+ * Analytics metrics service: this module validates and aggregates account,
+ * forecast, and product telemetry for the server metrics routes. It owns
+ * metric storage/query coordination and leaves authentication, billing policy,
+ * and HTTP response composition to their respective boundaries.
+ */
 'use strict';
 
 const rateLimit = require('express-rate-limit');
