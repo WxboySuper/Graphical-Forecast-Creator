@@ -14,6 +14,15 @@ interface UseTrimCurrentDayOutlooksOptions {
   addToast: AddToastFn;
 }
 
+const trimSessionMatches = (
+  forecast: RootState['forecast'],
+  expected: { day: number; cycleDate: string; generation: number },
+) => [
+  forecast.cycleGeneration === expected.generation,
+  forecast.forecastCycle.cycleDate === expected.cycleDate,
+  forecast.forecastCycle.currentDay === expected.day,
+].every(Boolean);
+
 /** Runs the on-demand trim action after preloading the cached land mask. */
 // @codescene(disable:"Complex Method")
 export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlooksOptions) => {
@@ -39,11 +48,11 @@ export const useTrimCurrentDayOutlooks = ({ addToast }: UseTrimCurrentDayOutlook
       }
 
       const latestCycle = store.getState().forecast;
-      if (
-        latestCycle.cycleGeneration !== trimCycleGeneration ||
-        latestCycle.forecastCycle.cycleDate !== trimCycleDate ||
-        latestCycle.forecastCycle.currentDay !== trimDay
-      ) {
+      if (!trimSessionMatches(latestCycle, {
+        day: trimDay,
+        cycleDate: trimCycleDate,
+        generation: trimCycleGeneration,
+      })) {
         addToast('Forecast changed while the land mask was loading. Try trimming again.', 'info');
         return;
       }
