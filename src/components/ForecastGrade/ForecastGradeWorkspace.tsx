@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade workspace. It composes the verification map, result panes,
+ * and grade controls around the `useForecastGrade` state and callbacks.
+ */
 import React, { type MutableRefObject } from 'react';
 import type { VerificationMapHandle } from '../Map/VerificationMap';
 import type { StormReport } from '../../types/stormReports';

@@ -1,3 +1,7 @@
+/**
+ * Monitor outlook-source helpers. It resolves saved-cycle and live forecast
+ * selections into the normalized features rendered by monitor layers.
+ */
 import type { Feature } from 'geojson';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 import type { DayType, ForecastCycle, OutlookData } from '../types/outlooks';
