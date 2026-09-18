@@ -51,9 +51,6 @@ describe('OpenLayersForecastMap additional helpers', () => {
     const s1 = createLabelOverlaySource('osm');
     expect(s1).toBeTruthy();
 
-    const s2 = createLabelOverlaySource('carto-dark');
-    expect(s2).toBeTruthy();
-
     const s3 = createLabelOverlaySource('esri-satellite');
     expect(s3).toBeTruthy();
 
@@ -66,6 +63,8 @@ describe('OpenLayersForecastMap additional helpers', () => {
 
     const t2 = createTileSource('esri-satellite');
     expect(t2).toBeTruthy();
+
+    expect(createTileSource('carto-dark' as never)).toBeTruthy();
   });
 
   test('hideOverlay clears overlay position', () => {
@@ -97,9 +96,9 @@ describe('OpenLayersForecastMap additional helpers', () => {
     const lakes = createBlankLayerConfig('lakes', source as never);
     const states = createBlankLayerConfig('usStates', source as never);
 
-    expect(world.url).toBe('geodata/ne_110m_admin_0_countries.geojson');
-    expect(lakes.url).toBe('geodata/ne_110m_lakes.geojson');
-    expect(states.url).toBe('geodata/us-states.json');
+    expect(world.url).toBe('/geodata/ne_110m_admin_0_countries.geojson');
+    expect(lakes.url).toBe('/geodata/ne_110m_lakes.geojson');
+    expect(states.url).toBe('/geodata/us-states.json');
     expect(world.style).toBe(BLANK_WORLD_STYLE);
     expect(lakes.style).toBe(BLANK_LAKE_STYLE);
     expect(states.style).toBeUndefined();

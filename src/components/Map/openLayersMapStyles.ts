@@ -7,7 +7,7 @@ import Overlay from "ol/Overlay";
 import type { FeatureLike } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { v4 as uuidv4 } from "uuid";
-import type { BaseMapStyle } from "../../store/overlaysSlice";
+import type { BaseMapStyle, LegacyBaseMapStyle } from "../../store/overlaysSlice";
 import type { OpenFreeMapStyleSet } from "../../lib/openFreeMap";
 import { getFeatureStyle, computeZIndex } from "../../utils/mapStyleUtils";
 import type {
@@ -473,7 +473,7 @@ export const toGhostOlStyle = ({
 
 // Creates a labels/places overlay source so cities and boundaries stay readable above polygons.
 export const createLabelOverlaySource = (
-  style: Exclude<BaseMapStyle, "blank">,
+  style: Exclude<BaseMapStyle, "blank"> | LegacyBaseMapStyle,
 ): XYZ | null => {
   switch (style) {
     case "osm":
@@ -484,15 +484,9 @@ export const createLabelOverlaySource = (
         crossOrigin: "anonymous",
       });
     case "carto-light":
-      return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-        attributions: "&copy; OpenStreetMap &copy; CARTO",
-        maxZoom: 19,
-        crossOrigin: "anonymous",
-      });
     case "carto-dark":
       return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",
+        url: "https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
         attributions: "&copy; OpenStreetMap &copy; CARTO",
         maxZoom: 19,
         crossOrigin: "anonymous",
@@ -511,7 +505,7 @@ export const createLabelOverlaySource = (
 
 // Helper to create tile source based on selected base map style
 export const createTileSource = (
-  style: Exclude<BaseMapStyle, "blank">,
+  style: Exclude<BaseMapStyle, "blank"> | LegacyBaseMapStyle,
 ): OSM | XYZ => {
   switch (style) {
     case "osm":
@@ -523,16 +517,9 @@ export const createTileSource = (
         crossOrigin: "anonymous",
       });
     case "carto-light":
-      return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-        attributions:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        maxZoom: 19,
-        crossOrigin: "anonymous",
-      });
     case "carto-dark":
       return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+        url: "https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
         attributions:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,

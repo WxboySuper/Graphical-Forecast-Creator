@@ -1,19 +1,10 @@
 import type { ForecastCycle } from '../../types/outlooks';
+import { downloadBlob } from '../fileUtils';
 import { buildStructuredKmlDocument } from './buildKml';
 import { buildSplitKmzArchive, buildStructuredKmzArchive } from './buildKmz';
 import type { KmzExportOptions, KmzExportStrategy } from './types';
 
-const triggerBlobDownload = (blob: Blob, filename: string): void => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-};
-
+/** Builds a timestamped filename for a KML or KMZ export. */
 const buildFilename = (forecastCycle: ForecastCycle, options: KmzExportOptions, extension: 'kml' | 'kmz'): string => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const scope = options.scope === 'cycle'
@@ -29,7 +20,7 @@ export const downloadKmlExport = (
 ): void => {
   const kml = buildStructuredKmlDocument({ forecastCycle, options });
   const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
-  triggerBlobDownload(blob, buildFilename(forecastCycle, options, 'kml'));
+  downloadBlob(blob, buildFilename(forecastCycle, options, 'kml'));
 };
 
 /** Downloads a KMZ archive using the selected prototype strategy. */
@@ -42,7 +33,7 @@ export const downloadKmzExport = async (
     ? await buildSplitKmzArchive({ forecastCycle, options })
     : await buildStructuredKmzArchive({ forecastCycle, options });
 
-  triggerBlobDownload(blob, buildFilename(forecastCycle, options, 'kmz'));
+  downloadBlob(blob, buildFilename(forecastCycle, options, 'kmz'));
 };
 
 export { buildStructuredKmlDocument } from './buildKml';

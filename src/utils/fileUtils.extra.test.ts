@@ -31,6 +31,35 @@ afterEach(() => {
 });
 
 describe('fileUtils extra', () => {
+  test('downloadBlob clicks the link and revokes its object URL after the click', async () => {
+    jest.resetModules();
+    const { downloadBlob } = await import('./fileUtils');
+
+    const clickMock = jest.fn();
+    const originalCreate = document.createElement.bind(document);
+    const createdLink = originalCreate('a') as HTMLAnchorElement;
+    createdLink.click = clickMock as () => void;
+    const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a'
+      ? (createdLink as unknown as HTMLElement)
+      : originalCreate(tagName));
+    const urlHelpers = Object.assign(globalThis.URL || URL, {
+      createObjectURL: jest.fn(() => 'blob:url'),
+      revokeObjectURL: jest.fn(),
+    }) as unknown as BlobUrlHelpers;
+    globalThis.URL = urlHelpers;
+
+    downloadBlob(new Blob(['forecast']), 'forecast.json');
+
+    expect(urlHelpers.createObjectURL).toHaveBeenCalled();
+    expect(createdLink.download).toBe('forecast.json');
+    expect(clickMock).toHaveBeenCalledTimes(1);
+    expect(urlHelpers.revokeObjectURL).not.toHaveBeenCalled();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(urlHelpers.revokeObjectURL).toHaveBeenCalledWith('blob:url');
+    spy.mockRestore();
+  });
+
   test('cloneForecastCycle produces deep clone', async () => {
     jest.resetModules();
     const { cloneForecastCycle } = await import('./fileUtils');

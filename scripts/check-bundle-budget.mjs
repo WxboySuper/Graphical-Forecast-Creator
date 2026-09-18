@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { getEagerModuleImports } from './lib/bundle-imports.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const BUILD_DIR = resolve(ROOT, 'build', 'assets');
@@ -23,6 +24,7 @@ const assetSize = (relativePath) => {
   return file.byteLength;
 };
 
+/** Validates the built entry's static dependencies and JavaScript size budgets. */
 const main = () => {
   const entryPath = findEntryChunk();
   if (!entryPath) {
@@ -31,6 +33,12 @@ const main = () => {
   }
 
   const entryBytes = assetSize(entryPath);
+  const entrySource = readFileSync(resolve(ROOT, 'build', entryPath), 'utf8');
+  const eagerTurfImports = getEagerModuleImports(entrySource).filter((specifier) => specifier.includes('turf'));
+  if (eagerTurfImports.length > 0) {
+    console.error(`Entry chunk eagerly imports Turf: ${eagerTurfImports.join(', ')}`);
+    process.exit(1);
+  }
   const budgetKb = (ENTRY_CHUNK_BUDGET_BYTES / 1024).toFixed(0);
   const entryKb = (entryBytes / 1024).toFixed(1);
 

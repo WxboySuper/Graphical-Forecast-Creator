@@ -11,6 +11,7 @@ import {
 } from '../types/customProducts';
 import { isCustomPolygonFeature } from './customFeatureValidation';
 import { isCustomCategoryList } from './customCategoryValidation';
+import { hasOnlyKeys, isBoundedText, isNonNegativeInteger, isRecord } from './customValidationPrimitives';
 import {
   createEmbeddedCustomProductSnapshot,
   isEmbeddedCustomProductSnapshot,
@@ -29,28 +30,12 @@ export {
 
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-/** Returns true only for non-array object records. */
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value && typeof value === 'object' && !Array.isArray(value));
-
-/** Rejects persistence fields outside a contract's explicit allowlist. */
-const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
-  Object.keys(value).every((key) => keys.includes(key));
-
-/** Validates trimmed non-empty text against a bounded length. */
-const isBoundedText = (value: unknown, max: number = CUSTOM_PRODUCT_LIMITS.labelLength): value is string =>
-  typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= max;
-
 /** Validates a canonical UTC ISO timestamp. */
 const isIsoTimestamp = (value: unknown): value is string =>
   typeof value === 'string'
   && ISO_TIMESTAMP.test(value)
   && !Number.isNaN(Date.parse(value))
   && new Date(value).toISOString() === value;
-
-/** Validates a whole number that may be zero. */
-const isNonNegativeInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 
 /** Validates a whole number that starts at one. */
 const isPositiveInteger = (value: unknown): value is number =>

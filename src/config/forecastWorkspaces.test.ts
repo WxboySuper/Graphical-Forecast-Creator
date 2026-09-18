@@ -5,6 +5,7 @@ import {
   getDefaultForecastWorkspace,
   getExposedForecastWorkspaces,
   getForecastWorkspace,
+  getForecastWorkspaceByLegacyPath,
   getForecastWorkspaceByPath,
   isForecastWorkspaceExposed,
 } from './forecastWorkspaces';
@@ -14,9 +15,9 @@ describe('forecast workspace product contract', () => {
     expect(FORECAST_WORKSPACES.map((workspace) => workspace.path)).toEqual([
       '/forecast/severe',
       '/forecast/mesoscale',
-      '/forecast/custom',
       '/forecast/tropical',
       '/forecast/winter',
+      '/forecast/custom',
     ]);
   });
 
@@ -24,9 +25,16 @@ describe('forecast workspace product contract', () => {
     expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(['severe', 'custom']);
   });
 
-  test('keeps unknown IDs and paths out of the contract', () => {
+  test('keeps unknown IDs and malformed paths out of the contract', () => {
     expect(getForecastWorkspace('unknown')).toBeUndefined();
-    expect(getForecastWorkspaceByPath('/forecast/unknown')).toBeUndefined();
+    expect([
+      '/forecast/unknown',
+      '/forecast/severe/',
+      '/Forecast/severe',
+      '',
+    ].map(getForecastWorkspaceByPath)).toEqual([undefined, undefined, undefined, undefined]);
+    expect(['unknown', '/custom-products/', '/Custom-products', ''].map(getForecastWorkspaceByLegacyPath))
+      .toEqual([undefined, undefined, undefined, undefined]);
   });
 
   test('resolves canonical workspace records', () => {
@@ -52,5 +60,7 @@ describe('forecast workspace product contract', () => {
     expect(DEFAULT_FORECAST_WORKSPACE).toBe('severe');
     expect(getDefaultForecastWorkspace().path).toBe('/forecast/severe');
     expect(getDefaultForecastWorkspace().legacyPaths).toContain('/forecast');
+    expect(getForecastWorkspaceByLegacyPath('/forecast')?.id).toBe('severe');
+    expect(getForecastWorkspaceByLegacyPath('/custom-products')?.id).toBe('custom');
   });
 });

@@ -20,9 +20,7 @@ import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
-import { getCachedLandMask } from '../utils/outlookPolygonMasking/landMaskRuntime';
-import { trimOutlookDataInPlace, type TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
-import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
+import type { TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import {
   applyPaintBucketStrategy,
   type PaintBucketEditAction,
@@ -840,22 +838,22 @@ export const forecastSlice = createSlice({
       state.isSaved = false;
     },
 
-    trimCurrentDayOutlooksToLand: (
+    applyTrimmedCurrentDayOutlooks: (
       state,
-      action: PayloadAction<{ strategy: LandMaskStrategy; day?: DayType }>,
+      action: PayloadAction<{
+        day: DayType;
+        data: OutlookData;
+        result: TrimOutlookDataResult;
+      }>,
     ) => {
-      const landMask = getCachedLandMask(action.payload.strategy);
-      if (!landMask) {
-        return;
-      }
-
-      const dayData = state.forecastCycle.days[action.payload.day ?? state.forecastCycle.currentDay];
+      const dayData = state.forecastCycle.days[action.payload.day];
       if (!dayData) {
         return;
       }
 
       pushUndoSnapshot(state);
-      state.lastTrimResult = trimOutlookDataInPlace(dayData.data, landMask, action.payload.strategy);
+      dayData.data = action.payload.data;
+      state.lastTrimResult = action.payload.result;
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
     },
@@ -1530,7 +1528,7 @@ export const {
   updateFeaturesBatch,
   removeFeature,
   applyPaintBucketEdit,
-  trimCurrentDayOutlooksToLand,
+  applyTrimmedCurrentDayOutlooks,
   resetCategorical,
   setOutlookMap,
   applyAutoCategoricalSync,

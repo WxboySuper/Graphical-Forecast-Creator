@@ -31,7 +31,7 @@ const RETRIEVED_AT = '2026-08-04';
 export const GEO_BOUNDARY_SOURCES: Record<GeoBoundarySource['key'], GeoBoundarySource> = {
   usStates: {
     key: 'usStates',
-    url: 'geodata/us-states.json',
+    url: '/geodata/us-states.json',
     vendoredPath: 'public/geodata/us-states.json',
     sha256: '6F23ED91FCE2C25D57C01D83225342BA40258E9571C486C3999BD827C80D193B',
     origin: 'https://github.com/PublicaMundi/MappingAPI (data/geojson/us-states.json)',
@@ -40,7 +40,7 @@ export const GEO_BOUNDARY_SOURCES: Record<GeoBoundarySource['key'], GeoBoundaryS
   },
   worldCountries: {
     key: 'worldCountries',
-    url: 'geodata/ne_110m_admin_0_countries.geojson',
+    url: '/geodata/ne_110m_admin_0_countries.geojson',
     vendoredPath: 'public/geodata/ne_110m_admin_0_countries.geojson',
     sha256: '6866C877D39CBA9C357620878839B336D569F8C662D3CFAB4CB1DBE2D39C977F',
     origin: 'https://github.com/nvkelso/natural-earth-vector (geojson/ne_110m_admin_0_countries.geojson)',
@@ -49,7 +49,7 @@ export const GEO_BOUNDARY_SOURCES: Record<GeoBoundarySource['key'], GeoBoundaryS
   },
   lakes: {
     key: 'lakes',
-    url: 'geodata/ne_110m_lakes.geojson',
+    url: '/geodata/ne_110m_lakes.geojson',
     vendoredPath: 'public/geodata/ne_110m_lakes.geojson',
     sha256: 'EB02ECC86C82004FCCBF979058BFABBBD6C2D07968C7844D38EB1C9152D2FFC9',
     origin: 'https://github.com/nvkelso/natural-earth-vector (geojson/ne_110m_lakes.geojson)',
