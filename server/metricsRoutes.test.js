@@ -58,4 +58,44 @@ describe('metrics route adapter', () => {
       message: { error: 'Too many admin metric requests right now. Please wait a moment and try again.' },
     });
   });
+
+  it('returns a safe error when either handler rejects', async () => {
+    const routes = [];
+    const app = {
+      post: (...args) => routes.push(['post', ...args]),
+      get: (...args) => routes.push(['get', ...args]),
+    };
+    const express = { json: () => ({}) };
+    const response = () => {
+      const result = {};
+      return {
+        result,
+        status: (code) => {
+          result.status = code;
+          return { json: (body) => { result.body = body; } };
+        },
+        json: (body) => { result.body = body; },
+      };
+    };
+
+    registerMetricsRoutes({
+      app,
+      express,
+      handleMetricEvent: async () => { throw new Error('event failure'); },
+      handleAdminMetrics: async () => { throw new Error('admin failure'); },
+    });
+
+    const eventResponse = response();
+    await routes[0][4]({}, eventResponse);
+    assert.deepEqual(eventResponse.result, {
+      status: 500,
+      body: { error: 'Unable to record metrics right now.' },
+    });
+    const adminResponse = response();
+    await routes[1][3]({}, adminResponse);
+    assert.deepEqual(adminResponse.result, {
+      status: 500,
+      body: { error: 'Unable to read admin metrics right now.' },
+    });
+  });
 });
