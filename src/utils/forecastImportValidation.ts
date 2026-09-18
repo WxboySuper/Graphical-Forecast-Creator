@@ -1,3 +1,7 @@
+/**
+ * Forecast-import validation entry point. It enforces byte, depth, string, and
+ * feature limits before an imported forecast is accepted by the application.
+ */
 import {
   MAX_ARRAY_ITEMS,
   MAX_IMPORT_BYTES,
