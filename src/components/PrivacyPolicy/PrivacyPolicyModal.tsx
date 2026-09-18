@@ -1,3 +1,9 @@
+/**
+ * Privacy-policy modal: this component presents the user-facing privacy
+ * document, consent interaction, and accessible dialog lifecycle. It owns
+ * modal presentation and local acknowledgment state; policy text and account
+ * persistence are supplied by their respective boundaries.
+ */
 import React, { useState } from 'react';
 import './PrivacyPolicyModal.css';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
