@@ -1,3 +1,9 @@
+/**
+ * Forecast-copy transformations: this module creates safe copies of forecast
+ * days, cycles, and integrated custom layers for editor actions. It owns pure
+ * copy semantics and isolation guarantees while Redux dispatch, persistence,
+ * and user interaction remain in their callers.
+ */
 import type { DayType, ForecastCycle } from '../types/outlooks';
 import type { ForecastState } from './forecastSlice';
 import { cloneIntegratedCustomLayers } from './forecastSnapshotHelpers';

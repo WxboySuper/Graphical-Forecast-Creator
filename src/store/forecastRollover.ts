@@ -1,3 +1,9 @@
+/**
+ * Forecast day-rollover transformations: this module derives the next cycle or
+ * day state, carries workflow metadata, and preserves supported outlook data.
+ * It owns pure rollover rules; storage, user prompts, and route orchestration
+ * stay in their respective modules.
+ */
 import type { DayType, ForecastCycle, OutlookData, OutlookType } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
