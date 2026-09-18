@@ -1,3 +1,9 @@
+/**
+ * Forecast outlook contracts: this module defines the serialized and in-memory
+ * types for hazard outlooks, forecast cycles, discussions, and related map
+ * data. It is the shared type boundary; it must remain independent from UI,
+ * Redux implementation, persistence, and network services.
+ */
 import type { Feature } from 'geojson';
 
 /**
