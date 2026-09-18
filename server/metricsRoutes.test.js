@@ -20,8 +20,6 @@ describe('metrics route adapter', () => {
     registerMetricsRoutes({
       app,
       express,
-      metricsRateLimit: 'metrics-limit',
-      adminRateLimit: 'admin-limit',
       handleMetricEvent,
       handleAdminMetrics,
     });
@@ -29,12 +27,12 @@ describe('metrics route adapter', () => {
     assert.equal(routes.length, 2);
     assert.equal(routes[0][0], 'post');
     assert.equal(routes[0][1], '/api/metrics/event');
-    assert.equal(routes[0][2], 'metrics-limit');
+    assert.equal(typeof routes[0][2], 'function');
     assert.deepEqual(routes[0][3], { kind: 'json', options: { limit: '2kb' } });
     await routes[0][4]({}, {});
     assert.equal(routes[1][0], 'get');
     assert.equal(routes[1][1], '/api/admin/metrics');
-    assert.equal(routes[1][2], 'admin-limit');
+    assert.equal(typeof routes[1][2], 'function');
     await routes[1][3]({}, {});
     assert.equal(metricCalls, 1);
     assert.equal(adminCalls, 1);
