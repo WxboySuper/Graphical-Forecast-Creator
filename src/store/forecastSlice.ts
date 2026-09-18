@@ -79,6 +79,7 @@ import {
   sharedEmptyOutlookData,
 } from './forecastStateFactory';
 import { createInitialForecastState } from './forecastInitialState';
+import { resetForecastState } from './forecastReset';
 import { applyCreateOutlookUpdate } from './forecastVersioning';
 import { applyDiscussionDraftMigrations } from './forecastDiscussionDrafts';
 import { applyLegacyForecastImport } from './forecastLegacyImport';
@@ -294,27 +295,10 @@ export const forecastSlice = createSlice({
     },
 
     resetForecasts: (state, action: UnknownAction) => {
-      clearHistory(state);
-      state.discussionDraftsByScope = {};
-
-      // Generate today's local date so rollover prompts and resets stay aligned.
-      const today = getActionLocalCalendarDate(action);
-
-      // Completely replace forecastCycle to force re-render
-      const newCycle: ForecastCycle = {
-        days: {
-          1: createEmptyOutlook(1, readActionTimestamp(action))
-        },
-        currentDay: 1,
-        cycleDate: today
-      };
-
-      state.forecastCycle = newCycle;
-      state.isSaved = false;
-      state.outlookVersionSnapshots = [];
-      state.workflowMetadata = undefined;
-      state.workflowTemplate = undefined;
-      state.isWorkflowActive = false;
+      resetForecastState(state, {
+        today: getActionLocalCalendarDate(action),
+        timestamp: readActionTimestamp(action),
+      });
     },
 
     markAsSaved: (state) => {
