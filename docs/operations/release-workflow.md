@@ -59,7 +59,7 @@ Beta is now a release channel, not a branch. To create a beta:
 3. Select the `main` ref or an immutable commit and type `RELEASE-BETA`.
 4. Optionally provide the previous beta tag when automatic detection should be overridden.
 
-The workflow creates a prerelease. Its GitHub Release uses GitHub's native generated notes to show merged PRs between the previous beta tag and the selected ref, with categories from [`.github/release.yml`](../.github/release.yml). The curated changelog remains the public product record and is linked from the release.
+The workflow creates a prerelease. Its GitHub Release uses GitHub's native generated notes to show merged PRs between the previous beta tag and the selected ref, with categories from [`.github/release.yml`](../../.github/release.yml). The curated changelog remains the public product record and is linked from the release.
 
 Publishing the prerelease activates the beta deployment workflow. A beta deployment can also be manually dispatched when an operator needs to deploy a selected ref.
 
