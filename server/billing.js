@@ -1,3 +1,9 @@
+/**
+ * Billing service: this module handles Stripe event interpretation,
+ * entitlement persistence, and idempotent billing-side effects used by the
+ * server routes. It owns provider integration and storage coordination while
+ * route authentication and client presentation remain outside this boundary.
+ */
 'use strict';
 
 const { randomUUID } = require('node:crypto');
