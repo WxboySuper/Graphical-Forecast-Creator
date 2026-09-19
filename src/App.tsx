@@ -33,7 +33,13 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
-import { DEFAULT_FORECAST_WORKSPACE, getDefaultForecastWorkspacePath, resolveForecastWorkspacePath } from './routing/forecastWorkspaceRoutes';
+import {
+  DEFAULT_FORECAST_WORKSPACE,
+  getDefaultForecastWorkspacePath,
+  getExposedForecastWorkspacePaths,
+  resolveForecastWorkspacePath,
+  type ForecastWorkspaceId,
+} from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -140,6 +146,18 @@ const AppRoutes: React.FC = () => {
         <Route path="forecast">
           <Route index element={<ForecastLegacyRedirect />} />
           <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId="severe" /></Suspense>} />
+          {getExposedForecastWorkspacePaths()
+            .filter((path) => path !== '/forecast/severe')
+            .map((path) => {
+              const workspaceId = path.slice('/forecast/'.length);
+              return (
+                <Route
+                  key={path}
+                  path={workspaceId}
+                  element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId={workspaceId as ForecastWorkspaceId} /></Suspense>}
+                />
+              );
+            })}
         </Route>
         <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
