@@ -1,3 +1,8 @@
+/**
+ * Outlook polygon land-mask runtime helpers.
+ *
+ * This module applies land-mask geometry during outlook polygon processing. Callers own forecast data and export decisions; this file owns the geometry runtime boundary.
+ */
 import { fetchBoundaryGeoBundle } from './fetchBoundaryGeoBundle';
 import type { LandMaskFeature, LandMaskStrategy } from './types';
 
@@ -58,8 +63,3 @@ export const ensureLandMask = async (
   inflightByStrategy.set(strategy, request);
   return request;
 };
-/**
- * Outlook polygon land-mask runtime helpers.
- *
- * This module applies land-mask geometry during outlook polygon processing. Callers own forecast data and export decisions; this file owns the geometry runtime boundary.
- */
