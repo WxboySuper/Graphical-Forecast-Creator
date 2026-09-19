@@ -846,17 +846,12 @@ export const forecastSlice = createSlice({
     applyTrimmedCurrentDayOutlooks: (
       state,
       action: PayloadAction<{
-        day: DayType;
-        cycleGeneration: number;
-        cycleDate: string;
-        data: OutlookData;
-        result: TrimOutlookDataResult;
+        day: DayType; cycleGeneration: number; cycleDate: string;
+        data: OutlookData; result: TrimOutlookDataResult;
       }>,
     ) => {
-      if (
-        state.cycleGeneration !== action.payload.cycleGeneration
-        || state.forecastCycle.cycleDate !== action.payload.cycleDate
-      ) {
+      if (state.cycleGeneration !== action.payload.cycleGeneration
+        || state.forecastCycle.cycleDate !== action.payload.cycleDate) {
         return;
       }
       const dayData = state.forecastCycle.days[action.payload.day];

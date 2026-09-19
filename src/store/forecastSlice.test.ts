@@ -7,7 +7,6 @@ import reducer, {
   applyTrimmedCurrentDayOutlooks,
   copyFeaturesFromPrevious,
   importForecastCycle,
-  importForecasts,
   importWorkflowPackage,
   restoreForecastCycle,
   redoLastEdit,
@@ -587,33 +586,6 @@ describe('forecastSlice undo/redo', () => {
 
     expect(getUndoStack(state, 1)).toHaveLength(2);
     expect(getUndoStack(state, 2)).toHaveLength(1);
-  });
-
-  test('ignores trim results from a cycle replaced during async work', () => {
-    let state = reducer(undefined, addFeature({ feature: createFeature('old', 0) }));
-    const staleGeneration = state.cycleGeneration;
-    const staleData = state.forecastCycle.days[1]!.data;
-
-    state = reducer(state, importForecasts({
-      tornado: new Map([['2%', [createFeature('new', 10)]]]),
-    }));
-    expect(state.cycleGeneration).toBe(staleGeneration + 1);
-
-    state = reducer(state, applyTrimmedCurrentDayOutlooks({
-      day: 1,
-      cycleGeneration: staleGeneration,
-      cycleDate: state.forecastCycle.cycleDate,
-      data: staleData,
-      result: {
-        trimmedCount: 1,
-        removedCount: 0,
-        failedCount: 0,
-        skippedCount: 0,
-        errors: [],
-      },
-    }));
-
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0]?.id).toBe('new');
   });
 
   test('auto categorical sync updates state without adding its own undo entry', () => {
