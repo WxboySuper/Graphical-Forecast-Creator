@@ -3,7 +3,6 @@
  * These helpers were moved out of OpenLayersForecastMap.tsx so map styling
  * concerns can be reviewed and tested without loading the React component.
  */
-import { jest } from '@jest/globals';
 import { apply } from 'ol-mapbox-style';
 
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
@@ -55,7 +54,7 @@ describe('openLayersMapStyles', () => {
   });
 
   test('loads base and reference groups through the lazy style adapter', async () => {
-    applyMock.mockResolvedValue(undefined);
+    applyMock.mockImplementation(async () => undefined as never);
     const styleSet = {
       baseStyle: { version: 8, sources: {}, layers: [] },
       overlayStyle: { version: 8, sources: {}, layers: [] },
@@ -71,7 +70,7 @@ describe('openLayersMapStyles', () => {
 
   test('rejects when either style application fails', async () => {
     const error = new Error('overlay style failed');
-    applyMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(error);
+    applyMock.mockImplementationOnce(async () => undefined as never).mockRejectedValueOnce(error);
     const styleSet = {
       baseStyle: { version: 8, sources: {}, layers: [] },
       overlayStyle: { version: 8, sources: {}, layers: [] },
