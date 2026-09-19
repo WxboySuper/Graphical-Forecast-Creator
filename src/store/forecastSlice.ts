@@ -572,13 +572,12 @@ const cloneIntegratedCustomLayers = (customLayers?: CustomLayerCollection): Cust
   cloneCustomLayers(customLayers);
 
 /** Captures the current day's drawable outlook data and low-probability metadata for history. */
-const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {
-  const currentDay = state.forecastCycle.currentDay;
-  const dayData = state.forecastCycle.days[currentDay];
+const getCurrentDaySnapshot = (state: ForecastState, day = state.forecastCycle.currentDay): ForecastDaySnapshot | null => {
+  const dayData = state.forecastCycle.days[day];
   if (!dayData) return null;
 
   return {
-    day: currentDay,
+    day,
     data: cloneOutlookData(dayData.data),
     lowProbabilityOutlooks: [...(dayData.metadata.lowProbabilityOutlooks || [])],
     outlookOpacities: dayData.metadata.outlookOpacities ? { ...dayData.metadata.outlookOpacities } : undefined,
@@ -618,8 +617,8 @@ const pushHistoryEntry = (
 };
 
 /** Saves the current day into the undo stack and clears redo after a new user edit. */
-const pushUndoSnapshot = (state: ForecastState) => {
-  const snapshot = getCurrentDaySnapshot(state);
+const pushUndoSnapshot = (state: ForecastState, day = state.forecastCycle.currentDay) => {
+  const snapshot = getCurrentDaySnapshot(state, day);
   if (!snapshot) return;
 
   const dayHistory = getOrCreateDayHistory(state, snapshot.day);
@@ -841,7 +840,7 @@ export const forecastSlice = createSlice({
         return;
       }
 
-      pushUndoSnapshot(state);
+      pushUndoSnapshot(state, action.payload.day);
       dayData.data = action.payload.data;
       state.lastTrimResult = action.payload.result;
       invalidateCompletionAcknowledgement(state);
