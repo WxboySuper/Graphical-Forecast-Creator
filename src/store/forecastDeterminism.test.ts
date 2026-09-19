@@ -1,6 +1,7 @@
 import type { UnknownAction } from '@reduxjs/toolkit';
 import reducer, {
   addFeature,
+  applyTrimmedCurrentDayOutlooks,
   completeCycle,
   createOutlookUpdate,
   redoLastEdit,
@@ -11,6 +12,7 @@ import reducer, {
   startFromPreviousCycle,
   undoLastEdit,
   updateFeature,
+  importForecasts,
 } from './forecastSlice';
 import { readActionTimestamp } from './timestampMiddleware';
 import type { Feature } from 'geojson';
@@ -81,5 +83,21 @@ describe('forecastSlice determinism', () => {
 
   test('readActionTimestamp falls back to a stable timestamp for direct reducer calls', () => {
     expect(readActionTimestamp({ type: 'forecast/test' })).toBe('1970-01-01T00:00:00.000Z');
+  });
+
+  test('ignores trim results from a cycle replaced during async work', () => {
+    let state = reducer(undefined, addFeature({ feature: feature('old') }));
+    const staleGeneration = state.cycleGeneration;
+    const staleData = state.forecastCycle.days[1]!.data;
+    state = reducer(state, importForecasts({ tornado: new Map([['2%', [feature('new')]]]) }));
+    expect(state.cycleGeneration).toBe(staleGeneration + 1);
+    state = reducer(state, applyTrimmedCurrentDayOutlooks({
+      day: 1,
+      cycleGeneration: staleGeneration,
+      cycleDate: state.forecastCycle.cycleDate,
+      data: staleData,
+      result: { trimmedCount: 1, removedCount: 0, failedCount: 0, skippedCount: 0, errors: [] },
+    }));
+    expect(state.forecastCycle.days[1]?.data.tornado?.get('30%')?.[0]?.id).toBe('new');
   });
 });
