@@ -3,7 +3,6 @@
  * These helpers were moved out of OpenLayersForecastMap.tsx so map styling
  * concerns can be reviewed and tested without loading the React component.
  */
-import { jest } from '@jest/globals';
 import { apply } from 'ol-mapbox-style';
 
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
