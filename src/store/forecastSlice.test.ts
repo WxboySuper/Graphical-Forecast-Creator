@@ -4,6 +4,7 @@ import type { WorkflowMetadata } from '../types/workflow';
 import reducer, {
   addFeature,
   applyAutoCategoricalSync,
+  applyTrimmedCurrentDayOutlooks,
   copyFeaturesFromPrevious,
   importForecastCycle,
   importWorkflowPackage,
@@ -562,6 +563,27 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, undoLastEdit());
     expect(getTornadoFeatures(state)).toHaveLength(0);
     expect(selectCanRedo({ forecast: state } as never)).toBe(true);
+  });
+
+  test('trim undo snapshots the edited day when it is not active', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('day-1-feature', 0) }));
+    state = reducer(state, setForecastDay(2));
+    state = reducer(state, addFeature({ feature: createFeature('day-2-feature', 1) }));
+
+    state = reducer(state, applyTrimmedCurrentDayOutlooks({
+      day: 1,
+      data: state.forecastCycle.days[1]!.data,
+      result: {
+        trimmedCount: 1,
+        removedCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        errors: [],
+      },
+    }));
+
+    expect(getUndoStack(state, 1)).toHaveLength(2);
+    expect(getUndoStack(state, 2)).toHaveLength(1);
   });
 
   test('auto categorical sync updates state without adding its own undo entry', () => {
