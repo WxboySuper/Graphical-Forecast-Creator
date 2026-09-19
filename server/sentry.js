@@ -1,3 +1,8 @@
+/**
+ * Server-side Sentry configuration helpers.
+ *
+ * This file reads the server Sentry DSN and exposes the configuration boundary used by server bootstrap and request error handling.
+ */
 'use strict';
 
 /** @returns {string} Trimmed Sentry DSN or empty when unset. */
