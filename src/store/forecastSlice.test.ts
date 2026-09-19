@@ -1324,12 +1324,12 @@ describe('forecastSlice undo/redo', () => {
       expect(selectOutlooksForDay(state, 4)).toBe(selectOutlooksForDay(state, 4));
 
       const base = reducer(undefined, setForecastDay(1));
-      const state = withForecast(base);
-      const fallback = selectOutlooksForDay(state, 99 as DayType);
+      const unknownDayState = withForecast(base);
+      const fallback = selectOutlooksForDay(unknownDayState, 99 as DayType);
 
       expect(fallback).toBeDefined();
       expect(fallback['day4-8']).toBeInstanceOf(Map);
-      expect(fallback).toBe(selectOutlooksForDay(state, 99 as DayType));
+      expect(fallback).toBe(selectOutlooksForDay(unknownDayState, 99 as DayType));
     });
 
     it('selectCurrentOutlooks returns a safe fallback for an unknown current day', () => {
