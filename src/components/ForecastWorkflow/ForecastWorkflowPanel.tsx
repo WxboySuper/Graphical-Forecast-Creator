@@ -538,6 +538,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         { center: [39.8283, -98.5795], zoom: 4 },
         workflowMetadata,
         'workflow',
+        controller?.workspaceId ?? 'severe',
       );
     } finally {
       setIsPackageDownloading(false);
@@ -551,6 +552,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
       { center: [39.8283, -98.5795], zoom: 4 },
       workflowMetadata,
       'cycle',
+      controller?.workspaceId ?? 'severe',
     ).finally(() => setIsPackageDownloading(false)).catch(() => undefined);
   }
   /** Dismisses guidance while leaving the completed workflow untouched. */

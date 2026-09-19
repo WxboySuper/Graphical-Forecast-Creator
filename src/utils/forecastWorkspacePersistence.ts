@@ -64,14 +64,14 @@ export const classifyForecastWorkspacePayload = (
   }
 
   if (isWorkflowExportPackage(value) && value.workspaceId !== undefined) {
-    return isWorkspaceId(value.workspaceId)
-      ? {
-          ok: true,
-          workspaceId: value.workspaceId,
-          payload: createForecastWorkspaceSave(value.workspaceId, value.forecast),
-          legacy: false,
-        }
-      : { ok: false, reason: 'unknown-workspace' };
+    if (!isWorkspaceId(value.workspaceId)) return { ok: false, reason: 'unknown-workspace' };
+    if (!validateForecastData(value.forecast)) return { ok: false, reason: 'invalid' };
+    return {
+      ok: true,
+      workspaceId: value.workspaceId,
+      payload: createForecastWorkspaceSave(value.workspaceId, value.forecast),
+      legacy: false,
+    };
   }
 
   if (isRecord(value) && value.workspaceId !== undefined) {
