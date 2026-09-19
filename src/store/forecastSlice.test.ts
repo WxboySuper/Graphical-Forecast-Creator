@@ -1,4 +1,3 @@
-// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import type { Feature, Polygon } from 'geojson';
 import type { DayType } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
@@ -1274,7 +1273,7 @@ describe('forecastSlice undo/redo', () => {
   });
 
   describe('cycle session identity', () => {
-    it('advances the cycle generation every time the whole cycle is replaced', () => {
+    it('tracks cycle generation across replacements, edits, and saved-cycle loads', () => {
       const first = reducer(undefined, createOutlookUpdate());
       const restored = reducer(first, restoreForecastCycle(first.forecastCycle));
       const imported = reducer(restored, resetForecasts());
@@ -1283,25 +1282,21 @@ describe('forecastSlice undo/redo', () => {
       expect(restored.cycleGeneration).toBe(2);
       expect(imported.cycleGeneration).toBe(3);
       expect(started.cycleGeneration).toBe(4);
-    });
 
-    it('does not advance the generation for ordinary day edits', () => {
       let state = reducer(undefined, resetForecasts());
       state = reducer(state, setForecastDay(1));
       const generation = state.cycleGeneration;
       state = reducer(state, setForecastDay(2));
 
       expect(state.cycleGeneration).toBe(generation);
-    });
 
-    it('advances the generation on saved-cycle loads', () => {
-      let state = reducer(undefined, setForecastDay(1));
-      state = reducer(state, resetForecasts());
-      state = reducer(state, saveCurrentCycle({}));
-      const generation = state.cycleGeneration;
-      state = reducer(state, resumeIncompleteCycle({ cycleId: state.savedCycles[0].id }));
+      let savedCycleState = reducer(undefined, setForecastDay(1));
+      savedCycleState = reducer(savedCycleState, resetForecasts());
+      savedCycleState = reducer(savedCycleState, saveCurrentCycle({}));
+      const savedGeneration = savedCycleState.cycleGeneration;
+      savedCycleState = reducer(savedCycleState, resumeIncompleteCycle({ cycleId: savedCycleState.savedCycles[0].id }));
 
-      expect(state.cycleGeneration).toBe(generation + 1);
+      expect(savedCycleState.cycleGeneration).toBe(savedGeneration + 1);
     });
   });
 
@@ -1322,14 +1317,12 @@ describe('forecastSlice undo/redo', () => {
       expect(first).toBe(second);
     });
 
-    it('selectOutlooksForDay returns the same fallback reference for the same day shape', () => {
+    it('keeps fallback selectors referentially stable for all supported day shapes', () => {
       const state = withForecast(reducer(undefined, setForecastDay(1)));
       expect(selectOutlooksForDay(state, 2)).toBe(selectOutlooksForDay(state, 2));
       expect(selectOutlooksForDay(state, 3)).toBe(selectOutlooksForDay(state, 3));
       expect(selectOutlooksForDay(state, 4)).toBe(selectOutlooksForDay(state, 4));
-    });
 
-    it('selectOutlooksForDay returns a safe fallback for an unknown day', () => {
       const base = reducer(undefined, setForecastDay(1));
       const state = withForecast(base);
       const fallback = selectOutlooksForDay(state, 99 as DayType);
