@@ -15,8 +15,11 @@ export const trimCurrentDayOutlooksToLand = ({
   strategy: LandMaskStrategy;
   day?: DayType;
 }): ThunkAction<Promise<void>, RootState, unknown, UnknownAction> => async (dispatch, getState) => {
-  const targetDay = day ?? getState().forecast.forecastCycle.currentDay;
-  const dayData = getState().forecast.forecastCycle.days[targetDay];
+  const forecast = getState().forecast;
+  const targetDay = day ?? forecast.forecastCycle.currentDay;
+  const cycleGeneration = forecast.cycleGeneration;
+  const cycleDate = forecast.forecastCycle.cycleDate;
+  const dayData = forecast.forecastCycle.days[targetDay];
   if (!dayData) {
     return;
   }
@@ -36,6 +39,12 @@ export const trimCurrentDayOutlooksToLand = ({
   });
 
   if (result) {
-    dispatch(applyTrimmedCurrentDayOutlooks({ day: targetDay, data, result }));
+    dispatch(applyTrimmedCurrentDayOutlooks({
+      day: targetDay,
+      cycleGeneration,
+      cycleDate,
+      data,
+      result,
+    }));
   }
 };

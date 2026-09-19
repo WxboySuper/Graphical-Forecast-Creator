@@ -847,10 +847,18 @@ export const forecastSlice = createSlice({
       state,
       action: PayloadAction<{
         day: DayType;
+        cycleGeneration: number;
+        cycleDate: string;
         data: OutlookData;
         result: TrimOutlookDataResult;
       }>,
     ) => {
+      if (
+        state.cycleGeneration !== action.payload.cycleGeneration
+        || state.forecastCycle.cycleDate !== action.payload.cycleDate
+      ) {
+        return;
+      }
       const dayData = state.forecastCycle.days[action.payload.day];
       if (!dayData) {
         return;
@@ -957,6 +965,7 @@ export const forecastSlice = createSlice({
         // Update metadata
         dayData.metadata.lastModified = readActionTimestamp(action);
       }
+      advanceCycleGeneration(state);
       state.isSaved = true;
     },
 
