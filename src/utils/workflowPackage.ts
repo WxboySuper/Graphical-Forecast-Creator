@@ -3,6 +3,7 @@ import type { CycleMetadata, SerializedWorkflowPackage } from '../types/workflow
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isFeatureExposed } from '../config/featureExposure';
+import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export type WorkflowExportScope = 'workflow' | 'cycle';
 
@@ -10,6 +11,7 @@ export interface WorkflowExportPackage {
   packageType: WorkflowExportScope;
   schemaVersion: typeof WORKFLOW_SCHEMA_VERSION;
   exportedAt: string;
+  workspaceId?: ForecastWorkspaceId;
   metadata?: CycleMetadata;
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
@@ -92,12 +94,14 @@ export const buildWorkflowExportPackage = ({
   scope,
   forecast,
   cycleMetadata,
+  workspaceId,
   styleSnapshots,
   exportedAt = new Date().toISOString(),
 }: {
   scope: WorkflowExportScope;
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
+  workspaceId?: ForecastWorkspaceId;
   styleSnapshots?: Record<string, unknown>;
   exportedAt?: string;
 }): WorkflowExportPackage => {
@@ -106,6 +110,7 @@ export const buildWorkflowExportPackage = ({
     packageType: scope,
     schemaVersion: WORKFLOW_SCHEMA_VERSION,
     exportedAt,
+    ...(workspaceId ? { workspaceId } : {}),
     ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
     ...(cycleMetadata ? { cycleMetadata } : {}),
     ...(forecast.mapView ? { mapView: forecast.mapView } : {}),

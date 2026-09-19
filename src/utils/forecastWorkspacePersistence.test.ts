@@ -5,6 +5,7 @@ import {
   getForecastDataFromWorkspacePayload,
 } from './forecastWorkspacePersistence';
 import type { GFCForecastSaveData } from '../types/outlooks';
+import { buildWorkflowExportPackage } from './workflowPackage';
 
 const validForecast = (): GFCForecastSaveData => ({
   version: '1.0.0',
@@ -85,5 +86,16 @@ describe('forecast workspace persistence contract', () => {
     const forecast = validForecast();
     expect(getForecastDataFromWorkspacePayload(forecast)).toBe(forecast);
     expect(getForecastDataFromWorkspacePayload(createForecastWorkspaceSave('severe', forecast))).toBe(forecast);
+  });
+
+  test('preserves workspace identity when importing a native workflow package', () => {
+    const forecast = validForecast();
+    const packagePayload = buildWorkflowExportPackage({ scope: 'cycle', forecast, workspaceId: 'custom' });
+
+    expect(classifyForecastWorkspacePayload(packagePayload)).toMatchObject({
+      ok: true,
+      workspaceId: 'custom',
+      legacy: false,
+    });
   });
 });

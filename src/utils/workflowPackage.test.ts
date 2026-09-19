@@ -22,6 +22,17 @@ test.each(['workflow', 'cycle'] as const)('builds a discriminated %s package', (
   expect(pkg.cycleMetadata).toEqual(metadata);
 });
 
+test('records the owning workspace in native packages', () => {
+  const pkg = buildWorkflowExportPackage({
+    scope: 'cycle',
+    forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+    workspaceId: 'custom',
+  });
+
+  expect(pkg.workspaceId).toBe('custom');
+  expect(isWorkflowExportPackage(pkg)).toBe(true);
+});
+
 test('converts packages into the existing v2 serialized package contract', () => {
   const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle }, cycleMetadata: metadata });
   expect(toSerializedWorkflowPackage(pkg)?.cycles[0].id).toBe(metadata.id);

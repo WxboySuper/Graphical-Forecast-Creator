@@ -181,6 +181,7 @@ const exportPackageTransfer = async (request: ForecastExportRequest): Promise<vo
     request.mapView,
     request.cycleMetadata,
     toWorkflowScope(request.scope),
+    request.workspaceId,
   );
 };
 

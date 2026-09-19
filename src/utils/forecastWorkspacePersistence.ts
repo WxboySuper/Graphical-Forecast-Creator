@@ -2,6 +2,7 @@ import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getForecastWorkspace } from '../config/forecastWorkspaces';
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { validateForecastData } from './fileUtils';
+import { isWorkflowExportPackage } from './workflowPackage';
 
 /** Version of the workspace-aware save envelope, independent of forecast data version. */
 export const FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION = 1 as const;
@@ -60,6 +61,17 @@ export const classifyForecastWorkspacePayload = (
 ): ForecastWorkspaceClassification => {
   if (isEnvelope(value)) {
     return { ok: true, workspaceId: value.workspaceId, payload: value, legacy: false };
+  }
+
+  if (isWorkflowExportPackage(value) && value.workspaceId !== undefined) {
+    return isWorkspaceId(value.workspaceId)
+      ? {
+          ok: true,
+          workspaceId: value.workspaceId,
+          payload: createForecastWorkspaceSave(value.workspaceId, value.forecast),
+          legacy: false,
+        }
+      : { ok: false, reason: 'unknown-workspace' };
   }
 
   if (isRecord(value) && value.workspaceId !== undefined) {
