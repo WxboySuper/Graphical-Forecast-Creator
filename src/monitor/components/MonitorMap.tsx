@@ -1,3 +1,8 @@
+/**
+ * Monitor map composition component.
+ *
+ * This file wires the monitor view, radar and alert layers, and map controls into the OpenLayers map. Hooks provide data; this component owns composition and rendering.
+ */
 import React, { useMemo, useRef } from 'react';
 import 'ol/ol.css';
 import type { StormReport } from '../../types/stormReports';

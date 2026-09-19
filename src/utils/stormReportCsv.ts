@@ -1,3 +1,8 @@
+/**
+ * Storm report CSV parsing helpers.
+ *
+ * This module converts exported storm-report rows into normalized fields used by the forecast import flow. It owns CSV tokenization and field mapping; callers handle validation and persistence.
+ */
 import type { ReportType } from '../types/stormReports';
 
 export interface StormReportRowFieldMap {

@@ -1,3 +1,8 @@
+/**
+ * Pull request changelog governance preparation.
+ *
+ * This script reads pull request metadata, applies dependency and port policy rules, and updates the managed changelog declaration. Release publication stays elsewhere.
+ */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { listDependencyBumpsBetweenRefs, applyDependencyBumpsToChangelog } from './lib/dependabot-changelog.mjs';
