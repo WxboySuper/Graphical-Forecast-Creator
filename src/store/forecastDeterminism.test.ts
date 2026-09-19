@@ -98,6 +98,6 @@ describe('forecastSlice determinism', () => {
       data: staleData,
       result: { trimmedCount: 1, removedCount: 0, failedCount: 0, skippedCount: 0, errors: [] },
     }));
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('30%')?.[0]?.id).toBe('new');
+    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0]?.id).toBe('new');
   });
 });
