@@ -1,3 +1,8 @@
+/**
+ * Pull request changelog evaluation helpers.
+ *
+ * This module parses and validates changelog metadata for policy workflows. It returns findings; the workflow owns GitHub reporting and failure handling.
+ */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { evaluateChangelogPolicy, isChangelogSkip } from './changelog-policy.mjs';
