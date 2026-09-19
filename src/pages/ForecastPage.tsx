@@ -784,12 +784,14 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   return (
     <div className="forecast-page-shell">
       {showLegacyNotice ? <LegacyForecastNotice onDismiss={() => setShowLegacyNotice(false)} /> : null}
-      {renderForecastWorkspaceLayout(forecastUiVariant, {
-        mapRef,
-        controller: workspaceController,
-        autoTstmTools,
-        tstmPreviewFeatures,
-      })}
+      <div className="forecast-page-workspace">
+        {renderForecastWorkspaceLayout(forecastUiVariant, {
+          mapRef,
+          controller: workspaceController,
+          autoTstmTools,
+          tstmPreviewFeatures,
+        })}
+      </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />
       <DayRolloverDialog
         promptState={dayRolloverPrompt.promptState}

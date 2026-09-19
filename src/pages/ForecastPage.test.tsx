@@ -195,6 +195,7 @@ describe('ForecastPage layout selection', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock').closest('.forecast-page-workspace')).not.toBeNull();
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
