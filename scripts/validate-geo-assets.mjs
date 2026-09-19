@@ -1,3 +1,8 @@
+/**
+ * Geographic asset validation script.
+ *
+ * This script checks vendored geographic resources for the shape and integrity rules required by builds. It reports validation failures; asset generation remains separate.
+ */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
