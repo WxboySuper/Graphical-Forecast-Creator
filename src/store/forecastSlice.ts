@@ -62,6 +62,8 @@ export interface LifetimeCycleStats {
 
 export interface ForecastState {
   forecastCycle: ForecastCycle;
+  /** Bumps on every whole-cycle replacement so async work can detect the active document changed. */
+  cycleGeneration: number;
   drawingState: DrawingState;
   customEditor: {
     mode: 'severe' | 'custom';
@@ -332,7 +334,13 @@ const sharedEmptyOutlookData = (day: DayType): OutlookData | null => {
   return null;
 };
 
+/** Bumps the cycle generation when the active forecast document is fully replaced. */
+const advanceCycleGeneration = (state: ForecastState) => {
+  state.cycleGeneration = (state.cycleGeneration ?? 0) + 1;
+};
+
 const initialState: ForecastState = {
+  cycleGeneration: 1,
   forecastCycle: {
     days: {
       1: createEmptyOutlook(1, INITIAL_TIMESTAMP)
@@ -434,6 +442,7 @@ interface PendingFeatureUpdate {
   feature: Feature;
 }
 
+/** Finds incoming features that already exist in the selected day's outlook maps. */
 const collectPendingFeatureUpdates = (
   state: ForecastState,
   incoming: Feature[],
@@ -502,6 +511,7 @@ const getFeatureCacheKey = (feature: Feature): object => {
   return original(feature) ?? feature;
 };
 
+/** Clones a feature once per stable source identity while building history snapshots. */
 const cloneFeatureCached = (feature: Feature): Feature => {
   const cacheKey = getFeatureCacheKey(feature);
   const cached = featureCloneCache.get(cacheKey);
@@ -564,6 +574,7 @@ const cloneOutlookData = (data: OutlookData): OutlookData => {
   };
 };
 
+/** Deep-clones custom layer metadata for an isolated history snapshot. */
 const cloneCustomLayers = (customLayers?: CustomLayerCollection): CustomLayerCollection | undefined =>
   customLayers ? cloneJsonValue(customLayers) : undefined;
 
@@ -572,13 +583,16 @@ const cloneIntegratedCustomLayers = (customLayers?: CustomLayerCollection): Cust
   cloneCustomLayers(customLayers);
 
 /** Captures the current day's drawable outlook data and low-probability metadata for history. */
-const getCurrentDaySnapshot = (state: ForecastState): ForecastDaySnapshot | null => {
-  const currentDay = state.forecastCycle.currentDay;
+const getCurrentDaySnapshot = (
+  state: ForecastState,
+  day: DayType = state.forecastCycle.currentDay,
+): ForecastDaySnapshot | null => {
+  const currentDay = day;
   const dayData = state.forecastCycle.days[currentDay];
   if (!dayData) return null;
 
   return {
-    day: currentDay,
+    day,
     data: cloneOutlookData(dayData.data),
     lowProbabilityOutlooks: [...(dayData.metadata.lowProbabilityOutlooks || [])],
     outlookOpacities: dayData.metadata.outlookOpacities ? { ...dayData.metadata.outlookOpacities } : undefined,
@@ -618,8 +632,8 @@ const pushHistoryEntry = (
 };
 
 /** Saves the current day into the undo stack and clears redo after a new user edit. */
-const pushUndoSnapshot = (state: ForecastState) => {
-  const snapshot = getCurrentDaySnapshot(state);
+const pushUndoSnapshot = (state: ForecastState, day: DayType = state.forecastCycle.currentDay) => {
+  const snapshot = getCurrentDaySnapshot(state, day);
   if (!snapshot) return;
 
   const dayHistory = getOrCreateDayHistory(state, snapshot.day);
@@ -698,6 +712,7 @@ const applyRolloverFromPreviousCycle = (state: ForecastState, args: ApplyRollove
   clearHistory(state);
   state.discussionDraftsByScope = {};
   state.forecastCycle = buildRolloverCycle({ ...args, now });
+  advanceCycleGeneration(state);
   state.isSaved = false;
   state.outlookVersionSnapshots = [];
   applyRolloverWorkflowState(state, args, now);
@@ -831,17 +846,20 @@ export const forecastSlice = createSlice({
     applyTrimmedCurrentDayOutlooks: (
       state,
       action: PayloadAction<{
-        day: DayType;
-        data: OutlookData;
-        result: TrimOutlookDataResult;
+        day: DayType; cycleGeneration: number; cycleDate: string;
+        data: OutlookData; result: TrimOutlookDataResult;
       }>,
     ) => {
+      if (state.cycleGeneration !== action.payload.cycleGeneration
+        || state.forecastCycle.cycleDate !== action.payload.cycleDate) {
+        return;
+      }
       const dayData = state.forecastCycle.days[action.payload.day];
       if (!dayData) {
         return;
       }
 
-      pushUndoSnapshot(state);
+      pushUndoSnapshot(state, action.payload.day);
       dayData.data = action.payload.data;
       state.lastTrimResult = action.payload.result;
       invalidateCompletionAcknowledgement(state);
@@ -850,7 +868,7 @@ export const forecastSlice = createSlice({
 
     resetForecasts: (state, action: UnknownAction) => {
       clearHistory(state);
-      state.discussionDraftsByScope = {};
+        state.discussionDraftsByScope = {};
 
       // Generate today's local date so rollover prompts and resets stay aligned.
       const today = getActionLocalCalendarDate(action);
@@ -861,10 +879,11 @@ export const forecastSlice = createSlice({
           1: createEmptyOutlook(1, readActionTimestamp(action))
         },
         currentDay: 1,
-        cycleDate: today
+        cycleDate: today,
       };
 
       state.forecastCycle = newCycle;
+      advanceCycleGeneration(state);
       state.isSaved = false;
       state.outlookVersionSnapshots = [];
       state.workflowMetadata = undefined;
@@ -880,6 +899,7 @@ export const forecastSlice = createSlice({
     restoreForecastCycle: {
       reducer: (state, action: PayloadAction<{ cycle: ForecastCycle; preserveDiscussionDrafts?: boolean }>) => {
         state.forecastCycle = action.payload.cycle;
+        advanceCycleGeneration(state);
         if (!action.payload.preserveDiscussionDrafts) {
           state.discussionDraftsByScope = {};
         }
@@ -898,6 +918,7 @@ export const forecastSlice = createSlice({
     // Import forecast data: Now handles Cycle
     importForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
       state.forecastCycle = action.payload;
+      advanceCycleGeneration(state);
       state.discussionDraftsByScope = {};
       clearHistory(state);
       state.isSaved = true;
@@ -939,6 +960,7 @@ export const forecastSlice = createSlice({
         // Update metadata
         dayData.metadata.lastModified = readActionTimestamp(action);
       }
+      advanceCycleGeneration(state);
       state.isSaved = true;
     },
 
@@ -1045,8 +1067,9 @@ export const forecastSlice = createSlice({
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
       if (savedCycle) {
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
+        advanceCycleGeneration(state);
         clearHistory(state);
-      state.discussionDraftsByScope = {};
+        state.discussionDraftsByScope = {};
         state.isSaved = true;
         state.outlookVersionSnapshots = [];
         
@@ -1326,9 +1349,10 @@ export const forecastSlice = createSlice({
       const newCycle: ForecastCycle = {
         days: { [startDay]: createEmptyOutlook(startDay, now) },
         currentDay: startDay,
-        cycleDate: today
+        cycleDate: today,
       };
       state.forecastCycle = newCycle;
+      advanceCycleGeneration(state);
       state.isSaved = false;
       state.outlookVersionSnapshots = [];
       
@@ -1366,6 +1390,7 @@ export const forecastSlice = createSlice({
       clearHistory(state);
       state.discussionDraftsByScope = {};
       state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
+      advanceCycleGeneration(state);
       state.isSaved = true;
       state.outlookVersionSnapshots = [];
       
@@ -1576,6 +1601,7 @@ const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
   layers: [],
 };
+/** Selects custom layers for the active forecast day, or an immutable empty value. */
 export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollection => {
   const cycle = state.forecast.forecastCycle;
   return cycle?.days?.[cycle.currentDay]?.customLayers || EMPTY_CUSTOM_LAYERS;
@@ -1606,6 +1632,7 @@ export const selectIsLowProbability = (state: RootState) => {
   return day?.metadata?.lowProbabilityOutlooks?.includes(activeType) || false;
 };
 
+/** Selects the clamped display opacity for one active-day outlook type. */
 export const selectCurrentOutlookOpacity = (state: RootState, outlookType: OutlookType): number => {
   const day = state.forecast.forecastCycle.days[state.forecast.forecastCycle.currentDay];
   const value = day?.metadata.outlookOpacities?.[outlookType];
