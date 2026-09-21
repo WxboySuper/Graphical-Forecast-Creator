@@ -34,18 +34,12 @@ All notable changes to this project will be documented in this file.
 - **jest-environment-jsdom:** ^30.5.0 → ^30.5.1
 - **typescript-eslint:** ^8.68.0 → ^8.70.0
 - **vite:** ^8.2.1 → ^8.3.0
-- **@sentry/node:** ^10.69.0 → ^10.73.0 (`server`)
+- **@sentry/node:** ^10.74.0 → ^10.75.0 (`server`)
 - **firebase-admin:** ^14.2.0 → ^14.3.0 (`server`)
 - **express-rate-limit:** ^8.6.2 → ^8.7.0 (`server`)
 - **stripe:** ^22.4.0 → ^22.6.1 (`server`)
 - **Paint bucket editing prototype:** Add beta-gated Step and Set editing for existing probabilistic outlook polygons, with undo/redo support.
 - **Population estimate prototype:** Add a beta-gated WorldPop estimate for the population inside the active day's active-hazard outlook polygons.
-
-<!-- Continue next-major work here after this stable line is cut. -->
-
-
-#### Fixed
-
 - **Production deployment action fallback:** Treat the manual workflow's `auto` option as a request to use the release manifest instead of rejecting it as an invalid deploy action.
 - **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
 - **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
@@ -53,9 +47,7 @@ All notable changes to this project will be documented in this file.
 - **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical recovery:** Reset timed-out geometry workers, preserve the newest probabilistic edit for a follow-up derivation, and prevent repeated retries of unchanged failed geometry.
-- Precision polygon editing now scopes vertex changes to the selected outlook tier and records multi-vertex edits as one undo step.
 - **Beta invite claims:** Activate premium access atomically when users claim a beta invite, preserve existing Stripe fields, and repair entitlement records for users already marked as beta-enabled.
-
 - **jszip:** ^3.10.1 → ^3.10.2
 - **react:** ^19.2.8 → ^19.3.0
 - **react-dom:** ^19.2.8 → ^19.3.0
@@ -67,6 +59,7 @@ All notable changes to this project will be documented in this file.
 - **autoprefixer:** ^10.5.4 → ^10.5.6
 - **postcss:** 8.5.26 → 8.5.28
 
+#
 ## v1.7.0
 
 #### Dependencies
