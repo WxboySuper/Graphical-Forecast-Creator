@@ -17,6 +17,8 @@ const FIXTURE_PATH = resolve(
   '../fixtures/stale-branch-report.json'
 );
 
+export { githubRequest } from './github-api.mjs';
+
 /**
  * @param {string} repository
  * @param {string} token

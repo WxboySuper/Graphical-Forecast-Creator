@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { githubRequest } from './github-api.mjs';
+import { githubRequest as staleBranchGithubRequest } from './stale-branch-github.mjs';
 
 /** Build the minimal response shape needed by the request helper tests. */
 const response = ({ ok, status, json = {}, text = '' }) => ({
@@ -11,6 +12,10 @@ const response = ({ ok, status, json = {}, text = '' }) => ({
 });
 
 describe('githubRequest', () => {
+  it('preserves the stale-branch module export', () => {
+    assert.equal(staleBranchGithubRequest, githubRequest);
+  });
+
   it('sends the shared authenticated request shape and parses JSON', () => {
     const originalFetch = globalThis.fetch;
     let request = null;
