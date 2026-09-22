@@ -524,6 +524,14 @@ describe("CloudLibraryPage", () => {
     expect(window.history.length).toBe(entriesBefore);
   });
 
+  it("does not double-wrap an already-enveloped cloud handoff payload", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
+    expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
+    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe('severe');
+  });
+
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(
