@@ -17,7 +17,6 @@ import {
   type CloudLibraryTab,
   type CloudLibraryTabId,
 } from './cloudLibraryWorkspace';
-import { getForecastWorkspace } from '../config/forecastWorkspaces';
 import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
 import './CloudLibraryPage.css';
 
@@ -534,6 +533,8 @@ const CloudLibraryTabs: React.FC<{
         key={tab.id}
         role="tab"
         aria-selected={activeTab === tab.id}
+        aria-controls="cloud-library-panel"
+        tabIndex={activeTab === tab.id ? 0 : -1}
         variant={activeTab === tab.id ? 'default' : 'outline'}
         className="cloud-library-tab"
         onClick={() => onTabChange(tab.id)}
@@ -579,7 +580,7 @@ const CloudLibraryMainCard: React.FC<{
       <CardDescription>Open a saved package, rename it, or clear out older copies.</CardDescription>
       <CloudLibraryTabs tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
     </CardHeader>
-    <CardContent className="cloud-library-list-content">
+    <CardContent className="cloud-library-list-content" id="cloud-library-panel" role="tabpanel" aria-label="Cloud cycles">
       {loading && cycles.length === 0 ? (
         <div className="cloud-library-loading">
           <LoaderCircle className="h-6 w-6 animate-spin" />
@@ -711,18 +712,23 @@ const useCloudLibraryActions = ({
   /** Loads one hosted cycle into the forecast editor and preserves its cloud metadata in session storage. */
   const handleLoadCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
+    const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
+    const workspaceId = selectedCycle?.workspaceId ?? 'severe';
+    if (workspaceId !== 'severe') {
+      setMessage('Workspace-specific cloud loading is not available yet.');
+      return;
+    }
+
     const payload = await loadCycle(cycleId);
     if (!payload) {
       return;
     }
 
-    const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
     if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
       return;
     }
 
-    const workspaceId = selectedCycle?.workspaceId ?? 'severe';
-    navigate(workspaceId === 'severe' ? getForecastWorkspace(workspaceId)?.path ?? '/forecast/severe' : '/forecast/severe');
+    navigate('/forecast/severe');
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */

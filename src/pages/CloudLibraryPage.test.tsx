@@ -111,4 +111,17 @@ describe("CloudLibraryPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Custom 0/i }));
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
+
+  it("does not load unsupported workspace cycles into the Severe editor", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn();
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+    expect(loadCycle).not.toHaveBeenCalled();
+    expect(screen.getByText("Workspace-specific cloud loading is not available yet.")).toBeInTheDocument();
+  });
 });
