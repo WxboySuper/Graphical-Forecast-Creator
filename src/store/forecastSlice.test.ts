@@ -360,6 +360,35 @@ describe('forecastSlice undo/redo', () => {
     expect(hydratedSnapshot.savedCycles[0]?.workspaceId).toBe('severe');
   });
 
+  test('memoizes workspace cycle selection across unrelated state changes', () => {
+    const state = { forecast: reducer(undefined, { type: '@@INIT' }) } as Parameters<typeof selectSavedCyclesForActiveWorkspace>[0];
+    const first = selectSavedCyclesForActiveWorkspace(state);
+    const second = selectSavedCyclesForActiveWorkspace({
+      ...state,
+      forecast: { ...state.forecast, isSaved: !state.forecast.isSaved },
+    });
+
+    expect(second).toBe(first);
+  });
+
+  test('does not load or delete a cycle owned by another workspace', () => {
+    let severeState = reducer(undefined, saveCurrentCycle({ label: 'Severe cycle' }));
+    const severeCycle = severeState.savedCycles[0]!;
+    severeState = reducer(severeState, setForecastWorkspace('custom'));
+    severeState = reducer(severeState, saveCurrentCycle({ label: 'Custom cycle' }));
+    const beforeLoad = severeState.forecastCycle;
+
+    const afterLoad = reducer(severeState, loadSavedCycle(severeCycle.id));
+    const afterDelete = reducer(afterLoad, deleteSavedCycle(severeCycle.id));
+    const afterResume = reducer(afterDelete, resumeIncompleteCycle({ cycleId: severeCycle.id }));
+    const afterStart = reducer(afterResume, startFromPreviousCycle({ sourceCycleId: severeCycle.id }));
+
+    expect(afterLoad.forecastCycle).toBe(beforeLoad);
+    expect(afterDelete.savedCycles.some((cycle) => cycle.id === severeCycle.id)).toBe(true);
+    expect(afterResume.forecastCycle).toBe(beforeLoad);
+    expect(afterStart.forecastCycle).toBe(beforeLoad);
+  });
+
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
     let state = reducer(undefined, { type: 'test/init' });
     for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {

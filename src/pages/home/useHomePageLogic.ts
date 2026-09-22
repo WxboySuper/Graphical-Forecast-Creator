@@ -50,6 +50,7 @@ const useHomePageLogic = () => {
     forecastCycle,
   });
 
+  // Lifetime totals intentionally remain account-wide; retained history and recent-cycle lists are workspace-scoped.
   const lifetimeStats = useSelector((state: RootState) => state.forecast.lifetimeCycleStats);
   const stats = useMemo(() => computeHomeStats(forecastCycle, savedCycles, lifetimeStats), [forecastCycle, savedCycles, lifetimeStats]);
   const formattedDate = useMemo(() => formatCycleDate(forecastCycle.cycleDate), [forecastCycle.cycleDate]);
