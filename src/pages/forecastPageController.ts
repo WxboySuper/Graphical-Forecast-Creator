@@ -778,13 +778,13 @@ const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, curre
 }) => {
   const handleKeepCurrentSession = useCallback(() => completeRollover(), [completeRollover]);
   const handleDownloadAndStartNewDay = useCallback(() => {
-    if (!runDayRolloverDownloadAction({ forecastCycle, mapView: currentMapView, dispatch, clearCurrent })) {
+    if (!runDayRolloverDownloadAction({ forecastCycle, mapView: currentMapView, dispatch, clearCurrent, workspaceId })) {
       setActionError('Unable to download this session. Your current forecast is still open.');
       return;
     }
     addToast('Forecast downloaded and a new day started.', 'success');
     completeRollover();
-  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, setActionError]);
+  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, setActionError, workspaceId]);
   const handleSaveToCloudAndStartNewDay = useCallback(async () => {
     setIsBusy(true);
     setActionError(null);

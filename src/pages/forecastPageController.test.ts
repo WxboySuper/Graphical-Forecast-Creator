@@ -1,3 +1,4 @@
+import { act, renderHook } from '@testing-library/react';
 import * as fileUtils from '../utils/fileUtils';
 import forecastReducer from '../store/forecastSlice';
 import type { DiscussionData } from '../types/outlooks';
@@ -20,6 +21,7 @@ import {
   parseStoredForecastPayload,
   runDayRolloverCloudSaveAction,
   runDayRolloverDownloadAction,
+  useDayRolloverPrompt,
 } from './forecastPageController';
 import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import type { ForecastImportResult } from '../utils/forecastTransfer';
@@ -242,6 +244,94 @@ describe('forecastPageController', () => {
     } finally {
       global.Blob = OriginalBlob;
       downloadSpy.mockRestore();
+    }
+  });
+
+  test('keeps Custom ownership on rollover download through useDayRolloverPrompt', () => {
+    const forecastCycle = createForecastCycle();
+    const currentMapView = { center: [39.8, -98.5] as [number, number], zoom: 4 };
+    const seen: string[] = [];
+    const OriginalBlob = global.Blob;
+    class CapturingBlob extends OriginalBlob {
+      constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+        super(parts, options);
+        if (parts) seen.push(parts.map((part) => (typeof part === 'string' ? part : '')).join(''));
+      }
+    }
+    global.Blob = CapturingBlob as typeof Blob;
+    const downloadSpy = jest.spyOn(fileUtils, 'downloadBlob').mockImplementation(() => undefined);
+    const dispatch = jest.fn();
+    const addToast = jest.fn();
+    const clearCurrent = jest.fn();
+    const saveCycle = jest.fn();
+
+    try {
+      const { result, unmount } = renderHook(() => useDayRolloverPrompt({
+        restoreComplete: false,
+        restoredSession: false,
+        dispatch,
+        addToast,
+        forecastCycle,
+        currentMapView,
+        isSaved: false,
+        canSaveToCloud: false,
+        saveCycle,
+        clearCurrent,
+        workspaceId: 'custom',
+      }));
+
+      act(() => {
+        result.current.handleDownloadAndStartNewDay();
+      });
+
+      expect(downloadSpy).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(seen.join('')) as { workspaceId?: string };
+      expect(payload.workspaceId).toBe('custom');
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      unmount();
+    } finally {
+      global.Blob = OriginalBlob;
+      downloadSpy.mockRestore();
+    }
+  });
+
+  test('keeps Severe ownership on rollover download through useDayRolloverPrompt', () => {
+    const forecastCycle = createForecastCycle();
+    const currentMapView = { center: [0, 0] as [number, number], zoom: 4 };
+    const exportSpy = jest.spyOn(fileUtils, 'downloadBlob').mockImplementation(() => undefined);
+    const dispatch = jest.fn();
+
+    try {
+      const { result, unmount } = renderHook(() => useDayRolloverPrompt({
+        restoreComplete: false,
+        restoredSession: false,
+        dispatch,
+        addToast: jest.fn(),
+        forecastCycle,
+        currentMapView,
+        isSaved: false,
+        canSaveToCloud: false,
+        saveCycle: jest.fn(),
+        clearCurrent: jest.fn(),
+        workspaceId: 'severe',
+      }));
+
+      act(() => {
+        result.current.handleDownloadAndStartNewDay();
+      });
+
+      expect(exportSpy).toHaveBeenCalledTimes(1);
+      const downloadedBlob = exportSpy.mock.calls[0]?.[0] as Blob;
+      expect(downloadedBlob).toBeInstanceOf(Blob);
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      unmount();
+
+      exportSpy.mockClear();
+      dispatch.mockClear();
+      expect(runDayRolloverDownloadAction({ forecastCycle, mapView: currentMapView, dispatch })).toBe(true);
+      expect(dispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      exportSpy.mockRestore();
     }
   });
 });
