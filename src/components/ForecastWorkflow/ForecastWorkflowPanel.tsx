@@ -464,6 +464,8 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
+  const activeWorkspaceId = useSelector((state: import('../../store').RootState) => state.forecast.workspaceId);
+  const exportWorkspaceId = controller?.workspaceId ?? activeWorkspaceId;
   const workflowTemplate = useSelector(selectWorkflowTemplate);
   const validationResult = useSelector(selectCompletionValidationResult);
   const showCompletionModal = useSelector(selectShowCompletionModal);
@@ -542,6 +544,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         { center: [39.8283, -98.5795], zoom: 4 },
         workflowMetadata,
         'workflow',
+        exportWorkspaceId,
       );
     } finally {
       setIsPackageDownloading(false);
@@ -555,6 +558,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
       { center: [39.8283, -98.5795], zoom: 4 },
       workflowMetadata,
       'cycle',
+      exportWorkspaceId,
     ).finally(() => setIsPackageDownloading(false)).catch(() => undefined);
   }
   /** Dismisses guidance while leaving the completed workflow untouched. */
