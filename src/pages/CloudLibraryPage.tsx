@@ -26,6 +26,7 @@ import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../
 import {
   getForecastWorkspace,
   isForecastWorkspaceExposed,
+  type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
 import {
