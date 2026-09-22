@@ -50,10 +50,15 @@ hashes, and a validated saved-item handoff may be carried into the destination,
 but a legacy or ambiguous `/forecast` URL is first redirected to Severe and marked
 for the temporary migration notice.
 
-`src/App.tsx` registers the current Severe route and its legacy redirect.
-`src/config/featureSurfaces.ts` owns the actual gated route definitions, which
-`src/routing/buildFeatureGatedRoutes.tsx` filters by exposure. The planned paths
-above do not register pages. Route tests exercise these active definitions.
+`src/App.tsx` registers the Severe route, the legacy redirect, and the workspace
+routes returned by `getExposedForecastWorkspaceRoutes()`.
+`src/config/forecastWorkspaces.ts` owns workspace definitions and exposure
+metadata; `src/routing/forecastWorkspaceRoutes.ts` validates them and returns only
+exposed route records. The application shell registers those records without
+loading unexposed workspace pages. Other gated features use
+`src/config/featureSurfaces.ts` and `src/routing/buildFeatureGatedRoutes.tsx`.
+The planned paths above do not by themselves register pages. Route tests cover
+the workspace definitions and route records.
 
 Future routes stay unregistered when their feature is off. A direct request
 falls through the normal application fallback instead of mounting a disabled
