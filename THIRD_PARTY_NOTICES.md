@@ -63,7 +63,7 @@ to each.
 - **react** ^19.3.0 (root (pnpm)) — MIT — allowed
 - **react-dom** ^19.3.0 (root (pnpm)) — MIT — allowed
 - **react-redux** ^9.3.0 (root (pnpm)) — MIT — allowed
-- **react-router** ^8.3.1 (root (pnpm)) — MIT — allowed
+- **react-router** ~8.3.1 (root (pnpm)) — MIT — allowed
 - **redux** ^5.0.1 (root (pnpm)) — MIT — allowed
 - **rollup** >=4.63.3 (root (pnpm)) — MIT — allowed
 - **tailwind-merge** ^3.7.0 (root (pnpm)) — MIT — allowed
