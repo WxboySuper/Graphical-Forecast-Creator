@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file.
 - **immer:** ^11.1.16 → ^11.1.18
 - **lucide-react:** ^1.45.0 → ^1.47.0
 - **ol-mapbox-style:** ^13.4.3 → ^13.5.1
-- **react-router:** ^8.3.1 → ^8.4.0
+- **react-router:** ^8.3.1 → ~8.3.1
 - **rollup:** >=4.63.1 → >=4.63.3
 - **uuid:** ^14.0.1 → ^14.0.2
 - **web-vitals:** ^6.1.0 → ^6.2.1
