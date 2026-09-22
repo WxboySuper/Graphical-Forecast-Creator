@@ -349,6 +349,12 @@ const advanceCycleGeneration = (state: ForecastState) => {
   state.cycleGeneration = (state.cycleGeneration ?? 0) + 1;
 };
 
+/** Normalizes hydrated cycle ownership so direct or legacy payloads cannot bypass Severe fallback. */
+const normalizeCycleWorkspace = (cycle: SavedCycle): SavedCycle => ({
+  ...cycle,
+  workspaceId: getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE,
+});
+
 const initialState: ForecastState = {
   cycleGeneration: 1,
   workspaceId: DEFAULT_FORECAST_WORKSPACE,
@@ -796,7 +802,6 @@ const restoreHistoryEntry = (
   state.isSaved = false;
 };
 
-// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 export const forecastSlice = createSlice({
   name: 'forecast',
   initialState,
@@ -1154,7 +1159,7 @@ export const forecastSlice = createSlice({
     // Load cycles from storage (for hydration)
     loadCycleHistory: (state, action: PayloadAction<SavedCycle[] | CycleHistoryLoad>) => {
       const cycles = Array.isArray(action.payload) ? action.payload : action.payload.cycles;
-      state.savedCycles = cycles.slice(-SAVED_CYCLES_LIMIT);
+      state.savedCycles = cycles.slice(-SAVED_CYCLES_LIMIT).map(normalizeCycleWorkspace);
       state.lifetimeCycleStats = Array.isArray(action.payload)
         ? {
             totalCyclesMade: cycles.length,
