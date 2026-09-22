@@ -19,8 +19,6 @@ import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 
-const getSavedCycleWorkspaceId = (cycle: Pick<SavedCycle, 'workspaceId'>): ForecastWorkspaceId =>
-  getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
 import type { TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
@@ -39,6 +37,9 @@ import {
   resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
+
+const getSavedCycleWorkspaceId = (cycle: Pick<SavedCycle, 'workspaceId'>): ForecastWorkspaceId =>
+  getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -1416,7 +1417,7 @@ export const forecastSlice = createSlice({
     resumeIncompleteCycle: (state, action: PayloadAction<{ cycleId: string }>) => {
       const { cycleId } = action.payload;
       const savedCycle = state.savedCycles.find((c) => c.id === cycleId);
-      if (!savedCycle) return;
+      if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== state.workspaceId) return;
 
       clearHistory(state);
       state.discussionDraftsByScope = {};
@@ -1515,7 +1516,7 @@ export const forecastSlice = createSlice({
       const { sourceCycleId, newCycleDate, sourceDay, targetDay = 1, workflowTemplate } = action.payload;
 
       const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
-      if (!sourceCycle) return;
+      if (!sourceCycle || getSavedCycleWorkspaceId(sourceCycle) !== state.workspaceId) return;
 
       const sourceForecastCycle = normalizeForecastCycle(sourceCycle.forecastCycle);
       const sourceDayNumber = sourceDay ?? sourceForecastCycle.currentDay;
