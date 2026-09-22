@@ -523,4 +523,24 @@ describe("CloudLibraryPage", () => {
     expect(window.location.search).toBe("");
     expect(window.history.length).toBe(entriesBefore);
   });
+
+  it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+    window.history.replaceState({}, "", "/cloud-library?workspace=custom&source=bookmark");
+
+    renderPage();
+
+    expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /All 2/i }));
+    expect(window.location.search).toBe("?source=bookmark");
+  });
 });
