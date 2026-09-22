@@ -1,7 +1,9 @@
 import { createFileHandlers } from './useFileLoader';
 import { waitFor } from '@testing-library/react';
+import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { deserializeForecast, downloadBlob, readForecastImportFile, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
 import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { isWorkflowExportPackage } from '../utils/workflowPackage';
 
 jest.mock('../utils/fileUtils', () => ({
   deserializeForecast: jest.fn(),
@@ -28,6 +30,7 @@ const mockDownloadBlob = downloadBlob as jest.MockedFunction<typeof downloadBlob
 const mockReadForecastImportFile = readForecastImportFile as jest.MockedFunction<typeof readForecastImportFile>;
 const mockDeserializeWorkspace = deserializeForecastWorkspace as jest.MockedFunction<typeof deserializeForecastWorkspace>;
 const mockSerializeWorkspace = serializeForecastWorkspace as jest.MockedFunction<typeof serializeForecastWorkspace>;
+const mockIsWorkflowExportPackage = isWorkflowExportPackage as jest.MockedFunction<typeof isWorkflowExportPackage>;
 
 describe('createFileHandlers', () => {
   const forecastCycle = { id: 'cycle-1' };
@@ -45,8 +48,7 @@ describe('createFileHandlers', () => {
     mockSerializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecast: { id: 'saved' } } as never);
     mockDownloadBlob.mockImplementation(() => undefined);
     mockReadForecastImportFile.mockImplementation(async (file) => JSON.parse(await file.text()) as unknown);
-    const { isWorkflowExportPackage } = require('../utils/workflowPackage') as { isWorkflowExportPackage: jest.Mock };
-    isWorkflowExportPackage.mockReturnValue(false);
+    mockIsWorkflowExportPackage.mockReturnValue(false);
   });
 
   const createTextFile = (text: string, shouldReject = false): File => ({
@@ -54,11 +56,27 @@ describe('createFileHandlers', () => {
     text: shouldReject ? jest.fn().mockRejectedValue(new Error('read failed')) : jest.fn().mockResolvedValue(text),
   } as unknown as File);
 
-  it('loads valid forecast JSON and dispatches the imported cycle', async () => {
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never });
-    const file = createTextFile(JSON.stringify({ version: 1 }));
+  const makeHandlers = (workspaceId?: ForecastWorkspaceId) =>
+    createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, ...(workspaceId ? { workspaceId } : {}) });
 
-    await handlers.handleLoad(file);
+  const loadJsonPayload = (handlers: ReturnType<typeof createFileHandlers>, payload: unknown) =>
+    handlers.handleLoad(createTextFile(JSON.stringify(payload)));
+
+  const loadWorkspaceIdentityFile = (activeWorkspaceId: ForecastWorkspaceId) => {
+    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'custom', forecastCycle: { id: 'custom-cycle' }, legacy: false } as never);
+    return loadJsonPayload(makeHandlers(activeWorkspaceId), { version: 1 });
+  };
+
+  const loadWorkflowPackageWithOuterWorkspace = (outerWorkspaceId: unknown) => {
+    mockIsWorkflowExportPackage.mockReturnValue(true);
+    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecastCycle: { id: 'inner' }, legacy: false } as never);
+    return loadJsonPayload(makeHandlers('severe'), { workspaceId: outerWorkspaceId, forecast: { version: 1 } });
+  };
+
+  it('loads valid forecast JSON and dispatches the imported cycle', async () => {
+    const handlers = makeHandlers();
+
+    await loadJsonPayload(handlers, { version: 1 });
 
     expect(mockValidateForecastDataReason).toHaveBeenCalledWith({ version: 1 });
     expect(mockDeserializeForecast).toHaveBeenCalledWith({ version: 1 });
@@ -70,7 +88,7 @@ describe('createFileHandlers', () => {
   });
 
   it('reports invalid JSON, invalid forecast data, and read errors', async () => {
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never });
+    const handlers = makeHandlers();
 
     await handlers.handleLoad(createTextFile('{nope'));
     expect(addToast).toHaveBeenLastCalledWith('File is not valid JSON.', 'error');
@@ -85,7 +103,7 @@ describe('createFileHandlers', () => {
   });
 
   it('handles file input selection and resets the input', async () => {
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never });
+    const handlers = makeHandlers();
     const input = document.createElement('input');
     const file = createTextFile('{}');
     Object.defineProperty(input, 'files', { value: [file] });
@@ -98,29 +116,21 @@ describe('createFileHandlers', () => {
   });
 
   it('refuses a cross-workspace file without mutating state', async () => {
-    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'custom', forecastCycle: { id: 'custom-cycle' }, legacy: false } as never);
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'severe' });
-    const file = createTextFile(JSON.stringify({ version: 1 }));
-
-    await handlers.handleLoad(file);
+    await loadWorkspaceIdentityFile('severe');
 
     expect(dispatch).not.toHaveBeenCalled();
     expect(addToast).toHaveBeenCalledWith(expect.stringContaining('custom workspace'), 'error');
   });
 
   it('loads a same-workspace file when workspace identity matches', async () => {
-    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'custom', forecastCycle: { id: 'custom-cycle' }, legacy: false } as never);
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'custom' });
-    const file = createTextFile(JSON.stringify({ version: 1 }));
-
-    await handlers.handleLoad(file);
+    await loadWorkspaceIdentityFile('custom');
 
     expect(dispatch).toHaveBeenCalled();
     expect(addToast).toHaveBeenCalledWith('Forecast loaded successfully!', 'success');
   });
 
   it('opens the hidden file picker when available', () => {
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never });
+    const handlers = makeHandlers();
     const click = jest.fn();
     handlers.fileInputRef.current = { click } as unknown as HTMLInputElement;
 
@@ -129,33 +139,15 @@ describe('createFileHandlers', () => {
     expect(click).toHaveBeenCalled();
   });
 
-  it('rejects a package with a present-but-unknown outer workspace instead of falling back', async () => {
-    const { isWorkflowExportPackage } = require('../utils/workflowPackage') as { isWorkflowExportPackage: jest.Mock };
-    isWorkflowExportPackage.mockReturnValue(true);
-    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecastCycle: { id: 'inner' }, legacy: false } as never);
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'severe' });
-    const file = createTextFile(JSON.stringify({ workspaceId: 'bogus', forecast: { version: 1 } }));
-
-    await handlers.handleLoad(file);
-
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('unknown workspace'), 'error');
-  });
-
-  it('rejects a noncanonical outer workspace declaration', async () => {
-    const { isWorkflowExportPackage } = require('../utils/workflowPackage') as { isWorkflowExportPackage: jest.Mock };
-    isWorkflowExportPackage.mockReturnValue(true);
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'severe' });
-    const file = createTextFile(JSON.stringify({ workspaceId: 'Severe', forecast: { version: 1 } }));
-
-    await handlers.handleLoad(file);
+  it.each(['bogus', 'Severe'])('rejects a package with invalid outer workspace %s instead of falling back', async (outerWorkspaceId) => {
+    await loadWorkflowPackageWithOuterWorkspace(outerWorkspaceId);
 
     expect(dispatch).not.toHaveBeenCalled();
     expect(addToast).toHaveBeenCalledWith(expect.stringContaining('unknown workspace'), 'error');
   });
 
   it('exports the current cycle and reports export failures', () => {
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'custom' });
+    const handlers = makeHandlers('custom');
 
     handlers.handleSave();
 
