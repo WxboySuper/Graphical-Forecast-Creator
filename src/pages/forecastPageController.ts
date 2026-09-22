@@ -583,9 +583,9 @@ export const runDayRolloverDownloadAction = ({ forecastCycle, mapView, dispatch,
   }
 };
 
-export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch, workspaceId }: { forecastCycle: ReturnType<typeof selectForecastCycle>; currentMapView: RootState['forecast']['currentMapView']; saveCycle: UseCloudCyclesResult['saveCycle']; clearCurrent: UseCloudCyclesResult['clearCurrent']; dispatch: ShortcutDispatch; workspaceId?: ForecastWorkspaceId }): Promise<boolean> => {
+export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch, workspaceId }: { forecastCycle: ReturnType<typeof selectForecastCycle>; currentMapView: RootState['forecast']['currentMapView']; saveCycle: UseCloudCyclesResult['saveCycle']; clearCurrent: UseCloudCyclesResult['clearCurrent']; dispatch: ShortcutDispatch; workspaceId: ForecastWorkspaceId }): Promise<boolean> => {
   try {
-    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true, workspaceId: workspaceId ?? DEFAULT_FORECAST_WORKSPACE });
+    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true, workspaceId });
     if (!success) return false;
     clearCurrent();
     dispatch(resetForecasts());
@@ -607,7 +607,7 @@ interface DayRolloverPromptArgs {
   canSaveToCloud: boolean;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   clearCurrent: UseCloudCyclesResult['clearCurrent'];
-  workspaceId?: ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
 }
 
 type PromptStateSetter = (value: DayRolloverPromptState | null) => void;

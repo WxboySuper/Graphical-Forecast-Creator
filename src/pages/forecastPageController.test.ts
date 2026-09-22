@@ -114,10 +114,11 @@ describe('forecastPageController', () => {
       saveCycle,
       clearCurrent,
       dispatch,
+      workspaceId: 'severe',
     })).toBe(true);
     expect(clearCurrent).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledTimes(1);
-    // Rollover cloud saves carry the active workspace by default.
+    // Rollover cloud saves carry the active workspace explicitly.
     expect(saveCycle).toHaveBeenLastCalledWith(
       expect.any(String),
       forecastCycle.cycleDate,
@@ -136,7 +137,16 @@ describe('forecastPageController', () => {
       saveCycle,
       clearCurrent,
       dispatch,
+      workspaceId: 'custom',
     })).toBe(false);
+    expect(saveCycle).toHaveBeenLastCalledWith(
+      expect.any(String),
+      forecastCycle.cycleDate,
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      expect.objectContaining({ saveAsNew: true, workspaceId: 'custom' }),
+    );
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
     exportSpy.mockRestore();
