@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useOutletContext } from 'react-router';
 import type { Dispatch, UnknownAction } from 'redux';
@@ -215,6 +215,8 @@ const LegacyForecastNotice: React.FC<{ onDismiss: () => void }> = ({ onDismiss }
     <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" onClick={onDismiss}>Dismiss</Button>
   </div>
 );
+
+const LEGACY_FORECAST_NOTICE_SESSION_KEY = 'gfc:legacy-forecast-notice';
 
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
 const INCREASE_PROBABILITY_KEYS = new Set(['arrowup', 'arrowright']);
@@ -738,14 +740,19 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showLegacyNotice, setShowLegacyNotice] = useState(
-    () => Boolean((location.state as { legacyForecastRedirect?: boolean } | null)?.legacyForecastRedirect),
-  );
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const locationState = location.state && typeof location.state === 'object'
+    ? location.state as Record<string, unknown>
+    : {};
+  const hasLegacyRedirectMarker = Boolean(locationState.legacyForecastRedirect);
+  const showLegacyNotice = hasLegacyRedirectMarker || window.sessionStorage.getItem(LEGACY_FORECAST_NOTICE_SESSION_KEY) === 'true';
+  useEffect(() => {
+    if (hasLegacyRedirectMarker) window.sessionStorage.setItem(LEGACY_FORECAST_NOTICE_SESSION_KEY, 'true');
+  }, [hasLegacyRedirectMarker]);
   const dismissLegacyNotice = () => {
-    setShowLegacyNotice(false);
-    const currentState = location.state && typeof location.state === 'object'
-      ? { ...(location.state as Record<string, unknown>) }
-      : {};
+    workspaceRef.current?.focus();
+    window.sessionStorage.removeItem(LEGACY_FORECAST_NOTICE_SESSION_KEY);
+    const currentState = { ...locationState };
     delete currentState.legacyForecastRedirect;
     navigate(
       { pathname: location.pathname, search: location.search, hash: location.hash },
@@ -795,7 +802,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   return (
     <div className="forecast-page-shell">
       {showLegacyNotice ? <LegacyForecastNotice onDismiss={dismissLegacyNotice} /> : null}
-      <div className="forecast-page-workspace" data-testid="forecast-page-workspace">
+      <div ref={workspaceRef} tabIndex={-1} className="forecast-page-workspace" data-testid="forecast-page-workspace">
         {renderForecastWorkspaceLayout(forecastUiVariant, {
           mapRef,
           controller: workspaceController,
