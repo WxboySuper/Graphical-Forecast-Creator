@@ -554,13 +554,13 @@ describe('ForecastPage helpers', () => {
     const mapView = { center: [0, 0] as [number, number], zoom: 4 };
     const dispatch = jest.fn();
     const clearCurrent = jest.fn();
-    const exportSpy = jest.spyOn(fileUtils, 'exportForecastToJson').mockImplementation(() => undefined);
+    const exportSpy = jest.spyOn(fileUtils, 'downloadBlob').mockImplementation(() => undefined);
 
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(true);
+    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch, workspaceId: 'severe' })).toBe(true);
     expect(dispatch).toHaveBeenCalledTimes(1);
     exportSpy.mockImplementationOnce(() => { throw new Error('download failed'); });
     dispatch.mockClear();
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(false);
+    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch, workspaceId: 'severe' })).toBe(false);
     expect(dispatch).not.toHaveBeenCalled();
 
     const saveCycle = jest.fn().mockResolvedValue(true);

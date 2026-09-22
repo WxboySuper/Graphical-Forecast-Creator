@@ -37,6 +37,7 @@ export interface ForecastTransferModalProps {
   onExported: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
   onError?: (message: string) => void;
   onExportImage?: () => void;
+  workspaceId?: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
 }
 
 const FORMAT_OPTIONS: Array<{ value: ForecastTransferFormat; label: string; description: string }> = [
@@ -84,6 +85,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   onExported,
   onError,
   onExportImage,
+  workspaceId,
 }) => {
   const kmzEnabled = isFeatureExposed('kmzExport');
   const [format, setFormat] = useState<ForecastTransferFormat>('json');
@@ -140,6 +142,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         day: forecastCycle.currentDay,
         kmlStrategy,
         outlookTypes: outlookType === 'all' ? undefined : [outlookType],
+        ...(workspaceId ? { workspaceId } : {}),
       });
       onExported(format, scope);
       onClose();
@@ -157,6 +160,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     cycleMetadata,
     kmlStrategy,
     outlookType,
+    workspaceId,
     onExported,
     onError,
     onClose,

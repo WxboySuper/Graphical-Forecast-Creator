@@ -1,9 +1,10 @@
 import {
-  exportForecastToJson,
   downloadGfcPackage,
   downloadBlob,
 } from '../fileUtils';
 import { downloadKmzExport } from '../kmzExport';
+import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
+import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type {
   ForecastExportRequest,
@@ -17,6 +18,19 @@ import {
 } from './transferExportUtils';
 import { importTransferFile } from './transferImportUtils';
 
+/** Downloads a workspace-owned native JSON transfer so identity survives round-trips. */
+const downloadWorkspaceJsonTransfer = (
+  request: Pick<ForecastExportRequest, 'forecastCycle' | 'mapView' | 'cycleMetadata' | 'workspaceId'>,
+): void => {
+  const workspaceId = request.workspaceId ?? DEFAULT_FORECAST_WORKSPACE;
+  const payload = serializeForecastWorkspace(workspaceId, request.forecastCycle, request.mapView, request.cycleMetadata);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  downloadBlob(
+    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+    `gfc-forecast-${timestamp}.json`,
+  );
+};
+
 /** Exports a forecast using the requested transfer format and scope. */
 export const exportForecastTransfer = async (request: ForecastExportRequest): Promise<void> => {
   const {
@@ -28,15 +42,16 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
     day,
     kmlStrategy,
     outlookTypes,
+    workspaceId,
   } = request;
 
   if (format === 'json') {
-    exportForecastToJson(forecastCycle, mapView, cycleMetadata);
+    downloadWorkspaceJsonTransfer({ forecastCycle, mapView, cycleMetadata, workspaceId });
     return;
   }
 
   if (format === 'package') {
-    await downloadGfcPackage(forecastCycle, mapView, cycleMetadata, toWorkflowScope(scope));
+    await downloadGfcPackage(forecastCycle, mapView, cycleMetadata, toWorkflowScope(scope), workspaceId);
     return;
   }
 

@@ -5,6 +5,7 @@ import {
   buildRestoreKey,
   buildRolloverSaveLabel,
   cycleHasDiscussionContent,
+  downloadWorkspaceForecastJson,
   formatRolloverDayLabel,
   getDayRolloverPromptState,
   getMismatchedCloudWorkspaceId,
@@ -30,6 +31,13 @@ describe('forecastPageController', () => {
 
     expect(getForecastImportWorkspaceError(result, 'severe')).toContain('custom workspace');
     expect(getForecastImportWorkspaceError({ ...result, workspaceId: 'severe' }, 'severe')).toBeNull();
+  });
+
+  test('rejects unowned KML/KMZ transfers in every workspace, including severe', () => {
+    const result = { workspaceId: null, format: 'kml' } as ForecastImportResult;
+
+    expect(getForecastImportWorkspaceError(result, 'severe')).toContain('does not declare');
+    expect(getForecastImportWorkspaceError(result, 'custom')).toContain('does not declare');
   });
 
   test('owns rollover labels, restore metadata parsing, and scope helpers', () => {
@@ -120,14 +128,16 @@ describe('forecastPageController', () => {
     const mapView = { center: [0, 0] as [number, number], zoom: 4 };
     const dispatch = jest.fn();
     const clearCurrent = jest.fn();
-    const exportSpy = jest.spyOn(fileUtils, 'exportForecastToJson').mockImplementation(() => undefined);
+    const exportSpy = jest.spyOn(fileUtils, 'downloadBlob').mockImplementation(() => undefined);
 
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(true);
+    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch, workspaceId: 'severe' })).toBe(true);
     expect(dispatch).toHaveBeenCalledTimes(1);
+    const downloadedBlob = exportSpy.mock.calls[0]?.[0] as Blob;
+    expect(downloadedBlob).toBeInstanceOf(Blob);
 
     exportSpy.mockImplementationOnce(() => { throw new Error('download failed'); });
     dispatch.mockClear();
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch })).toBe(false);
+    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch, workspaceId: 'severe' })).toBe(false);
     expect(dispatch).not.toHaveBeenCalled();
 
     const saveCycle = jest.fn().mockResolvedValue(true);
@@ -174,5 +184,29 @@ describe('forecastPageController', () => {
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
     exportSpy.mockRestore();
+  });
+
+  test('persists workspace identity on native JSON downloads', async () => {
+    const forecastCycle = createForecastCycle();
+    const mapView = { center: [39.8, -98.5] as [number, number], zoom: 4 };
+    const seen: string[] = [];
+    const OriginalBlob = global.Blob;
+    class CapturingBlob extends OriginalBlob {
+      constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+        super(parts, options);
+        if (parts) seen.push(parts.map((part) => (typeof part === 'string' ? part : '')).join(''));
+      }
+    }
+    global.Blob = CapturingBlob as typeof Blob;
+    const downloadSpy = jest.spyOn(fileUtils, 'downloadBlob').mockImplementation(() => undefined);
+
+    try {
+      downloadWorkspaceForecastJson('custom', forecastCycle, mapView);
+      const payload = JSON.parse(seen.join('')) as { workspaceId?: string };
+      expect(payload.workspaceId).toBe('custom');
+    } finally {
+      global.Blob = OriginalBlob;
+      downloadSpy.mockRestore();
+    }
   });
 });

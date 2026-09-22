@@ -14,6 +14,7 @@ export interface WorkflowExportPackage {
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
   mapView?: GFCForecastSaveData['mapView'];
+  workspaceId?: import('../config/forecastWorkspaces').ForecastWorkspaceId;
   styleSnapshots?: Record<string, unknown>;
   /** Explicit compatibility disclosure for embedded custom content. */
   customContent?: {
@@ -93,12 +94,14 @@ export const buildWorkflowExportPackage = ({
   forecast,
   cycleMetadata,
   styleSnapshots,
+  workspaceId,
   exportedAt = new Date().toISOString(),
 }: {
   scope: WorkflowExportScope;
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
   styleSnapshots?: Record<string, unknown>;
+  workspaceId?: import('../config/forecastWorkspaces').ForecastWorkspaceId;
   exportedAt?: string;
 }): WorkflowExportPackage => {
   const scopedForecast = scope === 'workflow' ? restrictForecastToWorkflow(forecast, cycleMetadata) : forecast;
@@ -109,6 +112,7 @@ export const buildWorkflowExportPackage = ({
     ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
     ...(cycleMetadata ? { cycleMetadata } : {}),
     ...(forecast.mapView ? { mapView: forecast.mapView } : {}),
+    ...(workspaceId ? { workspaceId } : {}),
     forecast: scopedForecast,
     ...(styleSnapshots ? { styleSnapshots } : {}),
     ...(isFeatureExposed('customProducts') && hasCustomContent(scopedForecast) ? {
