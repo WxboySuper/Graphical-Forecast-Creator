@@ -47,7 +47,9 @@ const registerMetricsRoutes = (dependencies) => {
 };
 
 module.exports = {
+  ADMIN_RATE_LIMIT,
   ADMIN_RATE_LIMIT_OPTIONS,
+  METRICS_RATE_LIMIT,
   METRICS_RATE_LIMIT_OPTIONS,
   registerMetricsRoutes,
 };
