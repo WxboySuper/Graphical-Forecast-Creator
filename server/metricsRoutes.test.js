@@ -3,7 +3,9 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  ADMIN_RATE_LIMIT,
   ADMIN_RATE_LIMIT_OPTIONS,
+  METRICS_RATE_LIMIT,
   METRICS_RATE_LIMIT_OPTIONS,
   registerMetricsRoutes,
 } = require('./metricsRoutes');
@@ -31,12 +33,16 @@ describe('metrics route adapter', () => {
     assert.equal(routes.length, 2);
     assert.equal(routes[0][0], 'post');
     assert.equal(routes[0][1], '/api/metrics/event');
-    assert.equal(typeof routes[0][2], 'function');
+    assert.equal(routes[0][2], METRICS_RATE_LIMIT);
+    assert.equal(METRICS_RATE_LIMIT_OPTIONS.max, 120);
+    assert.equal(METRICS_RATE_LIMIT_OPTIONS.windowMs, 60 * 1000);
     assert.deepEqual(routes[0][3], { kind: 'json', options: { limit: '2kb' } });
     await routes[0][4]({}, {});
     assert.equal(routes[1][0], 'get');
     assert.equal(routes[1][1], '/api/admin/metrics');
-    assert.equal(typeof routes[1][2], 'function');
+    assert.equal(routes[1][2], ADMIN_RATE_LIMIT);
+    assert.equal(ADMIN_RATE_LIMIT_OPTIONS.max, 30);
+    assert.equal(ADMIN_RATE_LIMIT_OPTIONS.windowMs, 60 * 1000);
     await routes[1][3]({}, {});
     assert.equal(metricCalls, 1);
     assert.equal(adminCalls, 1);
