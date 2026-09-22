@@ -10,6 +10,14 @@ import { useEntitlement } from '../billing/EntitlementProvider';
 import { PRICING_COPY } from '../billing/pricingCopy';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
+import { getBuildTarget } from '../config/buildTarget';
+import {
+  filterCloudCyclesByWorkspace,
+  getCloudCycleWorkspaceId,
+  getCloudLibraryTabs,
+  type CloudLibraryTab,
+  type CloudLibraryTabId,
+} from './cloudLibraryWorkspace';
 import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
 import './CloudLibraryPage.css';
 
@@ -143,13 +151,13 @@ const CloudLibraryUtilityCard: React.FC<{
 );
 
 /** Empty library state with cleaner product-facing calls to action. */
-const EmptyState: React.FC<{ premiumActive: boolean }> = ({ premiumActive }) => (
+const EmptyState: React.FC<{ premiumActive: boolean; workspaceLabel?: string }> = ({ premiumActive, workspaceLabel }) => (
   <div className="cloud-library-empty-state">
     <div className="cloud-library-empty-icon">
       <Cloud className="h-8 w-8" />
     </div>
     <div className="cloud-library-empty-copy">
-      <h2>No cloud cycles saved yet</h2>
+      <h2>No {workspaceLabel ? `${workspaceLabel} ` : ''}cloud cycles saved yet</h2>
       <p>
         {premiumActive
           ? 'Use the cloud save button in the forecast toolbar and your current package will land here.'
@@ -514,38 +522,82 @@ const CloudLibraryFeedbackCard: React.FC<{
   </Card>
 );
 
+/** Workspace tabs keep saved products separated while retaining an All view for discovery. */
+const CloudLibraryTabs: React.FC<{
+  tabs: CloudLibraryTab[];
+  activeTab: CloudLibraryTabId;
+  onTabChange: (tabId: CloudLibraryTabId) => void;
+}> = ({ tabs, activeTab, onTabChange }) => (
+  <div className="cloud-library-tabs" role="tablist" aria-label="Cloud library workspaces">
+    {tabs.map((tab) => (
+      <Button
+        key={tab.id}
+        id={`cloud-library-tab-${tab.id}`}
+        role="tab"
+        aria-selected={activeTab === tab.id}
+        aria-controls="cloud-library-panel"
+        tabIndex={activeTab === tab.id ? 0 : -1}
+        variant={activeTab === tab.id ? 'default' : 'outline'}
+        className="cloud-library-tab"
+        onClick={() => onTabChange(tab.id)}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+          event.preventDefault();
+          const currentIndex = tabs.findIndex((candidate) => candidate.id === tab.id);
+          const offset = event.key === 'ArrowRight' ? 1 : -1;
+          const nextTab = tabs[(currentIndex + offset + tabs.length) % tabs.length];
+          onTabChange(nextTab.id);
+          requestAnimationFrame(() => document.getElementById(`cloud-library-tab-${nextTab.id}`)?.focus());
+        }}
+      >
+        <span>{tab.label}</span>
+        <Badge variant={activeTab === tab.id ? 'secondary' : 'outline'}>{tab.cycleCount}</Badge>
+      </Button>
+    ))}
+  </div>
+);
+
 /** Main library card that owns the saved-cycle list, empty state, and loading state. */
 const CloudLibraryMainCard: React.FC<{
   loading: boolean;
   cycles: CloudCycleMetadata[];
+  tabs: CloudLibraryTab[];
+  activeTab: CloudLibraryTabId;
   premiumActive: boolean;
+  workspaceLabel?: string;
   canWrite: boolean;
   cycleCountLabel: string;
   onLoadCycle: (cycleId: string) => Promise<void>;
   onDeleteCycle: (cycleId: string) => Promise<void>;
   onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
+  onTabChange: (tabId: CloudLibraryTabId) => void;
 }> = ({
   loading,
   cycles,
+  tabs,
+  activeTab,
   premiumActive,
+  workspaceLabel,
   canWrite,
   cycleCountLabel,
   onLoadCycle,
   onDeleteCycle,
   onRenameCycle,
+  onTabChange,
 }) => (
   <Card className="cloud-library-surface-card">
     <CardHeader className="cloud-library-section-header">
       <CardTitle>Your cloud cycles</CardTitle>
       <CardDescription>Open a saved package, rename it, or clear out older copies.</CardDescription>
+      <CloudLibraryTabs tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
     </CardHeader>
-    <CardContent className="cloud-library-list-content">
+    <CardContent className="cloud-library-list-content" id="cloud-library-panel" role="tabpanel" aria-label="Cloud cycles">
       {loading && cycles.length === 0 ? (
         <div className="cloud-library-loading">
           <LoaderCircle className="h-6 w-6 animate-spin" />
         </div>
       ) : cycles.length === 0 ? (
-        <EmptyState premiumActive={premiumActive} />
+        <EmptyState premiumActive={premiumActive} workspaceLabel={workspaceLabel} />
       ) : (
         <>
           <div className="cloud-library-list-header">
@@ -578,33 +630,45 @@ const CloudLibrarySignedInLayout: React.FC<{
   isExpiredPremium: boolean;
   loading: boolean;
   cycles: CloudCycleMetadata[];
+  tabs: CloudLibraryTab[];
+  activeTab: CloudLibraryTabId;
+  workspaceLabel?: string;
   canWrite: boolean;
   cycleCountLabel: string;
   onLoadCycle: (cycleId: string) => Promise<void>;
   onDeleteCycle: (cycleId: string) => Promise<void>;
   onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
+  onTabChange: (tabId: CloudLibraryTabId) => void;
 }> = ({
   premiumActive,
   isExpiredPremium,
   loading,
   cycles,
+  tabs,
+  activeTab,
+  workspaceLabel,
   canWrite,
   cycleCountLabel,
   onLoadCycle,
   onDeleteCycle,
   onRenameCycle,
+  onTabChange,
 }) => (
   <div className="cloud-library-layout">
     <div className="cloud-library-main">
       <CloudLibraryMainCard
         loading={loading}
         cycles={cycles}
+        tabs={tabs}
+        activeTab={activeTab}
         premiumActive={premiumActive}
+        workspaceLabel={workspaceLabel}
         canWrite={canWrite}
         cycleCountLabel={cycleCountLabel}
         onLoadCycle={onLoadCycle}
         onDeleteCycle={onDeleteCycle}
         onRenameCycle={onRenameCycle}
+        onTabChange={onTabChange}
       />
     </div>
 
@@ -659,17 +723,23 @@ const useCloudLibraryActions = ({
   /** Loads one hosted cycle into the forecast editor and preserves its cloud metadata in session storage. */
   const handleLoadCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
+    const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
+    const workspaceId = getCloudCycleWorkspaceId(selectedCycle ?? { workspaceId: undefined });
+    if (workspaceId !== 'severe') {
+      setMessage('Workspace-specific cloud loading is not available yet.');
+      return;
+    }
+
     const payload = await loadCycle(cycleId);
     if (!payload) {
       return;
     }
 
-    const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
     if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
       return;
     }
 
-    navigate('/forecast');
+    navigate('/forecast/severe');
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
@@ -706,6 +776,9 @@ const CloudLibraryPage: React.FC = () => {
   const { user } = useAuth();
   const { premiumActive, effectiveSource } = useEntitlement();
   const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
+  const [activeTab, setActiveTab] = useState<CloudLibraryTabId>('all');
+  const tabs = useMemo(() => getCloudLibraryTabs(cycles, getBuildTarget()), [cycles]);
+  const visibleCycles = useMemo(() => filterCloudCyclesByWorkspace(cycles, activeTab), [activeTab, cycles]);
   const {
     message,
     handleLoadCycle,
@@ -723,7 +796,11 @@ const CloudLibraryPage: React.FC = () => {
 
   const canWrite = premiumActive;
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
-  const cycleCountLabel = useMemo(() => `${cycles.length} cloud cycle${cycles.length === 1 ? '' : 's'}`, [cycles.length]);
+  const cycleCountLabel = useMemo(
+    () => `${visibleCycles.length} cloud cycle${visibleCycles.length === 1 ? '' : 's'}`,
+    [visibleCycles.length],
+  );
+  const workspaceLabel = activeTab === 'all' ? undefined : tabs.find((tab) => tab.id === activeTab)?.label;
 
   if (!user) {
     return <SignedOutGate />;
@@ -741,12 +818,16 @@ const CloudLibraryPage: React.FC = () => {
           premiumActive={premiumActive}
           isExpiredPremium={isExpiredPremium}
           loading={loading}
-          cycles={cycles}
+          cycles={visibleCycles}
+          tabs={tabs}
+          activeTab={activeTab}
+          workspaceLabel={workspaceLabel}
           canWrite={canWrite}
           cycleCountLabel={cycleCountLabel}
           onLoadCycle={handleLoadCycle}
           onDeleteCycle={handleDeleteCycle}
           onRenameCycle={handleRenameCycle}
+          onTabChange={setActiveTab}
         />
       </div>
     </div>
