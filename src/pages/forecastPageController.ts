@@ -19,7 +19,7 @@ import { deserializeForecast, exportForecastToJson, readForecastImportFile, seri
 import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getForecastDataFromWorkspacePayload, type ForecastWorkspacePayload } from '../utils/forecastWorkspacePersistence';
-import { importForecastTransfer, type ForecastImportResult } from '../utils/forecastTransfer';
+import type { ForecastImportResult } from '../utils/forecastTransfer';
 import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
   DAY_ROLLOVER_CHECK_INTERVAL_MS,
@@ -127,6 +127,14 @@ export const applyForecastImportResult = (
   }
 };
 
+/** Returns an error when a native transfer belongs to another forecast workspace. */
+export const getForecastImportWorkspaceError = (
+  result: ForecastImportResult,
+  workspaceId: ForecastWorkspaceId,
+): string | null => result.workspaceId === workspaceId
+  ? null
+  : `This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`;
+
 const useForecastSaveAction = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
@@ -145,26 +153,7 @@ const useForecastSaveAction = (
   }
 }, [addToast, dispatch, forecastCycle, mapRef, user, workflowMetadata]);
 
-const useForecastLoadAction = (
-  dispatch: ShortcutDispatch,
-  addToast: AddToastFn,
-  mapRef: React.RefObject<ForecastMapHandle | null>,
-  forecastCycle: ReturnType<typeof selectForecastCycle>,
-) => useCallback(async (file: File) => {
-  try {
-    const result = await importForecastTransfer(file, {
-      baseCycle: forecastCycle,
-      defaultDay: forecastCycle.currentDay,
-    });
-    applyForecastImportResult(result, dispatch, mapRef);
-    const warningSuffix = result.warnings.length > 0 ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})` : '';
-    addToast(`Forecast imported from ${result.format.toUpperCase()}!${warningSuffix}`, 'success');
-  } catch (error) {
-    addToast(error instanceof Error ? error.message : 'Error reading file.', 'error');
-  }
-}, [addToast, dispatch, mapRef, forecastCycle]);
-
-/** Composes the save and load actions owned by the forecast session controller. */
+/** Composes the save action owned by the forecast session controller. */
 export const useForecastFileActions = (
   dispatch: ShortcutDispatch,
   addToast: AddToastFn,
@@ -174,7 +163,6 @@ export const useForecastFileActions = (
   workflowMetadata?: import('../types/workflow').CycleMetadata,
 ) => ({
   handleSave: useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user, workflowMetadata),
-  handleLoad: useForecastLoadAction(dispatch, addToast, mapRef, forecastCycle),
 });
 
 /** Returns true when a cycle has at least one forecast day or discussion. */
