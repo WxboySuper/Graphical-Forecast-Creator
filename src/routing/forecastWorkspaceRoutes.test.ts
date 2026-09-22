@@ -2,9 +2,13 @@ import {
   DEFAULT_FORECAST_WORKSPACE,
   getDefaultForecastWorkspacePath,
   getExposedForecastWorkspacePaths,
+  getExposedForecastWorkspaceRoutes,
   getForecastWorkspacePath,
+  resolveExposedForecastWorkspacePath,
+  resolveExposedLegacyForecastWorkspacePath,
   resolveForecastWorkspacePath,
   resolveLegacyForecastWorkspacePath,
+  resolveRouteForecastWorkspace,
 } from './forecastWorkspaceRoutes';
 
 describe('forecast workspace route contract', () => {
@@ -30,5 +34,29 @@ describe('forecast workspace route contract', () => {
       '/forecast/severe',
       '/forecast/custom',
     ]);
+  });
+
+  test('scopes route identity to forecast routes and gates legacy fallback by exposure', () => {
+    // Non-forecast pages never own workspace identity.
+    expect(resolveRouteForecastWorkspace('/')).toBeUndefined();
+    expect(resolveRouteForecastWorkspace('/cloud')).toBeUndefined();
+    expect(resolveRouteForecastWorkspace('/discussion')).toBeUndefined();
+    expect(resolveRouteForecastWorkspace('/forecast/unknown')).toBeUndefined();
+    // Canonical routes tolerate bookmarked trailing slashes.
+    expect(resolveRouteForecastWorkspace('/forecast/severe/')?.id).toBe('severe');
+    // Legacy entry points resolve only when the owning workspace is exposed.
+    expect(resolveRouteForecastWorkspace('/forecast')?.id).toBe('severe');
+    expect(resolveExposedForecastWorkspacePath('/forecast/mesoscale', 'production')).toBeUndefined();
+    expect(resolveExposedLegacyForecastWorkspacePath('/forecast', 'production')?.id).toBe('severe');
+  });
+
+  test('registers exposed workspaces from validated route records', () => {
+    const routes = getExposedForecastWorkspaceRoutes('production');
+    expect(routes.map((route) => route.id)).toEqual(['severe', 'custom']);
+    for (const route of routes) {
+      expect(route.path).toBe(`/forecast/${route.routePath}`);
+    }
+    // Unexposed workspaces never produce a route record.
+    expect(routes.some((route) => route.id === 'mesoscale')).toBe(false);
   });
 });

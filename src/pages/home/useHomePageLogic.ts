@@ -38,6 +38,7 @@ const useHomePageLogic = () => {
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -62,14 +63,14 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
   };
 
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     dispatch(setForecastDay(day));
     navigate('/forecast');
   };
@@ -82,7 +83,7 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     dispatch(startBlankCycle({
       workflowTemplate,
       cycleDate: getLocalCalendarDate(),
@@ -151,7 +152,7 @@ const useHomePageLogic = () => {
 
   /** Confirm starting a new cycle (discard changes). */
   const handleConfirmNewCycle = () => {
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     if (pendingWorkflow) {
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,

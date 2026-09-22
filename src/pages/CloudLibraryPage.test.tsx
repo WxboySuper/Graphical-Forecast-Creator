@@ -4,8 +4,9 @@ import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
-import CloudLibraryPage from "./CloudLibraryPage";
+<import CloudLibraryPage, { buildCloudSessionPayload } from "./CloudLibraryPage";
 import { getDefaultForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
+import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
 
 const mockNavigate = jest.fn();
 jest.mock("react-router", () => ({
@@ -299,7 +300,7 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("uses roving tabindex so only the active tab is in the tab order", () => {
+<  it("uses roving tabindex so only the active tab is in the tab order", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(
       cloudCyclesResult({
@@ -358,6 +359,15 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("does not double-wrap an already-enveloped cloud handoff payload", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
+    expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
+    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe('severe');
+  });
   });
 
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {

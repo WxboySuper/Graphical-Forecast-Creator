@@ -47,15 +47,17 @@ describe('useAutoSave', () => {
     expect(getAutoSaveStorageKey('user-1', 'severe')).toBe('forecastData:user-user-1');
   });
 
-  test('does not migrate a non-Severe anonymous autosave without a workspace contract', () => {
+  test('migrates a non-Severe anonymous autosave into its own account scope', () => {
     const anonymousKey = getAutoSaveStorageKey(null, 'custom');
     const scopedKey = getAutoSaveStorageKey('user-1', 'custom');
     localStorage.setItem(anonymousKey, JSON.stringify({ custom: true }));
 
     migrateLegacyAutoSave('user-1', undefined, 'custom');
 
-    expect(localStorage.getItem(anonymousKey)).toBe(JSON.stringify({ custom: true }));
-    expect(localStorage.getItem(scopedKey)).toBeNull();
+    expect(localStorage.getItem(anonymousKey)).toBeNull();
+    expect(localStorage.getItem(scopedKey)).toBe(JSON.stringify({ custom: true }));
+    // The Severe scope is never touched by a non-Severe migration.
+    expect(localStorage.getItem('forecastData')).toBeNull();
   });
 
   test('does not overwrite a non-Severe account autosave during migration', () => {
