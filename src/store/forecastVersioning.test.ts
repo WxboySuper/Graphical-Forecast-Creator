@@ -76,14 +76,28 @@ describe('applyCreateOutlookUpdate seam', () => {
     expect(next.isSaved).toBe(false);
   });
 
-  it('clones the snapshot with isolation from live state', () => {
+  it('stores snapshot content and metadata', () => {
     const next = runSeamUpdate(withAcknowledgement(startPopulatedCycle()), seamNow);
-    const liveFeature = next.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
-    const snapshotFeature = next.outlookVersionSnapshots[0]?.days[1]?.data.tornado?.get('2%')?.[0];
+    const snapshot = next.outlookVersionSnapshots[0] as NonNullable<typeof next.outlookVersionSnapshots[0]>;
+    const snapshotDay = snapshot.days[1] as NonNullable<ReturnType<typeof startPopulatedCycle>['forecastCycle']['days'][1]>;
+    const snapshotFeatures = snapshotDay.data.tornado as NonNullable<typeof snapshotDay.data.tornado>;
+    const snapshotFeature = (snapshotFeatures.get('2%') as NonNullable<ReturnType<typeof snapshotFeatures.get>>)[0] as Feature;
 
     expect(next.outlookVersionSnapshots).toHaveLength(1);
-    expect(next.outlookVersionSnapshots[0]).toMatchObject({ version: 1, createdAt: seamNow });
-    expect(snapshotFeature?.id).toBe('day-1-feature');
+    expect(snapshot).toMatchObject({ version: 1, createdAt: seamNow });
+    expect(snapshotFeature.id).toBe('day-1-feature');
+  });
+
+  it('isolates snapshot from live state', () => {
+    const next = runSeamUpdate(withAcknowledgement(startPopulatedCycle()), seamNow);
+    const liveDay = next.forecastCycle.days[1] as NonNullable<ReturnType<typeof startPopulatedCycle>['forecastCycle']['days'][1]>;
+    const liveFeatures = liveDay.data.tornado as NonNullable<typeof liveDay.data.tornado>;
+    const liveFeature = (liveFeatures.get('2%') as NonNullable<ReturnType<typeof liveFeatures.get>>)[0] as Feature;
+    const snapshotDay = next.outlookVersionSnapshots[0] as NonNullable<typeof next.outlookVersionSnapshots[0]>;
+    const snapshotDayData = snapshotDay.days[1] as NonNullable<typeof snapshotDay.days[1]>;
+    const snapshotFeatures = snapshotDayData.data.tornado as NonNullable<typeof snapshotDayData.data.tornado>;
+    const snapshotFeature = (snapshotFeatures.get('2%') as NonNullable<ReturnType<typeof snapshotFeatures.get>>)[0] as Feature;
+
     expect(snapshotFeature).not.toBe(liveFeature);
     expect(snapshotFeature).toEqual(liveFeature);
   });
