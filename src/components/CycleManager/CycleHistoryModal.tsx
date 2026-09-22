@@ -58,6 +58,9 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
 
   /** Prompts before replacing the active cycle with a saved one. */
   function handleLoadCycle(cycleId: string): void {
+    if (!visibleSavedCycles.some((cycle) => cycle.id === cycleId)) {
+      return;
+    }
     setConfirmAction({
       title: 'Load Cycle',
       message: 'Load this cycle? Unsaved changes to your current cycle will be lost.',
@@ -72,6 +75,9 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
 
   /** Prompts before deleting a saved cycle permanently. */
   function handleDeleteCycle(cycleId: string): void {
+    if (!visibleSavedCycles.some((cycle) => cycle.id === cycleId)) {
+      return;
+    }
     setConfirmAction({
       title: 'Delete Cycle',
       message: 'Delete this saved cycle permanently?',
