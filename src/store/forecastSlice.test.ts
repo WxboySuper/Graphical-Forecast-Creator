@@ -1,3 +1,4 @@
+// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import type { Feature, Polygon } from 'geojson';
 import type { DayType } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
