@@ -12,6 +12,9 @@ let aggregateGet = async () => ({ data: () => ({ count: 3 }) });
 let fallbackDocs = [];
 let fallbackGet = async () => ({ docs: fallbackDocs });
 let countCalls = 0;
+let premiumCountCalls = 0;
+let premiumAggregateGet = async () => ({ data: () => ({ count: 4 }) });
+let premiumFallbackGet = async () => ({ size: 0 });
 let clock = 0;
 
 const createRef = (collection, id) => ({ collection, id, key: `${collection}/${id}` });
@@ -19,7 +22,15 @@ const snapshot = (ref) => ({ exists: documents.has(ref.key), data: () => documen
 const db = {
   collection: (collection) => ({
     doc: (id) => createRef(collection, id),
-    where: () => ({ get: async () => ({ size: 0 }) }),
+    where: () => ({
+      get: () => premiumFallbackGet(),
+      count: () => ({
+        get: async () => {
+          premiumCountCalls += 1;
+          return premiumAggregateGet();
+        },
+      }),
+    }),
     count: () => ({
       get: async () => {
         countCalls += 1;
@@ -45,7 +56,7 @@ require.cache[firebaseAdminPath] = {
   exports: { getAdminDb: () => db, getAdminAuth: () => null, hasFirebaseAdminConfig: () => true },
 };
 delete require.cache[metricsPath];
-const { countTotalAccounts, recordBillingMetricEvent } = require('./metrics');
+const { countPremiumSubscriptions, countTotalAccounts, recordBillingMetricEvent } = require('./metrics');
 const { handleMetricEvent, requiresAuthenticatedMetricEvent } = require('./metrics');
 
 const createResponse = () => {
@@ -76,6 +87,9 @@ beforeEach(() => {
   fallbackDocs = [{}, {}];
   fallbackGet = async () => ({ docs: fallbackDocs });
   countCalls = 0;
+  premiumCountCalls = 0;
+  premiumAggregateGet = async () => ({ data: () => ({ count: 4 }) });
+  premiumFallbackGet = async () => ({ size: 0 });
   clock += 10 * 60 * 1000;
   Date.now = () => clock;
 });
@@ -141,6 +155,41 @@ describe('countTotalAccounts', () => {
 
     assert.equal(await countTotalAccounts(), 0);
     assert.equal(countCalls, 2);
+  });
+});
+
+describe('countPremiumSubscriptions', () => {
+  it('uses and caches the aggregate count while coalescing concurrent refreshes', async () => {
+    let resolveAggregate;
+    premiumAggregateGet = () => new Promise((resolve) => {
+      resolveAggregate = resolve;
+    });
+
+    const first = countPremiumSubscriptions();
+    const second = countPremiumSubscriptions();
+    assert.equal(premiumCountCalls, 1);
+    resolveAggregate({ data: () => ({ count: 4 }) });
+    assert.equal(await first, 4);
+    assert.equal(await second, 4);
+    assert.equal(await countPremiumSubscriptions(), 4);
+    assert.equal(premiumCountCalls, 1);
+  });
+
+  it('falls back to a filtered document count when aggregation is unavailable', async () => {
+    premiumAggregateGet = () => { throw new Error('aggregate unavailable'); };
+    premiumFallbackGet = async () => ({ size: 3, docs: [{}, {}, {}] });
+
+    assert.equal(await countPremiumSubscriptions(), 3);
+    assert.equal(premiumCountCalls, 1);
+  });
+
+  it('clears the in-flight request so a failed request can be retried', async () => {
+    premiumAggregateGet = async () => { throw new Error('temporary failure'); };
+    premiumFallbackGet = async () => { throw new Error('temporary failure'); };
+    await assert.rejects(countPremiumSubscriptions(), /temporary failure/);
+    premiumAggregateGet = async () => ({ data: () => ({ count: 5 }) });
+    assert.equal(await countPremiumSubscriptions(), 5);
+    assert.equal(premiumCountCalls, 2);
   });
 });
 
