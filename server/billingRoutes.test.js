@@ -87,7 +87,6 @@ const restoreBillingCompatModules = (Module, paths, snapshot, originalLoad) => {
   else delete require.cache[paths.accountLifecyclePath];
   if (snapshot.billing) require.cache[paths.billingPath] = snapshot.billing;
   else delete require.cache[paths.billingPath];
-  delete require.cache[paths.billingPath];
 };
 
 const assertForwardedAdapterArgs = (forwarded, app, express, billing) => {
