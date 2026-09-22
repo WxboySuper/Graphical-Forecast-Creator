@@ -144,7 +144,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         day: forecastCycle.currentDay,
         kmlStrategy,
         outlookTypes: outlookType === 'all' ? undefined : [outlookType],
-        ...(workspaceId ? { workspaceId } : {}),
+        workspaceId: workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
       });
       onExported(format, scope);
       onClose();

@@ -1,59 +1,17 @@
-import { deserializeForecast, downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
-import { isWorkflowExportPackage } from '../utils/workflowPackage';
-import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
-import { DEFAULT_FORECAST_WORKSPACE, getForecastWorkspace, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
   markAsSaved,
   importForecastCycle,
+  setMapView,
   setWorkflowMetadata,
   clearWorkflowMetadata,
 } from '../store/forecastSlice';
 import type { AddToastFn } from '../components/Layout';
 import type { Dispatch } from 'redux';
 import type { CycleMetadata, ForecastCycle } from '../types/outlooks';
-
-/** Reads the outer workspace named by a package. Missing means legacy; present-but-unknown is rejected. */
-const resolvePackageOuterWorkspace = (data: { workspaceId?: unknown }): ForecastWorkspaceId | null => {
-  if (data.workspaceId === undefined) return null;
-  if (typeof data.workspaceId !== 'string' || getForecastWorkspace(data.workspaceId) === undefined) {
-    throw new Error('This workflow package declares an unknown workspace.');
-  }
-  return data.workspaceId as ForecastWorkspaceId;
-};
-
-/** Returns true when an explicit outer owner disagrees with a non-legacy inner forecast. */
-const isPackageWorkspaceMismatch = (
-  outer: ForecastWorkspaceId | null,
-  restored: ReturnType<typeof deserializeForecastWorkspace>,
-): boolean => {
-  if (outer === null) return false;
-  if (restored.legacy) return false;
-  return outer !== restored.workspaceId;
-};
-
-/** Throws when an explicit outer owner disagrees with a non-legacy inner forecast. */
-const assertPackageWorkspaceMatch = (
-  outer: ForecastWorkspaceId | null,
-  restored: ReturnType<typeof deserializeForecastWorkspace>,
-): void => {
-  if (isPackageWorkspaceMismatch(outer, restored)) {
-    throw new Error('This workflow package declares a workspace that does not match its forecast.');
-  }
-};
-
-/** Returns the workspace that owns a workflow package, with the outer envelope as canonical. */
-const resolvePackageWorkspace = (data: { workspaceId?: unknown; forecast: unknown }): ForecastWorkspaceId => {
-  const outer = resolvePackageOuterWorkspace(data);
-  const restored = deserializeForecastWorkspace(data.forecast);
-  assertPackageWorkspaceMatch(outer, restored);
-  return outer ?? restored.workspaceId;
-};
-
-/** Returns the workspace that owns a loaded file, with the package outer envelope as canonical. */
-const resolveLoadedFileWorkspace = (data: unknown): ForecastWorkspaceId => {
-  if (isWorkflowExportPackage(data)) return resolvePackageWorkspace(data);
-  return deserializeForecastWorkspace(data).workspaceId;
-};
 
 /** Creates save and load file handler functions bound to the given toast notifier, Redux dispatch, and current forecast state. */
 export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMetadata, workspaceId = DEFAULT_FORECAST_WORKSPACE }: {
@@ -78,16 +36,11 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
     }
   };
 
-  /** Restores the workflow metadata embedded in a loaded forecast, if any. */
-  const syncWorkflowMetadata = (data: unknown): void => {
-    const validatedData = data as {
-      metadata?: CycleMetadata;
-      cycleMetadata?: CycleMetadata | null;
-    };
-    const packageMetadata = isWorkflowExportPackage(data) ? validatedData.metadata : validatedData.cycleMetadata;
-    if (packageMetadata) {
-      dispatch(setWorkflowMetadata(packageMetadata));
-    } else if (validatedData.cycleMetadata === null) {
+  /** Restores the workflow metadata from resolved envelope content, reading the inner forecast payload. */
+  const syncWorkflowMetadata = (cycleMetadata: CycleMetadata | null | undefined): void => {
+    if (cycleMetadata) {
+      dispatch(setWorkflowMetadata(cycleMetadata));
+    } else if (cycleMetadata === null) {
       dispatch(clearWorkflowMetadata());
     }
   };
@@ -109,21 +62,21 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
         return;
       }
 
-      let loadedWorkspaceId: ForecastWorkspaceId;
+      let resolved: ReturnType<typeof resolveNativeFileContent>;
       try {
-        loadedWorkspaceId = resolveLoadedFileWorkspace(data);
+        resolved = resolveNativeFileContent(data);
       } catch (error) {
         addToast(error instanceof Error ? error.message : 'Error reading file.', 'error');
         return;
       }
-      if (loadedWorkspaceId !== workspaceId) {
-        addToast(`This forecast belongs to the ${loadedWorkspaceId} workspace. Open it there before importing it.`, 'error');
+      if (resolved.workspaceId !== workspaceId) {
+        addToast(`This forecast belongs to the ${resolved.workspaceId} workspace. Open it there before importing it.`, 'error');
         return;
       }
 
-      const deserializedCycle = deserializeForecast(data);
-      dispatch(importForecastCycle(deserializedCycle));
-      syncWorkflowMetadata(data);
+      dispatch(importForecastCycle(resolved.forecastCycle));
+      syncWorkflowMetadata(resolved.cycleMetadata);
+      if (resolved.mapView) dispatch(setMapView(resolved.mapView));
       addToast('Forecast loaded successfully!', 'success');
     } catch {
       addToast('Error reading file.', 'error');

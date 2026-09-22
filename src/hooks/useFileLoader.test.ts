@@ -1,36 +1,29 @@
 import { createFileHandlers } from './useFileLoader';
 import { waitFor } from '@testing-library/react';
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
-import { deserializeForecast, downloadBlob, readForecastImportFile, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
-import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
-import { isWorkflowExportPackage } from '../utils/workflowPackage';
+import { downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
 
 jest.mock('../utils/fileUtils', () => ({
-  deserializeForecast: jest.fn(),
   downloadBlob: jest.fn(),
-  exportForecastToJson: jest.fn(),
   readForecastImportFile: jest.fn(),
-  validateForecastData: jest.fn(),
   validateForecastDataReason: jest.fn(),
 }));
 
 jest.mock('../utils/forecastWorkspacePersistenceAdapter', () => ({
-  deserializeForecastWorkspace: jest.fn(),
   serializeForecastWorkspace: jest.fn(),
 }));
 
-jest.mock('../utils/workflowPackage', () => ({
-  isWorkflowExportPackage: jest.fn(() => false),
+jest.mock('../utils/forecastTransfer/nativeImportUtils', () => ({
+  resolveNativeFileContent: jest.fn(),
 }));
 
-const mockValidateForecastData = validateForecastData as jest.MockedFunction<typeof validateForecastData>;
 const mockValidateForecastDataReason = validateForecastDataReason as jest.MockedFunction<typeof validateForecastDataReason>;
-const mockDeserializeForecast = deserializeForecast as jest.MockedFunction<typeof deserializeForecast>;
 const mockDownloadBlob = downloadBlob as jest.MockedFunction<typeof downloadBlob>;
 const mockReadForecastImportFile = readForecastImportFile as jest.MockedFunction<typeof readForecastImportFile>;
-const mockDeserializeWorkspace = deserializeForecastWorkspace as jest.MockedFunction<typeof deserializeForecastWorkspace>;
 const mockSerializeWorkspace = serializeForecastWorkspace as jest.MockedFunction<typeof serializeForecastWorkspace>;
-const mockIsWorkflowExportPackage = isWorkflowExportPackage as jest.MockedFunction<typeof isWorkflowExportPackage>;
+const mockResolveNativeFile = resolveNativeFileContent as jest.MockedFunction<typeof resolveNativeFileContent>;
 
 describe('createFileHandlers', () => {
   const forecastCycle = { id: 'cycle-1' };
@@ -41,14 +34,16 @@ describe('createFileHandlers', () => {
     jest.clearAllMocks();
     addToast = jest.fn();
     dispatch = jest.fn();
-    mockValidateForecastData.mockReturnValue(true);
     mockValidateForecastDataReason.mockReturnValue(null);
-    mockDeserializeForecast.mockReturnValue({ id: 'loaded-cycle' } as never);
-    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecastCycle: { id: 'loaded-cycle' }, legacy: true } as never);
+    mockResolveNativeFile.mockReturnValue({
+      workspaceId: 'severe',
+      forecastCycle: { id: 'loaded-cycle' },
+      mapView: undefined,
+      cycleMetadata: undefined,
+    } as never);
     mockSerializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecast: { id: 'saved' } } as never);
     mockDownloadBlob.mockImplementation(() => undefined);
     mockReadForecastImportFile.mockImplementation(async (file) => JSON.parse(await file.text()) as unknown);
-    mockIsWorkflowExportPackage.mockReturnValue(false);
   });
 
   const createTextFile = (text: string, shouldReject = false): File => ({
@@ -63,13 +58,19 @@ describe('createFileHandlers', () => {
     handlers.handleLoad(createTextFile(JSON.stringify(payload)));
 
   const loadWorkspaceIdentityFile = (activeWorkspaceId: ForecastWorkspaceId) => {
-    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'custom', forecastCycle: { id: 'custom-cycle' }, legacy: false } as never);
+    mockResolveNativeFile.mockReturnValue({
+      workspaceId: 'custom',
+      forecastCycle: { id: 'custom-cycle' },
+      mapView: undefined,
+      cycleMetadata: undefined,
+    } as never);
     return loadJsonPayload(makeHandlers(activeWorkspaceId), { version: 1 });
   };
 
   const loadWorkflowPackageWithOuterWorkspace = (outerWorkspaceId: unknown) => {
-    mockIsWorkflowExportPackage.mockReturnValue(true);
-    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecastCycle: { id: 'inner' }, legacy: false } as never);
+    mockResolveNativeFile.mockImplementation(() => {
+      throw new Error(`This workflow package declares an unknown workspace. (${String(outerWorkspaceId)})`);
+    });
     return loadJsonPayload(makeHandlers('severe'), { workspaceId: outerWorkspaceId, forecast: { version: 1 } });
   };
 
@@ -79,12 +80,45 @@ describe('createFileHandlers', () => {
     await loadJsonPayload(handlers, { version: 1 });
 
     expect(mockValidateForecastDataReason).toHaveBeenCalledWith({ version: 1 });
-    expect(mockDeserializeForecast).toHaveBeenCalledWith({ version: 1 });
+    expect(mockResolveNativeFile).toHaveBeenCalledWith({ version: 1 });
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
       type: 'forecast/importForecastCycle',
       payload: { id: 'loaded-cycle' },
     }));
     expect(addToast).toHaveBeenCalledWith('Forecast loaded successfully!', 'success');
+  });
+
+  it('restores workflow metadata and map view from the resolved envelope', async () => {
+    const handlers = makeHandlers('severe');
+    mockResolveNativeFile.mockReturnValue({
+      workspaceId: 'severe',
+      forecastCycle: { id: 'loaded-cycle' },
+      mapView: { center: [10, 20], zoom: 5 },
+      cycleMetadata: { id: 'WF-1' },
+    } as never);
+
+    await loadJsonPayload(handlers, { version: 1 });
+
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/importForecastCycle' }));
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/setWorkflowMetadata' }));
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'forecast/setMapView',
+      payload: { center: [10, 20], zoom: 5 },
+    }));
+  });
+
+  it('clears workflow metadata when the resolved envelope carries an explicit null', async () => {
+    const handlers = makeHandlers('severe');
+    mockResolveNativeFile.mockReturnValue({
+      workspaceId: 'severe',
+      forecastCycle: { id: 'loaded-cycle' },
+      mapView: undefined,
+      cycleMetadata: null,
+    } as never);
+
+    await loadJsonPayload(handlers, { version: 1 });
+
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/clearWorkflowMetadata' }));
   });
 
   it('reports invalid JSON, invalid forecast data, and read errors', async () => {

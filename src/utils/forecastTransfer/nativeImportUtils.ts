@@ -7,7 +7,7 @@ import { getForecastDataFromWorkspacePayload } from '../forecastWorkspacePersist
 import { getForecastWorkspace, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 /** Reads the outer workspace named by a package. Missing means legacy; present-but-unknown is rejected. */
-const getDeclaredPackageWorkspace = (data: { workspaceId?: unknown }): ForecastWorkspaceId | null => {
+export const getDeclaredPackageWorkspace = (data: { workspaceId?: unknown }): ForecastWorkspaceId | null => {
   if (data.workspaceId === undefined) return null;
   if (typeof data.workspaceId !== 'string' || getForecastWorkspace(data.workspaceId) === undefined) {
     throw new Error('This workflow package declares an unknown workspace.');
@@ -16,7 +16,7 @@ const getDeclaredPackageWorkspace = (data: { workspaceId?: unknown }): ForecastW
 };
 
 /** Returns true when an explicit outer owner disagrees with a non-legacy inner forecast. */
-const isPackageWorkspaceMismatch = (
+export const isPackageWorkspaceMismatch = (
   outer: ForecastWorkspaceId | null,
   restored: ReturnType<typeof deserializeForecastWorkspace>,
 ): boolean => {
@@ -26,7 +26,7 @@ const isPackageWorkspaceMismatch = (
 };
 
 /** Throws when an explicit outer owner disagrees with a non-legacy inner forecast. */
-const assertPackageWorkspaceMatch = (
+export const assertPackageWorkspaceMatch = (
   outer: ForecastWorkspaceId | null,
   restored: ReturnType<typeof deserializeForecastWorkspace>,
 ): void => {
@@ -35,11 +35,15 @@ const assertPackageWorkspaceMatch = (
   }
 };
 
-/** Imports a native JSON or workflow package transfer. */
-export const importNativeTransfer = async (file: File, format: 'json' | 'package'): Promise<ForecastImportResult> => {
-  const data = await readForecastImportFile(file);
-  const validationError = validateForecastDataReason(data);
-  if (validationError) throw new Error(validationError);
+interface ResolvedNativeFileContent {
+  workspaceId: ForecastWorkspaceId;
+  forecastCycle: ReturnType<typeof deserializeForecastWorkspace>['forecastCycle'];
+  mapView?: ForecastTransferMapView;
+  cycleMetadata?: CycleMetadata | null;
+}
+
+/** Resolves the owning workspace, cycle, map view, and workflow metadata for a native JSON or package payload. */
+export const resolveNativeFileContent = (data: unknown): ResolvedNativeFileContent => {
   if (isWorkflowExportPackage(data)) {
     const declaredWorkspaceId = getDeclaredPackageWorkspace(data);
     const restored = deserializeForecastWorkspace(data.forecast);
@@ -52,8 +56,6 @@ export const importNativeTransfer = async (file: File, format: 'json' | 'package
       workspaceId: declaredWorkspaceId ?? restored.workspaceId,
       mapView: data.mapView ?? inner.mapView,
       cycleMetadata: data.metadata ?? data.cycleMetadata ?? inner.cycleMetadata,
-      warnings: [],
-      format,
     };
   }
   const restored = deserializeForecastWorkspace(data);
@@ -65,6 +67,20 @@ export const importNativeTransfer = async (file: File, format: 'json' | 'package
     workspaceId: restored.workspaceId,
     mapView: rawData.mapView,
     cycleMetadata: rawData.cycleMetadata,
+  };
+};
+
+/** Imports a native JSON or workflow package transfer. */
+export const importNativeTransfer = async (file: File, format: 'json' | 'package'): Promise<ForecastImportResult> => {
+  const data = await readForecastImportFile(file);
+  const validationError = validateForecastDataReason(data);
+  if (validationError) throw new Error(validationError);
+  const resolved = resolveNativeFileContent(data);
+  return {
+    forecastCycle: resolved.forecastCycle,
+    workspaceId: resolved.workspaceId,
+    mapView: resolved.mapView,
+    cycleMetadata: resolved.cycleMetadata,
     warnings: [],
     format,
   };

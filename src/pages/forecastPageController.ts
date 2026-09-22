@@ -148,7 +148,10 @@ export const getForecastImportWorkspaceError = (
   workspaceId: ForecastWorkspaceId,
 ): string | null => {
   if (result.workspaceId === null) {
-    return 'This file does not declare a forecast workspace. KML/KMZ geometry cannot be imported across the workspace boundary.';
+    if (result.format === 'kml' || result.format === 'kmz') {
+      return 'This file does not declare a forecast workspace. KML/KMZ geometry cannot be imported across the workspace boundary.';
+    }
+    return 'This file does not declare a forecast workspace and cannot be imported.';
   }
   return result.workspaceId === workspaceId
     ? null
