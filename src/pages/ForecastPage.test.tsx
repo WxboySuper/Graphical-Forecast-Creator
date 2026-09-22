@@ -221,6 +221,23 @@ describe('ForecastPage layout selection', () => {
 
     expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
     expect(screen.getByTestId('router-state')).toHaveTextContent('null');
+    expect(screen.getByTestId('forecast-page-workspace')).toHaveFocus();
+  });
+
+  test('keeps the bookmark notice after a reload in the same tab until dismissed', async () => {
+    const firstRender = render(
+      <MemoryRouter initialEntries={[{ pathname: '/forecast/severe', state: { legacyForecastRedirect: true } }]}>
+        <Provider store={createStore()}><ForecastPage /></Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    await waitFor(() => expect(sessionStorage.getItem('gfc:legacy-forecast-notice')).toBe('true'));
+    firstRender.unmount();
+
+    renderForecastPage(createStore());
+
+    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
