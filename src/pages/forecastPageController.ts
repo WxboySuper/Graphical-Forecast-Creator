@@ -110,14 +110,19 @@ export const applyForecastImportResult = (
   result: ForecastImportResult,
   dispatch: ShortcutDispatch,
   mapRef: React.RefObject<ForecastMapHandle | null>,
-) => {
+  workspaceId?: ForecastWorkspaceId,
+): string | null => {
+  if (workspaceId !== undefined) {
+    const workspaceError = getForecastImportWorkspaceError(result, workspaceId);
+    if (workspaceError) return workspaceError;
+  }
   dispatch(importForecastCycle(result.forecastCycle));
   if (result.cycleMetadata) dispatch(setWorkflowMetadata(result.cycleMetadata));
   else if (result.cycleMetadata === null) dispatch(clearWorkflowMetadata());
 
   if (result.mapView) {
     dispatch(setMapView(result.mapView));
-    return;
+    return null;
   }
 
   const map = mapRef.current?.getMap();
@@ -125,6 +130,7 @@ export const applyForecastImportResult = (
   if (map && dayHasAnyFeatures(currentDayData)) {
     dispatch(setMapView({ center: [39.8283, -98.5795], zoom: 4 }));
   }
+  return null;
 };
 
 /** Returns an error when a transfer cannot be opened in the active forecast workspace. */

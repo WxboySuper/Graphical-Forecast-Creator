@@ -3,6 +3,7 @@ import type { CycleMetadata, SerializedWorkflowPackage } from '../types/workflow
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isFeatureExposed } from '../config/featureExposure';
+import { DEFAULT_FORECAST_WORKSPACE } from '../config/forecastWorkspaces';
 
 export type WorkflowExportScope = 'workflow' | 'cycle';
 
@@ -88,41 +89,73 @@ export const restrictForecastToWorkflow = (
   };
 };
 
-/** Builds the JSON payload used by both workflow- and cycle-scoped exports. */
-export const buildWorkflowExportPackage = ({
-  scope,
-  forecast,
-  cycleMetadata,
-  styleSnapshots,
-  workspaceId,
-  exportedAt = new Date().toISOString(),
-}: {
+interface BuildWorkflowExportPackageInput {
   scope: WorkflowExportScope;
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
   styleSnapshots?: Record<string, unknown>;
   workspaceId?: import('../config/forecastWorkspaces').ForecastWorkspaceId;
   exportedAt?: string;
-}): WorkflowExportPackage => {
-  const scopedForecast = scope === 'workflow' ? restrictForecastToWorkflow(forecast, cycleMetadata) : forecast;
-  return {
+}
+
+/** Resolves the forecast payload for the requested package scope. */
+const resolveScopedPackageForecast = (
+  scope: WorkflowExportScope,
+  forecast: GFCForecastSaveData,
+  cycleMetadata?: CycleMetadata,
+): GFCForecastSaveData => scope === 'workflow'
+  ? restrictForecastToWorkflow(forecast, cycleMetadata)
+  : forecast;
+
+/** Applies workflow metadata aliases shared by current and legacy readers. */
+const applyPackageMetadata = (pkg: WorkflowExportPackage, cycleMetadata?: CycleMetadata): void => {
+  if (!cycleMetadata) return;
+  pkg.metadata = cycleMetadata;
+  pkg.cycleMetadata = cycleMetadata;
+};
+
+/** Copies the map view from the source forecast when one exists. */
+const applyPackageMapView = (pkg: WorkflowExportPackage, forecast: GFCForecastSaveData): void => {
+  if (forecast.mapView) pkg.mapView = forecast.mapView;
+};
+
+/** Applies optional style snapshots carried by the package. */
+const applyPackageStyleSnapshots = (pkg: WorkflowExportPackage, styleSnapshots?: Record<string, unknown>): void => {
+  if (styleSnapshots) pkg.styleSnapshots = styleSnapshots;
+};
+
+/** Attaches the compatibility disclosure for embedded custom content. */
+const applyPackageCustomContent = (pkg: WorkflowExportPackage, scopedForecast: GFCForecastSaveData): void => {
+  if (!isFeatureExposed('customProducts') || !hasCustomContent(scopedForecast)) return;
+  pkg.customContent = {
+    included: true,
+    severeAnalytics: 'excluded',
+    autoCategorical: 'excluded',
+  };
+};
+
+/** Builds the JSON payload used by both workflow- and cycle-scoped exports. */
+export const buildWorkflowExportPackage = ({
+  scope,
+  forecast,
+  cycleMetadata,
+  styleSnapshots,
+  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+  exportedAt = new Date().toISOString(),
+}: BuildWorkflowExportPackageInput): WorkflowExportPackage => {
+  const scopedForecast = resolveScopedPackageForecast(scope, forecast, cycleMetadata);
+  const pkg: WorkflowExportPackage = {
     packageType: scope,
     schemaVersion: WORKFLOW_SCHEMA_VERSION,
     exportedAt,
-    ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
-    ...(cycleMetadata ? { cycleMetadata } : {}),
-    ...(forecast.mapView ? { mapView: forecast.mapView } : {}),
-    ...(workspaceId ? { workspaceId } : {}),
+    workspaceId,
     forecast: scopedForecast,
-    ...(styleSnapshots ? { styleSnapshots } : {}),
-    ...(isFeatureExposed('customProducts') && hasCustomContent(scopedForecast) ? {
-      customContent: {
-        included: true,
-        severeAnalytics: 'excluded',
-        autoCategorical: 'excluded',
-      },
-    } : {}),
   };
+  applyPackageMetadata(pkg, cycleMetadata);
+  applyPackageMapView(pkg, forecast);
+  applyPackageStyleSnapshots(pkg, styleSnapshots);
+  applyPackageCustomContent(pkg, scopedForecast);
+  return pkg;
 };
 
 /** Returns true only for the exact top-level markers of a workflow export package. */

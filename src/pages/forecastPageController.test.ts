@@ -2,6 +2,7 @@ import * as fileUtils from '../utils/fileUtils';
 import forecastReducer from '../store/forecastSlice';
 import type { DiscussionData } from '../types/outlooks';
 import {
+  applyForecastImportResult,
   buildRestoreKey,
   buildRolloverSaveLabel,
   cycleHasDiscussionContent,
@@ -33,11 +34,29 @@ describe('forecastPageController', () => {
     expect(getForecastImportWorkspaceError({ ...result, workspaceId: 'severe' }, 'severe')).toBeNull();
   });
 
-  test('rejects unowned KML/KMZ transfers in every workspace, including severe', () => {
+  test('keeps Severe-owned KML/KMZ in Severe and rejects it elsewhere', () => {
+    const result = { workspaceId: 'severe', format: 'kml' } as ForecastImportResult;
+
+    expect(getForecastImportWorkspaceError(result, 'severe')).toBeNull();
+    expect(getForecastImportWorkspaceError(result, 'custom')).toContain('severe workspace');
+  });
+
+  test('rejects unowned transfers in every workspace, including severe', () => {
     const result = { workspaceId: null, format: 'kml' } as ForecastImportResult;
 
     expect(getForecastImportWorkspaceError(result, 'severe')).toContain('does not declare');
     expect(getForecastImportWorkspaceError(result, 'custom')).toContain('does not declare');
+  });
+
+  test('refuses to mutate state when the apply path sees a workspace mismatch', () => {
+    const dispatch = jest.fn();
+    const mapRef = { current: null } as never;
+    const result = { workspaceId: 'custom', forecastCycle: createForecastCycle(), warnings: [], format: 'json' } as ForecastImportResult;
+
+    expect(applyForecastImportResult(result, dispatch, mapRef, 'severe')).toContain('custom workspace');
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(applyForecastImportResult({ ...result, workspaceId: 'severe' }, dispatch, mapRef, 'severe')).toBeNull();
+    expect(dispatch).toHaveBeenCalled();
   });
 
   test('owns rollover labels, restore metadata parsing, and scope helpers', () => {
