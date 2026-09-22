@@ -38,6 +38,37 @@ const textFile = (name: string, text: string): File => ({
   text: jest.fn().mockResolvedValue(text),
 } as unknown as File);
 
+type WorkspaceId = Parameters<typeof serializeForecastWorkspace>[0];
+type MapView = Parameters<typeof serializeForecastWorkspace>[2];
+
+const DEFAULT_MAP_VIEW: MapView = { center: [0, 0], zoom: 4 };
+
+const makeEnvelope = (
+  workspaceId: WorkspaceId,
+  cycleDate: string,
+  overrides?: { cycle?: ForecastCycle; mapView?: MapView; metadata?: CycleMetadata },
+) =>
+  serializeForecastWorkspace(
+    workspaceId,
+    overrides?.cycle ?? buildCycle(cycleDate),
+    overrides?.mapView ?? DEFAULT_MAP_VIEW,
+    overrides?.metadata,
+  );
+
+const makeBarePayload = (
+  cycleDate: string,
+  overrides?: { cycle?: ForecastCycle; mapView?: MapView },
+) =>
+  serializeForecast(
+    overrides?.cycle ?? buildCycle(cycleDate),
+    overrides?.mapView ?? DEFAULT_MAP_VIEW,
+  );
+
+const payloadFile = (payload: unknown, name = 'gfc-forecast.json'): File =>
+  textFile(name, JSON.stringify(payload));
+
+const legacyPayloadFile = (payload: unknown): File => payloadFile(payload, 'legacy.json');
+
 describe('workspace envelope loads across file surfaces', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -45,30 +76,28 @@ describe('workspace envelope loads across file surfaces', () => {
 
   test('VerificationMode parses a workspace envelope and preserves legacy bare files', async () => {
     const cycleDate = '2026-09-20';
-    const envelope = serializeForecastWorkspace(
-      'severe',
-      buildCycle(cycleDate),
-      { center: [11, 22], zoom: 5 },
-      buildMetadata(cycleDate),
-    );
+    const envelope = makeEnvelope('severe', cycleDate, {
+      mapView: { center: [11, 22], zoom: 5 },
+      metadata: buildMetadata(cycleDate),
+    });
 
-    const loaded = await parseAndValidateForecast(textFile('gfc-forecast.json', JSON.stringify(envelope)));
+    const loaded = await parseAndValidateForecast(payloadFile(envelope));
     expect(loaded.cycleDate).toBe(cycleDate);
 
-    const bare = serializeForecast(buildCycle(cycleDate), { center: [39.8, -98.5], zoom: 4 });
-    const legacy = await parseAndValidateForecast(textFile('legacy.json', JSON.stringify(bare)));
+    const bare = makeBarePayload(cycleDate, { mapView: { center: [39.8, -98.5], zoom: 4 } });
+    const legacy = await parseAndValidateForecast(legacyPayloadFile(bare));
     expect(legacy.cycleDate).toBe(cycleDate);
   });
 
   test('verificationV2 file and cloud loaders resolve envelopes', async () => {
     const cycleDate = '2026-09-21';
-    const envelope = serializeForecastWorkspace('severe', buildCycle(cycleDate), { center: [1, 2], zoom: 3 });
+    const envelope = makeEnvelope('severe', cycleDate, { mapView: { center: [1, 2], zoom: 3 } });
 
-    const fromFile = await loadForecastFromFile(textFile('gfc-forecast.json', JSON.stringify(envelope)));
+    const fromFile = await loadForecastFromFile(payloadFile(envelope));
     expect(fromFile.cycleDate).toBe(cycleDate);
 
-    const bare = serializeForecast(buildCycle(cycleDate), { center: [0, 0], zoom: 4 });
-    const legacyFile = await loadForecastFromFile(textFile('legacy.json', JSON.stringify(bare)));
+    const bare = makeBarePayload(cycleDate);
+    const legacyFile = await loadForecastFromFile(legacyPayloadFile(bare));
     expect(legacyFile.cycleDate).toBe(cycleDate);
 
     mockedLoadCloudCycle.mockResolvedValue({
@@ -88,13 +117,13 @@ describe('workspace envelope loads across file surfaces', () => {
 
   test('CopyFromPreviousModal parses envelopes and legacy bare files', async () => {
     const cycleDate = '2026-09-22';
-    const envelope = serializeForecastWorkspace('custom', buildCycle(cycleDate), { center: [5, 6], zoom: 4 });
+    const envelope = makeEnvelope('custom', cycleDate, { mapView: { center: [5, 6], zoom: 4 } });
 
-    const fromEnvelope = await parseForecastFile(textFile('gfc-forecast.json', JSON.stringify(envelope)));
+    const fromEnvelope = await parseForecastFile(payloadFile(envelope));
     expect(fromEnvelope.cycleDate).toBe(cycleDate);
 
-    const bare = serializeForecast(buildCycle(cycleDate), { center: [0, 0], zoom: 4 });
-    const fromLegacy = await parseForecastFile(textFile('legacy.json', JSON.stringify(bare)));
+    const bare = makeBarePayload(cycleDate);
+    const fromLegacy = await parseForecastFile(legacyPayloadFile(bare));
     expect(fromLegacy.cycleDate).toBe(cycleDate);
   });
 
@@ -104,14 +133,14 @@ describe('workspace envelope loads across file surfaces', () => {
       ...buildCycle(cycleDate),
       days: { 1: { day: 1, data: { tornado: 'x' }, metadata: {} } },
     } as unknown as ForecastCycle;
-    const envelope = serializeForecastWorkspace('severe', envelopeCycle, { center: [0, 0], zoom: 4 });
+    const envelope = makeEnvelope('severe', cycleDate, { cycle: envelopeCycle });
     const loadCycle = jest.fn().mockResolvedValue(envelope.forecast);
 
     const selected = { id: 'cycle-1', kind: 'cloud-cycle', label: 'Cloud' } as never;
     const option = await loadCloudOutlookOption(loadCycle, selected, cycleDate);
     expect(option.data).toBeDefined();
 
-    const bare = serializeForecast(envelopeCycle, { center: [0, 0], zoom: 4 });
+    const bare = makeBarePayload(cycleDate, { cycle: envelopeCycle });
     loadCycle.mockResolvedValueOnce(bare);
     const legacyOption = await loadCloudOutlookOption(loadCycle, selected, cycleDate);
     expect(legacyOption.data).toBeDefined();
@@ -119,25 +148,23 @@ describe('workspace envelope loads across file surfaces', () => {
 
   test('grade snapshot payloads resolve through the shared resolver', () => {
     const cycleDate = '2026-09-23';
-    const envelope = serializeForecastWorkspace('severe', buildCycle(cycleDate), { center: [0, 0], zoom: 4 });
+    const envelope = makeEnvelope('severe', cycleDate);
     expect(resolveNativeFileContent(envelope).forecastCycle.cycleDate).toBe(cycleDate);
 
-    const bare = serializeForecast(buildCycle(cycleDate), { center: [0, 0], zoom: 4 });
+    const bare = makeBarePayload(cycleDate);
     expect(resolveNativeFileContent(bare).forecastCycle.cycleDate).toBe(cycleDate);
   });
 
   test('parseLoadedForecast enforces the active workspace and keeps envelope identity', async () => {
     const cycleDate = '2026-09-24';
-    const envelope = serializeForecastWorkspace(
-      'custom',
-      buildCycle(cycleDate),
-      { center: [7, 8], zoom: 6 },
-      buildMetadata(cycleDate),
-    );
+    const envelope = makeEnvelope('custom', cycleDate, {
+      mapView: { center: [7, 8], zoom: 6 },
+      metadata: buildMetadata(cycleDate),
+    });
     const addToast = jest.fn();
 
     const loaded = await parseLoadedForecast(
-      textFile('gfc-forecast.json', JSON.stringify(envelope)),
+      payloadFile(envelope),
       addToast,
       'custom',
     );
@@ -146,15 +173,15 @@ describe('workspace envelope loads across file surfaces', () => {
     expect(loaded?.rawData.cycleMetadata).toMatchObject({ id: `WF-severe-${cycleDate}` });
 
     const rejected = await parseLoadedForecast(
-      textFile('gfc-forecast.json', JSON.stringify(envelope)),
+      payloadFile(envelope),
       addToast,
       'severe',
     );
     expect(rejected).toBeNull();
     expect(addToast).toHaveBeenCalledWith(expect.stringContaining('custom workspace'), 'error');
 
-    const bare = serializeForecast(buildCycle(cycleDate), { center: [0, 0], zoom: 4 });
-    const legacy = await parseLoadedForecast(textFile('legacy.json', JSON.stringify(bare)), addToast, 'severe');
+    const bare = makeBarePayload(cycleDate);
+    const legacy = await parseLoadedForecast(legacyPayloadFile(bare), addToast, 'severe');
     expect(legacy?.deserializedCycle.cycleDate).toBe(cycleDate);
   });
 });
