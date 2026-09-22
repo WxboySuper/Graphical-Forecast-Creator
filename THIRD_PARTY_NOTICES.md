@@ -72,7 +72,7 @@ to each.
 - **typescript-eslint** ^8.70.0 (root (pnpm)) — MIT — allowed
 - **uuid** ^14.0.2 (root (pnpm)) — MIT — allowed
 - **vite** ^8.3.0 (root (pnpm)) — MIT — allowed
-- **@sentry/node** ^10.74.0 (server (npm)) — MIT — allowed
+- **@sentry/node** ^10.75.0 (server (npm)) — MIT — allowed
 - **express** ^5.2.1 (server (npm)) — MIT — allowed
 - **express-rate-limit** ^8.7.0 (server (npm)) — MIT — allowed
 - **firebase-admin** ^14.4.0 (server (npm)) — Apache-2.0 — allowed
