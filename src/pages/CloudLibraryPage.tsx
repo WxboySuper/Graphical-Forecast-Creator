@@ -15,6 +15,7 @@ import { getBuildTarget } from '../config/buildTarget';
 import {
   getForecastWorkspace,
   isForecastWorkspaceExposed,
+  type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
 import {
@@ -700,6 +701,20 @@ export const buildCloudSessionPayload = (
     : createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
 };
 
+/** Only the registered Severe editor can open cloud payloads today. */
+export const isSupportedCloudLoadWorkspace = (
+  workspaceId: ForecastWorkspaceId,
+  workspace: ForecastWorkspaceDefinition | undefined,
+): boolean => {
+  if (workspaceId !== 'severe') {
+    return false;
+  }
+  if (!workspace) {
+    return false;
+  }
+  return isForecastWorkspaceExposed(workspace);
+};
+
 /** Creates the cloud library actions used by the page and keeps transient feedback local. */
 const useCloudLibraryActions = ({
   cycles,
@@ -750,10 +765,9 @@ const useCloudLibraryActions = ({
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
     const workspaceId = getCloudCycleWorkspaceId(selectedCycle ?? { workspaceId: undefined });
     const workspace = getForecastWorkspace(workspaceId);
-    // Only the registered Severe editor can open cloud payloads today. Unexposed
-    // or unregistered workspaces reuse the existing failure path instead of
+    // Unexposed or unregistered workspaces reuse the existing failure path instead of
     // navigating to a /forecast/{workspace} route with no editor.
-    if (workspaceId !== 'severe' || !workspace || !isForecastWorkspaceExposed(workspace)) {
+    if (!isSupportedCloudLoadWorkspace(workspaceId, workspace)) {
       setMessage('Workspace-specific cloud loading is not available yet.');
       return;
     }
