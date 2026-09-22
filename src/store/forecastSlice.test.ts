@@ -325,6 +325,12 @@ describe('forecastSlice undo/redo', () => {
     expect(state.savedCycles[0]?.workspaceId).toBe('custom');
   });
 
+  test('ignores an invalid workspace action and keeps Severe active', () => {
+    const state = reducer(undefined, setForecastWorkspace('not-a-workspace' as never));
+
+    expect(state.workspaceId).toBe('severe');
+  });
+
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
     let state = reducer(undefined, { type: 'test/init' });
     for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {
