@@ -1,4 +1,5 @@
 import type { ForecastState } from './forecastSlice';
+import type { DayType } from '../types/outlooks';
 import { cloneIntegratedCustomLayers, cloneOutlookData } from './forecastSnapshotHelpers';
 import { invalidateCompletionAcknowledgement } from './forecastProbabilityState';
 
@@ -11,12 +12,17 @@ export const applyCreateOutlookUpdate = (state: ForecastState, now: string): voi
 
   const snapshotDays: typeof state.forecastCycle.days = {};
   let hasSnapshot = false;
-  (Object.entries(state.forecastCycle.days) as [string, typeof state.forecastCycle.days[keyof typeof state.forecastCycle.days]][]).forEach(
+  // Snapshot every day that has data so full-outlook workflows keep
+  // the whole version side-by-side with the next iteration, not just
+  // the currently selected day.
+  (Object.entries(state.forecastCycle.days) as unknown as [DayType, typeof state.forecastCycle.days[DayType]][]).forEach(
     ([day, dayData]) => {
       if (!dayData) return;
-      snapshotDays[day as unknown as keyof typeof snapshotDays] = {
+      snapshotDays[day] = {
         ...dayData,
         data: cloneOutlookData(dayData.data),
+        // Version history must retain the exact geometry and appearance
+        // that existed before the update, not a live reference.
         customLayers: cloneIntegratedCustomLayers(dayData.customLayers),
       };
       hasSnapshot = true;
