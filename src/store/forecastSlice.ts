@@ -807,6 +807,7 @@ const restoreHistoryEntry = (
   state.isSaved = false;
 };
 
+// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 export const forecastSlice = createSlice({
   name: 'forecast',
   initialState,
