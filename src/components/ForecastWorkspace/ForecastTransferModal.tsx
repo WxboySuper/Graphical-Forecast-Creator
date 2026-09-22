@@ -95,13 +95,14 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   const [outlookType, setOutlookType] = useState<OutlookType | 'all'>('all');
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
+  const isSevereWorkspace = (workspaceId ?? DEFAULT_FORECAST_WORKSPACE) === DEFAULT_FORECAST_WORKSPACE;
   const availableFormats = useMemo(
     () => FORMAT_OPTIONS.filter((option) => (
       option.value === 'json'
       || option.value === 'package'
-      || (kmzEnabled && (option.value === 'kml' || option.value === 'kmz'))
+      || (isSevereWorkspace && kmzEnabled && (option.value === 'kml' || option.value === 'kmz'))
     )),
-    [kmzEnabled],
+    [kmzEnabled, isSevereWorkspace],
   );
 
   const availableScopes = useMemo(() => {

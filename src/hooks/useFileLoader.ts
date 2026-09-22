@@ -1,6 +1,6 @@
-import { exportForecastToJson, deserializeForecast, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecast, downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
 import { isWorkflowExportPackage } from '../utils/workflowPackage';
-import { deserializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { DEFAULT_FORECAST_WORKSPACE, getForecastWorkspace, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
   markAsSaved,
@@ -12,11 +12,23 @@ import type { AddToastFn } from '../components/Layout';
 import type { Dispatch } from 'redux';
 import type { CycleMetadata, ForecastCycle } from '../types/outlooks';
 
-/** Reads the canonical outer workspace declared by a workflow package, if it names one. */
+/** Reads the outer workspace named by a package. Missing means legacy; present-but-unknown is rejected. */
 const resolvePackageOuterWorkspace = (data: { workspaceId?: unknown }): ForecastWorkspaceId | null => {
-  if (typeof data.workspaceId !== 'string') return null;
-  if (getForecastWorkspace(data.workspaceId) === undefined) return null;
+  if (data.workspaceId === undefined) return null;
+  if (typeof data.workspaceId !== 'string' || getForecastWorkspace(data.workspaceId) === undefined) {
+    throw new Error('This workflow package declares an unknown workspace.');
+  }
   return data.workspaceId as ForecastWorkspaceId;
+};
+
+/** Returns true when an explicit outer owner disagrees with a non-legacy inner forecast. */
+const isPackageWorkspaceMismatch = (
+  outer: ForecastWorkspaceId | null,
+  restored: ReturnType<typeof deserializeForecastWorkspace>,
+): boolean => {
+  if (outer === null) return false;
+  if (restored.legacy) return false;
+  return outer !== restored.workspaceId;
 };
 
 /** Throws when an explicit outer owner disagrees with a non-legacy inner forecast. */
@@ -24,7 +36,7 @@ const assertPackageWorkspaceMatch = (
   outer: ForecastWorkspaceId | null,
   restored: ReturnType<typeof deserializeForecastWorkspace>,
 ): void => {
-  if (outer && !restored.legacy && outer !== restored.workspaceId) {
+  if (isPackageWorkspaceMismatch(outer, restored)) {
     throw new Error('This workflow package declares a workspace that does not match its forecast.');
   }
 };
@@ -132,16 +144,22 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
     fileInputRef.current?.click();
   };
 
-  /** Serializes the current forecast cycle to a JSON file and downloads it, then marks the store as saved. */
+  /** Serializes the active workspace cycle to a workspace-owned JSON file, then marks the store as saved. */
   const handleSave = () => {
     try {
-      exportForecastToJson(
+      const payload = serializeForecastWorkspace(
+        workspaceId,
         forecastCycle,
         {
           center: [39.8283, -98.5795],
           zoom: 4,
         },
         cycleMetadata,
+      );
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      downloadBlob(
+        new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+        `gfc-forecast-${timestamp}.json`,
       );
       dispatch(markAsSaved());
       addToast('Forecast exported to JSON!', 'success');

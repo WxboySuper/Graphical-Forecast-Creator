@@ -6,20 +6,44 @@ import { deserializeForecastWorkspace } from '../forecastWorkspacePersistenceAda
 import { getForecastDataFromWorkspacePayload } from '../forecastWorkspacePersistence';
 import { getForecastWorkspace, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
+/** Reads the outer workspace named by a package. Missing means legacy; present-but-unknown is rejected. */
+const getDeclaredPackageWorkspace = (data: { workspaceId?: unknown }): ForecastWorkspaceId | null => {
+  if (data.workspaceId === undefined) return null;
+  if (typeof data.workspaceId !== 'string' || getForecastWorkspace(data.workspaceId) === undefined) {
+    throw new Error('This workflow package declares an unknown workspace.');
+  }
+  return data.workspaceId as ForecastWorkspaceId;
+};
+
+/** Returns true when an explicit outer owner disagrees with a non-legacy inner forecast. */
+const isPackageWorkspaceMismatch = (
+  outer: ForecastWorkspaceId | null,
+  restored: ReturnType<typeof deserializeForecastWorkspace>,
+): boolean => {
+  if (outer === null) return false;
+  if (restored.legacy) return false;
+  return outer !== restored.workspaceId;
+};
+
+/** Throws when an explicit outer owner disagrees with a non-legacy inner forecast. */
+const assertPackageWorkspaceMatch = (
+  outer: ForecastWorkspaceId | null,
+  restored: ReturnType<typeof deserializeForecastWorkspace>,
+): void => {
+  if (isPackageWorkspaceMismatch(outer, restored)) {
+    throw new Error('This workflow package declares a workspace that does not match its forecast.');
+  }
+};
+
 /** Imports a native JSON or workflow package transfer. */
 export const importNativeTransfer = async (file: File, format: 'json' | 'package'): Promise<ForecastImportResult> => {
   const data = await readForecastImportFile(file);
   const validationError = validateForecastDataReason(data);
   if (validationError) throw new Error(validationError);
   if (isWorkflowExportPackage(data)) {
-    const declaredWorkspaceId = typeof (data as { workspaceId?: unknown }).workspaceId === 'string'
-      && getForecastWorkspace((data as { workspaceId: string }).workspaceId) !== undefined
-      ? (data as { workspaceId: ForecastWorkspaceId }).workspaceId
-      : null;
+    const declaredWorkspaceId = getDeclaredPackageWorkspace(data);
     const restored = deserializeForecastWorkspace(data.forecast);
-    if (declaredWorkspaceId && !restored.legacy && declaredWorkspaceId !== restored.workspaceId) {
-      throw new Error('This workflow package declares a workspace that does not match its forecast.');
-    }
+    assertPackageWorkspaceMatch(declaredWorkspaceId, restored);
     const inner = getForecastDataFromWorkspacePayload(
       data.forecast as Parameters<typeof getForecastDataFromWorkspacePayload>[0],
     ) as { mapView?: ForecastTransferMapView; cycleMetadata?: CycleMetadata | null };
