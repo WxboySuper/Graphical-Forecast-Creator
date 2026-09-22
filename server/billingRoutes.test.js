@@ -14,6 +14,114 @@ const createExpress = () => ({
   json: (options) => ({ kind: 'json', options }),
 });
 
+const resolveBillingCompatPaths = () => ({
+  billingRoutesPath: require.resolve('./billingRoutes'),
+  billingPath: require.resolve('./billing'),
+  firebaseAdminPath: require.resolve('./firebase-admin'),
+  metricsPath: require.resolve('./metrics'),
+  accountLifecyclePath: require.resolve('./account-lifecycle'),
+});
+
+const snapshotBillingCompatCache = (paths) => ({
+  adapter: require.cache[paths.billingRoutesPath],
+  billing: require.cache[paths.billingPath],
+  firebaseAdmin: require.cache[paths.firebaseAdminPath],
+  metrics: require.cache[paths.metricsPath],
+  accountLifecycle: require.cache[paths.accountLifecyclePath],
+});
+
+const stubBillingCompatModules = (Module, paths, holder) => {
+  const originalLoad = Module._load;
+  // Server dependencies are not installed for this focused adapter test, so
+  // stub the external and Firebase-backed modules before loading billing.js.
+  Module._load = function stubbedLoad(request, parent, isMain) {
+    if (request === 'stripe') return function FakeStripe() {};
+    if (request === 'express-rate-limit') return () => function billingRateLimit() {};
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  require.cache[paths.firebaseAdminPath] = {
+    id: paths.firebaseAdminPath,
+    filename: paths.firebaseAdminPath,
+    loaded: true,
+    exports: { getAdminAuth: () => null, getAdminDb: () => null, hasFirebaseAdminConfig: () => false },
+  };
+  require.cache[paths.metricsPath] = {
+    id: paths.metricsPath,
+    filename: paths.metricsPath,
+    loaded: true,
+    exports: { recordBillingMetricEvent: async () => true },
+  };
+  require.cache[paths.accountLifecyclePath] = {
+    id: paths.accountLifecyclePath,
+    filename: paths.accountLifecyclePath,
+    loaded: true,
+    exports: {
+      deleteStripeCustomer: async () => true,
+      isAccountDeletionBlocked: async () => false,
+      isStripeCustomerDeletionBlocked: async () => false,
+    },
+  };
+  require.cache[paths.billingRoutesPath] = {
+    id: paths.billingRoutesPath,
+    filename: paths.billingRoutesPath,
+    loaded: true,
+    exports: {
+      registerBillingRoutes: (args) => {
+        holder.forwarded = args;
+      },
+    },
+  };
+  delete require.cache[paths.billingPath];
+  return originalLoad;
+};
+
+const restoreBillingCompatModules = (Module, paths, snapshot, originalLoad) => {
+  Module._load = originalLoad;
+  if (snapshot.adapter) require.cache[paths.billingRoutesPath] = snapshot.adapter;
+  else delete require.cache[paths.billingRoutesPath];
+  if (snapshot.firebaseAdmin) require.cache[paths.firebaseAdminPath] = snapshot.firebaseAdmin;
+  else delete require.cache[paths.firebaseAdminPath];
+  if (snapshot.metrics) require.cache[paths.metricsPath] = snapshot.metrics;
+  else delete require.cache[paths.metricsPath];
+  if (snapshot.accountLifecycle) require.cache[paths.accountLifecyclePath] = snapshot.accountLifecycle;
+  else delete require.cache[paths.accountLifecyclePath];
+  if (snapshot.billing) require.cache[paths.billingPath] = snapshot.billing;
+  else delete require.cache[paths.billingPath];
+  delete require.cache[paths.billingPath];
+};
+
+const assertForwardedAdapterArgs = (forwarded, app, express, billing) => {
+  assert.deepStrictEqual(Object.keys(forwarded).sort(), [
+    'app',
+    'checkoutRateLimit',
+    'express',
+    'handleBillingConfig',
+    'handleBillingPortal',
+    'handleBillingWebhook',
+    'handleCheckout',
+    'portalRateLimit',
+    'webhookRateLimit',
+    'wrapBillingJsonRoute',
+  ]);
+  assert.strictEqual(forwarded.app, app);
+  assert.strictEqual(forwarded.express, express);
+  assert.strictEqual(forwarded.wrapBillingJsonRoute, billing.wrapBillingJsonRoute);
+  assert.strictEqual(typeof forwarded.handleBillingConfig, 'function');
+  assert.strictEqual(typeof forwarded.handleBillingWebhook, 'function');
+  assert.strictEqual(typeof forwarded.handleCheckout, 'function');
+  assert.strictEqual(typeof forwarded.handleBillingPortal, 'function');
+};
+
+const assertStableBillingRateLimits = (billing, holder, express) => {
+  // Rate limits are stable module singletons, with distinct checkout and portal caps.
+  const first = { ...holder.forwarded };
+  billing.registerBillingRoutes({ get: () => {}, post: () => {} }, express);
+  assert.strictEqual(holder.forwarded.webhookRateLimit, first.webhookRateLimit);
+  assert.strictEqual(holder.forwarded.checkoutRateLimit, first.checkoutRateLimit);
+  assert.strictEqual(holder.forwarded.portalRateLimit, first.portalRateLimit);
+  assert.notStrictEqual(holder.forwarded.checkoutRateLimit, holder.forwarded.portalRateLimit);
+};
+
 describe('billing route adapter', () => {
   it('registers config, webhook, checkout, and portal routes with handler identity and middleware order', () => {
     const routes = [];
@@ -114,59 +222,10 @@ describe('billing route adapter', () => {
 
   it('forwards adapter dependencies from the billing.js compatibility wrapper', () => {
     const Module = require('node:module');
-    const billingRoutesPath = require.resolve('./billingRoutes');
-    const billingPath = require.resolve('./billing');
-    const firebaseAdminPath = require.resolve('./firebase-admin');
-    const metricsPath = require.resolve('./metrics');
-    const accountLifecyclePath = require.resolve('./account-lifecycle');
-    const originalAdapter = require.cache[billingRoutesPath];
-    const originalBilling = require.cache[billingPath];
-    const originalFirebaseAdmin = require.cache[firebaseAdminPath];
-    const originalMetrics = require.cache[metricsPath];
-    const originalAccountLifecycle = require.cache[accountLifecyclePath];
-    const originalLoad = Module._load;
-    let forwarded = null;
-
-    // Server dependencies are not installed for this focused adapter test, so
-    // stub the external and Firebase-backed modules before loading billing.js.
-    Module._load = function stubbedLoad(request, parent, isMain) {
-      if (request === 'stripe') return function FakeStripe() {};
-      if (request === 'express-rate-limit') return () => function billingRateLimit() {};
-      return originalLoad.call(this, request, parent, isMain);
-    };
-    require.cache[firebaseAdminPath] = {
-      id: firebaseAdminPath,
-      filename: firebaseAdminPath,
-      loaded: true,
-      exports: { getAdminAuth: () => null, getAdminDb: () => null, hasFirebaseAdminConfig: () => false },
-    };
-    require.cache[metricsPath] = {
-      id: metricsPath,
-      filename: metricsPath,
-      loaded: true,
-      exports: { recordBillingMetricEvent: async () => true },
-    };
-    require.cache[accountLifecyclePath] = {
-      id: accountLifecyclePath,
-      filename: accountLifecyclePath,
-      loaded: true,
-      exports: {
-        deleteStripeCustomer: async () => true,
-        isAccountDeletionBlocked: async () => false,
-        isStripeCustomerDeletionBlocked: async () => false,
-      },
-    };
-    require.cache[billingRoutesPath] = {
-      id: billingRoutesPath,
-      filename: billingRoutesPath,
-      loaded: true,
-      exports: {
-        registerBillingRoutes: (args) => {
-          forwarded = args;
-        },
-      },
-    };
-    delete require.cache[billingPath];
+    const paths = resolveBillingCompatPaths();
+    const snapshot = snapshotBillingCompatCache(paths);
+    const holder = { forwarded: null };
+    const originalLoad = stubBillingCompatModules(Module, paths, holder);
 
     try {
       const billing = require('./billing');
@@ -175,46 +234,10 @@ describe('billing route adapter', () => {
 
       billing.registerBillingRoutes(app, express);
 
-      assert.deepStrictEqual(Object.keys(forwarded).sort(), [
-        'app',
-        'checkoutRateLimit',
-        'express',
-        'handleBillingConfig',
-        'handleBillingPortal',
-        'handleBillingWebhook',
-        'handleCheckout',
-        'portalRateLimit',
-        'webhookRateLimit',
-        'wrapBillingJsonRoute',
-      ]);
-      assert.strictEqual(forwarded.app, app);
-      assert.strictEqual(forwarded.express, express);
-      assert.strictEqual(forwarded.wrapBillingJsonRoute, billing.wrapBillingJsonRoute);
-      assert.strictEqual(typeof forwarded.handleBillingConfig, 'function');
-      assert.strictEqual(typeof forwarded.handleBillingWebhook, 'function');
-      assert.strictEqual(typeof forwarded.handleCheckout, 'function');
-      assert.strictEqual(typeof forwarded.handleBillingPortal, 'function');
-
-      // Rate limits are stable module singletons, with distinct checkout and portal caps.
-      const first = { ...forwarded };
-      billing.registerBillingRoutes({ get: () => {}, post: () => {} }, express);
-      assert.strictEqual(forwarded.webhookRateLimit, first.webhookRateLimit);
-      assert.strictEqual(forwarded.checkoutRateLimit, first.checkoutRateLimit);
-      assert.strictEqual(forwarded.portalRateLimit, first.portalRateLimit);
-      assert.notStrictEqual(forwarded.checkoutRateLimit, forwarded.portalRateLimit);
+      assertForwardedAdapterArgs(holder.forwarded, app, express, billing);
+      assertStableBillingRateLimits(billing, holder, express);
     } finally {
-      Module._load = originalLoad;
-      if (originalAdapter) require.cache[billingRoutesPath] = originalAdapter;
-      else delete require.cache[billingRoutesPath];
-      if (originalFirebaseAdmin) require.cache[firebaseAdminPath] = originalFirebaseAdmin;
-      else delete require.cache[firebaseAdminPath];
-      if (originalMetrics) require.cache[metricsPath] = originalMetrics;
-      else delete require.cache[metricsPath];
-      if (originalAccountLifecycle) require.cache[accountLifecyclePath] = originalAccountLifecycle;
-      else delete require.cache[accountLifecyclePath];
-      if (originalBilling) require.cache[billingPath] = originalBilling;
-      else delete require.cache[billingPath];
-      delete require.cache[billingPath];
+      restoreBillingCompatModules(Module, paths, snapshot, originalLoad);
     }
   });
 });
