@@ -771,13 +771,8 @@ const useCloudLibraryActions = ({
   };
 };
 
-/** Production-facing page for loading and managing cloud-hosted cycles. */
-const CloudLibraryPage: React.FC = () => {
-  const navigate = useNavigate();
+const useCloudLibraryWorkspaceNavigation = (cycles: CloudCycleMetadata[]) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
-  const { premiumActive, effectiveSource } = useEntitlement();
-  const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
   const tabs = useMemo(() => getCloudLibraryTabs(cycles, getBuildTarget()), [cycles]);
   const activeTab = useMemo(() => getCloudLibraryTabFromSearchParams(searchParams, tabs), [searchParams, tabs]);
   const visibleCycles = useMemo(() => filterCloudCyclesByWorkspace(cycles, activeTab), [activeTab, cycles]);
@@ -790,6 +785,17 @@ const CloudLibraryPage: React.FC = () => {
     }
     setSearchParams(nextSearchParams, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  return { tabs, activeTab, visibleCycles, handleTabChange };
+};
+
+/** Production-facing page for loading and managing cloud-hosted cycles. */
+const CloudLibraryPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { premiumActive, effectiveSource } = useEntitlement();
+  const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
+  const { tabs, activeTab, visibleCycles, handleTabChange } = useCloudLibraryWorkspaceNavigation(cycles);
   const {
     message,
     handleLoadCycle,
