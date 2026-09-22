@@ -48,6 +48,48 @@ describe('metrics route adapter', () => {
     assert.equal(adminCalls, 1);
   });
 
+  it('builds both limiters from the exported option objects via the injected factory', () => {
+    const routes = [];
+    const app = {
+      post: (...args) => routes.push(['post', ...args]),
+      get: (...args) => routes.push(['get', ...args]),
+    };
+    const express = { json: (options) => ({ kind: 'json', options }) };
+    const seenOptions = [];
+    const fakeMetricsLimiter = function fakeMetricsLimiter() {};
+    const fakeAdminLimiter = function fakeAdminLimiter() {};
+    const createRateLimiter = (options) => {
+      seenOptions.push(options);
+      return seenOptions.length === 1 ? fakeMetricsLimiter : fakeAdminLimiter;
+    };
+
+    registerMetricsRoutes({
+      app,
+      express,
+      handleMetricEvent: async () => {},
+      handleAdminMetrics: async () => {},
+      createRateLimiter,
+    });
+
+    assert.equal(seenOptions.length, 2);
+    assert.deepEqual(seenOptions[0], {
+      windowMs: 60 * 1000,
+      max: 120,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many metrics events right now. Please wait a moment and try again.' },
+    });
+    assert.deepEqual(seenOptions[1], {
+      windowMs: 60 * 1000,
+      max: 30,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many admin metric requests right now. Please wait a moment and try again.' },
+    });
+    assert.equal(routes[0][2], fakeMetricsLimiter);
+    assert.equal(routes[1][2], fakeAdminLimiter);
+  });
+
   it('keeps the documented rate limits attached to each endpoint', () => {
     assert.deepEqual(METRICS_RATE_LIMIT_OPTIONS, {
       windowMs: 60 * 1000,
