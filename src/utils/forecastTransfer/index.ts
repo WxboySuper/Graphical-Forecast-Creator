@@ -31,6 +31,15 @@ const downloadWorkspaceJsonTransfer = (
   );
 };
 
+/** KML/KMZ geometry is Severe-owned; other workspaces cannot produce it. */
+const assertSevereKmlExport = (format: ForecastExportRequest['format'], workspaceId: ForecastExportRequest['workspaceId']): void => {
+  if (format !== 'kml' && format !== 'kmz') return;
+  const owner = workspaceId ?? DEFAULT_FORECAST_WORKSPACE;
+  if (owner !== DEFAULT_FORECAST_WORKSPACE) {
+    throw new Error('KML/KMZ exports belong to the Severe workspace. Switch to Severe to export GIS geometry.');
+  }
+};
+
 /** Exports a forecast using the requested transfer format and scope. */
 export const exportForecastTransfer = async (request: ForecastExportRequest): Promise<void> => {
   const {
@@ -44,6 +53,8 @@ export const exportForecastTransfer = async (request: ForecastExportRequest): Pr
     outlookTypes,
     workspaceId,
   } = request;
+
+  assertSevereKmlExport(format, workspaceId);
 
   if (format === 'json') {
     downloadWorkspaceJsonTransfer({ forecastCycle, mapView, cycleMetadata, workspaceId });

@@ -1,10 +1,11 @@
 import { createFileHandlers } from './useFileLoader';
 import { waitFor } from '@testing-library/react';
-import { deserializeForecast, exportForecastToJson, readForecastImportFile, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
-import { deserializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { deserializeForecast, downloadBlob, readForecastImportFile, validateForecastData, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 
 jest.mock('../utils/fileUtils', () => ({
   deserializeForecast: jest.fn(),
+  downloadBlob: jest.fn(),
   exportForecastToJson: jest.fn(),
   readForecastImportFile: jest.fn(),
   validateForecastData: jest.fn(),
@@ -13,6 +14,7 @@ jest.mock('../utils/fileUtils', () => ({
 
 jest.mock('../utils/forecastWorkspacePersistenceAdapter', () => ({
   deserializeForecastWorkspace: jest.fn(),
+  serializeForecastWorkspace: jest.fn(),
 }));
 
 jest.mock('../utils/workflowPackage', () => ({
@@ -22,9 +24,10 @@ jest.mock('../utils/workflowPackage', () => ({
 const mockValidateForecastData = validateForecastData as jest.MockedFunction<typeof validateForecastData>;
 const mockValidateForecastDataReason = validateForecastDataReason as jest.MockedFunction<typeof validateForecastDataReason>;
 const mockDeserializeForecast = deserializeForecast as jest.MockedFunction<typeof deserializeForecast>;
-const mockExportForecastToJson = exportForecastToJson as jest.MockedFunction<typeof exportForecastToJson>;
+const mockDownloadBlob = downloadBlob as jest.MockedFunction<typeof downloadBlob>;
 const mockReadForecastImportFile = readForecastImportFile as jest.MockedFunction<typeof readForecastImportFile>;
 const mockDeserializeWorkspace = deserializeForecastWorkspace as jest.MockedFunction<typeof deserializeForecastWorkspace>;
+const mockSerializeWorkspace = serializeForecastWorkspace as jest.MockedFunction<typeof serializeForecastWorkspace>;
 
 describe('createFileHandlers', () => {
   const forecastCycle = { id: 'cycle-1' };
@@ -39,6 +42,8 @@ describe('createFileHandlers', () => {
     mockValidateForecastDataReason.mockReturnValue(null);
     mockDeserializeForecast.mockReturnValue({ id: 'loaded-cycle' } as never);
     mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecastCycle: { id: 'loaded-cycle' }, legacy: true } as never);
+    mockSerializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecast: { id: 'saved' } } as never);
+    mockDownloadBlob.mockImplementation(() => undefined);
     mockReadForecastImportFile.mockImplementation(async (file) => JSON.parse(await file.text()) as unknown);
     const { isWorkflowExportPackage } = require('../utils/workflowPackage') as { isWorkflowExportPackage: jest.Mock };
     isWorkflowExportPackage.mockReturnValue(false);
@@ -124,19 +129,45 @@ describe('createFileHandlers', () => {
     expect(click).toHaveBeenCalled();
   });
 
+  it('rejects a package with a present-but-unknown outer workspace instead of falling back', async () => {
+    const { isWorkflowExportPackage } = require('../utils/workflowPackage') as { isWorkflowExportPackage: jest.Mock };
+    isWorkflowExportPackage.mockReturnValue(true);
+    mockDeserializeWorkspace.mockReturnValue({ workspaceId: 'severe', forecastCycle: { id: 'inner' }, legacy: false } as never);
+    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'severe' });
+    const file = createTextFile(JSON.stringify({ workspaceId: 'bogus', forecast: { version: 1 } }));
+
+    await handlers.handleLoad(file);
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('unknown workspace'), 'error');
+  });
+
+  it('rejects a noncanonical outer workspace declaration', async () => {
+    const { isWorkflowExportPackage } = require('../utils/workflowPackage') as { isWorkflowExportPackage: jest.Mock };
+    isWorkflowExportPackage.mockReturnValue(true);
+    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'severe' });
+    const file = createTextFile(JSON.stringify({ workspaceId: 'Severe', forecast: { version: 1 } }));
+
+    await handlers.handleLoad(file);
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('unknown workspace'), 'error');
+  });
+
   it('exports the current cycle and reports export failures', () => {
-    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never });
+    const handlers = createFileHandlers({ addToast, dispatch, forecastCycle: forecastCycle as never, workspaceId: 'custom' });
 
     handlers.handleSave();
 
-    expect(mockExportForecastToJson).toHaveBeenCalledWith(forecastCycle, {
+    expect(mockSerializeWorkspace).toHaveBeenCalledWith('custom', forecastCycle, {
       center: [39.8283, -98.5795],
       zoom: 4,
     }, undefined);
+    expect(mockDownloadBlob).toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/markAsSaved' }));
     expect(addToast).toHaveBeenCalledWith('Forecast exported to JSON!', 'success');
 
-    mockExportForecastToJson.mockImplementationOnce(() => {
+    mockDownloadBlob.mockImplementationOnce(() => {
       throw new Error('download failed');
     });
     handlers.handleSave();

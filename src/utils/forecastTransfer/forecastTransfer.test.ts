@@ -281,6 +281,7 @@ describe('forecastTransfer', () => {
       forecastCycle,
       mapView: { center: [39.8, -98.5], zoom: 4 },
       day: 1,
+      workspaceId: 'severe',
     });
 
     expect(createObjectURL).toHaveBeenCalled();
@@ -290,5 +291,42 @@ describe('forecastTransfer', () => {
     appendChild.mockRestore();
     removeChild.mockRestore();
     jest.restoreAllMocks();
+  });
+
+  test('rejects non-Severe KML/KMZ exports so Custom cannot create Severe-owned geometry', async () => {
+    const forecastCycle = buildForecast();
+    const mapView = { center: [39.8, -98.5] as [number, number], zoom: 4 };
+
+    await expect(exportForecastTransfer({
+      format: 'kml',
+      scope: 'cycle',
+      forecastCycle,
+      mapView,
+      workspaceId: 'custom',
+    })).rejects.toThrow('Severe workspace');
+
+    await expect(exportForecastTransfer({
+      format: 'kmz',
+      scope: 'cycle',
+      forecastCycle,
+      mapView,
+      workspaceId: 'custom',
+    })).rejects.toThrow('Severe workspace');
+  });
+
+  test('rejects workflow packages with present-but-unknown or noncanonical outer workspaces', async () => {
+    const bare = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const basePkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'severe', exportedAt: '2026-08-18T12:00:00.000Z' });
+
+    for (const badWorkspace of ['bogus', 'Severe', 'SEVERE', 42]) {
+      const pkg = { ...basePkg, workspaceId: badWorkspace };
+      const zip = new JSZip();
+      zip.file('workflow_package.json', JSON.stringify(pkg));
+      const bytes = await zip.generateAsync({ type: 'uint8array' });
+      const buffer = Uint8Array.from(bytes).buffer;
+      const file = new File([buffer], 'bad-outer.zip', { type: 'application/zip' });
+      file.arrayBuffer = async () => buffer;
+      await expect(importForecastTransfer(file)).rejects.toThrow('unknown workspace');
+    }
   });
 });
