@@ -7,6 +7,8 @@ import reducer, {
 } from './forecastSlice';
 import { applyCreateOutlookUpdate } from './forecastVersioning';
 import type { WorkflowMetadata } from '../types/workflow';
+import { CUSTOM_PRODUCTS_SCHEMA_VERSION, type CustomLayerCollection } from '../types/customProducts';
+import { asCustomLayerId } from '../lib/customProducts';
 
 const seamWorkflowTemplate: WorkflowMetadata = {
   id: 'severe-day1',
@@ -59,6 +61,47 @@ const runSeamUpdate = (state: SeamState, now: string): SeamState =>
     applyCreateOutlookUpdate(draft, now);
   });
 
+const createCustomLayersFixture = (): CustomLayerCollection => ({
+  schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+  layers: [
+    {
+      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+      id: asCustomLayerId('seam-custom-layer'),
+      label: 'Seam custom',
+      order: 0,
+      categories: [
+        {
+          id: 'seam-category' as never,
+          label: 'Seam category',
+          order: 0,
+          style: {
+            fillColor: '#22c55e',
+            fillOpacity: 0.5,
+            strokeColor: '#111827',
+            strokeOpacity: 1,
+            strokeWidth: 2,
+            hatch: 'none',
+          },
+        },
+      ],
+      features: [],
+      createdAt: '2026-07-04T12:00:00.000Z',
+      updatedAt: '2026-07-04T12:00:00.000Z',
+    },
+  ],
+});
+
+const withCustomLayers = (state: SeamState, customLayers: CustomLayerCollection): SeamState =>
+  produce(state, (draft) => {
+    draft.forecastCycle.days[1]!.customLayers = customLayers;
+  });
+
+const getLiveCustomLayers = (state: SeamState): CustomLayerCollection =>
+  state.forecastCycle.days[1]!.customLayers!;
+
+const getSnapshotCustomLayers = (state: SeamState): CustomLayerCollection =>
+  state.outlookVersionSnapshots[0]!.days[1]!.customLayers!;
+
 describe('applyCreateOutlookUpdate seam', () => {
   it('transitions version, status, and timestamps', () => {
     const next = runSeamUpdate(withAcknowledgement(startPopulatedCycle()), seamNow);
@@ -100,6 +143,19 @@ describe('applyCreateOutlookUpdate seam', () => {
 
     expect(snapshotFeature).not.toBe(liveFeature);
     expect(snapshotFeature).toEqual(liveFeature);
+  });
+
+  it('clones customLayers into snapshots', () => {
+    const customLayers = createCustomLayersFixture();
+    const base = withCustomLayers(withAcknowledgement(startPopulatedCycle()), customLayers);
+    const next = runSeamUpdate(base, seamNow);
+    const live = getLiveCustomLayers(next);
+    const snapshot = getSnapshotCustomLayers(next);
+
+    expect(snapshot).toEqual(live);
+    expect(snapshot).not.toBe(live);
+    expect(snapshot.layers).toEqual(live.layers);
+    expect(snapshot.layers).not.toBe(live.layers);
   });
 
   it('invalidates completion acknowledgement', () => {
