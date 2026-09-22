@@ -542,7 +542,7 @@ describe('ForecastPage helpers', () => {
 
     const saveCycle = jest.fn().mockResolvedValue(true);
     dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(true);
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(true);
     expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true, workspaceId: 'severe' });
     expect(clearCurrent).toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -550,7 +550,7 @@ describe('ForecastPage helpers', () => {
     saveCycle.mockResolvedValueOnce(false);
     clearCurrent.mockClear();
     dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(false);
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(false);
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
     exportSpy.mockRestore();

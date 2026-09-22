@@ -41,6 +41,8 @@ describe('forecast workspace route contract', () => {
     expect(resolveRouteForecastWorkspace('/')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/cloud')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/discussion')).toBeUndefined();
+    expect(resolveRouteForecastWorkspace('/verification')).toBeUndefined();
+    expect(resolveRouteForecastWorkspace('/monitor')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/forecast/unknown')).toBeUndefined();
     // Canonical routes tolerate bookmarked trailing slashes.
     expect(resolveRouteForecastWorkspace('/forecast/severe/')?.id).toBe('severe');
