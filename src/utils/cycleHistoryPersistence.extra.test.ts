@@ -54,6 +54,28 @@ describe('cycleHistoryPersistence', () => {
     expect(fileUtils.deserializeForecast).toHaveBeenCalled();
   });
 
+  test('defaults malformed persisted workspace metadata to Severe', async () => {
+    jest.doMock('./fileUtils', () => ({
+      serializeForecast: jest.fn(() => ({ serialized: true })),
+      deserializeForecast: jest.fn(() => ({ restored: true })),
+    }));
+    jest.doMock('./forecastMetrics', () => ({
+      countForecastMetrics: jest.fn(() => ({ total: 1 })),
+    }));
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
+      id: 'malformed-workspace',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastData: { serialized: true },
+      workspaceId: 'not-a-workspace',
+      stats: { total: 1 },
+    }]));
+
+    const mod = await import('./cycleHistoryPersistence');
+    expect(mod.loadCycleHistoryFromStorage()[0]?.workspaceId).toBe('severe');
+  });
+
   test('persists lifetime stats separately from the capped retained cycles', async () => {
     jest.doMock('./fileUtils', () => ({
       serializeForecast: jest.fn(() => ({ serialized: true })),
