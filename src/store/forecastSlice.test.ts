@@ -1,3 +1,4 @@
+// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import type { Feature, Polygon } from 'geojson';
 import type { DayType } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
@@ -33,6 +34,7 @@ import reducer, {
   createOutlookUpdate,
   startFromPreviousCycle,
   saveCurrentCycle,
+  setForecastWorkspace,
   deleteSavedCycle,
   loadCycleHistory,
   SAVED_CYCLES_LIMIT,
@@ -316,6 +318,48 @@ const getRedoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
 
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module", disable:"Code Duplication")
 describe('forecastSlice undo/redo', () => {
+  test('records the active workspace on saved cycles', () => {
+    let state = reducer(undefined, setForecastWorkspace('custom'));
+    state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
+
+    expect(state.workspaceId).toBe('custom');
+    expect(state.savedCycles[0]?.workspaceId).toBe('custom');
+  });
+
+  test('ignores an invalid workspace action and keeps Severe active', () => {
+    const state = reducer(undefined, setForecastWorkspace('not-a-workspace' as never));
+
+    expect(state.workspaceId).toBe('severe');
+  });
+
+  test('normalizes missing workspace ownership on history hydration to Severe', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    state = reducer(state, saveCurrentCycle({ label: 'Legacy cycle' }));
+    const legacyCycle = { ...state.savedCycles[0] };
+    delete (legacyCycle as { workspaceId?: string }).workspaceId;
+
+    const hydrated = reducer(undefined, loadCycleHistory([legacyCycle]));
+    expect(hydrated.savedCycles[0]?.workspaceId).toBe('severe');
+  });
+
+  test('normalizes malformed workspace ownership on history hydration to Severe', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    state = reducer(state, saveCurrentCycle({ label: 'Direct cycle' }));
+    const malformedCycle = {
+      ...state.savedCycles[0],
+      workspaceId: 'not-a-workspace',
+    };
+
+    const hydratedArray = reducer(undefined, loadCycleHistory([malformedCycle as never]));
+    expect(hydratedArray.savedCycles[0]?.workspaceId).toBe('severe');
+
+    const hydratedSnapshot = reducer(undefined, loadCycleHistory({
+      cycles: [malformedCycle as never],
+      lifetimeCycleStats: { totalCyclesMade: 1, totalForecastsMade: 0 },
+    }));
+    expect(hydratedSnapshot.savedCycles[0]?.workspaceId).toBe('severe');
+  });
+
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
     let state = reducer(undefined, { type: 'test/init' });
     for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {

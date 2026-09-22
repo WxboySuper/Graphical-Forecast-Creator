@@ -1,3 +1,4 @@
+// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import '../immerSetup';
 import { isDraft, original } from 'immer';
 import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
@@ -30,6 +31,11 @@ import {
   countCopyableSourceFeatures,
   type CopyOutlookGeometryOptions,
 } from '../utils/outlookGeometryCopy';
+import {
+  DEFAULT_FORECAST_WORKSPACE,
+  getForecastWorkspace,
+  type ForecastWorkspaceId,
+} from '../config/forecastWorkspaces';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -44,6 +50,8 @@ export interface SavedCycle {
   label?: string;
   forecastCycle: ForecastCycle;
   stats: SavedCycleStats;
+  /** Product workspace that owns this local saved cycle. Legacy records default to Severe. */
+  workspaceId?: ForecastWorkspaceId;
   /** v2 workflow metadata for the cycle (optional, present for workflow-imported cycles). */
   workflowMetadata?: CycleMetadata;
 }
@@ -61,6 +69,8 @@ export interface LifetimeCycleStats {
 }
 
 export interface ForecastState {
+  /** Product workspace currently owning the active forecast state. */
+  workspaceId: ForecastWorkspaceId;
   forecastCycle: ForecastCycle;
   /** Bumps on every whole-cycle replacement so async work can detect the active document changed. */
   cycleGeneration: number;
@@ -339,8 +349,15 @@ const advanceCycleGeneration = (state: ForecastState) => {
   state.cycleGeneration = (state.cycleGeneration ?? 0) + 1;
 };
 
+/** Normalizes hydrated cycle ownership so direct or legacy payloads cannot bypass Severe fallback. */
+const normalizeCycleWorkspace = (cycle: SavedCycle): SavedCycle => ({
+  ...cycle,
+  workspaceId: getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE,
+});
+
 const initialState: ForecastState = {
   cycleGeneration: 1,
+  workspaceId: DEFAULT_FORECAST_WORKSPACE,
   forecastCycle: {
     days: {
       1: createEmptyOutlook(1, INITIAL_TIMESTAMP)
@@ -1028,6 +1045,12 @@ export const forecastSlice = createSlice({
     },
 
     // Cycle History Management
+    setForecastWorkspace: (state, action: PayloadAction<ForecastWorkspaceId>) => {
+      if (getForecastWorkspace(action.payload)) {
+        state.workspaceId = action.payload;
+      }
+    },
+
     saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {
       const forecastCycleSnapshot = cloneForecastCycle(state.forecastCycle);
       const now = readActionTimestamp(action);
@@ -1038,6 +1061,7 @@ export const forecastSlice = createSlice({
         label: action.payload.label,
         forecastCycle: forecastCycleSnapshot,
         stats: countForecastMetrics(forecastCycleSnapshot),
+        workspaceId: state.workspaceId,
         workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
@@ -1135,7 +1159,7 @@ export const forecastSlice = createSlice({
     // Load cycles from storage (for hydration)
     loadCycleHistory: (state, action: PayloadAction<SavedCycle[] | CycleHistoryLoad>) => {
       const cycles = Array.isArray(action.payload) ? action.payload : action.payload.cycles;
-      state.savedCycles = cycles.slice(-SAVED_CYCLES_LIMIT);
+      state.savedCycles = cycles.slice(-SAVED_CYCLES_LIMIT).map(normalizeCycleWorkspace);
       state.lifetimeCycleStats = Array.isArray(action.payload)
         ? {
             totalCyclesMade: cycles.length,
@@ -1550,6 +1574,7 @@ export const {
   setForecastDay,
   setCycleDate,
   setEmergencyMode,
+  setForecastWorkspace,
   updateDiscussionDraft,
   migrateDiscussionDrafts,
   updateDiscussion,
