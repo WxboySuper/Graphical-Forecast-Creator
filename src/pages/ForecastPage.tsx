@@ -218,6 +218,59 @@ const LegacyForecastNotice: React.FC<{ onDismiss: () => void }> = ({ onDismiss }
 
 const LEGACY_FORECAST_NOTICE_SESSION_KEY = 'gfc:legacy-forecast-notice';
 
+const hasPersistedLegacyForecastNotice = (): boolean => {
+  try {
+    return window.sessionStorage.getItem(LEGACY_FORECAST_NOTICE_SESSION_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const persistLegacyForecastNotice = (): void => {
+  try {
+    window.sessionStorage.setItem(LEGACY_FORECAST_NOTICE_SESSION_KEY, 'true');
+  } catch {
+    // Router state still displays the notice when session storage is unavailable.
+  }
+};
+
+const clearPersistedLegacyForecastNotice = (): void => {
+  try {
+    window.sessionStorage.removeItem(LEGACY_FORECAST_NOTICE_SESSION_KEY);
+  } catch {
+    // Dismissing the notice must still work when session storage is unavailable.
+  }
+};
+
+const useLegacyForecastNotice = (
+  location: ReturnType<typeof useLocation>,
+  navigate: ReturnType<typeof useNavigate>,
+  workspaceRef: React.RefObject<HTMLDivElement | null>,
+): [boolean, () => void] => {
+  const locationState = location.state && typeof location.state === 'object'
+    ? location.state as Record<string, unknown>
+    : {};
+  const hasLegacyRedirectMarker = Boolean(locationState.legacyForecastRedirect);
+  const showLegacyNotice = hasLegacyRedirectMarker || hasPersistedLegacyForecastNotice();
+
+  useEffect(() => {
+    if (hasLegacyRedirectMarker) persistLegacyForecastNotice();
+  }, [hasLegacyRedirectMarker]);
+
+  const dismissLegacyNotice = () => {
+    workspaceRef.current?.focus();
+    clearPersistedLegacyForecastNotice();
+    const currentState = { ...locationState };
+    delete currentState.legacyForecastRedirect;
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: location.hash },
+      { replace: true, state: Object.keys(currentState).length > 0 ? currentState : null },
+    );
+  };
+
+  return [showLegacyNotice, dismissLegacyNotice];
+};
+
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
 const INCREASE_PROBABILITY_KEYS = new Set(['arrowup', 'arrowright']);
 type ShortcutDispatch = Dispatch<UnknownAction>;
@@ -741,24 +794,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const navigate = useNavigate();
   const location = useLocation();
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const locationState = location.state && typeof location.state === 'object'
-    ? location.state as Record<string, unknown>
-    : {};
-  const hasLegacyRedirectMarker = Boolean(locationState.legacyForecastRedirect);
-  const showLegacyNotice = hasLegacyRedirectMarker || window.sessionStorage.getItem(LEGACY_FORECAST_NOTICE_SESSION_KEY) === 'true';
-  useEffect(() => {
-    if (hasLegacyRedirectMarker) window.sessionStorage.setItem(LEGACY_FORECAST_NOTICE_SESSION_KEY, 'true');
-  }, [hasLegacyRedirectMarker]);
-  const dismissLegacyNotice = () => {
-    workspaceRef.current?.focus();
-    window.sessionStorage.removeItem(LEGACY_FORECAST_NOTICE_SESSION_KEY);
-    const currentState = { ...locationState };
-    delete currentState.legacyForecastRedirect;
-    navigate(
-      { pathname: location.pathname, search: location.search, hash: location.hash },
-      { replace: true, state: Object.keys(currentState).length > 0 ? currentState : null },
-    );
-  };
+  const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(location, navigate, workspaceRef);
   const { addToast } = useOutletContext<PageContext>();
   const { syncedSettings, user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
