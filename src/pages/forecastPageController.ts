@@ -15,7 +15,9 @@ import {
   selectForecastCycle,
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
-import { deserializeForecast, downloadBlob, readForecastImportFile, serializeForecast, validateForecastDataReason } from '../utils/fileUtils';
+import { downloadBlob, readForecastImportFile, serializeForecast, validateForecastDataReason } from '../utils/fileUtils';
+import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
+import type { ForecastCycle } from '../types/outlooks';
 import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getForecastDataFromWorkspacePayload, type ForecastWorkspacePayload } from '../utils/forecastWorkspacePersistence';
@@ -44,9 +46,9 @@ export type ShortcutDispatch = Dispatch<UnknownAction>;
 interface LoadedForecastPayload {
   rawData: {
     mapView?: { center: [number, number]; zoom: number };
-    cycleMetadata?: import('../types/workflow').CycleMetadata;
+    cycleMetadata?: import('../types/workflow').CycleMetadata | null;
   };
-  deserializedCycle: ReturnType<typeof deserializeForecast>;
+  deserializedCycle: ForecastCycle;
 }
 
 interface StoredCloudMeta {
@@ -73,10 +75,11 @@ const getForecastImportErrorMessage = (file: File, error: unknown): string => {
   return error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.';
 };
 
-/** Reads and validates one forecast JSON file. */
+/** Reads and validates one forecast JSON file through the workspace-aware import pipeline. */
 export const parseLoadedForecast = async (
   file: File,
   addToast: AddToastFn,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): Promise<LoadedForecastPayload | null> => {
   let data: unknown;
   try {
@@ -92,9 +95,22 @@ export const parseLoadedForecast = async (
     return null;
   }
 
+  let resolved: ReturnType<typeof resolveNativeFileContent>;
+  try {
+    resolved = resolveNativeFileContent(data);
+  } catch (error) {
+    addToast(error instanceof Error ? error.message : 'File is not a valid forecast or workflow package.', 'error');
+    return null;
+  }
+
+  if (resolved.workspaceId !== workspaceId) {
+    addToast(`This forecast belongs to the ${resolved.workspaceId} workspace. Open it there before importing it.`, 'error');
+    return null;
+  }
+
   return {
-    rawData: data as LoadedForecastPayload['rawData'],
-    deserializedCycle: deserializeForecast(data),
+    rawData: { mapView: resolved.mapView, cycleMetadata: resolved.cycleMetadata },
+    deserializedCycle: resolved.forecastCycle,
   };
 };
 

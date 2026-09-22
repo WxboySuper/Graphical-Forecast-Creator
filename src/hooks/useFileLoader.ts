@@ -14,11 +14,12 @@ import type { Dispatch } from 'redux';
 import type { CycleMetadata, ForecastCycle } from '../types/outlooks';
 
 /** Creates save and load file handler functions bound to the given toast notifier, Redux dispatch, and current forecast state. */
-export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMetadata, workspaceId = DEFAULT_FORECAST_WORKSPACE }: {
+export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMetadata, mapView, workspaceId = DEFAULT_FORECAST_WORKSPACE }: {
   addToast: AddToastFn;
   dispatch: Dispatch;
   forecastCycle: ForecastCycle;
   cycleMetadata?: CycleMetadata;
+  mapView?: { center: [number, number]; zoom: number };
   workspaceId?: ForecastWorkspaceId;
 }) {
   const fileInputRef = { current: null as HTMLInputElement | null } as React.MutableRefObject<HTMLInputElement | null>;
@@ -103,7 +104,7 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
       const payload = serializeForecastWorkspace(
         workspaceId,
         forecastCycle,
-        {
+        mapView ?? {
           center: [39.8283, -98.5795],
           zoom: 4,
         },
