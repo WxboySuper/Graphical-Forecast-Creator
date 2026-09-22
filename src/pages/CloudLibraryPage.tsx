@@ -13,6 +13,7 @@ import { CloudCycleMetadata } from '../types/cloudCycles';
 import { getBuildTarget } from '../config/buildTarget';
 import {
   filterCloudCyclesByWorkspace,
+  getCloudCycleWorkspaceId,
   getCloudLibraryTabs,
   type CloudLibraryTab,
   type CloudLibraryTabId,
@@ -531,6 +532,7 @@ const CloudLibraryTabs: React.FC<{
     {tabs.map((tab) => (
       <Button
         key={tab.id}
+        id={`cloud-library-tab-${tab.id}`}
         role="tab"
         aria-selected={activeTab === tab.id}
         aria-controls="cloud-library-panel"
@@ -538,6 +540,15 @@ const CloudLibraryTabs: React.FC<{
         variant={activeTab === tab.id ? 'default' : 'outline'}
         className="cloud-library-tab"
         onClick={() => onTabChange(tab.id)}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+          event.preventDefault();
+          const currentIndex = tabs.findIndex((candidate) => candidate.id === tab.id);
+          const offset = event.key === 'ArrowRight' ? 1 : -1;
+          const nextTab = tabs[(currentIndex + offset + tabs.length) % tabs.length];
+          onTabChange(nextTab.id);
+          requestAnimationFrame(() => document.getElementById(`cloud-library-tab-${nextTab.id}`)?.focus());
+        }}
       >
         <span>{tab.label}</span>
         <Badge variant={activeTab === tab.id ? 'secondary' : 'outline'}>{tab.cycleCount}</Badge>
@@ -713,7 +724,7 @@ const useCloudLibraryActions = ({
   const handleLoadCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
-    const workspaceId = selectedCycle?.workspaceId ?? 'severe';
+    const workspaceId = getCloudCycleWorkspaceId(selectedCycle ?? { workspaceId: undefined });
     if (workspaceId !== 'severe') {
       setMessage('Workspace-specific cloud loading is not available yet.');
       return;
