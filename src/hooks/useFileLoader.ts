@@ -12,19 +12,34 @@ import type { AddToastFn } from '../components/Layout';
 import type { Dispatch } from 'redux';
 import type { CycleMetadata, ForecastCycle } from '../types/outlooks';
 
+/** Reads the canonical outer workspace declared by a workflow package, if it names one. */
+const resolvePackageOuterWorkspace = (data: { workspaceId?: unknown }): ForecastWorkspaceId | null => {
+  if (typeof data.workspaceId !== 'string') return null;
+  if (getForecastWorkspace(data.workspaceId) === undefined) return null;
+  return data.workspaceId as ForecastWorkspaceId;
+};
+
+/** Throws when an explicit outer owner disagrees with a non-legacy inner forecast. */
+const assertPackageWorkspaceMatch = (
+  outer: ForecastWorkspaceId | null,
+  restored: ReturnType<typeof deserializeForecastWorkspace>,
+): void => {
+  if (outer && !restored.legacy && outer !== restored.workspaceId) {
+    throw new Error('This workflow package declares a workspace that does not match its forecast.');
+  }
+};
+
+/** Returns the workspace that owns a workflow package, with the outer envelope as canonical. */
+const resolvePackageWorkspace = (data: { workspaceId?: unknown; forecast: unknown }): ForecastWorkspaceId => {
+  const outer = resolvePackageOuterWorkspace(data);
+  const restored = deserializeForecastWorkspace(data.forecast);
+  assertPackageWorkspaceMatch(outer, restored);
+  return outer ?? restored.workspaceId;
+};
+
 /** Returns the workspace that owns a loaded file, with the package outer envelope as canonical. */
 const resolveLoadedFileWorkspace = (data: unknown): ForecastWorkspaceId => {
-  if (isWorkflowExportPackage(data)) {
-    const outer = typeof (data as { workspaceId?: unknown }).workspaceId === 'string'
-      && getForecastWorkspace((data as { workspaceId: string }).workspaceId) !== undefined
-      ? (data as { workspaceId: ForecastWorkspaceId }).workspaceId
-      : null;
-    const restored = deserializeForecastWorkspace(data.forecast);
-    if (outer && !restored.legacy && outer !== restored.workspaceId) {
-      throw new Error('This workflow package declares a workspace that does not match its forecast.');
-    }
-    return outer ?? restored.workspaceId;
-  }
+  if (isWorkflowExportPackage(data)) return resolvePackageWorkspace(data);
   return deserializeForecastWorkspace(data).workspaceId;
 };
 
