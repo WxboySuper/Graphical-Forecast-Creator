@@ -49,7 +49,6 @@ import reducer, {
   toggleSignificant,
 } from './forecastSlice';
 import { getFallbackOutlookData } from './forecastStateFactory';
-import { applyCreateOutlookUpdate } from './forecastVersioning';
 
 const createPolygon = (offset: number): Polygon => ({
   type: 'Polygon',
@@ -1413,7 +1412,6 @@ describe('forecastSlice undo/redo', () => {
     });
   });
 });
-
 describe('deleteSavedCycle workspace ownership', () => {
   const initialState = reducer(undefined, { type: '@@INIT' });
   const savedCycle = (id: string, workspaceId: 'severe' | 'custom') => ({
