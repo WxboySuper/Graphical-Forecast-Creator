@@ -82,16 +82,18 @@ export const selectPreferredAutoSaveValue = (
  * On sign-in, reconcile live editor state with scoped storage, but never promote unscoped legacy over an
  * existing account autosave on shared browsers.
  */
-const migrateSevereLegacyAutoSave = (
+const migrateWorkspaceAutoSave = (
   userId?: string | null,
   liveSession?: unknown,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): void => {
   if (!userId) return;
 
   try {
-    const scopedKey = getAutoSaveStorageKey(userId);
+    const scopedKey = getAutoSaveStorageKey(userId, workspaceId);
     const scopedValue = localStorage.getItem(scopedKey);
-    const legacyValue = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const anonymousKey = getWorkspaceAutoSaveBaseKey(workspaceId);
+    const legacyValue = localStorage.getItem(anonymousKey);
 
     if (liveSession !== undefined) {
       if (scopedValue === null) {
@@ -101,7 +103,7 @@ const migrateSevereLegacyAutoSave = (
           localStorage.setItem(scopedKey, preferred);
         }
         if (legacyValue !== null) {
-          localStorage.removeItem(LOCAL_STORAGE_KEY);
+          localStorage.removeItem(anonymousKey);
         }
       }
       return;
@@ -109,7 +111,7 @@ const migrateSevereLegacyAutoSave = (
 
     if (scopedValue === null && legacyValue !== null) {
       localStorage.setItem(scopedKey, legacyValue);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      localStorage.removeItem(anonymousKey);
     }
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.
@@ -117,18 +119,16 @@ const migrateSevereLegacyAutoSave = (
 };
 
 /**
- * Migrates the legacy Severe snapshot into the account scope.
- * Non-Severe workspace migration remains disabled until those workspaces have
- * an explicit account migration contract, preventing accidental promotion of
- * an anonymous snapshot into the wrong account scope.
+ * Migrates the anonymous workspace snapshot into the account scope.
+ * Each workspace migrates only its own anonymous key into its own account
+ * scope, so a non-Severe draft is never promoted into the Severe scope.
  */
 export const migrateLegacyAutoSave = (
   userId?: string | null,
   liveSession?: unknown,
   workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): void => {
-  if (workspaceId !== DEFAULT_FORECAST_WORKSPACE) return;
-  migrateSevereLegacyAutoSave(userId, liveSession);
+  migrateWorkspaceAutoSave(userId, liveSession, workspaceId);
 };
 
 /** Debounces forecast edits into the current anonymous or account-scoped autosave. */

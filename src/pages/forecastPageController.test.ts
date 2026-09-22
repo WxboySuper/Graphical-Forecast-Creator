@@ -35,6 +35,9 @@ describe('forecastPageController', () => {
     expect(hasRestorableCloudSelection({ id: 'abc' })).toBe(false);
     expect(buildRestoreKey(null)).toBe('anonymous');
     expect(buildRestoreKey('user-1')).toBe('user-1');
+    // Restore keys are workspace-scoped so switching products re-runs restore.
+    expect(buildRestoreKey('user-1', 'custom')).toBe('user-1:custom');
+    expect(buildRestoreKey(null, 'custom')).toBe('anonymous:custom');
   });
 
   test('accepts matching envelopes and rejects cross-workspace envelopes', () => {
@@ -114,6 +117,15 @@ describe('forecastPageController', () => {
     })).toBe(true);
     expect(clearCurrent).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledTimes(1);
+    // Rollover cloud saves carry the active workspace by default.
+    expect(saveCycle).toHaveBeenLastCalledWith(
+      expect.any(String),
+      forecastCycle.cycleDate,
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      expect.objectContaining({ saveAsNew: true, workspaceId: 'severe' }),
+    );
 
     saveCycle.mockResolvedValueOnce(false);
     clearCurrent.mockClear();

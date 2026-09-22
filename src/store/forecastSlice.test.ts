@@ -362,6 +362,22 @@ describe('forecastSlice undo/redo', () => {
     expect(hydratedSnapshot.savedCycles[0]?.workspaceId).toBe('severe');
   });
 
+  test('resets the stale document when the route switches workspaces', () => {
+    let state = reducer(undefined, saveCurrentCycle({ label: 'Severe cycle' }));
+    const severeCycle = state.forecastCycle;
+    state = reducer(state, setForecastWorkspace('custom'));
+
+    expect(state.workspaceId).toBe('custom');
+    expect(state.forecastCycle).not.toBe(severeCycle);
+    expect(state.savedCycles).toHaveLength(1);
+    expect(state.isSaved).toBe(false);
+
+    // Re-dispatching the active workspace is a no-op and keeps the document.
+    const beforeNoop = state.forecastCycle;
+    state = reducer(state, setForecastWorkspace('custom'));
+    expect(state.forecastCycle).toBe(beforeNoop);
+  });
+
   test('memoizes workspace cycle selection across unrelated state changes', () => {
     const state = { forecast: reducer(undefined, { type: '@@INIT' }) } as Parameters<typeof selectSavedCyclesForActiveWorkspace>[0];
     const first = selectSavedCyclesForActiveWorkspace(state);

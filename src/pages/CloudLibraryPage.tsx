@@ -10,7 +10,17 @@ import { useEntitlement } from '../billing/EntitlementProvider';
 import { PRICING_COPY } from '../billing/pricingCopy';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
+import type { GFCForecastSaveData } from '../types/outlooks';
 import { getBuildTarget } from '../config/buildTarget';
+import {
+  getForecastWorkspace,
+  isForecastWorkspaceExposed,
+  type ForecastWorkspaceId,
+} from '../config/forecastWorkspaces';
+import {
+  classifyForecastWorkspacePayload,
+  createForecastWorkspaceSave,
+} from '../utils/forecastWorkspacePersistence';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -679,6 +689,17 @@ const CloudLibrarySignedInLayout: React.FC<{
   </div>
 );
 
+/** Builds the session payload for a cloud handoff without double-wrapping an envelope. */
+export const buildCloudSessionPayload = (
+  workspaceId: ForecastWorkspaceId,
+  payload: unknown,
+): unknown => {
+  const classification = classifyForecastWorkspacePayload(payload);
+  return classification.ok && !classification.legacy
+    ? payload
+    : createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+};
+
 /** Creates the cloud library actions used by the page and keeps transient feedback local. */
 const useCloudLibraryActions = ({
   cycles,
@@ -702,9 +723,11 @@ const useCloudLibraryActions = ({
   const [message, setMessage] = useState<string | null>(null);
 
   const persistCloudCycleToSession = useCallback(
-    (cycleId: string, label: string, payload: unknown): boolean => {
+    (cycleId: string, label: string, workspaceId: ForecastWorkspaceId, payload: unknown): boolean => {
       try {
-        sessionStorage.setItem(payloadKey, JSON.stringify(payload));
+        // Preserve an already-enveloped payload so cloud handoffs never double-wrap.
+        const storable = buildCloudSessionPayload(workspaceId, payload);
+        sessionStorage.setItem(payloadKey, JSON.stringify(storable));
         sessionStorage.setItem(
           metaKey,
           JSON.stringify({
@@ -726,7 +749,11 @@ const useCloudLibraryActions = ({
     setMessage(null);
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
     const workspaceId = getCloudCycleWorkspaceId(selectedCycle ?? { workspaceId: undefined });
-    if (workspaceId !== 'severe') {
+    const workspace = getForecastWorkspace(workspaceId);
+    // Only the registered Severe editor can open cloud payloads today. Unexposed
+    // or unregistered workspaces reuse the existing failure path instead of
+    // navigating to a /forecast/{workspace} route with no editor.
+    if (workspaceId !== 'severe' || !workspace || !isForecastWorkspaceExposed(workspace)) {
       setMessage('Workspace-specific cloud loading is not available yet.');
       return;
     }
@@ -736,7 +763,7 @@ const useCloudLibraryActions = ({
       return;
     }
 
-    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
+    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', workspaceId, payload)) {
       return;
     }
 

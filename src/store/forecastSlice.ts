@@ -1050,9 +1050,33 @@ export const forecastSlice = createSlice({
 
     // Cycle History Management
     setForecastWorkspace: (state, action: PayloadAction<ForecastWorkspaceId>) => {
-      if (getForecastWorkspace(action.payload)) {
-        state.workspaceId = action.payload;
+      const nextWorkspace = getForecastWorkspace(action.payload);
+      if (!nextWorkspace || nextWorkspace.id === state.workspaceId) {
+        return;
       }
+      state.workspaceId = nextWorkspace.id;
+      // Switching products must not leak the previous document, undo stacks,
+      // or discussion drafts into the new workspace. ForecastPage restores the
+      // target workspace autosave or cloud payload on top of this blank slate.
+      const now = readActionTimestamp(action);
+      const today = getActionLocalCalendarDate(action);
+      state.forecastCycle = {
+        days: {
+          1: createEmptyOutlook(1, now),
+        },
+        currentDay: 1,
+        cycleDate: today,
+      };
+      clearHistory(state);
+      state.discussionDraftsByScope = {};
+      state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
+      state.isWorkflowActive = false;
+      state.lastTrimResult = null;
+      state.autoCategoricalError = null;
+      invalidateCompletionAcknowledgement(state);
     },
 
     saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {

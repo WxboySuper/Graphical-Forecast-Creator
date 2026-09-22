@@ -4,7 +4,8 @@ import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
-import CloudLibraryPage from "./CloudLibraryPage";
+import CloudLibraryPage, { buildCloudSessionPayload } from "./CloudLibraryPage";
+import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
 
 jest.mock("../auth/AuthProvider", () => ({
   useAuth: jest.fn(),
@@ -123,6 +124,14 @@ describe("CloudLibraryPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
     expect(loadCycle).not.toHaveBeenCalled();
     expect(screen.getByText("Workspace-specific cloud loading is not available yet.")).toBeInTheDocument();
+  });
+
+  it("does not double-wrap an already-enveloped cloud handoff payload", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
+    expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
+    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe('severe');
   });
 
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
