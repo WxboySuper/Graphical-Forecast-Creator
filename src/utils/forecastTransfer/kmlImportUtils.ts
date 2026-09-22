@@ -45,5 +45,10 @@ const readKmlPayload = async (file: File, bytes?: Uint8Array): Promise<string> =
 export const importKmlTransfer = async (file: File, bytes: Uint8Array | undefined, format: 'kml' | 'kmz', options?: { baseCycle?: ForecastCycle; defaultDay?: DayType }): Promise<ForecastImportResult> => {
   const kml = await readKmlPayload(file, bytes);
   const { placemarks, warnings } = parseKmlDocument(kml, options?.defaultDay ?? options?.baseCycle?.currentDay ?? 1);
-  return { forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle), warnings, format };
+  return {
+    forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle),
+    workspaceId: 'severe',
+    warnings,
+    format,
+  };
 };

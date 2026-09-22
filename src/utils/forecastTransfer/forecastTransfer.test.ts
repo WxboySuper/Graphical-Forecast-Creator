@@ -5,6 +5,9 @@ import { buildStructuredKmlDocument } from '../kmzExport/buildKml';
 import { detectForecastTransferFormat } from './detectFormat';
 import { exportForecastTransfer, importForecastTransfer } from './index';
 import { forecastCycleFromKmlPlacemarks, parseKmlDocument } from './parseKml';
+import { serializeForecast } from '../fileUtils';
+import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
+import { buildWorkflowExportPackage } from '../workflowPackage';
 
 const square = (): Feature<Polygon> => ({
   type: 'Feature',
@@ -88,6 +91,47 @@ describe('forecastTransfer', () => {
     expect(result.format).toBe('kml');
     expect(result.warnings).toEqual([]);
     expect(result.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(2);
+    expect(result.workspaceId).toBe('severe');
+  });
+
+  test('preserves explicit workspace identity for native imports', async () => {
+    const forecast = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const payload = serializeForecastWorkspace('custom', buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const file = new File([JSON.stringify(payload)], 'custom-forecast.json', { type: 'application/json' });
+    file.arrayBuffer = async () => new TextEncoder().encode(JSON.stringify(payload)).buffer;
+
+    const result = await importForecastTransfer(file);
+
+    expect(result.workspaceId).toBe('custom');
+    expect(result.mapView).toEqual(forecast.mapView);
+    expect(result.forecastCycle.cycleDate).toBe(buildForecast().cycleDate);
+  });
+
+  test('preserves workflow package metadata through the workspace classifier', async () => {
+    const forecast = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const cycleMetadata = {
+      id: 'WF-severe-2026-08-18',
+      workflowId: 'severe-day1',
+      cycleDate: '2026-08-18',
+      status: 'in-progress',
+      outlookVersions: [{ version: 1, status: 'in-progress', createdAt: '2026-08-18T00:00:00.000Z' }],
+      createdAt: '2026-08-18T00:00:00.000Z',
+      updatedAt: '2026-08-18T00:00:00.000Z',
+    } as never;
+    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast, cycleMetadata, exportedAt: '2026-08-18T12:00:00.000Z' });
+    const zip = new JSZip();
+    zip.file('workflow_package.json', JSON.stringify(pkg));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const buffer = Uint8Array.from(bytes).buffer;
+    const file = new File([buffer], 'cycle-package.zip', { type: 'application/zip' });
+    file.arrayBuffer = async () => buffer;
+
+    const result = await importForecastTransfer(file);
+
+    expect(result.format).toBe('package');
+    expect(result.workspaceId).toBe('severe');
+    expect(result.cycleMetadata).toEqual(cycleMetadata);
+    expect(result.mapView).toEqual({ center: [39.8, -98.5], zoom: 4 });
   });
 
   test('rejects KMZ files whose expanded KML exceeds the import limit', async () => {

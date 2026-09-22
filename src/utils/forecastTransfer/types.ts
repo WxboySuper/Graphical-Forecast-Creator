@@ -1,5 +1,6 @@
 import type { DayType, ForecastCycle, OutlookType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 /** Supported forecast data transfer formats. */
 export type ForecastTransferFormat = 'json' | 'package' | 'kml' | 'kmz';
@@ -27,6 +28,7 @@ export interface ForecastExportRequest {
 
 export interface ForecastImportResult {
   forecastCycle: ForecastCycle;
+  workspaceId: ForecastWorkspaceId;
   mapView?: ForecastTransferMapView;
   cycleMetadata?: CycleMetadata | null;
   warnings: string[];
