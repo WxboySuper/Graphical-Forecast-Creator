@@ -96,7 +96,19 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByText("Custom save")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
+    expect(screen.getByText("1 cloud cycle")).toBeInTheDocument();
     expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
     expect(screen.getByText("Custom save")).toBeInTheDocument();
+  });
+
+  it("uses workspace-specific empty copy for an empty tab", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }] })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: /Custom 0/i }));
+    expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
 });
