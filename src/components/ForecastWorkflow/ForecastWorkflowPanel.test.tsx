@@ -7,9 +7,14 @@ import ForecastWorkflowPanel, { getYesterdayLocalDate } from './ForecastWorkflow
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, {
   addFeature,
+  saveCurrentCycle,
+  setCycleDate,
+  setForecastDay,
+  setForecastWorkspace,
   startBlankCycle,
   updateDiscussion,
 } from '../../store/forecastSlice';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 jest.mock('lucide-react', () => new Proxy({}, {
   get: () => (props: React.SVGProps<SVGSVGElement>) => <svg {...props} />,
@@ -72,6 +77,42 @@ const renderPanel = (context: 'forecast' | 'discussion', controller?: ForecastWo
   );
 };
 
+const previousOutlookButtonName = /Use .* Day 2/;
+
+interface SeededPreviousOutlook {
+  sourceWorkspace: ForecastWorkspaceId;
+  sourceFeatureId: string;
+  sourceLabel: string;
+}
+
+const renderPanelWithSeededPreviousOutlook = ({
+  sourceWorkspace,
+  sourceFeatureId,
+  sourceLabel,
+}: SeededPreviousOutlook): void => {
+  const store = createCompleteWorkflowStore();
+  store.dispatch(setForecastWorkspace(sourceWorkspace));
+  store.dispatch(setForecastDay(2));
+  store.dispatch(addFeature({ feature: createFeature(sourceFeatureId, 0, 'tornado', '2%') }));
+  store.dispatch(setCycleDate(getYesterdayLocalDate()));
+  store.dispatch(saveCurrentCycle({ label: sourceLabel }));
+  store.dispatch(setForecastWorkspace('severe'));
+  store.dispatch(setForecastDay(1));
+  store.dispatch(startBlankCycle({
+    workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
+    cycleDate: '2026-08-12',
+  }));
+  store.dispatch(setForecastDay(1));
+
+  render(
+    <MemoryRouter>
+      <Provider store={store}>
+        <ForecastWorkflowPanel context="forecast" />
+      </Provider>
+    </MemoryRouter>,
+  );
+};
+
 describe('ForecastWorkflowPanel completion review', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -95,6 +136,28 @@ describe('ForecastWorkflowPanel completion review', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByText('Ready for export')).not.toBeInTheDocument());
+  });
+
+  it('does not suggest a previous outlook from another workspace', () => {
+    renderPanelWithSeededPreviousOutlook({
+      sourceWorkspace: 'custom',
+      sourceFeatureId: 'custom-source',
+      sourceLabel: 'Custom source',
+    });
+
+    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: previousOutlookButtonName })).not.toBeInTheDocument();
+  });
+
+  it('suggests a previous outlook from the active workspace', () => {
+    renderPanelWithSeededPreviousOutlook({
+      sourceWorkspace: 'severe',
+      sourceFeatureId: 'severe-source',
+      sourceLabel: 'Severe source',
+    });
+
+    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: previousOutlookButtonName })).toBeInTheDocument();
   });
 });
 
