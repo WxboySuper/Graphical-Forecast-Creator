@@ -35,6 +35,8 @@ import reducer, {
   startFromPreviousCycle,
   saveCurrentCycle,
   setForecastWorkspace,
+  selectSavedCyclesForActiveWorkspace,
+  loadSavedCycle,
   deleteSavedCycle,
   loadCycleHistory,
   SAVED_CYCLES_LIMIT,
