@@ -17,6 +17,7 @@ import {
   type CloudLibraryTab,
   type CloudLibraryTabId,
 } from './cloudLibraryWorkspace';
+import { getForecastWorkspace } from '../config/forecastWorkspaces';
 import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
 import './CloudLibraryPage.css';
 
@@ -150,13 +151,13 @@ const CloudLibraryUtilityCard: React.FC<{
 );
 
 /** Empty library state with cleaner product-facing calls to action. */
-const EmptyState: React.FC<{ premiumActive: boolean }> = ({ premiumActive }) => (
+const EmptyState: React.FC<{ premiumActive: boolean; workspaceLabel?: string }> = ({ premiumActive, workspaceLabel }) => (
   <div className="cloud-library-empty-state">
     <div className="cloud-library-empty-icon">
       <Cloud className="h-8 w-8" />
     </div>
     <div className="cloud-library-empty-copy">
-      <h2>No cloud cycles saved yet</h2>
+      <h2>No {workspaceLabel ? `${workspaceLabel} ` : ''}cloud cycles saved yet</h2>
       <p>
         {premiumActive
           ? 'Use the cloud save button in the forecast toolbar and your current package will land here.'
@@ -551,6 +552,7 @@ const CloudLibraryMainCard: React.FC<{
   tabs: CloudLibraryTab[];
   activeTab: CloudLibraryTabId;
   premiumActive: boolean;
+  workspaceLabel?: string;
   canWrite: boolean;
   cycleCountLabel: string;
   onLoadCycle: (cycleId: string) => Promise<void>;
@@ -563,6 +565,7 @@ const CloudLibraryMainCard: React.FC<{
   tabs,
   activeTab,
   premiumActive,
+  workspaceLabel,
   canWrite,
   cycleCountLabel,
   onLoadCycle,
@@ -582,7 +585,7 @@ const CloudLibraryMainCard: React.FC<{
           <LoaderCircle className="h-6 w-6 animate-spin" />
         </div>
       ) : cycles.length === 0 ? (
-        <EmptyState premiumActive={premiumActive} />
+        <EmptyState premiumActive={premiumActive} workspaceLabel={workspaceLabel} />
       ) : (
         <>
           <div className="cloud-library-list-header">
@@ -617,6 +620,7 @@ const CloudLibrarySignedInLayout: React.FC<{
   cycles: CloudCycleMetadata[];
   tabs: CloudLibraryTab[];
   activeTab: CloudLibraryTabId;
+  workspaceLabel?: string;
   canWrite: boolean;
   cycleCountLabel: string;
   onLoadCycle: (cycleId: string) => Promise<void>;
@@ -630,6 +634,7 @@ const CloudLibrarySignedInLayout: React.FC<{
   cycles,
   tabs,
   activeTab,
+  workspaceLabel,
   canWrite,
   cycleCountLabel,
   onLoadCycle,
@@ -645,6 +650,7 @@ const CloudLibrarySignedInLayout: React.FC<{
         tabs={tabs}
         activeTab={activeTab}
         premiumActive={premiumActive}
+        workspaceLabel={workspaceLabel}
         canWrite={canWrite}
         cycleCountLabel={cycleCountLabel}
         onLoadCycle={onLoadCycle}
@@ -715,7 +721,8 @@ const useCloudLibraryActions = ({
       return;
     }
 
-    navigate('/forecast');
+    const workspaceId = selectedCycle?.workspaceId ?? 'severe';
+    navigate(workspaceId === 'severe' ? getForecastWorkspace(workspaceId)?.path ?? '/forecast/severe' : '/forecast/severe');
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
@@ -772,7 +779,11 @@ const CloudLibraryPage: React.FC = () => {
 
   const canWrite = premiumActive;
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
-  const cycleCountLabel = useMemo(() => `${cycles.length} cloud cycle${cycles.length === 1 ? '' : 's'}`, [cycles.length]);
+  const cycleCountLabel = useMemo(
+    () => `${visibleCycles.length} cloud cycle${visibleCycles.length === 1 ? '' : 's'}`,
+    [visibleCycles.length],
+  );
+  const workspaceLabel = activeTab === 'all' ? undefined : tabs.find((tab) => tab.id === activeTab)?.label;
 
   if (!user) {
     return <SignedOutGate />;
@@ -793,6 +804,7 @@ const CloudLibraryPage: React.FC = () => {
           cycles={visibleCycles}
           tabs={tabs}
           activeTab={activeTab}
+          workspaceLabel={workspaceLabel}
           canWrite={canWrite}
           cycleCountLabel={cycleCountLabel}
           onLoadCycle={handleLoadCycle}
