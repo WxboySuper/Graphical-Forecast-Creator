@@ -1,5 +1,7 @@
 import { exportForecastToJson, deserializeForecast, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
 import { isWorkflowExportPackage } from '../utils/workflowPackage';
+import { deserializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { DEFAULT_FORECAST_WORKSPACE, getForecastWorkspace, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
   markAsSaved,
   importForecastCycle,
@@ -10,12 +12,29 @@ import type { AddToastFn } from '../components/Layout';
 import type { Dispatch } from 'redux';
 import type { CycleMetadata, ForecastCycle } from '../types/outlooks';
 
+/** Returns the workspace that owns a loaded file, with the package outer envelope as canonical. */
+const resolveLoadedFileWorkspace = (data: unknown): ForecastWorkspaceId => {
+  if (isWorkflowExportPackage(data)) {
+    const outer = typeof (data as { workspaceId?: unknown }).workspaceId === 'string'
+      && getForecastWorkspace((data as { workspaceId: string }).workspaceId) !== undefined
+      ? (data as { workspaceId: ForecastWorkspaceId }).workspaceId
+      : null;
+    const restored = deserializeForecastWorkspace(data.forecast);
+    if (outer && !restored.legacy && outer !== restored.workspaceId) {
+      throw new Error('This workflow package declares a workspace that does not match its forecast.');
+    }
+    return outer ?? restored.workspaceId;
+  }
+  return deserializeForecastWorkspace(data).workspaceId;
+};
+
 /** Creates save and load file handler functions bound to the given toast notifier, Redux dispatch, and current forecast state. */
-export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMetadata }: {
+export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMetadata, workspaceId = DEFAULT_FORECAST_WORKSPACE }: {
   addToast: AddToastFn;
   dispatch: Dispatch;
   forecastCycle: ForecastCycle;
   cycleMetadata?: CycleMetadata;
+  workspaceId?: ForecastWorkspaceId;
 }) {
   const fileInputRef = { current: null as HTMLInputElement | null } as React.MutableRefObject<HTMLInputElement | null>;
 
@@ -60,6 +79,18 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
       const validationError = validateForecastDataReason(data);
       if (validationError) {
         addToast(validationError, 'error');
+        return;
+      }
+
+      let loadedWorkspaceId: ForecastWorkspaceId;
+      try {
+        loadedWorkspaceId = resolveLoadedFileWorkspace(data);
+      } catch (error) {
+        addToast(error instanceof Error ? error.message : 'Error reading file.', 'error');
+        return;
+      }
+      if (loadedWorkspaceId !== workspaceId) {
+        addToast(`This forecast belongs to the ${loadedWorkspaceId} workspace. Open it there before importing it.`, 'error');
         return;
       }
 

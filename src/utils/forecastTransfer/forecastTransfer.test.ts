@@ -74,7 +74,7 @@ describe('forecastTransfer', () => {
     expect(importedFeatures?.[0].geometry.type).toBe('Polygon');
   });
 
-  test('imports KML files as unowned transfers that never bypass the workspace guard', async () => {
+  test('imports untagged KML files as Severe-owned transfers guarded in other workspaces', async () => {
     const forecastCycle = buildForecast();
     const kml = buildStructuredKmlDocument({
       forecastCycle,
@@ -91,7 +91,7 @@ describe('forecastTransfer', () => {
     expect(result.format).toBe('kml');
     expect(result.warnings).toEqual([]);
     expect(result.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(2);
-    expect(result.workspaceId).toBeNull();
+    expect(result.workspaceId).toBe('severe');
   });
 
   test('preserves explicit workspace identity for native imports', async () => {
@@ -211,6 +211,21 @@ describe('forecastTransfer', () => {
     const badFile = new File([badBuffer], 'mismatched-package.zip', { type: 'application/zip' });
     badFile.arrayBuffer = async () => badBuffer;
     await expect(importForecastTransfer(badFile)).rejects.toThrow('does not match');
+  });
+
+  test('treats the package outer workspace as canonical over a legacy bare forecast', async () => {
+    const bare = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'custom', exportedAt: '2026-08-18T12:00:00.000Z' });
+    const zip = new JSZip();
+    zip.file('workflow_package.json', JSON.stringify(pkg));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const buffer = Uint8Array.from(bytes).buffer;
+    const file = new File([buffer], 'custom-legacy-inner.zip', { type: 'application/zip' });
+    file.arrayBuffer = async () => buffer;
+
+    const result = await importForecastTransfer(file);
+    expect(result.format).toBe('package');
+    expect(result.workspaceId).toBe('custom');
   });
 
   test('rejects KMZ files whose expanded KML exceeds the import limit', async () => {

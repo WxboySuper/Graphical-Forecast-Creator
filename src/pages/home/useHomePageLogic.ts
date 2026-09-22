@@ -20,6 +20,7 @@ import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
 import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
@@ -50,6 +51,7 @@ const useHomePageLogic = () => {
     addToast,
     dispatch,
     forecastCycle,
+    workspaceId: DEFAULT_FORECAST_WORKSPACE,
   });
 
   // Lifetime totals intentionally remain account-wide; retained history and recent-cycle lists are workspace-scoped.

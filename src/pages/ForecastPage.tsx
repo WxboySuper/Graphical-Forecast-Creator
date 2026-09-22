@@ -64,7 +64,6 @@ import {
 } from '../utils/forecastUiVariant';
 import {
   applyForecastImportResult,
-  getForecastImportWorkspaceError,
   useForecastFileActions,
   useDayRolloverPrompt as useControllerDayRolloverPrompt,
   useSessionRestore as useControllerSessionRestore,
@@ -632,12 +631,11 @@ const useForecastPageWorkspace = ({
   });
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
-    const workspaceError = getForecastImportWorkspaceError(result, workspaceId);
+    const workspaceError = applyForecastImportResult(result, dispatch, mapRef, workspaceId);
     if (workspaceError) {
       addToast(workspaceError, 'error');
       return;
     }
-    applyForecastImportResult(result, dispatch, mapRef);
     const warningSuffix = result.warnings.length > 0
       ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})`
       : '';

@@ -17,7 +17,7 @@ export const importNativeTransfer = async (file: File, format: 'json' | 'package
       ? (data as { workspaceId: ForecastWorkspaceId }).workspaceId
       : null;
     const restored = deserializeForecastWorkspace(data.forecast);
-    if (declaredWorkspaceId && declaredWorkspaceId !== restored.workspaceId) {
+    if (declaredWorkspaceId && !restored.legacy && declaredWorkspaceId !== restored.workspaceId) {
       throw new Error('This workflow package declares a workspace that does not match its forecast.');
     }
     const inner = getForecastDataFromWorkspacePayload(
