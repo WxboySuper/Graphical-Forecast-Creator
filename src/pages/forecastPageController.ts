@@ -105,32 +105,41 @@ export const dayHasAnyFeatures = (dayData: unknown): boolean => {
     .some((outlookMap) => (outlookMap?.size ?? 0) > 0);
 };
 
+/** Imports the cycle payload and its workflow metadata into the active session. */
+const applyImportCycleState = (dispatch: ShortcutDispatch, result: ForecastImportResult): void => {
+  dispatch(importForecastCycle(result.forecastCycle));
+  if (result.cycleMetadata) dispatch(setWorkflowMetadata(result.cycleMetadata));
+  else if (result.cycleMetadata === null) dispatch(clearWorkflowMetadata());
+};
+
+/** Applies the imported map view, falling back to the US center for drawn days. */
+const applyImportMapViewState = (
+  dispatch: ShortcutDispatch,
+  mapRef: React.RefObject<ForecastMapHandle | null>,
+  result: ForecastImportResult,
+): null => {
+  if (result.mapView) {
+    dispatch(setMapView(result.mapView));
+    return null;
+  }
+  const currentDayData = result.forecastCycle.days[result.forecastCycle.currentDay]?.data;
+  if (mapRef.current?.getMap() && dayHasAnyFeatures(currentDayData)) {
+    dispatch(setMapView({ center: [39.8283, -98.5795], zoom: 4 }));
+  }
+  return null;
+};
+
 /** Applies any supported forecast import result to the active workspace session. */
 export const applyForecastImportResult = (
   result: ForecastImportResult,
   dispatch: ShortcutDispatch,
   mapRef: React.RefObject<ForecastMapHandle | null>,
-  workspaceId?: ForecastWorkspaceId,
+  workspaceId: ForecastWorkspaceId,
 ): string | null => {
-  if (workspaceId !== undefined) {
-    const workspaceError = getForecastImportWorkspaceError(result, workspaceId);
-    if (workspaceError) return workspaceError;
-  }
-  dispatch(importForecastCycle(result.forecastCycle));
-  if (result.cycleMetadata) dispatch(setWorkflowMetadata(result.cycleMetadata));
-  else if (result.cycleMetadata === null) dispatch(clearWorkflowMetadata());
-
-  if (result.mapView) {
-    dispatch(setMapView(result.mapView));
-    return null;
-  }
-
-  const map = mapRef.current?.getMap();
-  const currentDayData = result.forecastCycle.days[result.forecastCycle.currentDay]?.data;
-  if (map && dayHasAnyFeatures(currentDayData)) {
-    dispatch(setMapView({ center: [39.8283, -98.5795], zoom: 4 }));
-  }
-  return null;
+  const workspaceError = getForecastImportWorkspaceError(result, workspaceId);
+  if (workspaceError) return workspaceError;
+  applyImportCycleState(dispatch, result);
+  return applyImportMapViewState(dispatch, mapRef, result);
 };
 
 /** Returns an error when a transfer cannot be opened in the active forecast workspace. */
