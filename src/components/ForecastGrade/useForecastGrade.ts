@@ -8,7 +8,8 @@ import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
 import type { DatEvidence } from '../../utils/dat';
 import type { GradeAccountTier, GradeCard, GradeSnapshot, PackageSourceKind } from '../../types/forecastGrade';
-import { serializeForecast, deserializeForecast } from '../../utils/fileUtils';
+import { serializeForecast } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import {
   FORECAST_GRADE_FORMULA_VERSION,
   isReachedArchiveDate,
@@ -391,7 +392,7 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
       const restoreSeq = ++restoreSeqRef.current;
       runGeneration.current += 1; // invalidate any in-flight run()
       abortDatLoad();
-      const restoredForecast = deserializeForecast(snapshot.forecast);
+      const restoredForecast = resolveNativeFileContent(snapshot.forecast).forecastCycle;
       const days = daysWithData(restoredForecast);
       setForecast(restoredForecast);
       setPackageSource('file');

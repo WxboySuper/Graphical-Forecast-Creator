@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';
 import { DayType, ForecastCycle } from '../../types/outlooks';
-import { deserializeForecast, validateForecastData } from '../../utils/fileUtils';
+import { readForecastImportFile, validateForecastData } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './CopyFromPreviousModal.css';
@@ -14,23 +15,13 @@ interface CopyFromPreviousModalProps {
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
-// Read a file as text (Promise wrapper) and deserialize into ForecastCycle
-const readFileAsText = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as string);
-    reader.onerror = () => reject(new Error('Failed to read file.'));
-    reader.readAsText(file);
-  });
-
 /** Reads and parses a GFC JSON forecast file into a ForecastCycle object. */
-const parseForecastFile = async (file: File): Promise<ForecastCycle> => {
-  const content = await readFileAsText(file);
-  const parsed = JSON.parse(content);
+export const parseForecastFile = async (file: File): Promise<ForecastCycle> => {
+  const parsed = await readForecastImportFile(file);
   if (!validateForecastData(parsed)) {
     throw new Error('Invalid GFC forecast file.');
   }
-  return deserializeForecast(parsed);
+  return resolveNativeFileContent(parsed).forecastCycle;
 };
 
 type CopyModalHeaderProps = {

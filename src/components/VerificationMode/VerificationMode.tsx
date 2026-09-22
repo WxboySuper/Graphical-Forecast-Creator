@@ -4,7 +4,8 @@ import { Eye, FileUp, Layers3 } from 'lucide-react';
 import VerificationMap, { VerificationMapHandle } from '../Map/VerificationMap';
 import VerificationPanel from '../Verification/VerificationPanel';
 import { loadVerificationForecast, clearVerificationForecast } from '../../store/verificationSlice';
-import { deserializeForecast, readForecastImportFile, validateForecastDataReason } from '../../utils/fileUtils';
+import { readForecastImportFile, validateForecastDataReason } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useAuth } from '../../auth/AuthProvider';
@@ -25,8 +26,8 @@ const getAvailableDays = (days: Record<string, unknown> | undefined): DayType[] 
     .sort((a, b) => a - b);
 };
 
-// Parses and validates through the shared JSON and workflow-package import pipeline.
-const parseAndValidateForecast = async (file: File) => {
+// Parses and validates through the shared JSON and workspace-envelope import pipeline.
+export const parseAndValidateForecast = async (file: File) => {
   const json = await readForecastImportFile(file);
 
   const validationError = validateForecastDataReason(json);
@@ -34,7 +35,7 @@ const parseAndValidateForecast = async (file: File) => {
     throw new Error(validationError);
   }
 
-  return deserializeForecast(json);
+  return resolveNativeFileContent(json).forecastCycle;
 };
 
 // Helper function to analyze verification results by comparing storm reports against the forecast outlooks, which takes in the storm reports and the outlook data for the selected day and calculates various metrics such as total reports, reports by type, and hit/miss analysis for each outlook type. It returns a structured result that can be used to display verification summaries in the UI.

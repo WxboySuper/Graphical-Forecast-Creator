@@ -199,4 +199,21 @@ describe('createFileHandlers', () => {
     handlers.handleSave();
     expect(addToast).toHaveBeenLastCalledWith('Error exporting forecast.', 'error');
   });
+
+  it('preserves the live map view and workflow metadata on save', () => {
+    const mapView = { center: [11, 22] as [number, number], zoom: 5 };
+    const cycleMetadata = { id: 'WF-severe-2026-09-10' } as never;
+    const handlers = createFileHandlers({
+      addToast,
+      dispatch,
+      forecastCycle: forecastCycle as never,
+      cycleMetadata,
+      mapView,
+      workspaceId: 'severe',
+    });
+
+    handlers.handleSave();
+
+    expect(mockSerializeWorkspace).toHaveBeenCalledWith('severe', forecastCycle, mapView, cycleMetadata);
+  });
 });
