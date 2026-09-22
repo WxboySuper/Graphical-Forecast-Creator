@@ -15,7 +15,7 @@ import {
   selectForecastCycle,
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
-import { deserializeForecast, exportForecastToJson, readForecastImportFile, serializeForecast, validateForecastDataReason } from '../utils/fileUtils';
+import { deserializeForecast, downloadBlob, readForecastImportFile, serializeForecast, validateForecastDataReason } from '../utils/fileUtils';
 import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getForecastDataFromWorkspacePayload, type ForecastWorkspacePayload } from '../utils/forecastWorkspacePersistence';
@@ -127,13 +127,33 @@ export const applyForecastImportResult = (
   }
 };
 
-/** Returns an error when a native transfer belongs to another forecast workspace. */
+/** Returns an error when a transfer cannot be opened in the active forecast workspace. */
 export const getForecastImportWorkspaceError = (
   result: ForecastImportResult,
   workspaceId: ForecastWorkspaceId,
-): string | null => result.workspaceId === workspaceId
-  ? null
-  : `This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`;
+): string | null => {
+  if (result.workspaceId === null) {
+    return 'This file does not declare a forecast workspace. KML/KMZ geometry cannot be imported across the workspace boundary.';
+  }
+  return result.workspaceId === workspaceId
+    ? null
+    : `This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`;
+};
+
+/** Downloads the active workspace cycle as a workspace-owned native JSON file. */
+export const downloadWorkspaceForecastJson = (
+  workspaceId: ForecastWorkspaceId,
+  forecastCycle: ReturnType<typeof selectForecastCycle>,
+  mapView: { center: [number, number]; zoom: number },
+  workflowMetadata?: import('../types/workflow').CycleMetadata,
+): void => {
+  const payload = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, workflowMetadata);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  downloadBlob(
+    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+    `gfc-forecast-${timestamp}.json`,
+  );
+};
 
 const useForecastSaveAction = (
   dispatch: ShortcutDispatch,
@@ -142,16 +162,17 @@ const useForecastSaveAction = (
   mapRef: React.RefObject<ForecastMapHandle | null>,
   user: ReturnType<typeof useAuth>['user'],
   workflowMetadata?: import('../types/workflow').CycleMetadata,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ) => useCallback(() => {
   try {
-    exportForecastToJson(forecastCycle, buildMapView(mapRef), workflowMetadata);
+    downloadWorkspaceForecastJson(workspaceId, forecastCycle, buildMapView(mapRef), workflowMetadata);
     dispatch(markAsSaved());
     queueProductMetric({ event: 'cycle_saved', user });
     addToast('Forecast exported to JSON!', 'success');
   } catch {
     addToast('Error exporting forecast.', 'error');
   }
-}, [addToast, dispatch, forecastCycle, mapRef, user, workflowMetadata]);
+}, [addToast, dispatch, forecastCycle, mapRef, user, workflowMetadata, workspaceId]);
 
 /** Composes the save action owned by the forecast session controller. */
 export const useForecastFileActions = (
@@ -161,8 +182,9 @@ export const useForecastFileActions = (
   mapRef: React.RefObject<ForecastMapHandle | null>,
   user: ReturnType<typeof useAuth>['user'],
   workflowMetadata?: import('../types/workflow').CycleMetadata,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ) => ({
-  handleSave: useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user, workflowMetadata),
+  handleSave: useForecastSaveAction(dispatch, addToast, forecastCycle, mapRef, user, workflowMetadata, workspaceId),
 });
 
 /** Returns true when a cycle has at least one forecast day or discussion. */
@@ -598,9 +620,9 @@ export const runDayRolloverSaveAction = ({ forecastCycle, isSaved, dispatch }: {
   return didSaveSession;
 };
 
-export const runDayRolloverDownloadAction = ({ forecastCycle, mapView, dispatch, clearCurrent }: { forecastCycle: ReturnType<typeof selectForecastCycle>; mapView: RootState['forecast']['currentMapView']; dispatch: ShortcutDispatch; clearCurrent?: UseCloudCyclesResult['clearCurrent'] }): boolean => {
+export const runDayRolloverDownloadAction = ({ forecastCycle, mapView, dispatch, clearCurrent, workspaceId = DEFAULT_FORECAST_WORKSPACE }: { forecastCycle: ReturnType<typeof selectForecastCycle>; mapView: RootState['forecast']['currentMapView']; dispatch: ShortcutDispatch; clearCurrent?: UseCloudCyclesResult['clearCurrent']; workspaceId?: ForecastWorkspaceId }): boolean => {
   try {
-    exportForecastToJson(forecastCycle, mapView);
+    downloadWorkspaceForecastJson(workspaceId, forecastCycle, mapView);
     clearCurrent?.();
     dispatch(resetForecasts());
     return true;

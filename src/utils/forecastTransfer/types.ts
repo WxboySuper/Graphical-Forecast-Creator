@@ -24,11 +24,16 @@ export interface ForecastExportRequest {
   day?: DayType;
   kmlStrategy?: KmlArchiveStrategy;
   outlookTypes?: OutlookType[];
+  workspaceId?: ForecastWorkspaceId;
 }
 
 export interface ForecastImportResult {
   forecastCycle: ForecastCycle;
-  workspaceId: ForecastWorkspaceId;
+  /**
+   * Owning workspace for native transfers. Null for KML/KMZ, which carry
+   * no workspace identity and must not bypass the workspace boundary.
+   */
+  workspaceId: ForecastWorkspaceId | null;
   mapView?: ForecastTransferMapView;
   cycleMetadata?: CycleMetadata | null;
   warnings: string[];

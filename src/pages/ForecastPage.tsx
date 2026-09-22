@@ -679,6 +679,7 @@ const useForecastPageWorkspace = ({
     addToast,
     onImportResult: handleImportResult,
     onExportComplete: handleExportComplete,
+    workspaceId,
     cloudTools: renderCloudToolbar({
       premiumActive,
       isExpiredPremium,
@@ -745,6 +746,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     mapRef,
     user,
     workflowMetadata,
+    workspaceId,
   );
   const {
     emergencyMode,

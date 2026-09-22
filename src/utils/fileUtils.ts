@@ -356,11 +356,12 @@ export const downloadGfcPackage = async (
   mapView: { center: [number, number]; zoom: number },
   cycleMetadata?: CycleMetadata,
   scope: WorkflowExportScope = 'cycle',
+  workspaceId?: import('../config/forecastWorkspaces').ForecastWorkspaceId,
 ): Promise<void> => {
   const zip = new JSZip();
 
   // 1. Forecast JSON
-  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata });
+  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata, ...(workspaceId ? { workspaceId } : {}) });
   const data = pkg.forecast;
   zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
   zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
