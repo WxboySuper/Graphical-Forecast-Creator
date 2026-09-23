@@ -136,14 +136,15 @@ describe('exportUtils additional unit tests', () => {
     expect((ctrl as HTMLElement).style.display).toBe('none');
     // overlays/footer should have been added; look for known footer text
     expect(clonedRoot.textContent).toContain('Created with Graphical Forecast Creator');
-    const overlays = Array.from(clonedRoot.children) as HTMLElement[];
-    const unofficial = overlays.find((child) => child.textContent?.includes('Unofficial'));
-    const footer = overlays.find((child) => child.textContent?.includes('Created with Graphical Forecast Creator'));
-    expect(unofficial?.style.bottom).toBe('8px');
-    expect(unofficial?.textContent).toContain(unofficialText);
-    expect((unofficial?.firstElementChild as HTMLElement).style.whiteSpace).toBe('normal');
-    expect((unofficial?.firstElementChild as HTMLElement).style.maxWidth).toBe('calc(100% - 16px)');
-    expect(footer?.style.bottom).toBe('58px');
-    expect(footer?.style.maxWidth).toBe('calc(100% - 40px)');
+    const unofficial = clonedRoot.querySelector<HTMLElement>('.gfc-export-unofficial-overlay');
+    const footer = clonedRoot.querySelector<HTMLElement>('.gfc-export-attribution');
+    expect(unofficial).not.toBeNull();
+    expect(footer).not.toBeNull();
+    expect(unofficial!.style.bottom).toBe('8px');
+    expect(unofficial!.textContent).toContain(unofficialText);
+    expect((unofficial!.firstElementChild as HTMLElement).style.whiteSpace).toBe('normal');
+    expect((unofficial!.firstElementChild as HTMLElement).style.maxWidth).toBe('calc(100% - 16px)');
+    expect(footer!.style.bottom).toBe('58px');
+    expect(footer!.style.maxWidth).toBe('calc(100% - 40px)');
   });
 });
