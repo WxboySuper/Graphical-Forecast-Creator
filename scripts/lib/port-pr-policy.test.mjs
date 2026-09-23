@@ -1,6 +1,5 @@
 /**
  * Covers port-branch parsing, target decoding, and stable forward-port policy.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

@@ -1,6 +1,5 @@
 /**
  * Covers Markdown rendering, safe output paths, local links, and Mermaid markup.
- *
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';

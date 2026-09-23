@@ -1,6 +1,5 @@
 /**
  * Covers managed changelog declarations, idempotent replacement, and source/reason references.
- *
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,6 +1,5 @@
 /**
  * Verifies the three vendored boundary datasets exist, match pinned checksums, and validate successfully.
- *
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

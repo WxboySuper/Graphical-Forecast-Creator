@@ -1,6 +1,5 @@
 /**
  * Covers extraction of unreleased, stable, and beta release-note sections.
- *
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

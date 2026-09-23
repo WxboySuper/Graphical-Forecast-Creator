@@ -1,6 +1,5 @@
 /**
  * Verifies diagnostic reason mapping for target policy and emergency-disabled server-backed features.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

@@ -1,6 +1,5 @@
 /**
  * Ensures every forward-port conflict remains assigned to a human decision.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

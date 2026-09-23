@@ -1,6 +1,5 @@
 /**
  * Checks dependency collection across project manifests and generation of complete license notices.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

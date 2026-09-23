@@ -1,6 +1,5 @@
 /**
  * Runs the exposure-report CLI against the repository registry and checks its output and exit status.
- *
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

@@ -1,6 +1,5 @@
 /**
  * Checks dependency-note insertion and updates while keeping root and server bumps distinct.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
