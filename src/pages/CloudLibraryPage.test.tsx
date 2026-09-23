@@ -365,6 +365,8 @@ describe("CloudLibraryPage", () => {
     const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
     const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
     expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
+    const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
     const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
     expect(wrapped.workspaceId).toBe('severe');
   });

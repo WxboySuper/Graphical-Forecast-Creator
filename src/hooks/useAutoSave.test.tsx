@@ -9,8 +9,8 @@ jest.mock('../utils/fileUtils', () => ({
   serializeForecast: jest.fn(() => ({ serialized: true })),
 }));
 
-const Harness = () => {
-  useAutoSave();
+const Harness = ({ workspaceId = 'severe' }: { workspaceId?: 'severe' | 'custom' }) => {
+  useAutoSave(undefined, workspaceId);
   return null;
 };
 
@@ -121,11 +121,13 @@ describe('useAutoSave', () => {
   test('clears only the selected non-Severe workspace autosave', () => {
     const customKey = getAutoSaveStorageKey('user-1', 'custom');
     localStorage.setItem(customKey, JSON.stringify({ custom: true }));
+    localStorage.setItem('forecastData:custom', JSON.stringify({ anonymousCustom: true }));
     localStorage.setItem('forecastData', JSON.stringify({ severe: true }));
 
     clearAutoSave('user-1', 'custom');
 
     expect(localStorage.getItem(customKey)).toBeNull();
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
     expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ severe: true }));
   });
 
@@ -224,5 +226,32 @@ describe('useAutoSave', () => {
 
     expect(serializeForecast).not.toHaveBeenCalled();
     expect(localStorage.getItem('forecastData')).toBeNull();
+  });
+
+  test('flushes the previous workspace edit when autosave scope changes', async () => {
+    const store = createStore();
+    const { rerender } = render(
+      <Provider store={store}>
+        <Harness workspaceId="severe" />
+      </Provider>
+    );
+
+    act(() => {
+      store.dispatch(setMapView({ center: [35, -97], zoom: 6 }));
+    });
+
+    await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
+    rerender(
+      <Provider store={store}>
+        <Harness workspaceId="custom" />
+      </Provider>
+    );
+
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: { serialized: true },
+    }));
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
   });
 });

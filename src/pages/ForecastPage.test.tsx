@@ -32,7 +32,7 @@ import ForecastPage, {
   writeStoredDayValue,
 } from './ForecastPage';
 import forecastReducer, { saveCurrentCycle } from '../store/forecastSlice';
-import { addCustomLayer, addFeature, updateDiscussionDraft } from '../store/forecastSlice';
+import { addCustomLayer, addFeature, setForecastWorkspace, updateDiscussionDraft } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -158,6 +158,25 @@ describe('ForecastPage layout selection', () => {
       store.dispatch(saveCurrentCycle({ label: 'Route save' }));
     });
     expect(store.getState().forecast.savedCycles[0]?.workspaceId).toBe('custom');
+  });
+
+  test('waits for Redux workspace ownership before mounting workspace restore effects', () => {
+    const store = createStore();
+    render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastPage workspaceId="custom" />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing custom forecast workspace');
+    expect(screen.queryByText('ForecastTabbedToolbarLayout Mock')).not.toBeInTheDocument();
+
+    act(() => store.dispatch(setForecastWorkspace('custom')));
+
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {

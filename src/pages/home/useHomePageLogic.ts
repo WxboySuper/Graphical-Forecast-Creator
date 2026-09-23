@@ -22,6 +22,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
+import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
 
 /**
  * Encapsulates the state and handlers used by the HomePage component so the page
@@ -72,7 +73,7 @@ const useHomePageLogic = () => {
   const handleQuickStart = (day: DayType) => {
     clearAutoSave(user?.uid, workspaceId);
     dispatch(setForecastDay(day));
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   };
 
   /** Start a workflow package from the selected scope. */
@@ -89,7 +90,7 @@ const useHomePageLogic = () => {
       cycleDate: getLocalCalendarDate(),
     }));
     addToast(`Started ${workflowTemplate.label} workflow`, 'success');
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   };
 
   /** Start a same-day update for the active workflow. */
@@ -97,14 +98,14 @@ const useHomePageLogic = () => {
     if (!workflowEnabled) return;
     dispatch(createOutlookUpdate());
     addToast('Started same-day workflow update', 'success');
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   };
 
   /** Save the current forecast cycle to storage. */
   const handleSave = () => doSave();
 
   /** Navigate to the forecast page. */
-  const handleNavigateForecast = () => navigate('/forecast');
+  const handleNavigateForecast = () => navigate(getForecastWorkspacePath(workspaceId));
   /** Navigate to the discussion page. */
   const handleNavigateDiscussion = () => navigate('/discussion');
   /** Navigate to the account page. */
@@ -161,7 +162,7 @@ const useHomePageLogic = () => {
       setPendingWorkflow(null);
       setConfirmNewCycle(false);
       addToast(`Started ${pendingWorkflow.label} workflow`, 'success');
-      navigate('/forecast');
+      navigate(getForecastWorkspacePath(workspaceId));
       return;
     }
     dispatch(resetForecasts());
