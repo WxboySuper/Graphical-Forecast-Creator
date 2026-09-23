@@ -174,7 +174,9 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
       setLoadedCycle(cycle);
       setLoadedFileName(file.name);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load forecast file.';
+      const message = error instanceof Error && error.message.startsWith('This forecast belongs to ')
+        ? error.message
+        : 'Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.';
       addToast(message, 'error');
     } finally {
       // Reset file input
