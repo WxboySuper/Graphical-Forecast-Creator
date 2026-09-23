@@ -66,7 +66,7 @@ to each.
 - **redux** ^5.0.1 (root (pnpm)) — MIT — allowed
 - **rollup** >=4.63.1 (root (pnpm)) — MIT — allowed
 - **tailwind-merge** ^3.5.0 (root (pnpm)) — MIT — allowed
-- **tailwindcss** ^3.4.19 (root (pnpm)) — MIT — allowed
+- **tailwindcss** 3.4.19 (root (pnpm)) — MIT — allowed
 - **typescript** npm:@typescript/typescript6@^6.0.2 (root (pnpm)) — Apache-2.0 — allowed
 - **typescript-eslint** ^8.70.0 (root (pnpm)) — MIT — allowed
 - **uuid** ^14.0.2 (root (pnpm)) — MIT — allowed
