@@ -210,8 +210,10 @@ const DayRolloverDialog: React.FC<{
 );
 
 const LegacyForecastNotice: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => (
-  <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground" role="status">
-    Forecast now opens in the Severe workspace at <code>/forecast/severe</code>. Update any bookmarks that still use <code>/forecast</code>.
+  <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
+    <span role="status">
+      Forecast now opens in the Severe workspace at <code>/forecast/severe</code>. Update any bookmarks that still use <code>/forecast</code>.
+    </span>
     <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" onClick={onDismiss}>Dismiss</Button>
   </div>
 );
@@ -252,14 +254,22 @@ const useLegacyForecastNotice = (
     : {};
   const hasLegacyRedirectMarker = Boolean(locationState.legacyForecastRedirect);
   const showLegacyNotice = hasLegacyRedirectMarker || hasPersistedLegacyForecastNotice();
+  const focusWorkspaceAfterDismiss = useRef(false);
 
   useEffect(() => {
     if (hasLegacyRedirectMarker) persistLegacyForecastNotice();
   }, [hasLegacyRedirectMarker]);
 
+  useEffect(() => {
+    if (!showLegacyNotice && focusWorkspaceAfterDismiss.current) {
+      focusWorkspaceAfterDismiss.current = false;
+      workspaceRef.current?.focus();
+    }
+  }, [showLegacyNotice, workspaceRef]);
+
   const dismissLegacyNotice = () => {
-    workspaceRef.current?.focus();
     clearPersistedLegacyForecastNotice();
+    focusWorkspaceAfterDismiss.current = true;
     const currentState = { ...locationState };
     delete currentState.legacyForecastRedirect;
     navigate(
@@ -838,7 +848,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   return (
     <div className="forecast-page-shell">
       {showLegacyNotice ? <LegacyForecastNotice onDismiss={dismissLegacyNotice} /> : null}
-      <div ref={workspaceRef} tabIndex={-1} className="forecast-page-workspace" data-testid="forecast-page-workspace">
+      <div ref={workspaceRef} tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         {renderForecastWorkspaceLayout(forecastUiVariant, {
           mapRef,
           controller: workspaceController,
