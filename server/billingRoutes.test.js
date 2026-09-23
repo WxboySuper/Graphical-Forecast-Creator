@@ -110,10 +110,10 @@ const assertForwardedAdapterArgs = (forwarded, app, express, billing) => {
   assert.strictEqual(forwarded.app, app);
   assert.strictEqual(forwarded.express, express);
   assert.strictEqual(forwarded.wrapBillingJsonRoute, billing.wrapBillingJsonRoute);
-  assert.strictEqual(typeof forwarded.handleBillingConfig, 'function');
-  assert.strictEqual(typeof forwarded.handleBillingWebhook, 'function');
-  assert.strictEqual(typeof forwarded.handleCheckout, 'function');
-  assert.strictEqual(typeof forwarded.handleBillingPortal, 'function');
+  assert.strictEqual(forwarded.handleBillingConfig.name, 'handleBillingConfig');
+  assert.strictEqual(forwarded.handleBillingWebhook.name, 'handleBillingWebhook');
+  assert.strictEqual(forwarded.handleCheckout.name, 'handleCheckout');
+  assert.strictEqual(forwarded.handleBillingPortal.name, 'handleBillingPortal');
 };
 
 const assertBillingRateLimitMaxCaps = (forwarded, holder) => {
@@ -244,9 +244,15 @@ describe('billing route adapter', () => {
   });
 
   it('restores every require.cache entry after loading billing.js through the compatibility wrapper', () => {
-    const before = Object.keys(require.cache).sort();
+    const before = { ...require.cache };
+    const Module = require('node:module');
+    const originalLoad = Module._load;
     requireBillingCompatWithStubs();
-    assert.deepStrictEqual(Object.keys(require.cache).sort(), before);
+    assert.deepStrictEqual(Object.keys(require.cache).sort(), Object.keys(before).sort());
+    for (const [filename, cachedModule] of Object.entries(before)) {
+      assert.strictEqual(require.cache[filename], cachedModule, `${filename} cache entry changed`);
+    }
+    assert.strictEqual(Module._load, originalLoad);
   });
 
   it('throws a named error before registering routes when dependencies are missing', () => {
