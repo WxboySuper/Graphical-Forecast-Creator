@@ -8,28 +8,56 @@ current implementation contracts.
 
 ## Code boundary guides
 
-The source tree has one short guide per broad code area. Read the guide before
-moving a module or adding a new cross-cutting dependency:
+The source tree has short guides for its broad code areas. Read the relevant
+guide before moving a module or adding a cross-cutting dependency:
 
-- [Frontend source](../src/README.md) - page, component, hook, store, utility, and feature ownership.
-- [Pages](../src/pages/README.md) - route-level composition and navigation.
-- [Monitor](../src/monitor/README.md) - weather sources, normalization, layers, and monitor state.
-- [Store](../src/store/README.md) - Redux state ownership and transitions.
-- [Utilities](../src/utils/README.md) - pure transformations, serialization, persistence, and exports.
-- [Server](../server/README.md) - hosted services and server-side boundaries.
+### Frontend guides
+
+- [Frontend overview](../src/README.md)
+- [Authentication](../src/auth/README.md)
+- [Billing](../src/billing/README.md)
+- [Components](../src/components/README.md)
+- [Configuration](../src/config/README.md)
+- [Content](../src/content/README.md)
+- [Feature exposure](../src/features/README.md)
+- [Hooks](../src/hooks/README.md)
+- [Libraries](../src/lib/README.md)
+- [Maps](../src/maps/README.md)
+- [Metrics](../src/metrics/README.md)
+- [Monitor](../src/monitor/README.md)
+- [Pages](../src/pages/README.md)
+- [Routing](../src/routing/README.md)
+- [Store](../src/store/README.md)
+- [Testing](../src/testing/README.md)
+- [Types](../src/types/README.md)
+- [Utilities](../src/utils/README.md)
+
+### Server guides
+
+- [Server overview](../server/README.md)
+- [Server library](../server/lib/README.md)
+- [Server release](../server/release/README.md)
+- [Server testing](../server/testing/README.md)
+- [Server weather](../server/weather/README.md)
 
 When a change crosses one of these boundaries, update the relevant architecture
-or operations document in the same pull request. Keep generated inventories and
-one-off investigation notes under `docs/personal` or the archive sections.
+or operations document in the same pull request. Keep maintained investigations
+with the relevant product or architecture guidance. Local generated inventories
+and personal notes may go under the git-ignored `docs/personal` directory;
+archive completed exploratory material in the archive sections.
 
 ## Choosing a document
 
 | If you are changing... | Start with... |
 | --- | --- |
-| route composition, state ownership, or feature exposure | [Repository map](./architecture/codebase-inventory.md) and [workspace boundaries](./architecture/forecast-workspace-boundaries.md) |
-| release, rollout, or support behavior | [Operations guides](./operations/release-workflow.md) |
-| product rules or export formats | [Product guides](./product/outlook-info.md) |
+| general route composition, state ownership, or feature exposure | [Repository map](./architecture/codebase-inventory.md) |
+| Forecast-specific workspace route, state, persistence, or exposure decisions | [Forecast workspace follow-up](./architecture/forecast-workspace-boundaries.md) - v1.8 decision |
+| release or rollout behavior | [Release workflow](./operations/release-workflow.md) |
+| support response or privacy requests | [Support and privacy operations](./operations/v1.7-support-and-privacy.md) |
+| product rules | [Outlook information](./product/outlook-info.md) and [specialty-style policy](./product/specialty-style-policy.md) |
+| export formats | [Import and export formats](./product/kmz-export.md) |
 | tests or test cleanup | [Current testing guidance](#current-guidance-testing) and the module's colocated tests |
+
 ## Architecture
 
 - [Repository map and architecture overview](./architecture/codebase-inventory.md) - product surfaces, boundaries, entry points, and safe future move direction.
