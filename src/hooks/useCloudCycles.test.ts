@@ -326,7 +326,7 @@ describe('useCloudCycles stale completions', () => {
     expect(result.current.currentCloud).toBeNull();
   });
 
-  test('stale save failure reports failure without overwriting the new selection', async () => {
+  test('stale save failure surfaces actual error without overwriting the new selection', async () => {
     mockSignedInUser();
     const deferred = mockPendingSave();
 
@@ -351,15 +351,46 @@ describe('useCloudCycles stale completions', () => {
       result.current.markAsCurrent('cycle-2', 'Two');
     });
 
-    let saveResult: boolean | undefined;
+    let saveError: unknown;
     await act(async () => {
       deferred.resolveFailure('boom');
-      saveResult = await pendingSave;
+      try {
+        await pendingSave;
+      } catch (error) {
+        saveError = error;
+      }
     });
 
-    expect(saveResult).toBe(false);
+    expect(saveError).toBeInstanceOf(Error);
+    expect((saveError as Error).message).toBe('boom');
     expect(result.current.currentCloud?.id).toBe('cycle-2');
     expect(result.current.currentCloud?.syncState).toBe('idle');
     expect(result.current.error).toBeNull();
+  });
+
+  test('immediate manual save after selection captures the new cycle', async () => {
+    mockSignedInUser();
+    mockSaveCloudCycle.mockResolvedValue({ success: true, data: 'cycle-2' });
+
+    const { result } = renderHook(() => useCloudCycles());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    let pendingSave: Promise<boolean> | undefined;
+    await act(async () => {
+      result.current.markAsCurrent('cycle-2', 'Two');
+      pendingSave = result.current.saveCycle('Two', '2026-07-14', stats, payload);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await pendingSave;
+    });
+
+    expect(mockSaveCloudCycle).toHaveBeenCalledWith(expect.objectContaining({ existingId: 'cycle-2' }));
+    expect(result.current.currentCloud?.id).toBe('cycle-2');
+    expect(result.current.currentCloud?.syncState).toBe('saved');
   });
 });
