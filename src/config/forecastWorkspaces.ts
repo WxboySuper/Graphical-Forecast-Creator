@@ -35,8 +35,8 @@ export const FORECAST_WORKSPACES = [
     path: '/forecast/mesoscale',
     label: 'Mesoscale',
     productType: 'mesoscale',
-    status: 'gated',
-    exposureKey: 'mesoscaleWorkspace',
+    status: 'future',
+    exposureKey: null,
     legacyPaths: [],
   },
   {
@@ -54,7 +54,7 @@ export const FORECAST_WORKSPACES = [
     label: 'Winter',
     productType: 'winter',
     status: 'future',
-    exposureKey: 'winterWorkspace',
+    exposureKey: null,
     legacyPaths: [],
   },
   {
@@ -101,7 +101,8 @@ export const getForecastWorkspaceByLegacyPath = (
 export const isForecastWorkspaceExposed = (
   workspace: ForecastWorkspaceDefinition,
   target: BuildTarget = getBuildTarget(),
-): boolean => workspace.exposureKey === null || isFeatureExposedOnTarget(workspace.exposureKey, target);
+): boolean => workspace.status !== 'future'
+  && (workspace.exposureKey === null || isFeatureExposedOnTarget(workspace.exposureKey, target));
 
 /** Returns only workspaces whose feature exposure permits route registration. */
 export const getExposedForecastWorkspaces = (
