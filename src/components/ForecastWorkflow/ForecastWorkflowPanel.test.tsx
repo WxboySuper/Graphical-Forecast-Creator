@@ -79,25 +79,18 @@ const renderPanel = (context: 'forecast' | 'discussion', controller?: ForecastWo
 
 const previousOutlookButtonName = /^Use [A-Z][a-z]{2} \d{1,2} Day 2$/;
 
-interface SeededPreviousOutlook {
-  sourceWorkspace: ForecastWorkspaceId;
-  activeWorkspace?: ForecastWorkspaceId;
-  sourceFeatureId: string;
-  sourceLabel: string;
-}
-
-const renderPanelWithSeededPreviousOutlook = ({
-  sourceWorkspace,
-  activeWorkspace = 'severe',
-  sourceFeatureId,
-  sourceLabel,
-}: SeededPreviousOutlook): void => {
+const renderPanelWithMixedWorkspaceHistory = (activeWorkspace: ForecastWorkspaceId) => {
   const store = createCompleteWorkflowStore();
-  store.dispatch(setForecastWorkspace(sourceWorkspace));
-  store.dispatch(setForecastDay(2));
-  store.dispatch(addFeature({ feature: createFeature(sourceFeatureId, 0, 'tornado', '2%') }));
-  store.dispatch(setCycleDate(getYesterdayLocalDate()));
-  store.dispatch(saveCurrentCycle({ label: sourceLabel }));
+  const sourceCycleDate = getYesterdayLocalDate();
+  (['custom', 'severe'] as const).forEach((sourceWorkspace) => {
+    store.dispatch(setForecastWorkspace(sourceWorkspace));
+    store.dispatch(setForecastDay(2));
+    store.dispatch(addFeature({
+      feature: createFeature(`${sourceWorkspace}-source`, sourceWorkspace === 'custom' ? 0 : 2, 'tornado', '2%'),
+    }));
+    store.dispatch(setCycleDate(sourceCycleDate));
+    store.dispatch(saveCurrentCycle({ label: `${sourceWorkspace} source` }));
+  });
   store.dispatch(setForecastWorkspace(activeWorkspace));
   store.dispatch(setForecastDay(1));
   store.dispatch(startBlankCycle({
@@ -113,6 +106,7 @@ const renderPanelWithSeededPreviousOutlook = ({
       </Provider>
     </MemoryRouter>,
   );
+  return store;
 };
 
 describe('ForecastWorkflowPanel completion review', () => {
@@ -141,26 +135,17 @@ describe('ForecastWorkflowPanel completion review', () => {
   });
 
   it.each([
-    ['hides Custom history from Severe', 'custom', 'severe', false],
-    ['keeps Custom history visible in Custom', 'custom', 'custom', true],
-    ['keeps Severe history visible in Severe', 'severe', 'severe', true],
-    ['hides Severe history from Custom', 'severe', 'custom', false],
-  ] as const)('%s', (_caseName, sourceWorkspace, activeWorkspace, shouldSuggest) => {
-    const sourceLabel = `${sourceWorkspace === 'custom' ? 'Custom' : 'Severe'} source`;
-    renderPanelWithSeededPreviousOutlook({
-      sourceWorkspace,
-      activeWorkspace,
-      sourceFeatureId: `${sourceWorkspace}-source`,
-      sourceLabel,
-    });
-
+    ['selects Custom history when Custom is active', 'custom'],
+    ['selects Severe history when Severe is active', 'severe'],
+  ] as const)('%s', (_caseName, activeWorkspace) => {
+    const store = renderPanelWithMixedWorkspaceHistory(activeWorkspace);
     expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
-    const previousOutlookButton = screen.queryByRole('button', { name: previousOutlookButtonName });
-    if (shouldSuggest) {
-      expect(previousOutlookButton).toBeInTheDocument();
-    } else {
-      expect(previousOutlookButton).not.toBeInTheDocument();
-    }
+    fireEvent.click(screen.getByRole('button', { name: previousOutlookButtonName }));
+
+    const importedFeatureIds = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%')
+      ?.map((feature) => feature.id);
+    expect(importedFeatureIds).toContain(`${activeWorkspace}-source`);
+    expect(importedFeatureIds).not.toContain(`${activeWorkspace === 'custom' ? 'severe' : 'custom'}-source`);
   });
 });
 
