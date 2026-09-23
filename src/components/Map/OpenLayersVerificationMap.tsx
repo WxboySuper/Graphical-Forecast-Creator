@@ -464,6 +464,11 @@ const OpenLayersVerificationMap = forwardRef<
     )
       return;
 
+    // Every style change invalidates any OpenFreeMap request started by a
+    // previous selection, including a switch back to a raster or blank map.
+    const requestId = vectorStyleRequestRef.current + 1;
+    vectorStyleRequestRef.current = requestId;
+
     /**
      * Load US state boundary features into the `landSourceRef` if they
      * are not already present. This creates the state outline layer
@@ -526,9 +531,6 @@ const OpenLayersVerificationMap = forwardRef<
     }
 
     if (isOpenFreeMapStyle(baseMapStyle)) {
-      const requestId = vectorStyleRequestRef.current + 1;
-      vectorStyleRequestRef.current = requestId;
-
       tile.setVisible(false);
       land.setVisible(false);
       landOutline.setVisible(true);
