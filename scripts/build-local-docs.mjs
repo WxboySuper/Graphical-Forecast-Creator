@@ -29,21 +29,34 @@ function shouldPreserveDestination(destination, context, resolveMarkdownLink) {
   return !resolveMarkdownLink || !context?.sourcePath || !context.pageMap || destination.startsWith('#') || /^(?:https?:|mailto:)/i.test(destination) || destination.startsWith('/');
 }
 
+/** Split a destination into its path portion and its preserved fragment suffix. */
+function splitDestination(trimmed) {
+  const [target, fragment] = trimmed.split('#', 2);
+  return { target, suffix: fragment === undefined ? '' : `#${fragment}` };
+}
+
+/** Normalize a link target against the directory of the document that links to it. */
+function normalizeTarget(sourcePath, target) {
+  if (!target) return '';
+  return path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), target));
+}
+
+/** Map a normalized source-relative path onto its generated page or repository file. */
+function resolveLocalPath(normalized, suffix, context) {
+  if (!normalized || normalized.startsWith('..')) return null;
+  const page = context.pageMap.get(normalized);
+  if (page) return `${page}${suffix}`;
+  if (context.repoFiles?.has(normalized)) return `${REPO_PREFIX}${normalized}${suffix}`;
+  return null;
+}
+
 /** Resolve a local Markdown link to its generated page, preserving fragments. */
 function resolveDestination(destination, context, resolveMarkdownLink) {
   const trimmed = destination.trim();
   if (!isSafeDestination(trimmed)) return '#';
   if (shouldPreserveDestination(trimmed, context, resolveMarkdownLink)) return trimmed;
-  const [target, fragment] = trimmed.split('#', 2);
-  const suffix = fragment === undefined ? '' : `#${fragment}`;
-  const normalized = target
-    ? path.posix.normalize(path.posix.join(path.posix.dirname(context.sourcePath), target))
-    : '';
-  if (!normalized || normalized.startsWith('..')) return trimmed;
-  const page = context.pageMap.get(normalized);
-  if (page) return `${page}${suffix}`;
-  if (context.repoFiles?.has(normalized)) return `${REPO_PREFIX}${normalized}${suffix}`;
-  return trimmed;
+  const { target, suffix } = splitDestination(trimmed);
+  return resolveLocalPath(normalizeTarget(context.sourcePath, target), suffix, context) ?? trimmed;
 }
 
 /** Render inline Markdown emphasis, code, images, and links. */
