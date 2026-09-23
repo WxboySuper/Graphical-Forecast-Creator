@@ -32,6 +32,7 @@ jest.mock('../../hooks/useFileLoader', () => ({
 }));
 
 const mockUseAuth = jest.requireMock('../../auth/AuthProvider').useAuth as jest.Mock;
+const mockCreateFileHandlers = jest.requireMock('../../hooks/useFileLoader').createFileHandlers as jest.Mock;
 
 const buildStore = (overrides?: Partial<ReturnType<typeof forecastReducer>>) => {
   const forecastState = { ...forecastReducer(undefined, { type: '@@INIT' }), ...(overrides ?? {}) };
@@ -224,5 +225,33 @@ describe('useHomePageLogic', () => {
 
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(mockAddToast).not.toHaveBeenCalled();
+  });
+
+  test('threads the active map view, workflow metadata, and workspace into the save path', () => {
+    const initial = forecastReducer(undefined, { type: '@@INIT' });
+    const workflowMetadata = {
+      id: 'WF-severe-2026-03-27',
+      workflowId: 'severe-day1',
+      cycleDate: '2026-03-27',
+      status: 'in-progress',
+      outlookVersions: [{ version: 1, status: 'in-progress', createdAt: '2026-03-27T12:00:00Z' }],
+      createdAt: '2026-03-27T12:00:00Z',
+      updatedAt: '2026-03-27T12:00:00Z',
+    } as never;
+    const store = buildStore({
+      workspaceId: 'custom',
+      currentMapView: { center: [11, 22], zoom: 5 },
+      workflowMetadata,
+      isWorkflowActive: true,
+    });
+
+    renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+
+    expect(mockCreateFileHandlers).toHaveBeenCalledWith(expect.objectContaining({
+      cycleMetadata: expect.objectContaining({ id: 'WF-severe-2026-03-27' }),
+      mapView: { center: [11, 22], zoom: 5 },
+      workspaceId: 'custom',
+      forecastCycle: expect.objectContaining({ cycleDate: initial.forecastCycle.cycleDate }),
+    }));
   });
 });

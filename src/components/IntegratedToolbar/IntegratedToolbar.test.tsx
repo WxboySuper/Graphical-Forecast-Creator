@@ -88,6 +88,7 @@ const ToolbarTestHarness: React.FC<{ variant: 'legacy' | 'tabbed' }> = ({ varian
     addToast: mockAddToast,
     onImportResult: jest.fn(),
     onExportComplete: jest.fn(),
+    workspaceId: 'severe',
   });
 
   return variant === 'tabbed'

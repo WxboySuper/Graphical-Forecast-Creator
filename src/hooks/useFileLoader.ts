@@ -1,8 +1,11 @@
-import { exportForecastToJson, deserializeForecast, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
-import { isWorkflowExportPackage } from '../utils/workflowPackage';
+import { downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
   markAsSaved,
   importForecastCycle,
+  setMapView,
   setWorkflowMetadata,
   clearWorkflowMetadata,
 } from '../store/forecastSlice';
@@ -11,11 +14,13 @@ import type { Dispatch } from 'redux';
 import type { CycleMetadata, ForecastCycle } from '../types/outlooks';
 
 /** Creates save and load file handler functions bound to the given toast notifier, Redux dispatch, and current forecast state. */
-export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMetadata }: {
+export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMetadata, mapView, workspaceId = DEFAULT_FORECAST_WORKSPACE }: {
   addToast: AddToastFn;
   dispatch: Dispatch;
   forecastCycle: ForecastCycle;
   cycleMetadata?: CycleMetadata;
+  mapView?: { center: [number, number]; zoom: number };
+  workspaceId?: ForecastWorkspaceId;
 }) {
   const fileInputRef = { current: null as HTMLInputElement | null } as React.MutableRefObject<HTMLInputElement | null>;
 
@@ -32,16 +37,11 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
     }
   };
 
-  /** Restores the workflow metadata embedded in a loaded forecast, if any. */
-  const syncWorkflowMetadata = (data: unknown): void => {
-    const validatedData = data as {
-      metadata?: CycleMetadata;
-      cycleMetadata?: CycleMetadata | null;
-    };
-    const packageMetadata = isWorkflowExportPackage(data) ? validatedData.metadata : validatedData.cycleMetadata;
-    if (packageMetadata) {
-      dispatch(setWorkflowMetadata(packageMetadata));
-    } else if (validatedData.cycleMetadata === null) {
+  /** Restores the workflow metadata from resolved envelope content, reading the inner forecast payload. */
+  const syncWorkflowMetadata = (cycleMetadata: CycleMetadata | null | undefined): void => {
+    if (cycleMetadata) {
+      dispatch(setWorkflowMetadata(cycleMetadata));
+    } else if (cycleMetadata === null) {
       dispatch(clearWorkflowMetadata());
     }
   };
@@ -63,9 +63,21 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
         return;
       }
 
-      const deserializedCycle = deserializeForecast(data);
-      dispatch(importForecastCycle(deserializedCycle));
-      syncWorkflowMetadata(data);
+      let resolved: ReturnType<typeof resolveNativeFileContent>;
+      try {
+        resolved = resolveNativeFileContent(data);
+      } catch (error) {
+        addToast(error instanceof Error ? error.message : 'Error reading file.', 'error');
+        return;
+      }
+      if (resolved.workspaceId !== workspaceId) {
+        addToast(`This forecast belongs to the ${resolved.workspaceId} workspace. Open it there before importing it.`, 'error');
+        return;
+      }
+
+      dispatch(importForecastCycle(resolved.forecastCycle));
+      syncWorkflowMetadata(resolved.cycleMetadata);
+      if (resolved.mapView) dispatch(setMapView(resolved.mapView));
       addToast('Forecast loaded successfully!', 'success');
     } catch {
       addToast('Error reading file.', 'error');
@@ -86,16 +98,22 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
     fileInputRef.current?.click();
   };
 
-  /** Serializes the current forecast cycle to a JSON file and downloads it, then marks the store as saved. */
+  /** Serializes the active workspace cycle to a workspace-owned JSON file, then marks the store as saved. */
   const handleSave = () => {
     try {
-      exportForecastToJson(
+      const payload = serializeForecastWorkspace(
+        workspaceId,
         forecastCycle,
-        {
+        mapView ?? {
           center: [39.8283, -98.5795],
           zoom: 4,
         },
         cycleMetadata,
+      );
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      downloadBlob(
+        new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+        `gfc-forecast-${timestamp}.json`,
       );
       dispatch(markAsSaved());
       addToast('Forecast exported to JSON!', 'success');

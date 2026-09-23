@@ -1,8 +1,9 @@
 import type { DayType, GFCForecastSaveData } from '../types/outlooks';
-import type { CycleMetadata, SerializedWorkflowPackage } from '../types/workflow';
+import type { CycleMetadata, SerializedOutlookVersionData, SerializedWorkflowPackage } from '../types/workflow';
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isFeatureExposed } from '../config/featureExposure';
+import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export type WorkflowExportScope = 'workflow' | 'cycle';
 
@@ -14,6 +15,7 @@ export interface WorkflowExportPackage {
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
   mapView?: GFCForecastSaveData['mapView'];
+  workspaceId: ForecastWorkspaceId;
   styleSnapshots?: Record<string, unknown>;
   /** Explicit compatibility disclosure for embedded custom content. */
   customContent?: {
@@ -87,38 +89,73 @@ export const restrictForecastToWorkflow = (
   };
 };
 
+interface BuildWorkflowExportPackageInput {
+  scope: WorkflowExportScope;
+  forecast: GFCForecastSaveData;
+  cycleMetadata?: CycleMetadata;
+  styleSnapshots?: Record<string, unknown>;
+  workspaceId: ForecastWorkspaceId;
+  exportedAt?: string;
+}
+
+/** Resolves the forecast payload for the requested package scope. */
+const resolveScopedPackageForecast = (
+  scope: WorkflowExportScope,
+  forecast: GFCForecastSaveData,
+  cycleMetadata?: CycleMetadata,
+): GFCForecastSaveData => scope === 'workflow'
+  ? restrictForecastToWorkflow(forecast, cycleMetadata)
+  : forecast;
+
+/** Applies workflow metadata aliases shared by current and legacy readers. */
+const applyPackageMetadata = (pkg: WorkflowExportPackage, cycleMetadata?: CycleMetadata): void => {
+  if (!cycleMetadata) return;
+  pkg.metadata = cycleMetadata;
+  pkg.cycleMetadata = cycleMetadata;
+};
+
+/** Copies the map view from the source forecast when one exists. */
+const applyPackageMapView = (pkg: WorkflowExportPackage, forecast: GFCForecastSaveData): void => {
+  if (forecast.mapView) pkg.mapView = forecast.mapView;
+};
+
+/** Applies optional style snapshots carried by the package. */
+const applyPackageStyleSnapshots = (pkg: WorkflowExportPackage, styleSnapshots?: Record<string, unknown>): void => {
+  if (styleSnapshots) pkg.styleSnapshots = styleSnapshots;
+};
+
+/** Attaches the compatibility disclosure for embedded custom content. */
+const applyPackageCustomContent = (pkg: WorkflowExportPackage, scopedForecast: GFCForecastSaveData): void => {
+  if (!isFeatureExposed('customProducts') || !hasCustomContent(scopedForecast)) return;
+  pkg.customContent = {
+    included: true,
+    severeAnalytics: 'excluded',
+    autoCategorical: 'excluded',
+  };
+};
+
 /** Builds the JSON payload used by both workflow- and cycle-scoped exports. */
 export const buildWorkflowExportPackage = ({
   scope,
   forecast,
   cycleMetadata,
   styleSnapshots,
+  workspaceId,
   exportedAt = new Date().toISOString(),
-}: {
-  scope: WorkflowExportScope;
-  forecast: GFCForecastSaveData;
-  cycleMetadata?: CycleMetadata;
-  styleSnapshots?: Record<string, unknown>;
-  exportedAt?: string;
-}): WorkflowExportPackage => {
-  const scopedForecast = scope === 'workflow' ? restrictForecastToWorkflow(forecast, cycleMetadata) : forecast;
-  return {
+}: BuildWorkflowExportPackageInput): WorkflowExportPackage => {
+  const scopedForecast = resolveScopedPackageForecast(scope, forecast, cycleMetadata);
+  const pkg: WorkflowExportPackage = {
     packageType: scope,
     schemaVersion: WORKFLOW_SCHEMA_VERSION,
     exportedAt,
-    ...(cycleMetadata ? { metadata: cycleMetadata } : {}),
-    ...(cycleMetadata ? { cycleMetadata } : {}),
-    ...(forecast.mapView ? { mapView: forecast.mapView } : {}),
+    workspaceId,
     forecast: scopedForecast,
-    ...(styleSnapshots ? { styleSnapshots } : {}),
-    ...(isFeatureExposed('customProducts') && hasCustomContent(scopedForecast) ? {
-      customContent: {
-        included: true,
-        severeAnalytics: 'excluded',
-        autoCategorical: 'excluded',
-      },
-    } : {}),
   };
+  applyPackageMetadata(pkg, cycleMetadata);
+  applyPackageMapView(pkg, forecast);
+  applyPackageStyleSnapshots(pkg, styleSnapshots);
+  applyPackageCustomContent(pkg, scopedForecast);
+  return pkg;
 };
 
 /** Returns true only for the exact top-level markers of a workflow export package. */
@@ -131,19 +168,40 @@ export const isWorkflowExportPackage = (value: unknown): value is WorkflowExport
     && Boolean(candidate.forecast && typeof candidate.forecast === 'object');
 };
 
+/** Reads the latest outlook version carried by the package metadata. */
+const getSerializedPackageVersion = (metadata: NonNullable<WorkflowExportPackage['metadata']>): number =>
+  metadata.outlookVersions.at(-1)?.version ?? 1;
+
+/** Strips detached custom layers when the custom-products surface is hidden. */
+const toSerializedGroupingValue = <T>(value: T): T =>
+  (isFeatureExposed('customProducts') ? value : { ...(value as Record<string, unknown>), customLayers: undefined }) as T;
+
+/** Keys serialized day payloads by workflow grouping, day, and outlook version. */
+const buildSerializedGroupingData = <T>(
+  dayEntries: [string, T][],
+  version: number,
+): Record<string, SerializedOutlookVersionData> => Object.fromEntries(dayEntries.map(([day, value]) => {
+  const dayNumber = Number(day) as DayType;
+  return [`${groupingForDay(dayNumber)}-day${dayNumber}-v${version}`, toSerializedGroupingValue(value)];
+})) as Record<string, SerializedOutlookVersionData>;
+
+/** Lists the workflow grouping that owns each serialized day. */
+const buildSerializedGroupings = <T>(dayEntries: [string, T][]) => dayEntries.map(([day]) => {
+  const dayNumber = Number(day) as DayType;
+  return { grouping: groupingForDay(dayNumber), day: dayNumber };
+});
+
+/** Returns true when any serialized day carries discussion content. */
+const hasSerializedDiscussion = (groupingData: Record<string, SerializedOutlookVersionData>): boolean =>
+  Object.values(groupingData).some((day) => Boolean(day.discussion));
+
 /** Converts the local package into the v2 package shape used for future readers. */
 export const toSerializedWorkflowPackage = (pkg: WorkflowExportPackage): SerializedWorkflowPackage | null => {
   const metadata = pkg.metadata;
   if (!metadata) return null;
-  const version = metadata.outlookVersions.at(-1)?.version ?? 1;
+  const version = getSerializedPackageVersion(metadata);
   const dayEntries = Object.entries(pkg.forecast.forecastCycle?.days ?? {});
-  const groupingData = Object.fromEntries(dayEntries.map(([day, value]) => {
-    const dayNumber = Number(day) as DayType;
-    const groupingValue = isFeatureExposed('customProducts')
-      ? value
-      : { ...value, customLayers: undefined };
-    return [`${groupingForDay(dayNumber)}-day${dayNumber}-v${version}`, groupingValue];
-  }));
+  const groupingData = buildSerializedGroupingData(dayEntries, version);
   return {
     schemaVersion: pkg.schemaVersion,
     version: pkg.schemaVersion,
@@ -152,7 +210,7 @@ export const toSerializedWorkflowPackage = (pkg: WorkflowExportPackage): Seriali
       cycleId: metadata.id,
       version,
       status: metadata.status,
-      includesDiscussions: Object.values(groupingData).some((day) => Boolean((day as { discussion?: unknown }).discussion)),
+      includesDiscussions: hasSerializedDiscussion(groupingData),
       includesStyleSnapshots: Boolean(pkg.styleSnapshots || pkg.customContent?.included),
     },
     cycles: [{
@@ -163,10 +221,7 @@ export const toSerializedWorkflowPackage = (pkg: WorkflowExportPackage): Seriali
       outlookVersions: metadata.outlookVersions,
       createdAt: metadata.createdAt,
       updatedAt: metadata.updatedAt,
-      groupings: dayEntries.map(([day]) => {
-        const dayNumber = Number(day) as DayType;
-        return { grouping: groupingForDay(dayNumber), day: dayNumber };
-      }),
+      groupings: buildSerializedGroupings(dayEntries),
       groupingData,
     }],
     ...(pkg.styleSnapshots ? { styleSnapshots: pkg.styleSnapshots } : {}),

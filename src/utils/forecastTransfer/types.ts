@@ -1,5 +1,6 @@
 import type { DayType, ForecastCycle, OutlookType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 /** Supported forecast data transfer formats. */
 export type ForecastTransferFormat = 'json' | 'package' | 'kml' | 'kmz';
@@ -23,10 +24,17 @@ export interface ForecastExportRequest {
   day?: DayType;
   kmlStrategy?: KmlArchiveStrategy;
   outlookTypes?: OutlookType[];
+  workspaceId: ForecastWorkspaceId;
 }
 
 export interface ForecastImportResult {
   forecastCycle: ForecastCycle;
+  /**
+   * Owning workspace for the transfer. Untagged KML/KMZ defaults to Severe
+   * ownership so Severe keeps its GIS route and other workspaces reject it.
+   * Null means unowned and is always rejected.
+   */
+  workspaceId: ForecastWorkspaceId | null;
   mapView?: ForecastTransferMapView;
   cycleMetadata?: CycleMetadata | null;
   warnings: string[];

@@ -70,6 +70,7 @@ export const ForecastWorkspaceModals: React.FC<{
         onExported={controller.onTransferExported}
         onError={onTransferError}
         onExportImage={controller.onInitiateExport}
+        workspaceId={controller.workspaceId}
       />
       <ResetConfirmDialog
         open={controller.showResetConfirm}

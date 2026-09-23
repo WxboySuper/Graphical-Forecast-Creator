@@ -16,6 +16,17 @@ jest.mock('../../billing/EntitlementProvider', () => ({
 jest.mock('../../utils/fileUtils', () => ({
   serializeForecast: jest.fn(() => ({ kind: 'serialized' })),
   deserializeForecast: jest.fn((payload: unknown) => payload),
+  validateForecastData: jest.fn(() => true),
+  validateForecastDataReason: jest.fn(() => null),
+}));
+
+jest.mock('../../utils/forecastTransfer/nativeImportUtils', () => ({
+  resolveNativeFileContent: jest.fn((payload: unknown) => ({
+    forecastCycle: payload,
+    workspaceId: 'severe',
+    mapView: undefined,
+    cycleMetadata: undefined,
+  })),
 }));
 
 jest.mock('../../utils/verificationV2/sources', () => ({
@@ -57,7 +68,8 @@ jest.mock('../../utils/verificationV2', () => ({
 
 import { useAuth } from '../../auth/AuthProvider';
 import { useEntitlement } from '../../billing/EntitlementProvider';
-import { deserializeForecast, serializeForecast } from '../../utils/fileUtils';
+import { serializeForecast } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import {
   buildGradeCard,
   loadForecastFromFile,
@@ -85,7 +97,7 @@ const mockRecordGradeResult = recordGradeResult as jest.MockedFunction<typeof re
 const mockBuildGradeCard = buildGradeCard as jest.MockedFunction<typeof buildGradeCard>;
 const mockTierHasSnapshots = tierHasSnapshots as jest.MockedFunction<typeof tierHasSnapshots>;
 const mockSerializeForecast = serializeForecast as jest.MockedFunction<typeof serializeForecast>;
-const mockDeserializeForecast = deserializeForecast as jest.MockedFunction<typeof deserializeForecast>;
+const mockResolveNativeFileContent = resolveNativeFileContent as jest.MockedFunction<typeof resolveNativeFileContent>;
 const mockLoadReportsForDate = loadReportsForDate as jest.MockedFunction<typeof loadReportsForDate>;
 const mockLoadDatEvidenceForDate = loadDatEvidenceForDate as jest.MockedFunction<typeof loadDatEvidenceForDate>;
 const mockLoadForecastFromFile = loadForecastFromFile as jest.MockedFunction<typeof loadForecastFromFile>;
@@ -599,7 +611,12 @@ describe('useForecastGrade', () => {
         })
       );
       // Make the snapshot deserialize to a real cycle so run() can read forecast.days.
-      mockDeserializeForecast.mockReturnValueOnce(sampleCycle);
+      mockResolveNativeFileContent.mockReturnValueOnce({
+        forecastCycle: sampleCycle,
+        workspaceId: 'severe',
+        mapView: undefined,
+        cycleMetadata: undefined,
+      } as never);
       const { result, store } = renderWithPackage();
 
       const snapshot = {

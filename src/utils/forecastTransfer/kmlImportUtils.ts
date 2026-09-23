@@ -4,6 +4,7 @@ import { parseKmlDocument } from './parseKml';
 import { forecastCycleFromKmlPlacemarks } from './forecastCycleFromKml';
 import type { ForecastImportResult } from './types';
 import { MAX_KML_IMPORT_BYTES } from '../forecastImportValidation';
+import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
 
 /** Finds the preferred KML entry in an archive, falling back to any .kml file. */
 const findKmlEntry = (zip: JSZip): JSZip.JSZipObject => {
@@ -41,9 +42,14 @@ const readKmlPayload = async (file: File, bytes?: Uint8Array): Promise<string> =
   throw new Error('Unable to read KML file contents.');
 };
 
-/** Imports a KML/KMZ transfer into a forecast cycle. */
+/** Imports a KML/KMZ transfer into a forecast cycle. Untagged KML defaults to Severe ownership. */
 export const importKmlTransfer = async (file: File, bytes: Uint8Array | undefined, format: 'kml' | 'kmz', options?: { baseCycle?: ForecastCycle; defaultDay?: DayType }): Promise<ForecastImportResult> => {
   const kml = await readKmlPayload(file, bytes);
   const { placemarks, warnings } = parseKmlDocument(kml, options?.defaultDay ?? options?.baseCycle?.currentDay ?? 1);
-  return { forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle), warnings, format };
+  return {
+    forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle),
+    workspaceId: DEFAULT_FORECAST_WORKSPACE,
+    warnings,
+    format,
+  };
 };

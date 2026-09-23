@@ -35,17 +35,25 @@ jest.mock('../DrawingTools/ConfirmationModal', () => {
 
 // Mock fileUtils
 jest.mock('../../utils/fileUtils', () => ({
-  deserializeForecast: jest.fn((data) => ({
-    cycleDate: '2026-04-21',
-    currentDay: 1,
-    days: {},
-    ...data
-  })),
+  readForecastImportFile: jest.fn().mockResolvedValue({ cycleDate: '2026-04-21', outlooks: {} }),
   validateForecastData: jest.fn(() => true),
   cloneForecastCycle: jest.fn((cycle) => JSON.parse(JSON.stringify(cycle))),
   cloneForecastDay: jest.fn((day) => JSON.parse(JSON.stringify(day)))
 }));
 const mockValidateForecastData = jest.requireMock('../../utils/fileUtils').validateForecastData as jest.Mock;
+const mockReadForecastImportFile = jest.requireMock('../../utils/fileUtils').readForecastImportFile as jest.Mock;
+
+jest.mock('../../utils/forecastTransfer/nativeImportUtils', () => ({
+  resolveNativeFileContent: jest.fn((data) => ({
+    workspaceId: 'severe',
+    forecastCycle: {
+      cycleDate: '2026-04-21',
+      currentDay: 1,
+      days: {},
+      ...data,
+    },
+  })),
+}));
 
 type ForecastStateOverrides = {
   forecastCycle?: Partial<ForecastState['forecastCycle']>;
@@ -309,6 +317,7 @@ describe('CycleManager Components', () => {
     });
 
     it('handles file parsing errors', async () => {
+      mockReadForecastImportFile.mockRejectedValueOnce(new Error('Invalid JSON'));
       renderCopyFromPreviousModal();
 
       const file = new File(['invalid json'], 'bad.json', { type: 'application/json' });

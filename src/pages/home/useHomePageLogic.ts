@@ -20,6 +20,7 @@ import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
 import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
@@ -36,6 +37,8 @@ const useHomePageLogic = () => {
   const { hostedAuthEnabled, status, user } = useAuth();
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
+  const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
@@ -50,6 +53,9 @@ const useHomePageLogic = () => {
     addToast,
     dispatch,
     forecastCycle,
+    cycleMetadata: workflowMetadata ?? undefined,
+    mapView: currentMapView,
+    workspaceId: activeWorkspaceId ?? DEFAULT_FORECAST_WORKSPACE,
   });
 
   // Lifetime totals intentionally remain account-wide; retained history and recent-cycle lists are workspace-scoped.

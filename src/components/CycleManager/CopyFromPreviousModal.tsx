@@ -1,8 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import type { RootState } from '../../store';
 import { selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';
 import { DayType, ForecastCycle } from '../../types/outlooks';
-import { deserializeForecast, validateForecastData } from '../../utils/fileUtils';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+import { readForecastImportFile, validateForecastData } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './CopyFromPreviousModal.css';
@@ -14,23 +17,17 @@ interface CopyFromPreviousModalProps {
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
-// Read a file as text (Promise wrapper) and deserialize into ForecastCycle
-const readFileAsText = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as string);
-    reader.onerror = () => reject(new Error('Failed to read file.'));
-    reader.readAsText(file);
-  });
-
 /** Reads and parses a GFC JSON forecast file into a ForecastCycle object. */
-const parseForecastFile = async (file: File): Promise<ForecastCycle> => {
-  const content = await readFileAsText(file);
-  const parsed = JSON.parse(content);
+export const parseForecastFile = async (file: File, workspaceId: ForecastWorkspaceId): Promise<ForecastCycle> => {
+  const parsed = await readForecastImportFile(file);
   if (!validateForecastData(parsed)) {
     throw new Error('Invalid GFC forecast file.');
   }
-  return deserializeForecast(parsed);
+  const resolved = resolveNativeFileContent(parsed);
+  if (resolved.workspaceId !== workspaceId) {
+    throw new Error(`This forecast belongs to the ${resolved.workspaceId} workspace.`);
+  }
+  return resolved.forecastCycle;
 };
 
 type CopyModalHeaderProps = {
@@ -156,6 +153,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
   const currentDay = useSelector(selectCurrentDay);
+  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setModalRef } = useModalFocusTrap({ active: isOpen, onClose });
 
@@ -172,11 +170,14 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
     if (!file) return;
 
     try {
-      const cycle = await parseForecastFile(file);
+      const cycle = await parseForecastFile(file, workspaceId);
       setLoadedCycle(cycle);
       setLoadedFileName(file.name);
-    } catch {
-      addToast('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.', 'error');
+    } catch (error) {
+      const message = error instanceof Error && error.message.startsWith('This forecast belongs to ')
+        ? error.message
+        : 'Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.';
+      addToast(message, 'error');
     } finally {
       // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';

@@ -630,12 +630,16 @@ const useForecastPageWorkspace = ({
   });
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
-    applyForecastImportResult(result, dispatch, mapRef);
+    const workspaceError = applyForecastImportResult(result, dispatch, mapRef, workspaceId);
+    if (workspaceError) {
+      addToast(workspaceError, 'error');
+      return;
+    }
     const warningSuffix = result.warnings.length > 0
       ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})`
       : '';
     addToast(`Forecast imported from ${result.format.toUpperCase()}!${warningSuffix}`, 'success');
-  }, [addToast, dispatch, mapRef]);
+  }, [addToast, dispatch, mapRef, workspaceId]);
 
   const handleExportComplete = useCallback((format: ForecastTransferFormat, scope: ForecastTransferScope) => {
     if (format === 'json') {
@@ -672,6 +676,7 @@ const useForecastPageWorkspace = ({
     addToast,
     onImportResult: handleImportResult,
     onExportComplete: handleExportComplete,
+    workspaceId,
     cloudTools: renderCloudToolbar({
       premiumActive,
       isExpiredPremium,
@@ -738,6 +743,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     mapRef,
     user,
     workflowMetadata,
+    workspaceId,
   );
   const {
     emergencyMode,
