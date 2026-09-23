@@ -534,6 +534,16 @@ describe("CloudLibraryPage", () => {
     expect(wrapped.workspaceId).toBe('severe');
   });
 
+  it("supports cloud loads only for workspaces with a registered exposed editor route", () => {
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("severe"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("custom", getForecastWorkspace("custom"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("mesoscale", getForecastWorkspace("mesoscale"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("tropical", getForecastWorkspace("tropical"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("winter", getForecastWorkspace("winter"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", undefined)).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("custom"))).toBe(false);
+  });
+
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(

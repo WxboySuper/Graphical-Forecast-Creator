@@ -33,7 +33,7 @@ import {
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
 } from '../utils/forecastWorkspacePersistence';
-import { getForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
+import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
