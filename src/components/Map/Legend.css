@@ -69,11 +69,12 @@
 
 @media (max-height: 500px) and (orientation: landscape) {
   .map-legend.map-legend--mobile-open {
-    top: 106px;
+    --legacy-forecast-landscape-legend-top: 106px;
+    top: calc(var(--legacy-forecast-landscape-legend-top) - var(--legacy-forecast-notice-height, 0px));
     left: 86px;
     bottom: auto;
     max-width: min(240px, calc(100vw - 110px));
-    max-height: calc(100dvh - var(--app-header-height, 64px) - 218px);
+    max-height: calc(100dvh - var(--app-header-height, 64px) - 218px - var(--legacy-forecast-notice-height, 0px));
   }
 }
 

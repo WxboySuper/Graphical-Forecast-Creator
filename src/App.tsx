@@ -64,11 +64,15 @@ const RouteFallback = () => (
 );
 
 /** Redirects the legacy Forecast entry point without dropping deep-link options. */
-const ForecastLegacyRedirect = () => {
+export const ForecastLegacyRedirect = () => {
   const location = useLocation();
+  const existingState = location.state && typeof location.state === 'object' && !Array.isArray(location.state)
+    ? location.state as Record<string, unknown>
+    : {};
   return (
     <Navigate
       to={{ pathname: getDefaultForecastWorkspacePath(), search: location.search, hash: location.hash }}
+      state={{ ...existingState, legacyForecastRedirect: true }}
       replace
     />
   );
