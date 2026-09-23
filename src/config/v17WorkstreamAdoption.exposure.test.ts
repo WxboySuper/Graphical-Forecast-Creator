@@ -17,7 +17,6 @@ const V17_WORKSTREAM_KEYS = [
 ] as const satisfies readonly FeatureKey[];
 
 const TEMPORARY_V17_WORKSTREAM_KEYS = [
-  'autoTstm',
   'tropicalWorkspace',
   'collaborationRoom',
 ] as const satisfies readonly FeatureKey[];
