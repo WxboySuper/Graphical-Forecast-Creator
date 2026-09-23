@@ -19,7 +19,7 @@ The planned Forecast routes are:
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
 | Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
-| Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
+| Tropical | `/forecast/tropical` | future; tracked separately from the legacy surface | Workspace status |
 | Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
 | Custom | `/forecast/custom` | gated; `customProducts` on for every target, availability follows implementation; `/custom-products` remains a separate library route | `customProducts` |
 
@@ -124,7 +124,7 @@ the workspace definitions and route records.
 Future routes stay unregistered when their feature is off. A direct request
 falls through the normal application fallback instead of mounting a disabled
 page or running workspace code. When a workspace is enabled, its route must be
-registered only through the same feature exposure decision.
+registered only through the same feature exposure decision. The existing top-level `/tropical` route and navigation remain separately gated by `tropicalWorkspace`; that key does not expose the planned `/forecast/tropical` workspace.
 
 ## Compatibility paths
 
@@ -168,7 +168,7 @@ and lifecycle before its discussion UI is integrated:
   metadata. Any later discussion feature must define a Custom-specific scope ID
   and draft lifecycle. Existing custom layers embedded in legacy
   Severe days remain readable while #915 moves the UI.
-- Tropical, Mesoscale, and Winter have no production state contract yet. Tropical remains disabled by its exposure entry; Mesoscale and Winter remain unregistered while their workspace status is future.
+- Tropical, Mesoscale, and Winter have no production state contract yet. Their planned `/forecast/*` workspaces remain unregistered while status is future. The separate legacy `/tropical` route and navigation remain gated by `tropicalWorkspace`; Mesoscale and Winter have no legacy gated surface.
 
 The URL is the only persistent active-workspace selector. Temporary controls,
 map interaction state, and open panels stay local to the active workspace. They
