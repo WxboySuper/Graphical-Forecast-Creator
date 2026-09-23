@@ -114,6 +114,30 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
 
+  it.each(["mesoscale", "tropical", "winter"] as const)(
+    "does not fetch a cloud cycle owned by hidden workspace %s",
+    async (workspaceId) => {
+      mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+      const loadCycle = jest.fn();
+      mockUseCloudCycles.mockReturnValue(
+        cloudCyclesResult({
+          cycles: [{ id: `${workspaceId}-1`, workspaceId, label: `${workspaceId} save` }],
+          loadCycle,
+        })
+      );
+      window.history.replaceState({}, "", "/cloud");
+
+      renderPage();
+      expect(screen.getByRole("tab", { name: "All 1" })).toHaveAttribute("aria-selected", "true");
+      fireEvent.click(screen.getByRole("button", { name: "Load" }));
+
+      expect(await screen.findByText("Workspace-specific cloud loading is not available yet.")).toBeInTheDocument();
+      expect(loadCycle).not.toHaveBeenCalled();
+      expect(sessionStorage.length).toBe(0);
+      expect(window.location.pathname).toBe("/cloud");
+    }
+  );
+
   it("loads an exposed Custom cloud cycle into the matching forecast editor", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-load" }).forecastCycle;
