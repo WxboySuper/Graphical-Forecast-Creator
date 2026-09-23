@@ -24,6 +24,7 @@ describe('forecast workspace product contract', () => {
   test.each(BUILD_TARGETS)('exposes Severe and Custom according to the %s target', (target: BuildTarget) => {
     expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(['severe', 'custom']);
     expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, target)).toBe(true);
+    expect(getForecastWorkspace('tropical')?.exposureKey).toBeNull();
     for (const workspaceId of ['mesoscale', 'tropical', 'winter'] as const) {
       expect(isForecastWorkspaceExposed(getForecastWorkspace(workspaceId)!, target)).toBe(false);
     }

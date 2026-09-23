@@ -45,7 +45,7 @@ export const FORECAST_WORKSPACES = [
     label: 'Tropical',
     productType: 'tropical',
     status: 'future',
-    exposureKey: 'tropicalWorkspace',
+    exposureKey: null,
     legacyPaths: [],
   },
   {
