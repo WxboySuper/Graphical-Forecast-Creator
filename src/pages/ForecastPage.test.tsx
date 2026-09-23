@@ -1,8 +1,8 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import ForecastPage, {
   buildMapView,
   buildRestoreKey,
@@ -127,6 +127,11 @@ const renderForecastPage = (store: ReturnType<typeof createStore>) =>
     </MemoryRouter>
   );
 
+const RouterStateProbe = () => {
+  const location = useLocation();
+  return <output data-testid="router-state">{JSON.stringify(location.state)}</output>;
+};
+
 
 describe('ForecastPage layout selection', () => {
   beforeEach(() => {
@@ -142,6 +147,7 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   test('waits for Redux workspace ownership before mounting workspace restore effects', () => {
@@ -195,7 +201,26 @@ describe('ForecastPage layout selection', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
-    expect(screen.getByText('ForecastTabbedToolbarLayout Mock').closest('.forecast-page-workspace')).not.toBeNull();
+    expect(screen.getByTestId('forecast-page-workspace')).toContainElement(
+      screen.getByText('ForecastTabbedToolbarLayout Mock'),
+    );
+  });
+
+  test('clears the one-time redirect marker when the bookmark notice is dismissed', () => {
+    const store = createStore();
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/forecast/severe', state: { legacyForecastRedirect: true } }]}>
+        <Provider store={store}>
+          <ForecastPage />
+          <RouterStateProbe />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('router-state')).toHaveTextContent('null');
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
