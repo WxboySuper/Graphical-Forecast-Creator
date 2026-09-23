@@ -1,5 +1,23 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { prepareAppState } from './testSetup';
+
+const expectNoOverlap = async (page: Page, firstSelector: string, secondSelector: string) => {
+  const first = await page.locator(firstSelector).boundingBox();
+  const second = await page.locator(secondSelector).boundingBox();
+  if (!first || !second) {
+    throw new Error(`Expected visible bounds for ${firstSelector} and ${secondSelector}`);
+  }
+
+  const separated =
+    first.x + first.width <= second.x ||
+    second.x + second.width <= first.x ||
+    first.y + first.height <= second.y ||
+    second.y + second.height <= first.y;
+  expect(
+    separated,
+    `${firstSelector} must not overlap ${secondSelector}: ${JSON.stringify({ first, second })}`,
+  ).toBe(true);
+};
 
 const expectPaintedMapCanvas = async (viewport: Locator) => {
   const paintedPixels = await viewport.locator('canvas').evaluateAll((canvases) =>
@@ -43,10 +61,16 @@ test('renders a drawn outlook in forecast and verification with shared map style
   const download = await downloadReady;
   const path = await download.path();
   if (!path) throw new Error('Forecast package download has no file');
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/verification');
   await page.getByLabel('Upload forecast file').setInputFiles(path);
   const verificationViewport = page.locator('.fg-map-pane .ol-viewport');
   await expect(verificationViewport).toBeVisible({ timeout: 15000 });
+  const telemetry = '.fg-map-telemetry';
+  const warning = '.forecast-map-container .unofficial-badge';
+  const controls = '.forecast-map-container .map-toolbar-bottom-right';
+  await expectNoOverlap(page, telemetry, warning);
+  await expectNoOverlap(page, telemetry, controls);
   await page.getByRole('group', { name: 'Outlook layer' }).getByRole('button', { name: 'wind', exact: true }).click();
   await page.getByRole('button', { name: 'Base map style', exact: true }).click();
   await page.getByRole('button', { name: 'Blank (Weather)', exact: true }).click();
@@ -58,7 +82,16 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await page.getByRole('button', { name: 'Switch to dark mode' }).click();
   await expect(verificationViewport.locator('canvas').first()).toBeVisible();
   await expectPaintedMapCanvas(verificationViewport);
+  await expectNoOverlap(page, telemetry, warning);
+  await expectNoOverlap(page, telemetry, controls);
   const verificationDarkScreenshot = testInfo.outputPath('verification-dark-style.png');
   await verificationViewport.screenshot({ path: verificationDarkScreenshot });
   await testInfo.attach('verification-dark-style', { path: verificationDarkScreenshot, contentType: 'image/png' });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoOverlap(page, telemetry, warning);
+  await expectNoOverlap(page, telemetry, controls);
+  await page.getByRole('button', { name: 'Switch to light mode' }).click();
+  await expectNoOverlap(page, telemetry, warning);
+  await expectNoOverlap(page, telemetry, controls);
 });
