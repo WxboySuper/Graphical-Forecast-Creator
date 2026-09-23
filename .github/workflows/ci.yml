@@ -320,6 +320,11 @@ jobs:
       - name: Validate vendored boundary dataset integrity
         run: node scripts/validate-geo-assets.mjs
 
+      - name: Verify generated Tailwind CSS is up to date
+        run: |
+          pnpm run css:build
+          git diff --exit-code -- src/tailwind.generated.css
+
       - name: Build
         run: pnpm run build
         env:
