@@ -10,6 +10,7 @@ import type {
   ForecastImportResult,
 } from './types';
 import {
+  buildWorkspaceForecastFilename,
   buildTransferFilename,
   toKmzStrategy,
   toKmlScope,
@@ -23,10 +24,9 @@ const downloadWorkspaceJsonTransfer = (
 ): void => {
   const { workspaceId } = request;
   const payload = serializeForecastWorkspace(workspaceId, request.forecastCycle, request.mapView, request.cycleMetadata);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   downloadBlob(
     new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
-    `gfc-forecast-${timestamp}.json`,
+    buildWorkspaceForecastFilename(workspaceId),
   );
 };
 

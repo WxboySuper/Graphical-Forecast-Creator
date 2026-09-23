@@ -225,6 +225,8 @@ describe('forecastPageController', () => {
       downloadWorkspaceForecastJson('custom', forecastCycle, mapView);
       const payload = JSON.parse(seen.join('')) as { workspaceId?: string };
       expect(payload.workspaceId).toBe('custom');
+      expect(downloadSpy).toHaveBeenCalledTimes(1);
+      expect(downloadSpy.mock.calls[0]?.[1]).toMatch(/gfc-custom-forecast-.*\.json$/);
     } finally {
       global.Blob = OriginalBlob;
       downloadSpy.mockRestore();

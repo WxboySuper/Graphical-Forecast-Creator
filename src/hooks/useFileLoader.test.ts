@@ -190,6 +190,7 @@ describe('createFileHandlers', () => {
       zoom: 4,
     }, undefined);
     expect(mockDownloadBlob).toHaveBeenCalled();
+    expect(mockDownloadBlob.mock.calls[0]?.[1]).toMatch(/^gfc-custom-forecast-.*\.json$/);
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/markAsSaved' }));
     expect(addToast).toHaveBeenCalledWith('Forecast exported to JSON!', 'success');
 
@@ -215,5 +216,11 @@ describe('createFileHandlers', () => {
     handlers.handleSave();
 
     expect(mockSerializeWorkspace).toHaveBeenCalledWith('severe', forecastCycle, mapView, cycleMetadata);
+  });
+
+  it('uses the Severe filename for legacy callers without an explicit workspace', () => {
+    makeHandlers().handleSave();
+
+    expect(mockDownloadBlob.mock.calls[0]?.[1]).toMatch(/^gfc-severe-forecast-.*\.json$/);
   });
 });
