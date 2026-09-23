@@ -69,7 +69,7 @@ describe('openLayersMapStyles', () => {
 
   test('rejects when either style application fails', async () => {
     const error = new Error('overlay style failed');
-    applyMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(error);
+    applyMock.mockImplementationOnce(async () => {}).mockRejectedValueOnce(error);
     const styleSet = {
       baseStyle: { version: 8, sources: {}, layers: [] },
       overlayStyle: { version: 8, sources: {}, layers: [] },
