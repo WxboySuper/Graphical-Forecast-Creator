@@ -16,6 +16,12 @@ const V17_WORKSTREAM_KEYS = [
   'collaborationRoom',
 ] as const satisfies readonly FeatureKey[];
 
+const TEMPORARY_V17_WORKSTREAM_KEYS = [
+  'autoTstm',
+  'tropicalWorkspace',
+  'collaborationRoom',
+] as const satisfies readonly FeatureKey[];
+
 describe('v1.7 workstream adoption contract', () => {
   test('forecastWorkflowV2 is enabled on every release target', () => {
     for (const target of BUILD_TARGETS) {
@@ -64,7 +70,7 @@ describe('v1.7 workstream adoption contract', () => {
     }
   });
 
-  test.each(V17_WORKSTREAM_KEYS)('%s declares required lifecycle metadata', (feature) => {
+  test.each(TEMPORARY_V17_WORKSTREAM_KEYS)('%s declares required temporary lifecycle metadata', (feature) => {
     const definition = getFeatureExposure(feature);
 
     expect(definition.temporary).toBe(true);
