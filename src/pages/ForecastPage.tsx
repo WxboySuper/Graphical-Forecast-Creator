@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useOutletContext } from 'react-router';
 import type { Dispatch, UnknownAction } from 'redux';
@@ -220,7 +220,7 @@ const LegacyForecastNotice: React.FC<{ onDismiss: () => void }> = ({ onDismiss }
 
 const LEGACY_FORECAST_NOTICE_SESSION_KEY = 'gfc:legacy-forecast-notice';
 
-const hasPersistedLegacyForecastNotice = (): boolean => {
+const readPersistedLegacyForecastNotice = (): boolean => {
   try {
     return window.sessionStorage.getItem(LEGACY_FORECAST_NOTICE_SESSION_KEY) === 'true';
   } catch {
@@ -253,11 +253,15 @@ const useLegacyForecastNotice = (
     ? location.state as Record<string, unknown>
     : {};
   const hasLegacyRedirectMarker = Boolean(locationState.legacyForecastRedirect);
-  const showLegacyNotice = hasLegacyRedirectMarker || hasPersistedLegacyForecastNotice();
+  const [hasPersistedNotice, setHasPersistedNotice] = useState(readPersistedLegacyForecastNotice);
+  const showLegacyNotice = hasLegacyRedirectMarker || hasPersistedNotice;
   const focusWorkspaceAfterDismiss = useRef(false);
 
   useEffect(() => {
-    if (hasLegacyRedirectMarker) persistLegacyForecastNotice();
+    if (hasLegacyRedirectMarker) {
+      persistLegacyForecastNotice();
+      setHasPersistedNotice(true);
+    }
   }, [hasLegacyRedirectMarker]);
 
   useEffect(() => {
@@ -269,6 +273,7 @@ const useLegacyForecastNotice = (
 
   const dismissLegacyNotice = () => {
     clearPersistedLegacyForecastNotice();
+    setHasPersistedNotice(false);
     focusWorkspaceAfterDismiss.current = true;
     const currentState = { ...locationState };
     delete currentState.legacyForecastRedirect;
@@ -848,7 +853,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   return (
     <div className="forecast-page-shell">
       {showLegacyNotice ? <LegacyForecastNotice onDismiss={dismissLegacyNotice} /> : null}
-      <div ref={workspaceRef} tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
+      <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         {renderForecastWorkspaceLayout(forecastUiVariant, {
           mapRef,
           controller: workspaceController,
