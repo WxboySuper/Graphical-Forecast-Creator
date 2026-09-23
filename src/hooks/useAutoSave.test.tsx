@@ -9,8 +9,8 @@ jest.mock('../utils/fileUtils', () => ({
   serializeForecast: jest.fn(() => ({ serialized: true })),
 }));
 
-const Harness = () => {
-  useAutoSave();
+const Harness = ({ workspaceId = 'severe' }: { workspaceId?: 'severe' | 'custom' }) => {
+  useAutoSave(undefined, workspaceId);
   return null;
 };
 
@@ -47,15 +47,17 @@ describe('useAutoSave', () => {
     expect(getAutoSaveStorageKey('user-1', 'severe')).toBe('forecastData:user-user-1');
   });
 
-  test('does not migrate a non-Severe anonymous autosave without a workspace contract', () => {
+  test('migrates a non-Severe anonymous autosave into its own account scope', () => {
     const anonymousKey = getAutoSaveStorageKey(null, 'custom');
     const scopedKey = getAutoSaveStorageKey('user-1', 'custom');
     localStorage.setItem(anonymousKey, JSON.stringify({ custom: true }));
 
     migrateLegacyAutoSave('user-1', undefined, 'custom');
 
-    expect(localStorage.getItem(anonymousKey)).toBe(JSON.stringify({ custom: true }));
-    expect(localStorage.getItem(scopedKey)).toBeNull();
+    expect(localStorage.getItem(anonymousKey)).toBeNull();
+    expect(localStorage.getItem(scopedKey)).toBe(JSON.stringify({ custom: true }));
+    // The Severe scope is never touched by a non-Severe migration.
+    expect(localStorage.getItem('forecastData')).toBeNull();
   });
 
   test('does not overwrite a non-Severe account autosave during migration', () => {
@@ -119,11 +121,13 @@ describe('useAutoSave', () => {
   test('clears only the selected non-Severe workspace autosave', () => {
     const customKey = getAutoSaveStorageKey('user-1', 'custom');
     localStorage.setItem(customKey, JSON.stringify({ custom: true }));
+    localStorage.setItem('forecastData:custom', JSON.stringify({ anonymousCustom: true }));
     localStorage.setItem('forecastData', JSON.stringify({ severe: true }));
 
     clearAutoSave('user-1', 'custom');
 
     expect(localStorage.getItem(customKey)).toBeNull();
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
     expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ severe: true }));
   });
 
@@ -222,5 +226,32 @@ describe('useAutoSave', () => {
 
     expect(serializeForecast).not.toHaveBeenCalled();
     expect(localStorage.getItem('forecastData')).toBeNull();
+  });
+
+  test('flushes the previous workspace edit when autosave scope changes', async () => {
+    const store = createStore();
+    const { rerender } = render(
+      <Provider store={store}>
+        <Harness workspaceId="severe" />
+      </Provider>
+    );
+
+    act(() => {
+      store.dispatch(setMapView({ center: [35, -97], zoom: 6 }));
+    });
+
+    await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
+    rerender(
+      <Provider store={store}>
+        <Harness workspaceId="custom" />
+      </Provider>
+    );
+
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: { serialized: true },
+    }));
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
   });
 });

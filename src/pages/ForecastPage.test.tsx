@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router';
@@ -32,7 +32,7 @@ import ForecastPage, {
   writeStoredDayValue,
 } from './ForecastPage';
 import forecastReducer from '../store/forecastSlice';
-import { addCustomLayer, addFeature, updateDiscussionDraft } from '../store/forecastSlice';
+import { addCustomLayer, addFeature, setForecastWorkspace, updateDiscussionDraft } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -41,6 +41,7 @@ import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
 import * as fileUtils from '../utils/fileUtils';
 import { serializeForecast } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
@@ -141,6 +142,45 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+  });
+
+  test('waits for Redux workspace ownership before mounting workspace restore effects', () => {
+    const store = createStore();
+    render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastPage workspaceId="custom" />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing custom forecast workspace');
+    expect(screen.queryByText('ForecastTabbedToolbarLayout Mock')).not.toBeInTheDocument();
+
+    act(() => store.dispatch(setForecastWorkspace('custom')));
+
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('surfaces a cross-workspace cloud handoff instead of silently restoring locally', async () => {
+    const store = createStore();
+    const customPayload = serializeForecastWorkspace(
+      'custom',
+      store.getState().forecast.forecastCycle,
+      { center: [0, 0], zoom: 4 },
+    );
+    sessionStorage.setItem('cloudCyclePayload:anonymous', JSON.stringify(customPayload));
+    sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'custom-1', label: 'Custom save' }));
+
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+      'This cloud cycle belongs to a different forecast workspace and was not loaded.',
+      'error',
+    ));
+    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
@@ -525,15 +565,15 @@ describe('ForecastPage helpers', () => {
 
     const saveCycle = jest.fn().mockResolvedValue(true);
     dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(true);
-    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true });
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(true);
+    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true, workspaceId: 'severe' });
     expect(clearCurrent).toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledTimes(1);
 
     saveCycle.mockResolvedValueOnce(false);
     clearCurrent.mockClear();
     dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(false);
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(false);
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
     exportSpy.mockRestore();

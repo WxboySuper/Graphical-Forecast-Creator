@@ -10,7 +10,19 @@ import { useEntitlement } from '../billing/EntitlementProvider';
 import { PRICING_COPY } from '../billing/pricingCopy';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
-import { getBuildTarget } from '../config/buildTarget';
+import type { GFCForecastSaveData } from '../types/outlooks';
+import { getBuildTarget, type BuildTarget } from '../config/buildTarget';
+import {
+  getForecastWorkspace,
+  isForecastWorkspaceExposed,
+  type ForecastWorkspaceDefinition,
+  type ForecastWorkspaceId,
+} from '../config/forecastWorkspaces';
+import {
+  classifyForecastWorkspacePayload,
+  createForecastWorkspaceSave,
+} from '../utils/forecastWorkspacePersistence';
+import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -679,6 +691,36 @@ const CloudLibrarySignedInLayout: React.FC<{
   </div>
 );
 
+/** Builds the session payload for a cloud handoff without double-wrapping an envelope. */
+export const buildCloudSessionPayload = (
+  workspaceId: ForecastWorkspaceId,
+  payload: unknown,
+): unknown => {
+  const classification = classifyForecastWorkspacePayload(payload);
+  if (classification.ok && !classification.legacy) {
+    if (classification.workspaceId !== workspaceId) {
+      throw new Error('Cloud payload belongs to a different forecast workspace.');
+    }
+    return payload;
+  }
+  return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+};
+
+/** A workspace can open cloud payloads only when it has a registered editor route for the target. */
+export const isSupportedCloudLoadWorkspace = (
+  workspaceId: ForecastWorkspaceId,
+  workspace: ForecastWorkspaceDefinition | undefined,
+  target?: BuildTarget,
+): boolean => {
+  if (!workspace || workspace.id !== workspaceId) {
+    return false;
+  }
+  if (!isForecastWorkspaceExposed(workspace, target)) {
+    return false;
+  }
+  return getExposedForecastWorkspaceRoutes(target).some((route) => route.id === workspaceId);
+};
+
 /** Creates the cloud library actions used by the page and keeps transient feedback local. */
 const useCloudLibraryActions = ({
   cycles,
@@ -702,9 +744,11 @@ const useCloudLibraryActions = ({
   const [message, setMessage] = useState<string | null>(null);
 
   const persistCloudCycleToSession = useCallback(
-    (cycleId: string, label: string, payload: unknown): boolean => {
+    (cycleId: string, label: string, workspaceId: ForecastWorkspaceId, payload: unknown): boolean => {
       try {
-        sessionStorage.setItem(payloadKey, JSON.stringify(payload));
+        // Preserve an already-enveloped payload so cloud handoffs never double-wrap.
+        const storable = buildCloudSessionPayload(workspaceId, payload);
+        sessionStorage.setItem(payloadKey, JSON.stringify(storable));
         sessionStorage.setItem(
           metaKey,
           JSON.stringify({
@@ -726,7 +770,10 @@ const useCloudLibraryActions = ({
     setMessage(null);
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
     const workspaceId = getCloudCycleWorkspaceId(selectedCycle ?? { workspaceId: undefined });
-    if (workspaceId !== 'severe') {
+    const workspace = getForecastWorkspace(workspaceId);
+    // Unexposed or unregistered workspaces reuse the existing failure path instead of
+    // navigating to a /forecast/{workspace} route with no editor.
+    if (!isSupportedCloudLoadWorkspace(workspaceId, workspace)) {
       setMessage('Workspace-specific cloud loading is not available yet.');
       return;
     }
@@ -736,11 +783,11 @@ const useCloudLibraryActions = ({
       return;
     }
 
-    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
+    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', workspaceId, payload)) {
       return;
     }
 
-    navigate('/forecast/severe');
+    navigate(getForecastWorkspacePath(workspaceId));
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */

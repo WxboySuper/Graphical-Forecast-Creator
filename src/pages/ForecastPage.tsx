@@ -84,6 +84,7 @@ export {
   formatRolloverDayLabel,
   parseStoredForecastPayload,
   parseStoredCloudMeta,
+  getMismatchedCloudWorkspaceId,
   clearStoredCloudSession,
   hasRestorableCloudSelection,
   buildRestoreKey,
@@ -504,6 +505,7 @@ const useCloudForecastActions = ({
   saveCycle,
   userId,
   workflowMetadata,
+  workspaceId,
 }: {
   addToast: AddToastFn;
   currentMapView: RootState['forecast']['currentMapView'];
@@ -513,6 +515,7 @@ const useCloudForecastActions = ({
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
   workflowMetadata?: import('../types/workflow').CycleMetadata;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const handleCloudCycleLoaded = useCallback(
     (cloudCycle: { id: string; label: string }) => {
@@ -530,7 +533,7 @@ const useCloudForecastActions = ({
 
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');
@@ -539,7 +542,7 @@ const useCloudForecastActions = ({
       markCurrentStateSynced();
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
+    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata, workspaceId]
   );
 
   return {
@@ -623,6 +626,7 @@ const useForecastPageWorkspace = ({
     saveCycle,
     userId: user?.uid,
     workflowMetadata,
+    workspaceId,
   });
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
@@ -704,6 +708,7 @@ const useForecastPageWorkspace = ({
     canSaveToCloud: premiumActive,
     saveCycle,
     clearCurrent,
+    workspaceId,
   });
 
   return {
@@ -717,9 +722,7 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
-  workspaceId = DEFAULT_FORECAST_WORKSPACE,
-}) => {
+const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -783,6 +786,19 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
       />
     </div>
   );
+};
+
+/** Waits for AppHooks to reset Redux ownership before mounting restore effects. */
+export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
+  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+}) => {
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+
+  if (activeWorkspaceId !== workspaceId) {
+    return <div role="status">Preparing {workspaceId} forecast workspace…</div>;
+  }
+
+  return <ForecastPageContent key={workspaceId} workspaceId={workspaceId} />;
 };
 
 export default ForecastPage;

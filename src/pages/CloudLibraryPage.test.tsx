@@ -1,10 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
-import CloudLibraryPage from "./CloudLibraryPage";
+import CloudLibraryPage, { buildCloudSessionPayload, isSupportedCloudLoadWorkspace } from "./CloudLibraryPage";
+import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
+import { getForecastWorkspace } from "../config/forecastWorkspaces";
 
 jest.mock("../auth/AuthProvider", () => ({
   useAuth: jest.fn(),
@@ -112,17 +114,40 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
 
-  it("does not load unsupported workspace cycles into the Severe editor", () => {
+  it("loads an exposed Custom cloud cycle into the matching forecast editor", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    const loadCycle = jest.fn();
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-load" }).forecastCycle;
+    const payload = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    const loadCycle = jest.fn().mockResolvedValue(payload);
     mockUseCloudCycles.mockReturnValue(
       cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
     );
 
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
-    expect(loadCycle).not.toHaveBeenCalled();
-    expect(screen.getByText("Workspace-specific cloud loading is not available yet.")).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe('/forecast/custom'));
+    expect(loadCycle).toHaveBeenCalledWith('custom-1');
+    expect(sessionStorage.length).toBeGreaterThan(0);
+  });
+
+  it("does not double-wrap an already-enveloped cloud handoff payload", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
+    expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
+    const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
+    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe('severe');
+  });
+
+  it("supports cloud loads only for workspaces with a registered exposed editor route", () => {
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("severe"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("custom", getForecastWorkspace("custom"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("mesoscale", getForecastWorkspace("mesoscale"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("tropical", getForecastWorkspace("tropical"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("winter", getForecastWorkspace("winter"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", undefined)).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("custom"))).toBe(false);
   });
 
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
