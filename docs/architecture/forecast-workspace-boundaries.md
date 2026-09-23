@@ -16,7 +16,7 @@ The planned Forecast routes are:
 | Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
 | Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
-| Custom | `/forecast/custom` | planned; `/custom-products` remains a separate library route | `customProducts` |
+| Custom | `/forecast/custom` | gated; `/custom-products` remains a separate library route | `customProducts` |
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
 contract preserves compatible query parameters and the hash when the routing
@@ -56,11 +56,17 @@ interface ForecastRecordDescriptor {
 }
 ```
 
-This is the target navigation contract. Until follow-up work moves cloud loads to
-it, the current Cloud Library stages the workspace envelope and cloud metadata in
-the `cloudCyclePayload` and `cloudCycleMeta` session-storage entries. That
-temporary transport does not replace or override the descriptor's ownership
-checks.
+The descriptor is an internal same-tab handoff, not a shareable URL. Stage it in
+session storage with the source payload until the destination consumes or rejects
+it. The current Cloud Library uses the `cloudCyclePayload` and `cloudCycleMeta`
+entries: `workspaceId` comes from the payload envelope, `source` is `cloud`, and
+`recordId` is the cloud metadata `id`. The destination derives its workspace from
+the canonical route, validates the pending descriptor and payload owner, then
+hydrates state and clears the handoff. On refresh, the canonical route still
+selects the workspace and the loader retries the staged handoff before that
+workspace's local autosave. If no pending handoff exists, it restores only that
+workspace's local autosave. If staging fails, stay on the source route and report
+the failure. #917 owns the switcher and this handoff/refresh behavior.
 
 The shared host validates the descriptor's shape, confirms that its workspace is
 known and exposed, and requires `workspaceId` to match the destination route. It
@@ -79,14 +85,14 @@ require a successful retry or an explicit leave confirmation before navigation.
 These rules apply independently of premium entitlement. #915 and #917 own the
 workspace-specific UI and tests for this shared contract.
 
-Canonical workspace paths are the share and bookmark contract. The Forecast
-route does not read a workspace selector or saved-record fields from the query
-string. The `workspace` query key belongs to Cloud Library tab selection only and
-never overrides a Forecast route. A saved-record descriptor travels in router
-location state, not in query parameters. Workspace-tab navigation preserves the
-existing query string and hash verbatim; there are no Forecast handoff query keys
-to strip. A legacy or ambiguous `/forecast` URL is first redirected to Severe and
-marked for the temporary migration notice.
+Canonical workspace paths are the share and bookmark contract. Saved-record
+handoffs are session-scoped and are not encoded in shareable URLs. Forecast routes
+do not read a workspace selector or saved-record fields from the query string.
+The `workspace` query key belongs to Cloud Library tab selection only and never
+overrides a Forecast route. Workspace-tab navigation preserves the query string
+and hash; there are no Forecast-specific query keys to strip. A legacy or
+ambiguous `/forecast` URL is first redirected to Severe and marked for the
+temporary migration notice.
 
 Back/forward and refresh must not transfer one workspace's unsaved domain state
 into another. If navigation is cancelled by the shared unsaved-change guard, the
@@ -185,7 +191,8 @@ interface ForecastWorkspaceSaveEnvelope {
 - a missing workspace id is classified as Severe only when the payload passes
   the existing `GFCForecastSaveData` validation;
 - if it does not pass that validation, the importer checks the Custom schema
-  owned by #915;
+  only when the caller supplies the `isCustomPayload` validator owned by #915;
+  without that validator, classification returns `unsupported-legacy-payload`;
 - an unknown workspace id is malformed and must not be silently treated as a
   different workspace;
 - a known but disabled workspace is not opened from an import; the user gets a
@@ -230,7 +237,8 @@ server-backed work.
   compatibility behavior.
 - #916 embeds Discussion in Severe and owns `/discussion` handoff behavior.
 - #917 adds the Forecast workspace switcher and removes Discussion as a peer
-  navigation item after the handoff exists.
+  navigation item after the handoff exists. It also owns the typed descriptor,
+  session-storage handoff, and refresh behavior defined above.
 - #918 defines the provider data contract without adding workspace state to
   Severe.
 - #919 registers and enables Mesoscale in stages, then defines its payload
