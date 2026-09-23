@@ -206,7 +206,7 @@ src/
 ## Documentation
 
 - [Outlook Information](docs/product/outlook-info.md) - risk levels, probability values, categorical conversion rules
-- [Roadmap](ROADMAP.md) - versioning plan and feature milestones
+- [Roadmap](ROADMAP.md) - current product direction and active development focus
 - [Changelog](CHANGELOG.md) - release history
 
 ---
