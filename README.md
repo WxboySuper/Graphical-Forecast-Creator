@@ -100,7 +100,7 @@ Use `pnpm` consistently for this repo so the checked-in `pnpm-lock.yaml` remains
 | `pnpm run build` | Production build to `/build` via Vite |
 
 During local development, run `pnpm run css:watch` in a second terminal alongside
-`pnpm run dev` or `pnpm start` so newly added Tailwind utilities are reflected in
+`pnpm run dev` so newly added Tailwind utilities are reflected in
 the generated stylesheet without waiting for a production build.
 
 Representative light/dark forecast and mobile-toolbar evidence for the generated
