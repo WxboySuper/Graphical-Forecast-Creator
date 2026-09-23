@@ -1,7 +1,6 @@
 /**
- * Script test contract for dependabot-changelog.test.
+ * Checks dependency-note insertion and updates while keeping root and server bumps distinct.
  *
- * This file verifies the script or automation boundary represented by dependabot-changelog.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

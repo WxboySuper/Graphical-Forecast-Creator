@@ -1,7 +1,6 @@
 /**
- * Script test contract for validate-feature-exposure.integration.test.
+ * Runs feature-exposure validation against repository inputs and verifies its CI entry-point result.
  *
- * This file verifies the script or automation boundary represented by validate-feature-exposure.integration.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

@@ -1,7 +1,6 @@
 /**
- * Script test contract for port-pr-policy.test.
+ * Covers port-branch parsing, target decoding, and stable forward-port policy.
  *
- * This file verifies the script or automation boundary represented by port-pr-policy.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

@@ -1,7 +1,6 @@
 /**
- * Script test contract for sentry-sourcemap-verification.test.
+ * Covers Sentry source-map readiness and reports every missing required environment variable.
  *
- * This file verifies the script or automation boundary represented by sentry-sourcemap-verification.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

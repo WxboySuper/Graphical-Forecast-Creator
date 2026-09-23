@@ -1,7 +1,6 @@
 /**
- * Script test contract for feature-exposure-report.test.
+ * Checks exposure classification and stable, counted formatting of report sections.
  *
- * This file verifies the script or automation boundary represented by feature-exposure-report.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

@@ -1,7 +1,6 @@
 /**
- * Script test contract for branch-policy.test.
+ * Verifies allowed branch-to-target combinations for feature, hotfix, and deployment-config work.
  *
- * This file verifies the script or automation boundary represented by branch-policy.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
