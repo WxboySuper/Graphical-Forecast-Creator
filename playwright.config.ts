@@ -22,7 +22,7 @@ export default defineConfig({
     },
   ],
   webServer: skipWebServer ? undefined : {
-    command: process.env.PLAYWRIGHT_WEBSERVER_COMMAND ?? 'npm start',
+    command: process.env.PLAYWRIGHT_WEBSERVER_COMMAND ?? 'pnpm run dev',
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
