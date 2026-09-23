@@ -31,7 +31,7 @@ Approved rows split into two lifecycles. Forecast Workflow v2, Verification rela
 
 ### Auto-TSTM (`autoTstm`, #427)
 
-- **Registry:** `temporary: true`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
+- **Registry:** `temporary: false`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
 - **Gates:** `FEATURE_SIDE_EFFECT_MODULES.autoTstm`, `ServerBackedFeatureBoundary`, `server/tstm.js` capability gate
 - **Tests:** `src/testing/featureExposure/exemplar.exposure.test.tsx`, `server/testing/autoTstm.exposure.test.js`
 - **Ops:** [auto-tstm-operations.md](./auto-tstm-operations.md)
