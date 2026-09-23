@@ -67,15 +67,17 @@ export const addStatusOverlay = (container: HTMLElement, statusText: string, isD
 };
 
 /** Adds the unofficial forecast badge to the export container. */
-export const addUnofficialOverlay = (container: HTMLElement, unofficialText: string) => {
+export const addUnofficialOverlay = (container: HTMLElement, unofficialText: string): HTMLElement => {
   const doc = container.ownerDocument;
   const unofficialWrapper = doc.createElement('div');
+  unofficialWrapper.className = 'gfc-export-unofficial-overlay';
+  // Keep the warning on its own bottom row; the attribution footer occupies the row above it.
   unofficialWrapper.style.cssText = 'position:absolute;bottom:8px;left:0;right:0;text-align:center;z-index:1300;pointer-events:none;';
 
   const innerBg = 'rgba(20,20,20,0.62)';
   const innerColor = '#f0f0f0';
   const innerDiv = doc.createElement('div');
-  innerDiv.style.cssText = `display:inline-block;background:${innerBg};color:${innerColor};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:0 10px;height:22px;line-height:16px;border-radius:999px;border:1px solid rgba(255,255,255,0.18);white-space:nowrap;`;
+  innerDiv.style.cssText = `display:inline-block;box-sizing:border-box;max-width:calc(100% - 16px);background:${innerBg};color:${innerColor};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:2px 10px;min-height:22px;line-height:16px;border-radius:999px;border:1px solid rgba(255,255,255,0.18);white-space:normal;overflow-wrap:anywhere;`;
 
   const dot = doc.createElement('span');
   dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;margin-right:6px;vertical-align:middle;';
@@ -89,10 +91,11 @@ export const addUnofficialOverlay = (container: HTMLElement, unofficialText: str
   innerDiv.appendChild(text);
   unofficialWrapper.appendChild(innerDiv);
   container.appendChild(unofficialWrapper);
+  return unofficialWrapper;
 };
 
 /** Adds the title and footer overlays to the export container. */
-export const addTitleAndFooter = (container: HTMLElement, options: OverlayOptions, isDarkMode: boolean) => {
+export const addTitleAndFooter = (container: HTMLElement, options: OverlayOptions, isDarkMode: boolean, footerBottom = 42) => {
   const doc = container.ownerDocument;
   if (options.title) {
     const titleDiv = doc.createElement('div');
@@ -104,9 +107,10 @@ export const addTitleAndFooter = (container: HTMLElement, options: OverlayOption
   }
 
   const footerDiv = doc.createElement('div');
+  footerDiv.className = 'gfc-export-attribution';
   const bg = isDarkMode ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)';
   const text = isDarkMode ? '#e4e4e4' : '#212529';
-  footerDiv.style.cssText = `position:absolute;bottom:20px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
+  footerDiv.style.cssText = `position:absolute;box-sizing:border-box;max-width:calc(100% - 40px);bottom:${footerBottom}px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;white-space:normal;overflow-wrap:anywhere;text-align:right;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
   footerDiv.textContent = `Created with Graphical Forecast Creator | ${getFormattedDate()} | OpenStreetMap contributors`;
   container.appendChild(footerDiv);
 };
@@ -121,11 +125,25 @@ export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}
   }
 
   // Unofficial badge recreated from text to avoid html2canvas baseline drift.
-  if (options.unofficialText) {
-    addUnofficialOverlay(container, options.unofficialText);
-  }
+  const unofficialOverlay = options.unofficialText
+    ? addUnofficialOverlay(container, options.unofficialText)
+    : null;
+  const unofficialInner = unofficialOverlay?.firstElementChild as HTMLElement | null | undefined;
+  const measuredHeight = Math.max(
+    unofficialOverlay?.getBoundingClientRect().height ?? 0,
+    unofficialInner?.getBoundingClientRect().height ?? 0,
+    unofficialInner?.scrollHeight ?? 0,
+  );
+  // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
+  const containerWidth = container.clientWidth || Number.parseFloat(container.style.width) || 320;
+  const textLength = options.unofficialText?.length ?? 0;
+  // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
+  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
+  const estimatedHeight = Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
+  const unofficialHeight = Math.max(measuredHeight, estimatedHeight);
+  const footerBottom = unofficialOverlay ? 8 + Math.ceil(unofficialHeight) + 12 : 42;
 
-  addTitleAndFooter(container, options, isDarkMode);
+  addTitleAndFooter(container, options, isDarkMode, footerBottom);
 };
 
 // Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
