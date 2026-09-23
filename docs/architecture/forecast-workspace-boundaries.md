@@ -56,6 +56,12 @@ interface ForecastRecordDescriptor {
 }
 ```
 
+This is the target navigation contract. Until follow-up work moves cloud loads to
+it, the current Cloud Library stages the workspace envelope and cloud metadata in
+the `cloudCyclePayload` and `cloudCycleMeta` session-storage entries. That
+temporary transport does not replace or override the descriptor's ownership
+checks.
+
 The shared host validates the descriptor's shape, confirms that its workspace is
 known and exposed, and requires `workspaceId` to match the destination route. It
 does not parse the forecast payload. The destination workspace loader resolves
@@ -160,10 +166,21 @@ Custom records are separate products even when the library displays them
 together. Existing Severe data keeps using `GFCForecastSaveData` during the
 migration.
 
-New workspace payloads should use an optional envelope field such as
-`workspaceId` around the existing forecast payload. The field is additive and
-must not replace `forecastCycle` or change the legacy `version` meaning. The
-envelope rules are:
+New workspace payloads use the versioned
+`ForecastWorkspaceSaveEnvelope` shape:
+
+```ts
+interface ForecastWorkspaceSaveEnvelope {
+  schemaVersion: 1;
+  workspaceId: ForecastWorkspaceId;
+  forecast: GFCForecastSaveData;
+}
+```
+
+`schemaVersion` versions the envelope independently of the legacy forecast
+`version`; the envelope does not replace `forecastCycle` inside
+`GFCForecastSaveData`. `ForecastWorkspacePayload` also accepts a legacy bare
+`GFCForecastSaveData` during migration. The envelope rules are:
 
 - a missing workspace id is classified as Severe only when the payload passes
   the existing `GFCForecastSaveData` validation;
