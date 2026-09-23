@@ -51,6 +51,7 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
+import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
@@ -217,74 +218,6 @@ const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.R
     <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" aria-label="Dismiss Forecast bookmark notice" onClick={onDismiss}>Dismiss</Button>
   </div>
 );
-
-const LEGACY_FORECAST_NOTICE_SESSION_KEY = 'gfc:legacy-forecast-notice';
-
-const readPersistedLegacyForecastNotice = (): boolean => {
-  try {
-    return window.sessionStorage.getItem(LEGACY_FORECAST_NOTICE_SESSION_KEY) === 'true';
-  } catch {
-    return false;
-  }
-};
-
-const persistLegacyForecastNotice = (): void => {
-  try {
-    window.sessionStorage.setItem(LEGACY_FORECAST_NOTICE_SESSION_KEY, 'true');
-  } catch {
-    // Router state still displays the notice when session storage is unavailable.
-  }
-};
-
-const clearPersistedLegacyForecastNotice = (): void => {
-  try {
-    window.sessionStorage.removeItem(LEGACY_FORECAST_NOTICE_SESSION_KEY);
-  } catch {
-    // Dismissing the notice must still work when session storage is unavailable.
-  }
-};
-
-const useLegacyForecastNotice = (
-  location: ReturnType<typeof useLocation>,
-  navigate: ReturnType<typeof useNavigate>,
-  workspaceRef: React.RefObject<HTMLDivElement | null>,
-): [boolean, () => void] => {
-  const locationState = location.state && typeof location.state === 'object' && !Array.isArray(location.state)
-    ? location.state as Record<string, unknown>
-    : {};
-  const hasLegacyRedirectMarker = Boolean(locationState.legacyForecastRedirect);
-  const [hasPersistedNotice, setHasPersistedNotice] = useState(readPersistedLegacyForecastNotice);
-  const showLegacyNotice = hasLegacyRedirectMarker || hasPersistedNotice;
-  const focusWorkspaceAfterDismiss = useRef(false);
-
-  useEffect(() => {
-    if (hasLegacyRedirectMarker) {
-      persistLegacyForecastNotice();
-      setHasPersistedNotice(true);
-    }
-  }, [hasLegacyRedirectMarker]);
-
-  useEffect(() => {
-    if (!showLegacyNotice && focusWorkspaceAfterDismiss.current) {
-      focusWorkspaceAfterDismiss.current = false;
-      workspaceRef.current?.focus();
-    }
-  }, [showLegacyNotice, workspaceRef]);
-
-  const dismissLegacyNotice = () => {
-    clearPersistedLegacyForecastNotice();
-    setHasPersistedNotice(false);
-    focusWorkspaceAfterDismiss.current = true;
-    const currentState = { ...locationState };
-    delete currentState.legacyForecastRedirect;
-    navigate(
-      { pathname: location.pathname, search: location.search, hash: location.hash },
-      { replace: true, state: Object.keys(currentState).length > 0 ? currentState : null },
-    );
-  };
-
-  return [showLegacyNotice, dismissLegacyNotice];
-};
 
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
 const INCREASE_PROBABILITY_KEYS = new Set(['arrowup', 'arrowright']);
@@ -811,7 +744,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
-  const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(location, navigate, workspaceRef);
+  const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef);
 
   useLayoutEffect(() => {
     const shell = forecastShellRef.current;
