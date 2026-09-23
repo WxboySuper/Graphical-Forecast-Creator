@@ -57,9 +57,7 @@ for (const width of [1280, 320]) {
 
         const warning = clonedRoot.querySelector<HTMLElement>('.gfc-export-unofficial-overlay');
         const warningContent = warning?.firstElementChild as HTMLElement | null;
-        const footer = Array.from(clonedRoot.children).find((child) =>
-          child.textContent?.includes('Created with Graphical Forecast Creator'),
-        ) as HTMLElement | undefined;
+        const footer = clonedRoot.querySelector<HTMLElement>('.gfc-export-attribution');
         if (!warning || !warningContent || !footer) throw new Error('Export warning or attribution footer was not created');
 
         const containerRect = clonedRoot.getBoundingClientRect();
