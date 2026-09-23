@@ -135,36 +135,84 @@ const isPointInRing = ([x, y]: LonLat, ring: number[][]): boolean => {
   return inside;
 };
 
-/** Pulls every drawn wind polygon ring out of an exported forecast package zip. */
-const extractWindRings = async (downloadPath: string): Promise<number[][][]> => {
-  const zip = await JSZip.loadAsync(await readFile(downloadPath));
+type ExportPackageJson = {
+  forecastCycle?: unknown;
+  forecast?: { forecastCycle?: unknown };
+};
+
+type ForecastCycleJson = {
+  days?: Record<string, unknown>;
+};
+
+type ForecastDayJson = {
+  data?: { wind?: unknown };
+};
+
+type WindFeatureJson = {
+  geometry?: { type?: string; coordinates?: number[][][] } | null;
+};
+
+/** Reads the forecast JSON out of an export zip; throws when neither entry exists. */
+const parseForecastPackage = async (zip: JSZip): Promise<ExportPackageJson> => {
   const entry = zip.file('workflow_package.json') ?? zip.file('forecast_cycle.json');
   if (!entry) {
     throw new Error('Forecast export is missing workflow_package.json and forecast_cycle.json');
   }
-  const parsed = JSON.parse(await entry.async('string')) as {
-    forecastCycle?: unknown;
-    forecast?: { forecastCycle?: unknown };
-  };
-  const forecastCycle = parsed.forecastCycle ?? parsed.forecast?.forecastCycle;
-  const days = (forecastCycle as { days?: Record<string, unknown> } | undefined)?.days;
+  return JSON.parse(await entry.async('string')) as ExportPackageJson;
+};
+
+/** Forecast cycle day map, found at either export layout; empty when the package omits it. */
+const forecastCycleDays = (packageJson: ExportPackageJson): Record<string, unknown> => {
+  const forecastCycle = packageJson.forecastCycle ?? packageJson.forecast?.forecastCycle;
+  const days = (forecastCycle as ForecastCycleJson | undefined)?.days;
+  return days ?? {};
+};
+
+/** Outer GeoJSON ring of a drawn wind polygon, or null when the feature is not one. */
+const windPolygonOuterRing = (feature: unknown): number[][] | null => {
+  const geometry = (feature as WindFeatureJson | null | undefined)?.geometry;
+  if (geometry?.type !== 'Polygon') return null;
+  const ring = geometry.coordinates?.[0];
+  return Array.isArray(ring) ? ring : null;
+};
+
+/** Rings from one [timestamp, features] wind tuple; malformed tuples yield none. */
+const windRingsFromTuple = (tuple: unknown): number[][][] => {
+  if (!Array.isArray(tuple)) return [];
+  const features: unknown = tuple[1];
+  if (!Array.isArray(features)) return [];
   const rings: number[][][] = [];
-
-  for (const day of Object.values(days ?? {})) {
-    const wind = (day as { data?: { wind?: unknown } } | null | undefined)?.data?.wind;
-    if (!Array.isArray(wind)) continue;
-    for (const tuple of wind) {
-      if (!Array.isArray(tuple) || !Array.isArray(tuple[1])) continue;
-      for (const feature of tuple[1]) {
-        const geometry = (feature as { geometry?: { type?: string; coordinates?: number[][][] } } | null)?.geometry;
-        if (geometry?.type === 'Polygon' && Array.isArray(geometry.coordinates?.[0])) {
-          rings.push(geometry.coordinates[0]);
-        }
-      }
-    }
+  for (const feature of features) {
+    const ring = windPolygonOuterRing(feature);
+    if (ring) rings.push(ring);
   }
-
   return rings;
+};
+
+/** Wind rings drawn for a single forecast day; missing wind data yields none. */
+const windRingsFromDay = (day: unknown): number[][][] => {
+  const wind = (day as ForecastDayJson | null | undefined)?.data?.wind;
+  if (!Array.isArray(wind)) return [];
+  const rings: number[][][] = [];
+  for (const tuple of wind) {
+    rings.push(...windRingsFromTuple(tuple));
+  }
+  return rings;
+};
+
+/** Every drawn wind polygon ring across all forecast days in the package. */
+const windRingsFromPackage = (packageJson: ExportPackageJson): number[][][] => {
+  const rings: number[][][] = [];
+  for (const day of Object.values(forecastCycleDays(packageJson))) {
+    rings.push(...windRingsFromDay(day));
+  }
+  return rings;
+};
+
+/** Pulls every drawn wind polygon ring out of an exported forecast package zip. */
+const extractWindRings = async (downloadPath: string): Promise<number[][][]> => {
+  const zip = await JSZip.loadAsync(await readFile(downloadPath));
+  return windRingsFromPackage(await parseForecastPackage(zip));
 };
 
 /**
