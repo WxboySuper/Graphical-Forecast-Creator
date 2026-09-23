@@ -96,7 +96,16 @@ Use `pnpm` consistently for this repo so the checked-in `pnpm-lock.yaml` remains
 | `pnpm test` | Run Jest unit test suite |
 | `pnpm run lint` | Run ESLint over the codebase |
 | `pnpm run test:e2e` | Run Playwright end-to-end tests |
+| `pnpm run css:build` | Regenerate the Tailwind utility snapshot from the compatibility config |
+| `pnpm run css:watch` | Watch source files and regenerate the Tailwind utility snapshot |
 | `pnpm run build` | Production build to `/build` via Vite |
+
+During local development, run `pnpm run css:watch` in a second terminal alongside
+`pnpm run dev` or `pnpm start` so newly added Tailwind utilities are reflected in
+the generated stylesheet without waiting for a production build.
+
+Representative light/dark forecast and mobile-toolbar evidence for the generated
+utility snapshot is checked in under [`docs/visual-evidence/`](docs/visual-evidence/).
 
 The `typescript` dependency is the TypeScript 6 compatibility package
 (`@typescript/typescript6`) so `typescript-eslint` has the compiler API it
