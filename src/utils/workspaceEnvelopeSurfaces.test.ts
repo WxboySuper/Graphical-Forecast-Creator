@@ -119,11 +119,11 @@ describe('workspace envelope loads across file surfaces', () => {
     const cycleDate = '2026-09-22';
     const envelope = makeEnvelope('custom', cycleDate, { mapView: { center: [5, 6], zoom: 4 } });
 
-    const fromEnvelope = await parseForecastFile(payloadFile(envelope));
+    const fromEnvelope = await parseForecastFile(payloadFile(envelope), 'custom');
     expect(fromEnvelope.cycleDate).toBe(cycleDate);
 
     const bare = makeBarePayload(cycleDate);
-    const fromLegacy = await parseForecastFile(legacyPayloadFile(bare));
+    const fromLegacy = await parseForecastFile(legacyPayloadFile(bare), 'severe');
     expect(fromLegacy.cycleDate).toBe(cycleDate);
   });
 
