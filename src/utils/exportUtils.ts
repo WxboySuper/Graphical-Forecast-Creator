@@ -107,6 +107,7 @@ export const addTitleAndFooter = (container: HTMLElement, options: OverlayOption
   }
 
   const footerDiv = doc.createElement('div');
+  footerDiv.className = 'gfc-export-attribution';
   const bg = isDarkMode ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)';
   const text = isDarkMode ? '#e4e4e4' : '#212529';
   footerDiv.style.cssText = `position:absolute;box-sizing:border-box;max-width:calc(100% - 40px);bottom:${footerBottom}px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;white-space:normal;overflow-wrap:anywhere;text-align:right;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
