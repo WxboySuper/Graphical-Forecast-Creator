@@ -1,7 +1,5 @@
 /**
- * Script test contract for release-notes.test.
- *
- * This file verifies the script or automation boundary represented by release-notes.test, including its inputs, outputs, and failure behavior.
+ * Checks prior-release selection and stable/beta choice between curated and PR-generated notes.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

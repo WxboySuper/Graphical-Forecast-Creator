@@ -1,7 +1,5 @@
 /**
- * Script test contract for feature-exposure-diagnostics.test.
- *
- * This file verifies the script or automation boundary represented by feature-exposure-diagnostics.test, including its inputs, outputs, and failure behavior.
+ * Verifies diagnostic reason mapping for target policy and emergency-disabled server-backed features.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

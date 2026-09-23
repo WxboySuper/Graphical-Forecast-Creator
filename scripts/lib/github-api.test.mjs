@@ -1,7 +1,5 @@
 /**
- * Script test contract for github-api.test.
- *
- * This file verifies the script or automation boundary represented by github-api.test, including its inputs, outputs, and failure behavior.
+ * Covers the shared authenticated GitHub request shape, JSON parsing, allowed empty responses, and errors.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
