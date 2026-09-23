@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
 const SESSION_KEY = 'gfc:legacy-forecast-notice';
@@ -55,7 +55,7 @@ export const useLegacyForecastNotice = (
 ): [boolean, () => void] => {
   const location = useLocation();
   const navigate = useNavigate();
-  const locationState = getLocationState(location.state);
+  const locationState = useMemo(() => getLocationState(location.state), [location.state]);
   const hasRedirectMarker = Boolean(locationState.legacyForecastRedirect);
   const [isPersisted, clearNotice] = usePersistedNotice(hasRedirectMarker);
   const shouldShowNotice = hasRedirectMarker || isPersisted;
