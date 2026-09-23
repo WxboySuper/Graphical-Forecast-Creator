@@ -52,6 +52,7 @@ test.describe('App smoke tests', () => {
     await page.goto('/forecast?localBetaBypass=true');
     await acceptAgreementsIfPresent(page);
 
+    await expect(page.getByRole('status').filter({ hasText: '/forecast/severe' })).toBeVisible();
     await expect(page.locator('.map-container')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.tabbed-integrated-toolbar')).toBeVisible();
     await expect(page.locator('.map-history-button[aria-label="Undo"]')).toBeVisible();
