@@ -126,9 +126,18 @@ test.describe('App smoke tests', () => {
 
     const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
     const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
-    if (!legendBox || !toolbarBox) {
-      throw new Error('Expected the mobile key popout and toolbar to have measurable bounds.');
+    const notice = page.getByRole('status').filter({ hasText: '/forecast/severe' });
+    const noticeBox = await notice.boundingBox();
+    const mapBox = await page.locator('.map-container').boundingBox();
+    const measuredNoticeHeight = await page.locator('.forecast-page-shell').evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).getPropertyValue('--legacy-forecast-notice-height')),
+    );
+    if (!legendBox || !toolbarBox || !noticeBox || !mapBox || !Number.isFinite(measuredNoticeHeight)) {
+      throw new Error('Expected the notice, map, legend, and toolbar to have measurable bounds.');
     }
+    expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
+    expect(Math.abs(legendBox.y - (mapBox.y + 106 - noticeBox.height))).toBeLessThanOrEqual(2);
+    expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
     expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
 
     await page.getByRole('tab', { name: 'Tools' }).click();
