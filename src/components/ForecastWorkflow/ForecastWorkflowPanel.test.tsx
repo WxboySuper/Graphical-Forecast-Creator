@@ -142,6 +142,7 @@ describe('ForecastWorkflowPanel completion review', () => {
 
   it.each([
     ['hides Custom history from Severe', 'custom', 'severe', false],
+    ['keeps Custom history visible in Custom', 'custom', 'custom', true],
     ['keeps Severe history visible in Severe', 'severe', 'severe', true],
     ['hides Severe history from Custom', 'severe', 'custom', false],
   ] as const)('%s', (_caseName, sourceWorkspace, activeWorkspace, shouldSuggest) => {
