@@ -320,7 +320,7 @@ describe('useCloudCycles stale completions', () => {
     expect(current.error).toBeNull();
   });
 
-  test('sign-out while a save is pending cannot restore sync state', async () => {
+  test('sign-out while a save is pending prevents queued writes and cannot restore sync state', async () => {
     mockSignedInUser();
     const deferred = mockPendingSave();
 
@@ -341,16 +341,23 @@ describe('useCloudCycles stale completions', () => {
     });
     expect(result.current.currentCloud?.syncState).toBe('saving');
 
+    let queuedSave: Promise<boolean> | undefined;
+    await act(async () => {
+      queuedSave = result.current.saveCycle('One', '2026-07-14', stats, payload);
+      await Promise.resolve();
+    });
+
     mockUseAuth.mockReturnValue({ user: null } as unknown as ReturnType<typeof useAuth>);
     rerender();
 
-    let saveResult: boolean | undefined;
+    let saveResults: boolean[] | undefined;
     await act(async () => {
       deferred.resolveSuccess();
-      saveResult = await pendingSave;
+      saveResults = await Promise.all([pendingSave!, queuedSave!]);
     });
 
-    expect(saveResult).toBe(true);
+    expect(saveResults).toEqual([true, false]);
+    expect(mockSaveCloudCycle).toHaveBeenCalledTimes(1);
     expect(result.current.currentCloud).toBeNull();
   });
 

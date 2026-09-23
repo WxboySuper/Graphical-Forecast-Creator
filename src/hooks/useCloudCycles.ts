@@ -23,6 +23,11 @@ export interface UseCloudCyclesResult {
   currentCloud: CloudCycleContext | null;
   loading: boolean;
   error: string | null;
+  /**
+   * Saves the requested snapshot. Current-cycle failures resolve false and update
+   * sync state; a stale failed save rejects with its original Error so explicit
+   * callers can surface the failure without assigning it to the new selection.
+   */
   saveCycle: (
     label: string,
     cycleDate: string,
@@ -533,6 +538,12 @@ async function executeCloudSave({
   currentUserIdRef: CloudStateContext['currentUserIdRef'];
   setCurrentCloud: Dispatch<SetStateAction<CloudCycleContext | null>>;
 }): Promise<boolean> {
+  // Saves may wait behind another write. Do not start a queued request for an
+  // account that signed out while it was waiting.
+  if (currentUserIdRef.current !== expectedUserId) {
+    return false;
+  }
+
   const result = await requestCloudCycleSave({
     userId,
     label,
