@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { collectRepoFiles, pageHtml, pageSlug, renderMarkdown, sourceFiles } from './build-local-docs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/** Prefix generated pages use to reach repository files. */
+const REPO_LINK_PREFIX = '../../../';
 
 /** Extract every id attribute from rendered HTML. */
 function collectIds(html) {
@@ -15,6 +17,65 @@ function collectIds(html) {
 /** Extract every href attribute from rendered HTML. */
 function collectHrefs(html) {
   return [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
+}
+
+/** Return whether a generated href is external and needs no local resolution. */
+function isExternalHref(href) {
+  return /^(?:https?:|mailto:)/i.test(href);
+}
+
+/** Render every source document into a slug-keyed corpus with its heading ids. */
+async function buildCorpus() {
+  const files = await sourceFiles();
+  const pageMap = new Map(files.map((file) => [file.relative, pageSlug(file.relative)]));
+  const repoFiles = await collectRepoFiles();
+  const rendered = new Map();
+  for (const file of files) {
+    const markdown = await fs.readFile(file.absolute, 'utf8');
+    rendered.set(pageSlug(file.relative), renderMarkdown(markdown, { sourcePath: file.relative, pageMap, repoFiles }));
+  }
+  const idsByPage = new Map([...rendered].map(([slug, html]) => [slug, collectIds(html)]));
+  const slugToSource = new Map(files.map((file) => [pageSlug(file.relative), file]));
+  return { rendered, idsByPage, slugToSource, repoFiles };
+}
+
+/** Report repository files missing behind a generated-site prefix link. */
+function findRepoLinkFailures(source, href, repoFiles) {
+  const target = href.slice(REPO_LINK_PREFIX.length).split('#')[0];
+  if (repoFiles.has(target)) return [];
+  return [`${source.relative}: missing repository file ${target}`];
+}
+
+/** Report an unknown page or a missing heading fragment on a same-site href. */
+function findPageLinkFailures(source, href, pageIds, corpus) {
+  const [page, fragment] = href.split('#', 2);
+  if (!page) {
+    if (fragment !== undefined && !pageIds.has(fragment)) return [`${source.relative}: missing local #${fragment}`];
+    return [];
+  }
+  const targetIds = corpus.idsByPage.get(page);
+  if (!targetIds) return [`${source.relative}: unknown page ${page}`];
+  if (fragment !== undefined && !targetIds.has(fragment)) return [`${source.relative}: ${page} is missing #${fragment}`];
+  return [];
+}
+
+/** Classify one generated href and return the failures it causes. */
+function findHrefFailures(href, source, pageIds, corpus) {
+  if (isExternalHref(href)) return [];
+  if (href === '#') return [`${source.relative}: unsafe destination placeholder`];
+  if (href.startsWith(REPO_LINK_PREFIX)) return findRepoLinkFailures(source, href, corpus.repoFiles);
+  return findPageLinkFailures(source, href, pageIds, corpus);
+}
+
+/** Return every unresolved local link and fragment on one generated page. */
+function findPageFailures(slug, corpus) {
+  const source = corpus.slugToSource.get(slug);
+  const pageIds = corpus.idsByPage.get(slug);
+  const failures = [];
+  for (const href of collectHrefs(corpus.rendered.get(slug))) {
+    failures.push(...findHrefFailures(href, source, pageIds, corpus));
+  }
+  return failures;
 }
 
 describe('local documentation renderer', () => {
@@ -38,6 +99,17 @@ describe('local documentation renderer', () => {
       pageMap: new Map([['docs/guide.md', 'docs__guide.html']]),
     });
     assert.match(html, /href="docs__guide\.html#setup"/);
+  });
+
+  test('preserves query strings on external links and leaves unresolved query links alone', () => {
+    const context = {
+      sourcePath: 'docs/plans/today.md',
+      pageMap: new Map([['docs/guide.md', 'docs__guide.html']]),
+    };
+    const external = renderMarkdown('[query](https://example.com/a?b=c#frag)', context);
+    assert.match(external, /href="https:\/\/example\.com\/a\?b=c#frag"/);
+    const unresolved = renderMarkdown('[raw](../guide.md?raw=1)', context);
+    assert.match(unresolved, /href="\.\.\/guide\.md\?raw=1"/);
   });
 
   test('uses collision-free page slugs and loads Mermaid only when needed', () => {
@@ -81,39 +153,10 @@ describe('local documentation renderer', () => {
   });
 
   test('every local link and fragment in the generated corpus resolves', async () => {
-    const files = await sourceFiles();
-    const pageMap = new Map(files.map((file) => [file.relative, pageSlug(file.relative)]));
-    const repoFiles = await collectRepoFiles();
-    const slugToSource = new Map(files.map((file) => [pageSlug(file.relative), file]));
-    const rendered = new Map();
-    for (const file of files) {
-      const markdown = await fs.readFile(file.absolute, 'utf8');
-      rendered.set(pageSlug(file.relative), renderMarkdown(markdown, { sourcePath: file.relative, pageMap, repoFiles }));
-    }
-
+    const corpus = await buildCorpus();
     const failures = [];
-    for (const [slug, html] of rendered) {
-      const source = slugToSource.get(slug);
-      const ids = collectIds(html);
-      for (const href of collectHrefs(html)) {
-        if (/^(?:https?:|mailto:)/i.test(href)) continue;
-        if (href === '#') { failures.push(`${source.relative}: unsafe destination placeholder`); continue; }
-        if (href.startsWith('../../../')) {
-          const target = href.slice('../../../'.length).split('#')[0];
-          if (!repoFiles.has(target)) failures.push(`${source.relative}: missing repository file ${target}`);
-          continue;
-        }
-        const [page, fragment] = href.split('#', 2);
-        if (!page) {
-          if (fragment !== undefined && !ids.has(fragment)) failures.push(`${source.relative}: missing local #${fragment}`);
-          continue;
-        }
-        const targetHtml = rendered.get(page);
-        if (!targetHtml) { failures.push(`${source.relative}: unknown page ${page}`); continue; }
-        if (fragment !== undefined && !collectIds(targetHtml).has(fragment)) {
-          failures.push(`${source.relative}: ${page} is missing #${fragment}`);
-        }
-      }
+    for (const slug of corpus.rendered.keys()) {
+      failures.push(...findPageFailures(slug, corpus));
     }
     assert.deepEqual(failures, []);
   });
