@@ -232,6 +232,45 @@ describe('useCloudCycles stale completions', () => {
     expect(result.current.currentCloud?.syncState).not.toBe('saved');
   });
 
+  test('starting a load cannot mark a newly selected cycle as loading', async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } } as ReturnType<typeof useAuth>);
+    let resolveLoad: ((value: { success: true; data: CloudCycle }) => void) | undefined;
+    mockLoadCloudCycle.mockImplementationOnce(
+      () =>
+        new Promise<{ success: true; data: CloudCycle }>((resolve) => {
+          resolveLoad = resolve;
+        }) as never,
+    );
+
+    const { result } = renderHook(() => useCloudCycles());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.markAsCurrent('cycle-2', 'Two');
+    });
+    expect(result.current.currentCloud?.syncState).toBe('idle');
+
+    let pendingLoad: Promise<unknown> | undefined;
+    await act(async () => {
+      pendingLoad = result.current.loadCycle('cycle-1');
+      await Promise.resolve();
+    });
+
+    expect(result.current.currentCloud?.id).toBe('cycle-2');
+    expect(result.current.currentCloud?.syncState).toBe('idle');
+
+    await act(async () => {
+      resolveLoad?.({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle });
+      await pendingLoad;
+    });
+
+    expect(result.current.currentCloud?.id).toBe('cycle-1');
+    expect(result.current.currentCloud?.syncState).toBe('saved');
+  });
+
   test('sign-out while a save is pending cannot restore sync state', async () => {
     mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } } as ReturnType<typeof useAuth>);
     let resolveSave: ((value: { success: true; data: string }) => void) | undefined;

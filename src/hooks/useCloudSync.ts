@@ -123,6 +123,64 @@ const syncCurrentCloudCycle = async ({
 
 type CloudSyncInput = Pick<UseCloudCyclesResult, 'currentCloud' | 'updateSyncState' | 'saveCycle'>;
 
+type LastSyncedState = { cloudId: string; hash: string } | null;
+
+/** Returns true when the selected cycle matches the last synced cycle and hash. */
+const isSelectedCloudSynced = (
+  currentCloud: CloudSyncInput['currentCloud'],
+  lastSyncedState: LastSyncedState,
+  currentHash: string,
+): boolean =>
+  Boolean(currentCloud && lastSyncedState?.cloudId === currentCloud.id && isCurrentStateSynced(lastSyncedState.hash, currentHash));
+
+/** Tracks sync request generations so stale completions can be ignored after selection changes. */
+function useSyncRequestGeneration(canSync: boolean, currentCloudId: string | null) {
+  const syncGenerationRef = useRef(0);
+  useEffect(() => {
+    syncGenerationRef.current += 1;
+  }, [canSync, currentCloudId]);
+  return syncGenerationRef;
+}
+
+/** Defers a loaded-cycle sync marker until that cycle becomes the selected one. */
+function useDeferredCloudSyncMarker({
+  canSync,
+  currentCloud,
+  currentHash,
+  setLastSyncedState,
+}: {
+  canSync: boolean;
+  currentCloud: CloudSyncInput['currentCloud'];
+  currentHash: string;
+  setLastSyncedState: (state: { cloudId: string; hash: string }) => void;
+}) {
+  // Stores the cloud id together with the content hash captured when the marker
+  // ran, so later content changes cannot be marked as synced on activation.
+  const pendingSyncedCloudRef = useRef<{ cloudId: string; hash: string } | null>(null);
+
+  const markCurrentStateSynced = useCallback((cloudId?: string) => {
+    if (!canSync) return;
+    if (cloudId && currentCloud?.id !== cloudId) {
+      pendingSyncedCloudRef.current = { cloudId, hash: currentHash };
+      return;
+    }
+    if (currentCloud) setLastSyncedState({ cloudId: currentCloud.id, hash: currentHash });
+  }, [canSync, currentCloud, currentHash, setLastSyncedState]);
+
+  useEffect(() => {
+    const pending = pendingSyncedCloudRef.current;
+    if (!canSync || !currentCloud) {
+      pendingSyncedCloudRef.current = null;
+      return;
+    }
+    if (!pending || currentCloud.id !== pending.cloudId) return;
+    pendingSyncedCloudRef.current = null;
+    setLastSyncedState({ cloudId: pending.cloudId, hash: pending.hash });
+  }, [canSync, currentCloud, setLastSyncedState]);
+
+  return markCurrentStateSynced;
+}
+
 /** Owns debounced cloud-sync execution and exposes explicit sync controls. */
 const useCloudSyncOperations = ({
   canSync,
@@ -146,12 +204,14 @@ const useCloudSyncOperations = ({
   workspaceId: ForecastWorkspaceId;
 }) => {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const syncGenerationRef = useRef(0);
-  const pendingSyncedCloudIdRef = useRef<string | null>(null);
-  const [lastSyncedState, setLastSyncedState] = useState<{ cloudId: string; hash: string } | null>(null);
-  useEffect(() => {
-    syncGenerationRef.current += 1;
-  }, [canSync, currentCloud?.id]);
+  const syncGenerationRef = useSyncRequestGeneration(canSync, currentCloud?.id ?? null);
+  const [lastSyncedState, setLastSyncedState] = useState<LastSyncedState>(null);
+  const markCurrentStateSynced = useDeferredCloudSyncMarker({
+    canSync,
+    currentCloud,
+    currentHash,
+    setLastSyncedState: (state) => setLastSyncedState(state),
+  });
 
   const performSync = useCallback(async () => {
     const requestGeneration = ++syncGenerationRef.current;
@@ -169,7 +229,7 @@ const useCloudSyncOperations = ({
       workspaceId,
       isLatestRequest: () => syncGenerationRef.current === requestGeneration,
     });
-  }, [canSync, currentCloud, currentHash, forecastCycle, saveCycle, serializedPayload, updateSyncState, workflowMetadata, workspaceId]);
+  }, [canSync, currentCloud, currentHash, forecastCycle, saveCycle, serializedPayload, syncGenerationRef, updateSyncState, workflowMetadata, workspaceId]);
 
   useCloudSyncScheduling({
     canSync,
@@ -184,28 +244,9 @@ const useCloudSyncOperations = ({
     clearSyncTimeout(syncTimeoutRef);
     await performSync();
   }, [performSync]);
-  const markCurrentStateSynced = useCallback((cloudId?: string) => {
-    if (!canSync) return;
-    if (cloudId && currentCloud?.id !== cloudId) {
-      pendingSyncedCloudIdRef.current = cloudId;
-      return;
-    }
-    if (currentCloud) setLastSyncedState({ cloudId: currentCloud.id, hash: currentHash });
-  }, [canSync, currentCloud, currentHash]);
-
-  useEffect(() => {
-    const pendingCloudId = pendingSyncedCloudIdRef.current;
-    if (!canSync || !currentCloud) {
-      pendingSyncedCloudIdRef.current = null;
-      return;
-    }
-    if (!pendingCloudId || currentCloud.id !== pendingCloudId) return;
-    pendingSyncedCloudIdRef.current = null;
-    setLastSyncedState({ cloudId: pendingCloudId, hash: currentHash });
-  }, [canSync, currentCloud, currentHash]);
 
   return {
-    isSynced: Boolean(currentCloud && lastSyncedState?.cloudId === currentCloud.id && isCurrentStateSynced(lastSyncedState.hash, currentHash)),
+    isSynced: isSelectedCloudSynced(currentCloud, lastSyncedState, currentHash),
     syncNow,
     markCurrentStateSynced,
   };
