@@ -5,6 +5,27 @@ import { test, expect } from '@playwright/test';
  * without any white-screen crashes.
  */
 
+const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test').Page) => {
+  const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
+  const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
+  const noticeBox = await page.getByRole('status').filter({ hasText: '/forecast/severe' }).boundingBox();
+  const mapBox = await page.locator('.map-container').boundingBox();
+  const measuredNoticeHeight = await page.locator('.forecast-page-shell').evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).getPropertyValue('--legacy-forecast-notice-height')),
+  );
+
+  if (!legendBox) throw new Error('Expected the map legend to have measurable bounds.');
+  if (!toolbarBox) throw new Error('Expected the toolbar to have measurable bounds.');
+  if (!noticeBox) throw new Error('Expected the migration notice to have measurable bounds.');
+  if (!mapBox) throw new Error('Expected the map to have measurable bounds.');
+  if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
+
+  expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
+  expect(Math.abs(legendBox.y - (mapBox.y + 106 - noticeBox.height))).toBeLessThanOrEqual(2);
+  expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
+  expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
+};
+
 test.describe('App smoke tests', () => {
   const bypassLocalBeta = async (page: import('@playwright/test').Page) => {
     await page.addInitScript(() => {
@@ -20,27 +41,6 @@ test.describe('App smoke tests', () => {
       await agreementCheckbox.check();
       await page.getByRole('button', { name: /Accept & Continue/i }).click();
     }
-  };
-
-  const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test').Page) => {
-    const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
-    const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
-    const noticeBox = await page.getByRole('status').filter({ hasText: '/forecast/severe' }).boundingBox();
-    const mapBox = await page.locator('.map-container').boundingBox();
-    const measuredNoticeHeight = await page.locator('.forecast-page-shell').evaluate((element) =>
-      Number.parseFloat(getComputedStyle(element).getPropertyValue('--legacy-forecast-notice-height')),
-    );
-
-    if (!legendBox) throw new Error('Expected the map legend to have measurable bounds.');
-    if (!toolbarBox) throw new Error('Expected the toolbar to have measurable bounds.');
-    if (!noticeBox) throw new Error('Expected the migration notice to have measurable bounds.');
-    if (!mapBox) throw new Error('Expected the map to have measurable bounds.');
-    if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
-
-    expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
-    expect(Math.abs(legendBox.y - (mapBox.y + 106 - noticeBox.height))).toBeLessThanOrEqual(2);
-    expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
-    expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
   };
 
   test('homepage loads with correct title', async ({ page }) => {
