@@ -10,12 +10,12 @@ implementation, not a promise that every workspace already has a page.
 
 The planned Forecast routes are:
 
-| Workspace | Canonical path | v1.8 state | Exposure owner |
+| Workspace | Canonical path | v1.8 state | Availability source |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | planned; tracked in #919 | Issue #919 |
+| Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
-| Winter | `/forecast/winter` | planned; tracked in #913 | Issue #913 |
+| Winter | `/forecast/winter` | planned; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
@@ -70,8 +70,9 @@ controls, layout, discussions, and save/restore lifecycle:
 - Custom owns custom forecast layers, category/product editing, its discussion
   editor, and its product metadata. Existing custom layers embedded in legacy
   Severe days remain readable while #915 moves the UI.
-- Tropical and Winter have no production state contract yet. Their exposure
-  entries stay disabled.
+- Tropical, Mesoscale, and Winter have no production state contract yet.
+  Tropical remains disabled by its exposure entry; Mesoscale and Winter remain
+  unregistered while their workspace status is future.
 
 The URL is the only persistent active-workspace selector. Temporary controls,
 map interaction state, and open panels stay local to the active workspace. They
@@ -118,10 +119,10 @@ shared day groupings would make drafts collide or disappear.
 
 ## Exposure and side effects
 
-The exposure registry owns whether Mesoscale, Tropical, Winter, and Custom
-workspace pages may be registered. The registry currently leaves Mesoscale and
-Winter off on every target. Tropical remains governed by its existing disabled
-entry. Custom keeps its current product exposure and entitlement behavior.
+Workspace status keeps future Mesoscale and Winter pages unregistered. The
+exposure registry continues to govern Tropical and Custom; Tropical remains
+disabled, while Custom keeps its current product exposure and entitlement
+behavior.
 
 No future workspace page, provider client, map layer, or repository may be
 imported at module scope from the always-on application shell. Route loaders and
