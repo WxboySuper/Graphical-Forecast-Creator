@@ -26,7 +26,7 @@ const downloadWorkspaceJsonTransfer = (
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   downloadBlob(
     new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
-    `gfc-forecast-${timestamp}.json`,
+    `gfc-${workspaceId}-forecast-${timestamp}.json`,
   );
 };
 

@@ -212,18 +212,18 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
 
           <TabsContent value="import" className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
-              {workspaceId === 'severe'
+              {isSevereWorkspace
                 ? 'Supported formats: JSON, workflow ZIP package, KML, and KMZ. KML/KMZ imports merge outlook polygons into your active forecast using GFC metadata when available.'
                 : 'Supported formats: JSON and workflow ZIP package. KML/KMZ geometry imports belong to the Severe workspace.'}
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border px-4 py-8 text-center hover:bg-muted/40">
               <span className="text-sm font-medium">Choose a forecast file</span>
               <span className="mt-1 text-xs text-muted-foreground">
-                {workspaceId === 'severe' ? '.json, .zip, .kml, .kmz' : '.json, .zip'}
+                {isSevereWorkspace ? '.json, .zip, .kml, .kmz' : '.json, .zip'}
               </span>
               <input
                 type="file"
-                accept={workspaceId === 'severe'
+                accept={isSevereWorkspace
                   ? '.json,.zip,.kml,.kmz,application/json,application/zip,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz'
                   : '.json,.zip,application/json,application/zip'}
                 className="sr-only"
