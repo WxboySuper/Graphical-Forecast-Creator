@@ -39,9 +39,6 @@ import {
   outlookIcons,
   outlookLabels,
 } from '../ForecastWorkspace/workspaceMeta';
-
-/** Returns the display color used for a non-active outlook layer. */
-const getGhostLayerColor = (type: OutlookType) => getOutlookColor({ outlookType: type, probability: type === 'categorical' ? 'SLGT' : '15%' });
 import TabbedToolbarSelectionStrip, { OutlookTrimToolbarSection } from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
 import CustomProductsDialog from './CustomProductsDialog';
@@ -49,7 +46,10 @@ import type { RootState } from '../../store';
 import { setCustomEditorMode } from '../../store/forecastSlice';
 import './IntegratedToolbar.css';
 
-interface IntegratedToolbarProps {
+/** Returns the display color used for a non-active outlook layer. */
+const getGhostLayerColor = (type: OutlookType) => getOutlookColor({ outlookType: type, probability: type === 'categorical' ? 'SLGT' : '15%' });
+
+interface TabbedIntegratedToolbarProps {
   controller: ForecastWorkspaceController;
   autoTstmTools?: React.ReactNode;
 }
@@ -821,7 +821,7 @@ const TabbedIntegratedToolbarHeader: React.FC<{
 );
 
 /** Tray area containing the tab panels. */
-const TabbedIntegratedToolbarTray: React.FC<IntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
+const TabbedIntegratedToolbarTray: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
   <div className="tabbed-integrated-toolbar__tray min-h-0 flex-1 overflow-hidden bg-background px-3 py-2 lg:px-4">
     <TabsContent value="draw" className="tabbed-integrated-toolbar__panel mt-0 h-full">
       <TabbedToolbarDrawTab controller={controller} />
@@ -842,7 +842,7 @@ const TabbedIntegratedToolbarTray: React.FC<IntegratedToolbarProps> = ({ control
 );
 
 /** Toolbar variant that keeps the original integrated-bar footprint but moves secondary controls behind tabs. */
-const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ controller, autoTstmTools }) => {
+const TabbedIntegratedToolbarBody: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools }) => {
   const [activeTab, setActiveTab] = React.useState<TabbedToolbarTabKey>('draw');
 
   return (
@@ -858,7 +858,7 @@ const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ control
 /**
  * Tabbed variant of the integrated toolbar — keeps primary footprint and moves secondary controls behind tabs.
  */
-export const TabbedIntegratedToolbar: React.FC<IntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
+export const TabbedIntegratedToolbar: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
   <TooltipProvider>
     <TabbedIntegratedToolbarBody controller={controller} autoTstmTools={autoTstmTools} />
   </TooltipProvider>

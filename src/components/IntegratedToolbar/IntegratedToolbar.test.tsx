@@ -1,12 +1,12 @@
 import React, { useRef } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
 import { TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
-import forecastReducer, { undoLastEdit } from '../../store/forecastSlice';
+import forecastReducer from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 
@@ -148,8 +148,16 @@ describe('custom Draw mode exposure', () => {
     await user.type(screen.getByLabelText('Layer title'), 'Winter impacts');
     await user.tab();
     expect(screen.getByLabelText('Layer title')).toHaveValue('Winter impacts');
-    act(() => { store.dispatch(undoLastEdit()); });
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await user.click(screen.getByRole('tab', { name: /Draw/i }));
     await waitFor(() => expect(screen.getByLabelText('Layer title')).toHaveValue('Custom Layer 1'));
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    await user.click(screen.getByRole('tab', { name: /Draw/i }));
+    await waitFor(() => expect(screen.getByLabelText('Layer title')).toHaveValue('Winter impacts'));
 
     await user.click(screen.getByRole('radio', { name: 'Severe' }));
     expect(screen.getByTitle('Wind')).toBeInTheDocument();
