@@ -1,7 +1,6 @@
 /**
- * Script test contract for stable-hotfix-policy.test.
+ * Ensures stable hotfixes preserve major/minor versions and advance the patch number.
  *
- * This file verifies the script or automation boundary represented by stable-hotfix-policy.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

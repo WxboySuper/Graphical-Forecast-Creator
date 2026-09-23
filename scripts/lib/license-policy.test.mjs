@@ -1,7 +1,6 @@
 /**
- * Script test contract for license-policy.test.
+ * Checks permissive and public-domain license acceptance and copyleft review requirements.
  *
- * This file verifies the script or automation boundary represented by license-policy.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

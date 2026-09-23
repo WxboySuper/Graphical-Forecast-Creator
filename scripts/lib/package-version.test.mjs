@@ -1,7 +1,6 @@
 /**
- * Script test contract for package-version.test.
+ * Covers beta/stable version derivation and release-branch naming.
  *
- * This file verifies the script or automation boundary represented by package-version.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

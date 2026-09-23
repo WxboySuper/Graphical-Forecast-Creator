@@ -1,7 +1,6 @@
 /**
- * Script test contract for stale-branch-report.test.
+ * Covers eligible branch prefixes, protected/managed exclusions, and the strict grace-period boundary.
  *
- * This file verifies the script or automation boundary represented by stale-branch-report.test, including its inputs, outputs, and failure behavior.
  */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
