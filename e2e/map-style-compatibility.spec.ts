@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';
 import { prepareAppState } from './testSetup';
@@ -19,7 +19,12 @@ const WIND_FIXTURES = [
   { time: '1920', speed: '70' },
 ];
 
+/** Vertex pulls used to build candidate points between each ring vertex and the centroid. */
+const CENTROID_PULLS = [0.2, 0.35, 0.5, 0.65];
+
 type LonLat = [longitude: number, latitude: number];
+
+type Box = { x: number; y: number; width: number; height: number };
 
 const expectNoOverlap = async (page: Page, firstSelector: string, secondSelector: string) => {
   const first = await page.locator(firstSelector).boundingBox();
@@ -59,6 +64,12 @@ const expectInsideMapPane = async (page: Page, selector: string) => {
   ).toBe(true);
 };
 
+const boxContainsBounds = (outer: Box, inner: Box): boolean =>
+  inner.x >= outer.x &&
+  inner.y >= outer.y &&
+  inner.x + inner.width <= outer.x + outer.width &&
+  inner.y + inner.height <= outer.y + outer.height;
+
 const expectTelemetryContentFits = async (page: Page) => {
   const telemetry = page.locator(TELEMETRY);
   const metrics = await telemetry.evaluate((element) => {
@@ -83,22 +94,40 @@ const expectTelemetryContentFits = async (page: Page) => {
 
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
   expect(metrics.items.length).toBeGreaterThan(0);
+  const bounds: Box = {
+    x: metrics.bounds.left,
+    y: metrics.bounds.top,
+    width: metrics.bounds.right - metrics.bounds.left,
+    height: metrics.bounds.bottom - metrics.bounds.top,
+  };
   for (const item of metrics.items) {
-    expect(item.left).toBeGreaterThanOrEqual(metrics.bounds.left);
-    expect(item.right).toBeLessThanOrEqual(metrics.bounds.right);
-    expect(item.top).toBeGreaterThanOrEqual(metrics.bounds.top);
-    expect(item.bottom).toBeLessThanOrEqual(metrics.bounds.bottom);
+    const itemBox: Box = {
+      x: item.left,
+      y: item.top,
+      width: item.right - item.left,
+      height: item.bottom - item.top,
+    };
+    expect(
+      boxContainsBounds(bounds, itemBox),
+      `Telemetry item escaped its strip: ${JSON.stringify(itemBox)}`,
+    ).toBe(true);
   }
 };
 
-const expectTelemetryClear = async (page: Page) => {
+/** Telemetry, warning, and map controls must stay separate and inside the pane. */
+const expectOverlaysClear = async (page: Page) => {
   await expectTelemetryContentFits(page);
   await expectNoOverlap(page, TELEMETRY, WARNING);
   await expectNoOverlap(page, TELEMETRY, CONTROLS);
-  await expectNoOverlap(page, TELEMETRY, GRADE);
-  await expectNoOverlap(page, GRADE, WARNING);
   await expectInsideMapPane(page, TELEMETRY);
   await expectInsideMapPane(page, WARNING);
+};
+
+/** Narrow layouts also show the grade pill, so it joins the separation checks. */
+const expectTelemetryClear = async (page: Page) => {
+  await expectOverlaysClear(page);
+  await expectNoOverlap(page, TELEMETRY, GRADE);
+  await expectNoOverlap(page, GRADE, WARNING);
   await expectInsideMapPane(page, GRADE);
 };
 
@@ -125,10 +154,7 @@ const isPointInRing = ([x, y]: LonLat, ring: number[][]): boolean => {
     const [xi, yi] = ring[index];
     const [xj, yj] = ring[previous];
     if (Number.isFinite(xi) === false || Number.isFinite(yi) === false) continue;
-    if (
-      (yi > y) !== (yj > y) &&
-      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
-    ) {
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
       inside = !inside;
     }
   }
@@ -215,42 +241,48 @@ const extractWindRings = async (downloadPath: string): Promise<number[][][]> => 
   return windRingsFromPackage(await parseForecastPackage(zip));
 };
 
+const finiteVertices = (ring: number[][]): LonLat[] =>
+  ring.filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+
+const centroidOf = (vertices: LonLat[]): LonLat => [
+  vertices.reduce((sum, [x]) => sum + x, 0) / vertices.length,
+  vertices.reduce((sum, [, y]) => sum + y, 0) / vertices.length,
+];
+
+const pullCandidates = (vertices: LonLat[], centroid: LonLat): LonLat[] =>
+  vertices.flatMap(([vx, vy]) =>
+    CENTROID_PULLS.map(
+      (pull): LonLat => [vx + (centroid[0] - vx) * pull, vy + (centroid[1] - vy) * pull],
+    ),
+  );
+
+const includesPoint = (points: LonLat[], candidate: LonLat): boolean =>
+  points.some(([x, y]) => Math.abs(x - candidate[0]) < 1e-7 && Math.abs(y - candidate[1]) < 1e-7);
+
+/** Up to three strictly interior points of one ring, or fewer when the ring is too small. */
+const interiorPointsForRing = (ring: number[][]): LonLat[] => {
+  const vertices = finiteVertices(ring);
+  if (vertices.length < 3) return [];
+  const centroid = centroidOf(vertices);
+  const interior: LonLat[] = [];
+  for (const candidate of [centroid, ...pullCandidates(vertices, centroid)]) {
+    if (!isPointInRing(candidate, ring)) continue;
+    if (includesPoint(interior, candidate)) continue;
+    interior.push(candidate);
+    if (interior.length === WIND_FIXTURES.length) break;
+  }
+  return interior;
+};
+
 /**
  * Picks three strictly interior points of the drawn wind polygon so fixture
  * wind reports land inside the geometry the grading run evaluates.
  */
-const interiorWindReportPoints = async (downloadPath: string): Promise<LonLat[]> => {
-  const rings = await extractWindRings(downloadPath);
-
+const interiorWindReportPoints = (rings: number[][][]): LonLat[] => {
   for (const ring of rings) {
-    const vertices = ring.filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
-    if (vertices.length < 3) continue;
-    const centroid: LonLat = [
-      vertices.reduce((sum, [x]) => sum + x, 0) / vertices.length,
-      vertices.reduce((sum, [, y]) => sum + y, 0) / vertices.length,
-    ];
-    const candidates: LonLat[] = [centroid];
-    for (const [vx, vy] of vertices) {
-      for (const pull of [0.2, 0.35, 0.5, 0.65]) {
-        candidates.push([
-          vx + (centroid[0] - vx) * pull,
-          vy + (centroid[1] - vy) * pull,
-        ]);
-      }
-    }
-
-    const interior: LonLat[] = [];
-    for (const candidate of candidates) {
-      if (!isPointInRing(candidate, ring)) continue;
-      const duplicate = interior.some(
-        ([x, y]) => Math.abs(x - candidate[0]) < 1e-7 && Math.abs(y - candidate[1]) < 1e-7,
-      );
-      if (!duplicate) interior.push(candidate);
-      if (interior.length === WIND_FIXTURES.length) break;
-    }
+    const interior = interiorPointsForRing(ring);
     if (interior.length === WIND_FIXTURES.length) return interior;
   }
-
   throw new Error('Could not place three wind reports inside the drawn wind polygon');
 };
 
@@ -293,8 +325,14 @@ const gradeThroughFixtureFeeds = async (page: Page, windReportsCsv: string) => {
   await expect(page.locator(TELEMETRY)).toContainText(`${WIND_FIXTURES.length} REPORTS`);
 };
 
-test('renders a drawn outlook in forecast and verification with shared map styles', async ({ page }, testInfo) => {
-  test.setTimeout(120000);
+const attachScreenshot = async (page: Page, testInfo: TestInfo, name: string) => {
+  const screenshot = testInfo.outputPath(`${name}.png`);
+  await page.screenshot({ path: screenshot });
+  await testInfo.attach(name, { path: screenshot, contentType: 'image/png' });
+};
+
+/** Draws the wind outlook, exports the package, and returns the download path. */
+const drawAndExportForecast = async (page: Page, testInfo: TestInfo): Promise<string> => {
   await prepareAppState(page);
   await page.goto('/?localTestAccount=premium');
   await page.getByRole('button', { name: 'Day 1', exact: true }).click();
@@ -306,81 +344,111 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await page.getByRole('button', { name: 'Draw polygons' }).click();
   const box = await viewport.boundingBox();
   if (!box) throw new Error('Map viewport has no bounds');
-  await page.mouse.click(box.x + box.width * .4, box.y + box.height * .35);
-  await page.mouse.click(box.x + box.width * .6, box.y + box.height * .35);
-  await page.mouse.dblclick(box.x + box.width * .5, box.y + box.height * .65);
+  await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.35);
+  await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.35);
+  await page.mouse.dblclick(box.x + box.width * 0.5, box.y + box.height * 0.65);
   await page.getByRole('button', { name: 'Pan map' }).click();
   const forecastScreenshot = testInfo.outputPath('forecast-style.png');
   await viewport.screenshot({ path: forecastScreenshot });
   await testInfo.attach('forecast-style', { path: forecastScreenshot, contentType: 'image/png' });
 
   const downloadReady = page.waitForEvent('download');
-  await page.locator('section[aria-label="Forecast package workflow"]').getByRole('button', { name: 'Export', exact: true }).click();
+  await page
+    .locator('section[aria-label="Forecast package workflow"]')
+    .getByRole('button', { name: 'Export', exact: true })
+    .click();
   const download = await downloadReady;
   const path = await download.path();
   if (!path) throw new Error('Forecast package download has no file');
-  const windReportsCsv = buildWindReportsCsv(await interiorWindReportPoints(path));
+  return path;
+};
+
+/** Uploads the package, grades it against the local SPC fixture, and returns the map viewport. */
+const gradeVerificationPackage = async (page: Page, packagePath: string): Promise<Locator> => {
+  const windReportsCsv = buildWindReportsCsv(
+    interiorWindReportPoints(await extractWindRings(packagePath)),
+  );
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/verification');
-  await page.getByLabel('Upload forecast file').setInputFiles(path);
-  const verificationViewport = page.locator('.fg-map-pane .ol-viewport');
-  await expect(verificationViewport).toBeVisible({ timeout: 15000 });
-
+  await page.getByLabel('Upload forecast file').setInputFiles(packagePath);
+  const viewport = page.locator('.fg-map-pane .ol-viewport');
+  await expect(viewport).toBeVisible({ timeout: 15000 });
   await gradeThroughFixtureFeeds(page, windReportsCsv);
+  await expect(page.locator(WARNING)).toBeVisible();
+  return viewport;
+};
 
-  await expectNoOverlap(page, TELEMETRY, WARNING);
-  await expectNoOverlap(page, TELEMETRY, CONTROLS);
-  await page.getByRole('group', { name: 'Outlook layer' }).getByRole('button', { name: 'wind', exact: true }).click();
+/** Desktop light and dark passes: style switching plus telemetry/warning separation. */
+const verifyDesktopLayout = async (page: Page, testInfo: TestInfo, viewport: Locator) => {
+  await expectOverlaysClear(page);
+  await page
+    .getByRole('group', { name: 'Outlook layer' })
+    .getByRole('button', { name: 'wind', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Base map style', exact: true }).click();
   await page.getByRole('button', { name: 'Blank (Weather)', exact: true }).click();
-  await expect(verificationViewport.locator('canvas').first()).toBeVisible();
-  await expectPaintedMapCanvas(verificationViewport);
+  await expect(viewport.locator('canvas').first()).toBeVisible();
+  await expectPaintedMapCanvas(viewport);
   const verificationScreenshot = testInfo.outputPath('verification-style.png');
-  await verificationViewport.screenshot({ path: verificationScreenshot });
-  await testInfo.attach('verification-style', { path: verificationScreenshot, contentType: 'image/png' });
+  await viewport.screenshot({ path: verificationScreenshot });
+  await testInfo.attach('verification-style', {
+    path: verificationScreenshot,
+    contentType: 'image/png',
+  });
   await page.getByRole('button', { name: 'Switch to dark mode' }).click();
-  await expect(verificationViewport.locator('canvas').first()).toBeVisible();
-  await expectPaintedMapCanvas(verificationViewport);
-  await expectNoOverlap(page, TELEMETRY, WARNING);
-  await expectNoOverlap(page, TELEMETRY, CONTROLS);
+  await expect(viewport.locator('canvas').first()).toBeVisible();
+  await expectPaintedMapCanvas(viewport);
+  await expectOverlaysClear(page);
   const verificationDarkScreenshot = testInfo.outputPath('verification-dark-style.png');
-  await verificationViewport.screenshot({ path: verificationDarkScreenshot });
-  await testInfo.attach('verification-dark-style', { path: verificationDarkScreenshot, contentType: 'image/png' });
+  await viewport.screenshot({ path: verificationDarkScreenshot });
+  await testInfo.attach('verification-dark-style', {
+    path: verificationDarkScreenshot,
+    contentType: 'image/png',
+  });
+};
 
-  // Phone and short-landscape geometry in both themes, with the real legend control.
+/** Both themes at one viewport size, with the real legend control open. */
+const verifyLegendAtSize = async (
+  page: Page,
+  testInfo: TestInfo,
+  size: { name: string; width: number; height: number },
+) => {
+  await page.setViewportSize({ width: size.width, height: size.height });
+  for (const pass of ['first', 'second'] as const) {
+    if (pass === 'second') {
+      await page.getByRole('button', { name: /Switch to (dark|light) mode/ }).click();
+    }
+    const theme = await page.evaluate(() =>
+      document.documentElement.classList.contains('dark-mode') ? 'dark' : 'light',
+    );
+
+    await expectTelemetryClear(page);
+
+    await page.getByRole('button', { name: 'Show map key' }).click();
+    await expect(page.locator(`${LEGEND}.map-legend--mobile-open`)).toBeVisible();
+    await expectTelemetryClear(page);
+    await expectNoOverlap(page, LEGEND, TELEMETRY);
+    await expectNoOverlap(page, LEGEND, GRADE);
+    await expectNoOverlap(page, LEGEND, WARNING);
+    await expectNoOverlap(page, LEGEND, CONTROLS);
+    await expectInsideMapPane(page, LEGEND);
+
+    await attachScreenshot(page, testInfo, `${size.name}-${theme}-legend-open`);
+
+    await page.getByRole('button', { name: 'Hide map key' }).click();
+    await expect(page.locator(`${LEGEND}.map-legend--mobile-open`)).toBeHidden();
+  }
+};
+
+test('renders a drawn outlook in forecast and verification with shared map styles', async ({ page }, testInfo) => {
+  test.setTimeout(120000);
+  const packagePath = await drawAndExportForecast(page, testInfo);
+  const viewport = await gradeVerificationPackage(page, packagePath);
+  await verifyDesktopLayout(page, testInfo, viewport);
   for (const size of [
     { name: 'phone', width: 390, height: 844 },
     { name: 'short-landscape', width: 844, height: 390 },
   ]) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    for (const pass of ['first', 'second'] as const) {
-      if (pass === 'second') {
-        await page.getByRole('button', { name: /Switch to (dark|light) mode/ }).click();
-      }
-      const theme = await page.evaluate(() =>
-        document.documentElement.classList.contains('dark-mode') ? 'dark' : 'light',
-      );
-
-      await expectTelemetryClear(page);
-
-      await page.getByRole('button', { name: 'Show map key' }).click();
-      await expect(page.locator(`${LEGEND}.map-legend--mobile-open`)).toBeVisible();
-      await expectTelemetryClear(page);
-      await expectNoOverlap(page, LEGEND, TELEMETRY);
-      await expectNoOverlap(page, LEGEND, GRADE);
-      await expectNoOverlap(page, LEGEND, WARNING);
-      await expectNoOverlap(page, LEGEND, CONTROLS);
-      await expectInsideMapPane(page, LEGEND);
-
-      const screenshot = testInfo.outputPath(`${size.name}-${theme}-legend-open.png`);
-      await page.screenshot({ path: screenshot });
-      await testInfo.attach(`${size.name}-${theme}-legend-open`, {
-        path: screenshot,
-        contentType: 'image/png',
-      });
-
-      await page.getByRole('button', { name: 'Hide map key' }).click();
-      await expect(page.locator(`${LEGEND}.map-legend--mobile-open`)).toBeHidden();
-    }
+    await verifyLegendAtSize(page, testInfo, size);
   }
 });
