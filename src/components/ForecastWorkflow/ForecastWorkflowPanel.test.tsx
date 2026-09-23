@@ -81,12 +81,14 @@ const previousOutlookButtonName = /Use .* Day 2/;
 
 interface SeededPreviousOutlook {
   sourceWorkspace: ForecastWorkspaceId;
+  activeWorkspace?: ForecastWorkspaceId;
   sourceFeatureId: string;
   sourceLabel: string;
 }
 
 const renderPanelWithSeededPreviousOutlook = ({
   sourceWorkspace,
+  activeWorkspace = 'severe',
   sourceFeatureId,
   sourceLabel,
 }: SeededPreviousOutlook): void => {
@@ -96,7 +98,7 @@ const renderPanelWithSeededPreviousOutlook = ({
   store.dispatch(addFeature({ feature: createFeature(sourceFeatureId, 0, 'tornado', '2%') }));
   store.dispatch(setCycleDate(getYesterdayLocalDate()));
   store.dispatch(saveCurrentCycle({ label: sourceLabel }));
-  store.dispatch(setForecastWorkspace('severe'));
+  store.dispatch(setForecastWorkspace(activeWorkspace));
   store.dispatch(setForecastDay(1));
   store.dispatch(startBlankCycle({
     workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
@@ -158,6 +160,18 @@ describe('ForecastWorkflowPanel completion review', () => {
 
     expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: previousOutlookButtonName })).toBeInTheDocument();
+  });
+
+  it('does not suggest a previous outlook from Severe while Custom is active', () => {
+    renderPanelWithSeededPreviousOutlook({
+      sourceWorkspace: 'severe',
+      activeWorkspace: 'custom',
+      sourceFeatureId: 'severe-source',
+      sourceLabel: 'Severe source',
+    });
+
+    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: previousOutlookButtonName })).not.toBeInTheDocument();
   });
 });
 
