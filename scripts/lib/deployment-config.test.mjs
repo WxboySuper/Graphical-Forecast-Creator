@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import {
+  mergeDeploymentConfigs,
   normalizeDeploymentConfig,
   renderServerEnvFile,
 } from './deployment-config.mjs';
@@ -39,6 +40,33 @@ describe('deployment config', () => {
         },
       }),
       ['TSTM_GENERATION_ENABLED=true', 'TSTM_INGESTION_ENABLED=true'].join('\n')
+    );
+  });
+
+  it('merges shared defaults with environment overrides', () => {
+    assert.deepEqual(
+      mergeDeploymentConfigs(
+        { environment: 'base', serverEnv: { TSTM_GENERATION_ENABLED: 'true', SHARED: 'base' } },
+        { environment: 'override', serverEnv: { SHARED: 'override', TSTM_INGESTION_ENABLED: 'true' } },
+      ),
+      {
+        environment: 'override',
+        serverEnv: {
+          TSTM_GENERATION_ENABLED: 'true',
+          TSTM_INGESTION_ENABLED: 'true',
+          SHARED: 'override',
+        },
+      },
+    );
+  });
+
+  it('rejects malformed inherited serverEnv overrides', () => {
+    assert.throws(
+      () => mergeDeploymentConfigs(
+        { serverEnv: { SHARED: 'base' } },
+        { serverEnv: 'not-an-object' },
+      ),
+      /override serverEnv must be an object/
     );
   });
 
@@ -115,6 +143,59 @@ describe('deployment config', () => {
 
     assert.equal(result.status, 1);
     assert.match(result.stderr, /under deploy/);
+  });
+
+  it('rejects inherited paths outside deploy and inheritance cycles', () => {
+    const testDir = mkdtempSync(join(ROOT, 'deploy', '.gfc-deployment-test-'));
+    const outsideDir = mkdtempSync(join(tmpdir(), 'gfc-deployment-outside-'));
+    const traversalConfig = join(testDir, 'traversal.json');
+    const cycleA = join(testDir, 'cycle-a.json');
+    const cycleB = join(testDir, 'cycle-b.json');
+    const malformedConfig = join(testDir, 'malformed.json');
+    const outsideConfig = join(outsideDir, 'outside.json');
+    const symlinkConfig = join(testDir, 'symlink.json');
+
+    try {
+      writeFileSync(traversalConfig, JSON.stringify({ extends: '../package.json' }));
+      const relativeCycleA = relative(resolve(ROOT, 'deploy'), cycleA);
+      const relativeCycleB = relative(resolve(ROOT, 'deploy'), cycleB);
+      writeFileSync(cycleA, JSON.stringify({ extends: relativeCycleB, serverEnv: {} }));
+      writeFileSync(cycleB, JSON.stringify({ extends: relativeCycleA, serverEnv: {} }));
+      writeFileSync(malformedConfig, JSON.stringify({ extends: false, serverEnv: {} }));
+      writeFileSync(outsideConfig, JSON.stringify({ serverEnv: { ESCAPED: 'true' } }));
+      symlinkSync(outsideConfig, symlinkConfig, 'file');
+
+      const traversalResult = spawnSync(process.execPath, [
+        WRITE_DEPLOYMENT_ENV_SCRIPT,
+        relative(ROOT, traversalConfig),
+      ], { cwd: ROOT, encoding: 'utf8' });
+      assert.equal(traversalResult.status, 1);
+      assert.match(traversalResult.stderr, /inheritance must stay under deploy/);
+
+      const cycleResult = spawnSync(process.execPath, [
+        WRITE_DEPLOYMENT_ENV_SCRIPT,
+        relative(ROOT, cycleA),
+      ], { cwd: ROOT, encoding: 'utf8' });
+      assert.equal(cycleResult.status, 1);
+      assert.match(cycleResult.stderr, /inheritance cycle/);
+
+      const malformedResult = spawnSync(process.execPath, [
+        WRITE_DEPLOYMENT_ENV_SCRIPT,
+        relative(ROOT, malformedConfig),
+      ], { cwd: ROOT, encoding: 'utf8' });
+      assert.equal(malformedResult.status, 1);
+      assert.match(malformedResult.stderr, /extends must be a non-empty string/);
+
+      const symlinkResult = spawnSync(process.execPath, [
+        WRITE_DEPLOYMENT_ENV_SCRIPT,
+        relative(ROOT, symlinkConfig),
+      ], { cwd: ROOT, encoding: 'utf8' });
+      assert.equal(symlinkResult.status, 1);
+      assert.match(symlinkResult.stderr, /inheritance must stay under deploy/);
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 
   it('prints readable errors for missing config files', () => {
