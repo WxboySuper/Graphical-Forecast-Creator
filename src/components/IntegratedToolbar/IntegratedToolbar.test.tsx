@@ -113,7 +113,7 @@ describe('custom Draw mode exposure', () => {
   afterEach(() => jest.restoreAllMocks());
 
   test('keeps hosted Draw UI unchanged with no custom toggle or placeholder', () => {
-    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature: string) => feature !== 'customProducts');
+    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature) => feature !== 'customProducts');
     renderToolbar();
     expect(screen.queryByRole('radiogroup', { name: 'Drawing product' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Saved products/i })).not.toBeInTheDocument();
