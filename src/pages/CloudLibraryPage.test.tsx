@@ -4,8 +4,9 @@ import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
-import CloudLibraryPage, { buildCloudSessionPayload } from "./CloudLibraryPage";
+import CloudLibraryPage, { buildCloudSessionPayload, isSupportedCloudLoadWorkspace } from "./CloudLibraryPage";
 import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
+import { getForecastWorkspace } from "../config/forecastWorkspaces";
 
 jest.mock("../auth/AuthProvider", () => ({
   useAuth: jest.fn(),
@@ -137,6 +138,16 @@ describe("CloudLibraryPage", () => {
     expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
     const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
     expect(wrapped.workspaceId).toBe('severe');
+  });
+
+  it("supports cloud loads only for workspaces with a registered exposed editor route", () => {
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("severe"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("custom", getForecastWorkspace("custom"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("mesoscale", getForecastWorkspace("mesoscale"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("tropical", getForecastWorkspace("tropical"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("winter", getForecastWorkspace("winter"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", undefined)).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("custom"))).toBe(false);
   });
 
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {

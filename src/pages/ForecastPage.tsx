@@ -84,6 +84,7 @@ export {
   formatRolloverDayLabel,
   parseStoredForecastPayload,
   parseStoredCloudMeta,
+  getMismatchedCloudWorkspaceId,
   clearStoredCloudSession,
   hasRestorableCloudSelection,
   buildRestoreKey,

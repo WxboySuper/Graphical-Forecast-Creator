@@ -7,6 +7,7 @@ import {
   cycleHasDiscussionContent,
   formatRolloverDayLabel,
   getDayRolloverPromptState,
+  getMismatchedCloudWorkspaceId,
   hasRestorableCloudSelection,
   hasRolloverForecastData,
   hasUnpublishedDiscussionDrafts,
@@ -16,6 +17,7 @@ import {
   runDayRolloverCloudSaveAction,
   runDayRolloverDownloadAction,
 } from './forecastPageController';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 
 const createForecastCycle = () =>
   forecastReducer(undefined, { type: '@@forecastPageController/test' }).forecastCycle;
@@ -55,6 +57,19 @@ describe('forecastPageController', () => {
     expect(parseStoredForecastPayload(customPayload, 'severe')).toBeNull();
     expect(parseStoredForecastPayload(JSON.stringify(forecast), 'custom')).toBeNull();
     expect(parseStoredForecastPayload(JSON.stringify(forecast), 'severe')).toEqual(forecast);
+  });
+
+  test('identifies a cloud handoff staged for a different workspace', () => {
+    const cycle = createForecastCycle();
+    const customStored = JSON.stringify(serializeForecastWorkspace('custom', cycle, { center: [0, 0], zoom: 4 }));
+    const severeStored = JSON.stringify(serializeForecastWorkspace('severe', cycle, { center: [0, 0], zoom: 4 }));
+
+    expect(getMismatchedCloudWorkspaceId(customStored, 'custom')).toBeNull();
+    expect(getMismatchedCloudWorkspaceId(customStored, 'severe')).toBe('custom');
+    expect(getMismatchedCloudWorkspaceId(severeStored, 'custom')).toBe('severe');
+    expect(getMismatchedCloudWorkspaceId(null, 'severe')).toBeNull();
+    expect(getMismatchedCloudWorkspaceId('not-json', 'severe')).toBeNull();
+    expect(getMismatchedCloudWorkspaceId(JSON.stringify({ nope: true }), 'severe')).toBeNull();
   });
 
   test('derives rollover candidates and preserves pending prompts', () => {

@@ -231,6 +231,21 @@ export const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMet
   }
 };
 
+/** Returns the source workspace when a stored cloud handoff belongs elsewhere, else null. */
+export const getMismatchedCloudWorkspaceId = (
+  storedValue: string | null,
+  workspaceId: ForecastWorkspaceId,
+): ForecastWorkspaceId | null => {
+  if (!storedValue) return null;
+  try {
+    const parsed = JSON.parse(storedValue) as unknown;
+    const restored = deserializeForecastWorkspace(parsed);
+    return restored.workspaceId === workspaceId ? null : restored.workspaceId;
+  } catch {
+    return null;
+  }
+};
+
 export const clearStoredCloudSession = (userId?: string | null) => {
   sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId)));
   sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId)));
@@ -274,8 +289,18 @@ const restoreCloudSession = ({
   workspaceId,
 }: RestoreCloudSessionOptions): boolean => {
   const payloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId));
-  const payload = parseStoredForecastPayload(sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null), workspaceId);
-  if (!payload) return false;
+  const storedValue = sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null);
+  const payload = parseStoredForecastPayload(storedValue, workspaceId);
+  if (!payload) {
+    // A pending handoff for another workspace must not fail silently into local
+    // restore. Surface it, drop the stale handoff, and stop the fallback chain.
+    if (getMismatchedCloudWorkspaceId(storedValue, workspaceId)) {
+      clearStoredCloudSession(userId);
+      addToast('This cloud cycle belongs to a different forecast workspace and was not loaded.', 'error');
+      return true;
+    }
+    return false;
+  }
 
   const metaKey = getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId));
   const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(metaKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_META_KEY) : null));
