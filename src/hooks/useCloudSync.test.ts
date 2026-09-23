@@ -43,19 +43,28 @@ describe('useCloudSync', () => {
   const saveCycle = jest.fn();
   const updateSyncState = jest.fn();
 
+  // Test-only partial forecast slice. Selectors under test read only these
+  // three fields, so an unknown cast is justified instead of building a full store.
+  const mockForecastSelectorState = (
+    currentMapViewInput: typeof mapView,
+    currentWorkflowMetadataInput: typeof workflowMetadata = workflowMetadata,
+  ) => {
+    mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => selector({
+      forecast: {
+        forecastCycle,
+        currentMapView: currentMapViewInput,
+        workflowMetadata: currentWorkflowMetadataInput,
+      },
+    } as unknown as RootState));
+  };
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     mockUseEntitlement.mockReturnValue({ premiumActive: true } as ReturnType<typeof useEntitlement>);
     mockSerializeForecast.mockReturnValue(payload as never);
     mockCountForecastMetrics.mockReturnValue({ forecastDays: 1, totalOutlooks: 2, totalFeatures: 3 });
-    mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => selector({
-      forecast: {
-        forecastCycle,
-        currentMapView: mapView,
-        workflowMetadata,
-      },
-    } as RootState));
+    mockForecastSelectorState(mapView);
     saveCycle.mockResolvedValue(true);
   });
 
@@ -130,7 +139,7 @@ describe('useCloudSync', () => {
         currentMapView: mapView,
         workflowMetadata: currentWorkflowMetadata,
       },
-    } as RootState));
+    } as unknown as RootState));
 
     const { result, rerender } = renderHook(() => useCloudSync(cloud()));
     await act(async () => {
@@ -230,7 +239,7 @@ describe('useCloudSync', () => {
         currentMapView,
         workflowMetadata,
       },
-    } as RootState));
+    } as unknown as RootState));
     mockSerializeForecast.mockImplementation((_forecastCycle, mapViewInput) => ({
       ...payload,
       mapView: mapViewInput,

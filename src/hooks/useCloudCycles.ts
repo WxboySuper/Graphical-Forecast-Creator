@@ -414,6 +414,8 @@ function applyCloudSaveSuccess({
     currentUserId: currentUserIdRef.current,
   });
   if (!canApply) {
+    // Matches executeCloudSave stale semantics: report server success
+    // without mutating a replaced selection.
     return true;
   }
   if (result.data) {
@@ -472,13 +474,20 @@ async function executeCloudSave({
     workflowMetadata,
     existingId: savedCycleId,
   });
+  const canApplySaveResult = canApplyCloudSaveResult({
+    expectedCycleId: expectedCurrentCycleId,
+    currentCycleId: currentCloudRef.current?.id,
+    expectedUserId,
+    currentUserId: currentUserIdRef.current,
+  });
+  if (!canApplySaveResult) {
+    // Stale completion: report the server outcome without touching
+    // selection-scoped state. Success stays truthy and failure stays falsy
+    // so explicit callers keep server truth while auto-sync drops the result
+    // through its own generation guard.
+    return result.success;
+  }
   if (!result.success) {
-    if (!canApplyCloudSaveResult({
-      expectedCycleId: expectedCurrentCycleId,
-      currentCycleId: currentCloudRef.current?.id,
-      expectedUserId,
-      currentUserId: currentUserIdRef.current,
-    })) return false;
     return handleCloudSaveFailure({ result, setError, updateSyncState, cycleId: savedCycleId });
   }
   return applyCloudSaveSuccess({
