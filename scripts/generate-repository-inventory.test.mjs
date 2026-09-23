@@ -1,7 +1,5 @@
 /**
- * Script test contract for generate-repository-inventory.test.
- *
- * This file verifies the script or automation boundary represented by generate-repository-inventory.test, including its inputs, outputs, and failure behavior.
+ * Covers boundary classification, import resolution, dependency edges, and ownership-root mapping.
  */
 import assert from 'node:assert/strict';
 import os from 'node:os';

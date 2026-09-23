@@ -1,7 +1,5 @@
 /**
- * Script test contract for feature-exposure-matrix-document.test.
- *
- * This file verifies the script or automation boundary represented by feature-exposure-matrix-document.test, including its inputs, outputs, and failure behavior.
+ * Compares the documented exposure matrix with registry keys/targets and detects documented drift.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

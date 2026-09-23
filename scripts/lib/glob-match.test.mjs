@@ -1,7 +1,5 @@
 /**
- * Script test contract for glob-match.test.
- *
- * This file verifies the script or automation boundary represented by glob-match.test, including its inputs, outputs, and failure behavior.
+ * Verifies directory-prefix, wildcard-prefix, and suffix matching behavior.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

@@ -1,7 +1,5 @@
 /**
- * Script test contract for generate-exposure-report.integration.test.
- *
- * This file verifies the script or automation boundary represented by generate-exposure-report.integration.test, including its inputs, outputs, and failure behavior.
+ * Runs the exposure-report CLI against the repository registry and checks its output and exit status.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

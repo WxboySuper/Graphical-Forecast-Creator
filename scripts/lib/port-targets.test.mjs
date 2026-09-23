@@ -1,7 +1,5 @@
 /**
- * Script test contract for port-targets.test.
- *
- * This file verifies the script or automation boundary represented by port-targets.test, including its inputs, outputs, and failure behavior.
+ * Verifies stable/main port direction and detection of manually opened forward-port PRs.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

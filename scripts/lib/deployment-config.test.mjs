@@ -1,7 +1,5 @@
 /**
- * Script test contract for deployment-config.test.
- *
- * This file verifies the script or automation boundary represented by deployment-config.test, including its inputs, outputs, and failure behavior.
+ * Covers environment normalization, merges, invalid input/path rejection, and CLI rendering.
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';

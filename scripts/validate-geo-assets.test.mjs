@@ -1,7 +1,5 @@
 /**
- * Script test contract for validate-geo-assets.test.
- *
- * This file verifies the script or automation boundary represented by validate-geo-assets.test, including its inputs, outputs, and failure behavior.
+ * Verifies the three vendored boundary datasets exist, match pinned checksums, and validate successfully.
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

@@ -1,7 +1,5 @@
 /**
- * Script test contract for port-conflicts.test.
- *
- * This file verifies the script or automation boundary represented by port-conflicts.test, including its inputs, outputs, and failure behavior.
+ * Ensures every forward-port conflict remains assigned to a human decision.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

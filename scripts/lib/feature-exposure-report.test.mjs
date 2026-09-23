@@ -1,7 +1,5 @@
 /**
- * Script test contract for feature-exposure-report.test.
- *
- * This file verifies the script or automation boundary represented by feature-exposure-report.test, including its inputs, outputs, and failure behavior.
+ * Covers exposure classification, leakage/promotion validation, report formatting, and PR comments.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

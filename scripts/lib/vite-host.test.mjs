@@ -1,7 +1,5 @@
 /**
- * Script test contract for vite-host.test.
- *
- * This file verifies the script or automation boundary represented by vite-host.test, including its inputs, outputs, and failure behavior.
+ * Guards the Vite development server to loopback and rejects binding it to all interfaces.
  */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

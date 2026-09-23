@@ -1,7 +1,5 @@
 /**
- * Script test contract for sentry-sourcemap-verification.test.
- *
- * This file verifies the script or automation boundary represented by sentry-sourcemap-verification.test, including its inputs, outputs, and failure behavior.
+ * Covers Sentry readiness, env validation, artifact bundles, release/slug normalization, local maps, and response verification.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

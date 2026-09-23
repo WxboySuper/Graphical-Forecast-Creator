@@ -1,7 +1,5 @@
 /**
- * Script test contract for changelog-automation.test.
- *
- * This file verifies the script or automation boundary represented by changelog-automation.test, including its inputs, outputs, and failure behavior.
+ * Covers managed changelog declarations, idempotent replacement, and source/reason references.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

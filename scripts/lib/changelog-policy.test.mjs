@@ -1,7 +1,5 @@
 /**
- * Script test contract for changelog-policy.test.
- *
- * This file verifies the script or automation boundary represented by changelog-policy.test, including its inputs, outputs, and failure behavior.
+ * Validates impact declarations, required reasons, and stable/beta changelog-lane policy.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

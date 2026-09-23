@@ -1,7 +1,5 @@
 /**
- * Script test contract for pr-ci-label-state.test.
- *
- * This file verifies the script or automation boundary represented by pr-ci-label-state.test, including its inputs, outputs, and failure behavior.
+ * Covers CI label definitions, check-run state mapping, label diffs, and PR-number parsing.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

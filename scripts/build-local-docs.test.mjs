@@ -1,7 +1,5 @@
 /**
- * Script test contract for build-local-docs.test.
- *
- * This file verifies the script or automation boundary represented by build-local-docs.test, including its inputs, outputs, and failure behavior.
+ * Covers Markdown rendering, safe output paths, local links, and Mermaid markup.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';

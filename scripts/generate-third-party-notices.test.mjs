@@ -1,7 +1,5 @@
 /**
- * Script test contract for generate-third-party-notices.test.
- *
- * This file verifies the script or automation boundary represented by generate-third-party-notices.test, including its inputs, outputs, and failure behavior.
+ * Checks dependency collection across project manifests and generation of complete license notices.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

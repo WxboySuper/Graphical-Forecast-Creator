@@ -1,7 +1,5 @@
 /**
- * Script test contract for changelog.test.
- *
- * This file verifies the script or automation boundary represented by changelog.test, including its inputs, outputs, and failure behavior.
+ * Covers extraction of unreleased, stable, and beta release-note sections.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
