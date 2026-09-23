@@ -89,7 +89,26 @@
 .fg-select-option { display:flex; align-items:center; justify-content:space-between; gap:.6rem; min-height:2.35rem; padding:.5rem .6rem; border-radius:.35rem; color:#27272a; font-size:.8rem; text-align:left; transition:background .12s ease,color .12s ease; }
 .fg-select-option:hover,.fg-select-option[aria-selected='true'] { background:#e6f5f6; color:#0e7490; }
 @media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
-  .fg-map-canvas .fg-map-telemetry { top: 4.25rem; right: .5rem; bottom: auto; }
+  .fg-map-canvas .fg-map-telemetry {
+    top: 4.25rem;
+    right: .5rem;
+    bottom: auto;
+    left: .5rem;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    gap: .25rem .5rem;
+    max-width: calc(100% - 1rem);
+    font-size: .5rem;
+    letter-spacing: .03em;
+  }
+
+  .fg-map-canvas .fg-map-telemetry span {
+    min-width: 0;
+  }
+
+  .fg-map-canvas .fg-map-telemetry span + span {
+    padding-left: .5rem;
+  }
 }
 .fg-select-option svg { width:1rem; height:1rem; }
 @keyframes fg-spin { to { transform:rotate(360deg); } }
