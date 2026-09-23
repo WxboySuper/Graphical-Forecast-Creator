@@ -14,7 +14,7 @@ The planned Forecast routes are:
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
 | Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
-| Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
+| Tropical | `/forecast/tropical` | future; tracked separately from the legacy surface | Workspace status |
 | Winter | `/forecast/winter` | future; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
 
@@ -32,7 +32,9 @@ Future workspaces stay unregistered based on their workspace status. A direct
 request falls through the normal application fallback instead of mounting an
 unfinished page. A workspace promoted to gated must also have an explicit
 feature exposure key; its route and visible navigation use the same exposure
-decision.
+decision. The existing top-level `/tropical` route and navigation remain
+separately gated by `tropicalWorkspace`; that key does not expose the planned
+`/forecast/tropical` workspace.
 
 ## Compatibility paths
 
@@ -71,9 +73,10 @@ controls, layout, discussions, and save/restore lifecycle:
 - Custom owns custom forecast layers, category/product editing, its discussion
   editor, and its product metadata. Existing custom layers embedded in legacy
   Severe days remain readable while #915 moves the UI.
-- Tropical, Mesoscale, and Winter have no production state contract yet.
-  Tropical remains disabled by its exposure entry; Mesoscale and Winter remain
-  unregistered while their workspace status is future.
+- Tropical, Mesoscale, and Winter have no production state contract yet. Their
+  planned `/forecast/*` workspaces remain unregistered while status is future.
+  The separate legacy `/tropical` route and navigation remain gated by
+  `tropicalWorkspace`; Mesoscale and Winter have no legacy gated surface.
 
 The URL is the only persistent active-workspace selector. Temporary controls,
 map interaction state, and open panels stay local to the active workspace. They
