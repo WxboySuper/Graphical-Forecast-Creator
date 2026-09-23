@@ -17,13 +17,13 @@ guide before moving a module or adding a cross-cutting dependency:
 - [Authentication](../src/auth/README.md)
 - [Billing](../src/billing/README.md)
 - [Components](../src/components/README.md)
-- [Configuration](../src/config/README.md)
+- [Configuration](../src/config/README.md) - build targets, exposure registry, navigation metadata, gated surfaces, server-capability status, and vendored boundary sources.
 - [Content](../src/content/README.md)
 - [Feature exposure](../src/features/README.md)
 - [Hooks](../src/hooks/README.md)
 - [Libraries](../src/lib/README.md)
 - [Maps](../src/maps/README.md)
-- [Metrics](../src/metrics/README.md)
+- [Metrics](../src/metrics/README.md) - read-only `userMetrics` hook that feeds progress numbers to the account page.
 - [Monitor](../src/monitor/README.md)
 - [Pages](../src/pages/README.md)
 - [Routing](../src/routing/README.md)
@@ -54,7 +54,7 @@ archive completed exploratory material in the archive sections.
 | Forecast-specific workspace route, state, persistence, or exposure decisions | [Forecast workspace follow-up](./architecture/forecast-workspace-boundaries.md) - v1.8 decision |
 | release or rollout behavior | [Release workflow](./operations/release-workflow.md) |
 | support response or privacy requests | [Support and privacy operations](./operations/v1.7-support-and-privacy.md) |
-| product rules | [Outlook information](./product/outlook-info.md) and [specialty-style policy](./product/specialty-style-policy.md) |
+| product rules | [Outlook information](./product/outlook-info.md), [specialty-style policy](./product/specialty-style-policy.md), and [custom layers and products](./custom-products.md) |
 | export formats | [Import and export formats](./product/kmz-export.md) |
 | tests or test cleanup | [Current testing guidance](#current-guidance-testing) and the module's colocated tests |
 
@@ -114,6 +114,7 @@ before using them to make a code or deployment decision.
 
 - [Outlook information](./product/outlook-info.md) - risk levels, probability values, and categorical conversion rules.
 - [Built-in specialty styles](./product/specialty-style-policy.md) - the approved relationship between visual presets and custom products.
+- [Custom layers and reusable products](./custom-products.md) - snapshot-first custom layer schema, exposure, and hosted authorization boundary.
 
 ## Current release reference
 

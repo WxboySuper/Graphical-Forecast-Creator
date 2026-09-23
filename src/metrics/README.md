@@ -1,7 +1,11 @@
 # Client metrics
 
-`src/metrics` owns client-side metrics hooks and their tests. Metrics are
-observability helpers, not a source of product state or authorization.
+`src/metrics` owns `useUserMetrics` and its tests. The hook reads the
+signed-in user's hosted `userMetrics` document (activity streak, total active
+days, cycles created, cloud cycles saved, discussions written, verification
+sessions run) and exposes it with loading and error state for the account
+page. The hook only reads; it writes nothing and never feeds authorization or
+feature-exposure decisions.
 
-Keep collection optional and privacy-conscious. Update the metrics tests when
-event names, payloads, or lifecycle behavior change.
+Without hosted auth the hook returns zeroed defaults. Update the metrics tests
+when document fields, normalization rules, or load lifecycle behavior change.

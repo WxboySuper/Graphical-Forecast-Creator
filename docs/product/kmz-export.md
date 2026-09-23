@@ -6,13 +6,13 @@ GFC uses a single **Import / Export** dialog for transferring forecast data betw
 
 ## UI entry points
 
-- Forecast toolbar **Import / Export** button
+- Forecast toolbar **Import / Export** button opens the dialog on the export tab
 - Keyboard shortcuts:
-  - `Ctrl/Cmd+S` — open export tab
-  - `Ctrl/Cmd+L` / `Ctrl/Cmd+O` — open import tab
+  - `Ctrl/Cmd+L` / `Ctrl/Cmd+O` — open the import tab
   - `Ctrl/Cmd+E` — map image export (unchanged)
+  - `Ctrl/Cmd+S` — export the forecast to JSON; it does not open this dialog
 
-Map image export remains separate via the existing export-image flow and is linked from the transfer modal.
+Map image export remains separate via the existing export-image flow and is linked from the transfer modal. No keyboard shortcut opens the export tab; use the toolbar button.
 
 ## Supported formats
 
