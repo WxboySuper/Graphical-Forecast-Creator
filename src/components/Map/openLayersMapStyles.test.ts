@@ -4,6 +4,7 @@
  * concerns can be reviewed and tested without loading the React component.
  */
 import { apply } from 'ol-mapbox-style';
+import LayerGroup from 'ol/layer/Group';
 
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
 
@@ -69,7 +70,7 @@ describe('openLayersMapStyles', () => {
 
   test('rejects when either style application fails', async () => {
     const error = new Error('overlay style failed');
-    applyMock.mockImplementationOnce(async () => {}).mockRejectedValueOnce(error);
+    applyMock.mockImplementationOnce(async () => new LayerGroup()).mockRejectedValueOnce(error);
     const styleSet = {
       baseStyle: { version: 8, sources: {}, layers: [] },
       overlayStyle: { version: 8, sources: {}, layers: [] },
