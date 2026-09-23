@@ -77,7 +77,7 @@ const renderPanel = (context: 'forecast' | 'discussion', controller?: ForecastWo
   );
 };
 
-const previousOutlookButtonName = /Use .* Day 2/;
+const previousOutlookButtonName = /^Use [A-Z][a-z]{2} \d{1,2} Day 2$/;
 
 interface SeededPreviousOutlook {
   sourceWorkspace: ForecastWorkspaceId;
@@ -140,38 +140,26 @@ describe('ForecastWorkflowPanel completion review', () => {
     await waitFor(() => expect(screen.queryByText('Ready for export')).not.toBeInTheDocument());
   });
 
-  it('does not suggest a previous outlook from another workspace', () => {
+  it.each([
+    ['hides Custom history from Severe', 'custom', 'severe', false],
+    ['keeps Severe history visible in Severe', 'severe', 'severe', true],
+    ['hides Severe history from Custom', 'severe', 'custom', false],
+  ] as const)('%s', (_caseName, sourceWorkspace, activeWorkspace, shouldSuggest) => {
+    const sourceLabel = `${sourceWorkspace === 'custom' ? 'Custom' : 'Severe'} source`;
     renderPanelWithSeededPreviousOutlook({
-      sourceWorkspace: 'custom',
-      sourceFeatureId: 'custom-source',
-      sourceLabel: 'Custom source',
+      sourceWorkspace,
+      activeWorkspace,
+      sourceFeatureId: `${sourceWorkspace}-source`,
+      sourceLabel,
     });
 
     expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: previousOutlookButtonName })).not.toBeInTheDocument();
-  });
-
-  it('suggests a previous outlook from the active workspace', () => {
-    renderPanelWithSeededPreviousOutlook({
-      sourceWorkspace: 'severe',
-      sourceFeatureId: 'severe-source',
-      sourceLabel: 'Severe source',
-    });
-
-    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: previousOutlookButtonName })).toBeInTheDocument();
-  });
-
-  it('does not suggest a previous outlook from Severe while Custom is active', () => {
-    renderPanelWithSeededPreviousOutlook({
-      sourceWorkspace: 'severe',
-      activeWorkspace: 'custom',
-      sourceFeatureId: 'severe-source',
-      sourceLabel: 'Severe source',
-    });
-
-    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: previousOutlookButtonName })).not.toBeInTheDocument();
+    const previousOutlookButton = screen.queryByRole('button', { name: previousOutlookButtonName });
+    if (shouldSuggest) {
+      expect(previousOutlookButton).toBeInTheDocument();
+    } else {
+      expect(previousOutlookButton).not.toBeInTheDocument();
+    }
   });
 });
 
