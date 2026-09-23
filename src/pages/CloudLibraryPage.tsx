@@ -12,17 +12,17 @@ import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { getBuildTarget } from '../config/buildTarget';
-<import {
+import {
   getForecastWorkspace,
   isForecastWorkspaceExposed,
   type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
-import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import {
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
 } from '../utils/forecastWorkspacePersistence';
+import { getForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -383,8 +383,9 @@ const CloudCycleActions: React.FC<{
   onCancelDelete,
   onConfirmDelete,
 }) => {
+  const workspaceId = getCloudCycleWorkspaceId(cycle);
   const workspaceLabel = getCloudCycleWorkspaceLabel(cycle);
-  const loadSupported = getCloudCycleWorkspaceId(cycle) === 'severe';
+  const loadSupported = isSupportedCloudLoadWorkspace(workspaceId, getForecastWorkspace(workspaceId));
   const loadHintId = `cloud-cycle-load-hint-${cycle.id}`;
 
   return (
@@ -751,15 +752,15 @@ export const buildCloudSessionPayload = (
   return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
 };
 
-/** Only the registered Severe editor can open cloud payloads today. */
+/** Only registered Severe and exposed Custom editors can open cloud payloads today. */
 export const isSupportedCloudLoadWorkspace = (
   workspaceId: ForecastWorkspaceId,
   workspace: ForecastWorkspaceDefinition | undefined,
 ): boolean => {
-  if (workspaceId !== 'severe') {
+  if (workspaceId !== 'severe' && workspaceId !== 'custom') {
     return false;
   }
-  if (!workspace) {
+  if (!workspace || workspace.id !== workspaceId) {
     return false;
   }
   return isForecastWorkspaceExposed(workspace);
@@ -833,11 +834,11 @@ const useCloudLibraryActions = ({
       return;
     }
 
-<    if (!persistCloudCycleToSession(cycleId, selectedCycle.label, workspaceId, payload)) {
+    if (!persistCloudCycleToSession(cycleId, selectedCycle.label, workspaceId, payload)) {
       return;
     }
 
-    navigate(getDefaultForecastWorkspacePath());
+    navigate(getForecastWorkspacePath(workspaceId));
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */

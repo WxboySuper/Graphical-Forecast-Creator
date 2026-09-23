@@ -25,7 +25,7 @@ describe('forecast workspace route contract', () => {
 
   test('maps legacy paths to their owning workspace', () => {
     expect(resolveLegacyForecastWorkspacePath('/forecast')?.id).toBe('severe');
-    expect(resolveLegacyForecastWorkspacePath('/custom-products')?.id).toBe('custom');
+    expect(resolveLegacyForecastWorkspacePath('/custom-products')).toBeUndefined();
     expect(resolveLegacyForecastWorkspacePath('/discussion')).toBeUndefined();
   });
 
@@ -41,6 +41,7 @@ describe('forecast workspace route contract', () => {
     expect(resolveRouteForecastWorkspace('/')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/cloud')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/discussion')).toBeUndefined();
+    expect(resolveRouteForecastWorkspace('/custom-products')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/verification')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/monitor')).toBeUndefined();
     expect(resolveRouteForecastWorkspace('/forecast/unknown')).toBeUndefined();

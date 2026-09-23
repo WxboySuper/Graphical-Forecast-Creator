@@ -802,7 +802,7 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
     return <div role="status">Preparing {workspaceId} forecast workspace…</div>;
   }
 
-  return <ForecastPageContent workspaceId={workspaceId} />;
+  return <ForecastPageContent key={workspaceId} workspaceId={workspaceId} />;
 };
 
 export default ForecastPage;
