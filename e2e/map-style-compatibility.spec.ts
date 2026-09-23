@@ -19,6 +19,37 @@ const expectNoOverlap = async (page: Page, firstSelector: string, secondSelector
   ).toBe(true);
 };
 
+const expectTelemetryContentFits = async (page: Page) => {
+  const telemetry = page.locator('.fg-map-canvas .fg-map-telemetry');
+  const metrics = await telemetry.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const items = Array.from(element.children, (child) => {
+      const childBounds = child.getBoundingClientRect();
+      return {
+        left: childBounds.left,
+        right: childBounds.right,
+        top: childBounds.top,
+        bottom: childBounds.bottom,
+      };
+    });
+
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      bounds: { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom },
+      items,
+    };
+  });
+
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+  for (const item of metrics.items) {
+    expect(item.left).toBeGreaterThanOrEqual(metrics.bounds.left);
+    expect(item.right).toBeLessThanOrEqual(metrics.bounds.right);
+    expect(item.top).toBeGreaterThanOrEqual(metrics.bounds.top);
+    expect(item.bottom).toBeLessThanOrEqual(metrics.bounds.bottom);
+  }
+};
+
 const expectPaintedMapCanvas = async (viewport: Locator) => {
   const paintedPixels = await viewport.locator('canvas').evaluateAll((canvases) =>
     canvases.some((canvas) => {
@@ -91,13 +122,17 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await page.setViewportSize({ width: 640, height: 900 });
   await expectNoOverlap(page, telemetry, warning);
   await expectNoOverlap(page, telemetry, controls);
+  await expectTelemetryContentFits(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoOverlap(page, telemetry, warning);
   await expectNoOverlap(page, telemetry, controls);
+  await expectTelemetryContentFits(page);
   await page.getByRole('button', { name: 'Switch to light mode' }).click();
   await expectNoOverlap(page, telemetry, warning);
   await expectNoOverlap(page, telemetry, controls);
+  await expectTelemetryContentFits(page);
   await page.setViewportSize({ width: 640, height: 900 });
   await expectNoOverlap(page, telemetry, warning);
   await expectNoOverlap(page, telemetry, controls);
+  await expectTelemetryContentFits(page);
 });
