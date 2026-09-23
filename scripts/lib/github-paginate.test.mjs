@@ -1,6 +1,5 @@
 /**
  * Checks page aggregation and termination for empty and short final GitHub API pages.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

@@ -1,6 +1,5 @@
 /**
- * Verifies allowed branch-to-target combinations for feature, hotfix, and deployment-config work.
- *
+ * Verifies allowed branch targets, including feature, hotfix, stable maintenance, and permissive main defaults.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

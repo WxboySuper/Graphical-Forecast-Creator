@@ -1,6 +1,5 @@
 /**
  * Checks release-lane extraction, formatting, and shared heading boundaries.
- *
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

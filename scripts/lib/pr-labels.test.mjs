@@ -1,6 +1,5 @@
 /**
  * Covers stable-promotion routing labels and descriptive PR-label classification.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

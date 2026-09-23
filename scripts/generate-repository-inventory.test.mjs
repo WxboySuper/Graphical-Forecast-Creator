@@ -1,6 +1,5 @@
 /**
- * Covers repository-boundary classification, relative-import extraction, and ownership-root mapping.
- *
+ * Covers boundary classification, import resolution, dependency edges, and ownership-root mapping.
  */
 import assert from 'node:assert/strict';
 import os from 'node:os';

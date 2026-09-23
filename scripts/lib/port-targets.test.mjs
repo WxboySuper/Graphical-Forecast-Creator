@@ -1,6 +1,5 @@
 /**
  * Verifies stable/main port direction and detection of manually opened forward-port PRs.
- *
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

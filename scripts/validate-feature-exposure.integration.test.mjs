@@ -1,6 +1,5 @@
 /**
  * Runs feature-exposure validation against repository inputs and verifies its CI entry-point result.
- *
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

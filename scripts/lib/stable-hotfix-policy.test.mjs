@@ -1,6 +1,5 @@
 /**
  * Ensures stable hotfixes preserve major/minor versions and advance the patch number.
- *
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
