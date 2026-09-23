@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useOutletContext } from 'react-router';
 import type { Dispatch, UnknownAction } from 'redux';
@@ -209,12 +209,12 @@ const DayRolloverDialog: React.FC<{
   </Dialog>
 );
 
-const LegacyForecastNotice: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => (
-  <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
+const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.RefObject<HTMLDivElement | null> }> = ({ onDismiss, noticeRef }) => (
+  <div ref={noticeRef} className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
     <span role="status">
       Forecast now opens in the Severe workspace at <code>/forecast/severe</code>. Update any bookmarks that still use <code>/forecast</code>.
     </span>
-    <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" onClick={onDismiss}>Dismiss</Button>
+    <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" aria-label="Dismiss Forecast bookmark notice" onClick={onDismiss}>Dismiss</Button>
   </div>
 );
 
@@ -809,7 +809,27 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const navigate = useNavigate();
   const location = useLocation();
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const forecastShellRef = useRef<HTMLDivElement>(null);
+  const legacyNoticeRef = useRef<HTMLDivElement>(null);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(location, navigate, workspaceRef);
+
+  useLayoutEffect(() => {
+    const shell = forecastShellRef.current;
+    const notice = legacyNoticeRef.current;
+    if (!shell || !notice || !showLegacyNotice) {
+      shell?.style.removeProperty('--legacy-forecast-notice-height');
+      return;
+    }
+
+    const updateNoticeHeight = () => {
+      shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
+    };
+    updateNoticeHeight();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateNoticeHeight);
+    observer.observe(notice);
+    return () => observer.disconnect();
+  }, [showLegacyNotice]);
   const { addToast } = useOutletContext<PageContext>();
   const { syncedSettings, user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
@@ -851,8 +871,8 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   });
 
   return (
-    <div className="forecast-page-shell">
-      {showLegacyNotice ? <LegacyForecastNotice onDismiss={dismissLegacyNotice} /> : null}
+    <div ref={forecastShellRef} className="forecast-page-shell">
+      {showLegacyNotice ? <LegacyForecastNotice noticeRef={legacyNoticeRef} onDismiss={dismissLegacyNotice} /> : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         {renderForecastWorkspaceLayout(forecastUiVariant, {
           mapRef,

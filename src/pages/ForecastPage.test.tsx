@@ -217,9 +217,9 @@ describe('ForecastPage layout selection', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Forecast bookmark notice' }));
 
-    expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Dismiss Forecast bookmark notice' })).not.toBeInTheDocument();
     expect(screen.getByTestId('router-state')).toHaveTextContent('null');
     expect(screen.getByTestId('forecast-page-workspace')).toHaveFocus();
   });
