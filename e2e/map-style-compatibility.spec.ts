@@ -88,10 +88,16 @@ test('renders a drawn outlook in forecast and verification with shared map style
   await verificationViewport.screenshot({ path: verificationDarkScreenshot });
   await testInfo.attach('verification-dark-style', { path: verificationDarkScreenshot, contentType: 'image/png' });
 
+  await page.setViewportSize({ width: 640, height: 900 });
+  await expectNoOverlap(page, telemetry, warning);
+  await expectNoOverlap(page, telemetry, controls);
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoOverlap(page, telemetry, warning);
   await expectNoOverlap(page, telemetry, controls);
   await page.getByRole('button', { name: 'Switch to light mode' }).click();
+  await expectNoOverlap(page, telemetry, warning);
+  await expectNoOverlap(page, telemetry, controls);
+  await page.setViewportSize({ width: 640, height: 900 });
   await expectNoOverlap(page, telemetry, warning);
   await expectNoOverlap(page, telemetry, controls);
 });
