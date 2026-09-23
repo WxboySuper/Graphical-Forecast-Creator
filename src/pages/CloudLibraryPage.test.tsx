@@ -53,6 +53,8 @@ describe("CloudLibraryPage", () => {
     sessionStorage.clear();
     window.history.replaceState({}, "", "/");
     mockUseAuth.mockReset();
+    mockUseEntitlement.mockReset();
+    mockUseCloudCycles.mockReset();
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult());
     mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: "local" });
   });
@@ -119,17 +121,14 @@ describe("CloudLibraryPage", () => {
   });
 
   it.each([
-    ["mesoscale", false],
-    ["tropical", true],
-    ["winter", false],
+    ["mesoscale", false, "local"],
+    ["tropical", true, "stripe"],
+    ["winter", false, "stripe"],
   ] as const)(
-    "does not fetch a cloud cycle owned by hidden workspace %s (premium: %s)",
-    async (workspaceId, premiumActive) => {
+    "does not fetch a cloud cycle owned by hidden workspace %s (premium: %s, source: %s)",
+    async (workspaceId, premiumActive, effectiveSource) => {
       mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-      mockUseEntitlement.mockReturnValue({
-        premiumActive,
-        effectiveSource: premiumActive ? "stripe" : "local",
-      });
+      mockUseEntitlement.mockReturnValue({ premiumActive, effectiveSource });
       const loadCycle = jest.fn();
       mockUseCloudCycles.mockReturnValue(
         cloudCyclesResult({
