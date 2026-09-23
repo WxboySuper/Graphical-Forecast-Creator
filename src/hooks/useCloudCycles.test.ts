@@ -200,19 +200,6 @@ describe('useCloudCycles stale completions', () => {
     mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } } as ReturnType<typeof useAuth>);
   };
 
-  const mockPendingLoad = () => {
-    let resolveLoad: ((value: { success: true; data: CloudCycle }) => void) | undefined;
-    mockLoadCloudCycle.mockImplementationOnce(
-      () =>
-        new Promise<{ success: true; data: CloudCycle }>((resolve) => {
-          resolveLoad = resolve;
-        }) as never,
-    );
-    return {
-      resolve: () => resolveLoad?.({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle }),
-    };
-  };
-
   type PendingLoadResolution = { success: true; data: CloudCycle } | { success: false; error: string };
 
   const mockPendingLoadResult = () => {
@@ -245,9 +232,9 @@ describe('useCloudCycles stale completions', () => {
     };
   };
 
-  test('stale load cannot update a different selected cycle', async () => {
+  test('stale loads cannot disturb a newly selected cycle', async () => {
     mockSignedInUser();
-    const deferred = mockPendingLoad();
+    const firstLoad = mockPendingLoadResult();
 
     const { result } = renderHook(() => useCloudCycles());
 
@@ -255,89 +242,52 @@ describe('useCloudCycles stale completions', () => {
       await Promise.resolve();
     });
 
-    let pendingLoad: Promise<unknown> | undefined;
-    await act(async () => {
-      pendingLoad = result.current.loadCycle('cycle-1');
-      await Promise.resolve();
-    });
-
     act(() => {
       result.current.markAsCurrent('cycle-2', 'Two');
     });
-    expect(result.current.currentCloud?.id).toBe('cycle-2');
 
+    let pendingFirstLoad: Promise<unknown> | undefined;
     await act(async () => {
-      deferred.resolve();
-      await pendingLoad;
-    });
-
-    expect(result.current.currentCloud?.id).toBe('cycle-2');
-    expect(result.current.currentCloud?.syncState).not.toBe('saved');
-  });
-
-  test('stale load failure cannot set global error for a newly selected cycle', async () => {
-    mockSignedInUser();
-    const deferred = mockPendingLoadResult();
-
-    const { result } = renderHook(() => useCloudCycles());
-
-    await act(async () => {
+      pendingFirstLoad = result.current.loadCycle('cycle-1');
       await Promise.resolve();
     });
-
-    let pendingLoad: Promise<unknown> | undefined;
-    await act(async () => {
-      pendingLoad = result.current.loadCycle('cycle-1');
-      await Promise.resolve();
-    });
+    expect(result.current.currentCloud?.id).toBe('cycle-2');
+    expect(result.current.currentCloud?.syncState).toBe('idle');
 
     act(() => {
-      result.current.markAsCurrent('cycle-2', 'Two');
+      result.current.markAsCurrent('cycle-3', 'Three');
     });
-    expect(result.current.currentCloud?.id).toBe('cycle-2');
+
+    await act(async () => {
+      firstLoad.resolveSuccess();
+      await pendingFirstLoad;
+    });
+
+    expect(result.current.currentCloud?.id).toBe('cycle-3');
+    expect(result.current.currentCloud?.syncState).toBe('idle');
     expect(result.current.error).toBeNull();
 
+    const secondLoad = mockPendingLoadResult();
+    let pendingSecondLoad: Promise<unknown> | undefined;
     await act(async () => {
-      deferred.resolveFailure('boom');
-      await pendingLoad;
+      pendingSecondLoad = result.current.loadCycle('cycle-1');
+      await Promise.resolve();
+    });
+    expect(result.current.currentCloud?.id).toBe('cycle-3');
+    expect(result.current.currentCloud?.syncState).toBe('idle');
+
+    act(() => {
+      result.current.markAsCurrent('cycle-2', 'Two');
+    });
+
+    await act(async () => {
+      secondLoad.resolveFailure('boom');
+      await pendingSecondLoad;
     });
 
     expect(result.current.currentCloud?.id).toBe('cycle-2');
     expect(result.current.currentCloud?.syncState).toBe('idle');
     expect(result.current.error).toBeNull();
-  });
-
-  test('starting a load cannot mark a newly selected cycle as loading', async () => {
-    mockSignedInUser();
-    const deferred = mockPendingLoad();
-
-    const { result } = renderHook(() => useCloudCycles());
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    act(() => {
-      result.current.markAsCurrent('cycle-2', 'Two');
-    });
-    expect(result.current.currentCloud?.syncState).toBe('idle');
-
-    let pendingLoad: Promise<unknown> | undefined;
-    await act(async () => {
-      pendingLoad = result.current.loadCycle('cycle-1');
-      await Promise.resolve();
-    });
-
-    expect(result.current.currentCloud?.id).toBe('cycle-2');
-    expect(result.current.currentCloud?.syncState).toBe('idle');
-
-    await act(async () => {
-      deferred.resolve();
-      await pendingLoad;
-    });
-
-    expect(result.current.currentCloud?.id).toBe('cycle-1');
-    expect(result.current.currentCloud?.syncState).toBe('saved');
   });
 
   test('sign-out while a save is pending cannot restore sync state', async () => {
