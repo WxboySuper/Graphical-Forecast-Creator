@@ -247,7 +247,7 @@ const useLegacyForecastNotice = (
   navigate: ReturnType<typeof useNavigate>,
   workspaceRef: React.RefObject<HTMLDivElement | null>,
 ): [boolean, () => void] => {
-  const locationState = location.state && typeof location.state === 'object'
+  const locationState = location.state && typeof location.state === 'object' && !Array.isArray(location.state)
     ? location.state as Record<string, unknown>
     : {};
   const hasLegacyRedirectMarker = Boolean(locationState.legacyForecastRedirect);
