@@ -118,7 +118,7 @@ describe('useHomePageLogic', () => {
       localStorage.setItem('forecastData:user-user-1', JSON.stringify({ stale: true }));
       result.current.handleQuickStartClick({ currentTarget: { dataset: { day: '5' } } } as React.MouseEvent<HTMLButtonElement>);
     });
-    expect(mockNavigate).toHaveBeenCalledWith('/forecast');
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/severe');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(5);
     expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
 
@@ -185,6 +185,17 @@ describe('useHomePageLogic', () => {
     const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
 
     expect(result.current.savedCycles.map((cycle) => cycle.id)).toEqual(['custom-cycle']);
+  });
+
+  test('quick-start navigates to the active workspace route', () => {
+    const store = buildStore({ workspaceId: 'custom' });
+    const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+
+    act(() => {
+      result.current.handleQuickStartClick({ currentTarget: { dataset: { day: '2' } } } as React.MouseEvent<HTMLButtonElement>);
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
   });
 
   test('ignores malformed quick-start and recent-cycle clicks', () => {

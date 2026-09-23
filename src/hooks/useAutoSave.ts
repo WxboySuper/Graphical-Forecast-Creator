@@ -9,6 +9,23 @@ import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenc
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
 const LOCAL_STORAGE_KEY = 'forecastData';
 
+interface PendingAutoSave {
+  userId?: string | null;
+  workspaceId: ForecastWorkspaceId;
+  forecastCycle: ReturnType<typeof selectForecastCycle>;
+  mapView: RootState['forecast']['currentMapView'];
+  workflowMetadata: RootState['forecast']['workflowMetadata'];
+}
+
+const persistAutoSave = ({ userId, workspaceId, forecastCycle, mapView, workflowMetadata }: PendingAutoSave): void => {
+  try {
+    const data = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, workflowMetadata);
+    localStorage.setItem(getAutoSaveStorageKey(userId, workspaceId), JSON.stringify(data));
+  } catch {
+    // Auto-save silently fails to avoid disrupting editing.
+  }
+};
+
 /** Returns the autosave key for an account scope, or the workspace key anonymously. */
 const getWorkspaceAutoSaveBaseKey = (workspaceId: ForecastWorkspaceId): string =>
   workspaceId === DEFAULT_FORECAST_WORKSPACE ? LOCAL_STORAGE_KEY : `${LOCAL_STORAGE_KEY}:${workspaceId}`;
@@ -28,8 +45,10 @@ export const clearAutoSave = (
 ): void => {
   try {
     localStorage.removeItem(getAutoSaveStorageKey(userId, workspaceId));
-    if (userId && workspaceId === DEFAULT_FORECAST_WORKSPACE) {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    if (userId) {
+      // Clear the anonymous fallback too, so a later sign-in migration cannot
+      // resurrect the workspace snapshot the user deliberately discarded.
+      localStorage.removeItem(getWorkspaceAutoSaveBaseKey(workspaceId));
     }
   } catch {
     // Ignore storage failures so starting a workflow remains usable.
@@ -142,6 +161,9 @@ export const useAutoSave = (
   const isFirstRender = useRef(true);
   const saveGenerationRef = useRef(0);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAutoSaveRef = useRef<PendingAutoSave | null>(null);
+  const currentScopeRef = useRef({ userId, workspaceId });
+  currentScopeRef.current = { userId, workspaceId };
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -150,15 +172,19 @@ export const useAutoSave = (
     }
 
     const generation = ++saveGenerationRef.current;
+    const pendingAutoSave: PendingAutoSave = {
+      userId,
+      workspaceId,
+      forecastCycle,
+      mapView,
+      workflowMetadata,
+    };
+    pendingAutoSaveRef.current = pendingAutoSave;
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      if (generation !== saveGenerationRef.current) return;
-      try {
-        const data = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, workflowMetadata);
-        localStorage.setItem(getAutoSaveStorageKey(userId, workspaceId), JSON.stringify(data));
-      } catch {
-        // Auto-save silently fails to avoid disrupting the user
-      }
+      if (generation !== saveGenerationRef.current || pendingAutoSaveRef.current !== pendingAutoSave) return;
+      pendingAutoSaveRef.current = null;
+      persistAutoSave(pendingAutoSave);
     }, AUTOSAVE_DELAY);
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
@@ -166,6 +192,15 @@ export const useAutoSave = (
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
+      }
+      if (pendingAutoSaveRef.current === pendingAutoSave) {
+        const currentScope = currentScopeRef.current;
+        if (currentScope.userId !== userId || currentScope.workspaceId !== workspaceId) {
+          // Do not lose the previous workspace's last debounced edit when a
+          // route switch changes the storage destination.
+          persistAutoSave(pendingAutoSave);
+        }
+        pendingAutoSaveRef.current = null;
       }
     };
   }, [forecastCycle, mapView, userId, workspaceId, workflowMetadata]);

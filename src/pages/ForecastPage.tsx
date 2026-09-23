@@ -721,9 +721,7 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
-  workspaceId = DEFAULT_FORECAST_WORKSPACE,
-}) => {
+const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -787,6 +785,19 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
       />
     </div>
   );
+};
+
+/** Waits for AppHooks to reset Redux ownership before mounting restore effects. */
+export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
+  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+}) => {
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+
+  if (activeWorkspaceId !== workspaceId) {
+    return <div role="status">Preparing {workspaceId} forecast workspace…</div>;
+  }
+
+  return <ForecastPageContent workspaceId={workspaceId} />;
 };
 
 export default ForecastPage;

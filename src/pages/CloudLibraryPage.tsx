@@ -696,9 +696,13 @@ export const buildCloudSessionPayload = (
   payload: unknown,
 ): unknown => {
   const classification = classifyForecastWorkspacePayload(payload);
-  return classification.ok && !classification.legacy
-    ? payload
-    : createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+  if (classification.ok && !classification.legacy) {
+    if (classification.workspaceId !== workspaceId) {
+      throw new Error('Cloud payload belongs to a different forecast workspace.');
+    }
+    return payload;
+  }
+  return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
 };
 
 /** Only the registered Severe editor can open cloud payloads today. */
