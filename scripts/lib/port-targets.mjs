@@ -2,7 +2,7 @@ import { PORTING_MANUAL_LABEL } from './porting-constants.mjs';
 
 export { PORTING_MANUAL_LABEL } from './porting-constants.mjs';
 
-/** @param {string | undefined} json */
+/** @param {string | undefined} json @returns {unknown[]} */
 export const parseOpenPortPrsJson = (json) => {
   if (!json) return [];
   try {
@@ -12,9 +12,6 @@ export const parseOpenPortPrsJson = (json) => {
     return [];
   }
 };
-
-/** @deprecated Use parseOpenPortPrsJson. */
-export const parseOpenBetaPrsJson = parseOpenPortPrsJson;
 
 /**
  * Stable merges are the only merges that need a forward-port target. Main
