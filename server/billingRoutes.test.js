@@ -22,13 +22,7 @@ const resolveBillingCompatPaths = () => ({
   accountLifecyclePath: require.resolve('./account-lifecycle'),
 });
 
-const snapshotBillingCompatCache = (paths) => ({
-  adapter: require.cache[paths.billingRoutesPath],
-  billing: require.cache[paths.billingPath],
-  firebaseAdmin: require.cache[paths.firebaseAdminPath],
-  metrics: require.cache[paths.metricsPath],
-  accountLifecycle: require.cache[paths.accountLifecyclePath],
-});
+const snapshotBillingCompatCache = () => ({ ...require.cache });
 
 const stubBillingCompatModules = (Module, paths, holder) => {
   const originalLoad = Module._load;
@@ -36,7 +30,13 @@ const stubBillingCompatModules = (Module, paths, holder) => {
   // stub the external and Firebase-backed modules before loading billing.js.
   Module._load = function stubbedLoad(request, parent, isMain) {
     if (request === 'stripe') return function FakeStripe() {};
-    if (request === 'express-rate-limit') return () => function billingRateLimit() {};
+    if (request === 'express-rate-limit') {
+      return (options) => {
+        const middleware = function billingRateLimit() {};
+        holder.rateLimitOptionsByMiddleware.set(middleware, options);
+        return middleware;
+      };
+    }
     return originalLoad.call(this, request, parent, isMain);
   };
   require.cache[paths.firebaseAdminPath] = {
@@ -75,18 +75,23 @@ const stubBillingCompatModules = (Module, paths, holder) => {
   return originalLoad;
 };
 
-const restoreBillingCompatModules = (Module, paths, snapshot, originalLoad) => {
+const restoreBillingCompatCache = (Module, snapshot, originalLoad) => {
   Module._load = originalLoad;
-  if (snapshot.adapter) require.cache[paths.billingRoutesPath] = snapshot.adapter;
-  else delete require.cache[paths.billingRoutesPath];
-  if (snapshot.firebaseAdmin) require.cache[paths.firebaseAdminPath] = snapshot.firebaseAdmin;
-  else delete require.cache[paths.firebaseAdminPath];
-  if (snapshot.metrics) require.cache[paths.metricsPath] = snapshot.metrics;
-  else delete require.cache[paths.metricsPath];
-  if (snapshot.accountLifecycle) require.cache[paths.accountLifecyclePath] = snapshot.accountLifecycle;
-  else delete require.cache[paths.accountLifecyclePath];
-  if (snapshot.billing) require.cache[paths.billingPath] = snapshot.billing;
-  else delete require.cache[paths.billingPath];
+  for (const key of Object.keys(require.cache)) delete require.cache[key];
+  Object.assign(require.cache, snapshot);
+};
+
+const requireBillingCompatWithStubs = () => {
+  const Module = require('node:module');
+  const paths = resolveBillingCompatPaths();
+  const snapshot = snapshotBillingCompatCache();
+  const holder = { forwarded: null, rateLimitOptionsByMiddleware: new Map() };
+  const originalLoad = stubBillingCompatModules(Module, paths, holder);
+  try {
+    return { billing: require('./billing'), holder };
+  } finally {
+    restoreBillingCompatCache(Module, snapshot, originalLoad);
+  }
 };
 
 const assertForwardedAdapterArgs = (forwarded, app, express, billing) => {
@@ -109,6 +114,13 @@ const assertForwardedAdapterArgs = (forwarded, app, express, billing) => {
   assert.strictEqual(typeof forwarded.handleBillingWebhook, 'function');
   assert.strictEqual(typeof forwarded.handleCheckout, 'function');
   assert.strictEqual(typeof forwarded.handleBillingPortal, 'function');
+};
+
+const assertBillingRateLimitMaxCaps = (forwarded, holder) => {
+  const maxFor = (middleware) => holder.rateLimitOptionsByMiddleware.get(middleware)?.max;
+  assert.strictEqual(maxFor(forwarded.checkoutRateLimit), 5);
+  assert.strictEqual(maxFor(forwarded.portalRateLimit), 10);
+  assert.strictEqual(maxFor(forwarded.webhookRateLimit), 100);
 };
 
 const assertStableBillingRateLimits = (billing, holder, express) => {
@@ -220,23 +232,49 @@ describe('billing route adapter', () => {
   });
 
   it('forwards adapter dependencies from the billing.js compatibility wrapper', () => {
-    const Module = require('node:module');
-    const paths = resolveBillingCompatPaths();
-    const snapshot = snapshotBillingCompatCache(paths);
-    const holder = { forwarded: null };
-    const originalLoad = stubBillingCompatModules(Module, paths, holder);
+    const { billing, holder } = requireBillingCompatWithStubs();
+    const app = { get: () => {}, post: () => {} };
+    const express = { raw: () => ({}), json: () => ({}) };
 
-    try {
-      const billing = require('./billing');
-      const app = { get: () => {}, post: () => {} };
-      const express = { raw: () => ({}), json: () => ({}) };
+    billing.registerBillingRoutes(app, express);
 
-      billing.registerBillingRoutes(app, express);
+    assertForwardedAdapterArgs(holder.forwarded, app, express, billing);
+    assertBillingRateLimitMaxCaps(holder.forwarded, holder);
+    assertStableBillingRateLimits(billing, holder, express);
+  });
 
-      assertForwardedAdapterArgs(holder.forwarded, app, express, billing);
-      assertStableBillingRateLimits(billing, holder, express);
-    } finally {
-      restoreBillingCompatModules(Module, paths, snapshot, originalLoad);
-    }
+  it('restores every require.cache entry after loading billing.js through the compatibility wrapper', () => {
+    const before = Object.keys(require.cache).sort();
+    requireBillingCompatWithStubs();
+    assert.deepStrictEqual(Object.keys(require.cache).sort(), before);
+  });
+
+  it('throws a named error before registering routes when dependencies are missing', () => {
+    assert.throws(
+      () => registerBillingRoutes(),
+      new Error(
+        'registerBillingRoutes missing dependencies: app, express, webhookRateLimit, checkoutRateLimit, portalRateLimit, handleBillingConfig, handleBillingWebhook, handleCheckout, handleBillingPortal, wrapBillingJsonRoute',
+      ),
+    );
+
+    const routes = [];
+    assert.throws(
+      () =>
+        registerBillingRoutes({
+          app: createApp(routes),
+          express: createExpress(),
+          webhookRateLimit: 'webhook-limit',
+          checkoutRateLimit: 'checkout-limit',
+          portalRateLimit: 'portal-limit',
+          handleBillingConfig: () => {},
+          handleBillingWebhook: () => {},
+          handleCheckout: () => {},
+          handleBillingPortal: () => {},
+        }),
+      new Error(
+        'registerBillingRoutes missing dependencies: wrapBillingJsonRoute',
+      ),
+    );
+    assert.deepStrictEqual(routes, []);
   });
 });

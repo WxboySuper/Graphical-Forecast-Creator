@@ -1,18 +1,42 @@
 'use strict';
 
+const REQUIRED_ROUTE_DEPENDENCIES = [
+  'app',
+  'express',
+  'webhookRateLimit',
+  'checkoutRateLimit',
+  'portalRateLimit',
+  'handleBillingConfig',
+  'handleBillingWebhook',
+  'handleCheckout',
+  'handleBillingPortal',
+  'wrapBillingJsonRoute',
+];
+
 /** Registers the hosted billing endpoints against the supplied Express app. */
-const registerBillingRoutes = ({
-  app,
-  express,
-  webhookRateLimit,
-  checkoutRateLimit,
-  portalRateLimit,
-  handleBillingConfig,
-  handleBillingWebhook,
-  handleCheckout,
-  handleBillingPortal,
-  wrapBillingJsonRoute,
-}) => {
+const registerBillingRoutes = (dependencies) => {
+  const missing = REQUIRED_ROUTE_DEPENDENCIES.filter(
+    (name) => dependencies?.[name] == null,
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `registerBillingRoutes missing dependencies: ${missing.join(', ')}`,
+    );
+  }
+
+  const {
+    app,
+    express,
+    webhookRateLimit,
+    checkoutRateLimit,
+    portalRateLimit,
+    handleBillingConfig,
+    handleBillingWebhook,
+    handleCheckout,
+    handleBillingPortal,
+    wrapBillingJsonRoute,
+  } = dependencies;
+
   app.get('/api/billing/config', handleBillingConfig);
   app.post(
     '/api/billing/webhook',
