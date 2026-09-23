@@ -741,6 +741,17 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const [showLegacyNotice, setShowLegacyNotice] = useState(
     () => Boolean((location.state as { legacyForecastRedirect?: boolean } | null)?.legacyForecastRedirect),
   );
+  const dismissLegacyNotice = () => {
+    setShowLegacyNotice(false);
+    const currentState = location.state && typeof location.state === 'object'
+      ? { ...(location.state as Record<string, unknown>) }
+      : {};
+    delete currentState.legacyForecastRedirect;
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: location.hash },
+      { replace: true, state: Object.keys(currentState).length > 0 ? currentState : null },
+    );
+  };
   const { addToast } = useOutletContext<PageContext>();
   const { syncedSettings, user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
@@ -783,8 +794,8 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
 
   return (
     <div className="forecast-page-shell">
-      {showLegacyNotice ? <LegacyForecastNotice onDismiss={() => setShowLegacyNotice(false)} /> : null}
-      <div className="forecast-page-workspace">
+      {showLegacyNotice ? <LegacyForecastNotice onDismiss={dismissLegacyNotice} /> : null}
+      <div className="forecast-page-workspace" data-testid="forecast-page-workspace">
         {renderForecastWorkspaceLayout(forecastUiVariant, {
           mapRef,
           controller: workspaceController,
