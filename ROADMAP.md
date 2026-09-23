@@ -14,7 +14,11 @@ the feature-exposure policy.
 
 The current architecture and ownership map live in
 [`docs/architecture/codebase-inventory.md`](docs/architecture/codebase-inventory.md).
-Use the release workflow and operations guides for deploy and support work.
+The [workspace boundaries](docs/architecture/forecast-workspace-boundaries.md)
+and [feature-exposure workstreams](docs/operations/feature-exposure-workstreams.md)
+describe the active architecture work. Use the
+[release workflow](docs/operations/release-workflow.md) and operations guides
+for deploy and support work.
 
 ## Shipped milestones
 
@@ -27,8 +31,9 @@ shape:
   save and load behavior, discussion editing, exports, and verification.
 - Workflow reliability work added safer editing, undo and redo behavior,
   cycle history, and stronger map and export boundaries.
-- The v1.4 and v1.7 work added hosted accounts, billing, cloud cycles, feature
-  exposure controls, beta operations, and release safeguards.
+- v1.4 established hosted accounts, entitlements, and the cloud forecast
+  library. v1.6 introduced Monitor. v1.7 expanded the hosted product and added
+  release and security safeguards.
 - The current v1.8 direction is to keep forecast workspace state independent,
   make persistence ownership explicit, and document the route, state, export,
   and exposure boundaries before adding more product surface.
