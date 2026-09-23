@@ -127,6 +127,61 @@ describe('loadOpenFreeMapBasemap', () => {
     expect(replaceLayerGroupLayers).not.toHaveBeenCalled();
   });
 
+  test('ignores a stale second-stage layer load after a newer basemap request', async () => {
+    let resolveLayers!: (value: {
+      baseGroup: LayerGroup;
+      referenceGroup: LayerGroup;
+    }) => void;
+    jest.mocked(getOpenFreeMapStyleSet).mockResolvedValue({} as OpenFreeMapStyleSet);
+    jest.mocked(loadOpenFreeMapLayerGroups).mockReturnValue(
+      new Promise((resolve) => {
+        resolveLayers = resolve;
+      })
+    );
+    const vectorBaseGroup = makeGroup();
+    const vectorReferenceGroup = makeGroup();
+    const requestRef = { current: 1 };
+
+    loadOpenFreeMapBasemap(options({
+      requestRef,
+      requestId: 1,
+      vectorBaseGroup,
+      vectorReferenceGroup,
+    }));
+    // Style set resolved, but the second-stage apply is still pending when
+    // the user picks a newer basemap.
+    await flushPromises();
+    requestRef.current += 1;
+    resolveLayers({
+      baseGroup: makeGroup() as unknown as LayerGroup,
+      referenceGroup: makeGroup() as unknown as LayerGroup,
+    });
+    await flushPromises();
+
+    expect(replaceLayerGroupLayers).not.toHaveBeenCalled();
+    expect(vectorBaseGroup.setVisible).not.toHaveBeenCalledWith(true);
+    expect(vectorReferenceGroup.setVisible).not.toHaveBeenCalledWith(true);
+  });
+
+  test('ignores a stale vector failure so it cannot overwrite the newer fallback', async () => {
+    let rejectLayers!: (reason: unknown) => void;
+    jest.mocked(getOpenFreeMapStyleSet).mockResolvedValue({} as OpenFreeMapStyleSet);
+    jest.mocked(loadOpenFreeMapLayerGroups).mockReturnValue(
+      new Promise((_, reject) => {
+        rejectLayers = reject;
+      })
+    );
+    const requestRef = { current: 7 };
+
+    loadOpenFreeMapBasemap(options({ requestRef, requestId: 7 }));
+    requestRef.current += 1;
+    rejectLayers(new Error('stale load failed'));
+    await flushPromises();
+
+    expect(createTileSource).not.toHaveBeenCalled();
+    expect(createLabelOverlaySource).not.toHaveBeenCalled();
+  });
+
   test('uses raster tiles and labels when vector loading fails', async () => {
     const tile = makeTile();
     const labels = makeTile();
