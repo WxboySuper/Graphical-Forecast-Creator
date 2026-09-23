@@ -126,6 +126,10 @@ describe('custom Draw mode exposure', () => {
     const user = userEvent.setup();
     const store = createStore();
     renderToolbar(store);
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+    await user.click(screen.getByRole('tab', { name: /Draw/i }));
     const toggle = screen.getByTestId('custom-product-toggle');
     expect(toggle).not.toHaveClass('is-custom-mode');
     expect(screen.getByRole('radio', { name: 'Severe' }))
