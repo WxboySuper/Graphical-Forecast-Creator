@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useEffect, useLayoutEffect, useState, useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { CloudCycleMetadata, CloudCycleContext, CloudOperationResult, CloudSyncState } from '../types/cloudCycles';
@@ -645,7 +645,7 @@ function beginCloudLoadRequest(
   return { startSelectionId, requestId };
 }
 
-/** Records a failed cloud load and keeps stale errors scoped to the requested cycle. */
+/** Records a failed cloud load only when the request is still applicable. */
 function applyCloudLoadFailure({
   resultError,
   cycleId,
@@ -659,10 +659,11 @@ function applyCloudLoadFailure({
   setError: Dispatch<SetStateAction<string | null>>;
   updateSyncState: CloudStateContext['updateSyncState'];
 }): null {
-  setError(resultError || 'Failed to load cloud cycle');
-  if (canApply) {
-    updateSyncState('error', resultError, cycleId);
+  if (!canApply) {
+    return null;
   }
+  setError(resultError || 'Failed to load cloud cycle');
+  updateSyncState('error', resultError, cycleId);
   return null;
 }
 
@@ -881,9 +882,11 @@ function useCloudCycleOperations(context: CloudAccessContext & CloudStateContext
 
 /** Keeps the current-cloud ref in sync with state so callbacks can read the latest selection. */
 function useCurrentCloudRef(currentCloud: CloudCycleContext | null): MutableRefObject<CloudCycleContext | null> {
-  const currentCloudRef = useRef<CloudCycleContext | null>(null);
+  const currentCloudRef = useRef<CloudCycleContext | null>(currentCloud);
 
-  currentCloudRef.current = currentCloud;
+  useLayoutEffect(() => {
+    currentCloudRef.current = currentCloud;
+  }, [currentCloud]);
 
   return currentCloudRef;
 }
@@ -961,7 +964,9 @@ export const useCloudCycles = (): UseCloudCyclesResult => {
   const loadRequestRef = useRef(0);
   const currentCloudRef = useCurrentCloudRef(currentCloud);
   const currentUserIdRef = useRef<string | undefined>(user?.uid);
-  currentUserIdRef.current = user?.uid;
+  useLayoutEffect(() => {
+    currentUserIdRef.current = user?.uid;
+  }, [user?.uid]);
   const canWrite = premiumActive;
   const localFixtureActive = Boolean(readLocalTestAccount());
 
