@@ -190,9 +190,11 @@ describe('useHomePageLogic', () => {
   test('quick-start navigates to the active workspace route', () => {
     const store = buildStore({ workspaceId: 'custom' });
     const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+    const button = document.createElement('button');
+    button.dataset.day = '2';
 
     act(() => {
-      result.current.handleQuickStartClick({ currentTarget: { dataset: { day: '2' } } } as React.MouseEvent<HTMLButtonElement>);
+      result.current.handleQuickStartClick({ currentTarget: button } as unknown as React.MouseEvent<HTMLButtonElement>);
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
