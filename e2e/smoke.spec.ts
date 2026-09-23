@@ -132,9 +132,11 @@ test.describe('App smoke tests', () => {
     const measuredNoticeHeight = await page.locator('.forecast-page-shell').evaluate((element) =>
       Number.parseFloat(getComputedStyle(element).getPropertyValue('--legacy-forecast-notice-height')),
     );
-    if (!legendBox || !toolbarBox || !noticeBox || !mapBox || !Number.isFinite(measuredNoticeHeight)) {
-      throw new Error('Expected the notice, map, legend, and toolbar to have measurable bounds.');
-    }
+    if (!legendBox) throw new Error('Expected the map legend to have measurable bounds.');
+    if (!toolbarBox) throw new Error('Expected the toolbar to have measurable bounds.');
+    if (!noticeBox) throw new Error('Expected the migration notice to have measurable bounds.');
+    if (!mapBox) throw new Error('Expected the map to have measurable bounds.');
+    if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
     expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
     expect(Math.abs(legendBox.y - (mapBox.y + 106 - noticeBox.height))).toBeLessThanOrEqual(2);
     expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
