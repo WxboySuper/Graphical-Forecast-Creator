@@ -200,6 +200,11 @@ describe('useCloudCycles stale completions', () => {
     mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } } as ReturnType<typeof useAuth>);
   };
 
+  const renderSignedInCycles = () => {
+    mockSignedInUser();
+    return renderHook(() => useCloudCycles());
+  };
+
   type PendingLoadResolution = { success: true; data: CloudCycle } | { success: false; error: string };
 
   const mockPendingLoadResult = () => {
@@ -232,11 +237,9 @@ describe('useCloudCycles stale completions', () => {
     };
   };
 
-  test('stale loads cannot disturb a newly selected cycle', async () => {
-    mockSignedInUser();
+  test('load start stays scoped when loading another cycle', async () => {
     const firstLoad = mockPendingLoadResult();
-
-    const { result } = renderHook(() => useCloudCycles());
+    const { result } = renderSignedInCycles();
 
     await act(async () => {
       await Promise.resolve();
@@ -254,6 +257,30 @@ describe('useCloudCycles stale completions', () => {
     expect(result.current.currentCloud?.id).toBe('cycle-2');
     expect(result.current.currentCloud?.syncState).toBe('idle');
 
+    await act(async () => {
+      firstLoad.resolveSuccess();
+      await pendingFirstLoad;
+    });
+  });
+
+  test('stale load success cannot replace a later selected cycle', async () => {
+    const firstLoad = mockPendingLoadResult();
+    const { result } = renderSignedInCycles();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.markAsCurrent('cycle-2', 'Two');
+    });
+
+    let pendingFirstLoad: Promise<unknown> | undefined;
+    await act(async () => {
+      pendingFirstLoad = result.current.loadCycle('cycle-1');
+      await Promise.resolve();
+    });
+
     act(() => {
       result.current.markAsCurrent('cycle-3', 'Three');
     });
@@ -266,15 +293,25 @@ describe('useCloudCycles stale completions', () => {
     expect(result.current.currentCloud?.id).toBe('cycle-3');
     expect(result.current.currentCloud?.syncState).toBe('idle');
     expect(result.current.error).toBeNull();
+  });
 
+  test('stale load failure after a selection switch cannot set global error', async () => {
     const secondLoad = mockPendingLoadResult();
+    const { result } = renderSignedInCycles();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.markAsCurrent('cycle-3', 'Three');
+    });
+
     let pendingSecondLoad: Promise<unknown> | undefined;
     await act(async () => {
       pendingSecondLoad = result.current.loadCycle('cycle-1');
       await Promise.resolve();
     });
-    expect(result.current.currentCloud?.id).toBe('cycle-3');
-    expect(result.current.currentCloud?.syncState).toBe('idle');
 
     act(() => {
       result.current.markAsCurrent('cycle-2', 'Two');
