@@ -446,6 +446,7 @@ test('renders a drawn outlook in forecast and verification with shared map style
   const viewport = await gradeVerificationPackage(page, packagePath);
   await verifyDesktopLayout(page, testInfo, viewport);
   for (const size of [
+    { name: 'tablet-portrait', width: 640, height: 900 },
     { name: 'phone', width: 390, height: 844 },
     { name: 'short-landscape', width: 844, height: 390 },
     { name: 'landscape-breakpoint', width: 844, height: 510 },
