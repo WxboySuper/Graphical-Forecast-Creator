@@ -15,7 +15,7 @@ The planned Forecast routes are:
 | Severe | `/forecast/severe` | available now | core Forecast |
 | Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
-| Winter | `/forecast/winter` | planned; tracked in #913 | Workspace status |
+| Winter | `/forecast/winter` | future; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
@@ -28,10 +28,11 @@ URL, not from a global "current workspace" value in Redux.
 `src/routing/buildFeatureGatedRoutes.tsx` filters by exposure. The planned paths
 above do not register pages. Route tests exercise these active definitions.
 
-Future routes stay unregistered when their feature is off. A direct request
-falls through the normal application fallback instead of mounting a disabled
-page or running workspace code. When a workspace is enabled, its route must be
-registered only through the same feature exposure decision.
+Future workspaces stay unregistered based on their workspace status. A direct
+request falls through the normal application fallback instead of mounting an
+unfinished page. A workspace promoted to gated must also have an explicit
+feature exposure key; its route and visible navigation use the same exposure
+decision.
 
 ## Compatibility paths
 
@@ -119,10 +120,11 @@ shared day groupings would make drafts collide or disappear.
 
 ## Exposure and side effects
 
-Workspace status keeps future Mesoscale and Winter pages unregistered. The
-exposure registry continues to govern Tropical and Custom; Tropical remains
-disabled, while Custom keeps its current product exposure and entitlement
-behavior.
+Workspace status keeps future Mesoscale, Tropical, and Winter pages
+unregistered. When implementation is ready, a future workspace must be
+deliberately promoted and a gated workspace must receive an explicit exposure
+key before route registration. The exposure registry continues to govern
+Custom, which keeps its current product exposure and entitlement behavior.
 
 No future workspace page, provider client, map layer, or repository may be
 imported at module scope from the always-on application shell. Route loaders and

@@ -23,6 +23,8 @@ describe('forecast workspace product contract', () => {
 
   test.each(BUILD_TARGETS)('exposes Severe and Custom according to the %s target', (target: BuildTarget) => {
     expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(['severe', 'custom']);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, target)).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('winter')!, target)).toBe(false);
   });
 
   test('keeps unknown IDs and malformed paths out of the contract', () => {
@@ -52,6 +54,18 @@ describe('forecast workspace product contract', () => {
       id: 'custom',
       productType: 'custom',
     });
+  });
+
+  test('does not expose a gated workspace without an explicit feature key', () => {
+    expect(isForecastWorkspaceExposed({
+      id: 'mesoscale',
+      path: '/forecast/mesoscale',
+      label: 'Mesoscale',
+      productType: 'mesoscale',
+      status: 'gated',
+      exposureKey: null,
+      legacyPaths: [],
+    }, 'production')).toBe(false);
   });
 
   test('keeps product identity separate from workspace exposure', () => {
