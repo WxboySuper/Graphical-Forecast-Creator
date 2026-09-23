@@ -2,6 +2,16 @@ import type { DayType, ForecastCycle } from '../../types/outlooks';
 import type { WorkflowExportScope } from '../workflowPackage';
 import type { KmzExportStrategy } from '../kmzExport';
 import type { ForecastExportRequest, KmlArchiveStrategy } from './types';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+
+const formatExportTimestamp = (date: Date): string =>
+  date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+/** Builds a timestamped filename for a workspace-owned native JSON forecast. */
+export const buildWorkspaceForecastFilename = (
+  workspaceId: ForecastWorkspaceId,
+  date = new Date(),
+): string => `gfc-${workspaceId}-forecast-${formatExportTimestamp(date)}.json`;
 
 /** Builds a timestamped filename for a forecast transfer export. */
 export const buildTransferFilename = (
@@ -10,7 +20,7 @@ export const buildTransferFilename = (
   day: DayType | undefined,
   extension: string,
 ): string => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const timestamp = formatExportTimestamp(new Date());
   const scopeLabel = scope === 'current-day'
     ? `day-${day ?? forecastCycle.currentDay}`
     : scope;
