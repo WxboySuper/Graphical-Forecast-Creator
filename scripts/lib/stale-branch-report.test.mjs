@@ -1,5 +1,5 @@
 /**
- * Covers eligible branch prefixes, protected/managed exclusions, and the strict grace-period boundary.
+ * Covers branch eligibility, exclusions, grace periods, orphan classification, report output, and issue lookup.
  *
  */
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 /**
- * Checks PR-number parsing from comma-separated input and the single-number fallback.
+ * Covers CI label definitions, check-run state mapping, label diffs, and PR-number parsing.
  *
  */
 import assert from 'node:assert/strict';

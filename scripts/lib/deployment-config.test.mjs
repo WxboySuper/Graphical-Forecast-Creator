@@ -1,5 +1,5 @@
 /**
- * Covers environment normalization and deterministic merging of deployment defaults and overrides.
+ * Covers environment normalization, merges, invalid input/path rejection, and CLI rendering.
  *
  */
 import assert from 'node:assert/strict';
