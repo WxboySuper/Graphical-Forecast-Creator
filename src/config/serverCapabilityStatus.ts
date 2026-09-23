@@ -187,7 +187,7 @@ function scheduleCapabilityStatusRetry(): void {
   retryTimer = setTimeout(() => {
     retryTimer = null;
     if (!cachedStatusSnapshot.loaded && !cachedStatusRequest) {
-      loadSharedServerCapabilityStatus();
+      void loadSharedServerCapabilityStatus();
     }
   }, RETRY_DELAY_MS);
 }
