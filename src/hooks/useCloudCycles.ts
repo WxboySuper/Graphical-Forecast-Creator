@@ -568,6 +568,111 @@ export const buildLoadedCloudForecastPayload = (
   return { ...plainPayload, cycleMetadata: null };
 };
 
+/** Returns the sign-in error that blocks a cloud load, or null when the load may proceed. */
+function getCloudLoadBlockedError({ userId, localFixtureActive }: Pick<CloudAccessContext, 'userId' | 'localFixtureActive'>): string | null {
+  if (!userId) {
+    return 'Not signed in';
+  }
+  if (localFixtureActive) {
+    return 'Cloud cycles are unavailable for local test accounts';
+  }
+  return null;
+}
+
+/** Captures the selection and request id for one cloud load so stale completions can be ignored. */
+function beginCloudLoadRequest(
+  currentCloudRef: CloudStateContext['currentCloudRef'],
+  loadRequestRef: CloudStateContext['loadRequestRef'],
+): { startSelectionId: string | null; requestId: number } {
+  const startSelectionId = currentCloudRef.current?.id ?? null;
+  const requestId = loadRequestRef.current + 1;
+  loadRequestRef.current = requestId;
+  return { startSelectionId, requestId };
+}
+
+/** Records a failed cloud load and keeps stale errors scoped to the requested cycle. */
+function applyCloudLoadFailure({
+  resultError,
+  cycleId,
+  canApply,
+  setError,
+  updateSyncState,
+}: {
+  resultError?: string;
+  cycleId: string;
+  canApply: boolean;
+  setError: Dispatch<SetStateAction<string | null>>;
+  updateSyncState: CloudStateContext['updateSyncState'];
+}): null {
+  setError(resultError || 'Failed to load cloud cycle');
+  if (canApply) {
+    updateSyncState('error', resultError, cycleId);
+  }
+  return null;
+}
+
+/** Records a successful cloud load when its completion still belongs to the current selection. */
+function applyCloudLoadSuccess({
+  cycles,
+  cycleId,
+  setCurrentCloud,
+  updateSyncState,
+  user,
+  data,
+}: Pick<CloudStateContext, 'cycles' | 'setCurrentCloud' | 'updateSyncState'> & {
+  cycleId: string;
+  user: ReturnType<typeof useAuth>['user'];
+  data: Pick<import('../types/cloudCycles').CloudCycle, 'payload' | 'workflowMetadata'>;
+}): GFCForecastSaveData {
+  syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
+  queueProductMetric({ event: 'cloud_cycle_loaded', user });
+  updateSyncState('saved', undefined, cycleId);
+  return buildLoadedCloudForecastPayload(data);
+}
+
+/** Resolves one finished load request into selection-scoped state updates and payload. */
+function finishCloudLoadRequest({
+  result,
+  cycleId,
+  requestedCycleId,
+  startSelectionId,
+  requestId,
+  expectedUserId,
+  cycles,
+  currentCloudRef,
+  currentUserIdRef,
+  loadRequestRef,
+  setCurrentCloud,
+  setError,
+  updateSyncState,
+  user,
+}: Pick<CloudStateContext, 'cycles' | 'currentCloudRef' | 'currentUserIdRef' | 'loadRequestRef' | 'setCurrentCloud' | 'setError' | 'updateSyncState'> & {
+  result: Awaited<ReturnType<typeof loadCloudCycle>>;
+  cycleId: string;
+  requestedCycleId: string;
+  startSelectionId: string | null;
+  requestId: number;
+  expectedUserId: string;
+  user: ReturnType<typeof useAuth>['user'];
+}): GFCForecastSaveData | null {
+  const canApply = canApplyCloudLoadResult({
+    requestedCycleId,
+    startSelectionId,
+    currentSelectionId: currentCloudRef.current?.id ?? null,
+    expectedUserId,
+    currentUserId: currentUserIdRef.current,
+    requestId,
+    latestRequestId: loadRequestRef.current,
+  });
+  if (!result.success || !result.data) {
+    return applyCloudLoadFailure({ resultError: result.error, cycleId, canApply, setError, updateSyncState });
+  }
+  if (!canApply) {
+    return null;
+  }
+  return applyCloudLoadSuccess({ cycles, cycleId, setCurrentCloud, updateSyncState, user, data: result.data });
+}
+
 /** Returns the load callback for hosted cloud cycles. */
 function useCloudLoadCycle({
   userId,
@@ -586,49 +691,37 @@ function useCloudLoadCycle({
   }) {
   return useCallback(
     async (cycleId: string): Promise<GFCForecastSaveData | null> => {
-      if (!userId) {
-        setError('Not signed in');
-        return null;
-      }
-      if (localFixtureActive) {
-        setError('Cloud cycles are unavailable for local test accounts');
+      const blockedError = getCloudLoadBlockedError({ userId, localFixtureActive });
+      if (blockedError) {
+        setError(blockedError);
         return null;
       }
 
-      const expectedUserId = userId;
-      const startSelectionId = currentCloudRef.current?.id ?? null;
-      const requestId = loadRequestRef.current + 1;
-      loadRequestRef.current = requestId;
+      const authenticatedUserId = userId as string;
+      const { startSelectionId, requestId } = beginCloudLoadRequest(currentCloudRef, loadRequestRef);
 
       setError(null);
-      updateSyncState('loading');
+      // Scope the loading flag to the requested cycle so starting a load never
+      // marks a newly selected cycle as loading.
+      updateSyncState('loading', undefined, cycleId);
 
-      const result = await loadCloudCycle({ userId, cycleId });
-      const canApply = canApplyCloudLoadResult({
+      const result = await loadCloudCycle({ userId: authenticatedUserId, cycleId });
+      return finishCloudLoadRequest({
+        result,
+        cycleId,
         requestedCycleId: cycleId,
         startSelectionId,
-        currentSelectionId: currentCloudRef.current?.id ?? null,
-        expectedUserId,
-        currentUserId: currentUserIdRef.current,
         requestId,
-        latestRequestId: loadRequestRef.current,
+        expectedUserId: authenticatedUserId,
+        cycles,
+        currentCloudRef,
+        currentUserIdRef,
+        loadRequestRef,
+        setCurrentCloud,
+        setError,
+        updateSyncState,
+        user,
       });
-      if (!result.success || !result.data) {
-        setError(result.error || 'Failed to load cloud cycle');
-        if (canApply) {
-          updateSyncState('error', result.error, cycleId);
-        }
-        return null;
-      }
-
-      if (!canApply) {
-        return null;
-      }
-
-      syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
-      queueProductMetric({ event: 'cloud_cycle_loaded', user });
-      updateSyncState('saved', undefined, cycleId);
-      return buildLoadedCloudForecastPayload(result.data);
     },
     [cycles, currentCloudRef, currentUserIdRef, loadRequestRef, localFixtureActive, setCurrentCloud, setError, updateSyncState, user, userId]
   );
