@@ -101,8 +101,17 @@ export const getForecastWorkspaceByLegacyPath = (
 export const isForecastWorkspaceExposed = (
   workspace: ForecastWorkspaceDefinition,
   target: BuildTarget = getBuildTarget(),
-): boolean => workspace.status !== 'future'
-  && (workspace.exposureKey === null || isFeatureExposedOnTarget(workspace.exposureKey, target));
+): boolean => {
+  if (workspace.status === 'future') {
+    return false;
+  }
+
+  if (workspace.status === 'gated') {
+    return workspace.exposureKey !== null && isFeatureExposedOnTarget(workspace.exposureKey, target);
+  }
+
+  return workspace.exposureKey === null || isFeatureExposedOnTarget(workspace.exposureKey, target);
+};
 
 /** Returns only workspaces whose feature exposure permits route registration. */
 export const getExposedForecastWorkspaces = (
