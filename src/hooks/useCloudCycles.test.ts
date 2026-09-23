@@ -196,8 +196,11 @@ describe('useCloudCycles stale completions', () => {
     });
   });
 
-  test('stale load cannot update a different selected cycle', async () => {
+  const mockSignedInUser = () => {
     mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } } as ReturnType<typeof useAuth>);
+  };
+
+  const mockPendingLoad = () => {
     let resolveLoad: ((value: { success: true; data: CloudCycle }) => void) | undefined;
     mockLoadCloudCycle.mockImplementationOnce(
       () =>
@@ -205,6 +208,30 @@ describe('useCloudCycles stale completions', () => {
           resolveLoad = resolve;
         }) as never,
     );
+    return {
+      resolve: () => resolveLoad?.({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle }),
+    };
+  };
+
+  type PendingSaveResolution = { success: true; data: string } | { success: false; error: string };
+
+  const mockPendingSave = () => {
+    let resolveSave: ((value: PendingSaveResolution) => void) | undefined;
+    mockSaveCloudCycle.mockImplementationOnce(
+      () =>
+        new Promise<PendingSaveResolution>((resolve) => {
+          resolveSave = resolve;
+        }) as never,
+    );
+    return {
+      resolveSuccess: (data = 'cycle-1') => resolveSave?.({ success: true, data }),
+      resolveFailure: (error = 'boom') => resolveSave?.({ success: false, error }),
+    };
+  };
+
+  test('stale load cannot update a different selected cycle', async () => {
+    mockSignedInUser();
+    const deferred = mockPendingLoad();
 
     const { result } = renderHook(() => useCloudCycles());
 
@@ -224,7 +251,7 @@ describe('useCloudCycles stale completions', () => {
     expect(result.current.currentCloud?.id).toBe('cycle-2');
 
     await act(async () => {
-      resolveLoad?.({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle });
+      deferred.resolve();
       await pendingLoad;
     });
 
@@ -233,14 +260,8 @@ describe('useCloudCycles stale completions', () => {
   });
 
   test('starting a load cannot mark a newly selected cycle as loading', async () => {
-    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } } as ReturnType<typeof useAuth>);
-    let resolveLoad: ((value: { success: true; data: CloudCycle }) => void) | undefined;
-    mockLoadCloudCycle.mockImplementationOnce(
-      () =>
-        new Promise<{ success: true; data: CloudCycle }>((resolve) => {
-          resolveLoad = resolve;
-        }) as never,
-    );
+    mockSignedInUser();
+    const deferred = mockPendingLoad();
 
     const { result } = renderHook(() => useCloudCycles());
 
@@ -263,7 +284,7 @@ describe('useCloudCycles stale completions', () => {
     expect(result.current.currentCloud?.syncState).toBe('idle');
 
     await act(async () => {
-      resolveLoad?.({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle });
+      deferred.resolve();
       await pendingLoad;
     });
 
@@ -272,14 +293,8 @@ describe('useCloudCycles stale completions', () => {
   });
 
   test('sign-out while a save is pending cannot restore sync state', async () => {
-    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } } as ReturnType<typeof useAuth>);
-    let resolveSave: ((value: { success: true; data: string }) => void) | undefined;
-    mockSaveCloudCycle.mockImplementationOnce(
-      () =>
-        new Promise<{ success: true; data: string }>((resolve) => {
-          resolveSave = resolve;
-        }) as never,
-    );
+    mockSignedInUser();
+    const deferred = mockPendingSave();
 
     const { result, rerender } = renderHook(() => useCloudCycles());
 
@@ -301,11 +316,50 @@ describe('useCloudCycles stale completions', () => {
     mockUseAuth.mockReturnValue({ user: null } as unknown as ReturnType<typeof useAuth>);
     rerender();
 
+    let saveResult: boolean | undefined;
     await act(async () => {
-      resolveSave?.({ success: true, data: 'cycle-1' });
-      await pendingSave;
+      deferred.resolveSuccess();
+      saveResult = await pendingSave;
     });
 
+    expect(saveResult).toBe(true);
     expect(result.current.currentCloud).toBeNull();
+  });
+
+  test('stale save failure reports failure without overwriting the new selection', async () => {
+    mockSignedInUser();
+    const deferred = mockPendingSave();
+
+    const { result } = renderHook(() => useCloudCycles());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.markAsCurrent('cycle-1', 'One');
+    });
+
+    let pendingSave: Promise<boolean> | undefined;
+    await act(async () => {
+      pendingSave = result.current.saveCycle('One', '2026-07-14', stats, payload);
+      await Promise.resolve();
+    });
+    expect(result.current.currentCloud?.syncState).toBe('saving');
+
+    act(() => {
+      result.current.markAsCurrent('cycle-2', 'Two');
+    });
+
+    let saveResult: boolean | undefined;
+    await act(async () => {
+      deferred.resolveFailure('boom');
+      saveResult = await pendingSave;
+    });
+
+    expect(saveResult).toBe(false);
+    expect(result.current.currentCloud?.id).toBe('cycle-2');
+    expect(result.current.currentCloud?.syncState).toBe('idle');
+    expect(result.current.error).toBeNull();
   });
 });
