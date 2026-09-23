@@ -217,4 +217,10 @@ describe('createFileHandlers', () => {
 
     expect(mockSerializeWorkspace).toHaveBeenCalledWith('severe', forecastCycle, mapView, cycleMetadata);
   });
+
+  it('uses the Severe filename for legacy callers without an explicit workspace', () => {
+    makeHandlers().handleSave();
+
+    expect(mockDownloadBlob.mock.calls[0]?.[1]).toMatch(/^gfc-severe-forecast-.*\.json$/);
+  });
 });
