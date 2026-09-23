@@ -213,6 +213,22 @@ describe('useCloudCycles stale completions', () => {
     };
   };
 
+  type PendingLoadResolution = { success: true; data: CloudCycle } | { success: false; error: string };
+
+  const mockPendingLoadResult = () => {
+    let resolveLoad: ((value: PendingLoadResolution) => void) | undefined;
+    mockLoadCloudCycle.mockImplementationOnce(
+      () =>
+        new Promise<PendingLoadResolution>((resolve) => {
+          resolveLoad = resolve;
+        }) as never,
+    );
+    return {
+      resolveSuccess: () => resolveLoad?.({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle }),
+      resolveFailure: (error = 'boom') => resolveLoad?.({ success: false, error }),
+    };
+  };
+
   type PendingSaveResolution = { success: true; data: string } | { success: false; error: string };
 
   const mockPendingSave = () => {
@@ -257,6 +273,38 @@ describe('useCloudCycles stale completions', () => {
 
     expect(result.current.currentCloud?.id).toBe('cycle-2');
     expect(result.current.currentCloud?.syncState).not.toBe('saved');
+  });
+
+  test('stale load failure cannot set global error for a newly selected cycle', async () => {
+    mockSignedInUser();
+    const deferred = mockPendingLoadResult();
+
+    const { result } = renderHook(() => useCloudCycles());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    let pendingLoad: Promise<unknown> | undefined;
+    await act(async () => {
+      pendingLoad = result.current.loadCycle('cycle-1');
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current.markAsCurrent('cycle-2', 'Two');
+    });
+    expect(result.current.currentCloud?.id).toBe('cycle-2');
+    expect(result.current.error).toBeNull();
+
+    await act(async () => {
+      deferred.resolveFailure('boom');
+      await pendingLoad;
+    });
+
+    expect(result.current.currentCloud?.id).toBe('cycle-2');
+    expect(result.current.currentCloud?.syncState).toBe('idle');
+    expect(result.current.error).toBeNull();
   });
 
   test('starting a load cannot mark a newly selected cycle as loading', async () => {
