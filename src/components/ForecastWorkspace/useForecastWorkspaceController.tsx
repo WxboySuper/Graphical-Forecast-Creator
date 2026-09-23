@@ -107,7 +107,7 @@ export interface ForecastWorkspaceController {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
-  workspaceId?: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
@@ -190,7 +190,7 @@ interface UseForecastWorkspaceControllerOptions {
   cloudTools?: React.ReactNode;
   onImportResult: (result: ForecastImportResult) => void;
   onExportComplete?: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
-  workspaceId?: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
 }
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
@@ -217,7 +217,7 @@ interface BuildForecastWorkspaceControllerArgs {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
-  workspaceId?: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   showHistoryModal: boolean;
   showCopyModal: boolean;
