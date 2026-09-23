@@ -211,7 +211,7 @@ const DayRolloverDialog: React.FC<{
 );
 
 const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.RefObject<HTMLDivElement | null> }> = ({ onDismiss, noticeRef }) => (
-  <div ref={noticeRef} className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
+  <div ref={noticeRef} data-testid="legacy-forecast-notice" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
     <span role="status">
       Forecast now opens in the Severe workspace at <code>/forecast/severe</code>. Update any bookmarks that still use <code>/forecast</code>.
     </span>

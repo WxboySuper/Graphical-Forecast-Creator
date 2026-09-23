@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test').Page) => {
   const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
   const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
-  const noticeBox = await page.getByRole('status').filter({ hasText: '/forecast/severe' }).boundingBox();
+  const noticeBox = await page.getByTestId('legacy-forecast-notice').boundingBox();
   const mapBox = await page.locator('.map-container').boundingBox();
   const legendTopOffset = await page.getByRole('complementary', { name: /map legend/i }).evaluate((element) =>
     Number.parseFloat(getComputedStyle(element).getPropertyValue('--legacy-forecast-landscape-legend-top')),
