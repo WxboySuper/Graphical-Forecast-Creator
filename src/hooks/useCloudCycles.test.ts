@@ -207,33 +207,32 @@ describe('useCloudCycles stale completions', () => {
 
   type PendingLoadResolution = { success: true; data: CloudCycle } | { success: false; error: string };
 
-  const mockPendingLoadResult = () => {
-    let resolveLoad: ((value: PendingLoadResolution) => void) | undefined;
-    mockLoadCloudCycle.mockImplementationOnce(
+  type PendingSaveResolution = { success: true; data: string } | { success: false; error: string };
+
+  const mockDeferredOnce = <T>(mockFn: { mockImplementationOnce: (impl: () => never) => unknown }) => {
+    let resolveDeferred: ((value: T) => void) | undefined;
+    mockFn.mockImplementationOnce(
       () =>
-        new Promise<PendingLoadResolution>((resolve) => {
-          resolveLoad = resolve;
+        new Promise<T>((resolve) => {
+          resolveDeferred = resolve;
         }) as never,
     );
+    return { resolve: (value: T) => resolveDeferred?.(value) };
+  };
+
+  const mockPendingLoadResult = () => {
+    const deferred = mockDeferredOnce<PendingLoadResolution>(mockLoadCloudCycle);
     return {
-      resolveSuccess: () => resolveLoad?.({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle }),
-      resolveFailure: (error = 'boom') => resolveLoad?.({ success: false, error }),
+      resolveSuccess: () => deferred.resolve({ success: true, data: { payload, workflowMetadata: undefined } as unknown as CloudCycle }),
+      resolveFailure: (error = 'boom') => deferred.resolve({ success: false, error }),
     };
   };
 
-  type PendingSaveResolution = { success: true; data: string } | { success: false; error: string };
-
   const mockPendingSave = () => {
-    let resolveSave: ((value: PendingSaveResolution) => void) | undefined;
-    mockSaveCloudCycle.mockImplementationOnce(
-      () =>
-        new Promise<PendingSaveResolution>((resolve) => {
-          resolveSave = resolve;
-        }) as never,
-    );
+    const deferred = mockDeferredOnce<PendingSaveResolution>(mockSaveCloudCycle);
     return {
-      resolveSuccess: (data = 'cycle-1') => resolveSave?.({ success: true, data }),
-      resolveFailure: (error = 'boom') => resolveSave?.({ success: false, error }),
+      resolveSuccess: (data = 'cycle-1') => deferred.resolve({ success: true, data }),
+      resolveFailure: (error = 'boom') => deferred.resolve({ success: false, error }),
     };
   };
 
@@ -263,8 +262,16 @@ describe('useCloudCycles stale completions', () => {
     });
   });
 
-  test('stale load success cannot replace a later selected cycle', async () => {
-    const firstLoad = mockPendingLoadResult();
+  const runStaleLoadScenario = async ({
+    initialSelection,
+    finalSelection,
+    completeLoad,
+  }: {
+    initialSelection: { id: string; label: string };
+    finalSelection: { id: string; label: string };
+    completeLoad: (pendingLoad: ReturnType<typeof mockPendingLoadResult>) => void;
+  }) => {
+    const pendingLoadResult = mockPendingLoadResult();
     const { result } = renderSignedInCycles();
 
     await act(async () => {
@@ -272,59 +279,45 @@ describe('useCloudCycles stale completions', () => {
     });
 
     act(() => {
-      result.current.markAsCurrent('cycle-2', 'Two');
+      result.current.markAsCurrent(initialSelection.id, initialSelection.label);
     });
 
-    let pendingFirstLoad: Promise<unknown> | undefined;
+    let pendingLoad: Promise<unknown> | undefined;
     await act(async () => {
-      pendingFirstLoad = result.current.loadCycle('cycle-1');
+      pendingLoad = result.current.loadCycle('cycle-1');
       await Promise.resolve();
     });
 
     act(() => {
-      result.current.markAsCurrent('cycle-3', 'Three');
+      result.current.markAsCurrent(finalSelection.id, finalSelection.label);
     });
 
     await act(async () => {
-      firstLoad.resolveSuccess();
-      await pendingFirstLoad;
+      completeLoad(pendingLoadResult);
+      await pendingLoad;
     });
 
-    expect(result.current.currentCloud?.id).toBe('cycle-3');
-    expect(result.current.currentCloud?.syncState).toBe('idle');
-    expect(result.current.error).toBeNull();
-  });
+    return result.current;
+  };
 
-  test('stale load failure after a selection switch cannot set global error', async () => {
-    const secondLoad = mockPendingLoadResult();
-    const { result } = renderSignedInCycles();
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    act(() => {
-      result.current.markAsCurrent('cycle-3', 'Three');
-    });
-
-    let pendingSecondLoad: Promise<unknown> | undefined;
-    await act(async () => {
-      pendingSecondLoad = result.current.loadCycle('cycle-1');
-      await Promise.resolve();
-    });
-
-    act(() => {
-      result.current.markAsCurrent('cycle-2', 'Two');
-    });
-
-    await act(async () => {
-      secondLoad.resolveFailure('boom');
-      await pendingSecondLoad;
-    });
-
-    expect(result.current.currentCloud?.id).toBe('cycle-2');
-    expect(result.current.currentCloud?.syncState).toBe('idle');
-    expect(result.current.error).toBeNull();
+  test.each([
+    {
+      name: 'stale load success cannot replace a later selected cycle',
+      initialSelection: { id: 'cycle-2', label: 'Two' },
+      finalSelection: { id: 'cycle-3', label: 'Three' },
+      completeLoad: (pendingLoad: ReturnType<typeof mockPendingLoadResult>) => pendingLoad.resolveSuccess(),
+    },
+    {
+      name: 'stale load failure after a selection switch cannot set global error',
+      initialSelection: { id: 'cycle-3', label: 'Three' },
+      finalSelection: { id: 'cycle-2', label: 'Two' },
+      completeLoad: (pendingLoad: ReturnType<typeof mockPendingLoadResult>) => pendingLoad.resolveFailure('boom'),
+    },
+  ])('$name', async ({ initialSelection, finalSelection, completeLoad }) => {
+    const current = await runStaleLoadScenario({ initialSelection, finalSelection, completeLoad });
+    expect(current.currentCloud?.id).toBe(finalSelection.id);
+    expect(current.currentCloud?.syncState).toBe('idle');
+    expect(current.error).toBeNull();
   });
 
   test('sign-out while a save is pending cannot restore sync state', async () => {
