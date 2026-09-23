@@ -118,7 +118,7 @@ describe('forecastTransfer', () => {
       createdAt: '2026-08-18T00:00:00.000Z',
       updatedAt: '2026-08-18T00:00:00.000Z',
     } as never;
-    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast, cycleMetadata, exportedAt: '2026-08-18T12:00:00.000Z' });
+    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast, cycleMetadata, workspaceId: 'severe', exportedAt: '2026-08-18T12:00:00.000Z' });
     const zip = new JSZip();
     zip.file('workflow_package.json', JSON.stringify(pkg));
     const bytes = await zip.generateAsync({ type: 'uint8array' });

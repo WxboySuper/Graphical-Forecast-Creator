@@ -3,7 +3,6 @@ import {
   downloadBlob,
 } from '../fileUtils';
 import { downloadKmzExport } from '../kmzExport';
-import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
 import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type {
@@ -22,7 +21,7 @@ import { importTransferFile } from './transferImportUtils';
 const downloadWorkspaceJsonTransfer = (
   request: Pick<ForecastExportRequest, 'forecastCycle' | 'mapView' | 'cycleMetadata' | 'workspaceId'>,
 ): void => {
-  const workspaceId = request.workspaceId ?? DEFAULT_FORECAST_WORKSPACE;
+  const { workspaceId } = request;
   const payload = serializeForecastWorkspace(workspaceId, request.forecastCycle, request.mapView, request.cycleMetadata);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   downloadBlob(
@@ -34,8 +33,7 @@ const downloadWorkspaceJsonTransfer = (
 /** KML/KMZ geometry is Severe-owned; other workspaces cannot produce it. */
 const assertSevereKmlExport = (format: ForecastExportRequest['format'], workspaceId: ForecastExportRequest['workspaceId']): void => {
   if (format !== 'kml' && format !== 'kmz') return;
-  const owner = workspaceId ?? DEFAULT_FORECAST_WORKSPACE;
-  if (owner !== DEFAULT_FORECAST_WORKSPACE) {
+  if (workspaceId !== 'severe') {
     throw new Error('KML/KMZ exports belong to the Severe workspace. Switch to Severe to export GIS geometry.');
   }
 };

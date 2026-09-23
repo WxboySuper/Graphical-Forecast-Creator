@@ -50,6 +50,7 @@ const LayoutHarness: React.FC<{
     addToast: mockAddToast,
     onImportResult: jest.fn(),
     onExportComplete: jest.fn(),
+    workspaceId: 'severe',
     cloudTools,
   });
 

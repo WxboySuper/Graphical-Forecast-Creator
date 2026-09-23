@@ -77,7 +77,7 @@ describe('fileUtils', () => {
     const serialized = serializeForecast({
       days: {}, currentDay: 1, cycleDate: '2026-04-21',
     }, { center: [0, 0], zoom: 0 });
-    const wrapper = buildWorkflowExportPackage({ scope: 'cycle', forecast: serialized });
+    const wrapper = buildWorkflowExportPackage({ scope: 'cycle', forecast: serialized, workspaceId: 'severe' });
     expect(validateForecastData(wrapper)).toBe(true);
     expect(deserializeForecast(wrapper).cycleDate).toBe('2026-04-21');
   });

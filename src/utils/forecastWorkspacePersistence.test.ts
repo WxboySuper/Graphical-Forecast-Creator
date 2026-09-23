@@ -50,7 +50,7 @@ describe('forecast workspace persistence contract', () => {
     })).toEqual({ ok: false, reason: 'unknown-workspace' });
   });
 
-  test('classifies a valid legacy forecast as Severe', () => {
+  test('keeps ambiguous untagged legacy forecasts Severe-owned because Custom requires an envelope', () => {
     const payload = validForecast();
     expect(classifyForecastWorkspacePayload(payload)).toEqual({
       ok: true,

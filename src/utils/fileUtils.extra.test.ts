@@ -146,7 +146,7 @@ describe('fileUtils extra', () => {
       discussionGroupings: [{ id: 'bad', label: ' ', days: [1, 2], discussionDay: 9 }],
     } as unknown as ForecastCycle;
 
-    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 });
+    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 }, undefined, 'cycle', 'severe');
 
     expect(Object.keys(generatedFiles).sort()).toEqual([
       'discussion_day1.txt',
@@ -189,7 +189,7 @@ describe('fileUtils extra', () => {
 
     const forecast: ForecastCycle = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() }, discussion } }, currentDay: 1, cycleDate: '2026-04-21' };
 
-    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 });
+    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 }, undefined, 'cycle', 'severe');
 
     expect(clickMock).toHaveBeenCalled();
     expect(urlHelpers.createObjectURL).toHaveBeenCalled();

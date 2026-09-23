@@ -19,7 +19,7 @@ import {
   type KmlArchiveStrategy,
 } from '../../utils/forecastTransfer';
 import { isFeatureExposed } from '../../config/featureExposure';
-import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 export type ForecastTransferDirection = 'import' | 'export';
 
@@ -38,7 +38,7 @@ export interface ForecastTransferModalProps {
   onExported: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
   onError?: (message: string) => void;
   onExportImage?: () => void;
-  workspaceId?: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
 }
 
 const FORMAT_OPTIONS: Array<{ value: ForecastTransferFormat; label: string; description: string }> = [
@@ -95,7 +95,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   const [outlookType, setOutlookType] = useState<OutlookType | 'all'>('all');
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
-  const isSevereWorkspace = (workspaceId ?? DEFAULT_FORECAST_WORKSPACE) === DEFAULT_FORECAST_WORKSPACE;
+  const isSevereWorkspace = workspaceId === 'severe';
   const availableFormats = useMemo(
     () => FORMAT_OPTIONS.filter((option) => (
       option.value === 'json'
@@ -144,7 +144,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         day: forecastCycle.currentDay,
         kmlStrategy,
         outlookTypes: outlookType === 'all' ? undefined : [outlookType],
-        workspaceId: workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
+        workspaceId,
       });
       onExported(format, scope);
       onClose();
@@ -212,18 +212,18 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
 
           <TabsContent value="import" className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
-              {(workspaceId ?? DEFAULT_FORECAST_WORKSPACE) === DEFAULT_FORECAST_WORKSPACE
+              {workspaceId === 'severe'
                 ? 'Supported formats: JSON, workflow ZIP package, KML, and KMZ. KML/KMZ imports merge outlook polygons into your active forecast using GFC metadata when available.'
                 : 'Supported formats: JSON and workflow ZIP package. KML/KMZ geometry imports belong to the Severe workspace.'}
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border px-4 py-8 text-center hover:bg-muted/40">
               <span className="text-sm font-medium">Choose a forecast file</span>
               <span className="mt-1 text-xs text-muted-foreground">
-                {(workspaceId ?? DEFAULT_FORECAST_WORKSPACE) === DEFAULT_FORECAST_WORKSPACE ? '.json, .zip, .kml, .kmz' : '.json, .zip'}
+                {workspaceId === 'severe' ? '.json, .zip, .kml, .kmz' : '.json, .zip'}
               </span>
               <input
                 type="file"
-                accept={(workspaceId ?? DEFAULT_FORECAST_WORKSPACE) === DEFAULT_FORECAST_WORKSPACE
+                accept={workspaceId === 'severe'
                   ? '.json,.zip,.kml,.kmz,application/json,application/zip,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz'
                   : '.json,.zip,application/json,application/zip'}
                 className="sr-only"

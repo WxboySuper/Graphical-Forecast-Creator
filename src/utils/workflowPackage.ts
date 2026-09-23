@@ -3,7 +3,7 @@ import type { CycleMetadata, SerializedOutlookVersionData, SerializedWorkflowPac
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isFeatureExposed } from '../config/featureExposure';
-import { DEFAULT_FORECAST_WORKSPACE } from '../config/forecastWorkspaces';
+import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export type WorkflowExportScope = 'workflow' | 'cycle';
 
@@ -15,7 +15,7 @@ export interface WorkflowExportPackage {
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
   mapView?: GFCForecastSaveData['mapView'];
-  workspaceId?: import('../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
   styleSnapshots?: Record<string, unknown>;
   /** Explicit compatibility disclosure for embedded custom content. */
   customContent?: {
@@ -94,7 +94,7 @@ interface BuildWorkflowExportPackageInput {
   forecast: GFCForecastSaveData;
   cycleMetadata?: CycleMetadata;
   styleSnapshots?: Record<string, unknown>;
-  workspaceId?: import('../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
   exportedAt?: string;
 }
 
@@ -140,7 +140,7 @@ export const buildWorkflowExportPackage = ({
   forecast,
   cycleMetadata,
   styleSnapshots,
-  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+  workspaceId,
   exportedAt = new Date().toISOString(),
 }: BuildWorkflowExportPackageInput): WorkflowExportPackage => {
   const scopedForecast = resolveScopedPackageForecast(scope, forecast, cycleMetadata);

@@ -24,7 +24,7 @@ export interface ForecastExportRequest {
   day?: DayType;
   kmlStrategy?: KmlArchiveStrategy;
   outlookTypes?: OutlookType[];
-  workspaceId?: ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
 }
 
 export interface ForecastImportResult {

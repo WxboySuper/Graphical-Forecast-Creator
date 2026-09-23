@@ -42,7 +42,12 @@ interface ResolvedNativeFileContent {
   cycleMetadata?: CycleMetadata | null;
 }
 
-/** Resolves the owning workspace, cycle, map view, and workflow metadata for a native JSON or package payload. */
+/**
+ * Resolves the declared or legacy workspace, cycle, map view, and workflow metadata.
+ * This does not enforce an active-workspace match. Mutating editor entry points
+ * must compare workspaceId before dispatch; grade, monitor, and verification
+ * readers are read-only and may inspect a forecast owned by another workspace.
+ */
 export const resolveNativeFileContent = (data: unknown): ResolvedNativeFileContent => {
   if (isWorkflowExportPackage(data)) {
     const declaredWorkspaceId = getDeclaredPackageWorkspace(data);
