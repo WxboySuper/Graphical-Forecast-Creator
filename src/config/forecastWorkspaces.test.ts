@@ -56,11 +56,11 @@ describe('forecast workspace product contract', () => {
     expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, 'production')).toBe(false);
   });
 
-  test('uses Severe for legacy Forecast entry points', () => {
+  test('keeps the Custom Products library separate from legacy Forecast entry points', () => {
     expect(DEFAULT_FORECAST_WORKSPACE).toBe('severe');
     expect(getDefaultForecastWorkspace().path).toBe('/forecast/severe');
     expect(getDefaultForecastWorkspace().legacyPaths).toContain('/forecast');
     expect(getForecastWorkspaceByLegacyPath('/forecast')?.id).toBe('severe');
-    expect(getForecastWorkspaceByLegacyPath('/custom-products')?.id).toBe('custom');
+    expect(getForecastWorkspaceByLegacyPath('/custom-products')).toBeUndefined();
   });
 });
