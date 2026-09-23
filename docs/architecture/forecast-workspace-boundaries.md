@@ -15,18 +15,13 @@ intent and that record describes that branch's code.
 
 The planned Forecast routes are:
 
-| Workspace | Canonical path | v1.8 state | Exposure owner |
+| Workspace | Canonical path | v1.8 state | Availability source |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | planned; tracked in #919 | Issue #919 |
+| Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
-<<<<<<< HEAD
-| Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
+| Winter | `/forecast/winter` | planned; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | gated; `customProducts` on for every target, availability follows implementation; `/custom-products` remains a separate library route | `customProducts` |
-=======
-| Winter | `/forecast/winter` | planned; tracked in #913 | Issue #913 |
-| Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
->>>>>>> 602c97b7 (docs: align feature exposure matrix)
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
 contract preserves compatible query parameters and the hash when the routing
