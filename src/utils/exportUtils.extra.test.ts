@@ -113,7 +113,13 @@ describe('exportUtils additional unit tests', () => {
     jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
     const { buildCloneCallback } = await import('./exportUtils');
 
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = 0;
+      return { x: 0, y: 0, width: 320, height, top: 0, right: 320, bottom: height, left: 0, toJSON: () => ({}) } as DOMRect;
+    });
+
     const clonedRoot = document.createElement('div');
+    clonedRoot.style.cssText = 'position:relative;height:180px;';
     const ctrl = document.createElement('div');
     ctrl.className = 'ol-control';
     clonedRoot.appendChild(ctrl);
@@ -122,7 +128,8 @@ describe('exportUtils additional unit tests', () => {
     legend.className = 'map-legend';
     clonedRoot.appendChild(legend);
 
-    const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: true, statusText: 'StatusText', unofficialText: 'Unofficial' });
+    const unofficialText = 'Unofficial Forecast — Not for Safety Decisions';
+    const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: true, statusText: 'StatusText', unofficialText });
     cb(clonedRoot);
 
     // original control should be hidden
@@ -133,6 +140,10 @@ describe('exportUtils additional unit tests', () => {
     const unofficial = overlays.find((child) => child.textContent?.includes('Unofficial'));
     const footer = overlays.find((child) => child.textContent?.includes('Created with Graphical Forecast Creator'));
     expect(unofficial?.style.bottom).toBe('8px');
-    expect(footer?.style.bottom).toBe('42px');
+    expect(unofficial?.textContent).toContain(unofficialText);
+    expect((unofficial?.firstElementChild as HTMLElement).style.whiteSpace).toBe('normal');
+    expect((unofficial?.firstElementChild as HTMLElement).style.maxWidth).toBe('calc(100% - 16px)');
+    expect(footer?.style.bottom).toBe('58px');
+    expect(footer?.style.maxWidth).toBe('calc(100% - 40px)');
   });
 });
