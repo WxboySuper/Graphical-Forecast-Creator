@@ -150,6 +150,11 @@ describe('forecastTransfer', () => {
     const revokeObjectURL = jest.fn();
     global.URL.createObjectURL = createObjectURL;
     global.URL.revokeObjectURL = revokeObjectURL;
+    const link = document.createElement('a');
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      if (tagName === 'a') return link;
+      return document.createElement(tagName);
+    }) as typeof document.createElement);
 
     let capturedJson = '';
     try {
@@ -163,10 +168,12 @@ describe('forecastTransfer', () => {
       capturedJson = seen.join('');
     } finally {
       global.Blob = OriginalBlob;
+      createElementSpy.mockRestore();
       jest.restoreAllMocks();
     }
 
     expect(capturedJson).toContain('"custom"');
+    expect(link.download).toMatch(/gfc-custom-forecast-.*\.json$/);
     const file = new File([capturedJson], 'custom-forecast.json', { type: 'application/json' });
     file.arrayBuffer = async () => new TextEncoder().encode(capturedJson).buffer;
     const result = await importForecastTransfer(file);

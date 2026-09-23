@@ -18,6 +18,7 @@ import { getOutlookColor } from '../../utils/outlookUtils';
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 import type { ForecastTransferDirection } from './ForecastTransferModal';
 import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../../utils/forecastTransfer';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 const EMPTY_LOW_PROBABILITY_OUTLOOKS: OutlookType[] = [];
@@ -107,7 +108,7 @@ export interface ForecastWorkspaceController {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
-  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
@@ -190,7 +191,7 @@ interface UseForecastWorkspaceControllerOptions {
   cloudTools?: React.ReactNode;
   onImportResult: (result: ForecastImportResult) => void;
   onExportComplete?: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
-  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
 }
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
@@ -217,7 +218,7 @@ interface BuildForecastWorkspaceControllerArgs {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
-  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
+  workspaceId: ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   showHistoryModal: boolean;
   showCopyModal: boolean;
