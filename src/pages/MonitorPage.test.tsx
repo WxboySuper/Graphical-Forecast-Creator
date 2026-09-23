@@ -1,5 +1,5 @@
 /**
- * Monitor page tests. Verify the monitor page composes map, alert, radar, and playback behavior correctly.
+ * Monitor page tests. Cover the mocked workspace shell and SPC MCD reference-attribution rules.
  */
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';

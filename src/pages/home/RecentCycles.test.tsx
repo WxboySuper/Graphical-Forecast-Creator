@@ -1,5 +1,5 @@
 /**
- * Recent cycles tests. Verify recent forecast cycle loading, display, and selection behavior.
+ * Recent cycles tests. Cover compact and section variants, empty states, and load/history callbacks.
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import RecentCycles from './RecentCycles';

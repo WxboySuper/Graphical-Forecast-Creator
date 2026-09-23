@@ -1,5 +1,5 @@
 /**
- * Verification page tests. Verify forecast review, grading, and verification workflow behavior.
+ * Verification page tests. Cover feature-exposure routing between classic verification and Forecast Grade.
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import * as featureExposure from '../config/featureExposure';
