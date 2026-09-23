@@ -1,5 +1,5 @@
 /**
- * Checks exposure classification and stable, counted formatting of report sections.
+ * Covers exposure classification, leakage/promotion validation, report formatting, and PR comments.
  *
  */
 import assert from 'node:assert/strict';
