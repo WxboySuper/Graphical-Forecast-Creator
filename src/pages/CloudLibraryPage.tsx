@@ -22,6 +22,7 @@ import {
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
 } from '../utils/forecastWorkspacePersistence';
+import { getForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -705,15 +706,15 @@ export const buildCloudSessionPayload = (
   return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
 };
 
-/** Only the registered Severe editor can open cloud payloads today. */
+/** Only registered Severe and exposed Custom editors can open cloud payloads today. */
 export const isSupportedCloudLoadWorkspace = (
   workspaceId: ForecastWorkspaceId,
   workspace: ForecastWorkspaceDefinition | undefined,
 ): boolean => {
-  if (workspaceId !== 'severe') {
+  if (workspaceId !== 'severe' && workspaceId !== 'custom') {
     return false;
   }
-  if (!workspace) {
+  if (!workspace || workspace.id !== workspaceId) {
     return false;
   }
   return isForecastWorkspaceExposed(workspace);
@@ -785,7 +786,7 @@ const useCloudLibraryActions = ({
       return;
     }
 
-    navigate('/forecast/severe');
+    navigate(getForecastWorkspacePath(workspaceId));
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
