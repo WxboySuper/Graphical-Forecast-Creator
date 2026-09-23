@@ -749,8 +749,13 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   useLayoutEffect(() => {
     const shell = forecastShellRef.current;
     const notice = legacyNoticeRef.current;
-    if (!shell || !notice || !showLegacyNotice) {
-      shell?.style.removeProperty('--legacy-forecast-notice-height');
+    if (!shell) return;
+    if (!showLegacyNotice) {
+      shell.style.removeProperty('--legacy-forecast-notice-height');
+      return;
+    }
+    if (!notice) {
+      shell.style.removeProperty('--legacy-forecast-notice-height');
       return;
     }
 
