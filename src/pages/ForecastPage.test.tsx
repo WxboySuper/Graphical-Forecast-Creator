@@ -183,6 +183,20 @@ describe('ForecastPage layout selection', () => {
     expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
   });
 
+  test('shows a bookmark migration notice after the legacy Forecast entry redirects', () => {
+    const store = createStore();
+
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/forecast/severe', state: { legacyForecastRedirect: true } }]}>
+        <Provider store={store}>
+          <ForecastPage />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+  });
+
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
     mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
     const store = createStore();
