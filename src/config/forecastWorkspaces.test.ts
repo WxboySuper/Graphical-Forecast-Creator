@@ -56,15 +56,10 @@ describe('forecast workspace product contract', () => {
   });
 
   test('does not expose a gated workspace without an explicit feature key', () => {
-    expect(isForecastWorkspaceExposed({
-      id: 'mesoscale',
-      path: '/forecast/mesoscale',
-      label: 'Mesoscale',
-      productType: 'mesoscale',
-      status: 'gated',
-      exposureKey: null,
-      legacyPaths: [],
-    }, 'production')).toBe(false);
+    const customWorkspace = getForecastWorkspace('custom')!;
+
+    expect(customWorkspace.status).toBe('gated');
+    expect(isForecastWorkspaceExposed({ ...customWorkspace, exposureKey: null }, 'production')).toBe(false);
   });
 
   test('keeps product identity separate from workspace exposure', () => {
