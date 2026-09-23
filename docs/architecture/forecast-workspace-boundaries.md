@@ -16,7 +16,7 @@ The planned Forecast routes are:
 | Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
 | Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
-| Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
+| Custom | `/forecast/custom` | planned; `/custom-products` remains a separate library route | `customProducts` |
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
 contract preserves compatible query parameters and the hash when the routing
@@ -37,20 +37,32 @@ listed below. Workspace domain data, controls, providers, repositories, editors,
 and product-specific persistence stay inside that workspace's route boundary and
 must not be initialized by rendering another workspace.
 
-The switcher hides unexposed workspaces by default. An unavailable-workspace
-placeholder may be shown only when explicitly designed and tested by #917; it is
-never an active route and must not initialize the gated workspace's provider,
-repository, or editor. A direct request for an unregistered route follows the
-application's unavailable-route behavior without loading that workspace.
+The switcher lists only exposed workspaces; it does not render disabled entries
+or placeholder routes. A direct request for an unregistered workspace follows
+the application fallback (`/`, or `/beta` in beta mode) without loading that
+workspace's code. If a saved-item handoff targets a known but unexposed
+workspace, the initiating view reports that the workspace is unavailable and
+keeps its current URL and session unchanged. It must not stage a payload or
+initialize the unavailable workspace.
 
 Opening a saved or shared item follows the same ownership rule as tab navigation.
-The handoff carries a typed record descriptor (workspace ID plus a local or cloud
-record identifier), not an unvalidated live editor/Redux payload. The shared route
-host validates the descriptor and the loaded payload before mutation, selects the
-owning workspace, and navigates to its canonical URL. The workspace loader owns
-schema validation; the shared host owns route selection and must reject malformed,
-unknown, or unexposed workspace IDs without changing the active session. Legacy
-items without a workspace ID use the compatibility rules in the envelope section.
+The handoff carries a typed record descriptor, never a live editor/Redux payload:
+
+```ts
+interface ForecastRecordDescriptor {
+  workspaceId: ForecastWorkspaceId;
+  source: 'local' | 'cloud';
+  recordId: string; // non-empty opaque ID scoped to source and workspace
+}
+```
+
+The shared host validates the descriptor's shape, confirms that its workspace is
+known and exposed, and requires `workspaceId` to match the destination route. It
+does not parse the forecast payload. The destination workspace loader resolves
+the record, validates its schema, and confirms that the loaded record's owner
+matches the descriptor before any state mutation. Either failure leaves the
+current session unchanged. Legacy records without a workspace ID use the
+compatibility rules in the envelope section.
 
 Before any workspace navigation, the shared host applies the same unsaved-change
 guard regardless of which workspace owns the edits. The user may stay and continue
@@ -61,13 +73,14 @@ require a successful retry or an explicit leave confirmation before navigation.
 These rules apply independently of premium entitlement. #915 and #917 own the
 workspace-specific UI and tests for this shared contract.
 
-Canonical workspace URLs are the share and bookmark contract. During a workspace
-switch, preserve the hash and query parameters that are not workspace selectors or
-saved-item handoff fields; the destination's canonical path always determines the
-workspace and cannot be overridden by query or router state. A typed handoff may
-carry only the validated record descriptor described above. A legacy or ambiguous
-`/forecast` URL is first redirected to Severe and marked for the temporary
-migration notice.
+Canonical workspace paths are the share and bookmark contract. The Forecast
+route does not read a workspace selector or saved-record fields from the query
+string. The `workspace` query key belongs to Cloud Library tab selection only and
+never overrides a Forecast route. A saved-record descriptor travels in router
+location state, not in query parameters. Workspace-tab navigation preserves the
+existing query string and hash verbatim; there are no Forecast handoff query keys
+to strip. A legacy or ambiguous `/forecast` URL is first redirected to Severe and
+marked for the temporary migration notice.
 
 Back/forward and refresh must not transfer one workspace's unsaved domain state
 into another. If navigation is cancelled by the shared unsaved-change guard, the
@@ -97,8 +110,9 @@ Existing links remain useful during the migration:
 - `/forecast` redirects to `/forecast/severe`.
 - `/discussion` remains available until #916 supplies the Severe workspace
   discussion surface. That issue owns the redirect or in-workspace handoff.
-- `/custom-products` remains available until #915 supplies the Custom route.
-  That issue owns the compatibility redirect and product handoff.
+- `/custom-products` remains the Custom Products library route after #915 adds
+  `/forecast/custom`. It is not an alias for the Forecast editor; #915 owns the
+  explicit product-to-editor handoff.
 - Existing top-level `/monitor` and `/verification` routes do not move.
 
 The compatibility paths are temporary routing concerns. They do not create a
