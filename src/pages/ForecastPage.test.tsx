@@ -41,6 +41,7 @@ import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
 import * as fileUtils from '../utils/fileUtils';
 import { serializeForecast } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
@@ -177,6 +178,26 @@ describe('ForecastPage layout selection', () => {
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('surfaces a cross-workspace cloud handoff instead of silently restoring locally', async () => {
+    const store = createStore();
+    const customPayload = serializeForecastWorkspace(
+      'custom',
+      store.getState().forecast.forecastCycle,
+      { center: [0, 0], zoom: 4 },
+    );
+    sessionStorage.setItem('cloudCyclePayload:anonymous', JSON.stringify(customPayload));
+    sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'custom-1', label: 'Custom save' }));
+
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+      'This cloud cycle belongs to a different forecast workspace and was not loaded.',
+      'error',
+    ));
+    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {

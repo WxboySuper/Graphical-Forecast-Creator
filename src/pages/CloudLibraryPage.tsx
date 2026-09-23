@@ -11,7 +11,7 @@ import { PRICING_COPY } from '../billing/pricingCopy';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
 import type { GFCForecastSaveData } from '../types/outlooks';
-import { getBuildTarget } from '../config/buildTarget';
+import { getBuildTarget, type BuildTarget } from '../config/buildTarget';
 import {
   getForecastWorkspace,
   isForecastWorkspaceExposed,
@@ -22,7 +22,7 @@ import {
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
 } from '../utils/forecastWorkspacePersistence';
-import { getForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
+import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -752,18 +752,19 @@ export const buildCloudSessionPayload = (
   return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
 };
 
-/** Only registered Severe and exposed Custom editors can open cloud payloads today. */
+/** A workspace can open cloud payloads only when it has a registered editor route for the target. */
 export const isSupportedCloudLoadWorkspace = (
   workspaceId: ForecastWorkspaceId,
   workspace: ForecastWorkspaceDefinition | undefined,
+  target?: BuildTarget,
 ): boolean => {
-  if (workspaceId !== 'severe' && workspaceId !== 'custom') {
-    return false;
-  }
   if (!workspace || workspace.id !== workspaceId) {
     return false;
   }
-  return isForecastWorkspaceExposed(workspace);
+  if (!isForecastWorkspaceExposed(workspace, target)) {
+    return false;
+  }
+  return getExposedForecastWorkspaceRoutes(target).some((route) => route.id === workspaceId);
 };
 
 /** Creates the cloud library actions used by the page and keeps transient feedback local. */
