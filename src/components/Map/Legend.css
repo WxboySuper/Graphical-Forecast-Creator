@@ -69,7 +69,7 @@
 
 @media (max-height: 500px) and (orientation: landscape) {
   .map-legend.map-legend--mobile-open {
-    top: 106px;
+    top: 68px;
     left: 86px;
     bottom: auto;
     max-width: min(240px, calc(100vw - 110px));
