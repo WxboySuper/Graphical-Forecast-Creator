@@ -1,8 +1,4 @@
-/**
- * E2E contract for day-rollover.spec.
- *
- * This file defines browser-level checks for the day-rollover.spec workflow and its user-visible behavior.
- */
+/** Verifies the new-day prompt offers download, disabled premium cloud save, defer/keep, and replace paths, and that deferring keeps the saved session. */
 import { test, expect } from '@playwright/test';
 
 const localDay = (date: Date) => {
