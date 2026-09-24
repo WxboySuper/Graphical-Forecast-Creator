@@ -127,6 +127,75 @@ const renderForecastPage = (store: ReturnType<typeof createStore>) =>
     </MemoryRouter>
   );
 
+const LOCAL_AUTOSAVE_MARKER_ID = 'local-autosave-marker';
+
+const seedSevereAutosaveWithMarker = (featureId: string = LOCAL_AUTOSAVE_MARKER_ID): void => {
+  const sourceStore = createStore();
+  sourceStore.dispatch(addFeature({
+    feature: {
+      type: 'Feature',
+      id: featureId,
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
+    } as never,
+  }));
+  localStorage.setItem('forecastData', JSON.stringify(serializeForecastWorkspace(
+    'severe',
+    sourceStore.getState().forecast.forecastCycle,
+    { center: [0, 0], zoom: 4 },
+  )));
+};
+
+const seedInvalidCloudHandoff = (payload: string): void => {
+  sessionStorage.setItem('cloudCyclePayload:anonymous', payload);
+  sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
+};
+
+const expectInvalidCloudHandoffClearedWithoutAutosaveFallback = async (
+  store: ReturnType<typeof createStore>,
+): Promise<void> => {
+  await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+    'The pending cloud forecast was invalid and was cleared without loading.',
+    'error',
+  ));
+  expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
+  expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBeNull();
+  expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+  expect(mockAddToast).not.toHaveBeenCalledWith('Session restored from auto-save.', 'success');
+  expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === LOCAL_AUTOSAVE_MARKER_ID)).not.toBe(true);
+};
+
+const buildCycleWithSingleOutlook = (
+  baseCycle: ReturnType<typeof createStore>['getState']['forecast']['forecastCycle'],
+  featureId: string,
+) => {
+  const cycleWithOutlook = { ...baseCycle };
+  const features = new Map<string, Feature[]>();
+  features.set('10%', [{
+    type: 'Feature',
+    id: featureId,
+    geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+    properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
+  } as Feature]);
+  cycleWithOutlook.days = {
+    1: {
+      data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
+      metadata: { lowProbabilityOutlooks: [] },
+    },
+  } as typeof cycleWithOutlook.days;
+  return cycleWithOutlook;
+};
+
+const seedLocalAutosaveOutlook = (featureId: string): void => {
+  const cycleWithOutlook = buildCycleWithSingleOutlook(createStore().getState().forecast.forecastCycle, featureId);
+  const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
+  localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
+};
+
+const expectSingleOutlookRestored = (store: ReturnType<typeof createStore>, featureId: string): void => {
+  expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe(featureId);
+};
+
 
 describe('ForecastPage layout selection', () => {
   beforeEach(() => {
@@ -202,70 +271,27 @@ describe('ForecastPage layout selection', () => {
   });
 
   test('clears a malformed cloud handoff through session restore without falling back to autosave', async () => {
-    const sourceStore = createStore();
-    sourceStore.dispatch(addFeature({
-      feature: {
-        type: 'Feature',
-        id: 'local-autosave-marker',
-        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
-        properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
-      } as never,
-    }));
-    localStorage.setItem('forecastData', JSON.stringify(serializeForecastWorkspace(
-      'severe',
-      sourceStore.getState().forecast.forecastCycle,
-      { center: [0, 0], zoom: 4 },
-    )));
-    sessionStorage.setItem('cloudCyclePayload:anonymous', 'not-json');
-    sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
+    seedSevereAutosaveWithMarker();
+    seedInvalidCloudHandoff('not-json');
 
     const store = createStore();
     renderForecastPage(store);
 
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
-      'The pending cloud forecast was invalid and was cleared without loading.',
-      'error',
-    ));
-    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
-    expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBeNull();
-    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
-    expect(mockAddToast).not.toHaveBeenCalledWith('Session restored from auto-save.', 'success');
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === 'local-autosave-marker')).not.toBe(true);
+    await expectInvalidCloudHandoffClearedWithoutAutosaveFallback(store);
   });
 
   test('clears an unknown-workspace cloud handoff through session restore without falling back to autosave', async () => {
-    const sourceStore = createStore();
-    sourceStore.dispatch(addFeature({
-      feature: {
-        type: 'Feature',
-        id: 'local-autosave-marker',
-        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
-        properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
-      } as never,
-    }));
-    localStorage.setItem('forecastData', JSON.stringify(serializeForecastWorkspace(
-      'severe',
-      sourceStore.getState().forecast.forecastCycle,
-      { center: [0, 0], zoom: 4 },
-    )));
-    sessionStorage.setItem('cloudCyclePayload:anonymous', JSON.stringify({
+    seedSevereAutosaveWithMarker();
+    seedInvalidCloudHandoff(JSON.stringify({
       schemaVersion: 1,
       workspaceId: 'bogus',
       forecast: { nope: true },
     }));
-    sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
 
     const store = createStore();
     renderForecastPage(store);
 
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
-      'The pending cloud forecast was invalid and was cleared without loading.',
-      'error',
-    ));
-    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
-    expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBeNull();
-    expect(mockAddToast).not.toHaveBeenCalledWith('Session restored from auto-save.', 'success');
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === 'local-autosave-marker')).not.toBe(true);
+    await expectInvalidCloudHandoffClearedWithoutAutosaveFallback(store);
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
@@ -445,46 +471,16 @@ describe('ForecastPage layout selection', () => {
 
   test('restores the local autosave when the current cycle is empty', () => {
     const store = createStore();
-    const cycleWithOutlook = { ...store.getState().forecast.forecastCycle };
-    const features = new Map<string, Feature[]>();
-    features.set('10%', [{
-      type: 'Feature',
-      id: 'autosave-outlook',
-      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
-      properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
-    } as Feature]);
-    cycleWithOutlook.days = {
-      1: {
-        data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
-        metadata: { lowProbabilityOutlooks: [] },
-      },
-    } as typeof cycleWithOutlook.days;
-    const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
-    localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
+    seedLocalAutosaveOutlook('autosave-outlook');
 
     renderForecastPage(store);
 
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('autosave-outlook');
+    expectSingleOutlookRestored(store, 'autosave-outlook');
   });
 
   test('restores the autosave only once under React StrictMode double effects', () => {
     const store = createStore();
-    const cycleWithOutlook = { ...store.getState().forecast.forecastCycle };
-    const features = new Map<string, Feature[]>();
-    features.set('10%', [{
-      type: 'Feature',
-      id: 'strictmode-outlook',
-      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
-      properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
-    } as Feature]);
-    cycleWithOutlook.days = {
-      1: {
-        data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
-        metadata: { lowProbabilityOutlooks: [] },
-      },
-    } as typeof cycleWithOutlook.days;
-    const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
-    localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
+    seedLocalAutosaveOutlook('strictmode-outlook');
 
     render(
       <React.StrictMode>
@@ -496,7 +492,7 @@ describe('ForecastPage layout selection', () => {
       </React.StrictMode>
     );
 
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('strictmode-outlook');
+    expectSingleOutlookRestored(store, 'strictmode-outlook');
   });
 
   test('keeps in-memory anonymous edits on sign-in without overwriting account autosave', async () => {

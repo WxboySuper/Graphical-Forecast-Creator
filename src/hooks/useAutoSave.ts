@@ -9,13 +9,18 @@ import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenc
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
 const LOCAL_STORAGE_KEY = 'forecastData';
 
-interface PendingAutoSave {
+interface AutoSaveScope {
   userId?: string | null;
   workspaceId: ForecastWorkspaceId;
+}
+
+interface ForecastSnapshot {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   mapView: RootState['forecast']['currentMapView'];
   workflowMetadata: RootState['forecast']['workflowMetadata'];
 }
+
+interface PendingAutoSave extends AutoSaveScope, ForecastSnapshot {}
 
 const persistAutoSave = ({ userId, workspaceId, forecastCycle, mapView, workflowMetadata }: PendingAutoSave): void => {
   try {
@@ -97,6 +102,37 @@ export const selectPreferredAutoSaveValue = (
   legacyValue: string | null,
 ): string | null => scopedValue ?? legacyValue;
 
+/** Promotes an anonymous snapshot into the account scope only when the account scope is empty. */
+const promoteAnonymousSnapshot = (
+  scopedKey: string,
+  anonymousKey: string,
+  scopedValue: string | null,
+  legacyValue: string | null,
+): void => {
+  if (scopedValue !== null) return;
+  if (legacyValue === null) return;
+  localStorage.setItem(scopedKey, legacyValue);
+  localStorage.removeItem(anonymousKey);
+};
+
+/** Reconciles live editor state with scoped storage without overwriting existing account data. */
+const reconcileLiveSessionSnapshot = (
+  scopedKey: string,
+  anonymousKey: string,
+  scopedValue: string | null,
+  legacyValue: string | null,
+  liveSession: unknown,
+): void => {
+  if (scopedValue !== null) return;
+  const preferred = pickNewestAutoSaveValue(legacyValue, JSON.stringify(liveSession));
+  if (preferred !== null) {
+    localStorage.setItem(scopedKey, preferred);
+  }
+  if (legacyValue !== null) {
+    localStorage.removeItem(anonymousKey);
+  }
+};
+
 /** Moves an anonymous autosave into the signed-in account scope once, without overwriting account data.
  * On sign-in, reconcile live editor state with scoped storage, but never promote unscoped legacy over an
  * existing account autosave on shared browsers.
@@ -115,23 +151,11 @@ const migrateWorkspaceAutoSave = (
     const legacyValue = localStorage.getItem(anonymousKey);
 
     if (liveSession !== undefined) {
-      if (scopedValue === null) {
-        const liveValue = JSON.stringify(liveSession);
-        const preferred = pickNewestAutoSaveValue(legacyValue, liveValue);
-        if (preferred) {
-          localStorage.setItem(scopedKey, preferred);
-        }
-        if (legacyValue !== null) {
-          localStorage.removeItem(anonymousKey);
-        }
-      }
+      reconcileLiveSessionSnapshot(scopedKey, anonymousKey, scopedValue, legacyValue, liveSession);
       return;
     }
 
-    if (scopedValue === null && legacyValue !== null) {
-      localStorage.setItem(scopedKey, legacyValue);
-      localStorage.removeItem(anonymousKey);
-    }
+    promoteAnonymousSnapshot(scopedKey, anonymousKey, scopedValue, legacyValue);
   } catch {
     // Ignore storage failures so sign-in never disrupts editing.
   }
@@ -150,6 +174,160 @@ export const migrateLegacyAutoSave = (
   migrateWorkspaceAutoSave(userId, liveSession, workspaceId);
 };
 
+/** Returns whether two autosave scopes resolve to the same storage destination. */
+const isSameScope = (previous: AutoSaveScope, next: AutoSaveScope): boolean => {
+  if (previous.userId !== next.userId) return false;
+  return previous.workspaceId === next.workspaceId;
+};
+
+/** Returns whether two snapshots reference the same committed Redux objects. */
+const isSameSnapshot = (previous: ForecastSnapshot, next: ForecastSnapshot): boolean => {
+  if (previous.forecastCycle !== next.forecastCycle) return false;
+  if (previous.mapView !== next.mapView) return false;
+  return previous.workflowMetadata === next.workflowMetadata;
+};
+
+/** Combines a storage scope with a committed snapshot into a persistable edit. */
+const createPendingAutoSave = (scope: AutoSaveScope, snapshot: ForecastSnapshot): PendingAutoSave => ({
+  userId: scope.userId,
+  workspaceId: scope.workspaceId,
+  forecastCycle: snapshot.forecastCycle,
+  mapView: snapshot.mapView,
+  workflowMetadata: snapshot.workflowMetadata,
+});
+
+/** Returns whether a scope-change flush has nothing new to persist. */
+const shouldSkipScopeFlush = (
+  hasPending: boolean,
+  latest: ForecastSnapshot,
+  lastScheduled: ForecastSnapshot,
+): boolean => {
+  if (hasPending) return true;
+  return isSameSnapshot(latest, lastScheduled);
+};
+
+/**
+ * Flushes a dirty edit that never became a debounced pending because React
+ * batched the document change and the workspace switch into one commit. The
+ * passive debounce effect never ran for the intermediate document, so its
+ * cleanup has nothing to flush. This runs before AppHooks resets the
+ * document for the new workspace, so latestSnapshot still holds the old
+ * workspace document.
+ */
+const useScopeChangeFlush = (
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
+  prevScopeRef: { current: AutoSaveScope },
+  latestSnapshotRef: { current: ForecastSnapshot },
+  lastScheduledSnapshotRef: { current: ForecastSnapshot },
+  pendingAutoSaveRef: { current: PendingAutoSave | null },
+): void => {
+  useEffect(() => {
+    const prevScope = prevScopeRef.current;
+    const nextScope: AutoSaveScope = { userId, workspaceId };
+    prevScopeRef.current = nextScope;
+    if (isSameScope(prevScope, nextScope)) return;
+    const latest = latestSnapshotRef.current;
+    if (shouldSkipScopeFlush(pendingAutoSaveRef.current !== null, latest, lastScheduledSnapshotRef.current)) return;
+    persistAutoSave(createPendingAutoSave(prevScope, latest));
+    lastScheduledSnapshotRef.current = latest;
+  }, [userId, workspaceId, prevScopeRef, latestSnapshotRef, lastScheduledSnapshotRef, pendingAutoSaveRef]);
+};
+
+/** Consumes the mount render so the debounce effect skips its initial run. */
+const consumeFirstRender = (
+  isFirstRenderRef: { current: boolean },
+  lastScheduledSnapshotRef: { current: ForecastSnapshot },
+  snapshot: ForecastSnapshot,
+): boolean => {
+  if (!isFirstRenderRef.current) return false;
+  isFirstRenderRef.current = false;
+  lastScheduledSnapshotRef.current = snapshot;
+  return true;
+};
+
+/** Commits a scheduled debounce only when it is still the latest generation. */
+const commitScheduledAutoSave = (
+  generation: number,
+  saveGenerationRef: { current: number },
+  pending: PendingAutoSave,
+  pendingAutoSaveRef: { current: PendingAutoSave | null },
+  saveTimeoutRef: { current: ReturnType<typeof setTimeout> | null },
+): void => {
+  saveTimeoutRef.current = null;
+  if (generation !== saveGenerationRef.current) return;
+  if (pendingAutoSaveRef.current !== pending) return;
+  pendingAutoSaveRef.current = null;
+  persistAutoSave(pending);
+};
+
+/** Clears a scheduled debounce, flushing it when the storage scope already moved on. */
+const cleanupScheduledAutoSave = (
+  pending: PendingAutoSave,
+  effectScope: AutoSaveScope,
+  pendingAutoSaveRef: { current: PendingAutoSave | null },
+  saveTimeoutRef: { current: ReturnType<typeof setTimeout> | null },
+  currentScopeRef: { current: AutoSaveScope },
+): void => {
+  if (saveTimeoutRef.current !== null) {
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = null;
+  }
+  if (pendingAutoSaveRef.current !== pending) return;
+  // Do not lose the previous workspace's last debounced edit when a
+  // route switch changes the storage destination.
+  if (!isSameScope(currentScopeRef.current, effectScope)) {
+    persistAutoSave(pending);
+  }
+  pendingAutoSaveRef.current = null;
+};
+
+/** Debounces forecast edits into the current anonymous or account-scoped autosave. */
+const useDebouncedAutoSaveEffect = (
+  forecastCycle: ForecastSnapshot['forecastCycle'],
+  mapView: ForecastSnapshot['mapView'],
+  workflowMetadata: ForecastSnapshot['workflowMetadata'],
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
+  isFirstRenderRef: { current: boolean },
+  saveGenerationRef: { current: number },
+  saveTimeoutRef: { current: ReturnType<typeof setTimeout> | null },
+  pendingAutoSaveRef: { current: PendingAutoSave | null },
+  currentScopeRef: { current: AutoSaveScope },
+  lastScheduledSnapshotRef: { current: ForecastSnapshot },
+): void => {
+  useEffect(() => {
+    const snapshot: ForecastSnapshot = { forecastCycle, mapView, workflowMetadata };
+    if (consumeFirstRender(isFirstRenderRef, lastScheduledSnapshotRef, snapshot)) return;
+
+    const effectScope: AutoSaveScope = { userId, workspaceId };
+    const pendingAutoSave = createPendingAutoSave(effectScope, snapshot);
+    pendingAutoSaveRef.current = pendingAutoSave;
+    lastScheduledSnapshotRef.current = snapshot;
+    const generation = ++saveGenerationRef.current;
+    saveTimeoutRef.current = setTimeout(() => {
+      commitScheduledAutoSave(generation, saveGenerationRef, pendingAutoSave, pendingAutoSaveRef, saveTimeoutRef);
+    }, AUTOSAVE_DELAY);
+
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return function cleanupAutoSaveTimeout() {
+      cleanupScheduledAutoSave(pendingAutoSave, effectScope, pendingAutoSaveRef, saveTimeoutRef, currentScopeRef);
+    };
+  }, [
+    forecastCycle,
+    mapView,
+    userId,
+    workspaceId,
+    workflowMetadata,
+    isFirstRenderRef,
+    saveGenerationRef,
+    saveTimeoutRef,
+    pendingAutoSaveRef,
+    currentScopeRef,
+    lastScheduledSnapshotRef,
+  ]);
+};
+
 /** Debounces forecast edits into the current anonymous or account-scoped autosave. */
 export const useAutoSave = (
   userId?: string | null,
@@ -162,90 +340,32 @@ export const useAutoSave = (
   const saveGenerationRef = useRef(0);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingAutoSaveRef = useRef<PendingAutoSave | null>(null);
-  const currentScopeRef = useRef({ userId, workspaceId });
+  const currentScopeRef = useRef<AutoSaveScope>({ userId, workspaceId });
   currentScopeRef.current = { userId, workspaceId };
   // Latest committed Redux snapshot, updated synchronously every render so a
   // workspace switch that batches past the debounce effect still has the
   // pre-switch document available for a scope-change flush.
-  const latestSnapshotRef = useRef({ forecastCycle, mapView, workflowMetadata });
+  const latestSnapshotRef = useRef<ForecastSnapshot>({ forecastCycle, mapView, workflowMetadata });
   latestSnapshotRef.current = { forecastCycle, mapView, workflowMetadata };
-  const prevScopeRef = useRef({ userId, workspaceId });
-  const lastScheduledSnapshotRef = useRef({ forecastCycle, mapView, workflowMetadata });
+  const prevScopeRef = useRef<AutoSaveScope>({ userId, workspaceId });
+  const lastScheduledSnapshotRef = useRef<ForecastSnapshot>({ forecastCycle, mapView, workflowMetadata });
 
   // Keep this scope-change flush above the debounced save effect so a batched
   // document + scope commit flushes the old workspace first. Behavior is pinned
   // by useAutoSave.test.tsx ("flushes the previous workspace edit") and the
   // dirty-switch e2e spec.
-  // Flushes a dirty edit that never became a debounced pending because React
-  // batched the document change and the workspace switch into one commit. The
-  // passive debounce effect below never ran for the intermediate document, so
-  // its cleanup has nothing to flush. This runs before AppHooks resets the
-  // document for the new workspace, so latestSnapshot still holds the old
-  // workspace document.
-  useEffect(() => {
-    const prevScope = prevScopeRef.current;
-    const scopeChanged = prevScope.userId !== userId || prevScope.workspaceId !== workspaceId;
-    prevScopeRef.current = { userId, workspaceId };
-    if (!scopeChanged) return;
-    if (pendingAutoSaveRef.current) return;
-    const latest = latestSnapshotRef.current;
-    const lastScheduled = lastScheduledSnapshotRef.current;
-    if (
-      latest.forecastCycle === lastScheduled.forecastCycle &&
-      latest.mapView === lastScheduled.mapView &&
-      latest.workflowMetadata === lastScheduled.workflowMetadata
-    ) {
-      return;
-    }
-    persistAutoSave({
-      userId: prevScope.userId,
-      workspaceId: prevScope.workspaceId,
-      forecastCycle: latest.forecastCycle,
-      mapView: latest.mapView,
-      workflowMetadata: latest.workflowMetadata,
-    });
-    lastScheduledSnapshotRef.current = latest;
-  }, [userId, workspaceId]);
-
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      lastScheduledSnapshotRef.current = { forecastCycle, mapView, workflowMetadata };
-      return;
-    }
-
-    const generation = ++saveGenerationRef.current;
-    const pendingAutoSave: PendingAutoSave = {
-      userId,
-      workspaceId,
-      forecastCycle,
-      mapView,
-      workflowMetadata,
-    };
-    pendingAutoSaveRef.current = pendingAutoSave;
-    lastScheduledSnapshotRef.current = { forecastCycle, mapView, workflowMetadata };
-    saveTimeoutRef.current = setTimeout(() => {
-      saveTimeoutRef.current = null;
-      if (generation !== saveGenerationRef.current || pendingAutoSaveRef.current !== pendingAutoSave) return;
-      pendingAutoSaveRef.current = null;
-      persistAutoSave(pendingAutoSave);
-    }, AUTOSAVE_DELAY);
-
-    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
-    return function cleanupAutoSaveTimeout() {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-      if (pendingAutoSaveRef.current === pendingAutoSave) {
-        const currentScope = currentScopeRef.current;
-        if (currentScope.userId !== userId || currentScope.workspaceId !== workspaceId) {
-          // Do not lose the previous workspace's last debounced edit when a
-          // route switch changes the storage destination.
-          persistAutoSave(pendingAutoSave);
-        }
-        pendingAutoSaveRef.current = null;
-      }
-    };
-  }, [forecastCycle, mapView, userId, workspaceId, workflowMetadata]);
+  useScopeChangeFlush(userId, workspaceId, prevScopeRef, latestSnapshotRef, lastScheduledSnapshotRef, pendingAutoSaveRef);
+  useDebouncedAutoSaveEffect(
+    forecastCycle,
+    mapView,
+    workflowMetadata,
+    userId,
+    workspaceId,
+    isFirstRender,
+    saveGenerationRef,
+    saveTimeoutRef,
+    pendingAutoSaveRef,
+    currentScopeRef,
+    lastScheduledSnapshotRef,
+  );
 };
