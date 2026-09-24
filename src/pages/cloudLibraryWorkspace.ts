@@ -1,7 +1,7 @@
 import {
-  DEFAULT_FORECAST_WORKSPACE,
   getExposedForecastWorkspaces,
   getForecastWorkspace,
+  resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
 import type { BuildTarget } from '../config/buildTarget';
@@ -26,7 +26,7 @@ export const getCloudLibraryTabFromSearchParams = (
 
 /** Resolves legacy or malformed cloud metadata to the Severe workspace boundary. */
 export const getCloudCycleWorkspaceId = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): ForecastWorkspaceId =>
-  getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+  resolveForecastWorkspaceId(cycle.workspaceId);
 
 /** Resolves the display label for one cycle, mapping legacy records to Severe. */
 export const getCloudCycleWorkspaceLabel = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): string =>
