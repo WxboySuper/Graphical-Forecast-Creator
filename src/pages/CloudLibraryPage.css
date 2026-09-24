@@ -281,7 +281,7 @@
   box-shadow: 0 10px 24px color-mix(in srgb, var(--button-bg) 18%, transparent);
 }
 
-.cloud-cycle-button--load:hover:not(:disabled) {
+.cloud-cycle-button--load:hover:not(:disabled):not([aria-disabled="true"]) {
   background: linear-gradient(135deg, color-mix(in srgb, var(--button-bg) 92%, white), color-mix(in srgb, var(--button-bg) 70%, white));
 }
 
@@ -301,9 +301,12 @@
   color: color-mix(in srgb, var(--error-text) 88%, var(--text-primary));
 }
 
-.cloud-cycle-button--load[aria-disabled="true"] {
+.cloud-cycle-button--load[aria-disabled="true"],
+.cloud-cycle-button--load[aria-disabled="true"]:hover {
   opacity: 0.55;
   cursor: not-allowed;
+  background: linear-gradient(135deg, var(--button-bg), color-mix(in srgb, var(--button-bg) 82%, white));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--button-bg) 18%, transparent);
 }
 
 .cloud-cycle-load-hint {
@@ -443,8 +446,13 @@
   box-shadow: 0 12px 30px rgba(61, 77, 214, 0.26);
 }
 
-.dark-mode .cloud-cycle-button--load:hover:not(:disabled) {
+.dark-mode .cloud-cycle-button--load:hover:not(:disabled):not([aria-disabled="true"]) {
   background: linear-gradient(135deg, color-mix(in srgb, var(--button-bg) 86%, #9ca9ff), color-mix(in srgb, var(--button-bg) 100%, #6371ff));
+}
+
+.dark-mode .cloud-cycle-button--load[aria-disabled="true"]:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--button-bg) 78%, #8fa0ff), color-mix(in srgb, var(--button-bg) 92%, #5967f2));
+  box-shadow: 0 12px 30px rgba(61, 77, 214, 0.26);
 }
 
 .dark-mode .cloud-cycle-button--danger {
