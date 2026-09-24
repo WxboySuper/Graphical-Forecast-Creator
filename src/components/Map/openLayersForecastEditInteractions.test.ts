@@ -4,18 +4,12 @@ import Polygon from "ol/geom/Polygon";
 import type OLMap from "ol/Map";
 import VectorSource from "ol/source/Vector";
 
-import { registerForecastEditInteractions } from "./openLayersForecastEditInteractions";
-
-type FilterFn = (feature: Feature<Geometry>) => boolean;
-type DeleteConditionFn = (event: {
-  type: string;
-  originalEvent: {
-    altKey: boolean;
-    shiftKey: boolean;
-    metaKey: boolean;
-    ctrlKey: boolean;
-  };
-}) => boolean;
+import {
+  createCategoricalModifyFilter,
+  createForecastModifyFilter,
+  forecastVertexDeleteCondition,
+  registerForecastEditInteractions,
+} from "./openLayersForecastEditInteractions";
 
 type MutableState = {
   customMode: boolean;
@@ -42,6 +36,12 @@ const setup = (overrides: Partial<MutableState> = {}) => {
     probability: "5%",
     ...overrides,
   };
+  const getters = {
+    isCustomMode: () => state.customMode,
+    activeCustomCategoryId: () => state.categoryId,
+    activeOutlookType: () => state.outlookType,
+    activeProbability: () => state.probability,
+  };
   const vectorSource = new VectorSource();
   const catSource = new VectorSource();
   const ghostSource = new VectorSource();
@@ -53,19 +53,18 @@ const setup = (overrides: Partial<MutableState> = {}) => {
     vectorSource,
     catSource,
     ghostSource,
-    isCustomMode: () => state.customMode,
-    activeCustomCategoryId: () => state.categoryId,
-    activeOutlookType: () => state.outlookType,
-    activeProbability: () => state.probability,
+    ...getters,
     onModifyEnd,
   });
 
-  const filterOf = (interaction: { get: (key: string) => unknown }): FilterFn =>
-    (interaction as unknown as { filter_: FilterFn }).filter_;
-  const deleteConditionOf = (interaction: { get: (key: string) => unknown }): DeleteConditionFn =>
-    (interaction as unknown as { deleteCondition_: DeleteConditionFn }).deleteCondition_;
-
-  return { state, map, interactions, onModifyEnd, filterOf, deleteConditionOf };
+  return {
+    state,
+    map,
+    interactions,
+    onModifyEnd,
+    filter: createForecastModifyFilter(getters),
+    catFilter: createCategoricalModifyFilter(getters),
+  };
 };
 
 const clickEvent = (
@@ -94,8 +93,7 @@ describe("openLayersForecastEditInteractions", () => {
   });
 
   test("regular filter allows custom features only in custom mode with a matching category", () => {
-    const { interactions, filterOf } = setup({ customMode: true, categoryId: "cat-a" });
-    const filter = filterOf(interactions.modify);
+    const { filter } = setup({ customMode: true, categoryId: "cat-a" });
 
     const matching = makeFeature({
       featureId: "custom-1",
@@ -115,8 +113,7 @@ describe("openLayersForecastEditInteractions", () => {
   });
 
   test("regular filter rejects custom features when custom mode is off", () => {
-    const { state, interactions, filterOf } = setup({ customMode: true, categoryId: "cat-a" });
-    const filter = filterOf(interactions.modify);
+    const { state, filter } = setup({ customMode: true, categoryId: "cat-a" });
     const custom = makeFeature({
       featureId: "custom-1",
       customLayerId: "layer-1",
@@ -130,8 +127,7 @@ describe("openLayersForecastEditInteractions", () => {
   });
 
   test("regular filter falls back to the active outlook tier for standard features", () => {
-    const { interactions, filterOf } = setup({ outlookType: "tornado", probability: "5%" });
-    const filter = filterOf(interactions.modify);
+    const { filter } = setup({ outlookType: "tornado", probability: "5%" });
 
     expect(filter(makeFeature({ outlookType: "tornado", probability: "5%" }))).toBe(true);
     expect(filter(makeFeature({ outlookType: "wind", probability: "5%" }))).toBe(false);
@@ -139,40 +135,42 @@ describe("openLayersForecastEditInteractions", () => {
   });
 
   test("categorical filter rejects auto-generated polygons even when the tier matches", () => {
-    const { interactions, filterOf } = setup({ probability: "TSTM" });
-    const filter = filterOf(interactions.catModify);
+    const { catFilter } = setup({ probability: "TSTM" });
 
     expect(
-      filter(makeFeature({ outlookType: "categorical", probability: "TSTM", derivedFrom: "auto-generated" })),
+      catFilter(makeFeature({ outlookType: "categorical", probability: "TSTM", derivedFrom: "auto-generated" })),
     ).toBe(false);
-    expect(filter(makeFeature({ outlookType: "categorical", probability: "TSTM" }))).toBe(true);
-    expect(filter(makeFeature({ outlookType: "categorical", probability: "MRGL" }))).toBe(false);
+    expect(catFilter(makeFeature({ outlookType: "categorical", probability: "TSTM" }))).toBe(true);
+    expect(catFilter(makeFeature({ outlookType: "categorical", probability: "MRGL" }))).toBe(false);
   });
 
   test("delete condition allows only single Alt-click or single Shift-click", () => {
-    const { interactions, deleteConditionOf } = setup();
-    const deleteCondition = deleteConditionOf(interactions.modify);
-    const catDeleteCondition = deleteConditionOf(interactions.catModify);
+    const deleteCondition = forecastVertexDeleteCondition;
 
-    expect(deleteCondition(clickEvent("singleclick", { altKey: true }))).toBe(true);
-    expect(deleteCondition(clickEvent("singleclick", { shiftKey: true }))).toBe(true);
-    expect(catDeleteCondition(clickEvent("singleclick", { altKey: true }))).toBe(true);
-    expect(catDeleteCondition(clickEvent("singleclick", { shiftKey: true }))).toBe(true);
+    expect(deleteCondition(clickEvent("singleclick", { altKey: true }) as never)).toBe(true);
+    expect(deleteCondition(clickEvent("singleclick", { shiftKey: true }) as never)).toBe(true);
 
-    expect(deleteCondition(clickEvent("singleclick"))).toBe(false);
-    expect(deleteCondition(clickEvent("singleclick", { altKey: true, shiftKey: true }))).toBe(false);
-    expect(deleteCondition(clickEvent("click", { altKey: true }))).toBe(false);
-    expect(deleteCondition(clickEvent("dblclick", { shiftKey: true }))).toBe(false);
+    expect(deleteCondition(clickEvent("singleclick") as never)).toBe(false);
+    expect(deleteCondition(clickEvent("singleclick", { altKey: true, shiftKey: true }) as never)).toBe(false);
+    expect(deleteCondition(clickEvent("click", { altKey: true }) as never)).toBe(false);
+    expect(deleteCondition(clickEvent("dblclick", { shiftKey: true }) as never)).toBe(false);
+  });
+
+  test("registered modify interactions share the exported delete behavior", () => {
+    const { interactions } = setup();
+
+    expect(interactions.modify).toBeDefined();
+    expect(interactions.catModify).toBeDefined();
+    expect(forecastVertexDeleteCondition(clickEvent("singleclick", { altKey: true }) as never)).toBe(true);
+    expect(forecastVertexDeleteCondition(clickEvent("singleclick") as never)).toBe(false);
   });
 
   test("filters read getter values dynamically after registration", () => {
-    const { state, interactions, filterOf } = setup({
+    const { state, filter, catFilter } = setup({
       customMode: false,
       outlookType: "tornado",
       probability: "5%",
     });
-    const filter = filterOf(interactions.modify);
-    const catFilter = filterOf(interactions.catModify);
     const tierFeature = makeFeature({ outlookType: "tornado", probability: "5%" });
 
     expect(filter(tierFeature)).toBe(true);
