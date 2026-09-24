@@ -1,4 +1,4 @@
-import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, resolveActiveCloudLibraryTab, getNextCloudLibraryTabId, getCloudLibraryTabFromSearchParams, getCloudLibraryTabLabel, getCloudLibraryWorkspacePath, type CloudLibraryTabId } from './cloudLibraryWorkspace';
+import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, getNextCloudLibraryTabId, getCloudLibraryTabFromSearchParams, getCloudLibraryTabLabel, getCloudLibraryWorkspacePath, type CloudLibraryTabId } from './cloudLibraryWorkspace';
 import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
@@ -69,16 +69,6 @@ describe('cloud library workspace boundaries', () => {
     expect(getCloudCycleWorkspaceLabel(makeCycle('custom-1', 'custom'))).toBe('Custom');
     expect(getCloudCycleWorkspaceLabel(makeCycle('meso-1', 'mesoscale'))).toBe('Mesoscale');
     expect(getCloudCycleWorkspaceLabel(makeCycle('trop-1', 'tropical'))).toBe('Tropical');
-  });
-
-  it('keeps the active tab when still present and falls back to All otherwise', () => {
-    const tabs = [
-      { id: 'all' as const, label: 'All', cycleCount: 2 },
-      { id: 'severe' as const, label: 'Severe', cycleCount: 1 },
-    ];
-
-    expect(resolveActiveCloudLibraryTab(tabs, 'severe')).toBe('severe');
-    expect(resolveActiveCloudLibraryTab(tabs, 'custom')).toBe('all');
   });
 
   it('resolves tab labels and editor routes for each workspace tab', () => {
