@@ -164,10 +164,49 @@ export const useAutoSave = (
   const pendingAutoSaveRef = useRef<PendingAutoSave | null>(null);
   const currentScopeRef = useRef({ userId, workspaceId });
   currentScopeRef.current = { userId, workspaceId };
+  // Latest committed Redux snapshot, updated synchronously every render so a
+  // workspace switch that batches past the debounce effect still has the
+  // pre-switch document available for a scope-change flush.
+  const latestSnapshotRef = useRef({ forecastCycle, mapView, workflowMetadata });
+  latestSnapshotRef.current = { forecastCycle, mapView, workflowMetadata };
+  const prevScopeRef = useRef({ userId, workspaceId });
+  const lastScheduledSnapshotRef = useRef({ forecastCycle, mapView, workflowMetadata });
+
+  // Flushes a dirty edit that never became a debounced pending because React
+  // batched the document change and the workspace switch into one commit. The
+  // passive debounce effect below never ran for the intermediate document, so
+  // its cleanup has nothing to flush. This runs before AppHooks resets the
+  // document for the new workspace, so latestSnapshot still holds the old
+  // workspace document.
+  useEffect(() => {
+    const prevScope = prevScopeRef.current;
+    const scopeChanged = prevScope.userId !== userId || prevScope.workspaceId !== workspaceId;
+    prevScopeRef.current = { userId, workspaceId };
+    if (!scopeChanged) return;
+    if (pendingAutoSaveRef.current) return;
+    const latest = latestSnapshotRef.current;
+    const lastScheduled = lastScheduledSnapshotRef.current;
+    if (
+      latest.forecastCycle === lastScheduled.forecastCycle &&
+      latest.mapView === lastScheduled.mapView &&
+      latest.workflowMetadata === lastScheduled.workflowMetadata
+    ) {
+      return;
+    }
+    persistAutoSave({
+      userId: prevScope.userId,
+      workspaceId: prevScope.workspaceId,
+      forecastCycle: latest.forecastCycle,
+      mapView: latest.mapView,
+      workflowMetadata: latest.workflowMetadata,
+    });
+    lastScheduledSnapshotRef.current = latest;
+  }, [userId, workspaceId]);
 
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      lastScheduledSnapshotRef.current = { forecastCycle, mapView, workflowMetadata };
       return;
     }
 
@@ -180,6 +219,7 @@ export const useAutoSave = (
       workflowMetadata,
     };
     pendingAutoSaveRef.current = pendingAutoSave;
+    lastScheduledSnapshotRef.current = { forecastCycle, mapView, workflowMetadata };
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       if (generation !== saveGenerationRef.current || pendingAutoSaveRef.current !== pendingAutoSave) return;
