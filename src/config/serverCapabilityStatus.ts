@@ -71,6 +71,19 @@ export const resetServerCapabilityStatusState = (): void => {
   notifyCapabilityStatusListeners();
 };
 
+const scheduleCapabilityStatusRetry = (): void => {
+  if (retryTimer || retryAttempts >= MAX_RETRY_ATTEMPTS) {
+    return;
+  }
+
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    if (!cachedStatusSnapshot.loaded && !cachedStatusRequest) {
+      void loadSharedServerCapabilityStatus();
+    }
+  }, RETRY_DELAY_MS);
+};
+
 /** Returns the server capability key for a registry feature when server-backed. */
 export const getServerCapabilityKeyForFeature = (feature: FeatureKey): string | null => {
   const definition = getFeatureExposure(feature);
@@ -81,12 +94,10 @@ export const getServerCapabilityKeyForFeature = (feature: FeatureKey): string | 
   return definition.serverCapabilityKey;
 };
 
-/** Checks whether an unknown value names a supported capability availability reason. */
 const isCapabilityStatusReason = (reason: unknown): reason is CapabilityAvailabilityReason =>
   typeof reason === 'string'
   && CAPABILITY_AVAILABILITY_REASONS.includes(reason as CapabilityAvailabilityReason);
 
-/** Checks whether an unknown value is a non-array object record. */
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   if (value === null || typeof value !== 'object') {
     return false;
@@ -95,7 +106,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !Array.isArray(value);
 };
 
-/** Checks whether an unknown value matches one capability status entry. */
 const isCapabilityStatusEntry = (entry: unknown): entry is CapabilityStatusEntry => {
   if (!isRecord(entry)) {
     return false;
@@ -177,20 +187,6 @@ export const loadSharedServerCapabilityStatus = (): Promise<CapabilityStatusSnap
 
   return cachedStatusRequest;
 };
-
-/** Schedules another shared capability status request after a failed attempt. */
-function scheduleCapabilityStatusRetry(): void {
-  if (retryTimer || retryAttempts >= MAX_RETRY_ATTEMPTS) {
-    return;
-  }
-
-  retryTimer = setTimeout(() => {
-    retryTimer = null;
-    if (!cachedStatusSnapshot.loaded && !cachedStatusRequest) {
-      void loadSharedServerCapabilityStatus();
-    }
-  }, RETRY_DELAY_MS);
-}
 
 /** Returns whether a capability is currently treated as unavailable on the client. */
 export const isServerCapabilityAvailable = (
