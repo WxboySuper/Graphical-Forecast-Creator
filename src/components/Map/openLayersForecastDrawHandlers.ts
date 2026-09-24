@@ -57,12 +57,14 @@ export const handleForecastDrawEnd = (
       }
 
       let outlookGeometry: Polygon | MultiPolygon | null = geometryObject as Polygon | MultiPolygon;
-      outlookGeometry = await options.trimGeometryForAutoDraw(
-        outlookGeometry,
-        options.trimStrategy,
-        options.trimAutoOnDraw,
-        options.trimPreviewOnly,
-      );
+      if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
+        outlookGeometry = await options.trimGeometryForAutoDraw(
+          outlookGeometry,
+          options.trimStrategy,
+          options.trimAutoOnDraw,
+          options.trimPreviewOnly,
+        );
+      }
       if (!outlookGeometry) return;
       const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
         type: "Feature",
