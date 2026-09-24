@@ -382,8 +382,7 @@ const CloudCycleActions: React.FC<{
       <Button
         className="cloud-cycle-button cloud-cycle-button--load"
         onClick={onLoad}
-        disabled={loading || isDeleting || isSavingRename}
-        aria-disabled={loadSupported ? undefined : true}
+        disabled={loading || isDeleting || isSavingRename || !loadSupported}
         aria-describedby={loadSupported ? undefined : loadHintId}
       >
         <Download className="mr-2 h-4 w-4" />
