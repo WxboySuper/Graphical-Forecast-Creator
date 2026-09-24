@@ -64,7 +64,9 @@ export const FORECAST_WORKSPACES = [
     productType: 'custom',
     status: 'gated',
     exposureKey: 'customProducts',
-    legacyPaths: ['/custom-products'],
+    // /custom-products remains the separate Custom Products library route,
+    // not a legacy Forecast editor route.
+    legacyPaths: [],
   },
 ] as const satisfies readonly ForecastWorkspaceDefinition[];
 

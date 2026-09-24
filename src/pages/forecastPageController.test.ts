@@ -7,15 +7,18 @@ import {
   cycleHasDiscussionContent,
   formatRolloverDayLabel,
   getDayRolloverPromptState,
+  getMismatchedCloudWorkspaceId,
   hasRestorableCloudSelection,
   hasRolloverForecastData,
   hasUnpublishedDiscussionDrafts,
   hasUnsavedRolloverCandidateSession,
+  INVALID_CLOUD_HANDOFF,
   parseStoredCloudMeta,
   parseStoredForecastPayload,
   runDayRolloverCloudSaveAction,
   runDayRolloverDownloadAction,
 } from './forecastPageController';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 
 const createForecastCycle = () =>
   forecastReducer(undefined, { type: '@@forecastPageController/test' }).forecastCycle;
@@ -35,6 +38,9 @@ describe('forecastPageController', () => {
     expect(hasRestorableCloudSelection({ id: 'abc' })).toBe(false);
     expect(buildRestoreKey(null)).toBe('anonymous');
     expect(buildRestoreKey('user-1')).toBe('user-1');
+    // Restore keys are workspace-scoped so switching products re-runs restore.
+    expect(buildRestoreKey('user-1', 'custom')).toBe('user-1:custom');
+    expect(buildRestoreKey(null, 'custom')).toBe('anonymous:custom');
   });
 
   test('accepts matching envelopes and rejects cross-workspace envelopes', () => {
@@ -52,6 +58,34 @@ describe('forecastPageController', () => {
     expect(parseStoredForecastPayload(customPayload, 'severe')).toBeNull();
     expect(parseStoredForecastPayload(JSON.stringify(forecast), 'custom')).toBeNull();
     expect(parseStoredForecastPayload(JSON.stringify(forecast), 'severe')).toEqual(forecast);
+  });
+
+  test('identifies a cloud handoff staged for a different workspace', () => {
+    const cycle = createForecastCycle();
+    const customStored = JSON.stringify(serializeForecastWorkspace('custom', cycle, { center: [0, 0], zoom: 4 }));
+    const severeStored = JSON.stringify(serializeForecastWorkspace('severe', cycle, { center: [0, 0], zoom: 4 }));
+
+    expect(getMismatchedCloudWorkspaceId(customStored, 'custom')).toBeNull();
+    expect(getMismatchedCloudWorkspaceId(customStored, 'severe')).toBe('custom');
+    expect(getMismatchedCloudWorkspaceId(severeStored, 'custom')).toBe('severe');
+    // Absence is not corruption.
+    expect(getMismatchedCloudWorkspaceId(null, 'severe')).toBeNull();
+    expect(getMismatchedCloudWorkspaceId('', 'severe')).toBeNull();
+  });
+
+  test('tags malformed or unknown cloud handoffs as invalid instead of absent', () => {
+    // Malformed JSON, unsupported shapes, unknown workspace ids, and known-but-invalid
+    // envelopes must all surface as a tagged invalid handoff so callers clear them.
+    expect(getMismatchedCloudWorkspaceId('not-json', 'severe')).toBe(INVALID_CLOUD_HANDOFF);
+    expect(getMismatchedCloudWorkspaceId(JSON.stringify({ nope: true }), 'severe')).toBe(INVALID_CLOUD_HANDOFF);
+    expect(getMismatchedCloudWorkspaceId(
+      JSON.stringify({ schemaVersion: 1, workspaceId: 'bogus', forecast: {} }),
+      'severe',
+    )).toBe(INVALID_CLOUD_HANDOFF);
+    expect(getMismatchedCloudWorkspaceId(
+      JSON.stringify({ schemaVersion: 1, workspaceId: 'severe', forecast: { nope: true } }),
+      'severe',
+    )).toBe(INVALID_CLOUD_HANDOFF);
   });
 
   test('derives rollover candidates and preserves pending prompts', () => {
@@ -111,9 +145,19 @@ describe('forecastPageController', () => {
       saveCycle,
       clearCurrent,
       dispatch,
+      workspaceId: 'severe',
     })).toBe(true);
     expect(clearCurrent).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledTimes(1);
+    // Rollover cloud saves carry the active workspace explicitly.
+    expect(saveCycle).toHaveBeenLastCalledWith(
+      expect.any(String),
+      forecastCycle.cycleDate,
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      expect.objectContaining({ saveAsNew: true, workspaceId: 'severe' }),
+    );
 
     saveCycle.mockResolvedValueOnce(false);
     clearCurrent.mockClear();
@@ -124,7 +168,16 @@ describe('forecastPageController', () => {
       saveCycle,
       clearCurrent,
       dispatch,
+      workspaceId: 'custom',
     })).toBe(false);
+    expect(saveCycle).toHaveBeenLastCalledWith(
+      expect.any(String),
+      forecastCycle.cycleDate,
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      expect.objectContaining({ saveAsNew: true, workspaceId: 'custom' }),
+    );
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
     exportSpy.mockRestore();

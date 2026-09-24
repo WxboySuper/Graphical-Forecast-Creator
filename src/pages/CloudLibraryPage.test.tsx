@@ -4,8 +4,10 @@ import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
-import CloudLibraryPage from "./CloudLibraryPage";
-import { getDefaultForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
+import CloudLibraryPage, { buildCloudSessionPayload, isSupportedCloudLoadWorkspace } from "./CloudLibraryPage";
+import { getDefaultForecastWorkspacePath, getForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
+import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
+import { getForecastWorkspace } from "../config/forecastWorkspaces";
 
 const mockNavigate = jest.fn();
 jest.mock("react-router", () => ({
@@ -123,29 +125,24 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
 
-  it("keeps unsupported Load activatable so the blocked message stays reachable", () => {
+  it("loads an exposed Custom cloud cycle into the matching forecast editor", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    const loadCycle = jest.fn();
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-load" }).forecastCycle;
+    const payload = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    const loadCycle = jest.fn().mockResolvedValue(payload);
     mockUseCloudCycles.mockReturnValue(
       cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
     );
 
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).not.toBeDisabled();
-    expect(loadButton).toHaveAttribute("aria-disabled", "true");
-    expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-custom-1");
-
-    loadButton.focus();
-    expect(loadButton).toHaveFocus();
-
-    const hint = screen.getByText("Custom loading is not supported yet. Only Severe saves can be opened.");
-    expect(hint).toBeInTheDocument();
-    expect(hint).toHaveAttribute("id", "cloud-cycle-load-hint-custom-1");
-
+    expect(loadButton).not.toHaveAttribute("aria-disabled");
+    expect(loadButton).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText(/loading is not supported yet/i)).not.toBeInTheDocument();
     fireEvent.click(loadButton);
-    expect(loadCycle).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent(/Custom saves can't be opened in the editor yet/);
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("custom-1"));
+    expect(mockNavigate).toHaveBeenCalledWith(getForecastWorkspacePath("custom"));
+    expect(sessionStorage.length).toBeGreaterThan(0);
   });
 
   it("keeps Severe Load fully enabled without a support hint", () => {
@@ -189,6 +186,27 @@ describe("CloudLibraryPage", () => {
 
     await waitFor(() => expect(loadCycle).not.toHaveBeenCalled());
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("keeps hidden-workspace Load activatable so the blocked message stays reachable", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn();
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "meso-1", workspaceId: "mesoscale", label: "Meso save" }], loadCycle })
+    );
+
+    renderPage();
+    const loadButton = screen.getByRole("button", { name: /load/i });
+    expect(loadButton).not.toBeDisabled();
+    expect(loadButton).toHaveAttribute("aria-disabled", "true");
+    expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-meso-1");
+    expect(screen.getByText("Mesoscale cloud loading is not available yet.")).toBeInTheDocument();
+
+    fireEvent.click(loadButton);
+    expect(loadCycle).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Mesoscale cloud loading is not available yet. Your save is still stored."
+    );
   });
 
   it("shows resolved workspace ownership in All without inventing gated tabs", () => {
@@ -358,6 +376,26 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("does not double-wrap an already-enveloped cloud handoff payload", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
+    expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
+    const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
+    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe('severe');
+  });
+
+  it("supports cloud loads only for workspaces with a registered exposed editor route", () => {
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("severe"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("custom", getForecastWorkspace("custom"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("mesoscale", getForecastWorkspace("mesoscale"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("tropical", getForecastWorkspace("tropical"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("winter", getForecastWorkspace("winter"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", undefined)).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("custom"))).toBe(false);
   });
 
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {

@@ -231,6 +231,27 @@ export const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMet
   }
 };
 
+/** Tagged result for a present-but-unreadable cloud handoff. Distinct from null (no handoff). */
+export const INVALID_CLOUD_HANDOFF = 'invalid' as const;
+export type CloudHandoffMismatch = ForecastWorkspaceId | typeof INVALID_CLOUD_HANDOFF;
+
+/** Returns the source workspace when a stored cloud handoff belongs elsewhere, an invalid sentinel when a present handoff cannot be read, else null. */
+export const getMismatchedCloudWorkspaceId = (
+  storedValue: string | null,
+  workspaceId: ForecastWorkspaceId,
+): CloudHandoffMismatch | null => {
+  if (!storedValue) return null;
+  try {
+    const parsed = JSON.parse(storedValue) as unknown;
+    const restored = deserializeForecastWorkspace(parsed);
+    return restored.workspaceId === workspaceId ? null : restored.workspaceId;
+  } catch {
+    // A non-empty value that fails to parse or classify is a corrupt handoff,
+    // not an absent one. Callers must clear it instead of falling back to local restore.
+    return INVALID_CLOUD_HANDOFF;
+  }
+};
+
 export const clearStoredCloudSession = (userId?: string | null) => {
   sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId)));
   sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId)));
@@ -274,8 +295,25 @@ const restoreCloudSession = ({
   workspaceId,
 }: RestoreCloudSessionOptions): boolean => {
   const payloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId));
-  const payload = parseStoredForecastPayload(sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null), workspaceId);
-  if (!payload) return false;
+  const storedValue = sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null);
+  const payload = parseStoredForecastPayload(storedValue, workspaceId);
+  if (!payload) {
+    // A pending handoff for another workspace must not fail silently into local
+    // restore. Surface it, drop the stale handoff, and stop the fallback chain.
+    // The same applies to a present-but-unreadable handoff: clear it and stop
+    // instead of treating absence as corruption or falling back to autosave.
+    const handoffIssue = getMismatchedCloudWorkspaceId(storedValue, workspaceId);
+    if (handoffIssue) {
+      clearStoredCloudSession(userId);
+      if (handoffIssue === INVALID_CLOUD_HANDOFF) {
+        addToast('The pending cloud forecast was invalid and was cleared without loading.', 'error');
+      } else {
+        addToast('This cloud cycle belongs to a different forecast workspace and was not loaded.', 'error');
+      }
+      return true;
+    }
+    return false;
+  }
 
   const metaKey = getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId));
   const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(metaKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_META_KEY) : null));
@@ -358,7 +396,12 @@ const restoreAvailableSession = (
 ) => restoreCloudSession({ dispatch, addToast, onCloudCycleLoaded: currentSession.onCloudCycleLoaded, userId, workspaceId })
   || restoreLocalSession({ dispatch, addToast, currentSession, userId, workspaceId });
 
-export const buildRestoreKey = (userId?: string | null): string => userId || 'anonymous';
+export const buildRestoreKey = (
+  userId?: string | null,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): string => workspaceId === DEFAULT_FORECAST_WORKSPACE
+  ? userId || 'anonymous'
+  : `${userId || 'anonymous'}:${workspaceId}`;
 
 /** Restores the pending cloud or local session once per signed-in storage scope. */
 export const useSessionRestore = (
@@ -399,7 +442,7 @@ export const useSessionRestore = (
         : undefined;
       migrateLegacyAutoSave(userId, liveSession, workspaceId);
       previousUserIdRef.current = userId;
-      const restoreKey = buildRestoreKey(userId);
+      const restoreKey = buildRestoreKey(userId, workspaceId);
       if (appliedRestoreKeyRef.current === restoreKey) {
         setRestoreAttempted(true);
         return;
@@ -578,9 +621,9 @@ export const runDayRolloverDownloadAction = ({ forecastCycle, mapView, dispatch,
   }
 };
 
-export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch }: { forecastCycle: ReturnType<typeof selectForecastCycle>; currentMapView: RootState['forecast']['currentMapView']; saveCycle: UseCloudCyclesResult['saveCycle']; clearCurrent: UseCloudCyclesResult['clearCurrent']; dispatch: ShortcutDispatch }): Promise<boolean> => {
+export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch, workspaceId }: { forecastCycle: ReturnType<typeof selectForecastCycle>; currentMapView: RootState['forecast']['currentMapView']; saveCycle: UseCloudCyclesResult['saveCycle']; clearCurrent: UseCloudCyclesResult['clearCurrent']; dispatch: ShortcutDispatch; workspaceId: ForecastWorkspaceId }): Promise<boolean> => {
   try {
-    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true });
+    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true, workspaceId });
     if (!success) return false;
     clearCurrent();
     dispatch(resetForecasts());
@@ -602,6 +645,7 @@ interface DayRolloverPromptArgs {
   canSaveToCloud: boolean;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   clearCurrent: UseCloudCyclesResult['clearCurrent'];
+  workspaceId: ForecastWorkspaceId;
 }
 
 type PromptStateSetter = (value: DayRolloverPromptState | null) => void;
@@ -683,7 +727,7 @@ const useDayRolloverDetection = ({ restoreComplete, userId, runtimeRefs, setProm
   }, [detectDayRollover]);
 };
 
-const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, setActionError, setIsBusy, saveCycle }: Pick<DayRolloverPromptArgs, 'addToast' | 'clearCurrent' | 'currentMapView' | 'dispatch' | 'forecastCycle' | 'saveCycle'> & {
+const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, setActionError, setIsBusy, saveCycle, workspaceId }: Pick<DayRolloverPromptArgs, 'addToast' | 'clearCurrent' | 'currentMapView' | 'dispatch' | 'forecastCycle' | 'saveCycle' | 'workspaceId'> & {
   completeRollover: () => void;
   setActionError: ActionErrorSetter;
   setIsBusy: BusyStateSetter;
@@ -701,7 +745,7 @@ const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, curre
     setIsBusy(true);
     setActionError(null);
     try {
-      const success = await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch });
+      const success = await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch, workspaceId });
       if (!success) {
         setActionError('Unable to save this session to the cloud. Your current forecast is still open.');
         return;
@@ -711,7 +755,7 @@ const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, curre
     } finally {
       setIsBusy(false);
     }
-  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy]);
+  }, [addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy, workspaceId]);
   const handleReplaceWithoutSaving = useCallback(() => {
     clearCurrent();
     dispatch(resetForecasts());
@@ -723,7 +767,7 @@ const useDayRolloverActions = ({ addToast, clearCurrent, completeRollover, curre
 };
 
 /** Owns day-rollover detection and the save/download/replace actions for the page. */
-export const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addToast, forecastCycle, currentMapView, isSaved, userId, canSaveToCloud, saveCycle, clearCurrent }: DayRolloverPromptArgs) => {
+export const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatch, addToast, forecastCycle, currentMapView, isSaved, userId, canSaveToCloud, saveCycle, clearCurrent, workspaceId }: DayRolloverPromptArgs) => {
   const [promptState, setPromptState] = useState<DayRolloverPromptState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -735,7 +779,7 @@ export const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatc
     setPromptState(null);
     setActionError(null);
   }, [setActionError, setPromptState, userId]);
-  const actions = useDayRolloverActions({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy });
+  const actions = useDayRolloverActions({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy, workspaceId });
 
   return { promptState, canSaveToCloud, isBusy, error: actionError, ...actions };
 };

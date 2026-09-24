@@ -9,8 +9,8 @@ jest.mock('../utils/fileUtils', () => ({
   serializeForecast: jest.fn(() => ({ serialized: true })),
 }));
 
-const Harness = () => {
-  useAutoSave();
+const Harness = ({ workspaceId = 'severe' }: { workspaceId?: 'severe' | 'custom' }) => {
+  useAutoSave(undefined, workspaceId);
   return null;
 };
 
@@ -47,15 +47,17 @@ describe('useAutoSave', () => {
     expect(getAutoSaveStorageKey('user-1', 'severe')).toBe('forecastData:user-user-1');
   });
 
-  test('does not migrate a non-Severe anonymous autosave without a workspace contract', () => {
+  test('migrates a non-Severe anonymous autosave into its own account scope', () => {
     const anonymousKey = getAutoSaveStorageKey(null, 'custom');
     const scopedKey = getAutoSaveStorageKey('user-1', 'custom');
     localStorage.setItem(anonymousKey, JSON.stringify({ custom: true }));
 
     migrateLegacyAutoSave('user-1', undefined, 'custom');
 
-    expect(localStorage.getItem(anonymousKey)).toBe(JSON.stringify({ custom: true }));
-    expect(localStorage.getItem(scopedKey)).toBeNull();
+    expect(localStorage.getItem(anonymousKey)).toBeNull();
+    expect(localStorage.getItem(scopedKey)).toBe(JSON.stringify({ custom: true }));
+    // The Severe scope is never touched by a non-Severe migration.
+    expect(localStorage.getItem('forecastData')).toBeNull();
   });
 
   test('does not overwrite a non-Severe account autosave during migration', () => {
@@ -119,11 +121,13 @@ describe('useAutoSave', () => {
   test('clears only the selected non-Severe workspace autosave', () => {
     const customKey = getAutoSaveStorageKey('user-1', 'custom');
     localStorage.setItem(customKey, JSON.stringify({ custom: true }));
+    localStorage.setItem('forecastData:custom', JSON.stringify({ anonymousCustom: true }));
     localStorage.setItem('forecastData', JSON.stringify({ severe: true }));
 
     clearAutoSave('user-1', 'custom');
 
     expect(localStorage.getItem(customKey)).toBeNull();
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
     expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ severe: true }));
   });
 
@@ -222,5 +226,86 @@ describe('useAutoSave', () => {
 
     expect(serializeForecast).not.toHaveBeenCalled();
     expect(localStorage.getItem('forecastData')).toBeNull();
+  });
+
+  // Guards the pending-old + batched-new + switch race: when a newer edit is
+  // batched with the workspace switch on top of an older debounced pending,
+  // the latest snapshot must win for the old scope in a single write.
+  test('flushes the latest batched edit when a switch lands on top of a pending save', async () => {
+    const store = createStore();
+    const { rerender } = render(
+      <Provider store={store}>
+        <Harness workspaceId="severe" />
+      </Provider>
+    );
+
+    act(() => {
+      store.dispatch(setMapView({ center: [35, -97], zoom: 6 }));
+    });
+
+    await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
+    (serializeForecast as jest.Mock).mockClear();
+    (serializeForecast as jest.Mock).mockImplementation(
+      (_cycle: unknown, mapView: { center: [number, number]; zoom: number }) => ({ zoom: mapView.zoom }),
+    );
+
+    // Batch the newer edit with the workspace switch so the debounce effect
+    // never runs for the intermediate document on its own.
+    // eslint-disable-next-line testing-library/no-unnecessary-act -- batching dispatch and rerender reproduces the race
+    act(() => {
+      store.dispatch(setMapView({ center: [36, -96], zoom: 9 }));
+      rerender(
+        <Provider store={store}>
+          <Harness workspaceId="custom" />
+        </Provider>
+      );
+    });
+
+    expect(serializeForecast).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: { zoom: 9 },
+    }));
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    // The suppressed older pending must not overwrite the newer flush later.
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: { zoom: 9 },
+    }));
+  });
+
+  // Guards flush-before-reset ordering: a dirty edit must land in the old
+  // workspace scope on switch, without waiting for another debounce.
+  test('flushes the previous workspace edit when autosave scope changes', async () => {
+    const store = createStore();
+    const { rerender } = render(
+      <Provider store={store}>
+        <Harness workspaceId="severe" />
+      </Provider>
+    );
+
+    act(() => {
+      store.dispatch(setMapView({ center: [35, -97], zoom: 6 }));
+    });
+
+    await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
+    rerender(
+      <Provider store={store}>
+        <Harness workspaceId="custom" />
+      </Provider>
+    );
+
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: { serialized: true },
+    }));
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
   });
 });
