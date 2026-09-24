@@ -116,8 +116,7 @@ describe('TabbedIntegratedToolbarTabsList', () => {
     installGeometry();
     const { rerender } = renderTabsList('draw');
 
-    const indicator = screen.getByTestId('toolbar-tab-indicator');
-    expect(indicator).toHaveStyle({ width: '80px', transform: 'translateX(0px)' });
+    expect(screen.getByTestId('toolbar-tab-indicator')).toHaveStyle({ width: '80px', transform: 'translateX(0px)' });
 
     rerender(
       <Tabs value="tools">
@@ -131,12 +130,13 @@ describe('TabbedIntegratedToolbarTabsList', () => {
   });
 
   test('keeps a single observer across tab changes and re-measures on resize', () => {
-    installGeometry();
+    const { triggerRects } = installGeometry();
     const { rerender } = renderTabsList('draw');
 
     expect(MockResizeObserver.instances).toHaveLength(1);
     const observer = MockResizeObserver.instances[0];
     expect(observer.observed.size).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId('toolbar-tab-indicator')).toHaveStyle({ width: '80px', transform: 'translateX(0px)' });
 
     rerender(
       <Tabs value="days">
@@ -146,10 +146,12 @@ describe('TabbedIntegratedToolbarTabsList', () => {
 
     expect(MockResizeObserver.instances).toHaveLength(1);
     expect(observer.disconnected).toBe(false);
+    expect(screen.getByTestId('toolbar-tab-indicator')).toHaveStyle({ width: '90px', transform: 'translateX(80px)' });
 
+    triggerRects.days = rectFor(120, 130);
     act(() => {
       observer.fire();
     });
-    expect(screen.getByTestId('toolbar-tab-indicator')).toBeInTheDocument();
+    expect(screen.getByTestId('toolbar-tab-indicator')).toHaveStyle({ width: '130px', transform: 'translateX(120px)' });
   });
 });

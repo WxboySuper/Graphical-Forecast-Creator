@@ -18,7 +18,6 @@ export const TabbedIntegratedToolbarTabsList: React.FC<{
   });
   const [indicatorStyle, setIndicatorStyle] = React.useState<React.CSSProperties>({});
   const activeTabRef = React.useRef(activeTab);
-  activeTabRef.current = activeTab;
 
   /** Re-measure the active trigger and update the sliding indicator position. */
   const measureActiveTrigger = React.useCallback(() => {
@@ -39,6 +38,7 @@ export const TabbedIntegratedToolbarTabsList: React.FC<{
   }, []);
 
   React.useLayoutEffect(() => {
+    activeTabRef.current = activeTab;
     measureActiveTrigger();
   }, [activeTab, measureActiveTrigger]);
 
