@@ -122,7 +122,7 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
 
-  it("disables unsupported Load with an explanatory hint instead of a dead-end action", () => {
+  it("keeps unsupported Load focusable with aria-disabled and a hint while blocking activation", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const loadCycle = jest.fn();
     mockUseCloudCycles.mockReturnValue(
@@ -131,8 +131,12 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).toBeDisabled();
+    expect(loadButton).not.toBeDisabled();
+    expect(loadButton).toHaveAttribute("aria-disabled", "true");
     expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-custom-1");
+
+    loadButton.focus();
+    expect(loadButton).toHaveFocus();
 
     const hint = screen.getByText("Custom loading is not supported yet. Only Severe saves can be opened.");
     expect(hint).toBeInTheDocument();
@@ -142,6 +146,21 @@ describe("CloudLibraryPage", () => {
     expect(loadCycle).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("uses native disabled for unsupported Load only while busy", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }],
+        loading: true,
+      })
+    );
+
+    renderPage();
+    const loadButton = screen.getByRole("button", { name: /load/i });
+    expect(loadButton).toBeDisabled();
+    expect(loadButton).toHaveAttribute("aria-disabled", "true");
   });
 
   it("keeps Severe Load fully enabled without a support hint", () => {
@@ -156,6 +175,9 @@ describe("CloudLibraryPage", () => {
     expect(loadButton).not.toHaveAttribute("aria-disabled");
     expect(loadButton).not.toHaveAttribute("aria-describedby");
     expect(screen.queryByText(/loading is not supported yet/i)).not.toBeInTheDocument();
+
+    loadButton.focus();
+    expect(loadButton).toHaveFocus();
   });
 
   it("navigates to the canonical Severe route when loading a supported cycle", async () => {
