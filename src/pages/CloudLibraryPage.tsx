@@ -10,19 +10,13 @@ import { useEntitlement } from '../billing/EntitlementProvider';
 import { PRICING_COPY } from '../billing/pricingCopy';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
-import type { GFCForecastSaveData } from '../types/outlooks';
-import { getBuildTarget, type BuildTarget } from '../config/buildTarget';
+import { getBuildTarget } from '../config/buildTarget';
+import { getForecastWorkspace, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { buildCloudSessionPayload } from '../utils/forecastWorkspacePersistence';
 import {
-  getForecastWorkspace,
-  isForecastWorkspaceExposed,
-  type ForecastWorkspaceDefinition,
-  type ForecastWorkspaceId,
-} from '../config/forecastWorkspaces';
-import {
-  classifyForecastWorkspacePayload,
-  createForecastWorkspaceSave,
-} from '../utils/forecastWorkspacePersistence';
-import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../routing/forecastWorkspaceRoutes';
+  getForecastWorkspacePath,
+  isSupportedCloudLoadWorkspace,
+} from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -35,6 +29,8 @@ import {
 } from './cloudLibraryWorkspace';
 import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
 import './CloudLibraryPage.css';
+
+export { buildCloudSessionPayload, isSupportedCloudLoadWorkspace };
 
 /** Formats cloud-cycle timestamps for the library surface. */
 const formatDate = (dateString: string): string =>
@@ -736,36 +732,6 @@ const CloudLibrarySignedInLayout: React.FC<{
     </div>
   </div>
 );
-
-/** Builds the session payload for a cloud handoff without double-wrapping an envelope. */
-export const buildCloudSessionPayload = (
-  workspaceId: ForecastWorkspaceId,
-  payload: unknown,
-): unknown => {
-  const classification = classifyForecastWorkspacePayload(payload);
-  if (classification.ok && !classification.legacy) {
-    if (classification.workspaceId !== workspaceId) {
-      throw new Error('Cloud payload belongs to a different forecast workspace.');
-    }
-    return payload;
-  }
-  return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
-};
-
-/** A workspace can open cloud payloads only when it has a registered editor route for the target. */
-export const isSupportedCloudLoadWorkspace = (
-  workspaceId: ForecastWorkspaceId,
-  workspace: ForecastWorkspaceDefinition | undefined,
-  target?: BuildTarget,
-): boolean => {
-  if (!workspace || workspace.id !== workspaceId) {
-    return false;
-  }
-  if (!isForecastWorkspaceExposed(workspace, target)) {
-    return false;
-  }
-  return getExposedForecastWorkspaceRoutes(target).some((route) => route.id === workspaceId);
-};
 
 /** Creates the cloud library actions used by the page and keeps transient feedback local. */
 const useCloudLibraryActions = ({

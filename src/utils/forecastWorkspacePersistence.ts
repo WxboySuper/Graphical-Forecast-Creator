@@ -88,3 +88,18 @@ export const classifyForecastWorkspacePayload = (
 export const getForecastDataFromWorkspacePayload = (
   payload: ForecastWorkspacePayload,
 ): GFCForecastSaveData => 'forecast' in payload ? payload.forecast : payload;
+
+/** Builds the session payload for a cloud handoff without double-wrapping an envelope. */
+export const buildCloudSessionPayload = (
+  workspaceId: ForecastWorkspaceId,
+  payload: unknown,
+): unknown => {
+  const classification = classifyForecastWorkspacePayload(payload);
+  if (classification.ok && !classification.legacy) {
+    if (classification.workspaceId !== workspaceId) {
+      throw new Error('Cloud payload belongs to a different forecast workspace.');
+    }
+    return payload;
+  }
+  return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+};
