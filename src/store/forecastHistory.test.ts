@@ -110,7 +110,7 @@ const makeSnapshot = (day: DayType, marker: string): ForecastDaySnapshot => ({
 });
 
 describe('forecastHistory helpers', () => {
-  test('creates per-day stacks that stay isolated', () => {
+  test('pushes undo snapshots into separate day stacks', () => {
     const state = makeState({ 1: makeDay(1, 0), 2: makeDay(2, 5) }, 1);
 
     pushUndoSnapshot(state, 1);
@@ -120,14 +120,26 @@ describe('forecastHistory helpers', () => {
     pushUndoSnapshot(state, 2);
     expect(state.historyByDay[1]?.undoStack).toHaveLength(1);
     expect(state.historyByDay[2]?.undoStack).toHaveLength(1);
+  });
+
+  test('stores the matching forecast snapshot for each day', () => {
+    const state = makeState({ 1: makeDay(1, 0), 2: makeDay(2, 5) }, 1);
+
+    pushUndoSnapshot(state, 1);
+    pushUndoSnapshot(state, 2);
+
     expect(state.historyByDay[1]?.undoStack[0].snapshot.data.tornado?.get('2%')?.[0].id).toBe(
       'feature-1',
     );
     expect(state.historyByDay[2]?.undoStack[0].snapshot.data.tornado?.get('2%')?.[0].id).toBe(
       'feature-2',
     );
+  });
 
+  test('reuses one history record per day', () => {
+    const state = makeState({ 1: makeDay(1, 0), 2: makeDay(2, 5) }, 1);
     const firstCall = getOrCreateDayHistory(state, 1);
+
     expect(getOrCreateDayHistory(state, 1)).toBe(firstCall);
     expect(getOrCreateDayHistory(state, 2)).not.toBe(firstCall);
   });
