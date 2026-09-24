@@ -1,10 +1,6 @@
-/** Verifies routing between home, forecast, verification, and discussion preserves query params and per-day drafts. */
+/** Verifies home, forecast, verification, and navbar links, one forecastUi query parameter on the legacy forecast redirect, and per-day discussion drafts across route changes. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
-
-/**
- * Navigation tests — verifies routing between pages works correctly.
- */
 
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {

@@ -1,4 +1,4 @@
-/** Verifies forecast drawing and tool controls stay usable across all four layout preferences. */
+/** Verifies each of four layout preference values renders the same tabbed toolbar, and Days, Draw, and Tools can be selected before Save. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 

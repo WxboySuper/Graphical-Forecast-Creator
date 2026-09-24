@@ -1,11 +1,6 @@
-/** Verifies dark-mode toggle and persistence, documentation modal behavior, confirmation handling, and keyboard shortcuts. */
+/** Verifies dark-mode toggle and persistence, documentation panel open and close (click and Escape), Ctrl+D, and that clicking Start a new forecast leaves the nav rendered. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
-
-/**
- * UI interaction tests — verifies dark mode, help modal, and
- * confirmation modals work correctly without crashing.
- */
 
 test.beforeEach(async ({ page }) => {
   await prepareAppState(page);

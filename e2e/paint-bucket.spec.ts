@@ -1,4 +1,4 @@
-/** Verifies a drawn probabilistic polygon can be recolored through the paint-bucket edit flow with undo available. */
+/** Exercises paint-bucket editing for a drawn probabilistic polygon and verifies Undo is available. */
 import { test, expect, type Page } from '@playwright/test';
 
 const startForecast = async (page: Page): Promise<void> => {
