@@ -7,6 +7,7 @@ import ForecastWorkflowPanel, { getYesterdayLocalDate } from './ForecastWorkflow
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, {
   addFeature,
+  loadCycleHistory,
   saveCurrentCycle,
   setCycleDate,
   setForecastDay,
@@ -109,6 +110,46 @@ const renderPanelWithMixedWorkspaceHistory = (activeWorkspace: ForecastWorkspace
   return store;
 };
 
+const renderPanelWithLegacyWorkspaceHistory = (
+  activeWorkspace: ForecastWorkspaceId,
+  legacyKind: 'missing' | 'malformed',
+) => {
+  const store = createCompleteWorkflowStore();
+  store.dispatch(setForecastWorkspace('severe'));
+  store.dispatch(setForecastDay(2));
+  store.dispatch(addFeature({
+    feature: createFeature('legacy-source', 2, 'tornado', '2%'),
+  }));
+  store.dispatch(setCycleDate(getYesterdayLocalDate()));
+  store.dispatch(saveCurrentCycle({ label: 'legacy source' }));
+
+  const [saved] = store.getState().forecast.savedCycles.slice(-1);
+  const legacyCycle = { ...saved! };
+  if (legacyKind === 'missing') {
+    delete legacyCycle.workspaceId;
+  } else {
+    legacyCycle.workspaceId = 'not-a-workspace' as never;
+  }
+  store.dispatch(loadCycleHistory([legacyCycle as never]));
+
+  store.dispatch(setForecastWorkspace(activeWorkspace));
+  store.dispatch(setForecastDay(1));
+  store.dispatch(startBlankCycle({
+    workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
+    cycleDate: '2026-08-12',
+  }));
+  store.dispatch(setForecastDay(1));
+
+  render(
+    <MemoryRouter>
+      <Provider store={store}>
+        <ForecastWorkflowPanel context="forecast" />
+      </Provider>
+    </MemoryRouter>,
+  );
+  return store;
+};
+
 describe('ForecastWorkflowPanel completion review', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -146,6 +187,29 @@ describe('ForecastWorkflowPanel completion review', () => {
       ?.map((feature) => feature.id);
     expect(importedFeatureIds).toContain(`${activeWorkspace}-source`);
     expect(importedFeatureIds).not.toContain(`${activeWorkspace === 'custom' ? 'severe' : 'custom'}-source`);
+  });
+
+  it.each([
+    ['missing workspaceId stays in Severe', 'missing', 'severe', true],
+    ['missing workspaceId stays out of Custom', 'missing', 'custom', false],
+    ['malformed workspaceId stays in Severe', 'malformed', 'severe', true],
+    ['malformed workspaceId stays out of Custom', 'malformed', 'custom', false],
+  ] as const)('%s', (_caseName, legacyKind, activeWorkspace, shouldSuggest) => {
+    const store = renderPanelWithLegacyWorkspaceHistory(activeWorkspace, legacyKind);
+    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
+    expect(store.getState().forecast.savedCycles[0]?.workspaceId).toBe('severe');
+
+    const previousOutlookButton = screen.queryByRole('button', { name: previousOutlookButtonName });
+    if (shouldSuggest) {
+      expect(previousOutlookButton).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: previousOutlookButtonName }));
+
+      const importedFeatureIds = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%')
+        ?.map((feature) => feature.id);
+      expect(importedFeatureIds).toContain('legacy-source');
+    } else {
+      expect(previousOutlookButton).not.toBeInTheDocument();
+    }
   });
 });
 
