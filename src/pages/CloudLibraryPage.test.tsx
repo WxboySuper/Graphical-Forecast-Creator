@@ -130,12 +130,12 @@ describe("CloudLibraryPage", () => {
   });
 
   it.each([
-    ["mesoscale", false, "local"],
-    ["tropical", true, "stripe"],
-    ["winter", false, "stripe"],
+    ["mesoscale", false, "local", "Mesoscale"],
+    ["tropical", true, "stripe", "Tropical"],
+    ["winter", false, "stripe", "Winter"],
   ] as const)(
     "does not fetch a cloud cycle owned by hidden workspace %s (premium: %s, source: %s)",
-    async (workspaceId, premiumActive, effectiveSource) => {
+    async (workspaceId, premiumActive, effectiveSource, workspaceLabel) => {
       mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
       mockUseEntitlement.mockReturnValue({ premiumActive, effectiveSource });
       const loadCycle = jest.fn();
@@ -151,9 +151,10 @@ describe("CloudLibraryPage", () => {
       expect(screen.getByRole("tab", { name: "All 1" })).toHaveAttribute("aria-selected", "true");
       fireEvent.click(screen.getByRole("button", { name: "Load" }));
 
-      expect(await screen.findByText("Workspace-specific cloud loading is not available yet.")).toBeInTheDocument();
+      expect(await screen.findByText(`${workspaceLabel} cloud loading is not available yet. Your save is still stored.`)).toBeInTheDocument();
       expect(loadCycle).not.toHaveBeenCalled();
       expect(sessionStorage.length).toBe(0);
+      expect(mockNavigate).not.toHaveBeenCalled();
       expect(window.location.pathname).toBe("/cloud");
     }
   );
