@@ -35,6 +35,44 @@ test('rejects billing requests when Firebase Admin is unavailable', async () => 
   assert.deepStrictEqual(response.body, { error: 'Firebase Admin is not configured on this deployment.' });
 });
 
+test('uses production defaults to reject unconfigured deployments with 503', async () => {
+  const projectIdKey = 'FIREBASE_ADMIN_PROJECT_ID';
+  const clientEmailKey = 'FIREBASE_ADMIN_CLIENT_EMAIL';
+  const privateKeyKey = 'FIREBASE_ADMIN_PRIVATE_KEY';
+  const savedProjectId = process.env[projectIdKey];
+  const savedClientEmail = process.env[clientEmailKey];
+  const savedPrivateKey = process.env[privateKeyKey];
+  delete process.env[projectIdKey];
+  delete process.env[clientEmailKey];
+  delete process.env[privateKeyKey];
+
+  try {
+    const response = createResponse();
+
+    const result = await verifyRequestUser({ headers: {} }, response);
+
+    assert.equal(result, null);
+    assert.equal(response.statusCode, 503);
+    assert.deepStrictEqual(response.body, { error: 'Firebase Admin is not configured on this deployment.' });
+  } finally {
+    if (savedProjectId === undefined) {
+      delete process.env[projectIdKey];
+    } else {
+      process.env[projectIdKey] = savedProjectId;
+    }
+    if (savedClientEmail === undefined) {
+      delete process.env[clientEmailKey];
+    } else {
+      process.env[clientEmailKey] = savedClientEmail;
+    }
+    if (savedPrivateKey === undefined) {
+      delete process.env[privateKeyKey];
+    } else {
+      process.env[privateKeyKey] = savedPrivateKey;
+    }
+  }
+});
+
 test('rejects billing requests when config is missing but auth is present', async () => {
   const response = createResponse();
   const adminAuth = {
@@ -125,6 +163,29 @@ test('returns the verified user for a valid ID token', async () => {
 
   assert.deepStrictEqual(result, expectedUser);
   assert.equal(receivedToken, 'valid-token');
+  assert.equal(response.statusCode, null);
+  assert.equal(response.body, null);
+});
+
+test('uses the Authorization bearer token when no token override is injected', async () => {
+  const response = createResponse();
+  const expectedUser = { uid: 'bearer-user-123' };
+  let receivedToken = null;
+  const adminAuth = {
+    verifyIdToken: async (token) => {
+      receivedToken = token;
+      return expectedUser;
+    },
+  };
+
+  const result = await verifyRequestUser(
+    { headers: { authorization: 'Bearer bearer-token-abc' } },
+    response,
+    { adminAuth, hasConfig: true }
+  );
+
+  assert.deepStrictEqual(result, expectedUser);
+  assert.equal(receivedToken, 'bearer-token-abc');
   assert.equal(response.statusCode, null);
   assert.equal(response.body, null);
 });
