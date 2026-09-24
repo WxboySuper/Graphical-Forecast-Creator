@@ -12,6 +12,7 @@ import {
   pushUndoSnapshot,
   restoreHistoryEntry,
   type ForecastDaySnapshot,
+  type ForecastHistoryStacks,
 } from './forecastHistory';
 
 const NOW = '2026-01-02T00:00:00.000Z';
@@ -105,6 +106,39 @@ const makeSnapshot = (day: DayType, marker: string): ForecastDaySnapshot => ({
   data: { tornado: new Map([['2%', [makeFeature(marker, 0)]]]) },
   lowProbabilityOutlooks: [],
 });
+
+const setupUndoWithStoredSnapshot = () => {
+  const live = makeDay(1, 0);
+  const state = makeState({ 1: live }, 1);
+  const stacks = getOrCreateDayHistory(state, 1);
+  pushUndoSnapshot(state, 1);
+  const stored = stacks.undoStack[0].snapshot;
+  return { live, state, stacks, stored };
+};
+
+const editLiveDayAfterSnapshot = (live: OutlookDay): void => {
+  live.data.tornado?.get('2%')?.push(makeFeature('live-new', 7));
+  if (live.metadata.outlookOpacities) live.metadata.outlookOpacities.tornado = 0.1;
+  live.metadata.lowProbabilityOutlooks = ['wind'];
+  live.customLayers?.layers[0].features.pop();
+};
+
+const restoreStoredSnapshot = (state: ForecastState, stacks: ForecastHistoryStacks): void => {
+  restoreHistoryEntry({
+    sourceStack: stacks.undoStack,
+    targetStack: stacks.redoStack,
+    state,
+    now: NOW,
+    createEmptyDay: makeEmptyDay,
+  });
+};
+
+const editRestoredDay = (restoredDay: OutlookDay): void => {
+  restoredDay.data.tornado?.get('2%')?.pop();
+  restoredDay.metadata.lowProbabilityOutlooks?.push('hail' as never);
+  if (restoredDay.metadata.outlookOpacities) restoredDay.metadata.outlookOpacities.tornado = 0.2;
+  restoredDay.customLayers?.layers[0].features.pop();
+};
 
 describe('forecastHistory helpers', () => {
   test('creates per-day stacks that stay isolated', () => {
@@ -244,37 +278,27 @@ describe('forecastHistory helpers', () => {
     expect(day.data.tornado?.get('2%')).toHaveLength(1);
   });
 
-  test('does not alias stored snapshots when restoring them', () => {
-    const live = makeDay(1, 0);
-    const state = makeState({ 1: live }, 1);
-    const stacks = getOrCreateDayHistory(state, 1);
-    pushUndoSnapshot(state, 1);
-    const stored = stacks.undoStack[0].snapshot;
+  test('keeps stored snapshots separate from later live edits', () => {
+    const { live, stored } = setupUndoWithStoredSnapshot();
 
-    live.data.tornado?.get('2%')?.push(makeFeature('live-new', 7));
-    if (live.metadata.outlookOpacities) live.metadata.outlookOpacities.tornado = 0.1;
-    live.metadata.lowProbabilityOutlooks = ['wind'];
-    live.customLayers?.layers[0].features.pop();
+    editLiveDayAfterSnapshot(live);
 
     expect(stored.data.tornado?.get('2%')).toHaveLength(1);
     expect(stored.outlookOpacities).toEqual({ tornado: 0.4 });
     expect(stored.lowProbabilityOutlooks).toEqual([]);
     expect(stored.customLayers?.layers[0].features).toHaveLength(1);
+  });
 
-    restoreHistoryEntry({
-      sourceStack: stacks.undoStack,
-      targetStack: stacks.redoStack,
-      state,
-      now: NOW,
-      createEmptyDay: makeEmptyDay,
-    });
+  test('restores a copy that leaves the stored snapshot alone', () => {
+    const { live, state, stacks, stored } = setupUndoWithStoredSnapshot();
+    editLiveDayAfterSnapshot(live);
+
+    restoreStoredSnapshot(state, stacks);
 
     const restoredDay = state.forecastCycle.days[1];
     expect(restoredDay?.data.tornado?.get('2%')).toHaveLength(1);
-    restoredDay?.data.tornado?.get('2%')?.pop();
-    restoredDay?.metadata.lowProbabilityOutlooks?.push('hail' as never);
-    if (restoredDay?.metadata.outlookOpacities) restoredDay.metadata.outlookOpacities.tornado = 0.2;
-    restoredDay?.customLayers?.layers[0].features.pop();
+    if (!restoredDay) return;
+    editRestoredDay(restoredDay);
 
     expect(stored.data.tornado?.get('2%')).toHaveLength(1);
     expect(stored.lowProbabilityOutlooks).toEqual([]);
