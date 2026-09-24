@@ -64,7 +64,7 @@ function inlineMarkdown(value, context = {}) {
   const tokens = [];
   /** Protect rendered links while escaping the surrounding Markdown text. */
   const protect = (html) => { const token = `__GFC_LINK_${tokens.length}__`; tokens.push(html); return token; };
-  let source = value.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, destination) => protect(`<img alt="${escapeHtml(alt)}" src="${escapeHtml(resolveDestination(destination, context, false))}">`));
+  let source = value.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, destination) => protect(`<img alt="${escapeHtml(alt)}" src="${escapeHtml(resolveDestination(destination, context, true))}">`));
   source = source.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, destination) => protect(`<a href="${escapeHtml(resolveDestination(destination, context, true))}">${escapeHtml(label)}</a>`));
   const html = escapeHtml(source).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return html.replace(/__GFC_LINK_(\d+)__/gu, (_, index) => tokens[Number(index)]);
@@ -115,9 +115,23 @@ function consumeTable(state, lines, index) {
   state.html.push(renderTable(tableLines, state.context)); return nextIndex;
 }
 
+/** Strip inline Markdown formatting so heading slugs match GitHub anchor behavior. */
+function stripHeadingMarkdown(text) {
+  return text
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/(^|\W)_([^_]+)_(\W|$)/g, '$1$2$3')
+    .replace(/<[^>]+>/g, '');
+}
+
 /** Derive a GitHub-style heading id, suffixing repeats within one document. */
 function headingId(text, state) {
-  const base = text.trim().toLowerCase().replace(/[^\p{L}\p{N}\s\-_]/gu, '').replace(/ /g, '-');
+  const base = stripHeadingMarkdown(text).trim().toLowerCase().replace(/[^\p{L}\p{N}\s\-_]/gu, '').trim().replace(/\s+/g, '-');
   const seen = state.headingSlugs.get(base) ?? 0;
   state.headingSlugs.set(base, seen + 1);
   return seen === 0 ? base : `${base}-${seen}`;
