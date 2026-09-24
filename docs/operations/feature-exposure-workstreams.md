@@ -60,14 +60,14 @@ Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM,
 - **Registry:** `temporary: true`, client-only
 - **Gates:** gated lazy route `/tropical`, navbar item `tropical-workspace`
 - **Tests:** exemplar + `buildFeatureGatedRoutes.test.tsx` + `featureNavigation.test.ts`
-- **Beta enablement:** tracker #432; first enable PR: not assigned
+- **Beta enablement:** tracker #432; first enable PR: not assigned until an implementation slice is ready
 
 ### Collaboration room (`collaborationRoom`, #433)
 
 - **Registry:** `temporary: true`, client-only
 - **Gates:** gated lazy route `/collaborate`, navbar item `collaboration-room`
 - **Tests:** exemplar contract runner + route/nav tests
-- **Beta enablement:** tracker #433; first enable PR: not assigned
+- **Beta enablement:** tracker #433; first enable PR: not assigned until an implementation slice is ready
 
 ## Commands
 
