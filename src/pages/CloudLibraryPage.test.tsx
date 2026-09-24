@@ -1,10 +1,17 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
 import CloudLibraryPage from "./CloudLibraryPage";
+import { getDefaultForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
+
+const mockNavigate = jest.fn();
+jest.mock("react-router", () => ({
+  ...jest.requireActual("react-router"),
+  useNavigate: () => mockNavigate,
+}));
 
 jest.mock("../auth/AuthProvider", () => ({
   useAuth: jest.fn(),
@@ -49,6 +56,8 @@ describe("CloudLibraryPage", () => {
   beforeEach(() => {
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult());
     mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: "local" });
+    mockNavigate.mockClear();
+    sessionStorage.clear();
   });
 
   it("shows the signed-out gate when no user is present", () => {
@@ -147,9 +156,38 @@ describe("CloudLibraryPage", () => {
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
     expect(loadButton).not.toBeDisabled();
-    expect(loadButton).toHaveAttribute("aria-disabled", "false");
+    expect(loadButton).not.toHaveAttribute("aria-disabled");
     expect(loadButton).not.toHaveAttribute("aria-describedby");
     expect(screen.queryByText(/loading is not supported yet/i)).not.toBeInTheDocument();
+  });
+
+  it("navigates to the canonical Severe route when loading a supported cycle", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn().mockResolvedValue({ version: 1 });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("severe-1"));
+    expect(mockNavigate).toHaveBeenCalledWith(getDefaultForecastWorkspacePath());
+  });
+
+  it("returns early without calling loadCycle when the selected cycle no longer resolves", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn();
+    const cycles = [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }];
+    mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles, loadCycle }));
+
+    renderPage();
+    const loadButton = screen.getByRole("button", { name: /load/i });
+    cycles.splice(0, 1);
+    fireEvent.click(loadButton);
+
+    await waitFor(() => expect(loadCycle).not.toHaveBeenCalled());
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("shows resolved workspace ownership in All without inventing gated tabs", () => {

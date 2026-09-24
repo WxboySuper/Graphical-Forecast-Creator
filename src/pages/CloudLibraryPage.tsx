@@ -12,6 +12,7 @@ import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
 import { getBuildTarget } from '../config/buildTarget';
 import { getForecastWorkspace } from '../config/forecastWorkspaces';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -382,7 +383,7 @@ const CloudCycleActions: React.FC<{
         className="cloud-cycle-button cloud-cycle-button--load"
         onClick={onLoad}
         disabled={loading || isDeleting || isSavingRename}
-        aria-disabled={!loadSupported}
+        aria-disabled={loadSupported ? undefined : true}
         aria-describedby={loadSupported ? undefined : loadHintId}
       >
         <Download className="mr-2 h-4 w-4" />
@@ -771,7 +772,10 @@ const useCloudLibraryActions = ({
   const handleLoadCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
-    const workspaceId = getCloudCycleWorkspaceId(selectedCycle ?? { workspaceId: undefined });
+    if (!selectedCycle) {
+      return;
+    }
+    const workspaceId = getCloudCycleWorkspaceId(selectedCycle);
     if (workspaceId !== 'severe') {
       const workspaceLabel = getForecastWorkspace(workspaceId)?.label ?? 'This workspace';
       setMessage(
@@ -785,11 +789,11 @@ const useCloudLibraryActions = ({
       return;
     }
 
-    if (!persistCloudCycleToSession(cycleId, selectedCycle?.label ?? 'Cloud Forecast', payload)) {
+    if (!persistCloudCycleToSession(cycleId, selectedCycle.label, payload)) {
       return;
     }
 
-    navigate('/forecast/severe');
+    navigate(getDefaultForecastWorkspacePath());
   }, [cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
