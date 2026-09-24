@@ -166,7 +166,7 @@ const expectInvalidCloudHandoffClearedWithoutAutosaveFallback = async (
 };
 
 const buildCycleWithSingleOutlook = (
-  baseCycle: ReturnType<typeof createStore>['getState']['forecast']['forecastCycle'],
+  baseCycle: ReturnType<ReturnType<typeof createStore>['getState']>['forecast']['forecastCycle'],
   featureId: string,
 ) => {
   const cycleWithOutlook = { ...baseCycle };

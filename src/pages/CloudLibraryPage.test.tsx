@@ -136,7 +136,7 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).toHaveAttribute("aria-disabled", "false");
+    expect(loadButton).not.toHaveAttribute("aria-disabled");
     expect(loadButton).not.toHaveAttribute("aria-describedby");
     expect(screen.queryByText(/loading is not supported yet/i)).not.toBeInTheDocument();
     fireEvent.click(loadButton);
