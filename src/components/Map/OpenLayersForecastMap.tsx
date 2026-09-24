@@ -11,7 +11,7 @@ import OLMap from "ol/Map";
 import View from "ol/View";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
-import { Draw, Modify, Select, Snap } from "ol/interaction";
+import { Draw, type Modify, type Select, type Snap } from "ol/interaction";
 import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
 import { Redo2, Undo2 } from "lucide-react";
