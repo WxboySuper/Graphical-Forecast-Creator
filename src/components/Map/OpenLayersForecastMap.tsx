@@ -909,10 +909,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               featureProjection: "EPSG:3857",
             }),
               apply: createFeatureApplier(
-                toOlStyle(
-                  { outlookType, probability },
-                  { isTopLayer, outlookOpacity },
-                ),
+                () =>
+                  toOlStyle(
+                    { outlookType, probability },
+                    { isTopLayer, outlookOpacity },
+                  ),
                 applyForecastFeatureMetadata,
                 {
                   featureId: stableId,
@@ -955,11 +956,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 featureProjection: "EPSG:3857",
               }),
               apply: createFeatureApplier(
-                toCustomOlStyle(
-                  category,
-                  zIndex === highestCustomZIndex,
-                  zIndex,
-                ),
+                () =>
+                  toCustomOlStyle(
+                    category,
+                    zIndex === highestCustomZIndex,
+                    zIndex,
+                  ),
                 applyCustomFeatureMetadata,
                 {
                   featureId: stableId,
@@ -1006,7 +1008,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 featureProjection: "EPSG:3857",
               }),
               apply: createFeatureApplier(
-                toGhostOlStyle({ outlookType, probability, isCategorical }),
+                () =>
+                  toGhostOlStyle({ outlookType, probability, isCategorical }),
                 applyForecastFeatureMetadata,
                 {
                   featureId: stableId,
