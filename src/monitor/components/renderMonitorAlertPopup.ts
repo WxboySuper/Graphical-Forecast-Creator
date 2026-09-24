@@ -6,7 +6,6 @@ export const clearMonitorAlertPopup = (container: HTMLElement): void => {
 };
 
 /** Appends a labeled metadata row when `value` is present. */
-/** Appends one labeled metadata row to an alert popup section. */
 const appendMetaRow = (
   parent: HTMLElement,
   label: string,
@@ -33,7 +32,6 @@ const appendMetaRow = (
 };
 
 /** Appends a titled description or instruction block to the popup. */
-/** Appends a titled section when the alert has content for it. */
 const appendSection = (
   parent: HTMLElement,
   title: string,
