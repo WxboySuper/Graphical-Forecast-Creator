@@ -1,4 +1,4 @@
-/** Verifies a drawn outlook renders in forecast and verification with shared map styles across base maps and dark mode. */
+/** Draws an outlook in forecast, reimports it in verification, asserts the verification canvas renders, and attaches screenshots at each stage. */
 import { expect, test } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 
