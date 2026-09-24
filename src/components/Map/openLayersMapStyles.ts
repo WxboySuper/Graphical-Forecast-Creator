@@ -12,6 +12,7 @@ import type { OpenFreeMapStyleSet } from "../../lib/openFreeMap";
 import { getFeatureStyle, computeZIndex } from "../../utils/mapStyleUtils";
 import type {
   Feature as GeoJsonFeature,
+  MultiPolygon,
   Polygon,
 } from "geojson";
 import type { CustomCategoryStyle, CustomCategoryTemplate, CustomPolygonFeature, OneOffCustomLayer } from "../../types/customProducts";
@@ -392,7 +393,7 @@ export const toUpdatedCustomFeature = (feature: FeatureLike, format: GeoJSON): C
 
 /** Converts a completed draw geometry when an active custom draw target exists. */
 export const toDrawnCustomFeature = (
-  geometry: Geometry,
+  geometry: Polygon | MultiPolygon,
   layer: OneOffCustomLayer | undefined,
   category: CustomCategoryTemplate | undefined,
   enabled: boolean,
@@ -403,7 +404,7 @@ export const toDrawnCustomFeature = (
   return {
     type: "Feature",
     id: uuidv4(),
-    geometry: geometry as unknown as Polygon,
+    geometry,
     properties: {
       customLayerId: layer.id,
       categoryId: category.id,
