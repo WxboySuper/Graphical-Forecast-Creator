@@ -553,7 +553,7 @@ const CloudLibraryFeedbackCard: React.FC<{
 const CloudLibraryTabs: React.FC<{
   tabs: CloudLibraryTab[];
   activeTab: CloudLibraryTabId;
-  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
 }> = ({ tabs, activeTab, onTabChange }) => {
   const tabRefs = useRef(new Map<CloudLibraryTabId, HTMLButtonElement>());
   const pendingFocus = useRef<CloudLibraryTabId | null>(null);
@@ -593,7 +593,7 @@ const CloudLibraryTabs: React.FC<{
             if (nextId === null) return;
             event.preventDefault();
             pendingFocus.current = nextId;
-            onTabChange(nextId);
+            onTabChange(nextId, { replaceHistory: true });
           }}
         >
           <span>{tab.label}</span>
@@ -617,7 +617,7 @@ const CloudLibraryMainCard: React.FC<{
   onLoadCycle: (cycleId: string) => Promise<void>;
   onDeleteCycle: (cycleId: string) => Promise<void>;
   onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
-  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
 }> = ({
   loading,
   cycles,
@@ -686,7 +686,7 @@ const CloudLibrarySignedInLayout: React.FC<{
   onLoadCycle: (cycleId: string) => Promise<void>;
   onDeleteCycle: (cycleId: string) => Promise<void>;
   onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
-  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
 }> = ({
   premiumActive,
   isExpiredPremium,
@@ -830,18 +830,30 @@ const useCloudLibraryWorkspaceNavigation = (cycles: CloudCycleMetadata[]) => {
   const tabs = useMemo(() => getCloudLibraryTabs(cycles, buildTarget), [cycles, buildTarget]);
   const activeTab = useMemo(() => getCloudLibraryTabFromSearchParams(searchParams, tabs), [searchParams, tabs]);
 
+  /** Normalizes malformed workspace params to the canonical All URL without adding history. */
+  useEffect(() => {
+    if (searchParams.get('workspace') === null || activeTab !== 'all') return;
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('workspace');
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [activeTab, searchParams, setSearchParams]);
+
   const visibleCycles = useMemo(
     () => filterCloudCyclesByWorkspace(cycles, activeTab),
     [activeTab, cycles]
   );
-  const handleTabChange = useCallback((tabId: CloudLibraryTabId) => {
+  const handleTabChange = useCallback((tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => {
     const nextSearchParams = new URLSearchParams(searchParams);
     if (tabId === 'all') {
       nextSearchParams.delete('workspace');
     } else {
       nextSearchParams.set('workspace', tabId);
     }
-    setSearchParams(nextSearchParams, { replace: true });
+    if (options?.replaceHistory) {
+      setSearchParams(nextSearchParams, { replace: true });
+    } else {
+      setSearchParams(nextSearchParams);
+    }
   }, [searchParams, setSearchParams]);
 
   return { tabs, activeTab, visibleCycles, handleTabChange };

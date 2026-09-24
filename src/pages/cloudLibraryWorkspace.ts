@@ -39,13 +39,6 @@ export const filterCloudCyclesByWorkspace = (
 ): CloudCycleMetadata[] =>
   tabId === 'all' ? cycles : cycles.filter((cycle) => getCloudCycleWorkspaceId(cycle) === tabId);
 
-/** Returns the active tab when still present, otherwise falls back to All. */
-export const resolveActiveCloudLibraryTab = (
-  tabs: CloudLibraryTab[],
-  activeTab: CloudLibraryTabId,
-): CloudLibraryTabId =>
-  tabs.some((tab) => tab.id === activeTab) ? activeTab : 'all';
-
 /** Resolves Home and End navigation, or undefined when the key is not an edge key. */
 const getCloudLibraryEdgeTabId = (
   tabs: CloudLibraryTab[],
