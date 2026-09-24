@@ -1,8 +1,11 @@
-import GeoJSON from "ol/format/GeoJSON";
 import Feature from "ol/Feature";
 import Point from "ol/geom/Point";
 import VectorSource from "ol/source/Vector";
-import type { Feature as GeoJsonFeature, Polygon } from "geojson";
+import type {
+  Feature as GeoJsonFeature,
+  MultiPolygon,
+  Polygon,
+} from "geojson";
 import {
   syncTrimPreviewSource,
   syncTstmPreviewSource,
@@ -23,6 +26,35 @@ const makePolygon = (
         [offset + 1, offset + 1],
         [offset, offset + 1],
         [offset, offset],
+      ],
+    ],
+  },
+  properties: {},
+});
+
+const makeMultiPolygon = (id: string): GeoJsonFeature<MultiPolygon> => ({
+  type: "Feature",
+  id,
+  geometry: {
+    type: "MultiPolygon",
+    coordinates: [
+      [
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [0, 0],
+        ],
+      ],
+      [
+        [
+          [5, 5],
+          [6, 5],
+          [6, 6],
+          [5, 6],
+          [5, 5],
+        ],
       ],
     ],
   },
@@ -51,21 +83,6 @@ const makePair = (
   makePolygon(secondId, 5),
 ];
 
-const readSplitParts = () => {
-  const format = new GeoJSON();
-  const options = {
-    dataProjection: "EPSG:4326",
-    featureProjection: "EPSG:3857",
-  } as const;
-  return [
-    format.readFeature(makePolygon("part-0", 0), options),
-    format.readFeature(makePolygon("part-1", 5), options),
-  ];
-};
-
-const mockSplitRead = (parts: ReturnType<typeof readSplitParts>) =>
-  jest.spyOn(GeoJSON.prototype, "readFeature").mockReturnValue(parts as never);
-
 const expectTrimPart = (feature: Feature): void => {
   expect(feature.get("trimPreview")).toBe(true);
   expect(feature.getStyle()).toBeTruthy();
@@ -78,28 +95,24 @@ const expectTstmPart = (feature: Feature, featureId: string): void => {
   expect(feature.getStyle()).toBeTruthy();
 };
 
-type SyncFn = (
-  source: VectorSource,
-  features: GeoJsonFeature<Polygon>[],
-) => void;
+type SyncFn = (source: VectorSource, features: GeoJsonFeature[]) => void;
 
 type SharedSuite = {
   label: string;
   sync: SyncFn;
-  assertSplitPart: (feature: Feature) => void;
-  assertReplaced?: (features: Feature[]) => void;
+  assertReplaced: (features: Feature[]) => void;
 };
 
 const sharedSuites: SharedSuite[] = [
   {
     label: "syncTrimPreviewSource",
     sync: syncTrimPreviewSource,
-    assertSplitPart: expectTrimPart,
+    assertReplaced: (features) =>
+      expect(features[0]?.get("trimPreview")).toBe(true),
   },
   {
     label: "syncTstmPreviewSource",
     sync: syncTstmPreviewSource,
-    assertSplitPart: (feature) => expectTstmPart(feature, "multi"),
     assertReplaced: (features) =>
       expect(features[0]?.get("featureId")).toBe("new"),
   },
@@ -107,7 +120,6 @@ const sharedSuites: SharedSuite[] = [
 
 describe.each(sharedSuites)("$label shared sync behavior", ({
   sync,
-  assertSplitPart,
   assertReplaced,
 }) => {
   test("clears the source when given empty input", () => {
@@ -128,24 +140,7 @@ describe.each(sharedSuites)("$label shared sync behavior", ({
     const secondRound = source.getFeatures();
     expect(secondRound).toHaveLength(1);
     expect(secondRound[0]).not.toBe(firstRound[0]);
-    assertReplaced?.(secondRound);
-  });
-
-  test("adds every part when readFeature returns multiple features", () => {
-    const source = createSource();
-    const parts = readSplitParts();
-    const spy = mockSplitRead(parts);
-
-    try {
-      sync(source, [makePolygon("multi", 0)]);
-
-      expect(source.getFeatures()).toHaveLength(2);
-      for (const feature of source.getFeatures()) {
-        assertSplitPart(feature);
-      }
-    } finally {
-      spy.mockRestore();
-    }
+    assertReplaced(secondRound);
   });
 });
 
@@ -172,7 +167,20 @@ describe("syncTrimPreviewSource", () => {
     }
   });
 
+  test("keeps a MultiPolygon as one feature with MultiPolygon geometry", () => {
+    const source = createSource();
+
+    syncTrimPreviewSource(source, [makeMultiPolygon("trim-multi")]);
+
+    const features = source.getFeatures();
+    expect(features).toHaveLength(1);
+    expectTrimPart(features[0] as Feature);
+    expect(features[0]?.getGeometry()?.getType()).toBe("MultiPolygon");
+  });
+
   test("shares the trim style across features in one sync", () => {
+    // Sharing is deliberate. The style is never mutated, so one instance
+    // covers every trim preview feature without extra allocation.
     const source = createSource();
 
     syncTrimPreviewSource(source, makePair());
@@ -205,6 +213,17 @@ describe("syncTstmPreviewSource", () => {
 
     expect(source.getFeatures()).toHaveLength(1);
     expect(source.getFeatures()[0]?.get("featureId")).toBe("tstm-preview");
+  });
+
+  test("keeps a MultiPolygon as one feature with MultiPolygon geometry", () => {
+    const source = createSource();
+
+    syncTstmPreviewSource(source, [makeMultiPolygon("tstm-multi")]);
+
+    const features = source.getFeatures();
+    expect(features).toHaveLength(1);
+    expectTstmPart(features[0] as Feature, "tstm-multi");
+    expect(features[0]?.getGeometry()?.getType()).toBe("MultiPolygon");
   });
 
   test("keeps each input featureId alongside shared TSTM metadata", () => {
