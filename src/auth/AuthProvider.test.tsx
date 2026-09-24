@@ -49,32 +49,10 @@ import {
   readRemoteSettings,
 } from './authSettings';
 import themeReducer from '../store/themeSlice';
-import overlaysReducer, { type OverlaysState } from '../store/overlaysSlice';
+import overlaysReducer from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
-
-const TEST_OVERLAY_STATE: OverlaysState = {
-  baseMapStyle: 'osm',
-  stateBorders: true,
-  counties: false,
-  ghostOutlooks: {
-    tornado: false,
-    wind: false,
-    hail: false,
-    categorical: false,
-    totalSevere: false,
-    'day4-8': false,
-  },
-  outlookTrimStrategy: 'us-country-minus-great-lakes',
-  outlookTrimAutoOnDraw: false,
-  outlookTrimPreviewOnly: false,
-};
-
-interface MockResponse {
-  ok: boolean;
-  json: () => Promise<Record<string, unknown>>;
-  text: () => Promise<string>;
-}
+import { TEST_OVERLAY_STATE } from './authTestFixtures';
 
 // Mock lib/firebase
 jest.mock('../lib/firebase', () => ({
@@ -147,14 +125,14 @@ describe('AuthProvider Utils', () => {
 
   test('safeParseJson parses valid JSON', async () => {
     const data = { foo: 'bar' };
-    const resp = { ok: true, json: jest.fn().mockResolvedValue(data), text: jest.fn() } as MockResponse;
-    const result = await safeParseJson<{ foo: string }>(resp as unknown as Response);
+    const resp = { json: () => Promise.resolve(data) } as Response;
+    const result = await safeParseJson<{ foo: string }>(resp);
     expect(result).toEqual(data);
   });
 
   test('safeParseJson returns null on invalid JSON', async () => {
-    const resp = { ok: false, json: jest.fn().mockRejectedValue(new Error('invalid json')), text: jest.fn() } as MockResponse;
-    const result = await safeParseJson(resp as unknown as Response);
+    const resp = { json: () => Promise.reject(new Error('invalid json')) } as Response;
+    const result = await safeParseJson(resp);
     expect(result).toBeNull();
   });
 
@@ -172,56 +150,7 @@ describe('AuthProvider Utils', () => {
     expect(user.displayName).toBe('Test User');
   });
 
-  test('createSettingsSnapshot builds correct object', () => {
-    const overlays = { ...TEST_OVERLAY_STATE };
-    const result = createSettingsSnapshot({
-      darkMode: true,
-      overlays,
-      defaultForecasterName: 'Forecaster',
-      forecastUiVariant: 'workspace_dock',
-    });
-    expect(result).toEqual({
-      darkMode: true,
-      baseMapStyle: 'osm',
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Forecaster',
-      forecastUiVariant: 'workspace_dock',
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    });
-  });
-
-  test('readRemoteSettings validates data', () => {
-    const validSettings = {
-      darkMode: true,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: {
-        tornado: false,
-        wind: false,
-        hail: false,
-        categorical: false,
-        totalSevere: false,
-        'day4-8': false,
-      },
-      defaultForecasterName: 'Forecaster',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    expect(readRemoteSettings(validSettings)).toEqual(validSettings);
-    expect(
-      readRemoteSettings({ ...validSettings, defaultForecasterName: 'a'.repeat(100) } as Record<string, unknown>)
-    ).not.toBeNull();
-    expect(
-      readRemoteSettings({ ...validSettings, defaultForecasterName: 'a'.repeat(101) } as Record<string, unknown>)
-    ).toBeNull();
-    expect(readRemoteSettings({ darkMode: 'not boolean' } as Record<string, unknown>)).toBeNull();
-    expect(readRemoteSettings(undefined)).toBeNull();
-  });
-
-  test('settings comparison and application helpers avoid redundant dispatches', () => {
+  test('overlay comparison and application helpers avoid redundant dispatches', () => {
     const overlays = { ...TEST_OVERLAY_STATE };
     const settings = createSettingsSnapshot({
       darkMode: false,
@@ -230,9 +159,6 @@ describe('AuthProvider Utils', () => {
       forecastUiVariant: 'workspace_dock',
     });
 
-    expect(areUserSettingsEqual(null, null)).toBe(true);
-    expect(areUserSettingsEqual(settings, { ...settings })).toBe(true);
-    expect(areUserSettingsEqual(settings, { ...settings, counties: true })).toBe(false);
     expect(areOverlaySettingsEqual(overlays, settings)).toBe(true);
     expect(areOverlaySettingsEqual({ ...overlays, counties: true }, settings)).toBe(false);
 
@@ -268,39 +194,10 @@ describe('AuthProvider Utils', () => {
     expect(setSyncedSettings).toHaveBeenCalledTimes(1);
   });
 
-  test('local post helper and auth utility fallbacks normalize errors', async () => {
+  test('local post helper and provider auth utilities normalize errors', async () => {
     expect(() => disabledAuthAction()).toThrow(/Hosted accounts are not enabled/);
     expect(getDefaultContextValue()).toEqual(expect.objectContaining({ status: 'disabled', hostedAuthEnabled: false }));
     expect(canSyncHostedUserDocuments(null)).toBe(false);
-    expect(readProfileBetaAccess({ betaAccess: true })).toBe(true);
-    expect(readProfileBetaAccess(undefined)).toBe(false);
-    expect(getSettingsUpdateError(new Error('Update failed'))).toBe('Update failed');
-    expect(getSettingsUpdateError('bad')).toBe('Unable to update synced settings right now.');
-    expect(getSettingsSyncError(new Error('Sync failed'))).toBe('Sync failed');
-    expect(getSettingsSyncError('bad')).toBe('Unable to sync account settings right now.');
-
-    const profilePayload = createProfilePayload({
-      email: null,
-      displayName: 'Tester',
-      photoURL: null,
-      providerData: [{ providerId: 'password' }],
-    } as never);
-    expect(profilePayload).toEqual(expect.objectContaining({ email: '', displayName: 'Tester', providers: ['password'] }));
-
-    const seed = getRemoteSeedPayload(
-      {
-        darkMode: false,
-        baseMapStyle: 'osm',
-        stateBorders: true,
-        counties: false,
-        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-        defaultForecasterName: '',
-        forecastUiVariant: 'workspace_dock',
-        monitorSettings: DEFAULT_MONITOR_SETTINGS,
-      },
-      { includeCreatedAt: true }
-    );
-    expect(seed).toEqual(expect.objectContaining({ updatedAt: expect.anything(), createdAt: expect.anything() }));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
