@@ -32,7 +32,40 @@ test('rejects billing requests when Firebase Admin is unavailable', async () => 
 
   assert.equal(result, null);
   assert.equal(response.statusCode, 503);
-  assert.deepEqual(response.body, { error: 'Firebase Admin is not configured on this deployment.' });
+  assert.deepStrictEqual(response.body, { error: 'Firebase Admin is not configured on this deployment.' });
+});
+
+test('rejects billing requests when config is missing but auth is present', async () => {
+  const response = createResponse();
+  const adminAuth = {
+    verifyIdToken: async () => {
+      throw new Error('verifyIdToken must not be called when config is missing');
+    },
+  };
+
+  const result = await verifyRequestUser({ headers: {} }, response, {
+    adminAuth,
+    hasConfig: false,
+    token: 'valid-token',
+  });
+
+  assert.equal(result, null);
+  assert.equal(response.statusCode, 503);
+  assert.deepStrictEqual(response.body, { error: 'Firebase Admin is not configured on this deployment.' });
+});
+
+test('rejects billing requests when auth is missing but config is present', async () => {
+  const response = createResponse();
+
+  const result = await verifyRequestUser({ headers: {} }, response, {
+    adminAuth: null,
+    hasConfig: true,
+    token: 'valid-token',
+  });
+
+  assert.equal(result, null);
+  assert.equal(response.statusCode, 503);
+  assert.deepStrictEqual(response.body, { error: 'Firebase Admin is not configured on this deployment.' });
 });
 
 test('rejects billing requests without an ID token', async () => {
@@ -51,7 +84,7 @@ test('rejects billing requests without an ID token', async () => {
 
   assert.equal(result, null);
   assert.equal(response.statusCode, 401);
-  assert.deepEqual(response.body, { error: 'Missing Firebase ID token.' });
+  assert.deepStrictEqual(response.body, { error: 'Missing Firebase ID token.' });
 });
 
 test('rejects billing requests with an invalid ID token', async () => {
@@ -70,5 +103,28 @@ test('rejects billing requests with an invalid ID token', async () => {
 
   assert.equal(result, null);
   assert.equal(response.statusCode, 401);
-  assert.deepEqual(response.body, { error: 'Invalid Firebase ID token.' });
+  assert.deepStrictEqual(response.body, { error: 'Invalid Firebase ID token.' });
+});
+
+test('returns the verified user for a valid ID token', async () => {
+  const response = createResponse();
+  const expectedUser = { uid: 'user-123' };
+  let receivedToken = null;
+  const adminAuth = {
+    verifyIdToken: async (token) => {
+      receivedToken = token;
+      return expectedUser;
+    },
+  };
+
+  const result = await verifyRequestUser({ headers: {} }, response, {
+    adminAuth,
+    hasConfig: true,
+    token: 'valid-token',
+  });
+
+  assert.deepStrictEqual(result, expectedUser);
+  assert.equal(receivedToken, 'valid-token');
+  assert.equal(response.statusCode, null);
+  assert.equal(response.body, null);
 });
