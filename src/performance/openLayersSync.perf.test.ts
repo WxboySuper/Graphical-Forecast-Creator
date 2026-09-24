@@ -1,3 +1,6 @@
+/**
+ * Benchmarks incremental feature reconciliation against full reparse.
+ */
 import GeoJSON from 'ol/format/GeoJSON';
 import VectorSource from 'ol/source/Vector';
 import type { Feature as GeoJsonFeature, Polygon } from 'geojson';

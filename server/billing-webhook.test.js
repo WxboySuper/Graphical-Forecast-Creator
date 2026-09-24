@@ -1,3 +1,6 @@
+/**
+ * Covers invoice entitlement derivation, stale-update protection, and replay handling.
+ */
 'use strict';
 
 /**

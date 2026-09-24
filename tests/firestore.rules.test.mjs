@@ -1,3 +1,6 @@
+/**
+ * Covers Firestore rules for profiles, settings, cloud cycles, and custom products.
+ */
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

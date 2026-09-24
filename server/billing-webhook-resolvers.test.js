@@ -1,3 +1,6 @@
+/**
+ * Covers webhook/invoice subscription resolution and fallback UID preservation.
+ */
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {

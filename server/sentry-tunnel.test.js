@@ -1,3 +1,6 @@
+/**
+ * Covers Sentry DSN parsing, tunnel forwarding, timeouts, and status mapping.
+ */
 'use strict';
 
 const assert = require('node:assert/strict');

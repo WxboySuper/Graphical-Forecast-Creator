@@ -1,3 +1,6 @@
+/**
+ * Covers replay determinism and timestamp-from-action handling in forecast slice.
+ */
 import type { UnknownAction } from '@reduxjs/toolkit';
 import reducer, {
   addFeature,

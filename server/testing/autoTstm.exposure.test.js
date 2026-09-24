@@ -1,3 +1,6 @@
+/**
+ * Covers Auto-TSTM latest gating for disabled, enabled, and emergency fixtures.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

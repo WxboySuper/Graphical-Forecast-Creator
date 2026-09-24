@@ -1,3 +1,6 @@
+/**
+ * Covers billing error boundary: stable public errors and bounded diagnostics.
+ */
 'use strict';
 
 const { describe, it, mock } = require('node:test');

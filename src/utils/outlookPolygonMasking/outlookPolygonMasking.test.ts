@@ -1,3 +1,6 @@
+/**
+ * Covers land-mask prototypes for Gulf/lake clipping and their build-cost benchmark.
+ */
 import * as turf from '@turf/turf';
 import { buildLandMask } from './buildLandMask';
 import { clipOutlookToLandMask } from './clipOutlookPolygon';

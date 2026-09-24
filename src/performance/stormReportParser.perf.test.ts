@@ -1,3 +1,6 @@
+/**
+ * Benchmarks optimized storm-report CSV parsing against the pinned baseline.
+ */
 import type { ReportType, StormReport } from '../types/stormReports';
 import { splitCsvLine } from '../utils/stormReportCsv';
 import { parseTodayCsvRow, TODAY_SECTION_HEADERS } from '../utils/stormReportRows';

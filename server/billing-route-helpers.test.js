@@ -1,3 +1,6 @@
+/**
+ * Covers checkout/portal availability, price selection, metadata, and email filtering.
+ */
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {

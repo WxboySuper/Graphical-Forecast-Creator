@@ -1,3 +1,6 @@
+/**
+ * Covers derivation worker routing, timeout/error recovery, disposal, and fallback.
+ */
 import { createDerivationController, type DerivationController } from './categoricalWorker';
 import type { OutlookData } from '../types/outlooks';
 

@@ -1,3 +1,6 @@
+/**
+ * Covers live billing-config/capability routes and absence of retired telemetry.
+ */
 'use strict';
 
 const { describe, it, after } = require('node:test');

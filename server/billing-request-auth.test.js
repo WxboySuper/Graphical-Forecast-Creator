@@ -1,3 +1,6 @@
+/**
+ * Verifies verifyRequestUser returns 503 when Firebase Admin is unavailable.
+ */
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { verifyRequestUser } = require('./billingRequestAuth');

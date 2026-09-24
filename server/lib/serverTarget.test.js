@@ -1,3 +1,6 @@
+/**
+ * Covers SERVER_TARGET/SENTRY_ENVIRONMENT resolution, precedence, and invalid values.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

@@ -1,3 +1,6 @@
+/**
+ * Covers billing route registration for config, webhook, checkout, and portal.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

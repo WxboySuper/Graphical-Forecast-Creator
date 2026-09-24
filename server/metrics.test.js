@@ -1,3 +1,6 @@
+/**
+ * Covers billing metric writes, cached counts with fallbacks, and auth rejection.
+ */
 'use strict';
 
 /**

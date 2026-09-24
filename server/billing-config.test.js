@@ -1,3 +1,6 @@
+/**
+ * Covers env-only base URL resolution and billing runtime checkout gating.
+ */
 'use strict';
 
 const { describe, it, beforeEach } = require('node:test');

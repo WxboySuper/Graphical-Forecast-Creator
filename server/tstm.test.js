@@ -1,3 +1,6 @@
+/**
+ * Covers TSTM enablement, generator handling, latest/status routes, and ingestion setup.
+ */
 'use strict';
 
 /**

@@ -1,3 +1,6 @@
+/**
+ * Covers cloud-cycle payload sizing, metadata validation, quota saves, and ownership.
+ */
 'use strict';
 
 /**

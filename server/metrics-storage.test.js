@@ -1,3 +1,6 @@
+/**
+ * Covers bounded storage-byte aggregation, capped-scan fallback, and zero without Admin.
+ */
 'use strict';
 
 const { after, beforeEach, describe, it } = require('node:test');

@@ -1,3 +1,6 @@
+/**
+ * Covers account deletion ordering, recent-auth checks, tombstones, and safe retry paths.
+ */
 'use strict';
 
 /**

@@ -1,3 +1,6 @@
+/**
+ * Covers metrics route registration for event and admin endpoints with limits.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

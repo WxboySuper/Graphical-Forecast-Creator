@@ -1,3 +1,6 @@
+/**
+ * Covers pinned qs version and comma stringify handling of null entries.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

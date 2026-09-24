@@ -1,3 +1,6 @@
+/**
+ * Covers TSTM run checks, expiry, candidate runs, cache I/O, cycles, and health.
+ */
 'use strict';
 
 const { describe, it, beforeEach, afterEach } = require('node:test');

@@ -1,3 +1,6 @@
+/**
+ * Covers idempotent webhook application, staleness checks, ties, and commit retry.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

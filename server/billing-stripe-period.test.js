@@ -1,3 +1,6 @@
+/**
+ * Covers period-end extraction from new item shape, legacy fallback, and null case.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

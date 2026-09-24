@@ -1,3 +1,6 @@
+/**
+ * Benchmarks current cloneJsonValue against the legacy path and repeated snapshots.
+ */
 import type { Feature } from 'geojson';
 import { cloneJsonValue } from '../store/cloneJsonValue';
 import forecastReducer, { addFeature, setOutlookOpacity } from '../store/forecastSlice';

@@ -1,3 +1,6 @@
+/**
+ * Covers the gated-app harness, disabled fixtures, and emergency status mapping.
+ */
 'use strict';
 
 const { describe, it } = require('node:test');

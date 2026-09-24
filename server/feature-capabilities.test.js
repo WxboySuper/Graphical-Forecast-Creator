@@ -1,3 +1,6 @@
+/**
+ * Covers enabling the Custom Products capability and skipping without Admin.
+ */
 'use strict';
 
 const test = require('node:test');

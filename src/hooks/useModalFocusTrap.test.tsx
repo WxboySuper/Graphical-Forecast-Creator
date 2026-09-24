@@ -1,3 +1,6 @@
+/**
+ * Covers modal focus entry, Tab wrapping, Escape close, and background hiding.
+ */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useModalFocusTrap } from './useModalFocusTrap';

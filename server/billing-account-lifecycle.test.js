@@ -1,3 +1,6 @@
+/**
+ * Covers entitlement write gating by identity/deletion markers and late Checkout refund cleanup.
+ */
 'use strict';
 
 const test = require('node:test');
