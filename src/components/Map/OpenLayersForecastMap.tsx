@@ -92,8 +92,8 @@ import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMa
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
-export { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
+export { getCustomStyleSignature, removeDrawInteraction };
 
 type OpenLayersForecastMapProps = {
   tstmPreviewFeatures?: GeoJsonFeature[];

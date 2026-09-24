@@ -2,7 +2,7 @@ import type { default as OLMap } from "ol/Map";
 import type { Draw } from "ol/interaction";
 import type { CustomCategoryStyle } from "../../types/customProducts";
 
-/** Builds a stable custom-style signature without serializing OpenLayers style objects. */
+/** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
 export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
   style.fillColor,
   style.fillOpacity,
