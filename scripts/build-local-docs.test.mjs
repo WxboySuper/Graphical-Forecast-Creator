@@ -19,6 +19,11 @@ function collectHrefs(html) {
   return [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
 }
 
+/** Extract every image src attribute from rendered HTML. */
+function collectSrcs(html) {
+  return [...html.matchAll(/<img[^>]*\ssrc="([^"]*)"/g)].map((match) => match[1]);
+}
+
 /** Return whether a generated href is external and needs no local resolution. */
 function isExternalHref(href) {
   return /^(?:https?:|mailto:)/i.test(href);
@@ -67,13 +72,16 @@ function findHrefFailures(href, source, pageIds, corpus) {
   return findPageLinkFailures(source, href, pageIds, corpus);
 }
 
-/** Return every unresolved local link and fragment on one generated page. */
+/** Return every unresolved local link, image, and fragment on one generated page. */
 function findPageFailures(slug, corpus) {
   const source = corpus.slugToSource.get(slug);
   const pageIds = corpus.idsByPage.get(slug);
   const failures = [];
   for (const href of collectHrefs(corpus.rendered.get(slug))) {
     failures.push(...findHrefFailures(href, source, pageIds, corpus));
+  }
+  for (const src of collectSrcs(corpus.rendered.get(slug))) {
+    failures.push(...findHrefFailures(src, source, pageIds, corpus));
   }
   return failures;
 }
@@ -129,6 +137,24 @@ describe('local documentation renderer', () => {
     assert.ok(ids.has('notes-1'));
   });
 
+  test('generates GitHub-like heading ids for markup and collapsed whitespace', () => {
+    const html = renderMarkdown('# Hello   World\n\n## [Guide label](../guide.md)\n\n## `setup` **bold** *emph*\n\n## Hello   World');
+    assert.match(html, /<h1 id="hello-world">/);
+    assert.match(html, /<h2 id="guide-label">/);
+    assert.match(html, /<h2 id="setup-bold-emph">/);
+    assert.match(html, /<h2 id="hello-world-1">/);
+  });
+
+  test('resolves local image sources with repository-relative mapping', () => {
+    const html = renderMarkdown('![diagram](../assets/diagram.png)', {
+      sourcePath: 'docs/plans/today.md',
+      pageMap: new Map(),
+      repoFiles: new Set(['docs/assets/diagram.png']),
+    });
+    assert.match(html, /src="\.\.\/\.\.\/\.\.\/docs\/assets\/diagram\.png"/);
+    assert.deepEqual(collectSrcs(html), ['../../../docs/assets/diagram.png']);
+  });
+
   test('resolves local non-Markdown links against repository files', async () => {
     const repoFiles = await collectRepoFiles();
     const html = renderMarkdown('[registry](../../src/config/featureExposure.ts)', {
@@ -144,15 +170,16 @@ describe('local documentation renderer', () => {
     const files = await sourceFiles();
     const pageMap = new Map(files.map((file) => [file.relative, pageSlug(file.relative)]));
     const markdown = await fs.readFile(path.join(ROOT, 'docs', 'README.md'), 'utf8');
-    const guideLinks = [...markdown.matchAll(/\]\((\.\.\/(?:src|server)\/[^)]+\.md)\)/g)].map((match) => match[1]);
-    assert.equal(guideLinks.length, 23);
-    for (const link of guideLinks) {
-      const target = path.posix.normalize(path.posix.join('docs', link));
-      assert.ok(pageMap.has(target), `${link} is missing from the page map`);
+    const guideLinks = [...markdown.matchAll(/\]\((\.\.\/(?:src|server)\/[^)\s]+\.md(?:#[^)\s]*)?)\)/g)].map((match) => match[1]);
+    assert.ok(guideLinks.length > 0, 'expected code boundary guides in docs/README.md');
+    const targets = guideLinks.map((link) => path.posix.normalize(path.posix.join('docs', link.split('#', 1)[0])));
+    assert.equal(new Set(targets).size, targets.length, 'duplicate code boundary guide entry');
+    for (const [index, link] of guideLinks.entries()) {
+      assert.ok(pageMap.has(targets[index]), `${link} is missing from the page map`);
     }
   });
 
-  test('every local link and fragment in the generated corpus resolves', async () => {
+  test('every local link, image, and fragment in the generated corpus resolves', async () => {
     const corpus = await buildCorpus();
     const failures = [];
     for (const slug of corpus.rendered.keys()) {
