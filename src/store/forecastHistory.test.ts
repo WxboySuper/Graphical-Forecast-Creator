@@ -3,6 +3,7 @@ import type { DayType, OutlookDay } from '../types/outlooks';
 import type { CustomLayerCollection } from '../types/customProducts';
 import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
 import type { ForecastState } from './forecastSlice';
+import reducer, { addFeature, redoLastEdit, undoLastEdit } from './forecastSlice';
 import {
   applyDaySnapshot,
   clearHistory,
@@ -16,6 +17,8 @@ import {
 } from './forecastHistory';
 
 const NOW = '2026-01-02T00:00:00.000Z';
+const UNDO_NOW = '2026-01-03T12:00:00.000Z';
+const REDO_NOW = '2026-01-03T13:00:00.000Z';
 
 const makePolygon = (offset: number): Polygon => ({
   type: 'Polygon',
@@ -314,5 +317,43 @@ describe('forecastHistory helpers', () => {
     clearHistory(state);
 
     expect(state.historyByDay).toEqual({});
+  });
+});
+
+describe('forecast history reducer wiring', () => {
+  test('undoLastEdit drains undo into redo and stamps the action timestamp', () => {
+    let state = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
+    expect(state.historyByDay[1]?.undoStack).toHaveLength(1);
+    expect(state.historyByDay[1]?.redoStack ?? []).toHaveLength(0);
+
+    state = reducer(state, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
+
+    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%') ?? []).toHaveLength(0);
+    expect(state.historyByDay[1]?.undoStack).toHaveLength(0);
+    expect(state.historyByDay[1]?.redoStack).toHaveLength(1);
+    expect(state.historyByDay[1]?.redoStack[0].snapshot.data.tornado?.get('2%')?.[0].id).toBe(
+      'wiring-1',
+    );
+    expect(state.forecastCycle.currentDay).toBe(1);
+    expect(state.forecastCycle.days[1]?.metadata.lastModified).toBe(UNDO_NOW);
+    expect(state.isSaved).toBe(false);
+  });
+
+  test('redoLastEdit drains redo into undo and stamps the action timestamp', () => {
+    let state = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
+    state = reducer(state, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
+    expect(state.historyByDay[1]?.redoStack).toHaveLength(1);
+
+    state = reducer(state, { ...redoLastEdit(), meta: { timestamp: REDO_NOW } });
+
+    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('wiring-1');
+    expect(state.historyByDay[1]?.redoStack).toHaveLength(0);
+    expect(state.historyByDay[1]?.undoStack).toHaveLength(1);
+    expect(state.historyByDay[1]?.undoStack[0].snapshot.data.tornado?.get('2%') ?? []).toHaveLength(
+      0,
+    );
+    expect(state.forecastCycle.currentDay).toBe(1);
+    expect(state.forecastCycle.days[1]?.metadata.lastModified).toBe(REDO_NOW);
+    expect(state.isSaved).toBe(false);
   });
 });
