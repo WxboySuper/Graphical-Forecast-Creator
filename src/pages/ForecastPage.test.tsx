@@ -39,7 +39,6 @@ import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
 import * as fileUtils from '../utils/fileUtils';
-const { serializeForecast } = fileUtils;
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
@@ -270,7 +269,7 @@ describe('ForecastPage layout selection', () => {
 
   test('does not overwrite active in-memory outlooks with an older local autosave on remount', () => {
     const store = createStore();
-    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
+    const stalePayload = fileUtils.serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
     localStorage.setItem('forecastData', JSON.stringify(stalePayload));
 
     store.dispatch(addFeature({
@@ -296,7 +295,7 @@ describe('ForecastPage layout selection', () => {
 
   test('does not overwrite in-memory discussion drafts with an older local autosave on remount', () => {
     const store = createStore();
-    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
+    const stalePayload = fileUtils.serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
     localStorage.setItem('forecastData', JSON.stringify(stalePayload));
 
     store.dispatch(updateDiscussionDraft({
@@ -333,7 +332,7 @@ describe('ForecastPage layout selection', () => {
         metadata: { lowProbabilityOutlooks: [] },
       },
     } as typeof cycleWithOutlook.days;
-    const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
+    const autosavePayload = fileUtils.serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
     localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
 
     renderForecastPage(store);
@@ -357,7 +356,7 @@ describe('ForecastPage layout selection', () => {
         metadata: { lowProbabilityOutlooks: [] },
       },
     } as typeof cycleWithOutlook.days;
-    const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
+    const autosavePayload = fileUtils.serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
     localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
 
     render(
@@ -375,7 +374,7 @@ describe('ForecastPage layout selection', () => {
 
   test('keeps in-memory anonymous edits on sign-in without overwriting account autosave', async () => {
     const store = createStore();
-    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [0, 0], zoom: 0 });
+    const stalePayload = fileUtils.serializeForecast(store.getState().forecast.forecastCycle, { center: [0, 0], zoom: 0 });
     stalePayload.timestamp = '2026-07-13T12:00:00.000Z';
 
     const anonymousCycle = { ...store.getState().forecast.forecastCycle };
@@ -392,7 +391,7 @@ describe('ForecastPage layout selection', () => {
         metadata: { lowProbabilityOutlooks: [] },
       },
     } as unknown as typeof anonymousCycle.days;
-    const anonymousPayload = serializeForecast(anonymousCycle, { center: [0, 0], zoom: 0 });
+    const anonymousPayload = fileUtils.serializeForecast(anonymousCycle, { center: [0, 0], zoom: 0 });
     anonymousPayload.timestamp = '2026-07-14T12:00:00.000Z';
 
     localStorage.setItem('forecastData', JSON.stringify(anonymousPayload));
@@ -436,7 +435,7 @@ describe('ForecastPage layout selection', () => {
         properties: {},
       },
     }));
-    localStorage.setItem('forecastData', JSON.stringify(serializeForecast(
+    localStorage.setItem('forecastData', JSON.stringify(fileUtils.serializeForecast(
       sourceStore.getState().forecast.forecastCycle,
       sourceStore.getState().forecast.currentMapView,
     )));
