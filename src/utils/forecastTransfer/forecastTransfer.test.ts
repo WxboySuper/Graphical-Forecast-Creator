@@ -150,10 +150,13 @@ describe('forecastTransfer', () => {
     const revokeObjectURL = jest.fn();
     global.URL.createObjectURL = createObjectURL;
     global.URL.revokeObjectURL = revokeObjectURL;
-    const link = document.createElement('a');
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
-      if (tagName === 'a') return link;
-      return document.createElement(tagName);
+    const originalCreateElement = document.createElement.bind(document);
+    const link = originalCreateElement('a');
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((
+      ...args: Parameters<typeof document.createElement>
+    ) => {
+      if (args[0] === 'a') return link;
+      return originalCreateElement(...args);
     }) as typeof document.createElement);
 
     let capturedJson = '';
@@ -179,6 +182,44 @@ describe('forecastTransfer', () => {
     const result = await importForecastTransfer(file);
     expect(result.workspaceId).toBe('custom');
     expect(result.mapView).toEqual(mapView);
+  });
+
+  test('uses the Severe workspace filename for native JSON exports', async () => {
+    const forecastCycle = buildForecast();
+    const mapView = { center: [39.8, -98.5] as [number, number], zoom: 4 };
+    const originalCreateElement = document.createElement.bind(document);
+    const link = originalCreateElement('a');
+    const clickSpy = jest.spyOn(link, 'click').mockImplementation(() => undefined);
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((
+      ...args: Parameters<typeof document.createElement>
+    ) => {
+      if (args[0] === 'a') return link;
+      return originalCreateElement(...args);
+    }) as typeof document.createElement);
+    const appendChildSpy = jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+    const removeChildSpy = jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+    const createObjectURL = jest.fn(() => 'blob:test');
+    const revokeObjectURL = jest.fn();
+    global.URL.createObjectURL = createObjectURL;
+    global.URL.revokeObjectURL = revokeObjectURL;
+
+    try {
+      await exportForecastTransfer({
+        format: 'json',
+        scope: 'cycle',
+        forecastCycle,
+        mapView,
+        workspaceId: 'severe',
+      });
+    } finally {
+      createElementSpy.mockRestore();
+      appendChildSpy.mockRestore();
+      removeChildSpy.mockRestore();
+      clickSpy.mockRestore();
+      jest.restoreAllMocks();
+    }
+
+    expect(link.download).toMatch(/^gfc-severe-forecast-.*\.json$/);
   });
 
   test('preserves explicit package workspace identity and rejects mismatched envelopes', async () => {
@@ -324,15 +365,18 @@ describe('forecastTransfer', () => {
     const revokeObjectURL = jest.fn();
     const appendChild = jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
     const removeChild = jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
-    const link = document.createElement('a');
+    const originalCreateElement = document.createElement.bind(document);
+    const link = originalCreateElement('a');
     link.click = click;
 
-    jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-      if (tagName === 'a') {
+    jest.spyOn(document, 'createElement').mockImplementation(((
+      ...args: Parameters<typeof document.createElement>
+    ) => {
+      if (args[0] === 'a') {
         return link;
       }
-      return document.createElement(tagName);
-    });
+      return originalCreateElement(...args);
+    }) as typeof document.createElement);
     global.URL.createObjectURL = createObjectURL;
     global.URL.revokeObjectURL = revokeObjectURL;
 
