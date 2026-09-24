@@ -39,7 +39,7 @@ import {
   getProviderLabel,
   getSyncStatusMeta,
   type SyncStatusMeta,
-} from './accountPageUtils';
+} from "./accountPageUtils";
 import "./AccountPage.css";
 
 type AuthMode = "sign_in" | "sign_up";
@@ -545,7 +545,6 @@ const useAccountDeletionAction = (usesPassword: boolean) => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const canDelete = canSubmitAccountDeletion(confirmation, usesPassword, password);
 
-  /** Attempts account deletion after confirmation and any required reauthentication. */
   const handleDelete = async () => {
     setDeleting(true);
     setDeleteError(null);
