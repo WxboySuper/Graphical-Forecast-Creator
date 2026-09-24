@@ -376,13 +376,23 @@ const CloudCycleActions: React.FC<{
   const workspaceLabel = getCloudCycleWorkspaceLabel(cycle);
   const loadSupported = getCloudCycleWorkspaceId(cycle) === 'severe';
   const loadHintId = `cloud-cycle-load-hint-${cycle.id}`;
+  const isBusy = loading || isDeleting || isSavingRename;
+
+  /** Keeps unsupported Load focusable while blocking any load, fetch, or navigation. */
+  const handleLoadClick = () => {
+    if (!loadSupported) {
+      return;
+    }
+    onLoad();
+  };
 
   return (
     <div className="cloud-cycle-actions">
       <Button
         className="cloud-cycle-button cloud-cycle-button--load"
-        onClick={onLoad}
-        disabled={loading || isDeleting || isSavingRename || !loadSupported}
+        onClick={handleLoadClick}
+        disabled={isBusy}
+        aria-disabled={!loadSupported ? true : undefined}
         aria-describedby={loadSupported ? undefined : loadHintId}
       >
         <Download className="mr-2 h-4 w-4" />
