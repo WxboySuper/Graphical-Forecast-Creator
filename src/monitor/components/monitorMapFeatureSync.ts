@@ -40,9 +40,8 @@ export const syncOutlookFeatures = (
       featureProjection: 'EPSG:3857',
     });
 
-    // Applies monitor outlook styling before adding a feature to the source.
-/** Applies the computed monitor style to a feature. */
-const applyStyle = (item: FeatureLike) => {
+    /** Applies the computed monitor style to a feature. */
+    const applyStyle = (item: FeatureLike) => {
       if ('setStyle' in item && typeof item.setStyle === 'function') {
         item.setStyle(toOlStyle(
           { outlookType, probability },
