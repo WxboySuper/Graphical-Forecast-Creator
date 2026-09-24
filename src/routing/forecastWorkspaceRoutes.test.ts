@@ -5,6 +5,7 @@ import {
   getExposedForecastWorkspaceRoutes,
   getForecastWorkspacePath,
   getUnavailableForecastWorkspaceRoutes,
+  isSupportedCloudLoadWorkspace,
   resolveExposedForecastWorkspacePath,
   resolveExposedLegacyForecastWorkspacePath,
   resolveForecastWorkspacePath,
@@ -12,6 +13,7 @@ import {
   resolveRouteForecastWorkspace,
   resolveUnavailableForecastWorkspacePath,
 } from './forecastWorkspaceRoutes';
+import { getForecastWorkspace } from '../config/forecastWorkspaces';
 
 describe('forecast workspace route contract', () => {
   test('uses the canonical Severe route for the legacy Forecast entry point', () => {
@@ -63,6 +65,16 @@ describe('forecast workspace route contract', () => {
     }
     // Unexposed workspaces never produce a route record.
     expect(routes.some((route) => route.id === 'mesoscale')).toBe(false);
+  });
+
+  test('supports cloud loads only for workspaces with a registered exposed editor route', () => {
+    expect(isSupportedCloudLoadWorkspace('severe', getForecastWorkspace('severe'))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace('custom', getForecastWorkspace('custom'))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace('mesoscale', getForecastWorkspace('mesoscale'))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace('tropical', getForecastWorkspace('tropical'))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace('winter', getForecastWorkspace('winter'))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace('severe', undefined)).toBe(false);
+    expect(isSupportedCloudLoadWorkspace('severe', getForecastWorkspace('custom'))).toBe(false);
   });
 
   test('routes direct gated URLs to the unavailable page and keeps unknown paths unregistered', () => {

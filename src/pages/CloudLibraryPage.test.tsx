@@ -4,8 +4,9 @@ import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
-import CloudLibraryPage, { buildCloudSessionPayload, isSupportedCloudLoadWorkspace } from "./CloudLibraryPage";
-import { getDefaultForecastWorkspacePath, getForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
+import CloudLibraryPage from "./CloudLibraryPage";
+import { getDefaultForecastWorkspacePath, getForecastWorkspacePath, isSupportedCloudLoadWorkspace } from "../routing/forecastWorkspaceRoutes";
+import { buildCloudSessionPayload } from "../utils/forecastWorkspacePersistence";
 import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
 import { getForecastWorkspace } from "../config/forecastWorkspaces";
 

@@ -1,4 +1,5 @@
 import {
+  buildCloudSessionPayload,
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
   FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
@@ -85,5 +86,14 @@ describe('forecast workspace persistence contract', () => {
     const forecast = validForecast();
     expect(getForecastDataFromWorkspacePayload(forecast)).toBe(forecast);
     expect(getForecastDataFromWorkspacePayload(createForecastWorkspaceSave('severe', forecast))).toBe(forecast);
+  });
+
+  test('does not double-wrap an already-enveloped cloud handoff payload', () => {
+    const envelope = createForecastWorkspaceSave('severe', validForecast());
+    expect(buildCloudSessionPayload('severe', envelope)).toBe(envelope);
+    const customEnvelope = createForecastWorkspaceSave('custom', validForecast());
+    expect(() => buildCloudSessionPayload('severe', customEnvelope)).toThrow(/different forecast workspace/);
+    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe('severe');
   });
 });
