@@ -21,6 +21,7 @@ import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
+import type { ModifyEvent } from "ol/interaction/Modify";
 import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { v4 as uuidv4 } from "uuid";
 import { Redo2, Undo2 } from "lucide-react";
@@ -507,10 +508,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       });
 
       /** Creates a modify listener for either regular or categorical forecast features. */
-      const handleModifyEnd = (isCategorical: boolean) => (event: {
-        features: { getArray: () => OLFeature<Geometry>[] };
-      }) => {
-        handleModifiedFeatures(event.features.getArray(), isCategorical, {
+      const handleModifyEnd = (isCategorical: boolean) => (event: ModifyEvent) => {
+        handleModifiedFeatures(event.features.getArray() as OLFeature<Geometry>[], isCategorical, {
           currentDay: currentDayRef.current,
           dispatch,
           trimStoredOutlookFeature,
