@@ -17,28 +17,30 @@ export const TabbedIntegratedToolbarTabsList: React.FC<{
     tools: null,
   });
   const [indicatorStyle, setIndicatorStyle] = React.useState<React.CSSProperties>({});
+  const activeTabRef = React.useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  /** Re-measure the active trigger and update the sliding indicator position. */
+  const measureActiveTrigger = React.useCallback(() => {
+    const tabsList = tabsListRef.current;
+    const trigger = triggerRefs.current[activeTabRef.current];
+
+    if (!tabsList || !trigger) {
+      return;
+    }
+
+    const tabsRect = tabsList.getBoundingClientRect();
+    const triggerRect = trigger.getBoundingClientRect();
+
+    setIndicatorStyle({
+      width: triggerRect.width,
+      transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
+    });
+  }, []);
 
   React.useLayoutEffect(() => {
-    /** Re-measure the active trigger and update the sliding indicator position. */
-    const measure = () => {
-      const tabsList = tabsListRef.current;
-      const trigger = triggerRefs.current[activeTab];
-
-      if (!tabsList || !trigger) {
-        return;
-      }
-
-      const tabsRect = tabsList.getBoundingClientRect();
-      const triggerRect = trigger.getBoundingClientRect();
-
-      setIndicatorStyle({
-        width: triggerRect.width,
-        transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
-      });
-    };
-
-    measure();
-  }, [activeTab]);
+    measureActiveTrigger();
+  }, [activeTab, measureActiveTrigger]);
 
   React.useEffect(function setupTabIndicatorObserver() {
     const tabsList = tabsListRef.current;
@@ -47,18 +49,11 @@ export const TabbedIntegratedToolbarTabsList: React.FC<{
     }
 
     const observer = new ResizeObserver(() => {
-      const trigger = triggerRefs.current[activeTab];
-      if (!tabsList.isConnected || !trigger) {
+      if (!tabsList.isConnected) {
         return;
       }
 
-      const tabsRect = tabsList.getBoundingClientRect();
-      const triggerRect = trigger.getBoundingClientRect();
-
-      setIndicatorStyle({
-        width: triggerRect.width,
-        transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
-      });
+      measureActiveTrigger();
     });
     observer.observe(tabsList);
     Object.values(triggerRefs.current).forEach((trigger) => {
@@ -69,7 +64,7 @@ export const TabbedIntegratedToolbarTabsList: React.FC<{
     return function cleanup() {
       observer.disconnect();
     };
-  }, [activeTab]);
+  }, [measureActiveTrigger]);
 
   return (
     <TabsList
@@ -81,6 +76,7 @@ export const TabbedIntegratedToolbarTabsList: React.FC<{
         className="tabbed-integrated-toolbar__tab-indicator pointer-events-none absolute inset-y-0 left-0"
         style={indicatorStyle}
         aria-hidden="true"
+        data-testid="toolbar-tab-indicator"
       />
       <TabsTrigger
         value="draw"
