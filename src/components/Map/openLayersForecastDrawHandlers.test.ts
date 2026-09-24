@@ -76,7 +76,7 @@ const baseOptions = (overrides: Partial<DrawOptions> = {}): DrawOptions & {
     trimPreviewOnly: false,
     dispatch,
     ...overrides,
-  } as DrawOptions & { dispatch: jest.Mock; trimGeometryForAutoDraw: jest.Mock };
+    } as DrawOptions & { dispatch: jest.Mock; trimGeometryForAutoDraw: jest.Mock };
 };
 
 const polygonRing: number[][][] = [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]];
