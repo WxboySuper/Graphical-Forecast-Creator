@@ -38,4 +38,3 @@ export const CONTENT_MANAGED_LABELS = [
   'exposure:server-backed',
   'exposure:registry-change',
 ];
-
