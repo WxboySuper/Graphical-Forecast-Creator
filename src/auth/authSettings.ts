@@ -35,15 +35,15 @@ export interface BuildSettingsArgs {
   monitorSettings?: MonitorSettings;
 }
 
-/** Checks the required primitive fields before a remote settings payload is normalized. */
-type ValidRemoteSettingsFields = Pick<
+/** Checks the required settings fields before a remote payload is normalized. */
+type RequiredRemoteSettingsFields = Pick<
   UserSettingsDocument,
   'darkMode' | 'baseMapStyle' | 'stateBorders' | 'counties' | 'ghostOutlooks' | 'defaultForecasterName'
 >;
 
-const hasValidRemoteSettingsFields = (
+const hasRequiredRemoteSettingsFields = (
   value: Partial<UserSettingsDocument>,
-): value is ValidRemoteSettingsFields & Partial<UserSettingsDocument> => {
+): value is RequiredRemoteSettingsFields & Partial<UserSettingsDocument> => {
   const { darkMode, baseMapStyle, stateBorders, counties, ghostOutlooks, defaultForecasterName } = value;
   return (
     typeof darkMode === 'boolean' &&
@@ -60,7 +60,7 @@ const hasValidRemoteSettingsFields = (
 export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
   if (!value) return null;
 
-  if (!hasValidRemoteSettingsFields(value)) return null;
+  if (!hasRequiredRemoteSettingsFields(value)) return null;
 
   return {
     darkMode: value.darkMode,
