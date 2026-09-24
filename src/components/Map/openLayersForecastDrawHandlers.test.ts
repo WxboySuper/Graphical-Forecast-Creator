@@ -71,14 +71,14 @@ describe("handleForecastDrawEnd", () => {
     });
   });
 
-  test("skips trim for non-polygon geometry but still dispatches the drawn feature", async () => {
+  test("rejects non-polygon geometry without trimming or dispatching", async () => {
     const options = baseOptions();
 
     handleForecastDrawEnd({ feature: pointFeature() as Feature<Geometry> }, options);
     await flush();
 
     expect(options.trimGeometryForAutoDraw).not.toHaveBeenCalled();
-    expect(options.dispatch).toHaveBeenCalledTimes(1);
+    expect(options.dispatch).not.toHaveBeenCalled();
   });
 
   test("dispatches a custom feature without running outlook trim", async () => {

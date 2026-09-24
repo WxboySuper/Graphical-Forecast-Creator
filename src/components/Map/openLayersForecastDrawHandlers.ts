@@ -45,6 +45,7 @@ export const handleForecastDrawEnd = (
         dataProjection: "EPSG:4326",
         featureProjection: "EPSG:3857",
       });
+      if (geometryObject.type !== "Polygon" && geometryObject.type !== "MultiPolygon") return;
       const customFeature = toDrawnCustomFeature(
         geometryObject as unknown as Geometry,
         options.activeCustomLayer,
@@ -57,14 +58,12 @@ export const handleForecastDrawEnd = (
       }
 
       let outlookGeometry: Polygon | MultiPolygon | null = geometryObject as Polygon | MultiPolygon;
-      if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
-        outlookGeometry = await options.trimGeometryForAutoDraw(
-          outlookGeometry,
-          options.trimStrategy,
-          options.trimAutoOnDraw,
-          options.trimPreviewOnly,
-        );
-      }
+      outlookGeometry = await options.trimGeometryForAutoDraw(
+        outlookGeometry,
+        options.trimStrategy,
+        options.trimAutoOnDraw,
+        options.trimPreviewOnly,
+      );
       if (!outlookGeometry) return;
       const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
         type: "Feature",
