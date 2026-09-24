@@ -214,6 +214,41 @@ describe('cycleHistoryPersistence', () => {
     expect(loaded[0].forecastCycle.days[1]?.data.wind?.get('30%')).toHaveLength(1);
   });
 
+  test('preserves top-level workflowMetadata on legacy hydration and ignores embedded cycleMetadata', async () => {
+    const workflowMetadata = {
+      id: 'WF-test-2026-04-22',
+      workflowId: 'test',
+      cycleDate: '2026-04-22',
+      status: 'in-progress',
+      outlookVersions: [],
+      createdAt: 'ts',
+      updatedAt: 'ts',
+    };
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
+      id: 'legacy-workflow',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastCycle: {},
+      stats: { forecastDays: 0, totalOutlooks: 0, totalFeatures: 0 },
+      workflowMetadata,
+    }]));
+
+    const mod = await import('./cycleHistoryPersistence');
+    const loaded = mod.loadCycleHistoryFromStorage();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.workflowMetadata).toEqual(workflowMetadata);
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
+      id: 'legacy-plain',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastCycle: {},
+      stats: { forecastDays: 0, totalOutlooks: 0, totalFeatures: 0 },
+    }]));
+    expect(mod.loadCycleHistoryFromStorage()[0]?.workflowMetadata).toBeUndefined();
+  });
+
   test('loadCycleHistoryFromStorage handles legacy format and computes stats when missing', async () => {
     jest.doMock('./forecastMetrics', () => ({
       countForecastMetrics: jest.fn(() => ({ computed: 42 })),

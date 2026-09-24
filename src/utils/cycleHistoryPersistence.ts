@@ -73,6 +73,7 @@ const fromLegacySavedCycle = (cycle: {
   label?: string;
   forecastCycle: ForecastCycle;
   stats?: SavedCycleStats;
+  workflowMetadata?: CycleMetadata;
 }): SavedCycle => {
   const forecastCycle = normalizeForecastCycle(cycle.forecastCycle);
 
@@ -84,6 +85,10 @@ const fromLegacySavedCycle = (cycle: {
     forecastCycle,
     stats: cycle.stats ?? countForecastMetrics(forecastCycle),
     workspaceId: DEFAULT_FORECAST_WORKSPACE,
+    // Preserve top-level workflow session when a legacy record carries it. Embedded
+    // forecastData.cycleMetadata is deliberately not recovered here: deserializeForecast
+    // is cycle-only by contract, and the persistence envelope keeps workflow state top-level.
+    workflowMetadata: cycle.workflowMetadata,
   };
 };
 

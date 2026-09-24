@@ -1090,7 +1090,8 @@ export const forecastSlice = createSlice({
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
       if (savedCycle) {
-        state.workspaceId = resolveForecastWorkspaceId(savedCycle.workspaceId);
+        // The route owns workspace identity: loading a saved cycle never retags
+        // the active workspace. Cross-workspace opens must navigate explicitly.
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
         advanceCycleGeneration(state);
         clearHistory(state);
