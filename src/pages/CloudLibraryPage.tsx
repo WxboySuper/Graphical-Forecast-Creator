@@ -12,7 +12,10 @@ import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
 import { getBuildTarget } from '../config/buildTarget';
 import { getForecastWorkspace } from '../config/forecastWorkspaces';
-import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
+import {
+  getDefaultForecastWorkspacePath,
+  getForecastWorkspacePath,
+} from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -156,7 +159,11 @@ const CloudLibraryUtilityCard: React.FC<{
 );
 
 /** Empty library state with cleaner product-facing calls to action. */
-const EmptyState: React.FC<{ premiumActive: boolean; workspaceLabel?: string }> = ({ premiumActive, workspaceLabel }) => (
+const EmptyState: React.FC<{
+  premiumActive: boolean;
+  workspaceLabel?: string;
+  workspacePath: string;
+}> = ({ premiumActive, workspaceLabel, workspacePath }) => (
   <div className="cloud-library-empty-state">
     <div className="cloud-library-empty-icon">
       <Cloud className="h-8 w-8" />
@@ -171,7 +178,7 @@ const EmptyState: React.FC<{ premiumActive: boolean; workspaceLabel?: string }> 
     </div>
     <div className="cloud-library-empty-actions">
       <Button asChild variant="default">
-        <Link to="/forecast">{premiumActive ? 'Start your first forecast' : 'Open Forecast Editor'}</Link>
+        <Link to={workspacePath}>{premiumActive ? 'Start your first forecast' : 'Open Forecast Editor'}</Link>
       </Button>
       <Button asChild variant={premiumActive ? 'outline' : 'default'}>
         <Link to="/pricing">{premiumActive ? 'View Pricing' : 'See Premium'}</Link>
@@ -570,10 +577,14 @@ const CloudLibraryTabs: React.FC<{
   /** Moves focus after render so keyboard selection lands on the new tab. */
   useEffect(() => {
     if (pendingFocus.current === null) return;
-    const tabId = pendingFocus.current;
+    const requestedTabId = pendingFocus.current;
     pendingFocus.current = null;
-    tabRefs.current.get(tabId)?.focus();
-  }, [activeTab]);
+    const fallbackTabId = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0]?.id;
+    const focusTabId = tabs.some((tab) => tab.id === requestedTabId) ? requestedTabId : fallbackTabId;
+    if (focusTabId) {
+      tabRefs.current.get(focusTabId)?.focus();
+    }
+  }, [activeTab, tabs]);
 
   if (tabs.length === 0) return null;
 
@@ -621,6 +632,7 @@ const CloudLibraryMainCard: React.FC<{
   activeTab: CloudLibraryTabId;
   premiumActive: boolean;
   workspaceLabel?: string;
+  workspacePath: string;
   canWrite: boolean;
   cycleCountLabel: string;
   onLoadCycle: (cycleId: string) => Promise<void>;
@@ -634,6 +646,7 @@ const CloudLibraryMainCard: React.FC<{
   activeTab,
   premiumActive,
   workspaceLabel,
+  workspacePath,
   canWrite,
   cycleCountLabel,
   onLoadCycle,
@@ -649,11 +662,22 @@ const CloudLibraryMainCard: React.FC<{
     </CardHeader>
     <CardContent className="cloud-library-list-content" id="cloud-library-panel" role="tabpanel" tabIndex={loading && cycles.length === 0 ? 0 : undefined} aria-labelledby={`cloud-library-tab-${activeTab}`}>
       {loading && cycles.length === 0 ? (
-        <div className="cloud-library-loading">
-          <LoaderCircle className="h-6 w-6 animate-spin" />
+        <div
+          className="cloud-library-loading"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="Loading cloud cycles"
+        >
+          <LoaderCircle className="h-6 w-6 animate-spin" aria-hidden="true" />
+          <span>Loading cloud cycles</span>
         </div>
       ) : cycles.length === 0 ? (
-        <EmptyState premiumActive={premiumActive} workspaceLabel={workspaceLabel} />
+        <EmptyState
+          premiumActive={premiumActive}
+          workspaceLabel={workspaceLabel}
+          workspacePath={workspacePath}
+        />
       ) : (
         <>
           <div className="cloud-library-list-header">
@@ -690,6 +714,7 @@ const CloudLibrarySignedInLayout: React.FC<{
   tabs: CloudLibraryTab[];
   activeTab: CloudLibraryTabId;
   workspaceLabel?: string;
+  workspacePath: string;
   canWrite: boolean;
   cycleCountLabel: string;
   onLoadCycle: (cycleId: string) => Promise<void>;
@@ -704,6 +729,7 @@ const CloudLibrarySignedInLayout: React.FC<{
   tabs,
   activeTab,
   workspaceLabel,
+  workspacePath,
   canWrite,
   cycleCountLabel,
   onLoadCycle,
@@ -720,6 +746,7 @@ const CloudLibrarySignedInLayout: React.FC<{
         activeTab={activeTab}
         premiumActive={premiumActive}
         workspaceLabel={workspaceLabel}
+        workspacePath={workspacePath}
         canWrite={canWrite}
         cycleCountLabel={cycleCountLabel}
         onLoadCycle={onLoadCycle}
@@ -871,6 +898,10 @@ const CloudLibraryPage: React.FC = () => {
   );
   const workspaceLabel =
     effectiveActiveTab === 'all' ? undefined : tabs.find((tab) => tab.id === effectiveActiveTab)?.label;
+  const workspacePath =
+    effectiveActiveTab === 'all'
+      ? getDefaultForecastWorkspacePath()
+      : getForecastWorkspacePath(effectiveActiveTab);
 
   if (!user) {
     return <SignedOutGate />;
@@ -892,6 +923,7 @@ const CloudLibraryPage: React.FC = () => {
           tabs={tabs}
           activeTab={effectiveActiveTab}
           workspaceLabel={workspaceLabel}
+          workspacePath={workspacePath}
           canWrite={canWrite}
           cycleCountLabel={cycleCountLabel}
           onLoadCycle={handleLoadCycle}

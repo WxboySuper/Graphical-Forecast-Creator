@@ -23,9 +23,19 @@ jest.mock("../hooks/useCloudCycles", () => ({
   useCloudCycles: jest.fn(),
 }));
 
+jest.mock("./cloudLibraryWorkspace", () => {
+  const actual = jest.requireActual("./cloudLibraryWorkspace");
+  return {
+    ...actual,
+    getCloudLibraryTabs: jest.fn(actual.getCloudLibraryTabs),
+  };
+});
+
 const mockUseAuth = jest.requireMock("../auth/AuthProvider").useAuth as jest.Mock;
 const mockUseEntitlement = jest.requireMock("../billing/EntitlementProvider").useEntitlement as jest.Mock;
 const mockUseCloudCycles = jest.requireMock("../hooks/useCloudCycles").useCloudCycles as jest.Mock;
+const actualGetCloudLibraryTabs = jest.requireActual("./cloudLibraryWorkspace").getCloudLibraryTabs;
+const mockGetCloudLibraryTabs = jest.requireMock("./cloudLibraryWorkspace").getCloudLibraryTabs as jest.Mock;
 
 const makeStore = () =>
   configureStore({
@@ -56,6 +66,8 @@ describe("CloudLibraryPage", () => {
   beforeEach(() => {
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult());
     mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: "local" });
+    mockGetCloudLibraryTabs.mockReset();
+    mockGetCloudLibraryTabs.mockImplementation(actualGetCloudLibraryTabs);
     mockNavigate.mockClear();
     sessionStorage.clear();
   });
@@ -113,13 +125,19 @@ describe("CloudLibraryPage", () => {
 
   it("uses workspace-specific empty copy for an empty tab", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }] })
-    );
+    mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [] }));
 
     renderPage();
+    expect(screen.getByRole("link", { name: "Open Forecast Editor" })).toHaveAttribute(
+      "href",
+      getDefaultForecastWorkspacePath(),
+    );
     fireEvent.click(screen.getByRole("tab", { name: /Custom 0/i }));
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Forecast Editor" })).toHaveAttribute(
+      "href",
+      "/forecast/custom",
+    );
   });
 
   it("keeps unsupported Load focusable with aria-disabled and a hint while blocking activation", () => {
@@ -317,6 +335,38 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("moves focus to the valid tab when a keyboard target is removed", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+
+    let useReducedTabs = false;
+    const fullTabs = [
+      { id: "all" as const, label: "All", cycleCount: 2 },
+      { id: "severe" as const, label: "Severe", cycleCount: 1 },
+      { id: "custom" as const, label: "Custom", cycleCount: 1 },
+    ];
+    const reducedTabs = fullTabs.filter((tab) => tab.id !== "severe");
+    mockGetCloudLibraryTabs.mockImplementation(() => (useReducedTabs ? reducedTabs : fullTabs));
+
+    renderPage();
+    const customTab = screen.getByRole("tab", { name: /Custom 1/i });
+    const allTab = screen.getByRole("tab", { name: /All 2/i });
+    customTab.focus();
+    useReducedTabs = true;
+    mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [] }));
+    fireEvent.keyDown(allTab, { key: "ArrowRight" });
+
+    expect(screen.getByRole("tab", { name: /All 2/i })).toHaveFocus();
+    expect(customTab).not.toHaveFocus();
+  });
+
   it("uses roving tabindex so only the active tab is in the tab order", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(
@@ -371,11 +421,15 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByRole("tabpanel")).not.toHaveAttribute("tabindex");
   });
 
-  it("keeps the panel focusable while loading without interactive content", () => {
+  it("announces the loading state and keeps the panel focusable", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [], loading: true }));
 
     renderPage();
+    const loadingStatus = screen.getByRole("status", { name: "Loading cloud cycles" });
+    expect(loadingStatus).toHaveAttribute("aria-live", "polite");
+    expect(loadingStatus).toHaveAttribute("aria-busy", "true");
+    expect(loadingStatus).toHaveTextContent("Loading cloud cycles");
     expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
   });
 });
