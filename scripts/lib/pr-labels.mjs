@@ -2,7 +2,7 @@ import { descriptiveLabels } from './pr-label-content.mjs';
 import { exposureLabels } from './pr-label-exposure.mjs';
 import { routingLabels } from './pr-label-routing.mjs';
 
-export { CONTENT_MANAGED_LABELS, CI_MANAGED_LABELS, MANAGED_LABELS } from './pr-label-managed.mjs';
+export { CONTENT_MANAGED_LABELS, CI_MANAGED_LABELS } from './pr-label-managed.mjs';
 export { routingLabels } from './pr-label-routing.mjs';
 export { descriptiveLabels } from './pr-label-content.mjs';
 export { exposureLabels } from './pr-label-exposure.mjs';
