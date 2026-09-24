@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
 import { TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
-import forecastReducer from '../../store/forecastSlice';
+import forecastReducer, { addFeature } from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 
@@ -67,6 +67,20 @@ const createStore = () => configureStore({
   }),
 });
 
+const createFeature = () => ({
+  type: 'Feature' as const,
+  id: 'feature-1',
+  geometry: {
+    type: 'Polygon' as const,
+    coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
+  },
+  properties: {
+    outlookType: 'tornado' as const,
+    probability: '2%',
+    isSignificant: false,
+  },
+});
+
 const ToolbarTestHarness: React.FC = () => {
   const mapRef = useRef<ForecastMapHandle | null>(null);
   const controller = useForecastWorkspaceController({
@@ -86,6 +100,45 @@ const renderToolbar = (store = createStore()) => render(
     </Provider>
   </MemoryRouter>
 );
+
+describe('TabbedIntegratedToolbar undo/redo buttons', () => {
+  beforeEach(() => {
+    mockAddToast.mockReset();
+  });
+
+  test('renders undo and redo buttons with disabled state from selectors', async () => {
+    const user = userEvent.setup();
+    renderToolbar();
+
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+  });
+
+  test('clicking undo and redo dispatches history actions through the toolbar', async () => {
+    const user = userEvent.setup();
+    const store = createStore();
+    store.dispatch(addFeature({ feature: createFeature() }));
+
+    renderToolbar(store);
+
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+
+    const undoButton = screen.getByRole('button', { name: 'Undo' });
+    const redoButton = screen.getByRole('button', { name: 'Redo' });
+
+    expect(undoButton).toBeEnabled();
+    expect(redoButton).toBeDisabled();
+
+    await user.click(undoButton);
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  });
+});
 
 describe('TabbedIntegratedToolbar completion validation exposure', () => {
   afterEach(() => {
