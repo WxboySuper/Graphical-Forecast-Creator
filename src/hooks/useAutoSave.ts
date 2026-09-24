@@ -172,6 +172,10 @@ export const useAutoSave = (
   const prevScopeRef = useRef({ userId, workspaceId });
   const lastScheduledSnapshotRef = useRef({ forecastCycle, mapView, workflowMetadata });
 
+  // Keep this scope-change flush above the debounced save effect so a batched
+  // document + scope commit flushes the old workspace first. Behavior is pinned
+  // by useAutoSave.test.tsx ("flushes the previous workspace edit") and the
+  // dirty-switch e2e spec.
   // Flushes a dirty edit that never became a debounced pending because React
   // batched the document change and the workspace switch into one commit. The
   // passive debounce effect below never ran for the intermediate document, so

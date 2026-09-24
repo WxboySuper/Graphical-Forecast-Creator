@@ -228,6 +228,8 @@ describe('useAutoSave', () => {
     expect(localStorage.getItem('forecastData')).toBeNull();
   });
 
+  // Guards flush-before-reset ordering: a dirty edit must land in the old
+  // workspace scope on switch, without waiting for another debounce.
   test('flushes the previous workspace edit when autosave scope changes', async () => {
     const store = createStore();
     const { rerender } = render(

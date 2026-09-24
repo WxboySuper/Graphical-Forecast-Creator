@@ -201,6 +201,73 @@ describe('ForecastPage layout selection', () => {
     expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
   });
 
+  test('clears a malformed cloud handoff through session restore without falling back to autosave', async () => {
+    const sourceStore = createStore();
+    sourceStore.dispatch(addFeature({
+      feature: {
+        type: 'Feature',
+        id: 'local-autosave-marker',
+        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
+      } as never,
+    }));
+    localStorage.setItem('forecastData', JSON.stringify(serializeForecastWorkspace(
+      'severe',
+      sourceStore.getState().forecast.forecastCycle,
+      { center: [0, 0], zoom: 4 },
+    )));
+    sessionStorage.setItem('cloudCyclePayload:anonymous', 'not-json');
+    sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+      'The pending cloud forecast was invalid and was cleared without loading.',
+      'error',
+    ));
+    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    expect(mockAddToast).not.toHaveBeenCalledWith('Session restored from auto-save.', 'success');
+    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === 'local-autosave-marker')).not.toBe(true);
+  });
+
+  test('clears an unknown-workspace cloud handoff through session restore without falling back to autosave', async () => {
+    const sourceStore = createStore();
+    sourceStore.dispatch(addFeature({
+      feature: {
+        type: 'Feature',
+        id: 'local-autosave-marker',
+        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
+      } as never,
+    }));
+    localStorage.setItem('forecastData', JSON.stringify(serializeForecastWorkspace(
+      'severe',
+      sourceStore.getState().forecast.forecastCycle,
+      { center: [0, 0], zoom: 4 },
+    )));
+    sessionStorage.setItem('cloudCyclePayload:anonymous', JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'bogus',
+      forecast: { nope: true },
+    }));
+    sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+      'The pending cloud forecast was invalid and was cleared without loading.',
+      'error',
+    ));
+    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Session restored from auto-save.', 'success');
+    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === 'local-autosave-marker')).not.toBe(true);
+  });
+
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
     mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
     const store = createStore();

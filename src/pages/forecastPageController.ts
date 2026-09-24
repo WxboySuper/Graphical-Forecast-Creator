@@ -231,18 +231,24 @@ export const parseStoredCloudMeta = (storedValue: string | null): StoredCloudMet
   }
 };
 
-/** Returns the source workspace when a stored cloud handoff belongs elsewhere, else null. */
+/** Tagged result for a present-but-unreadable cloud handoff. Distinct from null (no handoff). */
+export const INVALID_CLOUD_HANDOFF = 'invalid' as const;
+export type CloudHandoffMismatch = ForecastWorkspaceId | typeof INVALID_CLOUD_HANDOFF;
+
+/** Returns the source workspace when a stored cloud handoff belongs elsewhere, an invalid sentinel when a present handoff cannot be read, else null. */
 export const getMismatchedCloudWorkspaceId = (
   storedValue: string | null,
   workspaceId: ForecastWorkspaceId,
-): ForecastWorkspaceId | null => {
+): CloudHandoffMismatch | null => {
   if (!storedValue) return null;
   try {
     const parsed = JSON.parse(storedValue) as unknown;
     const restored = deserializeForecastWorkspace(parsed);
     return restored.workspaceId === workspaceId ? null : restored.workspaceId;
   } catch {
-    return null;
+    // A non-empty value that fails to parse or classify is a corrupt handoff,
+    // not an absent one. Callers must clear it instead of falling back to local restore.
+    return INVALID_CLOUD_HANDOFF;
   }
 };
 
@@ -294,9 +300,16 @@ const restoreCloudSession = ({
   if (!payload) {
     // A pending handoff for another workspace must not fail silently into local
     // restore. Surface it, drop the stale handoff, and stop the fallback chain.
-    if (getMismatchedCloudWorkspaceId(storedValue, workspaceId)) {
+    // The same applies to a present-but-unreadable handoff: clear it and stop
+    // instead of treating absence as corruption or falling back to autosave.
+    const handoffIssue = getMismatchedCloudWorkspaceId(storedValue, workspaceId);
+    if (handoffIssue) {
       clearStoredCloudSession(userId);
-      addToast('This cloud cycle belongs to a different forecast workspace and was not loaded.', 'error');
+      if (handoffIssue === INVALID_CLOUD_HANDOFF) {
+        addToast('The pending cloud forecast was invalid and was cleared without loading.', 'error');
+      } else {
+        addToast('This cloud cycle belongs to a different forecast workspace and was not loaded.', 'error');
+      }
       return true;
     }
     return false;

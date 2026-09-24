@@ -12,6 +12,7 @@ import {
   hasRolloverForecastData,
   hasUnpublishedDiscussionDrafts,
   hasUnsavedRolloverCandidateSession,
+  INVALID_CLOUD_HANDOFF,
   parseStoredCloudMeta,
   parseStoredForecastPayload,
   runDayRolloverCloudSaveAction,
@@ -67,9 +68,24 @@ describe('forecastPageController', () => {
     expect(getMismatchedCloudWorkspaceId(customStored, 'custom')).toBeNull();
     expect(getMismatchedCloudWorkspaceId(customStored, 'severe')).toBe('custom');
     expect(getMismatchedCloudWorkspaceId(severeStored, 'custom')).toBe('severe');
+    // Absence is not corruption.
     expect(getMismatchedCloudWorkspaceId(null, 'severe')).toBeNull();
-    expect(getMismatchedCloudWorkspaceId('not-json', 'severe')).toBeNull();
-    expect(getMismatchedCloudWorkspaceId(JSON.stringify({ nope: true }), 'severe')).toBeNull();
+    expect(getMismatchedCloudWorkspaceId('', 'severe')).toBeNull();
+  });
+
+  test('tags malformed or unknown cloud handoffs as invalid instead of absent', () => {
+    // Malformed JSON, unsupported shapes, unknown workspace ids, and known-but-invalid
+    // envelopes must all surface as a tagged invalid handoff so callers clear them.
+    expect(getMismatchedCloudWorkspaceId('not-json', 'severe')).toBe(INVALID_CLOUD_HANDOFF);
+    expect(getMismatchedCloudWorkspaceId(JSON.stringify({ nope: true }), 'severe')).toBe(INVALID_CLOUD_HANDOFF);
+    expect(getMismatchedCloudWorkspaceId(
+      JSON.stringify({ schemaVersion: 1, workspaceId: 'bogus', forecast: {} }),
+      'severe',
+    )).toBe(INVALID_CLOUD_HANDOFF);
+    expect(getMismatchedCloudWorkspaceId(
+      JSON.stringify({ schemaVersion: 1, workspaceId: 'severe', forecast: { nope: true } }),
+      'severe',
+    )).toBe(INVALID_CLOUD_HANDOFF);
   });
 
   test('derives rollover candidates and preserves pending prompts', () => {

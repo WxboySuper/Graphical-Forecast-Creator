@@ -85,6 +85,7 @@ export {
   parseStoredForecastPayload,
   parseStoredCloudMeta,
   getMismatchedCloudWorkspaceId,
+  INVALID_CLOUD_HANDOFF,
   clearStoredCloudSession,
   hasRestorableCloudSelection,
   buildRestoreKey,

@@ -33,6 +33,7 @@ This record pins down what #1456 actually built. The base doc describes the plan
 - Cloud loads wrap the payload in the workspace envelope. An already enveloped payload is reused as is. A mismatched envelope is rejected.
 - A workspace can open cloud payloads only when it has a registered editor route for the current build target. Today that is Severe and exposed Custom. The check reads the shared workspace registry and exposure contract, not a separate hardcoded list.
 - A cross-workspace handoff that reaches the wrong editor is a user-visible error. The pending cloud session is cleared and the editor shows an error toast instead of silently falling back to local restore.
+- A malformed or unknown pending handoff is cleared the same way with an invalid-session error; absence alone is not treated as corruption.
 
 ## Exposure
 
@@ -45,4 +46,7 @@ This record pins down what #1456 actually built. The base doc describes the plan
 - Custom UI move and compatibility redirect stay with #915.
 - Discussion embedding and `/discussion` handoff stay with #916.
 - Mesoscale registration stays with #919.
-- Browser-level coverage for direct navigation, refresh, and back/forward across the restore gate is still open.
+
+## Browser coverage
+
+- `e2e/forecast-workspace-navigation.spec.ts` covers direct navigation, refresh, back/forward, and a dirty SPA switch across the restore gate. It passed locally.
