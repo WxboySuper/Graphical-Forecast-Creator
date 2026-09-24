@@ -413,7 +413,7 @@ const CloudCycleActions: React.FC<{
       />
       {!loadSupported ? (
         <p id={loadHintId} className="cloud-cycle-load-hint">
-          {workspaceLabel} loading is not supported yet. Only Severe saves can be opened.
+          {workspaceLabel} cloud loading is not available yet.
         </p>
       ) : null}
     </div>
@@ -825,7 +825,7 @@ const useCloudLibraryActions = ({
     if (!isSupportedCloudLoadWorkspace(workspaceId, workspace)) {
       const workspaceLabel = workspace?.label ?? 'This workspace';
       setMessage(
-        `${workspaceLabel} saves can't be opened in the editor yet. Cloud loading currently supports Severe saves only. Your save is still stored.`
+        `${workspaceLabel} cloud loading is not available yet. Your save is still stored.`
       );
       return;
     }

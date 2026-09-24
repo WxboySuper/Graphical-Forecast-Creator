@@ -17,7 +17,6 @@ import {
   setActiveProbability,
   toggleSignificant,
   setEmergencyMode,
-  setForecastWorkspace,
   selectForecastCycle,
   selectCanRedo,
   selectCanUndo,
@@ -725,10 +724,6 @@ const useForecastPageWorkspace = ({
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
 const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
-  // The route owns workspace identity: publish it to Redux so saveCurrentCycle tags new cycles.
-  useEffect(() => {
-    dispatch(setForecastWorkspace(workspaceId));
-  }, [dispatch, workspaceId]);
   const navigate = useNavigate();
   const location = useLocation();
   const { addToast } = useOutletContext<PageContext>();

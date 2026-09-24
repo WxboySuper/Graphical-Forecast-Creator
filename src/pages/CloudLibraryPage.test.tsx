@@ -200,12 +200,12 @@ describe("CloudLibraryPage", () => {
     expect(loadButton).not.toBeDisabled();
     expect(loadButton).toHaveAttribute("aria-disabled", "true");
     expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-meso-1");
-    expect(screen.getByText("Mesoscale loading is not supported yet. Only Severe saves can be opened.")).toBeInTheDocument();
+    expect(screen.getByText("Mesoscale cloud loading is not available yet.")).toBeInTheDocument();
 
     fireEvent.click(loadButton);
     expect(loadCycle).not.toHaveBeenCalled();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Mesoscale saves can't be opened in the editor yet. Cloud loading currently supports Severe saves only. Your save is still stored."
+      "Mesoscale cloud loading is not available yet. Your save is still stored."
     );
   });
 
