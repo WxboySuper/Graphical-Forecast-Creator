@@ -25,6 +25,8 @@ import {
   getFeatureIdentity,
   applyBlankLayerStyle,
   isDrawableOutlookType,
+  isPolygonOrMultiPolygon,
+  toUpdatedGeoJsonFeature,
   toOlStyle,
   createCustomFill,
   toCustomOlStyle,
@@ -141,6 +143,30 @@ describe('openLayersMapStyles', () => {
       writeGeometryObject: () => ({ type: 'Point', coordinates: [0, 0] }),
     };
     expect(toUpdatedCustomFeature(feature as never, format as never)).toBeNull();
+  });
+
+  test('isPolygonOrMultiPolygon accepts Polygon/MultiPolygon and rejects Point', () => {
+    expect(isPolygonOrMultiPolygon({ type: 'Polygon', coordinates: [] })).toBe(true);
+    expect(isPolygonOrMultiPolygon({ type: 'MultiPolygon', coordinates: [] })).toBe(true);
+    expect(isPolygonOrMultiPolygon({ type: 'Point', coordinates: [0, 0] })).toBe(false);
+    expect(isPolygonOrMultiPolygon(null)).toBe(false);
+  });
+
+  test('toUpdatedGeoJsonFeature keeps Polygon and MultiPolygon geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', outlookType: 'tornado', probability: '2%', isSignificant: false };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const polygonFormat = { writeGeometryObject: () => ({ type: 'Polygon', coordinates: [] }) };
+    const multiFormat = { writeGeometryObject: () => ({ type: 'MultiPolygon', coordinates: [] }) };
+
+    expect(toUpdatedGeoJsonFeature(feature as never, polygonFormat as never, false)?.geometry.type).toBe('Polygon');
+    expect(toUpdatedGeoJsonFeature(feature as never, multiFormat as never, false)?.geometry.type).toBe('MultiPolygon');
+  });
+
+  test('toUpdatedGeoJsonFeature returns null for serialized Point geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', outlookType: 'tornado', probability: '2%', isSignificant: false };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const format = { writeGeometryObject: () => ({ type: 'Point', coordinates: [0, 0] }) };
+    expect(toUpdatedGeoJsonFeature(feature as never, format as never, false)).toBeNull();
   });
 
   test('toTstmPreviewOlStyle and toGhostOlStyle build styles', () => {
