@@ -22,10 +22,12 @@ describe('authLocalTransport', () => {
     await expect(safeParseJson(resp)).resolves.toBeNull();
   });
 
-  test('asRecord passes objects through and rejects anything else', () => {
+  test('asRecord passes objects through and returns an empty record for primitives and null', () => {
     const record = { uid: 'user-1' };
 
     expect(asRecord(record)).toEqual(record);
+    // Arrays satisfy typeof === 'object', so they pass through rather than becoming {}.
+    expect(asRecord(['user-1'])).toEqual(['user-1']);
     expect(asRecord(null)).toEqual({});
     expect(asRecord(undefined)).toEqual({});
     expect(asRecord('user-1')).toEqual({});
@@ -137,5 +139,11 @@ describe('authLocalTransport', () => {
     } as unknown as Response);
 
     await expect(postLocalJson('/api/local/test', { failureMessage: 'Failed' })).rejects.toThrow('Failed');
+  });
+
+  test('postLocalJson propagates a fetch rejection', async () => {
+    jest.mocked(global.fetch).mockRejectedValueOnce(new Error('offline'));
+
+    await expect(postLocalJson('/api/local/test', { failureMessage: 'Failed' })).rejects.toThrow('offline');
   });
 });
