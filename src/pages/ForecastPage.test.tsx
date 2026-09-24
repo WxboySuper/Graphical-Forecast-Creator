@@ -144,8 +144,9 @@ describe('ForecastPage layout selection', () => {
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
   });
 
-  test('publishes the route workspace to Redux so saves are workspace-tagged', () => {
+  test('tags new cycles with the active workspace after route ownership is synchronized', () => {
     const store = createStore();
+    store.dispatch(setForecastWorkspace('custom'));
     render(
       <MemoryRouter>
         <Provider store={store}>

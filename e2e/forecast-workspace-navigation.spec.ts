@@ -160,7 +160,7 @@ test.describe('Forecast workspace route navigation', () => {
     await setDay(page, 4);
 
     await spaNavigate(page, '/forecast/custom');
-    await gotoWorkspace(page, 'custom');
+    await expectActiveDay(page, 5);
 
     // The old workspace flush lands promptly, without waiting for another
     // full debounce after the switch.
