@@ -1,12 +1,7 @@
 'use strict';
 
 const { deleteStripeCustomer } = require('./account-lifecycle');
-
-/** Returns the Stripe object ID for either an expanded object or a plain ID. */
-const getStripeObjectId = (value) => (typeof value === 'string' ? value : value?.id || '');
-
-/** Returns the first usable Stripe ID from a list of expanded objects or plain IDs. */
-const getFirstStripeObjectId = (values) => values.map(getStripeObjectId).find(Boolean) || '';
+const { getFirstStripeObjectId, getStripeObjectId } = require('./billing-stripe-identifiers');
 
 /** Finds a payment intent from invoice payments list via the Invoice Payments API. */
 const findPaymentIntentFromInvoicePayments = async (stripe, invoiceId) => {

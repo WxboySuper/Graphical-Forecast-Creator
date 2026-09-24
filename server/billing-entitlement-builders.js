@@ -1,7 +1,7 @@
 'use strict';
 
+const { getFirstStripeObjectId } = require('./billing-stripe-identifiers');
 const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
-const { getStripeObjectId } = require('./billing-cleanup');
 
 /** Maps a Stripe recurring interval into the entitlement interval shape. */
 const getPlanInterval = (interval) => (interval === 'year' ? 'annual' : 'monthly');
@@ -63,9 +63,6 @@ const createSubscriptionEntitlementWrite = (subscription) => {
     payload: createSubscriptionEntitlementPayload(subscription, uid, stripeCustomerId),
   };
 };
-
-/** Returns the first usable Stripe identifier from expanded objects or plain IDs. */
-const getFirstStripeObjectId = (values) => values.map(getStripeObjectId).find(Boolean) || '';
 
 /** Finds the payment intent across current and legacy Checkout invoice shapes. */
 const getCheckoutPaymentIntentId = (session, invoice, payments) =>
