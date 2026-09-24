@@ -45,9 +45,13 @@ import "./AccountPage.css";
 type AuthMode = "sign_in" | "sign_up";
 
 /** Renders the save button label while optionally showing a loading spinner. */
-const renderSaveDefaultsButtonLabel = (savingDefaults: boolean): React.ReactNode => (
+const renderSaveDefaultsButtonLabel = (
+  savingDefaults: boolean,
+): React.ReactNode => (
   <>
-    {savingDefaults ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+    {savingDefaults ? (
+      <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+    ) : null}
     Save Changes
   </>
 );
