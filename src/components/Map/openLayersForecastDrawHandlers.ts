@@ -8,7 +8,7 @@ import { addCustomFeature, addFeature } from "../../store/forecastSlice";
 import type { DayType } from "../../types/outlooks";
 import type { CustomCategoryTemplate, OneOffCustomLayer } from "../../types/customProducts";
 import type { LandMaskStrategy } from "../../utils/outlookPolygonMasking/types";
-import { toDrawnCustomFeature } from "./openLayersMapStyles";
+import { isPolygonOrMultiPolygon, toDrawnCustomFeature } from "./openLayersMapStyles";
 
 export interface DrawnFeatureHandlerOptions {
   currentDay: DayType;
@@ -29,13 +29,6 @@ export interface DrawnFeatureHandlerOptions {
   trimPreviewOnly: boolean;
   dispatch: (action: ReturnType<typeof addFeature> | ReturnType<typeof addCustomFeature>) => unknown;
 }
-
-/** Narrows serialized draw output to the polygon shapes the forecast store persists. */
-const isPolygonOrMultiPolygon = (value: unknown): value is Polygon | MultiPolygon => {
-  if (typeof value !== "object" || value === null) return false;
-  const type = (value as { type?: unknown }).type;
-  return type === "Polygon" || type === "MultiPolygon";
-};
 
 /** Persists a completed OpenLayers polygon as a custom or regular forecast feature. */
 export const handleForecastDrawEnd = (
