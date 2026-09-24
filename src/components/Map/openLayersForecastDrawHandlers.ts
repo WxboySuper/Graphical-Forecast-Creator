@@ -30,6 +30,13 @@ export interface DrawnFeatureHandlerOptions {
   dispatch: (action: ReturnType<typeof addFeature> | ReturnType<typeof addCustomFeature>) => unknown;
 }
 
+/** Narrows serialized draw output to the polygon shapes the forecast store persists. */
+const isPolygonOrMultiPolygon = (value: unknown): value is Polygon | MultiPolygon => {
+  if (typeof value !== "object" || value === null) return false;
+  const type = (value as { type?: unknown }).type;
+  return type === "Polygon" || type === "MultiPolygon";
+};
+
 /** Persists a completed OpenLayers polygon as a custom or regular forecast feature. */
 export const handleForecastDrawEnd = (
   event: { feature: OLFeature<Geometry> },
@@ -41,13 +48,13 @@ export const handleForecastDrawEnd = (
 
   (async () => {
     try {
-      const geometryObject = format.writeGeometryObject(geometry, {
+      const geometryObject: unknown = format.writeGeometryObject(geometry, {
         dataProjection: "EPSG:4326",
         featureProjection: "EPSG:3857",
       });
-      if (geometryObject.type !== "Polygon" && geometryObject.type !== "MultiPolygon") return;
+      if (!isPolygonOrMultiPolygon(geometryObject)) return;
       const customFeature = toDrawnCustomFeature(
-        geometryObject as unknown as Geometry,
+        geometryObject,
         options.activeCustomLayer,
         options.activeCustomCategory,
         options.customMode,
@@ -57,7 +64,7 @@ export const handleForecastDrawEnd = (
         return;
       }
 
-      let outlookGeometry: Polygon | MultiPolygon | null = geometryObject as Polygon | MultiPolygon;
+      let outlookGeometry: Polygon | MultiPolygon | null = geometryObject;
       outlookGeometry = await options.trimGeometryForAutoDraw(
         outlookGeometry,
         options.trimStrategy,
