@@ -113,10 +113,18 @@ describe('cloneOutlookData', () => {
 
     const cloned = cloneOutlookData(data);
 
-    expect(cloned['day4-8']?.get('15%')?.[0]).toEqual(data['day4-8']?.get('15%')?.[0]);
-    expect(cloned['day4-8']?.get('15%')?.[0]).not.toBe(data['day4-8']?.get('15%')?.[0]);
     expect(cloned.tornado?.get('2%')?.[0]).toEqual(data.tornado?.get('2%')?.[0]);
     expect(cloned.tornado?.get('2%')?.[0]).not.toBe(data.tornado?.get('2%')?.[0]);
+    expect(cloned.wind?.get('5%')?.[0]).toEqual(data.wind?.get('5%')?.[0]);
+    expect(cloned.wind?.get('5%')?.[0]).not.toBe(data.wind?.get('5%')?.[0]);
+    expect(cloned.hail?.get('5%')?.[0]).toEqual(data.hail?.get('5%')?.[0]);
+    expect(cloned.hail?.get('5%')?.[0]).not.toBe(data.hail?.get('5%')?.[0]);
+    expect(cloned.totalSevere?.get('15%')?.[0]).toEqual(data.totalSevere?.get('15%')?.[0]);
+    expect(cloned.totalSevere?.get('15%')?.[0]).not.toBe(data.totalSevere?.get('15%')?.[0]);
+    expect(cloned.categorical?.get('MRGL')?.[0]).toEqual(data.categorical?.get('MRGL')?.[0]);
+    expect(cloned.categorical?.get('MRGL')?.[0]).not.toBe(data.categorical?.get('MRGL')?.[0]);
+    expect(cloned['day4-8']?.get('15%')?.[0]).toEqual(data['day4-8']?.get('15%')?.[0]);
+    expect(cloned['day4-8']?.get('15%')?.[0]).not.toBe(data['day4-8']?.get('15%')?.[0]);
   });
 
   test('preserves missing maps and isolates live edits', () => {
