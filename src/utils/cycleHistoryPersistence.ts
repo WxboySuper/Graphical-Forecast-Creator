@@ -45,7 +45,7 @@ const toPersistedSavedCycle = (cycle: SavedCycle): PersistedSavedCycle => ({
   label: cycle.label,
   forecastData: serializeForecast(cycle.forecastCycle, STORAGE_MAP_VIEW, cycle.workflowMetadata),
   stats: cycle.stats,
-  workspaceId: cycle.workspaceId,
+  workspaceId: getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE,
   workflowMetadata: cycle.workflowMetadata,
 });
 
