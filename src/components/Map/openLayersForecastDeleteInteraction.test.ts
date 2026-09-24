@@ -1,7 +1,8 @@
 /**
  * Focused tests for the extracted forecast delete interaction seam.
- * Covers the inactive default, the auto-generated categorical guard,
- * custom/forecast deletion dispatches, and the unknown-identity no-op.
+ * Covers the inactive default, layer restriction, delete-mode activation,
+ * the auto-generated categorical guard, custom/forecast deletion dispatches,
+ * and the unknown-identity no-op.
  */
 import Feature from "ol/Feature";
 import Polygon from "ol/geom/Polygon";
@@ -10,7 +11,7 @@ import VectorSource from "ol/source/Vector";
 import { SelectEvent } from "ol/interaction/Select";
 
 import type { AppDispatch } from "../../store";
-import { createForecastDeleteInteraction } from "./openLayersForecastDeleteInteraction";
+import { createForecastDeleteInteraction, setForecastDeleteMode } from "./openLayersForecastDeleteInteraction";
 
 const createLayers = () => ({
   vectorLayer: new VectorLayer({ source: new VectorSource() }),
@@ -31,9 +32,13 @@ type DeleteInteraction = ReturnType<typeof createForecastDeleteInteraction>;
 
 const setup = () => {
   const dispatch = jest.fn() as unknown as AppDispatch;
-  const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
-  return { dispatch, select };
+  const layers = createLayers();
+  const select = createForecastDeleteInteraction({ ...layers, dispatch });
+  return { dispatch, select, ...layers };
 };
+
+const getLayerFilter = (select: DeleteInteraction) =>
+  (select as unknown as { layerFilter_: (layer: unknown) => boolean }).layerFilter_;
 
 const emitSelect = (select: DeleteInteraction, selected: Feature[]) => {
   select.dispatchEvent(new SelectEvent("select", selected as never[], [], undefined as never));
@@ -51,6 +56,19 @@ describe("createForecastDeleteInteraction", () => {
     const { select } = setup();
 
     expect(select.getActive()).toBe(false);
+  });
+
+  test("restricts picking to editable outlook layers", () => {
+    const dispatch = jest.fn() as unknown as AppDispatch;
+    const vectorLayer = new VectorLayer({ source: new VectorSource() });
+    const catLayer = new VectorLayer({ source: new VectorSource() });
+    const overlayLayer = new VectorLayer({ source: new VectorSource() });
+    const select = createForecastDeleteInteraction({ vectorLayer, catLayer, dispatch });
+    const layerFilter = getLayerFilter(select);
+
+    expect(layerFilter(vectorLayer)).toBe(true);
+    expect(layerFilter(catLayer)).toBe(true);
+    expect(layerFilter(overlayLayer)).toBe(false);
   });
 
   const deletionCases = [
@@ -121,5 +139,30 @@ describe("createForecastDeleteInteraction", () => {
     emitSelect(select, []);
 
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("setForecastDeleteMode", () => {
+  test("activates the selector without dropping a pending selection", () => {
+    const { select } = setup();
+    const feature = createPolygonFeature({ featureId: "pending-1" });
+    select.getFeatures().push(feature as never);
+
+    setForecastDeleteMode(select, true);
+
+    expect(select.getActive()).toBe(true);
+    expect(select.getFeatures().getLength()).toBe(1);
+  });
+
+  test("deactivates the selector and clears stale highlights", () => {
+    const { select } = setup();
+    const feature = createPolygonFeature({ featureId: "stale-1" });
+    select.setActive(true);
+    select.getFeatures().push(feature as never);
+
+    setForecastDeleteMode(select, false);
+
+    expect(select.getActive()).toBe(false);
+    expect(select.getFeatures().getLength()).toBe(0);
   });
 });
