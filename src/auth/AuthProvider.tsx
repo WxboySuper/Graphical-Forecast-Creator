@@ -491,9 +491,7 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   refreshBetaAccess: disabledAuthAction,
 });
 
-/** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
-/** Local-only auth action helpers (extracted to reduce hook complexity) */
-/** Local API route and metric suffix selected by the public credential wrappers. */
+/** Local-only auth action helpers (extracted to reduce hook complexity). */
 type LocalCredentialAction = 'signin' | 'signup';
 
 /** Post a local credential action and apply its response to the shared auth state. */

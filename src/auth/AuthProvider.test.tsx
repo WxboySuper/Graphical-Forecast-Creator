@@ -916,6 +916,27 @@ describe('AuthProvider local credential edge cases', () => {
     expect(fetchMock()).toHaveBeenNthCalledWith(1, '/api/local/signup', expect.objectContaining({ method: 'POST' }));
   });
 
+  test('surfaces network failures to user-facing errors for sign-in and sign-up', async () => {
+    const signInDeps = makeCredentialDeps();
+    const signUpDeps = makeCredentialDeps();
+    fetchMock().mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'));
+
+    await expect(localSignInWithEmail({ email: 'user@example.com', password: 'secret' }, signInDeps)).rejects.toThrow(
+      'offline',
+    );
+    expect(signInDeps.setError).toHaveBeenCalledWith('offline');
+    expect(signInDeps.setStatus).not.toHaveBeenCalledWith('signed_in');
+
+    await expect(localSignUpWithEmail({ email: 'new@example.com', password: 'secret' }, signUpDeps)).rejects.toThrow(
+      'offline',
+    );
+    expect(signUpDeps.setError).toHaveBeenCalledWith('offline');
+    expect(signUpDeps.setStatus).not.toHaveBeenCalledWith('signed_in');
+    expect(fetchMock()).toHaveBeenCalledTimes(2);
+    expect(fetchMock()).toHaveBeenNthCalledWith(1, '/api/local/signin', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock()).toHaveBeenNthCalledWith(2, '/api/local/signup', expect.objectContaining({ method: 'POST' }));
+  });
+
   test('tolerates malformed JSON on successful sign-in and sign-up', async () => {
     const signInDeps = makeCredentialDeps();
     const signUpDeps = makeCredentialDeps();
@@ -1101,5 +1122,27 @@ describe('AuthProvider Local Auth', () => {
       '/api/local/profile',
       expect.objectContaining({ method: 'GET' })
     );
+  });
+
+  test('sign-in and sign-up network failures surface hook error state', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: false })
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new Error('offline'));
+
+    const { result } = renderAuthHookWithStore(store);
+
+    await waitForAuthEffects(0);
+    expect(result.current.status).toBe('signed_out');
+
+    await act(async () => {
+      await expect(result.current.signInWithEmail('user@example.com', 'secret')).rejects.toThrow('offline');
+    });
+    expect(result.current.error).toBe('offline');
+
+    await act(async () => {
+      await expect(result.current.signUpWithEmail('new@example.com', 'secret')).rejects.toThrow('offline');
+    });
+    expect(result.current.error).toBe('offline');
   });
 });
