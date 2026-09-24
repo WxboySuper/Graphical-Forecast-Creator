@@ -259,4 +259,66 @@ describe("CloudLibraryPage", () => {
     fireEvent.keyDown(screen.getByRole("tab", { name: /All 2/i }), { key: "End" });
     expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("aria-selected", "true");
   });
+
+  it("uses roving tabindex so only the active tab is in the tab order", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+
+    renderPage();
+    expect(screen.getByRole("tab", { name: /All 2/i })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: /Severe 1/i })).toHaveAttribute("tabindex", "-1");
+    expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("tabindex", "-1");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
+    expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: /All 2/i })).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("ignores non-navigation keys without moving selection or focus", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+
+    renderPage();
+    const allTab = screen.getByRole("tab", { name: /All 2/i });
+    allTab.focus();
+    fireEvent.keyDown(allTab, { key: "Enter" });
+
+    expect(allTab).toHaveAttribute("aria-selected", "true");
+    expect(allTab).toHaveFocus();
+    expect(screen.getByRole("tab", { name: /Severe 1/i })).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("removes the extra panel tab stop when panel content is interactive", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }],
+      })
+    );
+
+    renderPage();
+    expect(screen.getByRole("tabpanel")).not.toHaveAttribute("tabindex");
+  });
+
+  it("keeps the panel focusable while loading without interactive content", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [], loading: true }));
+
+    renderPage();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
+  });
 });
