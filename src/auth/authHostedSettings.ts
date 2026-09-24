@@ -139,10 +139,18 @@ export const attachHostedSettingsSubscription = (
   subscriptionPromise: Promise<Unsubscribe | undefined>,
   isActive: () => boolean,
   setSubscription: (unsubscribe: Unsubscribe) => void,
-): Promise<void> => subscriptionPromise.then((nextUnsubscribe) => {
-  if (!isActive()) {
-    nextUnsubscribe?.();
-    return;
-  }
-  if (nextUnsubscribe) setSubscription(nextUnsubscribe);
-});
+): Promise<void> =>
+  subscriptionPromise.then(
+    (nextUnsubscribe) => {
+      if (!isActive()) {
+        nextUnsubscribe?.();
+        return;
+      }
+      if (nextUnsubscribe) setSubscription(nextUnsubscribe);
+    },
+    () => {
+      // runInitialHostedSync already reports sync failures through status and
+      // error state. Swallow a late handoff rejection here so the effect's
+      // floating promise cannot surface an unhandled rejection.
+    },
+  );
