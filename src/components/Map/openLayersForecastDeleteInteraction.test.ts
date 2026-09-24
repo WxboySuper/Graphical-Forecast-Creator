@@ -17,107 +17,106 @@ const createLayers = () => ({
   catLayer: new VectorLayer({ source: new VectorSource() }),
 });
 
+const POLYGON_RING = [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]];
+
 const createPolygonFeature = (properties: Record<string, unknown>) => {
-  const feature = new Feature({
-    geometry: new Polygon([[
-      [0, 0],
-      [1, 0],
-      [1, 1],
-      [0, 1],
-      [0, 0],
-    ]]),
-  });
+  const feature = new Feature({ geometry: new Polygon(POLYGON_RING) });
   Object.entries(properties).forEach(([key, value]) => {
     feature.set(key, value);
   });
   return feature;
 };
 
-const emitSelect = (select: ReturnType<typeof createForecastDeleteInteraction>, selected: Feature[]) => {
+type DeleteInteraction = ReturnType<typeof createForecastDeleteInteraction>;
+
+const setup = () => {
+  const dispatch = jest.fn() as unknown as AppDispatch;
+  const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
+  return { dispatch, select };
+};
+
+const emitSelect = (select: DeleteInteraction, selected: Feature[]) => {
   select.dispatchEvent(new SelectEvent("select", selected as never[], [], undefined as never));
+};
+
+const selectFeature = (select: DeleteInteraction, properties: Record<string, unknown>) => {
+  const feature = createPolygonFeature(properties);
+  select.getFeatures().push(feature as never);
+  emitSelect(select, [feature]);
+  return feature;
 };
 
 describe("createForecastDeleteInteraction", () => {
   test("creates an inactive selector", () => {
-    const dispatch = jest.fn() as unknown as AppDispatch;
-    const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
+    const { select } = setup();
 
     expect(select.getActive()).toBe(false);
   });
 
-  test("keeps auto-generated categorical features read-only", () => {
-    const dispatch = jest.fn() as unknown as AppDispatch;
-    const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
-    const feature = createPolygonFeature({
-      featureId: "cat-1",
-      outlookType: "categorical",
-      probability: "TSTM",
-      derivedFrom: "auto-generated",
-    });
-    select.getFeatures().push(feature as never);
-
-    emitSelect(select, [feature as never]);
-
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(select.getFeatures().getLength()).toBe(0);
-  });
-
-  test("dispatches custom deletion for custom features", () => {
-    const dispatch = jest.fn() as unknown as AppDispatch;
-    const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
-    const feature = createPolygonFeature({
-      featureId: "custom-1",
-      customLayerId: "layer-1",
-      categoryId: "category-1",
-      title: "Custom title",
-    });
-    select.getFeatures().push(feature as never);
-
-    emitSelect(select, [feature as never]);
-
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
-      type: expect.stringContaining("removeCustomFeature"),
+  const deletionCases = [
+    {
+      name: "dispatches custom deletion for custom features",
+      properties: {
+        featureId: "custom-1",
+        customLayerId: "layer-1",
+        categoryId: "category-1",
+        title: "Custom title",
+      },
+      typeSubstring: "removeCustomFeature",
       payload: { layerId: "layer-1", featureId: "custom-1" },
-    }));
-    expect(select.getFeatures().getLength()).toBe(0);
-  });
+    },
+    {
+      name: "dispatches forecast deletion for outlook features",
+      properties: {
+        featureId: "tornado-1",
+        outlookType: "tornado",
+        probability: "2%",
+      },
+      typeSubstring: "removeFeature",
+      payload: { outlookType: "tornado", probability: "2%", featureId: "tornado-1" },
+    },
+  ];
 
-  test("dispatches forecast deletion for outlook features", () => {
-    const dispatch = jest.fn() as unknown as AppDispatch;
-    const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
-    const feature = createPolygonFeature({
-      featureId: "tornado-1",
-      outlookType: "tornado",
-      probability: "2%",
-    });
-    select.getFeatures().push(feature as never);
+  test.each(deletionCases)("$name", ({ properties, typeSubstring, payload }) => {
+    const { dispatch, select } = setup();
 
-    emitSelect(select, [feature as never]);
+    selectFeature(select, properties);
 
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
-      type: expect.stringContaining("removeFeature"),
-      payload: { outlookType: "tornado", probability: "2%", featureId: "tornado-1" },
+      type: expect.stringContaining(typeSubstring),
+      payload,
     }));
     expect(select.getFeatures().getLength()).toBe(0);
   });
 
-  test("clears unknown identities without dispatching", () => {
-    const dispatch = jest.fn() as unknown as AppDispatch;
-    const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
-    const feature = createPolygonFeature({ outlookType: "tornado" });
-    select.getFeatures().push(feature as never);
+  const noDispatchCases = [
+    {
+      name: "keeps auto-generated categorical features read-only",
+      properties: {
+        featureId: "cat-1",
+        outlookType: "categorical",
+        probability: "TSTM",
+        derivedFrom: "auto-generated",
+      },
+    },
+    {
+      name: "clears unknown identities without dispatching",
+      properties: { outlookType: "tornado" },
+    },
+  ];
 
-    emitSelect(select, [feature as never]);
+  test.each(noDispatchCases)("$name", ({ properties }) => {
+    const { dispatch, select } = setup();
+
+    selectFeature(select, properties);
 
     expect(dispatch).not.toHaveBeenCalled();
     expect(select.getFeatures().getLength()).toBe(0);
   });
 
   test("ignores empty selections without dispatching", () => {
-    const dispatch = jest.fn() as unknown as AppDispatch;
-    const select = createForecastDeleteInteraction({ ...createLayers(), dispatch });
+    const { dispatch, select } = setup();
 
     emitSelect(select, []);
 
