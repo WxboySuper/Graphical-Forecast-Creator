@@ -12,10 +12,7 @@ import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
 import { getBuildTarget } from '../config/buildTarget';
 import { getForecastWorkspace } from '../config/forecastWorkspaces';
-import {
-  getDefaultForecastWorkspacePath,
-  getForecastWorkspacePath,
-} from '../routing/forecastWorkspaceRoutes';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
@@ -126,7 +123,7 @@ const CloudLibraryUtilityActions: React.FC<{
 }> = ({ premiumActive, isExpiredPremium }) => (
   <div className="cloud-library-support-actions">
     <Button asChild variant="default">
-      <Link to="/forecast">Back to Forecast Editor</Link>
+      <Link to={getDefaultForecastWorkspacePath()}>Back to Forecast Editor</Link>
     </Button>
     <Button asChild variant={premiumActive ? 'outline' : 'default'}>
       <Link to="/pricing">{premiumActive ? 'View Pricing' : 'Upgrade to Premium'}</Link>
@@ -425,11 +422,19 @@ const CloudCycleActions: React.FC<{
   );
 };
 
+interface CycleRowUiState {
+  isRenaming: boolean;
+  draft: string | null;
+  confirmingDelete: boolean;
+}
+
 interface CycleItemProps {
   cycle: CloudCycleMetadata;
   canWrite: boolean;
   loading: boolean;
   showWorkspaceBadge?: boolean;
+  rowState: CycleRowUiState;
+  onRowStateChange: (next: CycleRowUiState) => void;
   onLoad: (cycleId: string) => Promise<void>;
   onDelete: (cycleId: string) => Promise<void>;
   onRename: (cycleId: string, newLabel: string) => Promise<void>;
@@ -444,19 +449,18 @@ interface CloudLibraryActions {
 }
 
 /** One cloud cycle row inside the library list. */
-const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWorkspaceBadge = false, onLoad, onDelete, onRename }) => {
+const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWorkspaceBadge = false, rowState, onRowStateChange, onLoad, onDelete, onRename }) => {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isRenaming, setIsRenaming] = useState(false);
   const [isSavingRename, setIsSavingRename] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [newLabel, setNewLabel] = useState(cycle.label);
+  const { isRenaming, confirmingDelete } = rowState;
+  const newLabel = rowState.draft ?? cycle.label;
 
   /** Deletes the selected cloud cycle after the inline confirmation has been accepted. */
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
       await onDelete(cycle.id);
-      setConfirmingDelete(false);
+      onRowStateChange({ ...rowState, confirmingDelete: false });
     } finally {
       setIsDeleting(false);
     }
@@ -465,8 +469,7 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
   /** Saves a renamed cloud-cycle label and exits inline editing when the request completes. */
   const handleRenameSave = async () => {
     if (!newLabel.trim() || newLabel.trim() === cycle.label) {
-      setIsRenaming(false);
-      setNewLabel(cycle.label);
+      onRowStateChange({ isRenaming: false, draft: null, confirmingDelete: false });
       return;
     }
 
@@ -475,7 +478,7 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
       await onRename(cycle.id, newLabel.trim());
     } finally {
       setIsSavingRename(false);
-      setIsRenaming(false);
+      onRowStateChange({ isRenaming: false, draft: null, confirmingDelete: false });
     }
   };
 
@@ -489,12 +492,10 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
             <CycleRenameRow
               newLabel={newLabel}
               isBusy={loading || isSavingRename}
-              onLabelChange={setNewLabel}
+              onLabelChange={(value) => onRowStateChange({ ...rowState, draft: value })}
               onSave={handleRenameSave}
               onCancel={() => {
-                setIsRenaming(false);
-                setNewLabel(cycle.label);
-                setConfirmingDelete(false);
+                onRowStateChange({ isRenaming: false, draft: null, confirmingDelete: false });
               }}
             />
           ) : null}
@@ -512,11 +513,10 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
           confirmingDelete={confirmingDelete}
           onLoad={() => onLoad(cycle.id)}
           onStartRename={() => {
-            setIsRenaming(true);
-            setConfirmingDelete(false);
+            onRowStateChange({ ...rowState, isRenaming: true, confirmingDelete: false });
           }}
-          onRequestDelete={() => setConfirmingDelete(true)}
-          onCancelDelete={() => setConfirmingDelete(false)}
+          onRequestDelete={() => onRowStateChange({ ...rowState, confirmingDelete: true })}
+          onCancelDelete={() => onRowStateChange({ ...rowState, confirmingDelete: false })}
           onConfirmDelete={handleDelete}
         />
       </CardContent>
@@ -609,8 +609,9 @@ const CloudLibraryTabs: React.FC<{
           className="cloud-library-tab"
           onClick={() => onTabChange(tab.id)}
           onKeyDown={(event) => {
+            if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
             const nextId = getNextCloudLibraryTabId(tabs, tab.id, event.key);
-            if (nextId === null) return;
+            if (nextId === null || nextId === tab.id) return;
             event.preventDefault();
             pendingFocus.current = nextId;
             onTabChange(nextId);
@@ -653,24 +654,27 @@ const CloudLibraryMainCard: React.FC<{
   onDeleteCycle,
   onRenameCycle,
   onTabChange,
-}) => (
+}) => {
+  const [rowStates, setRowStates] = useState<Record<string, CycleRowUiState>>({});
+
+  return (
   <Card className="cloud-library-surface-card">
     <CardHeader className="cloud-library-section-header">
       <CardTitle>Your cloud cycles</CardTitle>
       <CardDescription>Open a saved package, rename it, or clear out older copies.</CardDescription>
       <CloudLibraryTabs tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
     </CardHeader>
-    <CardContent className="cloud-library-list-content" id="cloud-library-panel" role="tabpanel" tabIndex={loading && cycles.length === 0 ? 0 : undefined} aria-labelledby={`cloud-library-tab-${activeTab}`}>
+    <CardContent className="cloud-library-list-content" id="cloud-library-panel" role="tabpanel" tabIndex={loading ? 0 : undefined} aria-labelledby={`cloud-library-tab-${activeTab}`}>
       {loading && cycles.length === 0 ? (
         <div
           className="cloud-library-loading"
           role="status"
           aria-live="polite"
           aria-busy="true"
-          aria-label="Loading cloud cycles"
+          aria-labelledby="cloud-library-loading-text"
         >
           <LoaderCircle className="h-6 w-6 animate-spin" aria-hidden="true" />
-          <span>Loading cloud cycles</span>
+          <span id="cloud-library-loading-text">Loading cloud cycles</span>
         </div>
       ) : cycles.length === 0 ? (
         <EmptyState
@@ -693,6 +697,8 @@ const CloudLibraryMainCard: React.FC<{
                 canWrite={canWrite}
                 loading={loading}
                 showWorkspaceBadge={activeTab === 'all'}
+                rowState={rowStates[cycle.id] ?? { isRenaming: false, draft: null, confirmingDelete: false }}
+                onRowStateChange={(next) => setRowStates((prev) => ({ ...prev, [cycle.id]: next }))}
                 onLoad={onLoadCycle}
                 onDelete={onDeleteCycle}
                 onRename={onRenameCycle}
@@ -703,7 +709,8 @@ const CloudLibraryMainCard: React.FC<{
       )}
     </CardContent>
   </Card>
-);
+  );
+};
 
 /** Signed-in library layout tying together the main list and the utility rail. */
 const CloudLibrarySignedInLayout: React.FC<{
@@ -871,6 +878,13 @@ const CloudLibraryPage: React.FC = () => {
   const tabs = useMemo(() => getCloudLibraryTabs(cycles, buildTarget), [cycles, buildTarget]);
   const effectiveActiveTab = resolveActiveCloudLibraryTab(tabs, activeTab);
 
+  /** Resets selection to All when exposure changes remove the selected workspace. */
+  useEffect(() => {
+    if (effectiveActiveTab !== activeTab) {
+      setActiveTab(effectiveActiveTab);
+    }
+  }, [effectiveActiveTab, activeTab]);
+
   const visibleCycles = useMemo(
     () => filterCloudCyclesByWorkspace(cycles, effectiveActiveTab),
     [effectiveActiveTab, cycles]
@@ -901,7 +915,9 @@ const CloudLibraryPage: React.FC = () => {
   const workspacePath =
     effectiveActiveTab === 'all'
       ? getDefaultForecastWorkspacePath()
-      : getForecastWorkspacePath(effectiveActiveTab);
+      : effectiveActiveTab === 'custom'
+        ? '/custom-products'
+        : (getForecastWorkspace(effectiveActiveTab)?.path ?? getDefaultForecastWorkspacePath());
 
   if (!user) {
     return <SignedOutGate />;

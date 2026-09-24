@@ -6,6 +6,8 @@ import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
 import CloudLibraryPage from "./CloudLibraryPage";
 import { getDefaultForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
+import { getForecastWorkspaceByLegacyPath } from "../config/forecastWorkspaces";
+import { getExposedGatedRoutePaths } from "../routing/buildFeatureGatedRoutes";
 
 const mockNavigate = jest.fn();
 jest.mock("react-router", () => ({
@@ -132,12 +134,20 @@ describe("CloudLibraryPage", () => {
       "href",
       getDefaultForecastWorkspacePath(),
     );
+    expect(getDefaultForecastWorkspacePath()).toBe("/forecast/severe");
+    fireEvent.click(screen.getByRole("tab", { name: /Severe 0/i }));
+    expect(screen.getByText("No Severe cloud cycles saved yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Forecast Editor" })).toHaveAttribute(
+      "href",
+      "/forecast/severe",
+    );
     fireEvent.click(screen.getByRole("tab", { name: /Custom 0/i }));
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Forecast Editor" })).toHaveAttribute(
       "href",
-      "/forecast/custom",
+      "/custom-products",
     );
+    expect(getExposedGatedRoutePaths()).toContain("/custom-products");
   });
 
   it("keeps unsupported Load focusable with aria-disabled and a hint while blocking activation", () => {
@@ -431,5 +441,81 @@ describe("CloudLibraryPage", () => {
     expect(loadingStatus).toHaveAttribute("aria-busy", "true");
     expect(loadingStatus).toHaveTextContent("Loading cloud cycles");
     expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("ignores modified ArrowLeft/ArrowRight without preventDefault or tab changes", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+
+    renderPage();
+    const allTab = screen.getByRole("tab", { name: /All 2/i });
+    allTab.focus();
+    for (const mods of [{ shiftKey: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
+      const notCancelled = fireEvent.keyDown(allTab, { key: "ArrowRight", ...mods });
+      expect(notCancelled).not.toBe(false);
+      const notCancelledLeft = fireEvent.keyDown(allTab, { key: "ArrowLeft", ...mods });
+      expect(notCancelledLeft).not.toBe(false);
+    }
+
+    expect(allTab).toHaveAttribute("aria-selected", "true");
+    expect(allTab).toHaveFocus();
+    expect(screen.getByRole("tab", { name: /Severe 1/i })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "cloud-library-tab-all");
+  });
+
+  it("keeps the panel focusable while refreshing existing cycles", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }],
+        loading: true,
+      })
+    );
+
+    renderPage();
+    expect(screen.getByText("Severe save")).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("keeps rename draft when switching workspace filters away and back", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: "local" });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+
+    renderPage();
+    const renameButtons = screen.getAllByRole("button", { name: /rename/i });
+    fireEvent.click(renameButtons[0]);
+
+    const renameInput = screen.getByLabelText(/rename cloud cycle/i) as HTMLInputElement;
+    fireEvent.change(renameInput, { target: { value: "My draft rename" } });
+    expect(renameInput.value).toBe("My draft rename");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
+    expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
+    expect(screen.getByText("Custom save")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /All 2/i }));
+    expect(screen.getByText("Severe save")).toBeInTheDocument();
+    const restoredInput = screen.getByLabelText(/rename cloud cycle/i) as HTMLInputElement;
+    expect(restoredInput.value).toBe("My draft rename");
+  });
+
+  it("exposes the registered custom-products route for the Custom workspace", () => {
+    expect(getForecastWorkspaceByLegacyPath("/custom-products")?.id).toBe("custom");
+    expect(getExposedGatedRoutePaths()).toContain("/custom-products");
   });
 });
