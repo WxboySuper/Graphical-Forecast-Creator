@@ -1,4 +1,3 @@
-// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import type { Feature, Polygon } from 'geojson';
 import type { DayType } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
@@ -35,6 +34,7 @@ import reducer, {
   startFromPreviousCycle,
   saveCurrentCycle,
   setForecastWorkspace,
+  loadSavedCycle,
   deleteSavedCycle,
   loadCycleHistory,
   SAVED_CYCLES_LIMIT,
@@ -358,6 +358,40 @@ describe('forecastSlice undo/redo', () => {
       lifetimeCycleStats: { totalCyclesMade: 1, totalForecastsMade: 0 },
     }));
     expect(hydratedSnapshot.savedCycles[0]?.workspaceId).toBe('severe');
+  });
+
+  test('adopts the saved cycle workspace when loading a cycle', () => {
+    let state = reducer(undefined, setForecastWorkspace('custom'));
+    state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
+    const customId = state.savedCycles[0]?.id as string;
+
+    state = reducer(state, setForecastWorkspace('severe'));
+    expect(state.workspaceId).toBe('severe');
+
+    state = reducer(state, loadSavedCycle(customId));
+    expect(state.workspaceId).toBe('custom');
+  });
+
+  test('falls back to Severe when loading a cycle with missing or malformed ownership', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    state = reducer(state, saveCurrentCycle({ label: 'Legacy load' }));
+    const legacyId = state.savedCycles[0]?.id as string;
+
+    const missingOwner = {
+      ...state.savedCycles[0],
+    };
+    delete (missingOwner as { workspaceId?: string }).workspaceId;
+    const withMissing = {
+      ...state,
+      savedCycles: [missingOwner],
+    };
+    expect(reducer(withMissing, loadSavedCycle(legacyId)).workspaceId).toBe('severe');
+
+    const withMalformed = {
+      ...state,
+      savedCycles: [{ ...state.savedCycles[0], workspaceId: 'not-a-workspace' } as never],
+    };
+    expect(reducer(withMalformed, loadSavedCycle(legacyId)).workspaceId).toBe('severe');
   });
 
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
