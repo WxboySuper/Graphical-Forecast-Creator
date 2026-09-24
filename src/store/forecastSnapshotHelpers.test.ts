@@ -101,61 +101,34 @@ describe('cloneEntries', () => {
 });
 
 describe('cloneOutlookData', () => {
-  const createOutlookData = (): OutlookData => ({
-    tornado: new Map([['2%', [createFeature('tornado-1', 0)]]]),
-    wind: new Map([['5%', [createFeature('wind-1', 1)]]]),
-    hail: new Map([['5%', [createFeature('hail-1', 2)]]]),
-    totalSevere: new Map([['15%', [createFeature('severe-1', 3)]]]),
-    categorical: new Map([['MRGL', [createFeature('cat-1', 4)]]]),
-    'day4-8': new Map([['15%', [createFeature('day48-1', 5)]]]),
-  });
+  type OutlookMapKey = 'tornado' | 'wind' | 'hail' | 'totalSevere' | 'categorical' | 'day4-8';
 
-  test('clones the tornado map', () => {
-    const data = createOutlookData();
+  const outlookCloneCases: { key: OutlookMapKey; probability: string; id: string; offset: number }[] = [
+    { key: 'tornado', probability: '2%', id: 'tornado-1', offset: 0 },
+    { key: 'wind', probability: '5%', id: 'wind-1', offset: 1 },
+    { key: 'hail', probability: '5%', id: 'hail-1', offset: 2 },
+    { key: 'totalSevere', probability: '15%', id: 'severe-1', offset: 3 },
+    { key: 'categorical', probability: 'MRGL', id: 'cat-1', offset: 4 },
+    { key: 'day4-8', probability: '15%', id: 'day48-1', offset: 5 },
+  ];
+
+  const createSingleMapData = (
+    key: OutlookMapKey,
+    probability: string,
+    id: string,
+    offset: number,
+  ): OutlookData => {
+    const data: OutlookData = {};
+    data[key] = new Map([[probability, [createFeature(id, offset)]]]);
+    return data;
+  };
+
+  test.each(outlookCloneCases)('clones the $key map', ({ key, probability, id, offset }) => {
+    const data = createSingleMapData(key, probability, id, offset);
     const cloned = cloneOutlookData(data);
 
-    expect(cloned.tornado?.get('2%')?.[0]).toEqual(data.tornado?.get('2%')?.[0]);
-    expect(cloned.tornado?.get('2%')?.[0]).not.toBe(data.tornado?.get('2%')?.[0]);
-  });
-
-  test('clones the wind map', () => {
-    const data = createOutlookData();
-    const cloned = cloneOutlookData(data);
-
-    expect(cloned.wind?.get('5%')?.[0]).toEqual(data.wind?.get('5%')?.[0]);
-    expect(cloned.wind?.get('5%')?.[0]).not.toBe(data.wind?.get('5%')?.[0]);
-  });
-
-  test('clones the hail map', () => {
-    const data = createOutlookData();
-    const cloned = cloneOutlookData(data);
-
-    expect(cloned.hail?.get('5%')?.[0]).toEqual(data.hail?.get('5%')?.[0]);
-    expect(cloned.hail?.get('5%')?.[0]).not.toBe(data.hail?.get('5%')?.[0]);
-  });
-
-  test('clones the total severe map', () => {
-    const data = createOutlookData();
-    const cloned = cloneOutlookData(data);
-
-    expect(cloned.totalSevere?.get('15%')?.[0]).toEqual(data.totalSevere?.get('15%')?.[0]);
-    expect(cloned.totalSevere?.get('15%')?.[0]).not.toBe(data.totalSevere?.get('15%')?.[0]);
-  });
-
-  test('clones the categorical map', () => {
-    const data = createOutlookData();
-    const cloned = cloneOutlookData(data);
-
-    expect(cloned.categorical?.get('MRGL')?.[0]).toEqual(data.categorical?.get('MRGL')?.[0]);
-    expect(cloned.categorical?.get('MRGL')?.[0]).not.toBe(data.categorical?.get('MRGL')?.[0]);
-  });
-
-  test('clones the day4-8 map', () => {
-    const data = createOutlookData();
-    const cloned = cloneOutlookData(data);
-
-    expect(cloned['day4-8']?.get('15%')?.[0]).toEqual(data['day4-8']?.get('15%')?.[0]);
-    expect(cloned['day4-8']?.get('15%')?.[0]).not.toBe(data['day4-8']?.get('15%')?.[0]);
+    expect(cloned[key]?.get(probability)?.[0]).toEqual(data[key]?.get(probability)?.[0]);
+    expect(cloned[key]?.get(probability)?.[0]).not.toBe(data[key]?.get(probability)?.[0]);
   });
 
   test('preserves missing maps and isolates live edits', () => {
@@ -164,11 +137,9 @@ describe('cloneOutlookData', () => {
 
     const cloned = cloneOutlookData(data);
 
-    expect(cloned.wind).toBeUndefined();
-    expect(cloned.hail).toBeUndefined();
-    expect(cloned.totalSevere).toBeUndefined();
-    expect(cloned.categorical).toBeUndefined();
-    expect(cloned['day4-8']).toBeUndefined();
+    for (const key of ['wind', 'hail', 'totalSevere', 'categorical', 'day4-8'] as const) {
+      expect(cloned[key]).toBeUndefined();
+    }
 
     feature.properties = { ...feature.properties, probability: '10%' };
     expect(cloned.tornado?.get('2%')?.[0].properties).toMatchObject({ probability: '2%' });
