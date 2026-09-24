@@ -16,7 +16,7 @@ import VectorSource from "ol/source/Vector";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import GeoJSON from "ol/format/GeoJSON";
-import { Draw, Modify, Select, Snap } from "ol/interaction";
+import { Draw, type Modify, type Select, type Snap } from "ol/interaction";
 import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
 import type OLFeature from "ol/Feature";
