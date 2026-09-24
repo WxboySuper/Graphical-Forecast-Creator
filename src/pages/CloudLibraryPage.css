@@ -165,6 +165,7 @@
 .cloud-library-side-note,
 .cloud-library-feedback p,
 .cloud-library-notice-content p,
+.cloud-cycle-load-hint,
 .cloud-cycle-meta,
 .cloud-library-empty-copy p {
   margin: 0;
@@ -184,6 +185,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.cloud-library-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding-top: 0.35rem;
+}
+
+.cloud-library-tab {
+  gap: 0.55rem;
 }
 
 .cloud-library-list {

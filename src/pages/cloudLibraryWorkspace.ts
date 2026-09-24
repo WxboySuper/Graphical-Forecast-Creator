@@ -19,12 +19,59 @@ export interface CloudLibraryTab {
 export const getCloudCycleWorkspaceId = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): ForecastWorkspaceId =>
   getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
 
+/** Resolves the display label for one cycle, mapping legacy records to Severe. */
+export const getCloudCycleWorkspaceLabel = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): string =>
+  getForecastWorkspace(getCloudCycleWorkspaceId(cycle))?.label ?? 'Severe';
+
 /** Returns the cycles owned by one workspace, treating legacy records as Severe. */
 export const filterCloudCyclesByWorkspace = (
   cycles: CloudCycleMetadata[],
   tabId: CloudLibraryTabId,
 ): CloudCycleMetadata[] =>
   tabId === 'all' ? cycles : cycles.filter((cycle) => getCloudCycleWorkspaceId(cycle) === tabId);
+
+/** Returns the active tab when still present, otherwise falls back to All. */
+export const resolveActiveCloudLibraryTab = (
+  tabs: CloudLibraryTab[],
+  activeTab: CloudLibraryTabId,
+): CloudLibraryTabId =>
+  tabs.some((tab) => tab.id === activeTab) ? activeTab : 'all';
+
+/** Resolves Home and End navigation, or undefined when the key is not an edge key. */
+const getCloudLibraryEdgeTabId = (
+  tabs: CloudLibraryTab[],
+  key: string,
+): CloudLibraryTabId | null | undefined => {
+  if (key === 'Home') return tabs[0]?.id ?? null;
+  if (key === 'End') return tabs[tabs.length - 1]?.id ?? null;
+  return undefined;
+};
+
+/** Resolves Arrow navigation with wrapping, or null when the key does not move. */
+const getCloudLibraryArrowTabId = (
+  tabs: CloudLibraryTab[],
+  currentId: CloudLibraryTabId,
+  key: string,
+): CloudLibraryTabId | null => {
+  if (key !== 'ArrowRight' && key !== 'ArrowLeft') return null;
+
+  const currentIndex = tabs.findIndex((tab) => tab.id === currentId);
+  const safeIndex = currentIndex < 0 ? 0 : currentIndex;
+  const offset = key === 'ArrowRight' ? 1 : -1;
+  return tabs[(safeIndex + offset + tabs.length) % tabs.length]?.id ?? null;
+};
+
+/** Resolves the next tab for one keyboard command, or null when the key does nothing. */
+export const getNextCloudLibraryTabId = (
+  tabs: CloudLibraryTab[],
+  currentId: CloudLibraryTabId,
+  key: string,
+): CloudLibraryTabId | null => {
+  if (tabs.length === 0) return null;
+  const edgeTabId = getCloudLibraryEdgeTabId(tabs, key);
+  if (edgeTabId !== undefined) return edgeTabId;
+  return getCloudLibraryArrowTabId(tabs, currentId, key);
+};
 
 /** Builds stable library tabs from the exposed, non-future workspace registry. */
 export const getCloudLibraryTabs = (
