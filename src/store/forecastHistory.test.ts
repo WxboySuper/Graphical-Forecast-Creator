@@ -143,6 +143,52 @@ const editRestoredDay = (restoredDay: OutlookDay): void => {
   restoredDay.customLayers?.layers[0].features.pop();
 };
 
+const addWiringFeature = (): ForecastState =>
+  reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
+
+const applyUndoStamp = (state: ForecastState, timestamp: string): ForecastState =>
+  reducer(state, { ...undoLastEdit(), meta: { timestamp } });
+
+const applyRedoStamp = (state: ForecastState, timestamp: string): ForecastState =>
+  reducer(state, { ...redoLastEdit(), meta: { timestamp } });
+
+const readStackLengths = (state: ForecastState): { undo: number; redo: number } => {
+  const stacks = state.historyByDay[1];
+  return { undo: stacks?.undoStack.length ?? 0, redo: stacks?.redoStack.length ?? 0 };
+};
+
+const readUndoWiringResult = (state: ForecastState) => {
+  const day = state.forecastCycle.days[1];
+  const stacks = state.historyByDay[1];
+  const features = day?.data.tornado?.get('2%') ?? [];
+  const redoSnapshotFeatures = stacks?.redoStack[0]?.snapshot.data.tornado?.get('2%') ?? [];
+  return {
+    featureCount: features.length,
+    undo: stacks?.undoStack.length ?? 0,
+    redo: stacks?.redoStack.length ?? 0,
+    redoFirstId: redoSnapshotFeatures[0]?.id,
+    currentDay: state.forecastCycle.currentDay,
+    lastModified: day?.metadata.lastModified,
+    isSaved: state.isSaved,
+  };
+};
+
+const readRedoWiringResult = (state: ForecastState) => {
+  const day = state.forecastCycle.days[1];
+  const stacks = state.historyByDay[1];
+  const features = day?.data.tornado?.get('2%') ?? [];
+  const undoSnapshotFeatures = stacks?.undoStack[0]?.snapshot.data.tornado?.get('2%') ?? [];
+  return {
+    featureId: features[0]?.id,
+    undo: stacks?.undoStack.length ?? 0,
+    redo: stacks?.redoStack.length ?? 0,
+    undoSnapshotCount: undoSnapshotFeatures.length,
+    currentDay: state.forecastCycle.currentDay,
+    lastModified: day?.metadata.lastModified,
+    isSaved: state.isSaved,
+  };
+};
+
 describe('forecastHistory helpers', () => {
   test('creates per-day stacks that stay isolated', () => {
     const state = makeState({ 1: makeDay(1, 0), 2: makeDay(2, 5) }, 1);
@@ -322,38 +368,34 @@ describe('forecastHistory helpers', () => {
 
 describe('forecast history reducer wiring', () => {
   test('undoLastEdit drains undo into redo and stamps the action timestamp', () => {
-    let state = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
-    expect(state.historyByDay[1]?.undoStack).toHaveLength(1);
-    expect(state.historyByDay[1]?.redoStack ?? []).toHaveLength(0);
+    const added = addWiringFeature();
+    expect(readStackLengths(added)).toEqual({ redo: 0, undo: 1 });
 
-    state = reducer(state, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
-
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%') ?? []).toHaveLength(0);
-    expect(state.historyByDay[1]?.undoStack).toHaveLength(0);
-    expect(state.historyByDay[1]?.redoStack).toHaveLength(1);
-    expect(state.historyByDay[1]?.redoStack[0].snapshot.data.tornado?.get('2%')?.[0].id).toBe(
-      'wiring-1',
-    );
-    expect(state.forecastCycle.currentDay).toBe(1);
-    expect(state.forecastCycle.days[1]?.metadata.lastModified).toBe(UNDO_NOW);
-    expect(state.isSaved).toBe(false);
+    const undone = applyUndoStamp(added, UNDO_NOW);
+    expect(readUndoWiringResult(undone)).toEqual({
+      currentDay: 1,
+      featureCount: 0,
+      isSaved: false,
+      lastModified: UNDO_NOW,
+      redo: 1,
+      redoFirstId: 'wiring-1',
+      undo: 0,
+    });
   });
 
   test('redoLastEdit drains redo into undo and stamps the action timestamp', () => {
-    let state = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
-    state = reducer(state, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
-    expect(state.historyByDay[1]?.redoStack).toHaveLength(1);
+    const undone = applyUndoStamp(addWiringFeature(), UNDO_NOW);
+    expect(readStackLengths(undone)).toEqual({ redo: 1, undo: 0 });
 
-    state = reducer(state, { ...redoLastEdit(), meta: { timestamp: REDO_NOW } });
-
-    expect(state.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('wiring-1');
-    expect(state.historyByDay[1]?.redoStack).toHaveLength(0);
-    expect(state.historyByDay[1]?.undoStack).toHaveLength(1);
-    expect(state.historyByDay[1]?.undoStack[0].snapshot.data.tornado?.get('2%') ?? []).toHaveLength(
-      0,
-    );
-    expect(state.forecastCycle.currentDay).toBe(1);
-    expect(state.forecastCycle.days[1]?.metadata.lastModified).toBe(REDO_NOW);
-    expect(state.isSaved).toBe(false);
+    const redone = applyRedoStamp(undone, REDO_NOW);
+    expect(readRedoWiringResult(redone)).toEqual({
+      currentDay: 1,
+      featureId: 'wiring-1',
+      isSaved: false,
+      lastModified: REDO_NOW,
+      redo: 0,
+      undo: 1,
+      undoSnapshotCount: 0,
+    });
   });
 });
