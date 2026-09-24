@@ -19,7 +19,7 @@ const {
   createSubscriptionEntitlementWrite,
   getCheckoutRefundTarget,
   getSubscriptionUid,
-} = require('./billingEntitlementBuilders');
+} = require('./billing-entitlement-builders');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
