@@ -198,19 +198,24 @@ const createPendingAutoSave = (scope: AutoSaveScope, snapshot: ForecastSnapshot)
 
 /** Returns whether a scope-change flush has nothing new to persist. */
 const shouldSkipScopeFlush = (
-  hasPending: boolean,
+  pending: PendingAutoSave | null,
   latest: ForecastSnapshot,
   lastScheduled: ForecastSnapshot,
 ): boolean => {
-  if (hasPending) return true;
-  return isSameSnapshot(latest, lastScheduled);
+  if (isSameSnapshot(latest, lastScheduled)) return true;
+  // The latest edit is already captured as the debounced pending. Its cleanup
+  // flushes the old scope, so writing here would duplicate it.
+  if (pending !== null && isSameSnapshot(pending, latest)) return true;
+  return false;
 };
 
 /**
- * Flushes a dirty edit that never became a debounced pending because React
- * batched the document change and the workspace switch into one commit. The
- * passive debounce effect never ran for the intermediate document, so its
- * cleanup has nothing to flush. This runs before AppHooks resets the
+ * Flushes a dirty edit on workspace switch. This covers both a debounced edit
+ * that never ran because React batched the document change and the switch
+ * into one commit, and a newer batched edit that landed on top of an older
+ * pending snapshot. In the latter case the latest snapshot wins for the old
+ * scope, and the stale pending timer is suppressed so its cleanup cannot
+ * overwrite the newer document. This runs before AppHooks resets the
  * document for the new workspace, so latestSnapshot still holds the old
  * workspace document.
  */
@@ -221,6 +226,8 @@ const useScopeChangeFlush = (
   latestSnapshotRef: { current: ForecastSnapshot },
   lastScheduledSnapshotRef: { current: ForecastSnapshot },
   pendingAutoSaveRef: { current: PendingAutoSave | null },
+  saveTimeoutRef: { current: ReturnType<typeof setTimeout> | null },
+  saveGenerationRef: { current: number },
 ): void => {
   useEffect(() => {
     const prevScope = prevScopeRef.current;
@@ -228,10 +235,19 @@ const useScopeChangeFlush = (
     prevScopeRef.current = nextScope;
     if (isSameScope(prevScope, nextScope)) return;
     const latest = latestSnapshotRef.current;
-    if (shouldSkipScopeFlush(pendingAutoSaveRef.current !== null, latest, lastScheduledSnapshotRef.current)) return;
+    if (shouldSkipScopeFlush(pendingAutoSaveRef.current, latest, lastScheduledSnapshotRef.current)) return;
     persistAutoSave(createPendingAutoSave(prevScope, latest));
+    // Drop the older pending so the debounce cleanup sees a consumed pending
+    // and cannot write its stale snapshot over the newer flush, regardless of
+    // whether cleanup runs before or after this effect.
+    if (saveTimeoutRef.current !== null) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    pendingAutoSaveRef.current = null;
+    saveGenerationRef.current += 1;
     lastScheduledSnapshotRef.current = latest;
-  }, [userId, workspaceId, prevScopeRef, latestSnapshotRef, lastScheduledSnapshotRef, pendingAutoSaveRef]);
+  }, [userId, workspaceId, prevScopeRef, latestSnapshotRef, lastScheduledSnapshotRef, pendingAutoSaveRef, saveTimeoutRef, saveGenerationRef]);
 };
 
 /** Consumes the mount render so the debounce effect skips its initial run. */
@@ -268,6 +284,8 @@ const cleanupScheduledAutoSave = (
   pendingAutoSaveRef: { current: PendingAutoSave | null },
   saveTimeoutRef: { current: ReturnType<typeof setTimeout> | null },
   currentScopeRef: { current: AutoSaveScope },
+  latestSnapshotRef: { current: ForecastSnapshot },
+  lastScheduledSnapshotRef: { current: ForecastSnapshot },
 ): void => {
   if (saveTimeoutRef.current !== null) {
     clearTimeout(saveTimeoutRef.current);
@@ -277,7 +295,16 @@ const cleanupScheduledAutoSave = (
   // Do not lose the previous workspace's last debounced edit when a
   // route switch changes the storage destination.
   if (!isSameScope(currentScopeRef.current, effectScope)) {
-    persistAutoSave(pending);
+    const latest = latestSnapshotRef.current;
+    if (!isSameSnapshot(pending, latest)) {
+      // A newer edit was batched with the switch after this pending was
+      // scheduled. The newer document wins for the old scope, and marking it
+      // scheduled keeps a later scope-change flush from writing it twice.
+      persistAutoSave(createPendingAutoSave(effectScope, latest));
+      lastScheduledSnapshotRef.current = latest;
+    } else {
+      persistAutoSave(pending);
+    }
   }
   pendingAutoSaveRef.current = null;
 };
@@ -295,6 +322,7 @@ const useDebouncedAutoSaveEffect = (
   pendingAutoSaveRef: { current: PendingAutoSave | null },
   currentScopeRef: { current: AutoSaveScope },
   lastScheduledSnapshotRef: { current: ForecastSnapshot },
+  latestSnapshotRef: { current: ForecastSnapshot },
 ): void => {
   useEffect(() => {
     const snapshot: ForecastSnapshot = { forecastCycle, mapView, workflowMetadata };
@@ -311,7 +339,7 @@ const useDebouncedAutoSaveEffect = (
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupAutoSaveTimeout() {
-      cleanupScheduledAutoSave(pendingAutoSave, effectScope, pendingAutoSaveRef, saveTimeoutRef, currentScopeRef);
+      cleanupScheduledAutoSave(pendingAutoSave, effectScope, pendingAutoSaveRef, saveTimeoutRef, currentScopeRef, latestSnapshotRef, lastScheduledSnapshotRef);
     };
   }, [
     forecastCycle,
@@ -325,6 +353,7 @@ const useDebouncedAutoSaveEffect = (
     pendingAutoSaveRef,
     currentScopeRef,
     lastScheduledSnapshotRef,
+    latestSnapshotRef,
   ]);
 };
 
@@ -354,7 +383,7 @@ export const useAutoSave = (
   // document + scope commit flushes the old workspace first. Behavior is pinned
   // by useAutoSave.test.tsx ("flushes the previous workspace edit") and the
   // dirty-switch e2e spec.
-  useScopeChangeFlush(userId, workspaceId, prevScopeRef, latestSnapshotRef, lastScheduledSnapshotRef, pendingAutoSaveRef);
+  useScopeChangeFlush(userId, workspaceId, prevScopeRef, latestSnapshotRef, lastScheduledSnapshotRef, pendingAutoSaveRef, saveTimeoutRef, saveGenerationRef);
   useDebouncedAutoSaveEffect(
     forecastCycle,
     mapView,
@@ -367,5 +396,6 @@ export const useAutoSave = (
     pendingAutoSaveRef,
     currentScopeRef,
     lastScheduledSnapshotRef,
+    latestSnapshotRef,
   );
 };

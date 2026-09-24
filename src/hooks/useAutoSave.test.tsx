@@ -228,6 +228,58 @@ describe('useAutoSave', () => {
     expect(localStorage.getItem('forecastData')).toBeNull();
   });
 
+  // Guards the pending-old + batched-new + switch race: when a newer edit is
+  // batched with the workspace switch on top of an older debounced pending,
+  // the latest snapshot must win for the old scope in a single write.
+  test('flushes the latest batched edit when a switch lands on top of a pending save', async () => {
+    const store = createStore();
+    const { rerender } = render(
+      <Provider store={store}>
+        <Harness workspaceId="severe" />
+      </Provider>
+    );
+
+    act(() => {
+      store.dispatch(setMapView({ center: [35, -97], zoom: 6 }));
+    });
+
+    await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
+    (serializeForecast as jest.Mock).mockClear();
+    (serializeForecast as jest.Mock).mockImplementation(
+      (_cycle: unknown, mapView: { center: [number, number]; zoom: number }) => ({ zoom: mapView.zoom }),
+    );
+
+    // Batch the newer edit with the workspace switch so the debounce effect
+    // never runs for the intermediate document on its own.
+    // eslint-disable-next-line testing-library/no-unnecessary-act -- batching dispatch and rerender reproduces the race
+    act(() => {
+      store.dispatch(setMapView({ center: [36, -96], zoom: 9 }));
+      rerender(
+        <Provider store={store}>
+          <Harness workspaceId="custom" />
+        </Provider>
+      );
+    });
+
+    expect(serializeForecast).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: { zoom: 9 },
+    }));
+    expect(localStorage.getItem('forecastData:custom')).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    // The suppressed older pending must not overwrite the newer flush later.
+    expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: { zoom: 9 },
+    }));
+  });
+
   // Guards flush-before-reset ordering: a dirty edit must land in the old
   // workspace scope on switch, without waiting for another debounce.
   test('flushes the previous workspace edit when autosave scope changes', async () => {
