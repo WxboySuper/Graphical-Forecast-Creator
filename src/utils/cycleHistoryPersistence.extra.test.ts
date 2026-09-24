@@ -99,6 +99,30 @@ describe('cycleHistoryPersistence', () => {
     expect(loaded[0]?.workspaceId).toBe('severe');
   });
 
+  test('normalizes malformed workspace ownership on persistence write to Severe', async () => {
+    jest.doMock('./fileUtils', () => ({
+      serializeForecast: jest.fn(() => ({ serialized: true })),
+      deserializeForecast: jest.fn(() => ({ restored: true })),
+    }));
+    jest.doMock('./forecastMetrics', () => ({
+      countForecastMetrics: jest.fn(() => ({ total: 1 })),
+    }));
+
+    const mod = await import('./cycleHistoryPersistence');
+    mod.saveCycleHistoryToStorage([{
+      id: 'write-malformed',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastCycle: { some: 'fc' },
+      stats: { total: 1 },
+      workspaceId: 'not-a-workspace',
+    } as never]);
+
+    const raw = JSON.parse(localStorage.getItem('gfc-cycle-history') as string);
+    expect(raw.cycles[0].workspaceId).toBe('severe');
+    expect(mod.loadCycleHistoryFromStorage()[0]?.workspaceId).toBe('severe');
+  });
+
   test('persists lifetime stats separately from the capped retained cycles', async () => {
     jest.doMock('./fileUtils', () => ({
       serializeForecast: jest.fn(() => ({ serialized: true })),
