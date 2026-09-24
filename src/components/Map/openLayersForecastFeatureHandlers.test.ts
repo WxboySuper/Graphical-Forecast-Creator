@@ -58,7 +58,7 @@ describe("handleModifiedFeatures", () => {
 
   test("skips categorical features derived from auto-generation", async () => {
     const feature = stubFeature("auto-generated");
-    const trimStoredOutlookFeature = jest.fn(async (value: never) => value);
+    const trimStoredOutlookFeature = jest.fn(async () => undefined as never);
     const dispatch = jest.fn();
 
     handleModifiedFeatures([feature], true, {
