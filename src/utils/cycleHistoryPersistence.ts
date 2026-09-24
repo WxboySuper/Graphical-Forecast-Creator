@@ -107,7 +107,7 @@ const parseStoredCycleHistory = (serialized: string | null): SavedCycle[] => {
   }
 };
 
-/** Returns an empty history snapshot for missing or malformed storage. */
+/** Returns a fresh empty cycle-history snapshot. */
 const emptyCycleHistorySnapshot = (): CycleHistorySnapshot => ({
   cycles: [],
   lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
