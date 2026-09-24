@@ -82,3 +82,19 @@ export const getExposedForecastWorkspaceRoutes = (target?: BuildTarget): Forecas
     .filter((workspace) => getForecastWorkspace(workspace.id)?.id === workspace.id)
     .filter((workspace) => getForecastWorkspaceByPath(workspace.path)?.id === workspace.id)
     .map((workspace) => ({ id: workspace.id, path: workspace.path, routePath: workspace.id }));
+
+/** Resolves a known workspace route only when its build target does not expose it. */
+export const resolveUnavailableForecastWorkspacePath = (
+  path: string,
+  target?: BuildTarget,
+): ForecastWorkspaceDefinition | undefined => {
+  const workspace = resolveForecastWorkspacePath(path);
+  return workspace && !isForecastWorkspaceExposed(workspace, target) ? workspace : undefined;
+};
+
+/** Returns validated route records for known but unexposed workspaces. */
+export const getUnavailableForecastWorkspaceRoutes = (target?: BuildTarget): ForecastWorkspaceRoute[] =>
+  FORECAST_WORKSPACES.filter((workspace) => !isForecastWorkspaceExposed(workspace, target))
+    .filter((workspace) => getForecastWorkspace(workspace.id)?.id === workspace.id)
+    .filter((workspace) => getForecastWorkspaceByPath(workspace.path)?.id === workspace.id)
+    .map((workspace) => ({ id: workspace.id, path: workspace.path, routePath: workspace.id }));

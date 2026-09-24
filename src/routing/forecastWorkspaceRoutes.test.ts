@@ -4,11 +4,13 @@ import {
   getExposedForecastWorkspacePaths,
   getExposedForecastWorkspaceRoutes,
   getForecastWorkspacePath,
+  getUnavailableForecastWorkspaceRoutes,
   resolveExposedForecastWorkspacePath,
   resolveExposedLegacyForecastWorkspacePath,
   resolveForecastWorkspacePath,
   resolveLegacyForecastWorkspacePath,
   resolveRouteForecastWorkspace,
+  resolveUnavailableForecastWorkspacePath,
 } from './forecastWorkspaceRoutes';
 
 describe('forecast workspace route contract', () => {
@@ -61,5 +63,24 @@ describe('forecast workspace route contract', () => {
     }
     // Unexposed workspaces never produce a route record.
     expect(routes.some((route) => route.id === 'mesoscale')).toBe(false);
+  });
+
+  test('routes direct gated URLs to the unavailable page and keeps unknown paths unregistered', () => {
+    expect(resolveUnavailableForecastWorkspacePath('/forecast/tropical', 'production')?.id).toBe('tropical');
+    expect(resolveUnavailableForecastWorkspacePath('/forecast/mesoscale', 'production')?.id).toBe('mesoscale');
+    expect(resolveUnavailableForecastWorkspacePath('/forecast/winter', 'production')?.id).toBe('winter');
+    // Exposed editors never count as unavailable.
+    expect(resolveUnavailableForecastWorkspacePath('/forecast/severe', 'production')).toBeUndefined();
+    expect(resolveUnavailableForecastWorkspacePath('/forecast/custom', 'production')).toBeUndefined();
+    // Unknown paths stay on the existing not-found behavior.
+    expect(resolveUnavailableForecastWorkspacePath('/forecast/unknown', 'production')).toBeUndefined();
+    expect(resolveRouteForecastWorkspace('/forecast/unknown', 'production')).toBeUndefined();
+
+    const unavailable = getUnavailableForecastWorkspaceRoutes('production');
+    expect(unavailable.map((route) => route.id)).toEqual(['mesoscale', 'tropical', 'winter']);
+    for (const route of unavailable) {
+      expect(route.path).toBe(`/forecast/${route.routePath}`);
+    }
+    expect(unavailable.some((route) => route.id === 'severe')).toBe(false);
   });
 });

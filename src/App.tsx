@@ -36,8 +36,10 @@ import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDia
 import {
   getDefaultForecastWorkspacePath,
   getExposedForecastWorkspaceRoutes,
+  getUnavailableForecastWorkspaceRoutes,
   resolveRouteForecastWorkspace,
 } from './routing/forecastWorkspaceRoutes';
+import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWorkspacePage';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -158,6 +160,13 @@ const AppRoutes: React.FC = () => {
               key={route.id}
               path={route.routePath}
               element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId={route.id} /></Suspense>}
+            />
+          ))}
+          {getUnavailableForecastWorkspaceRoutes().map((route) => (
+            <Route
+              key={`unavailable-${route.id}`}
+              path={route.routePath}
+              element={<UnavailableForecastWorkspacePage workspaceId={route.id} />}
             />
           ))}
         </Route>
