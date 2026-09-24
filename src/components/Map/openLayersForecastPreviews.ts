@@ -1,5 +1,5 @@
 import GeoJSON from "ol/format/GeoJSON";
-import type { default as OLFeature, FeatureLike } from "ol/Feature";
+import type { default as OLFeature } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import VectorSource from "ol/source/Vector";
 import { Fill, Stroke, Style as OlStyle } from "ol/style";
@@ -20,6 +20,8 @@ const addTstmPreviewOlFeature = (
   previewSource.addFeature(item);
 };
 
+// One shared style instance is intentional. Trim previews are temporary and
+// never mutate this style, so reusing it avoids allocating per feature.
 const TRIM_PREVIEW_STYLE = new OlStyle({
   fill: new Fill({ color: "rgba(0, 188, 212, 0.35)" }),
   stroke: new Stroke({ color: "#00acc1", width: 2, lineDash: [8, 4] }),
@@ -34,24 +36,16 @@ export const syncTrimPreviewSource = (
   const format = new GeoJSON();
 
   previewFeatures.forEach((feature) => {
+    // readFeature returns a single feature. Polygon and MultiPolygon inputs
+    // both arrive as one OL feature with the matching geometry type.
     const olFeature = format.readFeature(feature, {
       dataProjection: "EPSG:4326",
       featureProjection: "EPSG:3857",
-    });
+    }) as OLFeature<Geometry>;
 
-    /** Marks a feature as part of the temporary trim preview. */
-    const applyPreview = (item: OLFeature<Geometry>) => {
-      item.setStyle(TRIM_PREVIEW_STYLE);
-      item.set("trimPreview", true);
-    };
-
-    if (Array.isArray(olFeature)) {
-      olFeature.forEach((item: FeatureLike) => applyPreview(item as OLFeature<Geometry>));
-      previewSource.addFeatures(olFeature as OLFeature<Geometry>[]);
-    } else {
-      applyPreview(olFeature as OLFeature<Geometry>);
-      previewSource.addFeature(olFeature as OLFeature<Geometry>);
-    }
+    olFeature.setStyle(TRIM_PREVIEW_STYLE);
+    olFeature.set("trimPreview", true);
+    previewSource.addFeature(olFeature);
   });
 };
 
@@ -65,18 +59,14 @@ export const syncTstmPreviewSource = (
   const previewStyle = toTstmPreviewOlStyle();
 
   tstmPreviewFeatures.forEach((feature) => {
+    // readFeature returns a single feature. Polygon and MultiPolygon inputs
+    // both arrive as one OL feature with the matching geometry type.
     const olFeature = format.readFeature(feature, {
       dataProjection: "EPSG:4326",
       featureProjection: "EPSG:3857",
-    });
+    }) as OLFeature<Geometry>;
     const featureId = String(feature.id ?? "tstm-preview");
 
-    if (Array.isArray(olFeature)) {
-      olFeature.forEach((item: FeatureLike) =>
-        addTstmPreviewOlFeature(item as OLFeature<Geometry>, previewSource, previewStyle, featureId),
-      );
-    } else {
-      addTstmPreviewOlFeature(olFeature as OLFeature<Geometry>, previewSource, previewStyle, featureId);
-    }
+    addTstmPreviewOlFeature(olFeature, previewSource, previewStyle, featureId);
   });
 };
