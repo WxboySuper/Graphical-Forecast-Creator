@@ -73,7 +73,7 @@ import {
 } from "./openLayersForecastViewSync";
 import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
 import { createForecastMapLayers, type ForecastMapLayerSet } from "./openLayersForecastLayerSetup";
-import { createForecastDeleteInteraction } from "./openLayersForecastDeleteInteraction";
+import { createForecastDeleteInteraction, setForecastDeleteMode } from "./openLayersForecastDeleteInteraction";
 import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
 export { getCustomStyleSignature, removeDrawInteraction };
 
@@ -532,10 +532,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         return;
       }
 
-      selectRef.current.setActive(interactionMode === "delete");
-      if (interactionMode !== "delete") {
-        selectRef.current.getFeatures().clear();
-      }
+      setForecastDeleteMode(selectRef.current, interactionMode === "delete");
 
       const disableModify = interactionMode === "delete" || interactionMode === "edit";
       modifyRef.current?.setActive(!disableModify);
