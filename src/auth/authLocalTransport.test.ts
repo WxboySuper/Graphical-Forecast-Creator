@@ -72,40 +72,36 @@ describe('authLocalTransport', () => {
     expect(extractLocalUserFromData('user-1')).toEqual(fallback);
   });
 
-  test('postLocalJson sends JSON with credentials', async () => {
+  test.each([
+    {
+      name: 'sends JSON with credentials',
+      requestOptions: { body: { ok: true }, failureMessage: 'Failed' },
+      expectedInit: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ok: true }),
+        credentials: 'include',
+      },
+    },
+    {
+      name: 'omits headers and body when there is no payload',
+      requestOptions: { failureMessage: 'Failed' },
+      expectedInit: {
+        method: 'POST',
+        headers: undefined,
+        body: undefined,
+        credentials: 'include',
+      },
+    },
+  ])('postLocalJson $name', async ({ requestOptions, expectedInit }) => {
     const fetchMock = jest.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ ok: true }),
     } as unknown as Response);
 
-    await expect(
-      postLocalJson('/api/local/test', { body: { ok: true }, failureMessage: 'Failed' }),
-    ).resolves.toEqual({ ok: true });
+    await expect(postLocalJson('/api/local/test', requestOptions)).resolves.toEqual({ ok: true });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/local/test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true }),
-      credentials: 'include',
-    });
-  });
-
-  test('postLocalJson omits headers and body when there is no payload', async () => {
-    const fetchMock = jest.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ ok: true }),
-    } as unknown as Response);
-
-    await expect(postLocalJson('/api/local/test', { failureMessage: 'Failed' })).resolves.toEqual({
-      ok: true,
-    });
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/local/test', {
-      method: 'POST',
-      headers: undefined,
-      body: undefined,
-      credentials: 'include',
-    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/local/test', expectedInit);
   });
 
   test('postLocalJson resolves an empty object when a success body is not JSON', async () => {
