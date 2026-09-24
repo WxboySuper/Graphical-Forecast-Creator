@@ -1,5 +1,5 @@
 /**
- * Covers beta prerelease detection, stable derivation, release branch naming, and the version policy on main, feature, and stable release branches.
+ * Covers beta prerelease detection, stable derivation, release branch naming, and version policy checks for main and stable-line targets, where any other target passes through untouched.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
