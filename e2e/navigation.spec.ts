@@ -1,14 +1,6 @@
-/**
- * E2E contract for navigation.spec.
- *
- * This file defines browser-level checks for the navigation.spec workflow and its user-visible behavior.
- */
+/** Verifies home, forecast, verification, and navbar links, one forecastUi query parameter on the legacy forecast redirect, and per-day discussion drafts across route changes. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
-
-/**
- * Navigation tests — verifies routing between pages works correctly.
- */
 
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {

@@ -1,15 +1,6 @@
-/**
- * E2E contract for ui-interactions.spec.
- *
- * This file defines browser-level checks for the ui-interactions.spec workflow and its user-visible behavior.
- */
+/** Verifies dark-mode toggle and persistence, documentation panel open and close (click and Escape), Ctrl+D, and that clicking Start a new forecast leaves the nav rendered. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
-
-/**
- * UI interaction tests — verifies dark mode, help modal, and
- * confirmation modals work correctly without crashing.
- */
 
 test.beforeEach(async ({ page }) => {
   await prepareAppState(page);
