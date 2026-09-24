@@ -45,7 +45,6 @@ import themeReducer from '../store/themeSlice';
 import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
 import * as fileUtils from '../utils/fileUtils';
-const { serializeForecast } = fileUtils;
 import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
