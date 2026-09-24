@@ -15,6 +15,18 @@ import {
 
 type SelectableLayer = VectorLayer<VectorSource>;
 
+/**
+ * Syncs the delete selector with the map interaction mode.
+ * Activating delete mode leaves any pending selection alone.
+ * Leaving delete mode clears the transient selection so stale highlights do not linger.
+ */
+export const setForecastDeleteMode = (select: Select, isDeleteActive: boolean): void => {
+  select.setActive(isDeleteActive);
+  if (!isDeleteActive) {
+    select.getFeatures().clear();
+  }
+};
+
 /** Creates the inactive delete selector used by the forecast map. */
 export const createForecastDeleteInteraction = ({
   vectorLayer,
