@@ -101,28 +101,59 @@ describe('cloneEntries', () => {
 });
 
 describe('cloneOutlookData', () => {
-  test('clones every outlook map including day4-8', () => {
-    const data: OutlookData = {
-      tornado: new Map([['2%', [createFeature('tornado-1', 0)]]]),
-      wind: new Map([['5%', [createFeature('wind-1', 1)]]]),
-      hail: new Map([['5%', [createFeature('hail-1', 2)]]]),
-      totalSevere: new Map([['15%', [createFeature('severe-1', 3)]]]),
-      categorical: new Map([['MRGL', [createFeature('cat-1', 4)]]]),
-      'day4-8': new Map([['15%', [createFeature('day48-1', 5)]]]),
-    };
+  const createOutlookData = (): OutlookData => ({
+    tornado: new Map([['2%', [createFeature('tornado-1', 0)]]]),
+    wind: new Map([['5%', [createFeature('wind-1', 1)]]]),
+    hail: new Map([['5%', [createFeature('hail-1', 2)]]]),
+    totalSevere: new Map([['15%', [createFeature('severe-1', 3)]]]),
+    categorical: new Map([['MRGL', [createFeature('cat-1', 4)]]]),
+    'day4-8': new Map([['15%', [createFeature('day48-1', 5)]]]),
+  });
 
+  test('clones the tornado map', () => {
+    const data = createOutlookData();
     const cloned = cloneOutlookData(data);
 
     expect(cloned.tornado?.get('2%')?.[0]).toEqual(data.tornado?.get('2%')?.[0]);
     expect(cloned.tornado?.get('2%')?.[0]).not.toBe(data.tornado?.get('2%')?.[0]);
+  });
+
+  test('clones the wind map', () => {
+    const data = createOutlookData();
+    const cloned = cloneOutlookData(data);
+
     expect(cloned.wind?.get('5%')?.[0]).toEqual(data.wind?.get('5%')?.[0]);
     expect(cloned.wind?.get('5%')?.[0]).not.toBe(data.wind?.get('5%')?.[0]);
+  });
+
+  test('clones the hail map', () => {
+    const data = createOutlookData();
+    const cloned = cloneOutlookData(data);
+
     expect(cloned.hail?.get('5%')?.[0]).toEqual(data.hail?.get('5%')?.[0]);
     expect(cloned.hail?.get('5%')?.[0]).not.toBe(data.hail?.get('5%')?.[0]);
+  });
+
+  test('clones the total severe map', () => {
+    const data = createOutlookData();
+    const cloned = cloneOutlookData(data);
+
     expect(cloned.totalSevere?.get('15%')?.[0]).toEqual(data.totalSevere?.get('15%')?.[0]);
     expect(cloned.totalSevere?.get('15%')?.[0]).not.toBe(data.totalSevere?.get('15%')?.[0]);
+  });
+
+  test('clones the categorical map', () => {
+    const data = createOutlookData();
+    const cloned = cloneOutlookData(data);
+
     expect(cloned.categorical?.get('MRGL')?.[0]).toEqual(data.categorical?.get('MRGL')?.[0]);
     expect(cloned.categorical?.get('MRGL')?.[0]).not.toBe(data.categorical?.get('MRGL')?.[0]);
+  });
+
+  test('clones the day4-8 map', () => {
+    const data = createOutlookData();
+    const cloned = cloneOutlookData(data);
+
     expect(cloned['day4-8']?.get('15%')?.[0]).toEqual(data['day4-8']?.get('15%')?.[0]);
     expect(cloned['day4-8']?.get('15%')?.[0]).not.toBe(data['day4-8']?.get('15%')?.[0]);
   });
