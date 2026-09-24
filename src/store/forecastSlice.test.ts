@@ -360,7 +360,7 @@ describe('forecastSlice undo/redo', () => {
     expect(hydratedSnapshot.savedCycles[0]?.workspaceId).toBe('severe');
   });
 
-  test('adopts the saved cycle workspace when loading a cycle', () => {
+  test('keeps the route-owned workspace when loading a cycle from another workspace', () => {
     let state = reducer(undefined, setForecastWorkspace('custom'));
     state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
     const customId = state.savedCycles[0]?.id as string;
@@ -369,11 +369,12 @@ describe('forecastSlice undo/redo', () => {
     expect(state.workspaceId).toBe('severe');
 
     state = reducer(state, loadSavedCycle(customId));
-    expect(state.workspaceId).toBe('custom');
+    expect(state.workspaceId).toBe('severe');
+    expect(state.savedCycles[0]?.workspaceId).toBe('custom');
   });
 
-  test('falls back to Severe when loading a cycle with missing or malformed ownership', () => {
-    let state = reducer(undefined, { type: 'test/init' });
+  test('loading a cycle with missing or malformed ownership leaves the active workspace unchanged', () => {
+    let state = reducer(undefined, setForecastWorkspace('custom'));
     state = reducer(state, saveCurrentCycle({ label: 'Legacy load' }));
     const legacyId = state.savedCycles[0]?.id as string;
 
@@ -385,13 +386,13 @@ describe('forecastSlice undo/redo', () => {
       ...state,
       savedCycles: [missingOwner],
     };
-    expect(reducer(withMissing, loadSavedCycle(legacyId)).workspaceId).toBe('severe');
+    expect(reducer(withMissing, loadSavedCycle(legacyId)).workspaceId).toBe('custom');
 
     const withMalformed = {
       ...state,
       savedCycles: [{ ...state.savedCycles[0], workspaceId: 'not-a-workspace' } as never],
     };
-    expect(reducer(withMalformed, loadSavedCycle(legacyId)).workspaceId).toBe('severe');
+    expect(reducer(withMalformed, loadSavedCycle(legacyId)).workspaceId).toBe('custom');
   });
 
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
