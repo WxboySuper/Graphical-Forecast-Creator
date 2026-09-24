@@ -90,7 +90,7 @@ const readPremiumSubscriptionCount = async (db) => {
 };
 
 /** Returns the cached or in-flight premium subscription count, refreshing it when expired. */
-const countPremiumSubscriptions = () => {
+const countPremiumSubscriptions = async () => {
   const db = getAdminDb();
   if (!db) {
     return 0;
@@ -134,10 +134,10 @@ const readTotalAccounts = async (db) => {
 };
 
 /** Returns the cached or freshly aggregated total account count. */
-const countTotalAccounts = () => {
+const countTotalAccounts = async () => {
   const db = getAdminDb();
   if (!db) {
-    return Promise.resolve(0);
+    return 0;
   }
 
   if (typeof totalAccountsCache.value === 'number' && Date.now() < totalAccountsCache.expiresAt) {
