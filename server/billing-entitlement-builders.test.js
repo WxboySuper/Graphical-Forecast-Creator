@@ -2,9 +2,12 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
   createCheckoutEntitlementWrite,
+  createSubscriptionEntitlementPayload,
   createSubscriptionEntitlementWrite,
   getCheckoutRefundTarget,
-} = require('./billingEntitlementBuilders');
+  getPlanInterval,
+  getSubscriptionUid,
+} = require('./billing-entitlement-builders');
 
 test('builds checkout entitlement writes from session metadata', () => {
   assert.deepEqual(
@@ -61,4 +64,61 @@ test('prefers payment intents when locating a refund target', () => {
         { payment_intent: { id: 'pi_session' } },
         { latest_invoice: { charge: { id: 'ch_invoice' }, payments: { data: [] } } }
     ), { payment_intent: 'pi_session' });
+});
+
+test('falls back to a charge when no payment intent exists', () => {
+  assert.deepEqual(
+    getCheckoutRefundTarget(
+        {},
+        { latest_invoice: { payments: { data: [{ payment: { charge: 'ch_123' } }] } } }
+    ), { charge: 'ch_123' });
+});
+
+test('returns null when no refundable payment exists', () => {
+  assert.equal(getCheckoutRefundTarget({}, {}), null);
+  assert.equal(
+    getCheckoutRefundTarget({}, { latest_invoice: { payments: { data: [] } } }),
+    null
+  );
+});
+
+test('maps plan intervals and subscription UIDs', () => {
+  assert.equal(getPlanInterval('year'), 'annual');
+  assert.equal(getPlanInterval('month'), 'monthly');
+  assert.equal(getPlanInterval(undefined), 'monthly');
+  assert.equal(getSubscriptionUid({ metadata: { uid: 'user-1' } }), 'user-1');
+  assert.equal(getSubscriptionUid({}), '');
+});
+
+test('normalizes expanded Stripe objects to null in checkout writes', () => {
+  const result = createCheckoutEntitlementWrite({
+    metadata: { uid: 'user-1', plan: 'monthly' },
+    customer: { id: 'cus_expanded' },
+    subscription: { id: 'sub_expanded' },
+  });
+
+  assert.equal(result.stripeCustomerId, null);
+  assert.equal(result.stripeSubscriptionId, null);
+  assert.equal(result.payload.planInterval, 'monthly');
+});
+
+test('defaults subscription payloads when Stripe fields are missing', () => {
+  const payload = createSubscriptionEntitlementPayload({ id: 'sub_123' }, '', null);
+
+  assert.deepEqual(
+    {
+      planInterval: payload.planInterval,
+      billingStatus: payload.billingStatus,
+      stripeSubscriptionId: payload.stripeSubscriptionId,
+      cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
+      currentPeriodEnd: payload.currentPeriodEnd,
+    },
+    {
+      planInterval: 'monthly',
+      billingStatus: 'inactive',
+      stripeSubscriptionId: 'sub_123',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+    }
+  );
 });
