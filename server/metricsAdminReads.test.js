@@ -98,6 +98,23 @@ const createSnapshotDb = ({
   };
 };
 
+/** Verifies a counter returns a Promise on no-database, fresh, and cache-hit paths. */
+const assertCounterPromiseContract = async (counterName, seedDb, expected) => {
+  lastDb = null;
+  const noDbResult = adminReads[counterName]();
+  assert.ok(noDbResult instanceof Promise);
+  assert.equal(await noDbResult, 0);
+
+  lastDb = seedDb;
+  const first = adminReads[counterName]();
+  assert.ok(first instanceof Promise);
+  assert.equal(await first, expected);
+
+  const cached = adminReads[counterName]();
+  assert.ok(cached instanceof Promise);
+  assert.equal(await cached, expected);
+};
+
 describe('metrics admin reads extraction', () => {
   it('normalizes supported windows and falls back to 7', () => {
     assert.equal(adminReads.normalizeAdminWindowSize('7'), 7);
@@ -187,34 +204,18 @@ describe('metrics admin reads extraction', () => {
   });
 
   it('always returns a Promise from countPremiumSubscriptions, including no-database and cache-hit paths', async () => {
-    lastDb = null;
-    const noDbResult = adminReads.countPremiumSubscriptions();
-    assert.ok(noDbResult instanceof Promise);
-    assert.equal(await noDbResult, 0);
-
-    lastDb = createSnapshotDb({ premiumCount: 4 });
-    const first = adminReads.countPremiumSubscriptions();
-    assert.ok(first instanceof Promise);
-    assert.equal(await first, 4);
-
-    const cached = adminReads.countPremiumSubscriptions();
-    assert.ok(cached instanceof Promise);
-    assert.equal(await cached, 4);
+    await assertCounterPromiseContract(
+      'countPremiumSubscriptions',
+      createSnapshotDb({ premiumCount: 4 }),
+      4
+    );
   });
 
   it('always returns a Promise from countTotalAccounts, including no-database and cache-hit paths', async () => {
-    lastDb = null;
-    const noDbResult = adminReads.countTotalAccounts();
-    assert.ok(noDbResult instanceof Promise);
-    assert.equal(await noDbResult, 0);
-
-    lastDb = createSnapshotDb({ totalAccounts: 9 });
-    const first = adminReads.countTotalAccounts();
-    assert.ok(first instanceof Promise);
-    assert.equal(await first, 9);
-
-    const cached = adminReads.countTotalAccounts();
-    assert.ok(cached instanceof Promise);
-    assert.equal(await cached, 9);
+    await assertCounterPromiseContract(
+      'countTotalAccounts',
+      createSnapshotDb({ totalAccounts: 9 }),
+      9
+    );
   });
 });
