@@ -85,7 +85,6 @@ interface SaveCloudCycleParams {
   existingId?: string;
 }
 
-/** Sends a normalized cloud cycle payload to the authenticated API. */
 const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
   const response = await fetch('/api/cloud-cycles', {
     method: 'POST',
@@ -96,7 +95,6 @@ const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
   return { success: true };
 };
 
-/** Builds the API request body for a cloud cycle save or update. */
 const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }: { cycleId: string; params: SaveCloudCycleParams; metadata: CloudCycleMetadata; workflowMetadata?: CycleMetadata }) => ({
   id: cycleId,
   userId: params.userId,
@@ -106,10 +104,9 @@ const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }:
   metadata: { ...metadata, ...(params.workspaceId ? { workspaceId: params.workspaceId } : {}), ...(workflowMetadata ? { workflowMetadata } : {}) },
 });
 
-/** Returns the current Firebase token when a user is signed in. */
-const getCloudSaveToken = (): Promise<string | null> => {
+const getCloudSaveToken = async (): Promise<string | null> => {
   const currentUser = auth?.currentUser;
-  return Promise.resolve(currentUser ? currentUser.getIdToken() : null);
+  return currentUser ? currentUser.getIdToken() : null;
 };
 
 type LegacyCloudCyclesValue = string | Record<string, unknown> | undefined;
@@ -465,7 +462,6 @@ const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
   return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
 };
 
-/** Performs the authenticated cloud cycle save and converts failures to results. */
 const saveCloudCycleInternal = async (params: SaveCloudCycleParams): Promise<CloudOperationResult<string>> => {
   try {
     const context = await buildCloudCycleSaveContext(params);
@@ -484,7 +480,6 @@ const saveCloudCycleInternal = async (params: SaveCloudCycleParams): Promise<Clo
   }
 };
 
-/** Saves a cloud cycle through the shared cloud persistence flow. */
 export const saveCloudCycle = (params: SaveCloudCycleParams): Promise<CloudOperationResult<string>> =>
   saveCloudCycleInternal(params);
 
@@ -622,8 +617,8 @@ export const subscribeToCloudCycles = (
           return;
         }
 
-        readLegacyCloudCycles(userId)
-          .then((legacyCycles) => {
+        void readLegacyCloudCycles(userId)
+          .then(async (legacyCycles) => {
             if (!active) {
               return;
             }
