@@ -1,5 +1,5 @@
 /**
- * Validates impact declarations, required reasons, and stable/beta changelog-lane policy.
+ * Validates impact declarations and required reasons, enforces stable/beta lane placement, inherits forward-port entries from the source changelog, classifies waived and inherited impacts as skips, and requires the declared lane to change rather than merely exist.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
