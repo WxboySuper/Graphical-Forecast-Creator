@@ -66,6 +66,7 @@ const renderPage = (store = makeStore()) =>
 
 describe("CloudLibraryPage", () => {
   beforeEach(() => {
+    window.history.replaceState({}, "", "/");
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult());
     mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: "local" });
     mockGetCloudLibraryTabs.mockReset();
