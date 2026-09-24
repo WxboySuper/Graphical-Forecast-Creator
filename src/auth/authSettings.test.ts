@@ -48,7 +48,7 @@ describe('readRemoteSettings', () => {
   });
 
   test('returns null for wrong field types', () => {
-    expect(readRemoteSettings({ darkMode: 'not boolean' } as Partial<UserSettingsDocument>)).toBeNull();
+    expect(readRemoteSettings({ darkMode: 'not boolean' } as unknown as Partial<UserSettingsDocument>)).toBeNull();
   });
 
   test('rejects an overlong forecaster name but keeps the 100 character limit', () => {
