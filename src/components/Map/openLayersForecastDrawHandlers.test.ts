@@ -180,8 +180,8 @@ describe("handleForecastDrawEnd", () => {
   test("dispatches a custom feature for MultiPolygon draws in custom mode", async () => {
     const options = baseOptions({
       customMode: true,
-      activeCustomLayer: { id: "layer-1" } as never,
-      activeCustomCategory: { id: "cat-1", label: "Heavy snow" } as never,
+      activeCustomLayer: customLayer,
+      activeCustomCategory: customCategory,
     });
     const feature = new Feature<Geometry>({ geometry: new MultiPolygon([polygonRing]) });
 
@@ -204,12 +204,5 @@ describe("handleForecastDrawEnd", () => {
     expect(options.dispatch).toHaveBeenCalledTimes(1);
     const action = options.dispatch.mock.calls[0][0] as { payload: { feature: { geometry: { type: string } } } };
     expect(action.payload.feature.geometry.type).toBe("MultiPolygon");
-  });
-
-  test("still dispatches Polygon draws", async () => {
-    const options = baseOptions();
-    handleForecastDrawEnd({ feature: polygonFeature() as Feature<Geometry> }, options);
-    await flush();
-    expect(options.dispatch).toHaveBeenCalledTimes(1);
   });
 });

@@ -239,6 +239,13 @@ export const getFeatureIdentity = (
   return { featureId, outlookType, probability };
 };
 
+/** Narrows serialized geometry to the polygon shapes the forecast store persists. */
+export const isPolygonOrMultiPolygon = (value: unknown): value is Polygon | MultiPolygon => {
+  if (typeof value !== "object" || value === null) return false;
+  const type = (value as { type?: unknown }).type;
+  return type === "Polygon" || type === "MultiPolygon";
+};
+
 /** Converts an OL feature back to a GeoJSON Feature object with current projection, enriched with Redux state properties. Returns null if identity or geometry cannot be extracted. */
 export const toUpdatedGeoJsonFeature = (
   feature: FeatureLike,
@@ -251,15 +258,16 @@ export const toUpdatedGeoJsonFeature = (
   const geometry = feature.getGeometry();
   if (!geometry) return null;
 
-  const geoJsonGeometry = format.writeGeometryObject(geometry as Geometry, {
+  const geometryObject: unknown = format.writeGeometryObject(geometry as Geometry, {
     dataProjection: "EPSG:4326",
     featureProjection: "EPSG:3857",
   });
+  if (!isPolygonOrMultiPolygon(geometryObject)) return null;
 
   return {
     type: "Feature",
     id: identity.featureId,
-    geometry: geoJsonGeometry as Polygon | MultiPolygon,
+    geometry: geometryObject,
     properties: {
       outlookType: identity.outlookType,
       probability: identity.probability,
@@ -378,13 +386,6 @@ export const getCustomFeatureIdentity = (feature: FeatureLike): CustomFeatureIde
   const categoryId = feature.get("categoryId") as string | undefined;
   const title = feature.get("title") as string | undefined;
   return featureId && customLayerId && categoryId && title ? { featureId, customLayerId, categoryId, title } : null;
-};
-
-/** Narrows serialized custom geometry to the polygon shapes the store persists. */
-const isPolygonOrMultiPolygon = (value: unknown): value is Polygon | MultiPolygon => {
-  if (typeof value !== "object" || value === null) return false;
-  const type = (value as { type?: unknown }).type;
-  return type === "Polygon" || type === "MultiPolygon";
 };
 
 /** Converts an edited custom OpenLayers feature back to the persisted polygon shape. */
