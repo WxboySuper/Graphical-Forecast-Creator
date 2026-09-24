@@ -36,6 +36,7 @@ import {
 import {
   areUserSettingsEqual,
   createSettingsSnapshot,
+  getSettingsSyncError,
   getSettingsUpdateError,
   mergeUserSettingsDocument,
   readProfileBetaAccess,
@@ -977,6 +978,13 @@ const useHostedAuthState = (): AuthContextValue => {
     });
     attachHostedSettingsSubscription(subscriptionPromise, () => isActive, (nextUnsubscribe) => {
       unsubscribeSettings = nextUnsubscribe;
+    }).catch((handoffError) => {
+      console.error('Hosted settings subscription handoff failed:', handoffError);
+      if (!isActive) {
+        return;
+      }
+      setSettingsSyncStatus('error');
+      setError(getSettingsSyncError(handoffError));
     });
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
