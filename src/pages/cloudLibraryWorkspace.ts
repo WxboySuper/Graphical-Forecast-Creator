@@ -37,6 +37,34 @@ export const resolveActiveCloudLibraryTab = (
 ): CloudLibraryTabId =>
   tabs.some((tab) => tab.id === activeTab) ? activeTab : 'all';
 
+/** Returns the edge tab for Home/End, or undefined when the key is not an edge key. */
+const getCloudLibraryEdgeTabId = (
+  tabs: CloudLibraryTab[],
+  key: string,
+): CloudLibraryTabId | null | undefined => {
+  if (key === 'Home') return tabs[0]?.id ?? null;
+  if (key === 'End') return tabs[tabs.length - 1]?.id ?? null;
+  return undefined;
+};
+
+/** Returns the step for Arrow keys, or null when the key does not move focus. */
+const getCloudLibraryArrowOffset = (key: string): 1 | -1 | null => {
+  if (key === 'ArrowRight') return 1;
+  if (key === 'ArrowLeft') return -1;
+  return null;
+};
+
+/** Returns the wrapped tab after one Arrow step, falling back to the first tab. */
+const getCloudLibraryArrowTabId = (
+  tabs: CloudLibraryTab[],
+  currentId: CloudLibraryTabId,
+  offset: 1 | -1,
+): CloudLibraryTabId | null => {
+  const currentIndex = tabs.findIndex((tab) => tab.id === currentId);
+  const safeIndex = currentIndex < 0 ? 0 : currentIndex;
+  return tabs[(safeIndex + offset + tabs.length) % tabs.length]?.id ?? null;
+};
+
 /** Resolves the next tab for one keyboard command, or null when the key does nothing. */
 export const getNextCloudLibraryTabId = (
   tabs: CloudLibraryTab[],
@@ -44,14 +72,11 @@ export const getNextCloudLibraryTabId = (
   key: string,
 ): CloudLibraryTabId | null => {
   if (tabs.length === 0) return null;
-  if (key === 'Home') return tabs[0]?.id ?? null;
-  if (key === 'End') return tabs[tabs.length - 1]?.id ?? null;
-  if (key !== 'ArrowRight' && key !== 'ArrowLeft') return null;
-
-  const currentIndex = tabs.findIndex((tab) => tab.id === currentId);
-  const safeIndex = currentIndex < 0 ? 0 : currentIndex;
-  const offset = key === 'ArrowRight' ? 1 : -1;
-  return tabs[(safeIndex + offset + tabs.length) % tabs.length]?.id ?? null;
+  const edgeTabId = getCloudLibraryEdgeTabId(tabs, key);
+  if (edgeTabId !== undefined) return edgeTabId;
+  const offset = getCloudLibraryArrowOffset(key);
+  if (offset === null) return null;
+  return getCloudLibraryArrowTabId(tabs, currentId, offset);
 };
 
 /** Builds stable library tabs from the exposed, non-future workspace registry. */
