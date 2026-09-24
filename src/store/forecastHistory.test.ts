@@ -13,7 +13,6 @@ import {
   pushUndoSnapshot,
   restoreHistoryEntry,
   type ForecastDaySnapshot,
-  type ForecastHistoryStacks,
 } from './forecastHistory';
 
 const NOW = '2026-01-02T00:00:00.000Z';
@@ -109,85 +108,6 @@ const makeSnapshot = (day: DayType, marker: string): ForecastDaySnapshot => ({
   data: { tornado: new Map([['2%', [makeFeature(marker, 0)]]]) },
   lowProbabilityOutlooks: [],
 });
-
-const setupUndoWithStoredSnapshot = () => {
-  const live = makeDay(1, 0);
-  const state = makeState({ 1: live }, 1);
-  const stacks = getOrCreateDayHistory(state, 1);
-  pushUndoSnapshot(state, 1);
-  const stored = stacks.undoStack[0].snapshot;
-  return { live, state, stacks, stored };
-};
-
-const editLiveDayAfterSnapshot = (live: OutlookDay): void => {
-  live.data.tornado?.get('2%')?.push(makeFeature('live-new', 7));
-  if (live.metadata.outlookOpacities) live.metadata.outlookOpacities.tornado = 0.1;
-  live.metadata.lowProbabilityOutlooks = ['wind'];
-  live.customLayers?.layers[0].features.pop();
-};
-
-const restoreStoredSnapshot = (state: ForecastState, stacks: ForecastHistoryStacks): void => {
-  restoreHistoryEntry({
-    sourceStack: stacks.undoStack,
-    targetStack: stacks.redoStack,
-    state,
-    now: NOW,
-    createEmptyDay: makeEmptyDay,
-  });
-};
-
-const editRestoredDay = (restoredDay: OutlookDay): void => {
-  restoredDay.data.tornado?.get('2%')?.pop();
-  restoredDay.metadata.lowProbabilityOutlooks?.push('hail' as never);
-  if (restoredDay.metadata.outlookOpacities) restoredDay.metadata.outlookOpacities.tornado = 0.2;
-  restoredDay.customLayers?.layers[0].features.pop();
-};
-
-const addWiringFeature = (): ForecastState =>
-  reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
-
-const applyUndoStamp = (state: ForecastState, timestamp: string): ForecastState =>
-  reducer(state, { ...undoLastEdit(), meta: { timestamp } });
-
-const applyRedoStamp = (state: ForecastState, timestamp: string): ForecastState =>
-  reducer(state, { ...redoLastEdit(), meta: { timestamp } });
-
-const readStackLengths = (state: ForecastState): { undo: number; redo: number } => {
-  const stacks = state.historyByDay[1];
-  return { undo: stacks?.undoStack.length ?? 0, redo: stacks?.redoStack.length ?? 0 };
-};
-
-const readUndoWiringResult = (state: ForecastState) => {
-  const day = state.forecastCycle.days[1];
-  const stacks = state.historyByDay[1];
-  const features = day?.data.tornado?.get('2%') ?? [];
-  const redoSnapshotFeatures = stacks?.redoStack[0]?.snapshot.data.tornado?.get('2%') ?? [];
-  return {
-    featureCount: features.length,
-    undo: stacks?.undoStack.length ?? 0,
-    redo: stacks?.redoStack.length ?? 0,
-    redoFirstId: redoSnapshotFeatures[0]?.id,
-    currentDay: state.forecastCycle.currentDay,
-    lastModified: day?.metadata.lastModified,
-    isSaved: state.isSaved,
-  };
-};
-
-const readRedoWiringResult = (state: ForecastState) => {
-  const day = state.forecastCycle.days[1];
-  const stacks = state.historyByDay[1];
-  const features = day?.data.tornado?.get('2%') ?? [];
-  const undoSnapshotFeatures = stacks?.undoStack[0]?.snapshot.data.tornado?.get('2%') ?? [];
-  return {
-    featureId: features[0]?.id,
-    undo: stacks?.undoStack.length ?? 0,
-    redo: stacks?.redoStack.length ?? 0,
-    undoSnapshotCount: undoSnapshotFeatures.length,
-    currentDay: state.forecastCycle.currentDay,
-    lastModified: day?.metadata.lastModified,
-    isSaved: state.isSaved,
-  };
-};
 
 describe('forecastHistory helpers', () => {
   test('creates per-day stacks that stay isolated', () => {
@@ -307,19 +227,19 @@ describe('forecastHistory helpers', () => {
     const state = makeState({ 1: day }, 1);
     const snapshot = getCurrentDaySnapshot(state, 1);
     expect(snapshot).not.toBeNull();
-    if (!snapshot) return;
+    const snap = snapshot as ForecastDaySnapshot;
 
-    expect(snapshot.outlookOpacities).not.toBe(day.metadata.outlookOpacities);
-    expect(snapshot.outlookOpacities).toEqual({ tornado: 0.4 });
-    expect(snapshot.customLayers).not.toBe(day.customLayers);
-    expect(snapshot.customLayers).toEqual(day.customLayers);
-    expect(snapshot.lowProbabilityOutlooks).not.toBe(day.metadata.lowProbabilityOutlooks);
-    expect(snapshot.data.tornado).not.toBe(day.data.tornado);
+    expect(snap.outlookOpacities).not.toBe(day.metadata.outlookOpacities);
+    expect(snap.outlookOpacities).toEqual({ tornado: 0.4 });
+    expect(snap.customLayers).not.toBe(day.customLayers);
+    expect(snap.customLayers).toEqual(day.customLayers);
+    expect(snap.lowProbabilityOutlooks).not.toBe(day.metadata.lowProbabilityOutlooks);
+    expect(snap.data.tornado).not.toBe(day.data.tornado);
 
-    snapshot.outlookOpacities = { tornado: 0.9 };
-    snapshot.lowProbabilityOutlooks.push('wind' as never);
-    snapshot.customLayers?.layers[0].features.pop();
-    snapshot.data.tornado?.get('2%')?.pop();
+    snap.outlookOpacities = { tornado: 0.9 };
+    snap.lowProbabilityOutlooks.push('wind' as never);
+    snap.customLayers?.layers[0].features.pop();
+    snap.data.tornado?.get('2%')?.pop();
 
     expect(day.metadata.outlookOpacities).toEqual({ tornado: 0.4 });
     expect(day.metadata.lowProbabilityOutlooks).toEqual(['tornado']);
@@ -327,27 +247,39 @@ describe('forecastHistory helpers', () => {
     expect(day.data.tornado?.get('2%')).toHaveLength(1);
   });
 
-  test('keeps stored snapshots separate from later live edits', () => {
-    const { live, stored } = setupUndoWithStoredSnapshot();
+  test('does not alias stored snapshots across live edits and restores', () => {
+    const live = makeDay(1, 0);
+    const state = makeState({ 1: live }, 1);
+    const stacks = getOrCreateDayHistory(state, 1);
+    pushUndoSnapshot(state, 1);
+    const stored = stacks.undoStack[0].snapshot;
 
-    editLiveDayAfterSnapshot(live);
+    live.data.tornado?.get('2%')?.push(makeFeature('live-new', 7));
+    live.metadata.outlookOpacities!.tornado = 0.1;
+    live.metadata.lowProbabilityOutlooks = ['wind'];
+    live.customLayers!.layers[0].features.pop();
 
     expect(stored.data.tornado?.get('2%')).toHaveLength(1);
     expect(stored.outlookOpacities).toEqual({ tornado: 0.4 });
     expect(stored.lowProbabilityOutlooks).toEqual([]);
     expect(stored.customLayers?.layers[0].features).toHaveLength(1);
-  });
 
-  test('restores a copy that leaves the stored snapshot alone', () => {
-    const { live, state, stacks, stored } = setupUndoWithStoredSnapshot();
-    editLiveDayAfterSnapshot(live);
-
-    restoreStoredSnapshot(state, stacks);
+    restoreHistoryEntry({
+      sourceStack: stacks.undoStack,
+      targetStack: stacks.redoStack,
+      state,
+      now: NOW,
+      createEmptyDay: makeEmptyDay,
+    });
 
     const restoredDay = state.forecastCycle.days[1];
     expect(restoredDay?.data.tornado?.get('2%')).toHaveLength(1);
-    if (!restoredDay) return;
-    editRestoredDay(restoredDay);
+    const restored = restoredDay as OutlookDay;
+
+    restored.data.tornado?.get('2%')?.pop();
+    restored.metadata.lowProbabilityOutlooks?.push('hail' as never);
+    restored.metadata.outlookOpacities!.tornado = 0.2;
+    restored.customLayers!.layers[0].features.pop();
 
     expect(stored.data.tornado?.get('2%')).toHaveLength(1);
     expect(stored.lowProbabilityOutlooks).toEqual([]);
@@ -368,34 +300,38 @@ describe('forecastHistory helpers', () => {
 
 describe('forecast history reducer wiring', () => {
   test('undoLastEdit drains undo into redo and stamps the action timestamp', () => {
-    const added = addWiringFeature();
-    expect(readStackLengths(added)).toEqual({ redo: 0, undo: 1 });
+    const added = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
+    expect(added.historyByDay[1]?.undoStack).toHaveLength(1);
+    expect(added.historyByDay[1]?.redoStack ?? []).toHaveLength(0);
 
-    const undone = applyUndoStamp(added, UNDO_NOW);
-    expect(readUndoWiringResult(undone)).toEqual({
-      currentDay: 1,
-      featureCount: 0,
-      isSaved: false,
-      lastModified: UNDO_NOW,
-      redo: 1,
-      redoFirstId: 'wiring-1',
-      undo: 0,
-    });
+    const undone = reducer(added, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
+
+    expect(undone.forecastCycle.days[1]?.data.tornado?.get('2%') ?? []).toHaveLength(0);
+    expect(undone.historyByDay[1]?.undoStack).toHaveLength(0);
+    expect(undone.historyByDay[1]?.redoStack).toHaveLength(1);
+    expect(undone.historyByDay[1]?.redoStack[0].snapshot.data.tornado?.get('2%')?.[0].id).toBe(
+      'wiring-1',
+    );
+    expect(undone.forecastCycle.currentDay).toBe(1);
+    expect(undone.forecastCycle.days[1]?.metadata.lastModified).toBe(UNDO_NOW);
+    expect(undone.isSaved).toBe(false);
   });
 
   test('redoLastEdit drains redo into undo and stamps the action timestamp', () => {
-    const undone = applyUndoStamp(addWiringFeature(), UNDO_NOW);
-    expect(readStackLengths(undone)).toEqual({ redo: 1, undo: 0 });
+    const added = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
+    const undone = reducer(added, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
+    expect(undone.historyByDay[1]?.redoStack).toHaveLength(1);
 
-    const redone = applyRedoStamp(undone, REDO_NOW);
-    expect(readRedoWiringResult(redone)).toEqual({
-      currentDay: 1,
-      featureId: 'wiring-1',
-      isSaved: false,
-      lastModified: REDO_NOW,
-      redo: 0,
-      undo: 1,
-      undoSnapshotCount: 0,
-    });
+    const redone = reducer(undone, { ...redoLastEdit(), meta: { timestamp: REDO_NOW } });
+
+    expect(redone.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('wiring-1');
+    expect(redone.historyByDay[1]?.redoStack).toHaveLength(0);
+    expect(redone.historyByDay[1]?.undoStack).toHaveLength(1);
+    expect(redone.historyByDay[1]?.undoStack[0].snapshot.data.tornado?.get('2%') ?? []).toHaveLength(
+      0,
+    );
+    expect(redone.forecastCycle.currentDay).toBe(1);
+    expect(redone.forecastCycle.days[1]?.metadata.lastModified).toBe(REDO_NOW);
+    expect(redone.isSaved).toBe(false);
   });
 });
