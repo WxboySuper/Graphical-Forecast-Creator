@@ -185,4 +185,36 @@ describe('metrics admin reads extraction', () => {
     assert.equal(payload.summary.premiumSubscriptions, 5);
     assert.equal(payload.summary.totalAccounts, 11);
   });
+
+  it('always returns a Promise from countPremiumSubscriptions, including no-database and cache-hit paths', async () => {
+    lastDb = null;
+    const noDbResult = adminReads.countPremiumSubscriptions();
+    assert.ok(noDbResult instanceof Promise);
+    assert.equal(await noDbResult, 0);
+
+    lastDb = createSnapshotDb({ premiumCount: 4 });
+    const first = adminReads.countPremiumSubscriptions();
+    assert.ok(first instanceof Promise);
+    assert.equal(await first, 4);
+
+    const cached = adminReads.countPremiumSubscriptions();
+    assert.ok(cached instanceof Promise);
+    assert.equal(await cached, 4);
+  });
+
+  it('always returns a Promise from countTotalAccounts, including no-database and cache-hit paths', async () => {
+    lastDb = null;
+    const noDbResult = adminReads.countTotalAccounts();
+    assert.ok(noDbResult instanceof Promise);
+    assert.equal(await noDbResult, 0);
+
+    lastDb = createSnapshotDb({ totalAccounts: 9 });
+    const first = adminReads.countTotalAccounts();
+    assert.ok(first instanceof Promise);
+    assert.equal(await first, 9);
+
+    const cached = adminReads.countTotalAccounts();
+    assert.ok(cached instanceof Promise);
+    assert.equal(await cached, 9);
+  });
 });
