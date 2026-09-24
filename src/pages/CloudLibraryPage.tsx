@@ -637,7 +637,7 @@ const CloudLibraryMainCard: React.FC<{
       <CardDescription>Open a saved package, rename it, or clear out older copies.</CardDescription>
       <CloudLibraryTabs tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
     </CardHeader>
-    <CardContent className="cloud-library-list-content" id="cloud-library-panel" role="tabpanel" tabIndex={0} aria-labelledby={`cloud-library-tab-${activeTab}`}>
+    <CardContent className="cloud-library-list-content" id="cloud-library-panel" role="tabpanel" tabIndex={loading && cycles.length === 0 ? 0 : undefined} aria-labelledby={`cloud-library-tab-${activeTab}`}>
       {loading && cycles.length === 0 ? (
         <div className="cloud-library-loading">
           <LoaderCircle className="h-6 w-6 animate-spin" />
