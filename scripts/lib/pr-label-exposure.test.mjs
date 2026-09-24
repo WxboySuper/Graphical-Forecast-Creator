@@ -1,5 +1,5 @@
 /**
- * Verifies exposure labels derived from registry, registry-test, and server-capability file changes.
+ * Verifies exposure labels derived from registry, registry-test, server-capability, and production exposure surface changes.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
