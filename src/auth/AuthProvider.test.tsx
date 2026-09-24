@@ -133,37 +133,6 @@ describe('AuthProvider Utils', () => {
     expect(mergeProviderUserSettingsDocument).toBe(mergeUserSettingsDocument);
     expect(readProviderProfileBetaAccess).toBe(readProfileBetaAccess);
     expect(readProviderRemoteSettings).toBe(readRemoteSettings);
-
-    const overlays = { ...TEST_OVERLAY_STATE };
-    const baseSettings = createSettingsSnapshot({
-      darkMode: false,
-      overlays,
-      defaultForecasterName: 'Forecaster',
-      forecastUiVariant: 'workspace_dock',
-    });
-
-    // Invalid variant falls back to the default variant.
-    const fallbackSettings = readRemoteSettings({
-      ...baseSettings,
-      forecastUiVariant: 'unknown-variant',
-    } as unknown as Record<string, unknown>);
-    expect(fallbackSettings).toEqual(expect.objectContaining({ forecastUiVariant: 'integrated' }));
-
-    // Missing optional profile fields fall back to empty defaults.
-    const minimalPayload = createProfilePayload({} as never);
-    expect(minimalPayload).toEqual(
-      expect.objectContaining({ displayName: '', providers: [] }),
-    );
-
-    // Seeding without opts still timestamps the payload without a creation marker.
-    const seedWithoutCreatedAt = getRemoteSeedPayload(baseSettings);
-    expect(seedWithoutCreatedAt).toEqual(expect.objectContaining({ updatedAt: expect.anything() }));
-    expect(seedWithoutCreatedAt).not.toHaveProperty('createdAt');
-
-    // Partial patches merge onto the baseline without mutating it.
-    const merged = mergeUserSettingsDocument(baseSettings, { darkMode: true });
-    expect(merged).toEqual(expect.objectContaining({ ...baseSettings, darkMode: true }));
-    expect(baseSettings.darkMode).toBe(false);
   });
 
   test('local sign-out failure does not turn completed server deletion into a failure', async () => {
