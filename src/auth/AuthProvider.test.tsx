@@ -598,6 +598,72 @@ describe('AuthProvider Utils', () => {
     expect(typeof unsubscribeResult).toBe('function');
   });
 
+  test('runInitialHostedSync applies live subscription snapshots while active', async () => {
+    const seedSettings = {
+      darkMode: false,
+      baseMapStyle: 'osm' as const,
+      stateBorders: true,
+      counties: false,
+      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+      defaultForecasterName: 'Local',
+      forecastUiVariant: 'workspace_dock' as const,
+      monitorSettings: DEFAULT_MONITOR_SETTINGS,
+    };
+    const liveSettings = {
+      ...seedSettings,
+      defaultForecasterName: 'Live',
+    };
+    const getDocSpy = jest.mocked(getDoc);
+    getDocSpy.mockClear();
+    getDocSpy
+      .mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ email: 'user@example.com', createdAt: { __serverTimestamp: true } }),
+      } as never)
+      .mockResolvedValueOnce({ data: () => undefined, exists: () => false } as never);
+    const setDocSpy = jest.mocked(setDoc);
+    setDocSpy.mockClear();
+    setDocSpy.mockResolvedValue(undefined as never);
+    const onSnapshotSpy = jest.mocked(onSnapshot);
+    onSnapshotSpy.mockClear();
+    const liveUnsubscribe = jest.fn();
+    let liveNext: ((snapshot: { data: () => unknown }) => void) | undefined;
+    onSnapshotSpy.mockImplementation((_ref, next) => {
+      liveNext = next as (snapshot: { data: () => unknown }) => void;
+      return liveUnsubscribe;
+    });
+
+    const applyRemoteSettings = jest.fn();
+    const setSettingsSyncStatus = jest.fn();
+    const setError = jest.fn();
+    const hasInitializedSettingsRef = { current: false };
+    const unsubscribeResult = await runInitialHostedSync({
+      profileRef: { path: 'profile' } as never,
+      settingsRef: { path: 'settings' } as never,
+      user: { uid: 'user-1', email: 'user@example.com', displayName: 'User', photoURL: '', providerData: [] } as never,
+      buildLocalSettingsSnapshot: () => seedSettings,
+      applyRemoteSettings,
+      isActive: () => true,
+      lastSyncedSettingsRef: { current: null },
+      setSyncedSettings: jest.fn(),
+      setSettingsSyncStatus,
+      setError,
+      hasInitializedSettingsRef,
+    });
+
+    expect(unsubscribeResult).toBe(liveUnsubscribe);
+    expect(hasInitializedSettingsRef.current).toBe(true);
+    expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
+    expect(setError).not.toHaveBeenCalled();
+    if (!liveNext) {
+      throw new Error('Expected live subscription handler to be registered');
+    }
+    liveNext({ data: () => liveSettings });
+    expect(applyRemoteSettings).toHaveBeenCalledWith(expect.objectContaining({ defaultForecasterName: 'Live' }));
+    expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
+    expect(hasInitializedSettingsRef.current).toBe(true);
+  });
+
   test('cleans up a listener that resolves after hosted settings cleanup', async () => {
     const unsubscribe = jest.fn();
     const setSubscription = jest.fn();
@@ -819,7 +885,7 @@ describe('AuthProvider Utils', () => {
     expect(idleError).not.toHaveBeenCalled();
   });
 
-  test('hands off an active subscription and swallows late rejections', async () => {
+  test('hands off an active subscription and propagates late rejections', async () => {
     const unsubscribe = jest.fn();
     const setSubscription = jest.fn();
 
@@ -832,12 +898,10 @@ describe('AuthProvider Utils', () => {
     expect(noopSubscription).not.toHaveBeenCalled();
 
     const rejectedSubscription = jest.fn();
-    const rejectedUnsubscribe = jest.fn();
     await expect(
       attachHostedSettingsSubscription(Promise.reject(new Error('late handoff')), () => true, rejectedSubscription),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('late handoff');
     expect(rejectedSubscription).not.toHaveBeenCalled();
-    expect(rejectedUnsubscribe).not.toHaveBeenCalled();
 
     await attachHostedSettingsSubscription(Promise.resolve(undefined), () => false, jest.fn());
   });
