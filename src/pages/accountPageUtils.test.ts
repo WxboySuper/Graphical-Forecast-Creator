@@ -44,11 +44,43 @@ describe("accountPageUtils", () => {
     expect(getBillingSupportCopy("stripe", true, false)).toBeNull();
   });
 
-  test("formats empty, invalid, and valid activity dates", () => {
+  test("returns fallbacks for empty and invalid activity dates", () => {
     expect(formatLastActiveDate(null)).toBe("No activity yet");
     expect(formatLastActiveDate("")).toBe("No activity yet");
     expect(formatLastActiveDate("not-a-date")).toBe("not-a-date");
-    expect(formatLastActiveDate("2026-03-30")).toContain("2026");
+  });
+
+  test("formats date-only keys as local midnight with browser locale", () => {
+    const spy = jest
+      .spyOn(Date.prototype, "toLocaleDateString")
+      .mockReturnValue("Mar 30, 2026");
+    try {
+      expect(formatLastActiveDate("2026-03-30")).toBe("Mar 30, 2026");
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      const formattedDate = spy.mock.instances[0] as Date;
+      expect(formattedDate.getFullYear()).toBe(2026);
+      expect(formattedDate.getMonth()).toBe(2);
+      expect(formattedDate.getDate()).toBe(30);
+      expect(formattedDate.getHours()).toBe(0);
+      expect(formattedDate.getMinutes()).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("does not invoke locale formatter for invalid dates", () => {
+    const spy = jest.spyOn(Date.prototype, "toLocaleDateString");
+    try {
+      expect(formatLastActiveDate("not-a-date")).toBe("not-a-date");
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   test("maps provider ids and pricing variants", () => {

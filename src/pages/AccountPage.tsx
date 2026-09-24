@@ -178,6 +178,7 @@ const DiscussionDefaultsSection: React.FC<{
   </div>
 );
 
+/** Bottom action row for saving defaults and ending the current session. */
 /** Opt-in disclosure for the metadata-only workflow awareness feature. */
 const WorkflowAwarenessSection: React.FC<{
   enabled: boolean;
