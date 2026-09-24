@@ -82,7 +82,7 @@ export const getCurrentPlanPrice = (
   return "Included";
 };
 
-/** Formats the last recorded active-day key into an account-friendly date label. */
+/** Formats a date-only YYYY-MM-DD activity key with the user's local calendar and browser locale. */
 export const formatLastActiveDate = (value: string | null): string => {
   if (!value) return "No activity yet";
   const parsed = new Date(`${value}T00:00:00`);
