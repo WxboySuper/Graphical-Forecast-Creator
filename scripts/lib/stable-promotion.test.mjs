@@ -1,5 +1,5 @@
 /**
- * Verifies that a promotion target is the stable form of the current main beta version.
+ * Verifies stable version derivation from hard-coded beta examples.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
