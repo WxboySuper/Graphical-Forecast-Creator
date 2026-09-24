@@ -1,8 +1,4 @@
-/**
- * E2E contract for custom-products.spec.
- *
- * This file defines browser-level checks for the custom-products.spec workflow and its user-visible behavior.
- */
+/** Verifies reusable custom-product creation, forecast reuse, validation, limits, concurrent edits, and exposure gating. */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 

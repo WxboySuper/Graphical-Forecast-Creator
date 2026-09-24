@@ -1,14 +1,5 @@
-/**
- * E2E contract for smoke.spec.
- *
- * This file defines browser-level checks for the smoke.spec workflow and its user-visible behavior.
- */
+/** Verifies core routes load without white-screen crashes, including mobile forecast layouts and gated-route guards. */
 import { test, expect } from '@playwright/test';
-
-/**
- * Smoke tests — verifies the app loads and core routes are reachable
- * without any white-screen crashes.
- */
 
 test.describe('App smoke tests', () => {
   const bypassLocalBeta = async (page: import('@playwright/test').Page) => {

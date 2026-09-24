@@ -1,8 +1,4 @@
-/**
- * E2E contract for auto-tstm.spec.
- *
- * This file defines browser-level checks for the auto-tstm.spec workflow and its user-visible behavior.
- */
+/** Verifies Auto-TSTM preview opens from Tools, cancels cleanly, and stays disabled on unsupported days. */
 import { test, expect } from '@playwright/test';
 
 const bypassLocalBeta = async (page: import('@playwright/test').Page) => {

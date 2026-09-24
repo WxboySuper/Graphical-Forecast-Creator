@@ -1,8 +1,4 @@
-/**
- * E2E contract for map-image-export.spec.
- *
- * This file defines browser-level checks for the map-image-export.spec workflow and its user-visible behavior.
- */
+/** Verifies the live forecast map exports as a correctly sized JPEG in light and dark modes. */
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { prepareAppState } from './testSetup';

@@ -1,8 +1,4 @@
-/**
- * E2E contract for workflows.spec.
- *
- * This file defines browser-level checks for the workflows.spec workflow and its user-visible behavior.
- */
+/** Verifies workflow startup, discussion isolation and persistence, package round-trip, and cross-page continuity. */
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';

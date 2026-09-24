@@ -1,8 +1,4 @@
-/**
- * E2E contract for ui-interactions.spec.
- *
- * This file defines browser-level checks for the ui-interactions.spec workflow and its user-visible behavior.
- */
+/** Verifies dark-mode toggle and persistence, documentation modal behavior, confirmation handling, and keyboard shortcuts. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 

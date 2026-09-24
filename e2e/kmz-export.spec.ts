@@ -1,8 +1,4 @@
-/**
- * E2E contract for kmz-export.spec.
- *
- * This file defines browser-level checks for the kmz-export.spec workflow and its user-visible behavior.
- */
+/** Verifies KMZ/KML export scopes, split-layout output, outlook filtering, and KML re-import through the transfer modal. */
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';

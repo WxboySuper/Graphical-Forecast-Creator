@@ -1,8 +1,4 @@
-/**
- * E2E contract for navigation.spec.
- *
- * This file defines browser-level checks for the navigation.spec workflow and its user-visible behavior.
- */
+/** Verifies routing between home, forecast, verification, and discussion preserves query params and per-day drafts. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 

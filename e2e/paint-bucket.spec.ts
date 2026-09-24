@@ -1,8 +1,4 @@
-/**
- * E2E contract for paint-bucket.spec.
- *
- * This file defines browser-level checks for the paint-bucket.spec workflow and its user-visible behavior.
- */
+/** Verifies a drawn probabilistic polygon can be recolored through the paint-bucket edit flow with undo available. */
 import { test, expect, type Page } from '@playwright/test';
 
 const startForecast = async (page: Page): Promise<void> => {

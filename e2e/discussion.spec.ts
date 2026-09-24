@@ -1,8 +1,4 @@
-/**
- * E2E contract for discussion.spec.
- *
- * This file defines browser-level checks for the discussion.spec workflow and its user-visible behavior.
- */
+/** Verifies discussion drafts persist across scope changes, support scope combining, and stay usable on a portrait phone. */
 import { test, expect } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 

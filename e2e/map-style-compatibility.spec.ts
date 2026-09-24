@@ -1,8 +1,4 @@
-/**
- * E2E contract for map-style-compatibility.spec.
- *
- * This file defines browser-level checks for the map-style-compatibility.spec workflow and its user-visible behavior.
- */
+/** Verifies a drawn outlook renders in forecast and verification with shared map styles across base maps and dark mode. */
 import { expect, test } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 
