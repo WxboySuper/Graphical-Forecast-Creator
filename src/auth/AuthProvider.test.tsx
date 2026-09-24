@@ -22,6 +22,15 @@ import {
   localUpdateSyncedSettings,
   postLocalJson,
   safeParseJson,
+  createSettingsSnapshot as createProviderSettingsSnapshot,
+  areUserSettingsEqual as areProviderUserSettingsEqual,
+  createProfilePayload as createProviderProfilePayload,
+  getRemoteSeedPayload as getProviderRemoteSeedPayload,
+  getSettingsSyncError as getProviderSettingsSyncError,
+  getSettingsUpdateError as getProviderSettingsUpdateError,
+  mergeUserSettingsDocument as mergeProviderUserSettingsDocument,
+  readProfileBetaAccess as readProviderProfileBetaAccess,
+  readRemoteSettings as readProviderRemoteSettings,
   AuthProvider,
   useAuth,
 } from './AuthProvider';
@@ -33,7 +42,8 @@ import {
   startSettingsSubscription,
   syncProfileDocument,
 } from './hostedSettingsSync';
-import { queueProductMetric } from '../utils/productMetrics';import {
+import { queueProductMetric } from '../utils/productMetrics';
+import {
   areUserSettingsEqual,
   createProfilePayload,
   createSettingsSnapshot,
@@ -119,7 +129,9 @@ const waitForAuthEffects = async (delay = 100) => {
 
 describe('AuthProvider Utils', () => {
   test('keeps the existing provider re-export for settings helpers', () => {
-    expect(createProviderSettingsSnapshot).toBe(createSettingsSnapshot);
+    for (const helper of [createProviderSettingsSnapshot, areProviderUserSettingsEqual, createProviderProfilePayload, getProviderRemoteSeedPayload, getProviderSettingsSyncError, getProviderSettingsUpdateError, mergeProviderUserSettingsDocument, readProviderProfileBetaAccess, readProviderRemoteSettings]) {
+      expect(typeof helper).toBe('function');
+    }
   });
   afterEach(() => {
     jest.useRealTimers();

@@ -58,6 +58,7 @@ export {
   readRemoteSettings,
 } from './userSettingsDocument';
 export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
+export { createProfilePayload, readProfileBetaAccess } from './authSettings';
 export {
   applySettingsToState,
   areOverlaySettingsEqual,
