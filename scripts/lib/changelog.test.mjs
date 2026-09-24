@@ -1,5 +1,5 @@
 /**
- * Covers extraction of unreleased, stable, and beta release-note sections.
+ * Covers unreleased body extraction, minor-line heading matching, stable and beta release notes with Unreleased fallback, and next-major and stable-hotfix lane extraction.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

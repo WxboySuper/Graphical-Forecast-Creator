@@ -1,5 +1,5 @@
 /**
- * Covers Markdown rendering, unsafe link destinations, local links, and Mermaid markup.
+ * Covers Markdown and Mermaid rendering, unsafe destination rejection, heading anchors with duplicate-id suffixes, page slugs, local link and image resolution, and the full-corpus link check.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';

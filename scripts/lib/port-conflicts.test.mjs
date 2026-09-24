@@ -1,5 +1,5 @@
 /**
- * Ensures every forward-port conflict remains assigned to a human decision.
+ * Checks that server/package.json and package-lock.json conflicts land in needsHuman with an empty autoResolvable list and fail the auto-resolve check.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
