@@ -11,7 +11,7 @@ import type { ForecastCycle, GFCForecastSaveData, CycleMetadata } from '../types
 import { getScopedStorageKey, getStorageScope } from './storageScope';
 import {
   DEFAULT_FORECAST_WORKSPACE,
-  getForecastWorkspace,
+  resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
 
@@ -45,7 +45,7 @@ const toPersistedSavedCycle = (cycle: SavedCycle): PersistedSavedCycle => ({
   label: cycle.label,
   forecastData: serializeForecast(cycle.forecastCycle, STORAGE_MAP_VIEW, cycle.workflowMetadata),
   stats: cycle.stats,
-  workspaceId: getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE,
+  workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
   workflowMetadata: cycle.workflowMetadata,
 });
 
@@ -60,7 +60,7 @@ const fromPersistedSavedCycle = (cycle: PersistedSavedCycle): SavedCycle => {
     label: cycle.label,
     forecastCycle,
     stats: cycle.stats ?? countForecastMetrics(forecastCycle),
-    workspaceId: getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE,
+    workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
     workflowMetadata: cycle.workflowMetadata,
   };
 };

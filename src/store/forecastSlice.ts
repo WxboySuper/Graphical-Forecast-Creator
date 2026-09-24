@@ -33,6 +33,7 @@ import {
 import {
   DEFAULT_FORECAST_WORKSPACE,
   getForecastWorkspace,
+  resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
 
@@ -351,7 +352,7 @@ const advanceCycleGeneration = (state: ForecastState) => {
 /** Normalizes hydrated cycle ownership so direct or legacy payloads cannot bypass Severe fallback. */
 const normalizeCycleWorkspace = (cycle: SavedCycle): SavedCycle => ({
   ...cycle,
-  workspaceId: getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE,
+  workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
 });
 
 const initialState: ForecastState = {
@@ -1060,7 +1061,7 @@ export const forecastSlice = createSlice({
         label: action.payload.label,
         forecastCycle: forecastCycleSnapshot,
         stats: countForecastMetrics(forecastCycleSnapshot),
-        workspaceId: getForecastWorkspace(state.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE,
+        workspaceId: resolveForecastWorkspaceId(state.workspaceId),
         workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
       };
       state.savedCycles.push(savedCycle);
@@ -1089,7 +1090,7 @@ export const forecastSlice = createSlice({
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
       if (savedCycle) {
-        state.workspaceId = getForecastWorkspace(savedCycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+        state.workspaceId = resolveForecastWorkspaceId(savedCycle.workspaceId);
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
         advanceCycleGeneration(state);
         clearHistory(state);
