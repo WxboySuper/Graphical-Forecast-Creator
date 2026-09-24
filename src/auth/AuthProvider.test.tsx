@@ -131,11 +131,7 @@ describe('AuthProvider Utils', () => {
   test('keeps the existing provider re-export for settings helpers', () => {
     for (const helper of [createProviderSettingsSnapshot, areProviderUserSettingsEqual, createProviderProfilePayload, getProviderRemoteSeedPayload, getProviderSettingsSyncError, getProviderSettingsUpdateError, mergeProviderUserSettingsDocument, readProviderProfileBetaAccess, readProviderRemoteSettings]) {
       expect(typeof helper).toBe('function');
-    }
-  });
-  afterEach(() => {
-    jest.useRealTimers();
-  });
+    }  });
 
   test('local sign-out failure does not turn completed server deletion into a failure', async () => {
     const clearLocalState = jest.fn();
