@@ -1,10 +1,20 @@
 import Feature from "ol/Feature";
+import GeoJSON from "ol/format/GeoJSON";
 import Polygon from "ol/geom/Polygon";
 import Point from "ol/geom/Point";
 import type Geometry from "ol/geom/Geometry";
 import type { MultiPolygon, Polygon as GeoJsonPolygon } from "geojson";
 import { handleForecastDrawEnd, type DrawnFeatureHandlerOptions } from "./openLayersForecastDrawHandlers";
 import { captureException } from "@sentry/react";
+import {
+  CUSTOM_PRODUCTS_SCHEMA_VERSION,
+  type CustomCategoryId,
+  type CustomCategoryTemplate,
+  type CustomPolygonFeature,
+  type OneOffCustomLayer,
+} from "../../types/customProducts";
+import { asCustomLayerId } from "../../lib/customProducts";
+import { addCustomFeature } from "../../store/forecastSlice";
 
 jest.mock("@sentry/react", () => ({ captureException: jest.fn() }));
 
@@ -17,6 +27,31 @@ const polygonFeature = () => new Feature({
 const pointFeature = () => new Feature({
   geometry: new Point([0, 0]),
 });
+
+const customCategory: CustomCategoryTemplate = {
+  id: "cat-1" as CustomCategoryId,
+  label: "Heavy snow",
+  order: 0,
+  style: {
+    fillColor: "#22c55e",
+    fillOpacity: 0.5,
+    strokeColor: "#111827",
+    strokeOpacity: 1,
+    strokeWidth: 2,
+    hatch: "none",
+  },
+};
+
+const customLayer: OneOffCustomLayer = {
+  schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+  id: asCustomLayerId("layer-1"),
+  label: "Winter impacts",
+  order: 0,
+  categories: [customCategory],
+  features: [],
+  createdAt: "2026-07-17T12:00:00.000Z",
+  updatedAt: "2026-07-17T12:00:00.000Z",
+};
 
 type DrawOptions = DrawnFeatureHandlerOptions;
 
@@ -84,15 +119,32 @@ describe("handleForecastDrawEnd", () => {
   test("dispatches a custom feature without running outlook trim", async () => {
     const options = baseOptions({
       customMode: true,
-      activeCustomLayer: { id: "layer-1" } as never,
-      activeCustomCategory: { id: "cat-1", label: "Heavy snow" } as never,
+      activeCustomLayer: customLayer,
+      activeCustomCategory: customCategory,
+    });
+    const drawn = polygonFeature() as Feature<Geometry>;
+    const expectedGeometry = new GeoJSON().writeGeometryObject(drawn.getGeometry()!, {
+      dataProjection: "EPSG:4326",
+      featureProjection: "EPSG:3857",
     });
 
-    handleForecastDrawEnd({ feature: polygonFeature() as Feature<Geometry> }, options);
+    handleForecastDrawEnd({ feature: drawn }, options);
     await flush();
 
     expect(options.trimGeometryForAutoDraw).not.toHaveBeenCalled();
     expect(options.dispatch).toHaveBeenCalledTimes(1);
+    const action = options.dispatch.mock.calls[0][0] as ReturnType<typeof addCustomFeature>;
+    expect(action.type).toBe(addCustomFeature.type);
+    const payload = action.payload as CustomPolygonFeature;
+    expect(payload.type).toBe("Feature");
+    expect(typeof payload.id).toBe("string");
+    expect(payload.geometry).toEqual(expectedGeometry);
+    expect(payload.geometry.type).toBe("Polygon");
+    expect(payload.properties).toMatchObject({
+      customLayerId: customLayer.id,
+      categoryId: customCategory.id,
+      title: customCategory.label,
+    });
   });
 
   test("does nothing when trim removes the geometry", async () => {
