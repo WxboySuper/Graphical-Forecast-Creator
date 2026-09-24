@@ -164,8 +164,8 @@ const createPointerMoveHandler = ({ map, layers }: {
   let frameId: number | null = null;
   let latestPixel: number[] | null = null;
 
-/** Applies the pending pointer cursor state to the map target. */
-const updateCursor = () => {
+  /** Applies the pending pointer cursor state to the map target. */
+  const updateCursor = () => {
     frameId = null;
     if (!latestPixel) return;
     const target = map.getTargetElement();
