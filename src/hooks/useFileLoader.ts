@@ -78,6 +78,9 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
       dispatch(importForecastCycle(resolved.forecastCycle));
       syncWorkflowMetadata(resolved.cycleMetadata);
       if (resolved.mapView) dispatch(setMapView(resolved.mapView));
+      for (const warning of resolved.warnings ?? []) {
+        addToast(warning, 'warning');
+      }
       addToast('Forecast loaded successfully!', 'success');
     } catch {
       addToast('Error reading file.', 'error');

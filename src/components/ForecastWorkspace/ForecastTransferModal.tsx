@@ -177,6 +177,14 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         defaultDay: forecastCycle.currentDay as DayType,
       });
       setImportWarnings(result.warnings);
+      if (result.workspaceId !== null && result.workspaceId !== workspaceId) {
+        onError?.(`This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`);
+        return;
+      }
+      if (result.workspaceId === null) {
+        onError?.('This file does not declare a forecast workspace and cannot be imported.');
+        return;
+      }
       onImported(result);
       onClose();
     } catch (error) {
@@ -184,7 +192,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     } finally {
       onBusyChange(false);
     }
-  }, [onBusyChange, forecastCycle, onImported, onError, onClose]);
+  }, [onBusyChange, forecastCycle, onImported, onError, onClose, workspaceId]);
 
   const onFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

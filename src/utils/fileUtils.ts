@@ -46,12 +46,33 @@ const isZipImport = (file: File, bytes?: Uint8Array): boolean => [
   bytes?.[0] === 0x50 && bytes?.[1] === 0x4b,
 ].includes(true);
 
-/** Extracts the preferred forecast payload from a workflow ZIP package. */
+/** Returns a canonical JSON string with object keys sorted so key order cannot mask differences. */
+const toCanonicalJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map((item) => toCanonicalJson(item)).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entryValue]) => `${JSON.stringify(key)}:${toCanonicalJson(entryValue)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+};
+
+/** Extracts the manifest payload from a workflow ZIP package, rejecting missing or conflicting entries. */
 const readForecastPackage = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
   const zip = await JSZip.loadAsync(bytes ?? file);
-  const entry = zip.file('workflow_package.json') ?? zip.file('forecast_cycle.json');
-  if (!entry) throw new Error('Package is missing workflow_package.json and forecast_cycle.json.');
-  return JSON.parse(await entry.async('string')) as unknown;
+  const manifestEntry = zip.file('workflow_package.json');
+  if (!manifestEntry) throw new Error('Package is missing workflow_package.json.');
+  const manifest = JSON.parse(await manifestEntry.async('string')) as unknown;
+  const fallbackEntry = zip.file('forecast_cycle.json');
+  if (fallbackEntry) {
+    const fallback = JSON.parse(await fallbackEntry.async('string')) as unknown;
+    const manifestForecast = (manifest as { forecast?: unknown }).forecast;
+    if (manifestForecast !== undefined && toCanonicalJson(manifestForecast) !== toCanonicalJson(fallback)) {
+      throw new Error('workflow_package.json does not match forecast_cycle.json.');
+    }
+  }
+  return manifest;
 };
 
 /** Parses a plain JSON forecast from already-read bytes or the File text API. */

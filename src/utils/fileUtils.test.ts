@@ -85,12 +85,32 @@ describe('fileUtils', () => {
   test('reads the workflow manifest from an exported ZIP package', async () => {
     const manifest = { packageType: 'workflow', schemaVersion: '1.0.0', exportedAt: '2026-07-17T00:00:00.000Z', forecast: { forecastCycle: {} } };
     const zip = new JSZip();
-    zip.file('forecast_cycle.json', JSON.stringify({ fallback: true }));
+    zip.file('forecast_cycle.json', JSON.stringify({ forecastCycle: {} }));
     zip.file('workflow_package.json', JSON.stringify(manifest));
     const bytes = await zip.generateAsync({ type: 'uint8array' });
     const file = Object.assign(bytes, { name: 'workflow.zip', type: 'application/zip' }) as unknown as File;
 
     await expect(readForecastImportFile(file)).resolves.toEqual(manifest);
+  });
+
+  test('rejects a ZIP package whose manifest disagrees with its forecast entry', async () => {
+    const manifest = { packageType: 'workflow', schemaVersion: '1.0.0', exportedAt: '2026-07-17T00:00:00.000Z', forecast: { forecastCycle: {} } };
+    const zip = new JSZip();
+    zip.file('forecast_cycle.json', JSON.stringify({ fallback: true }));
+    zip.file('workflow_package.json', JSON.stringify(manifest));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const file = Object.assign(bytes, { name: 'workflow.zip', type: 'application/zip' }) as unknown as File;
+
+    await expect(readForecastImportFile(file)).rejects.toThrow('does not match');
+  });
+
+  test('rejects a ZIP package missing its workflow manifest instead of falling back', async () => {
+    const zip = new JSZip();
+    zip.file('forecast_cycle.json', JSON.stringify({ forecastCycle: {} }));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const file = Object.assign(bytes, { name: 'workflow.zip', type: 'application/zip' }) as unknown as File;
+
+    await expect(readForecastImportFile(file)).rejects.toThrow('missing workflow_package.json');
   });
 
   test('serialize/deserialize preserves discussion scopes without changing day data', () => {

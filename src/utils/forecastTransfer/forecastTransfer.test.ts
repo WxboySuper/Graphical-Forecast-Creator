@@ -218,6 +218,7 @@ describe('forecastTransfer', () => {
     const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'custom', exportedAt: '2026-08-18T12:00:00.000Z' });
     const zip = new JSZip();
     zip.file('workflow_package.json', JSON.stringify(pkg));
+    zip.file('forecast_cycle.json', JSON.stringify(bare));
     const bytes = await zip.generateAsync({ type: 'uint8array' });
     const buffer = Uint8Array.from(bytes).buffer;
     const file = new File([buffer], 'custom-legacy-inner.zip', { type: 'application/zip' });
@@ -226,6 +227,59 @@ describe('forecastTransfer', () => {
     const result = await importForecastTransfer(file);
     expect(result.format).toBe('package');
     expect(result.workspaceId).toBe('custom');
+    expect(result.warnings.join(' ')).toMatch('untagged legacy');
+  });
+
+  test('warns when a package has no outer workspace instead of silently assuming Severe', async () => {
+    const bare = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'severe', exportedAt: '2026-08-18T12:00:00.000Z' });
+    const legacyPkg = { packageType: pkg.packageType, schemaVersion: pkg.schemaVersion, exportedAt: pkg.exportedAt, forecast: bare } as unknown as Record<string, unknown>;
+    const zip = new JSZip();
+    zip.file('workflow_package.json', JSON.stringify(legacyPkg));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const buffer = Uint8Array.from(bytes).buffer;
+    const file = new File([buffer], 'legacy-package.zip', { type: 'application/zip' });
+    file.arrayBuffer = async () => buffer;
+
+    const result = await importForecastTransfer(file);
+    expect(result.workspaceId).toBe('severe');
+    expect(result.warnings.join(' ')).toMatch('no workspace label');
+  });
+
+  test('keeps a bare legacy JSON file Severe-owned without a package warning', async () => {
+    const bare = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const file = new File([JSON.stringify(bare)], 'legacy.json', { type: 'application/json' });
+    file.arrayBuffer = async () => new TextEncoder().encode(JSON.stringify(bare)).buffer;
+
+    const result = await importForecastTransfer(file);
+    expect(result.workspaceId).toBe('severe');
+    expect(result.warnings).toEqual([]);
+  });
+
+  test('rejects a ZIP whose forecast entry disagrees with its manifest', async () => {
+    const bare = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'severe', exportedAt: '2026-08-18T12:00:00.000Z' });
+    const zip = new JSZip();
+    zip.file('workflow_package.json', JSON.stringify(pkg));
+    zip.file('forecast_cycle.json', JSON.stringify({ tampered: true }));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const buffer = Uint8Array.from(bytes).buffer;
+    const file = new File([buffer], 'conflict-package.zip', { type: 'application/zip' });
+    file.arrayBuffer = async () => buffer;
+
+    await expect(importForecastTransfer(file)).rejects.toThrow('does not match');
+  });
+
+  test('rejects a ZIP missing its workflow manifest instead of using the legacy entry', async () => {
+    const bare = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const zip = new JSZip();
+    zip.file('forecast_cycle.json', JSON.stringify(bare));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const buffer = Uint8Array.from(bytes).buffer;
+    const file = new File([buffer], 'no-manifest.zip', { type: 'application/zip' });
+    file.arrayBuffer = async () => buffer;
+
+    await expect(importForecastTransfer(file)).rejects.toThrow('missing workflow_package.json');
   });
 
   test('rejects KMZ files whose expanded KML exceeds the import limit', async () => {

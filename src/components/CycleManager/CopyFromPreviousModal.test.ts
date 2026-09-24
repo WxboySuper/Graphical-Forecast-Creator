@@ -7,7 +7,7 @@ jest.mock('../../utils/forecastTransfer/nativeImportUtils', () => ({
   resolveNativeFileContent: jest.fn(),
 }));
 
-import { parseForecastFile } from './CopyFromPreviousModal';
+import { parseForecastFile, parseForecastFileWithOwner } from './CopyFromPreviousModal';
 
 const { readForecastImportFile, validateForecastData } = jest.requireMock('../../utils/fileUtils') as {
   readForecastImportFile: jest.Mock;
@@ -32,6 +32,22 @@ describe('parseForecastFile workspace ownership', () => {
 
   it('rejects a file owned by another workspace before copying features', async () => {
     await expect(parseForecastFile(new File(['{}'], 'cycle.json'), 'severe'))
+      .rejects.toThrow('This forecast belongs to the custom workspace.');
+  });
+
+  it('returns the owning workspace and warnings so dispatch can re-check', async () => {
+    resolveNativeFileContent.mockReturnValue({
+      workspaceId: 'custom',
+      forecastCycle: { cycleDate: '2026-09-22' },
+      warnings: ['This package labels an untagged legacy forecast as custom workspace.'],
+    });
+    await expect(parseForecastFileWithOwner(new File(['{}'], 'cycle.json'), 'custom'))
+      .resolves.toEqual({
+        cycle: { cycleDate: '2026-09-22' },
+        workspaceId: 'custom',
+        warnings: ['This package labels an untagged legacy forecast as custom workspace.'],
+      });
+    await expect(parseForecastFileWithOwner(new File(['{}'], 'cycle.json'), 'severe'))
       .rejects.toThrow('This forecast belongs to the custom workspace.');
   });
 });

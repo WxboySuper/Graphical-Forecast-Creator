@@ -207,6 +207,20 @@ describe('forecastPageController', () => {
     exportSpy.mockRestore();
   });
 
+  test('keeps cloud handoff enveloped so a bare rollover payload cannot silently downgrade', async () => {
+    const { buildCloudSessionPayload } = await import('./CloudLibraryPage');
+    const { deserializeForecastWorkspace } = await import('../utils/forecastWorkspacePersistenceAdapter');
+    const cycle = createForecastCycle();
+    const bare = fileUtils.serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+
+    const storable = buildCloudSessionPayload('custom', bare) as { workspaceId?: string };
+    expect(storable.workspaceId).toBe('custom');
+    expect(deserializeForecastWorkspace(storable).workspaceId).toBe('custom');
+
+    const envelope = serializeForecastWorkspace('custom', cycle, { center: [0, 0], zoom: 4 });
+    expect(buildCloudSessionPayload('custom', envelope)).toBe(envelope);
+  });
+
   test('persists workspace identity on native JSON downloads', async () => {
     const forecastCycle = createForecastCycle();
     const mapView = { center: [39.8, -98.5] as [number, number], zoom: 4 };

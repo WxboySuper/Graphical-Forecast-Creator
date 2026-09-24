@@ -182,4 +182,24 @@ describe('createFileHandlers workspace envelope round-trip', () => {
     const imported = dispatch.mock.calls.find((call) => (call[0] as { type?: string })?.type === 'forecast/importForecastCycle');
     expect((imported?.[0] as { payload: ForecastCycle }).payload.cycleDate).toBe(cycleDate);
   });
+
+  it('binds a legacy inner forecast to the declared outer workspace with an explicit warning', async () => {
+    const cycleDate = '2026-09-14';
+    const bare = serializeForecast(buildCycle(cycleDate), { center: [39.8, -98.5], zoom: 4 });
+    const { buildWorkflowExportPackage } = await import('../utils/workflowPackage');
+    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'custom' });
+    const handlers = createFileHandlers({
+      addToast,
+      dispatch,
+      forecastCycle: buildCycle('2026-01-01'),
+      workspaceId: 'custom',
+    });
+
+    await handlers.handleLoad(textFile('package.json', JSON.stringify(pkg)));
+
+    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('untagged legacy'), 'warning');
+    expect(addToast).toHaveBeenCalledWith('Forecast loaded successfully!', 'success');
+    const imported = dispatch.mock.calls.find((call) => (call[0] as { type?: string })?.type === 'forecast/importForecastCycle');
+    expect((imported?.[0] as { payload: ForecastCycle }).payload.cycleDate).toBe(cycleDate);
+  });
 });
