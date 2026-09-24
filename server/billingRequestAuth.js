@@ -4,11 +4,12 @@ const { getAdminAuth, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBearerToken } = require('./firebase-auth');
 
 /** Verifies the Firebase identity attached to a billing request. */
-const verifyRequestUser = async (req, res) => {
-  const token = getBearerToken(req);
-  const adminAuth = getAdminAuth();
-
-  if (!adminAuth || !hasFirebaseAdminConfig()) {
+const verifyRequestUser = async (
+  req,
+  res,
+  { adminAuth = getAdminAuth(), hasConfig = hasFirebaseAdminConfig(), token = getBearerToken(req) } = {}
+) => {
+  if (!adminAuth || !hasConfig) {
     res.status(503).json({ error: 'Firebase Admin is not configured on this deployment.' });
     return null;
   }
