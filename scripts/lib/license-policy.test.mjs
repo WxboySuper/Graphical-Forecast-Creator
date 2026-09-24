@@ -1,5 +1,5 @@
 /**
- * Checks permissive and public-domain license acceptance and copyleft review requirements.
+ * Checks permissive and public-domain acceptance, copyleft routing to review, prohibited and unknown license rejection, and SPDX dual-license decisions.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
