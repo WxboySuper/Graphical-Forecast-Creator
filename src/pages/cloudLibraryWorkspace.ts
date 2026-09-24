@@ -15,6 +15,15 @@ export interface CloudLibraryTab {
   cycleCount: number;
 }
 
+/** Reads a shareable workspace tab from the cloud-library query string. */
+export const getCloudLibraryTabFromSearchParams = (
+  searchParams: URLSearchParams,
+  tabs: readonly CloudLibraryTab[],
+): CloudLibraryTabId => {
+  const requestedTab = searchParams.get('workspace');
+  return tabs.some((tab) => tab.id === requestedTab) ? (requestedTab as CloudLibraryTabId) : 'all';
+};
+
 /** Resolves legacy or malformed cloud metadata to the Severe workspace boundary. */
 export const getCloudCycleWorkspaceId = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): ForecastWorkspaceId =>
   getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
@@ -29,13 +38,6 @@ export const filterCloudCyclesByWorkspace = (
   tabId: CloudLibraryTabId,
 ): CloudCycleMetadata[] =>
   tabId === 'all' ? cycles : cycles.filter((cycle) => getCloudCycleWorkspaceId(cycle) === tabId);
-
-/** Returns the active tab when still present, otherwise falls back to All. */
-export const resolveActiveCloudLibraryTab = (
-  tabs: CloudLibraryTab[],
-  activeTab: CloudLibraryTabId,
-): CloudLibraryTabId =>
-  tabs.some((tab) => tab.id === activeTab) ? activeTab : 'all';
 
 /** Resolves Home and End navigation, or undefined when the key is not an edge key. */
 const getCloudLibraryEdgeTabId = (

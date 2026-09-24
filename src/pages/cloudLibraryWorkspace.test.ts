@@ -1,4 +1,4 @@
-import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, resolveActiveCloudLibraryTab, getNextCloudLibraryTabId, type CloudLibraryTabId } from './cloudLibraryWorkspace';
+import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, getNextCloudLibraryTabId, getCloudLibraryTabFromSearchParams, type CloudLibraryTabId } from './cloudLibraryWorkspace';
 import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 
@@ -70,16 +70,6 @@ describe('cloud library workspace boundaries', () => {
     expect(getCloudCycleWorkspaceLabel(makeCycle('trop-1', 'tropical'))).toBe('Tropical');
   });
 
-  it('keeps the active tab when still present and falls back to All otherwise', () => {
-    const tabs = [
-      { id: 'all' as const, label: 'All', cycleCount: 2 },
-      { id: 'severe' as const, label: 'Severe', cycleCount: 1 },
-    ];
-
-    expect(resolveActiveCloudLibraryTab(tabs, 'severe')).toBe('severe');
-    expect(resolveActiveCloudLibraryTab(tabs, 'custom')).toBe('all');
-  });
-
   it('resolves arrow, home, and end keys across tabs', () => {
     const tabs = [
       { id: 'all' as const, label: 'All', cycleCount: 2 },
@@ -105,5 +95,13 @@ describe('cloud library workspace boundaries', () => {
 
     expect(getNextCloudLibraryTabId(tabs, 'missing' as unknown as CloudLibraryTabId, 'ArrowRight')).toBe('severe');
     expect(getNextCloudLibraryTabId(tabs, 'missing' as unknown as CloudLibraryTabId, 'ArrowLeft')).toBe('custom');
+  });
+
+  it('accepts only tabs present in the current exposed tab set', () => {
+    const tabs = getCloudLibraryTabs([makeCycle('legacy')], 'production');
+
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=custom'), tabs)).toBe('custom');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=mesoscale'), tabs)).toBe('all');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=unknown'), tabs)).toBe('all');
   });
 });
