@@ -107,6 +107,25 @@ describe('forecastTransfer', () => {
     expect(result.forecastCycle.cycleDate).toBe(buildForecast().cycleDate);
   });
 
+  test('imports legacy gfc-forecast filenames from payload ownership, not the filename', async () => {
+    const payload = serializeForecastWorkspace('custom', buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const json = JSON.stringify(payload);
+    const legacyFile = new File([json], 'gfc-forecast-2026-09-23T12-34-56.json', { type: 'application/json' });
+    legacyFile.arrayBuffer = async () => new TextEncoder().encode(json).buffer;
+
+    const legacyResult = await importForecastTransfer(legacyFile);
+    expect(legacyResult.format).toBe('json');
+    expect(legacyResult.workspaceId).toBe('custom');
+
+    const severePayload = serializeForecastWorkspace('severe', buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const severeJson = JSON.stringify(severePayload);
+    const mislabeledFile = new File([severeJson], 'gfc-custom-forecast-2026-09-23T12-34-56.json', { type: 'application/json' });
+    mislabeledFile.arrayBuffer = async () => new TextEncoder().encode(severeJson).buffer;
+
+    const mislabeledResult = await importForecastTransfer(mislabeledFile);
+    expect(mislabeledResult.workspaceId).toBe('severe');
+  });
+
   test('preserves workflow package metadata through the workspace classifier', async () => {
     const forecast = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
     const cycleMetadata = {

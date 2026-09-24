@@ -18,7 +18,7 @@ import {
 } from './transferExportUtils';
 import { importTransferFile } from './transferImportUtils';
 
-/** Downloads a workspace-owned native JSON transfer so identity survives round-trips. */
+/** Downloads a native JSON transfer with a workspace-specific filename. Ownership comes from the payload, not the filename. */
 const downloadWorkspaceJsonTransfer = (
   request: Pick<ForecastExportRequest, 'forecastCycle' | 'mapView' | 'cycleMetadata' | 'workspaceId'>,
 ): void => {

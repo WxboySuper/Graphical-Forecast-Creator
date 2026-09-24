@@ -102,7 +102,7 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
     fileInputRef.current?.click();
   };
 
-  /** Serializes the active workspace cycle to a workspace-owned JSON file, then marks the store as saved. */
+  /** Serializes the active workspace cycle to native JSON with a workspace-specific filename, then marks the store as saved. */
   const handleSave = () => {
     try {
       const payload = serializeForecastWorkspace(

@@ -181,7 +181,7 @@ export const getForecastImportWorkspaceError = (
     : `This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`;
 };
 
-/** Downloads the active workspace cycle as a workspace-owned native JSON file. */
+/** Downloads the active workspace cycle as native JSON with a workspace-specific filename. */
 export const downloadWorkspaceForecastJson = (
   workspaceId: ForecastWorkspaceId,
   forecastCycle: ReturnType<typeof selectForecastCycle>,

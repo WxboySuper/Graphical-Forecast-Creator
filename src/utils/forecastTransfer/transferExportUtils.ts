@@ -7,7 +7,7 @@ import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 const formatExportTimestamp = (date: Date): string =>
   date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
-/** Builds a timestamped filename for a workspace-owned native JSON forecast. */
+/** Builds a workspace-specific filename for a native JSON export. Ownership stays in the payload; the name is only a label. */
 export const buildWorkspaceForecastFilename = (
   workspaceId: ForecastWorkspaceId,
   date = new Date(),
