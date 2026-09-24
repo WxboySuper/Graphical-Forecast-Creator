@@ -56,11 +56,15 @@ const renderPage = (store = makeStore()) =>
 
 describe("CloudLibraryPage", () => {
   beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
     window.history.replaceState({}, "", "/");
+    mockUseAuth.mockReset();
+    mockUseEntitlement.mockReset();
+    mockUseCloudCycles.mockReset();
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult());
     mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: "local" });
     mockNavigate.mockClear();
-    sessionStorage.clear();
   });
 
   it("shows the signed-out gate when no user is present", () => {
@@ -124,6 +128,36 @@ describe("CloudLibraryPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Custom 0/i }));
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
+
+  it.each([
+    ["mesoscale", false, "local", "Mesoscale"],
+    ["tropical", true, "stripe", "Tropical"],
+    ["winter", false, "stripe", "Winter"],
+  ] as const)(
+    "does not fetch a cloud cycle owned by hidden workspace %s (premium: %s, source: %s)",
+    async (workspaceId, premiumActive, effectiveSource, workspaceLabel) => {
+      mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+      mockUseEntitlement.mockReturnValue({ premiumActive, effectiveSource });
+      const loadCycle = jest.fn();
+      mockUseCloudCycles.mockReturnValue(
+        cloudCyclesResult({
+          cycles: [{ id: `${workspaceId}-1`, workspaceId, label: `${workspaceId} save` }],
+          loadCycle,
+        })
+      );
+      window.history.replaceState({}, "", "/cloud");
+
+      renderPage();
+      expect(screen.getByRole("tab", { name: "All 1" })).toHaveAttribute("aria-selected", "true");
+      fireEvent.click(screen.getByRole("button", { name: "Load" }));
+
+      expect(await screen.findByText(`${workspaceLabel} cloud loading is not available yet. Your save is still stored.`)).toBeInTheDocument();
+      expect(loadCycle).not.toHaveBeenCalled();
+      expect(sessionStorage.length).toBe(0);
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe("/cloud");
+    }
+  );
 
   it("loads an exposed Custom cloud cycle into the matching forecast editor", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
