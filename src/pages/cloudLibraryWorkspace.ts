@@ -1,5 +1,6 @@
 import {
   getExposedForecastWorkspaces,
+  getForecastWorkspace,
   resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
