@@ -1,4 +1,4 @@
-/** Verifies reusable custom-product creation, forecast reuse, validation, limits, concurrent edits, and exposure gating. */
+/** Verifies local custom-product workflows plus target-conditional non-release and beta exposure checks; other target groups skip under the default local target. */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 
