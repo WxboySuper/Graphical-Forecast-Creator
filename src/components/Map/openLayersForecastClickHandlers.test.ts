@@ -42,6 +42,29 @@ const featureWith = (values: Record<string, unknown>) => ({
   get: (key: string) => values[key],
 });
 
+type ClickContext = ReturnType<typeof buildArgs>;
+
+const mockFeatureHit = (ctx: Pick<ClickContext, 'args' | 'map'>, feature: unknown) => {
+  ctx.map.forEachFeatureAtPixel.mockImplementation((_pixel: unknown, callback: (feature: unknown, layer: unknown) => unknown) =>
+    callback(feature, ctx.args.vectorLayer),
+  );
+};
+
+const clickFeature = (values: Record<string, unknown>, overrides: ClickOverrides = {}) => {
+  const ctx = buildArgs(overrides);
+  const feature = featureWith(values);
+  mockFeatureHit(ctx, feature);
+  handleForecastMapClick(ctx.args);
+  return { ...ctx, feature };
+};
+
+const clickEmpty = (overrides: ClickOverrides = {}) => {
+  const ctx = buildArgs(overrides);
+  ctx.map.forEachFeatureAtPixel.mockReturnValue(undefined);
+  handleForecastMapClick(ctx.args);
+  return ctx;
+};
+
 describe('shouldHandlePaintBucketClick', () => {
   test('handles paint-bucket clicks only for enabled edit mode on probabilistic outlooks', () => {
     expect(shouldHandlePaintBucketClick(true, 'edit', false, 'tornado')).toBe(true);
@@ -105,11 +128,7 @@ describe('handleForecastMapClick', () => {
   });
 
   test('shows a popup for the selected outlook polygon in pan mode', () => {
-    const feature = featureWith({ outlookType: 'wind', probability: '15%', isSignificant: true });
-    const { args, map, overlay } = buildArgs();
-    map.forEachFeatureAtPixel.mockImplementation((_pixel, callback) => callback(feature, args.vectorLayer));
-
-    handleForecastMapClick(args);
+    const { args, map, overlay } = clickFeature({ outlookType: 'wind', probability: '15%', isSignificant: true });
 
     expect(map.forEachFeatureAtPixel).toHaveBeenCalledWith(
       [10, 20],
@@ -140,72 +159,66 @@ describe('handleForecastMapClick', () => {
     expect(args.setPopupInfo).toHaveBeenCalledWith(null);
   });
 
-  test('uses the custom layer title and category for custom features', () => {
-    const feature = featureWith({
-      featureId: 'custom-1',
-      customLayerId: 'layer-1',
-      categoryId: 'cat-1',
-      title: 'My category',
-      customLayerTitle: 'Storm survey',
-      isSignificant: false,
-    });
-    const { args } = buildArgs();
-    (args.map as unknown as { forEachFeatureAtPixel: jest.Mock }).forEachFeatureAtPixel
-      .mockImplementation((_pixel, callback) => callback(feature, args.vectorLayer));
-
-    handleForecastMapClick(args);
-
-    expect(args.setPopupInfo).toHaveBeenCalledWith({
-      outlookType: 'Storm survey',
-      probability: 'My category',
-      isSignificant: false,
-    });
-  });
-
-  test('falls back to a generic custom layer label when the title is missing', () => {
-    const feature = featureWith({
-      featureId: 'custom-2',
-      customLayerId: 'layer-2',
-      categoryId: 'cat-2',
-      title: 'Another category',
-      isSignificant: true,
-    });
-    const { args } = buildArgs();
-    (args.map as unknown as { forEachFeatureAtPixel: jest.Mock }).forEachFeatureAtPixel
-      .mockImplementation((_pixel, callback) => callback(feature, args.vectorLayer));
-
-    handleForecastMapClick(args);
-
-    expect(args.setPopupInfo).toHaveBeenCalledWith({
-      outlookType: 'Custom layer',
-      probability: 'Another category',
-      isSignificant: true,
-    });
+  test.each([
+    {
+      name: 'uses the custom layer title and category for custom features',
+      values: {
+        featureId: 'custom-1',
+        customLayerId: 'layer-1',
+        categoryId: 'cat-1',
+        title: 'My category',
+        customLayerTitle: 'Storm survey',
+        isSignificant: false,
+      },
+      expected: {
+        outlookType: 'Storm survey',
+        probability: 'My category',
+        isSignificant: false,
+      },
+    },
+    {
+      name: 'falls back to a generic custom layer label when the title is missing',
+      values: {
+        featureId: 'custom-2',
+        customLayerId: 'layer-2',
+        categoryId: 'cat-2',
+        title: 'Another category',
+        isSignificant: true,
+      },
+      expected: {
+        outlookType: 'Custom layer',
+        probability: 'Another category',
+        isSignificant: true,
+      },
+    },
+  ])('$name', ({ values, expected }) => {
+    const { args } = clickFeature(values);
+    expect(args.setPopupInfo).toHaveBeenCalledWith(expected);
   });
 
   test('hides the popup when a pan click hits no feature', () => {
-    const { args, map, overlay } = buildArgs();
-    map.forEachFeatureAtPixel.mockReturnValue(undefined);
-    const hideSpy = jest.spyOn(overlay, 'setPosition');
-
-    handleForecastMapClick(args);
-
-    expect(hideSpy).toHaveBeenCalledWith(undefined);
+    const { args, map, overlay } = clickEmpty();
+    expect(map.forEachFeatureAtPixel).toHaveBeenCalledTimes(1);
+    expect(overlay.setPosition).toHaveBeenCalledWith(undefined);
     expect(args.setPopupInfo).toHaveBeenCalledWith(null);
   });
 
-  test('does nothing visible when a feature is found without an overlay', () => {
-    const feature = featureWith({ outlookType: 'hail', probability: '5%', isSignificant: false });
+  test.each([
+    {
+      name: 'feature hit',
+      values: { outlookType: 'hail', probability: '5%', isSignificant: false },
+    },
+    {
+      name: 'empty space',
+      values: null,
+    },
+  ])('does nothing without an overlay on $name', ({ values }) => {
     const { args, map } = buildArgs({ overlay: null });
-    map.forEachFeatureAtPixel.mockImplementation((_pixel, callback) => callback(feature, args.vectorLayer));
-
-    expect(() => handleForecastMapClick(args)).not.toThrow();
-    expect(args.setPopupInfo).not.toHaveBeenCalled();
-  });
-
-  test('does nothing when empty space is clicked without an overlay', () => {
-    const { args, map } = buildArgs({ overlay: null });
-    map.forEachFeatureAtPixel.mockReturnValue(undefined);
+    if (values) {
+      mockFeatureHit({ args, map }, featureWith(values));
+    } else {
+      map.forEachFeatureAtPixel.mockReturnValue(undefined);
+    }
 
     expect(() => handleForecastMapClick(args)).not.toThrow();
     expect(args.setPopupInfo).not.toHaveBeenCalled();
