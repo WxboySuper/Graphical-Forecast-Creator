@@ -17,6 +17,7 @@ import {
   setActiveProbability,
   toggleSignificant,
   setEmergencyMode,
+  setForecastWorkspace,
   selectForecastCycle,
   selectCanRedo,
   selectCanUndo,
@@ -721,6 +722,10 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
   workspaceId = DEFAULT_FORECAST_WORKSPACE,
 }) => {
   const dispatch = useDispatch();
+  // The route owns workspace identity: publish it to Redux so saveCurrentCycle tags new cycles.
+  useEffect(() => {
+    dispatch(setForecastWorkspace(workspaceId));
+  }, [dispatch, workspaceId]);
   const navigate = useNavigate();
   const location = useLocation();
   const { addToast } = useOutletContext<PageContext>();
