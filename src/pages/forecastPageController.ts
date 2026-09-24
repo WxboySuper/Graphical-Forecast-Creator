@@ -49,6 +49,7 @@ interface LoadedForecastPayload {
     cycleMetadata?: import('../types/workflow').CycleMetadata | null;
   };
   deserializedCycle: ForecastCycle;
+  warnings: string[];
 }
 
 interface StoredCloudMeta {
@@ -108,9 +109,14 @@ export const parseLoadedForecast = async (
     return null;
   }
 
+  for (const warning of resolved.warnings ?? []) {
+    addToast(warning, 'warning');
+  }
+
   return {
     rawData: { mapView: resolved.mapView, cycleMetadata: resolved.cycleMetadata },
     deserializedCycle: resolved.forecastCycle,
+    warnings: resolved.warnings ?? [],
   };
 };
 

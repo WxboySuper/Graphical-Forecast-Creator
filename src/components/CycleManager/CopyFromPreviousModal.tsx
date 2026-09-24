@@ -17,8 +17,8 @@ interface CopyFromPreviousModalProps {
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
-/** Reads and parses a GFC JSON forecast file into a ForecastCycle object. */
-export const parseForecastFile = async (file: File, workspaceId: ForecastWorkspaceId): Promise<ForecastCycle> => {
+/** Reads a forecast file with its owning workspace and import notes so dispatch can re-check. */
+export const parseForecastFileWithOwner = async (file: File, workspaceId: ForecastWorkspaceId): Promise<{ cycle: ForecastCycle; workspaceId: ForecastWorkspaceId; warnings: string[] }> => {
   const parsed = await readForecastImportFile(file);
   if (!validateForecastData(parsed)) {
     throw new Error('Invalid GFC forecast file.');
@@ -27,7 +27,13 @@ export const parseForecastFile = async (file: File, workspaceId: ForecastWorkspa
   if (resolved.workspaceId !== workspaceId) {
     throw new Error(`This forecast belongs to the ${resolved.workspaceId} workspace.`);
   }
-  return resolved.forecastCycle;
+  return { cycle: resolved.forecastCycle, workspaceId: resolved.workspaceId, warnings: resolved.warnings ?? [] };
+};
+
+/** Reads and parses a GFC JSON forecast file into a ForecastCycle object. */
+export const parseForecastFile = async (file: File, workspaceId: ForecastWorkspaceId): Promise<ForecastCycle> => {
+  const parsed = await parseForecastFileWithOwner(file, workspaceId);
+  return parsed.cycle;
 };
 
 type CopyModalHeaderProps = {
@@ -158,6 +164,7 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
   const { setModalRef } = useModalFocusTrap({ active: isOpen, onClose });
 
   const [loadedCycle, setLoadedCycle] = useState<ForecastCycle | null>(null);
+  const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<ForecastWorkspaceId | null>(null);
   const [loadedFileName, setLoadedFileName] = useState<string>('');
   const [sourceDay, setSourceDay] = useState<DayType>(1);
   const [targetDay, setTargetDay] = useState<DayType>(currentDay);
@@ -170,9 +177,13 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
     if (!file) return;
 
     try {
-      const cycle = await parseForecastFile(file, workspaceId);
-      setLoadedCycle(cycle);
+      const parsed = await parseForecastFileWithOwner(file, workspaceId);
+      setLoadedCycle(parsed.cycle);
+      setLoadedWorkspaceId(parsed.workspaceId);
       setLoadedFileName(file.name);
+      for (const warning of parsed.warnings) {
+        addToast(warning, 'warning');
+      }
     } catch (error) {
       const message = error instanceof Error && error.message.startsWith('This forecast belongs to ')
         ? error.message
@@ -188,6 +199,10 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
   const handleCopy = () => {
     if (!loadedCycle) {
       addToast('Please load a forecast file first.', 'warning');
+      return;
+    }
+    if (loadedWorkspaceId !== null && loadedWorkspaceId !== workspaceId) {
+      addToast(`This forecast belongs to the ${loadedWorkspaceId} workspace.`, 'error');
       return;
     }
 

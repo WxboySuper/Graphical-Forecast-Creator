@@ -184,4 +184,17 @@ describe('workspace envelope loads across file surfaces', () => {
     const legacy = await parseLoadedForecast(legacyPayloadFile(bare), addToast, 'severe');
     expect(legacy?.deserializedCycle.cycleDate).toBe(cycleDate);
   });
+
+  test('parseLoadedForecast surfaces legacy package relabel warnings without losing identity', async () => {
+    const cycleDate = '2026-09-25';
+    const bare = makeBarePayload(cycleDate);
+    const { buildWorkflowExportPackage } = await import('./workflowPackage');
+    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'custom' });
+    const addToast = jest.fn();
+
+    const loaded = await parseLoadedForecast(payloadFile(pkg), addToast, 'custom');
+    expect(loaded?.deserializedCycle.cycleDate).toBe(cycleDate);
+    expect(loaded?.warnings.join(' ')).toMatch('untagged legacy');
+    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('untagged legacy'), 'warning');
+  });
 });

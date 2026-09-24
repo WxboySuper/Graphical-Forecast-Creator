@@ -40,6 +40,8 @@ interface ResolvedNativeFileContent {
   forecastCycle: ReturnType<typeof deserializeForecastWorkspace>['forecastCycle'];
   mapView?: ForecastTransferMapView;
   cycleMetadata?: CycleMetadata | null;
+  warnings: string[];
+  legacy: boolean;
 }
 
 /**
@@ -47,20 +49,61 @@ interface ResolvedNativeFileContent {
  * This does not enforce an active-workspace match. Mutating editor entry points
  * must compare workspaceId before dispatch; grade, monitor, and verification
  * readers are read-only and may inspect a forecast owned by another workspace.
+ *
+ * A declared outer workspace is canonical over an untagged legacy inner forecast,
+ * but that relabel is surfaced as a warning so a stripped or repackaged legacy
+ * file cannot silently change owners. Packages without an outer label keep
+ * backward compatibility by falling back to the inner owner with a warning that
+ * ownership was inferred as Severe legacy.
  */
 export const resolveNativeFileContent = (data: unknown): ResolvedNativeFileContent => {
   if (isWorkflowExportPackage(data)) {
     const declaredWorkspaceId = getDeclaredPackageWorkspace(data);
     const restored = deserializeForecastWorkspace(data.forecast);
+    if (declaredWorkspaceId !== null && restored.legacy) {
+      const inner = getForecastDataFromWorkspacePayload(
+        data.forecast as Parameters<typeof getForecastDataFromWorkspacePayload>[0],
+      ) as { mapView?: ForecastTransferMapView; cycleMetadata?: CycleMetadata | null };
+      return {
+        forecastCycle: restored.forecastCycle,
+        workspaceId: declaredWorkspaceId,
+        mapView: data.mapView ?? inner.mapView,
+        cycleMetadata: data.metadata ?? data.cycleMetadata ?? inner.cycleMetadata,
+        warnings: [`This package labels an untagged legacy forecast as ${declaredWorkspaceId} workspace.`],
+        legacy: true,
+      };
+    }
     assertPackageWorkspaceMatch(declaredWorkspaceId, restored);
     const inner = getForecastDataFromWorkspacePayload(
       data.forecast as Parameters<typeof getForecastDataFromWorkspacePayload>[0],
     ) as { mapView?: ForecastTransferMapView; cycleMetadata?: CycleMetadata | null };
+    if (declaredWorkspaceId === null) {
+      if (restored.legacy) {
+        return {
+          forecastCycle: restored.forecastCycle,
+          workspaceId: restored.workspaceId,
+          mapView: data.mapView ?? inner.mapView,
+          cycleMetadata: data.metadata ?? data.cycleMetadata ?? inner.cycleMetadata,
+          warnings: ['This package has no workspace label; treated as a Severe legacy package.'],
+          legacy: true,
+        };
+      }
+      return {
+        forecastCycle: restored.forecastCycle,
+        workspaceId: restored.workspaceId,
+        mapView: data.mapView ?? inner.mapView,
+        cycleMetadata: data.metadata ?? data.cycleMetadata ?? inner.cycleMetadata,
+        warnings: [],
+        legacy: false,
+      };
+    }
     return {
       forecastCycle: restored.forecastCycle,
-      workspaceId: declaredWorkspaceId ?? restored.workspaceId,
+      workspaceId: declaredWorkspaceId,
       mapView: data.mapView ?? inner.mapView,
       cycleMetadata: data.metadata ?? data.cycleMetadata ?? inner.cycleMetadata,
+      warnings: [],
+      legacy: restored.legacy,
     };
   }
   const restored = deserializeForecastWorkspace(data);
@@ -72,6 +115,8 @@ export const resolveNativeFileContent = (data: unknown): ResolvedNativeFileConte
     workspaceId: restored.workspaceId,
     mapView: rawData.mapView,
     cycleMetadata: rawData.cycleMetadata,
+    warnings: [],
+    legacy: restored.legacy,
   };
 };
 
@@ -86,7 +131,7 @@ export const importNativeTransfer = async (file: File, format: 'json' | 'package
     workspaceId: resolved.workspaceId,
     mapView: resolved.mapView,
     cycleMetadata: resolved.cycleMetadata,
-    warnings: [],
+    warnings: resolved.warnings,
     format,
   };
 };
