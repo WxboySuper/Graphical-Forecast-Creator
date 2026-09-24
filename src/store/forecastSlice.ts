@@ -1,6 +1,6 @@
 import '../immerSetup';
 import { isDraft, original } from 'immer';
-import { createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
+import { createSelector, createSlice, PayloadAction, type UnknownAction } from '@reduxjs/toolkit';
 import { OutlookData, OutlookType, DrawingState, ForecastCycle, DayType, OutlookDay, DiscussionData, DiscussionGrouping } from '../types/outlooks';
 import type { CycleMetadata, WorkflowMetadata, Package, CycleValidationResult, StandardGrouping } from '../types/workflow';
 import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
@@ -18,6 +18,7 @@ import { getLocalCalendarDate } from '../utils/localDate';
 import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
+
 import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
 import type { TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
@@ -36,6 +37,9 @@ import {
   resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
+
+const getSavedCycleWorkspaceId = (cycle: Pick<SavedCycle, 'workspaceId'>): ForecastWorkspaceId =>
+  getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -1089,7 +1093,7 @@ export const forecastSlice = createSlice({
     loadSavedCycle: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
-      if (savedCycle) {
+      if (savedCycle && getSavedCycleWorkspaceId(savedCycle) === state.workspaceId) {
         // The route owns workspace identity: loading a saved cycle never retags
         // the active workspace. Cross-workspace opens must navigate explicitly.
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
@@ -1119,7 +1123,9 @@ export const forecastSlice = createSlice({
 
     deleteSavedCycle: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
-      state.savedCycles = state.savedCycles.filter(c => c.id !== cycleId);
+      state.savedCycles = state.savedCycles.filter((cycle) => (
+        cycle.id !== cycleId || getSavedCycleWorkspaceId(cycle) !== state.workspaceId
+      ));
       // lifetimeCycleStats intentionally tracks historical saves, not the retained/deletable window.
     },
 
@@ -1411,7 +1417,7 @@ export const forecastSlice = createSlice({
     resumeIncompleteCycle: (state, action: PayloadAction<{ cycleId: string }>) => {
       const { cycleId } = action.payload;
       const savedCycle = state.savedCycles.find((c) => c.id === cycleId);
-      if (!savedCycle) return;
+      if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== state.workspaceId) return;
 
       clearHistory(state);
       state.discussionDraftsByScope = {};
@@ -1510,7 +1516,7 @@ export const forecastSlice = createSlice({
       const { sourceCycleId, newCycleDate, sourceDay, targetDay = 1, workflowTemplate } = action.payload;
 
       const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
-      if (!sourceCycle) return;
+      if (!sourceCycle || getSavedCycleWorkspaceId(sourceCycle) !== state.workspaceId) return;
 
       const sourceForecastCycle = normalizeForecastCycle(sourceCycle.forecastCycle);
       const sourceDayNumber = sourceDay ?? sourceForecastCycle.currentDay;
@@ -1640,6 +1646,15 @@ export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   };
 /** Selects the saved forecast cycle snapshots shown in cycle history. */
 export const selectSavedCycles = (state: RootState) => state.forecast.savedCycles;
+/** Selects saved cycles owned by the active workspace, treating legacy records as Severe. */
+const selectActiveWorkspaceId = (state: RootState) =>
+  getForecastWorkspace(state.forecast.workspaceId)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+export const selectSavedCyclesForActiveWorkspace = createSelector(
+  [selectActiveWorkspaceId, selectSavedCycles],
+  (activeWorkspaceId, savedCycles) => savedCycles.filter((cycle) => (
+    getSavedCycleWorkspaceId(cycle) === activeWorkspaceId
+  )),
+);
 /** Returns whether there is at least one reversible edit available. */
 export const selectCanUndo = (state: RootState) => {
   const dayHistory = state.forecast.historyByDay[state.forecast.forecastCycle.currentDay];
