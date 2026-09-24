@@ -1,11 +1,14 @@
 import { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from './authLocalTransport';
 
 describe('authLocalTransport', () => {
+  const originalFetch = global.fetch;
+
   beforeEach(() => {
     global.fetch = jest.fn();
   });
 
   afterEach(() => {
+    global.fetch = originalFetch;
     jest.clearAllMocks();
   });
 
