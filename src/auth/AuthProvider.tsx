@@ -504,20 +504,18 @@ async function localCredentialAction(
 ) {
   const failureMessage = action === 'signin' ? 'Sign in failed' : 'Sign up failed';
   deps.setError(null);
-  const resp = await fetch(`/api/local/${action}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(creds),
-    credentials: 'include',
-  });
-
-  if (!resp.ok) {
-    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: failureMessage };
-    deps.setError(body.message ?? failureMessage);
-    throw new Error(body.message ?? failureMessage);
+  let data: Record<string, unknown>;
+  try {
+    data = await postLocalJson<Record<string, unknown>>(`/api/local/${action}`, {
+      body: creds,
+      failureMessage,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : failureMessage;
+    deps.setError(message);
+    throw error instanceof Error ? error : new Error(message);
   }
 
-  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
   const localUser = extractLocalUserFromData(data) as unknown as User;
   applyLocalAuthData(data, deps);
   queueProductMetric({ event: action === 'signin' ? 'account_signin' : 'account_signup', user: localUser });
