@@ -25,6 +25,14 @@ import {
   startSettingsSubscription,
   syncProfileDocument,
   createSettingsSnapshot as createProviderSettingsSnapshot,
+  areUserSettingsEqual as areProviderUserSettingsEqual,
+  createProfilePayload as createProviderProfilePayload,
+  getRemoteSeedPayload as getProviderRemoteSeedPayload,
+  getSettingsSyncError as getProviderSettingsSyncError,
+  getSettingsUpdateError as getProviderSettingsUpdateError,
+  mergeUserSettingsDocument as mergeProviderUserSettingsDocument,
+  readProfileBetaAccess as readProviderProfileBetaAccess,
+  readRemoteSettings as readProviderRemoteSettings,
   AuthProvider,
   useAuth,
 } from './AuthProvider';
@@ -36,6 +44,7 @@ import {
   getRemoteSeedPayload,
   getSettingsSyncError,
   getSettingsUpdateError,
+  mergeUserSettingsDocument,
   readProfileBetaAccess,
   readRemoteSettings,
 } from './authSettings';
@@ -116,6 +125,45 @@ const waitForAuthEffects = async (delay = 100) => {
 describe('AuthProvider Utils', () => {
   test('keeps the existing provider re-export for settings helpers', () => {
     expect(createProviderSettingsSnapshot).toBe(createSettingsSnapshot);
+    expect(areProviderUserSettingsEqual).toBe(areUserSettingsEqual);
+    expect(createProviderProfilePayload).toBe(createProfilePayload);
+    expect(getProviderRemoteSeedPayload).toBe(getRemoteSeedPayload);
+    expect(getProviderSettingsSyncError).toBe(getSettingsSyncError);
+    expect(getProviderSettingsUpdateError).toBe(getSettingsUpdateError);
+    expect(mergeProviderUserSettingsDocument).toBe(mergeUserSettingsDocument);
+    expect(readProviderProfileBetaAccess).toBe(readProfileBetaAccess);
+    expect(readProviderRemoteSettings).toBe(readRemoteSettings);
+
+    const overlays = { ...TEST_OVERLAY_STATE };
+    const baseSettings = createSettingsSnapshot({
+      darkMode: false,
+      overlays,
+      defaultForecasterName: 'Forecaster',
+      forecastUiVariant: 'workspace_dock',
+    });
+
+    // Invalid variant falls back to the default variant.
+    const fallbackSettings = readRemoteSettings({
+      ...baseSettings,
+      forecastUiVariant: 'unknown-variant',
+    } as unknown as Record<string, unknown>);
+    expect(fallbackSettings).toEqual(expect.objectContaining({ forecastUiVariant: 'integrated' }));
+
+    // Missing optional profile fields fall back to empty defaults.
+    const minimalPayload = createProfilePayload({} as never);
+    expect(minimalPayload).toEqual(
+      expect.objectContaining({ displayName: '', providers: [] }),
+    );
+
+    // Seeding without opts still timestamps the payload without a creation marker.
+    const seedWithoutCreatedAt = getRemoteSeedPayload(baseSettings);
+    expect(seedWithoutCreatedAt).toEqual(expect.objectContaining({ updatedAt: expect.anything() }));
+    expect(seedWithoutCreatedAt).not.toHaveProperty('createdAt');
+
+    // Partial patches merge onto the baseline without mutating it.
+    const merged = mergeUserSettingsDocument(baseSettings, { darkMode: true });
+    expect(merged).toEqual(expect.objectContaining({ ...baseSettings, darkMode: true }));
+    expect(baseSettings.darkMode).toBe(false);
   });
 
   test('local sign-out failure does not turn completed server deletion into a failure', async () => {
