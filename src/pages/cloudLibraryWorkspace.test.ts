@@ -1,4 +1,4 @@
-import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, resolveActiveCloudLibraryTab, getNextCloudLibraryTabId } from './cloudLibraryWorkspace';
+import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, resolveActiveCloudLibraryTab, getNextCloudLibraryTabId, type CloudLibraryTabId } from './cloudLibraryWorkspace';
 import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 
@@ -94,5 +94,16 @@ describe('cloud library workspace boundaries', () => {
     expect(getNextCloudLibraryTabId(tabs, 'all', 'End')).toBe('custom');
     expect(getNextCloudLibraryTabId(tabs, 'severe', 'Enter')).toBeNull();
     expect(getNextCloudLibraryTabId([], 'all', 'ArrowRight')).toBeNull();
+  });
+
+  it('falls back to the first tab when arrow navigation starts from an unknown tab', () => {
+    const tabs = [
+      { id: 'all' as const, label: 'All', cycleCount: 2 },
+      { id: 'severe' as const, label: 'Severe', cycleCount: 1 },
+      { id: 'custom' as const, label: 'Custom', cycleCount: 1 },
+    ];
+
+    expect(getNextCloudLibraryTabId(tabs, 'missing' as unknown as CloudLibraryTabId, 'ArrowRight')).toBe('severe');
+    expect(getNextCloudLibraryTabId(tabs, 'missing' as unknown as CloudLibraryTabId, 'ArrowLeft')).toBe('custom');
   });
 });
