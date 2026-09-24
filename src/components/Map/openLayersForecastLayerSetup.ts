@@ -18,7 +18,7 @@ import {
 } from "./openLayersBlankBasemap";
 
 export type ForecastMapLayerSet = {
-  tileLayer: TileLayer<OSM>;
+  tileLayer: TileLayer<OSM | XYZ>;
   vectorBaseGroup: LayerGroup;
   vectorReferenceGroup: LayerGroup;
   worldLayer: VectorLayer<VectorSource>;
@@ -55,7 +55,7 @@ export const createForecastMapLayers = ({
   trimPreviewSource,
   vectorSource,
 }: ForecastMapLayerSources): ForecastMapLayerSet => {
-  const tileLayer = new TileLayer({
+  const tileLayer = new TileLayer<OSM | XYZ>({
     source: new OSM({ crossOrigin: "anonymous" }),
   });
   const vectorBaseGroup = new LayerGroup({ visible: false, zIndex: 1 });
