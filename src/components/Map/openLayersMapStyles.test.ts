@@ -29,6 +29,7 @@ import {
   createCustomFill,
   toCustomOlStyle,
   getCustomFeatureIdentity,
+  toUpdatedCustomFeature,
   toTstmPreviewOlStyle,
   toGhostOlStyle,
   createLabelOverlaySource,
@@ -120,6 +121,26 @@ describe('openLayersMapStyles', () => {
     const values: Record<string, unknown> = { featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' };
     const feature = { get: (key: string) => values[key], getGeometry: () => null };
     expect(getCustomFeatureIdentity(feature as never)).toEqual({ featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' });
+  });
+
+  test('toUpdatedCustomFeature preserves MultiPolygon geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const format = {
+      writeGeometryObject: () => ({ type: 'MultiPolygon', coordinates: [] }),
+    };
+    const result = toUpdatedCustomFeature(feature as never, format as never);
+    expect(result?.geometry.type).toBe('MultiPolygon');
+    expect(result?.properties).toEqual({ customLayerId: 'l1', categoryId: 'c1', title: 'T' });
+  });
+
+  test('toUpdatedCustomFeature returns null for non-polygon geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const format = {
+      writeGeometryObject: () => ({ type: 'Point', coordinates: [0, 0] }),
+    };
+    expect(toUpdatedCustomFeature(feature as never, format as never)).toBeNull();
   });
 
   test('toTstmPreviewOlStyle and toGhostOlStyle build styles', () => {

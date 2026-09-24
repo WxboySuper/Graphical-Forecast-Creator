@@ -1,10 +1,10 @@
 import Feature from "ol/Feature";
 import GeoJSON from "ol/format/GeoJSON";
 import Polygon from "ol/geom/Polygon";
+import MultiPolygon from "ol/geom/MultiPolygon";
 import Point from "ol/geom/Point";
 import type Geometry from "ol/geom/Geometry";
-import type { MultiPolygon, Polygon as GeoJsonPolygon } from "geojson";
-import { handleForecastDrawEnd, type DrawnFeatureHandlerOptions } from "./openLayersForecastDrawHandlers";
+import type { MultiPolygon as GeoJsonMultiPolygon, Polygon as GeoJsonPolygon } from "geojson";
 import { captureException } from "@sentry/react";
 import {
   CUSTOM_PRODUCTS_SCHEMA_VERSION,
@@ -15,6 +15,7 @@ import {
 } from "../../types/customProducts";
 import { asCustomLayerId } from "../../lib/customProducts";
 import { addCustomFeature } from "../../store/forecastSlice";
+import { handleForecastDrawEnd, type DrawnFeatureHandlerOptions } from "./openLayersForecastDrawHandlers";
 
 jest.mock("@sentry/react", () => ({ captureException: jest.fn() }));
 
@@ -60,7 +61,7 @@ const baseOptions = (overrides: Partial<DrawOptions> = {}): DrawOptions & {
   trimGeometryForAutoDraw: jest.Mock;
 } => {
   const dispatch = jest.fn();
-  const trimGeometryForAutoDraw = jest.fn(async (geometry: GeoJsonPolygon | MultiPolygon) => geometry);
+  const trimGeometryForAutoDraw = jest.fn(async (geometry: GeoJsonPolygon | GeoJsonMultiPolygon) => geometry);
   return {
     currentDay: 1,
     activeOutlookType: "tornado",
@@ -77,6 +78,8 @@ const baseOptions = (overrides: Partial<DrawOptions> = {}): DrawOptions & {
     ...overrides,
   } as DrawOptions & { dispatch: jest.Mock; trimGeometryForAutoDraw: jest.Mock };
 };
+
+const polygonRing: number[][][] = [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]];
 
 describe("handleForecastDrawEnd", () => {
   beforeEach(() => {
@@ -108,7 +111,6 @@ describe("handleForecastDrawEnd", () => {
 
   test("rejects non-polygon geometry without trimming or dispatching", async () => {
     const options = baseOptions();
-
     handleForecastDrawEnd({ feature: pointFeature() as Feature<Geometry> }, options);
     await flush();
 
@@ -150,7 +152,6 @@ describe("handleForecastDrawEnd", () => {
   test("does nothing when trim removes the geometry", async () => {
     const options = baseOptions();
     options.trimGeometryForAutoDraw.mockResolvedValue(null);
-
     handleForecastDrawEnd({ feature: polygonFeature() as Feature<Geometry> }, options);
     await flush();
 
@@ -159,9 +160,7 @@ describe("handleForecastDrawEnd", () => {
 
   test("does nothing when the drawn feature has no geometry", async () => {
     const options = baseOptions();
-    const empty = new Feature() as Feature<Geometry>;
-
-    handleForecastDrawEnd({ feature: empty }, options);
+    handleForecastDrawEnd({ feature: new Feature() as Feature<Geometry> }, options);
     await flush();
 
     expect(options.trimGeometryForAutoDraw).not.toHaveBeenCalled();
@@ -171,11 +170,46 @@ describe("handleForecastDrawEnd", () => {
   test("reports trim failures to Sentry without dispatching", async () => {
     const options = baseOptions();
     options.trimGeometryForAutoDraw.mockRejectedValue(new Error("trim failed"));
-
     handleForecastDrawEnd({ feature: polygonFeature() as Feature<Geometry> }, options);
     await flush();
 
     expect(options.dispatch).not.toHaveBeenCalled();
     expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  test("dispatches a custom feature for MultiPolygon draws in custom mode", async () => {
+    const options = baseOptions({
+      customMode: true,
+      activeCustomLayer: { id: "layer-1" } as never,
+      activeCustomCategory: { id: "cat-1", label: "Heavy snow" } as never,
+    });
+    const feature = new Feature<Geometry>({ geometry: new MultiPolygon([polygonRing]) });
+
+    handleForecastDrawEnd({ feature }, options);
+    await flush();
+
+    expect(options.dispatch).toHaveBeenCalledTimes(1);
+    const action = options.dispatch.mock.calls[0][0] as { payload: { geometry: { type: string } } };
+    expect(action.payload.geometry.type).toBe("MultiPolygon");
+    expect(options.trimGeometryForAutoDraw).not.toHaveBeenCalled();
+  });
+
+  test("dispatches an outlook feature for MultiPolygon draws in forecast mode", async () => {
+    const options = baseOptions();
+    const feature = new Feature<Geometry>({ geometry: new MultiPolygon([polygonRing]) });
+
+    handleForecastDrawEnd({ feature }, options);
+    await flush();
+
+    expect(options.dispatch).toHaveBeenCalledTimes(1);
+    const action = options.dispatch.mock.calls[0][0] as { payload: { feature: { geometry: { type: string } } } };
+    expect(action.payload.feature.geometry.type).toBe("MultiPolygon");
+  });
+
+  test("still dispatches Polygon draws", async () => {
+    const options = baseOptions();
+    handleForecastDrawEnd({ feature: polygonFeature() as Feature<Geometry> }, options);
+    await flush();
+    expect(options.dispatch).toHaveBeenCalledTimes(1);
   });
 });

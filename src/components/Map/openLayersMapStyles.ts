@@ -257,7 +257,7 @@ export const toUpdatedGeoJsonFeature = (
   return {
     type: "Feature",
     id: identity.featureId,
-    geometry: geoJsonGeometry as Polygon,
+    geometry: geoJsonGeometry as Polygon | MultiPolygon,
     properties: {
       outlookType: identity.outlookType,
       probability: identity.probability,
@@ -378,15 +378,24 @@ export const getCustomFeatureIdentity = (feature: FeatureLike): CustomFeatureIde
   return featureId && customLayerId && categoryId && title ? { featureId, customLayerId, categoryId, title } : null;
 };
 
+/** Narrows serialized custom geometry to the polygon shapes the store persists. */
+const isPolygonOrMultiPolygon = (value: unknown): value is Polygon | MultiPolygon => {
+  if (typeof value !== "object" || value === null) return false;
+  const type = (value as { type?: unknown }).type;
+  return type === "Polygon" || type === "MultiPolygon";
+};
+
 /** Converts an edited custom OpenLayers feature back to the persisted polygon shape. */
 export const toUpdatedCustomFeature = (feature: FeatureLike, format: GeoJSON): CustomPolygonFeature | null => {
   const identity = getCustomFeatureIdentity(feature);
   const geometry = feature.getGeometry();
   if (!identity || !geometry) return null;
+  const geometryObject: unknown = format.writeGeometryObject(geometry as Geometry, { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" });
+  if (!isPolygonOrMultiPolygon(geometryObject)) return null;
   return {
     type: "Feature",
     id: identity.featureId,
-    geometry: format.writeGeometryObject(geometry as Geometry, { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" }) as Polygon,
+    geometry: geometryObject,
     properties: { customLayerId: identity.customLayerId as CustomPolygonFeature['properties']['customLayerId'], categoryId: identity.categoryId as CustomPolygonFeature['properties']['categoryId'], title: identity.title },
   };
 };
