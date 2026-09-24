@@ -67,10 +67,10 @@ type FeatureStyle = Parameters<OLFeature<Geometry>["setStyle"]>[0];
 
 /** Builds a descriptor applier that combines an OpenLayers style with metadata. */
 export const createFeatureApplier = <Metadata,>(
-  style: FeatureStyle,
+  createStyle: () => FeatureStyle,
   applyMetadata: (item: OLFeature<Geometry>, metadata: Metadata) => void,
   metadata: Metadata,
 ): ((item: OLFeature<Geometry>) => void) => (item) => {
-  item.setStyle(style);
+  item.setStyle(createStyle());
   applyMetadata(item, metadata);
 };
