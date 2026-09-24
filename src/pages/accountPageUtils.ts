@@ -7,7 +7,7 @@ type SyncStatus = ReturnType<typeof useAuth>["settingsSyncStatus"];
 
 export interface SyncStatusMeta {
   label: string;
-  variant: BadgeProps['variant'];
+  variant: BadgeProps["variant"];
 }
 
 /** Maps Firebase provider ids to short labels for the account UI. */

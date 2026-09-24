@@ -10,8 +10,11 @@ import {
 } from "./accountPageUtils";
 
 describe("accountPageUtils", () => {
-  test("maps sync status to badge metadata with idle/unknown defaults", () => {
+  test("maps every sync status variant with an unknown fallback", () => {
     expect(getSyncStatusMeta("synced")).toEqual({ label: "Synced", variant: "success" });
+    expect(getSyncStatusMeta("syncing")).toEqual({ label: "Syncing", variant: "secondary" });
+    expect(getSyncStatusMeta("error")).toEqual({ label: "Needs Attention", variant: "warning" });
+    expect(getSyncStatusMeta("disabled")).toEqual({ label: "Local Only", variant: "outline" });
     expect(getSyncStatusMeta("idle")).toEqual({ label: "Ready", variant: "secondary" });
     expect(getSyncStatusMeta("unknown-status" as never)).toEqual({
       label: "Ready",
@@ -19,31 +22,39 @@ describe("accountPageUtils", () => {
     });
   });
 
-  test("labels beta override access separately from plain premium", () => {
+  test("labels free, interval, beta override, and plain premium plans", () => {
+    expect(getPlanLabel(false, null, "none")).toBe("Free Plan");
+    expect(getPlanLabel(true, "annual", "stripe")).toBe("Premium Annual");
+    expect(getPlanLabel(true, "monthly", "stripe")).toBe("Premium Monthly");
     expect(getPlanLabel(true, null, "beta_override")).toBe("Premium Beta Access");
     expect(getPlanLabel(true, null, "stripe")).toBe("Premium");
-    expect(getPlanLabel(false, null, "none")).toBe("Free Plan");
   });
 
-  test("falls back to included pricing when premium has no interval", () => {
+  test("returns interval prices with free and included fallbacks", () => {
     expect(getCurrentPlanPrice(false, null, "$3/month", "$30/year")).toBe("$0");
+    expect(getCurrentPlanPrice(true, "annual", "$3/month", "$30/year")).toBe("$30/year");
     expect(getCurrentPlanPrice(true, "monthly", "$3/month", "$30/year")).toBe("$3/month");
     expect(getCurrentPlanPrice(true, null, "$3/month", "$30/year")).toBe("Included");
   });
 
-  test("returns null billing copy for standard premium without promo", () => {
-    expect(getBillingSupportCopy("stripe", true, false)).toBeNull();
+  test("covers beta override, downgrade, promo, and null billing copy", () => {
+    expect(getBillingSupportCopy("beta_override", true, false)).toContain("beta override path");
     expect(getBillingSupportCopy("stripe", false, false)).toBe(PRICING_COPY.downgradeSummary);
+    expect(getBillingSupportCopy("stripe", true, true)).toContain("Annual intro pricing");
+    expect(getBillingSupportCopy("stripe", true, false)).toBeNull();
   });
 
   test("formats empty, invalid, and valid activity dates", () => {
     expect(formatLastActiveDate(null)).toBe("No activity yet");
+    expect(formatLastActiveDate("")).toBe("No activity yet");
     expect(formatLastActiveDate("not-a-date")).toBe("not-a-date");
     expect(formatLastActiveDate("2026-03-30")).toContain("2026");
   });
 
   test("maps provider ids and pricing variants", () => {
     expect(getProviderLabel("google.com")).toBe("Google");
+    expect(getProviderLabel("password")).toBe("Email / Password");
+    expect(getProviderLabel("github.com")).toBe("github.com");
     expect(getPricingButtonVariant(true)).toBe("outline");
     expect(getPricingButtonVariant(false)).toBe("default");
   });
