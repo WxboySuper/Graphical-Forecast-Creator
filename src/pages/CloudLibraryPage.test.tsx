@@ -122,7 +122,7 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
   });
 
-  it("keeps unsupported Load activatable so the blocked message stays reachable", () => {
+  it("disables unsupported Load with an explanatory hint instead of a dead-end action", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const loadCycle = jest.fn();
     mockUseCloudCycles.mockReturnValue(
@@ -131,12 +131,8 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).not.toBeDisabled();
-    expect(loadButton).toHaveAttribute("aria-disabled", "true");
+    expect(loadButton).toBeDisabled();
     expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-custom-1");
-
-    loadButton.focus();
-    expect(loadButton).toHaveFocus();
 
     const hint = screen.getByText("Custom loading is not supported yet. Only Severe saves can be opened.");
     expect(hint).toBeInTheDocument();
@@ -144,7 +140,8 @@ describe("CloudLibraryPage", () => {
 
     fireEvent.click(loadButton);
     expect(loadCycle).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent(/Custom saves can't be opened in the editor yet/);
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("keeps Severe Load fully enabled without a support hint", () => {
