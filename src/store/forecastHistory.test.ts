@@ -259,12 +259,11 @@ describe('forecastHistory helpers', () => {
     expect(day.data.tornado?.get('2%')).toHaveLength(1);
   });
 
-  test('does not alias stored snapshots across live edits and restores', () => {
+  test('keeps stored snapshots separate from later live edits', () => {
     const live = makeDay(1, 0);
     const state = makeState({ 1: live }, 1);
-    const stacks = getOrCreateDayHistory(state, 1);
     pushUndoSnapshot(state, 1);
-    const stored = stacks.undoStack[0].snapshot;
+    const stored = state.historyByDay[1]?.undoStack[0].snapshot as ForecastDaySnapshot;
 
     live.data.tornado?.get('2%')?.push(makeFeature('live-new', 7));
     live.metadata.outlookOpacities!.tornado = 0.1;
@@ -275,6 +274,19 @@ describe('forecastHistory helpers', () => {
     expect(stored.outlookOpacities).toEqual({ tornado: 0.4 });
     expect(stored.lowProbabilityOutlooks).toEqual([]);
     expect(stored.customLayers?.layers[0].features).toHaveLength(1);
+  });
+
+  test('restores a copy that leaves the stored snapshot alone', () => {
+    const live = makeDay(1, 0);
+    const state = makeState({ 1: live }, 1);
+    pushUndoSnapshot(state, 1);
+    const stacks = getOrCreateDayHistory(state, 1);
+    const stored = stacks.undoStack[0].snapshot;
+
+    live.data.tornado?.get('2%')?.push(makeFeature('live-new', 7));
+    live.metadata.outlookOpacities!.tornado = 0.1;
+    live.metadata.lowProbabilityOutlooks = ['wind'];
+    live.customLayers!.layers[0].features.pop();
 
     restoreHistoryEntry({
       sourceStack: stacks.undoStack,
@@ -284,9 +296,8 @@ describe('forecastHistory helpers', () => {
       createEmptyDay: makeEmptyDay,
     });
 
-    const restoredDay = state.forecastCycle.days[1];
-    expect(restoredDay?.data.tornado?.get('2%')).toHaveLength(1);
-    const restored = restoredDay as OutlookDay;
+    const restored = state.forecastCycle.days[1] as OutlookDay;
+    expect(restored.data.tornado?.get('2%')).toHaveLength(1);
 
     restored.data.tornado?.get('2%')?.pop();
     restored.metadata.lowProbabilityOutlooks?.push('hail' as never);
