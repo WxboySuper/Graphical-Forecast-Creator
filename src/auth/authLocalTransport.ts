@@ -9,7 +9,9 @@ export const safeParseJson = async <T = unknown>(resp: Response): Promise<T | nu
 
 /** Coerces an unknown response value into a record for guarded field access. */
 export const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 
 /** Extracts the minimal user shape returned by the local auth endpoints. */
 export const extractLocalUserFromData = (data: unknown) => {

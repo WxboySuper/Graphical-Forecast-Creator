@@ -25,12 +25,11 @@ describe('authLocalTransport', () => {
     await expect(safeParseJson(resp)).resolves.toBeNull();
   });
 
-  test('asRecord passes objects through and returns an empty record for primitives and null', () => {
+  test('asRecord passes objects through and returns an empty record for arrays, primitives and null', () => {
     const record = { uid: 'user-1' };
 
     expect(asRecord(record)).toEqual(record);
-    // Arrays satisfy typeof === 'object', so they pass through rather than becoming {}.
-    expect(asRecord(['user-1'])).toEqual(['user-1']);
+    expect(asRecord(['user-1'])).toEqual({});
     expect(asRecord(null)).toEqual({});
     expect(asRecord(undefined)).toEqual({});
     expect(asRecord('user-1')).toEqual({});

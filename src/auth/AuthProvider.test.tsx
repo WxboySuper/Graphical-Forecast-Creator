@@ -45,6 +45,12 @@ import {
   syncProfileDocument as syncHostedDirect,
 } from './authHostedSettings';
 import {
+  asRecord as asRecordDirect,
+  extractLocalUserFromData as extractLocalUserDirect,
+  postLocalJson as postLocalJsonDirect,
+  safeParseJson as safeParseJsonDirect,
+} from './authLocalTransport';
+import {
   areUserSettingsEqual,
   createProfilePayload,
   createSettingsSnapshot,
@@ -130,31 +136,11 @@ describe('AuthProvider Utils', () => {
     expect(clearLocalState).toHaveBeenCalledTimes(1);
   });
 
-  test('safeParseJson parses valid JSON', async () => {
-    const data = { foo: 'bar' };
-    const resp = { json: () => Promise.resolve(data) } as Response;
-    const result = await safeParseJson<{ foo: string }>(resp);
-    expect(result).toEqual(data);
-  });
-
-  test('safeParseJson returns null on invalid JSON', async () => {
-    const resp = { json: () => Promise.reject(new Error('invalid json')) } as Response;
-    const result = await safeParseJson(resp);
-    expect(result).toBeNull();
-  });
-
-  test('asRecord coerces objects', () => {
-    expect(asRecord({ a: 1 })).toEqual({ a: 1 });
-    expect(asRecord(null)).toEqual({});
-    expect(asRecord('string')).toEqual({});
-  });
-
-  test('extractLocalUserFromData works', () => {
-    const data = { uid: 'user123', email: 'test@example.com', displayName: 'Test User' };
-    const user = extractLocalUserFromData(data);
-    expect(user.uid).toBe('user123');
-    expect(user.email).toBe('test@example.com');
-    expect(user.displayName).toBe('Test User');
+  test('re-exports the local transport seam from the extracted module', () => {
+    expect(asRecord).toBe(asRecordDirect);
+    expect(extractLocalUserFromData).toBe(extractLocalUserDirect);
+    expect(postLocalJson).toBe(postLocalJsonDirect);
+    expect(safeParseJson).toBe(safeParseJsonDirect);
   });
 
   test('overlay comparison and application helpers avoid redundant dispatches', () => {
@@ -201,28 +187,10 @@ describe('AuthProvider Utils', () => {
     expect(setSyncedSettings).toHaveBeenCalledTimes(1);
   });
 
-  test('local post helper and provider auth utilities normalize errors', async () => {
+  test('auth utility fallbacks normalize errors', () => {
     expect(() => disabledAuthAction()).toThrow(/Hosted accounts are not enabled/);
     expect(getDefaultContextValue()).toEqual(expect.objectContaining({ status: 'disabled', hostedAuthEnabled: false }));
     expect(canSyncHostedUserDocuments(null)).toBe(false);
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ ok: true }),
-    });
-    await expect(postLocalJson('/api/local/test', { body: { ok: true }, failureMessage: 'Failed' })).resolves.toEqual({ ok: true });
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      json: () => Promise.resolve({ message: 'Nope' }),
-    });
-    await expect(postLocalJson('/api/local/test', { failureMessage: 'Failed' })).rejects.toThrow('Nope');
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.reject(new Error('invalid')),
-    });
-    await expect(postLocalJson('/api/local/test', { failureMessage: 'Failed' })).resolves.toEqual({});
   });
 
   test('local auth action helpers update state and surface failures', async () => {
