@@ -36,4 +36,3 @@ export const upsertManagedChangelogDeclaration = (body, declaration) => {
 
   return `${withoutDeclarations ? `${withoutDeclarations}\n\n` : ''}${formatManagedChangelogDeclaration(declaration)}\n`;
 };
-
