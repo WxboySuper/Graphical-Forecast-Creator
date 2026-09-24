@@ -1,6 +1,7 @@
 import Feature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import Polygon from "ol/geom/Polygon";
+import { Modify, Snap } from "ol/interaction";
 import type OLMap from "ol/Map";
 import VectorSource from "ol/source/Vector";
 
@@ -85,11 +86,19 @@ describe("openLayersForecastEditInteractions", () => {
     const { map, interactions } = setup();
 
     expect(map.addInteraction).toHaveBeenCalledTimes(5);
-    expect(interactions.modify).toBeDefined();
-    expect(interactions.catModify).toBeDefined();
-    expect(interactions.snap).toBeDefined();
-    expect(interactions.catSnap).toBeDefined();
-    expect(interactions.ghostSnap).toBeDefined();
+    const added = (map.addInteraction as jest.Mock).mock.calls.map(([interaction]) => interaction);
+    expect(added).toEqual([
+      interactions.modify,
+      interactions.catModify,
+      interactions.snap,
+      interactions.catSnap,
+      interactions.ghostSnap,
+    ]);
+    expect(interactions.modify).toBeInstanceOf(Modify);
+    expect(interactions.catModify).toBeInstanceOf(Modify);
+    expect(interactions.snap).toBeInstanceOf(Snap);
+    expect(interactions.catSnap).toBeInstanceOf(Snap);
+    expect(interactions.ghostSnap).toBeInstanceOf(Snap);
   });
 
   test("regular filter allows custom features only in custom mode with a matching category", () => {
@@ -156,13 +165,16 @@ describe("openLayersForecastEditInteractions", () => {
     expect(deleteCondition(clickEvent("dblclick", { shiftKey: true }) as never)).toBe(false);
   });
 
-  test("registered modify interactions share the exported delete behavior", () => {
+  test("exposes distinct modify and snap instances for map lifecycle management", () => {
     const { interactions } = setup();
 
-    expect(interactions.modify).toBeDefined();
-    expect(interactions.catModify).toBeDefined();
-    expect(forecastVertexDeleteCondition(clickEvent("singleclick", { altKey: true }) as never)).toBe(true);
-    expect(forecastVertexDeleteCondition(clickEvent("singleclick") as never)).toBe(false);
+    expect(interactions.modify).toBeInstanceOf(Modify);
+    expect(interactions.catModify).toBeInstanceOf(Modify);
+    expect(interactions.modify).not.toBe(interactions.catModify);
+    expect(interactions.snap).toBeInstanceOf(Snap);
+    expect(interactions.catSnap).toBeInstanceOf(Snap);
+    expect(interactions.ghostSnap).toBeInstanceOf(Snap);
+    expect(new Set([interactions.snap, interactions.catSnap, interactions.ghostSnap]).size).toBe(3);
   });
 
   test("filters read getter values dynamically after registration", () => {
