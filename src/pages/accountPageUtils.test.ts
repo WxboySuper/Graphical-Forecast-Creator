@@ -53,7 +53,14 @@ describe("accountPageUtils", () => {
   test("formats date-only keys as local midnight with browser locale", () => {
     const spy = jest
       .spyOn(Date.prototype, "toLocaleDateString")
-      .mockReturnValue("Mar 30, 2026");
+      .mockImplementation(function (this: Date) {
+        expect(this.getFullYear()).toBe(2026);
+        expect(this.getMonth()).toBe(2);
+        expect(this.getDate()).toBe(30);
+        expect(this.getHours()).toBe(0);
+        expect(this.getMinutes()).toBe(0);
+        return "Mar 30, 2026";
+      });
     try {
       expect(formatLastActiveDate("2026-03-30")).toBe("Mar 30, 2026");
       expect(spy).toHaveBeenCalledTimes(1);
@@ -62,12 +69,6 @@ describe("accountPageUtils", () => {
         day: "numeric",
         year: "numeric",
       });
-      const formattedDate = spy.mock.instances[0] as Date;
-      expect(formattedDate.getFullYear()).toBe(2026);
-      expect(formattedDate.getMonth()).toBe(2);
-      expect(formattedDate.getDate()).toBe(30);
-      expect(formattedDate.getHours()).toBe(0);
-      expect(formattedDate.getMinutes()).toBe(0);
     } finally {
       spy.mockRestore();
     }
