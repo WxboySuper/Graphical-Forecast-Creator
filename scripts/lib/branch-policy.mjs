@@ -8,16 +8,6 @@ const STABLE_BRANCH_PATTERN = /^stable\/\d+\.\d+\.x$/;
 /**
  * @param {string} headRef
  */
-export const isFeatureBranch = (headRef) => headRef.startsWith('feature/');
-
-/**
- * @param {string} headRef
- */
-export const isFixBranch = (headRef) => headRef.startsWith('fix/');
-
-/**
- * @param {string} headRef
- */
 export const isHotfixBranch = (headRef) => headRef.startsWith('hotfix/');
 
 /**
