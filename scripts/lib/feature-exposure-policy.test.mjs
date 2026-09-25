@@ -29,9 +29,9 @@ const emptySurfaces = { gatedRoutes: [], navigationItems: [] };
 
 const v17WorkstreamRegistry = {
   autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Enable on beta.', serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
-  forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after v2.', serverBacked: false, trackingIssue: 429 },
-  verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after relaunch.', serverBacked: false, trackingIssue: 430 },
-  customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 431 },
+  forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 429 },
+  verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 430 },
+  customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 431 },
   tropicalWorkspace: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Keep disabled.', serverBacked: false, trackingIssue: 432 },
   collaborationRoom: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 433 },
 };
@@ -283,9 +283,9 @@ describe('feature exposure policy', () => {
       categoricalOutlook: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-21', temporary: false, serverBacked: false, trackingIssue: 440 },
       significantThreats: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-21', temporary: false, serverBacked: false, trackingIssue: 440 },
       autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Enable on beta.', serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
-      forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after v2.', serverBacked: false, trackingIssue: 429 },
-      verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after relaunch.', serverBacked: false, trackingIssue: 430 },
-      customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 431 },
+      forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 429 },
+      verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 430 },
+      customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 431 },
       tropicalWorkspace: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Keep disabled.', serverBacked: false, trackingIssue: 432 },
       collaborationRoom: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 433 },
     };
@@ -442,6 +442,23 @@ describe('feature exposure policy', () => {
       },
     };
     assertPolicyErrors(registry, [/customProducts.*betaEnablementApproved/], emptySurfaces, {
+      acknowledgements: v17Acknowledgements,
+    });
+  });
+
+  it('fails when an unreleased v1.7 workstream leaves the temporary lifecycle', () => {
+    const registry = {
+      ...v17WorkstreamRegistry,
+      tropicalWorkspace: {
+        exposure: { ...ALL_OFF },
+        owner: 'WxboySuper',
+        addedDate: '2026-06-20',
+        temporary: false,
+        serverBacked: false,
+        trackingIssue: 432,
+      },
+    };
+    assertPolicyErrors(registry, [/tropicalWorkspace.*cannot adopt permanent state/], emptySurfaces, {
       acknowledgements: v17Acknowledgements,
     });
   });

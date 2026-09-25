@@ -22,7 +22,7 @@ Every workstream must:
 | Tropical workspace | `tropicalWorkspace` | #432 | Gated route `/tropical` + navbar | Exemplar + route/nav tests |
 | Collaboration room | `collaborationRoom` | #433 | Gated route `/collaborate` + navbar | Exemplar + route/nav tests |
 
-Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM, Forecast Workflow v2, Verification relaunch, and Custom Products are release-approved across local, beta, staging, and production for v1.7.
+Unreleased rows stay disabled until their enablement criteria pass. Forecast Workflow v2, Verification relaunch, and Custom Products are release-approved on local, beta, staging, and production for v1.7 and hold `temporary: false`. Release approval only turns on targets. Auto-TSTM is release-approved on every target too, and it still holds `temporary: true` with its removal condition, because graduation is a separate decision that approval does not grant.
 
 ## Per-workstream detail
 

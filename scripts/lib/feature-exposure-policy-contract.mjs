@@ -44,6 +44,13 @@ export const V17_WORKSTREAM_KEYS = [
   'collaborationRoom',
 ];
 
+/** v1.7 workstreams that shipped on every release target and left the temporary lifecycle. */
+export const V17_GRADUATED_WORKSTREAM_KEYS = [
+  'forecastWorkflowV2',
+  'verificationRelaunch',
+  'customProducts',
+];
+
 /** Adds an error when the registry declares only part of the v1.7 workstream key set. */
 function validateV17RegistryCompleteness(registry, errors) {
   const presentKeys = V17_WORKSTREAM_KEYS.filter((featureKey) => featureKey in registry);
@@ -94,10 +101,29 @@ function validateV17RestrictedTargets(featureKey, definition, acknowledgements, 
   }
 }
 
+/** Keeps unreleased workstreams temporary and permanent state limited to graduated keys. */
+function validateV17TemporaryLifecycle(featureKey, definition, errors) {
+  const graduated = V17_GRADUATED_WORKSTREAM_KEYS.includes(featureKey);
+
+  if (definition.temporary === false && !graduated) {
+    errors.push(
+      `v1.7 workstream "${featureKey}" cannot adopt permanent state; only graduated keys (${V17_GRADUATED_WORKSTREAM_KEYS.join(', ')}) may leave the temporary lifecycle.`
+    );
+    return;
+  }
+
+  if (!graduated && definition.temporary !== true) {
+    errors.push(
+      `v1.7 workstream "${featureKey}" must remain temporary until it graduates from the v1.7 lifecycle.`
+    );
+  }
+}
+
 /** Adds lifecycle violations for one v1.7 workstream registry entry. */
 function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors) {
   const { acknowledgements } = contract;
 
+  validateV17TemporaryLifecycle(featureKey, definition, errors);
   validateV17LocalDevelopmentExposure(featureKey, definition, acknowledgements, errors);
   validateV17RestrictedTargets(featureKey, definition, acknowledgements, errors);
 
