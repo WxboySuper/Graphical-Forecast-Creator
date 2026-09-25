@@ -1,3 +1,7 @@
+/**
+ * Account-deletion card. It presents the confirmation flow, submits the
+ * deletion request through the account controller, and reports its state.
+ */
 import React, { useState } from 'react';
 import { LoaderCircle, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
