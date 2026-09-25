@@ -1,3 +1,9 @@
+/**
+ * Resolves the user's effective billing entitlement from local feature configuration,
+ * authenticated account state, and the Stripe-backed Firestore document. The provider
+ * exposes normalized status to the UI and owns snapshot cleanup; presentation components
+ * should consume this context instead of reading billing documents directly.
+ */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
 import { db, requireDb } from '../lib/firebase';

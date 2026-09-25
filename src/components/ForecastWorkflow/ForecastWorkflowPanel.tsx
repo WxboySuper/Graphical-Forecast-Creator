@@ -1,3 +1,9 @@
+/**
+ * Renders the forecast-workflow completion and persistence surface. This component
+ * coordinates validation, cycle metadata, and the save/archive actions exposed by the
+ * workflow, while the Redux slice and cloud services remain the owners of state changes
+ * and transport details.
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router';
@@ -436,6 +442,7 @@ const hasSameDayWorkflowWork = (
   currentDay: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
 ): boolean => cycleDate === getLocalCalendarDate() && Boolean(currentDay && dayHasPackageWork(currentDay));
 
+/** Returns whether a forecast day contains any user-defined custom layers. */
 const dayHasCustomContent = (
   day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]> | undefined,
 ): boolean => Boolean(day?.customLayers?.layers.length);
