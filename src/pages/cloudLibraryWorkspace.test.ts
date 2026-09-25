@@ -1,5 +1,4 @@
 import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, getNextCloudLibraryTabId, getCloudLibraryTabFromSearchParams, type CloudLibraryTabId } from './cloudLibraryWorkspace';
-import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 
 const makeCycle = (id: string, workspaceId?: CloudCycleMetadata['workspaceId']): CloudCycleMetadata => ({
@@ -40,26 +39,35 @@ describe('cloud library workspace boundaries', () => {
     ]);
   });
 
-  it.each([['local'], ['production']] as Array<[BuildTarget]>)(
-    'keeps gated and future saves in All without dedicated tabs on %s',
-    (target) => {
-      const cycles = [
-        makeCycle('severe-1', 'severe'),
-        makeCycle('legacy'),
-        makeCycle('custom-1', 'custom'),
-        makeCycle('meso-1', 'mesoscale'),
-        makeCycle('trop-1', 'tropical'),
-        makeCycle('winter-1', 'winter'),
-      ];
+  const mixedCycles = () => [
+    makeCycle('severe-1', 'severe'),
+    makeCycle('legacy'),
+    makeCycle('custom-1', 'custom'),
+    makeCycle('meso-1', 'mesoscale'),
+    makeCycle('trop-1', 'tropical'),
+    makeCycle('winter-1', 'winter'),
+  ];
 
-      expect(getCloudLibraryTabs(cycles, target)).toEqual([
-        { id: 'all', label: 'All', cycleCount: 6 },
-        { id: 'severe', label: 'Severe', cycleCount: 2 },
-        { id: 'custom', label: 'Custom', cycleCount: 1 },
-      ]);
-      expect(filterCloudCyclesByWorkspace(cycles, 'all')).toHaveLength(6);
-    },
-  );
+  it('keeps gated and future saves in All without dedicated tabs on production', () => {
+    const cycles = mixedCycles();
+
+    expect(getCloudLibraryTabs(cycles, 'production')).toEqual([
+      { id: 'all', label: 'All', cycleCount: 6 },
+      { id: 'severe', label: 'Severe', cycleCount: 2 },
+    ]);
+    expect(filterCloudCyclesByWorkspace(cycles, 'all')).toHaveLength(6);
+  });
+
+  it('gives Custom a dedicated tab only where its workspace route is exposed', () => {
+    const cycles = mixedCycles();
+
+    expect(getCloudLibraryTabs(cycles, 'local')).toEqual([
+      { id: 'all', label: 'All', cycleCount: 6 },
+      { id: 'severe', label: 'Severe', cycleCount: 2 },
+      { id: 'custom', label: 'Custom', cycleCount: 1 },
+    ]);
+    expect(filterCloudCyclesByWorkspace(cycles, 'all')).toHaveLength(6);
+  });
 
   it('labels every cycle by its resolved workspace', () => {
     expect(getCloudCycleWorkspaceLabel(makeCycle('legacy'))).toBe('Severe');
@@ -98,10 +106,12 @@ describe('cloud library workspace boundaries', () => {
   });
 
   it('accepts only tabs present in the current exposed tab set', () => {
-    const tabs = getCloudLibraryTabs([makeCycle('legacy')], 'production');
+    const productionTabs = getCloudLibraryTabs([makeCycle('legacy')], 'production');
+    const localTabs = getCloudLibraryTabs([makeCycle('legacy')], 'local');
 
-    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=custom'), tabs)).toBe('custom');
-    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=mesoscale'), tabs)).toBe('all');
-    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=unknown'), tabs)).toBe('all');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=custom'), productionTabs)).toBe('all');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=custom'), localTabs)).toBe('custom');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=mesoscale'), productionTabs)).toBe('all');
+    expect(getCloudLibraryTabFromSearchParams(new URLSearchParams('workspace=unknown'), productionTabs)).toBe('all');
   });
 });
