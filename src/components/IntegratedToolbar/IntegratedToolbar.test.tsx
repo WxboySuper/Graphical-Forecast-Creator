@@ -1,12 +1,12 @@
 import React, { useRef } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
-import { IntegratedToolbar, TabbedIntegratedToolbar } from './IntegratedToolbar';
+import { TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
-import forecastReducer, { addFeature, undoLastEdit } from '../../store/forecastSlice';
+import forecastReducer, { addFeature } from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 
@@ -81,7 +81,7 @@ const createFeature = () => ({
   },
 });
 
-const ToolbarTestHarness: React.FC<{ variant: 'legacy' | 'tabbed' }> = ({ variant }) => {
+const ToolbarTestHarness: React.FC = () => {
   const mapRef = useRef<ForecastMapHandle | null>(null);
   const controller = useForecastWorkspaceController({
     mapRef,
@@ -90,29 +90,30 @@ const ToolbarTestHarness: React.FC<{ variant: 'legacy' | 'tabbed' }> = ({ varian
     onExportComplete: jest.fn(),
   });
 
-  return variant === 'tabbed'
-    ? <TabbedIntegratedToolbar controller={controller} />
-    : <IntegratedToolbar controller={controller} />;
+  return <TabbedIntegratedToolbar controller={controller} />;
 };
 
-const renderToolbar = (variant: 'legacy' | 'tabbed', store = createStore()) => render(
+const renderToolbar = (store = createStore()) => render(
   <MemoryRouter>
     <Provider store={store}>
-      <ToolbarTestHarness variant={variant} />
+      <ToolbarTestHarness />
     </Provider>
   </MemoryRouter>
 );
 
-describe('IntegratedToolbar undo/redo buttons', () => {
+describe('TabbedIntegratedToolbar undo/redo buttons', () => {
   beforeEach(() => {
     mockAddToast.mockReset();
   });
 
-  test('renders undo and redo buttons with disabled state from selectors', () => {
-    renderToolbar('legacy');
+  test('renders undo and redo buttons with disabled state from selectors', async () => {
+    const user = userEvent.setup();
+    renderToolbar();
 
-    expect(screen.getByLabelText('Undo')).toBeDisabled();
-    expect(screen.getByLabelText('Redo')).toBeDisabled();
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
   });
 
   test('clicking undo and redo dispatches history actions through the toolbar', async () => {
@@ -120,20 +121,22 @@ describe('IntegratedToolbar undo/redo buttons', () => {
     const store = createStore();
     store.dispatch(addFeature({ feature: createFeature() }));
 
-    renderToolbar('legacy', store);
+    renderToolbar(store);
 
-    const undoButton = screen.getByLabelText('Undo');
-    const redoButton = screen.getByLabelText('Redo');
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+
+    const undoButton = screen.getByRole('button', { name: 'Undo' });
+    const redoButton = screen.getByRole('button', { name: 'Redo' });
 
     expect(undoButton).toBeEnabled();
     expect(redoButton).toBeDisabled();
 
     await user.click(undoButton);
-    expect(screen.getByLabelText('Undo')).toBeDisabled();
-    expect(screen.getByLabelText('Redo')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled();
 
-    await user.click(screen.getByLabelText('Redo'));
-    expect(screen.getByLabelText('Undo')).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
   });
 });
 
@@ -151,7 +154,7 @@ describe('TabbedIntegratedToolbar completion validation exposure', () => {
       jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(exposed);
       const user = userEvent.setup();
 
-      renderToolbar('tabbed');
+      renderToolbar();
       await user.click(screen.getByRole('tab', { name: /Tools/i }));
 
       expect(Boolean(screen.queryByRole('button', { name: 'Complete' }))).toBe(visible);
@@ -163,8 +166,8 @@ describe('custom Draw mode exposure', () => {
   afterEach(() => jest.restoreAllMocks());
 
   test('keeps hosted Draw UI unchanged with no custom toggle or placeholder', () => {
-    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature: string) => feature !== 'customProducts');
-    renderToolbar('tabbed');
+    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature) => feature !== 'customProducts');
+    renderToolbar();
     expect(screen.queryByRole('radiogroup', { name: 'Drawing product' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Saved products/i })).not.toBeInTheDocument();
     expect(screen.getByTitle('Wind')).toBeInTheDocument();
@@ -175,7 +178,11 @@ describe('custom Draw mode exposure', () => {
     jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
     const user = userEvent.setup();
     const store = createStore();
-    renderToolbar('tabbed', store);
+    renderToolbar(store);
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+    await user.click(screen.getByRole('tab', { name: /Draw/i }));
     const toggle = screen.getByTestId('custom-product-toggle');
     expect(toggle).not.toHaveClass('is-custom-mode');
     expect(screen.getByRole('radio', { name: 'Severe' }))
@@ -198,8 +205,16 @@ describe('custom Draw mode exposure', () => {
     await user.type(screen.getByLabelText('Layer title'), 'Winter impacts');
     await user.tab();
     expect(screen.getByLabelText('Layer title')).toHaveValue('Winter impacts');
-    act(() => { store.dispatch(undoLastEdit()); });
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await user.click(screen.getByRole('tab', { name: /Draw/i }));
     await waitFor(() => expect(screen.getByLabelText('Layer title')).toHaveValue('Custom Layer 1'));
+    await user.click(screen.getByRole('tab', { name: /Tools/i }));
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    await user.click(screen.getByRole('tab', { name: /Draw/i }));
+    await waitFor(() => expect(screen.getByLabelText('Layer title')).toHaveValue('Winter impacts'));
 
     await user.click(screen.getByRole('radio', { name: 'Severe' }));
     expect(screen.getByTitle('Wind')).toBeInTheDocument();
