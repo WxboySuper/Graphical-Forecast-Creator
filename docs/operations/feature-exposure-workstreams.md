@@ -1,6 +1,6 @@
 # v1.7 feature exposure workstreams
 
-Single adoption manifest for every unfinished v1.7 workstream registered in `src/config/featureExposure.ts`. Completing this adoption is tracked in FND-14 (#530).
+Single adoption manifest for every v1.7 workstream registered in `src/config/featureExposure.ts`. Some rows are permanent and never plan an exit, others are temporary until their gate retires, and the registry enforces both. Completing this adoption is tracked in FND-14 (#530).
 
 ## Adoption rule
 
@@ -10,6 +10,7 @@ Every workstream must:
 2. Gate routes, navigation, boundaries, side-effect modules, and server capabilities **before** the first exposed slice merges.
 3. Ship disabled-side-effect tests or a documented acknowledgement (see [feature-exposure-testing.md](./feature-exposure-testing.md)).
 4. Record the tracker issue and the PR that may first flip `exposure.beta` (TBD until an implementation slice is ready).
+5. Declare the lifecycle the registry enforces. Permanent rows use `temporary: false` with no `removalCondition`, temporary rows use `temporary: true` with a `removalCondition`.
 
 ## Summary
 
@@ -23,6 +24,8 @@ Every workstream must:
 | Collaboration room | `collaborationRoom` | #433 | Gated route `/collaborate` + navbar | Exemplar + route/nav tests |
 
 Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM, Forecast Workflow v2, Verification relaunch, and Custom Products are release-approved across local, beta, staging, and production for v1.7.
+
+Approved rows split into two lifecycles. Forecast Workflow v2, Verification relaunch, and Custom Products are permanent, so they carry `temporary: false` and no removal condition. Auto-TSTM is approved on every target but stays temporary, so it keeps a removal condition until #427 retires the gate.
 
 ## Per-workstream detail
 
