@@ -1,3 +1,7 @@
+/**
+ * Verification severity helpers. This module translates observed storm-report
+ * damage and forecast outcomes into the severity labels used by Verification.
+ */
 import type { StormReport } from '../../types/stormReports';
 import { datDamagePointToStormReport, isTornadoDamagePoint, type DatDamagePoint } from '../dat';
 import {
