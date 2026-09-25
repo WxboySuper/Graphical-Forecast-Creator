@@ -6,7 +6,8 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useCustomProducts, type UseCustomProductsResult } from '../../hooks/useCustomProducts';
 import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct, type OneOffCustomLayer } from '../../types/customProducts';
-import { consumeCustomProductForecastHandoff } from '../../lib/customProductHandoff';
+import { discardCustomProductForecastHandoff } from '../../lib/customProductHandoff';
+import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
 import { isBuiltInCustomProduct } from '../../lib/builtInCustomProducts';
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
@@ -136,16 +137,17 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
     const layer = customProducts.useProduct(product);
     if (!layer) return;
     if (onProductUse) {
+      // The editor already applied the layer inline, so the staged copy is a
+      // duplicate that must be dropped rather than consumed by a later mount.
+      discardCustomProductForecastHandoff();
       if (onProductUse(layer)) {
-        consumeCustomProductForecastHandoff(customProducts.premiumActive || isBuiltInCustomProduct(product));
         setApplicationError(null);
       } else {
-        consumeCustomProductForecastHandoff(customProducts.premiumActive || isBuiltInCustomProduct(product));
         setApplicationError(`Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`);
       }
       return;
     }
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath('custom'));
   };
 
   return (

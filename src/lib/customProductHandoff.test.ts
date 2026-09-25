@@ -47,22 +47,22 @@ describe('customProductHandoff — iOS private mode hardening (GFC-WEB-Y)', () =
   test('consume returns null when getItem throws SecurityError', () => {
     sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ bogus: true }));
     jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError'); });
-    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
-    expect(() => consumeCustomProductForecastHandoff(true)).not.toThrow();
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toBeNull();
+    expect(() => consumeCustomProductForecastHandoff(true, 'custom')).not.toThrow();
   });
 
   test('consume returns null when getItem throws DOMException code 18 (legacy SECURITY_ERR)', () => {
     const err = new DOMException('Blocked', 'SecurityError');
     Object.defineProperty(err, 'code', { value: 18 });
     jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw err; });
-    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toBeNull();
   });
 
   test('consume returns null when removeItem SecurityError prevents consume-once semantics', () => {
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(validLayer()));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ workspaceId: 'custom', layer: validLayer() }));
     jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError'); });
-    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
-    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toBeNull();
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toBeNull();
   });
 
   test('restore does not throw when setItem throws SecurityError', () => {
@@ -97,6 +97,6 @@ describe('customProductHandoff — iOS private mode hardening (GFC-WEB-Y)', () =
 
   test('hook path: Forecast still renders when storage is blocked', async () => {
     jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError'); });
-    expect(consumeCustomProductForecastHandoff(false)).toBeNull();
+    expect(consumeCustomProductForecastHandoff(false, 'custom')).toBeNull();
   });
 });

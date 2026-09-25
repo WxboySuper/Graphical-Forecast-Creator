@@ -695,7 +695,7 @@ const useForecastPageWorkspace = ({
     mapRef,
     currentDay: forecastCycle.currentDay,
   });
-  useCustomProductForecastHandoff(restoreComplete, addToast);
+  useCustomProductForecastHandoff(restoreComplete, addToast, workspaceId);
 
   const dayRolloverPrompt = useControllerDayRolloverPrompt({
     restoreComplete,

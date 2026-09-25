@@ -128,6 +128,18 @@ const renderForecastPage = (store: ReturnType<typeof createStore>) =>
     </MemoryRouter>
   );
 
+/** Mounts the page as a non-default workspace, mirroring the App route -> Redux handoff. */
+const renderForecastPageInWorkspace = (store: ReturnType<typeof createStore>, workspaceId: 'severe' | 'custom') => {
+  store.dispatch(setForecastWorkspace(workspaceId));
+  return render(
+    <MemoryRouter>
+      <Provider store={store}>
+        <ForecastPage workspaceId={workspaceId} />
+      </Provider>
+    </MemoryRouter>
+  );
+};
+
 const LOCAL_AUTOSAVE_MARKER_ID = 'local-autosave-marker';
 
 const seedSevereAutosaveWithMarker = (featureId: string = LOCAL_AUTOSAVE_MARKER_ID): void => {
@@ -326,18 +338,52 @@ describe('ForecastPage layout selection', () => {
       createdAt: '2026-07-17T12:00:00.000Z',
       updatedAt: '2026-07-17T12:00:00.000Z',
     };
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ workspaceId: 'custom', layer }));
 
-    renderForecastPage(store);
+    renderForecastPageInWorkspace(store, 'custom');
 
     await waitFor(() => expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers[0]?.label).toBe('Fire weather'));
     expect(store.getState().forecast.customEditor.mode).toBe('custom');
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
   });
 
+  test('leaves a custom-staged handoff untouched in the Severe workspace', async () => {
+    mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
+    seedSevereAutosaveWithMarker();
+    const store = createStore();
+    const stagedLayer = {
+      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+      id: 'staged-for-custom' as never,
+      label: 'Custom only',
+      order: 0,
+      categories: [{
+        id: 'only' as never,
+        label: 'Only',
+        order: 0,
+        style: { fillColor: '#f97316', fillOpacity: 0.45, strokeColor: '#123456', strokeOpacity: 1, strokeWidth: 2, hatch: 'none' as const },
+      }],
+      features: [],
+      createdAt: '2026-07-17T12:00:00.000Z',
+      updatedAt: '2026-07-17T12:00:00.000Z',
+    };
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ workspaceId: 'custom', layer: stagedLayer }));
+
+    renderForecastPage(store);
+
+    // The restore toast proves the handoff effect has run with ready=true.
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers ?? []).toHaveLength(0);
+    expect(store.getState().forecast.customEditor.mode).toBe('severe');
+    expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual({
+      workspaceId: 'custom',
+      layer: stagedLayer,
+    });
+  });
+
   test('preserves a reusable-product handoff and reports the custom-layer limit', async () => {
     mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
     const store = createStore();
+    store.dispatch(setForecastWorkspace('custom'));
     for (let index = 0; index < CUSTOM_PRODUCT_LIMITS.layersPerCollection; index += 1) {
       store.dispatch(addCustomLayer({
         schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
@@ -370,22 +416,28 @@ describe('ForecastPage layout selection', () => {
       createdAt: '2026-07-17T12:00:00.000Z',
       updatedAt: '2026-07-17T12:00:00.000Z',
     };
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(stagedLayer));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ workspaceId: 'custom', layer: stagedLayer }));
 
-    renderForecastPage(store);
+    renderForecastPageInWorkspace(store, 'custom');
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
       `Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`,
       'error',
     ));
     expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers).toHaveLength(CUSTOM_PRODUCT_LIMITS.layersPerCollection);
-    expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual(stagedLayer);
+    expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual({
+      workspaceId: 'custom',
+      layer: stagedLayer,
+    });
     expect(store.getState().forecast.customEditor.mode).toBe('severe');
   });
 
   test('discards a staged reusable-product handoff if premium expired before forecast load', async () => {
     const store = createStore();
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, id: 'stale' }));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({
+      workspaceId: 'custom',
+      layer: { schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, id: 'stale' },
+    }));
     renderForecastPage(store);
     await waitFor(() => expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull());
     expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers ?? []).toHaveLength(0);

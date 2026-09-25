@@ -147,8 +147,9 @@ describe('customProductsRepository', () => {
 
     product.categories[0].label = 'Mutated later';
     expect(layer.productSnapshot?.categories[0].label).toBe('Moderate');
-    expect(stored.productSnapshot.sourceProductVersion).toBe(1);
-    expect(consumeCustomProductForecastHandoff(true)).toEqual(layer);
+    expect(stored.workspaceId).toBe('custom');
+    expect(stored.layer.productSnapshot.sourceProductVersion).toBe(1);
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toEqual(layer);
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
     expect(() => stageCustomProductForForecast(product, false)).toThrow('Premium');
     expect(() => stageCustomProductForForecast({ ...product, status: 'archived' } as HostedCustomProduct, true)).toThrow('Archived');
@@ -159,7 +160,7 @@ describe('customProductsRepository', () => {
     const layer = stageCustomProductForForecast(builtIn, false);
 
     expect(layer.productSnapshot?.builtIn).toBe(true);
-    expect(consumeCustomProductForecastHandoff(false)).toEqual(layer);
+    expect(consumeCustomProductForecastHandoff(false, 'custom')).toEqual(layer);
 
     const userProduct = createHostedProduct({
       id: 'product-01',
@@ -172,24 +173,34 @@ describe('customProductsRepository', () => {
 
   test('clears malformed or invalid forecast handoffs without consuming them', () => {
     sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, '{bad json');
-    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toBeNull();
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
 
     sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ id: 'not-a-layer' }));
-    expect(consumeCustomProductForecastHandoff(true)).toBeNull();
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toBeNull();
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
   });
 
   test('rejects a staged product after entitlement expires and clears only matching deleted-product handoffs', () => {
     const product = createHostedProduct({ id: 'product-01', userId: 'user-1', draft: draft(), now: '2026-07-17T12:00:00.000Z' });
     stageCustomProductForForecast(product, true);
-    expect(consumeCustomProductForecastHandoff(false)).toBeNull();
+    expect(consumeCustomProductForecastHandoff(false, 'custom')).toBeNull();
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
 
     stageCustomProductForForecast(product, true);
     clearCustomProductForecastHandoff('another-product' as HostedCustomProduct['id']);
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).not.toBeNull();
     clearCustomProductForecastHandoff(product.id);
+    expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
+  });
+
+  test('keeps a staged product out of a workspace that does not own custom layers', () => {
+    const product = createHostedProduct({ id: 'product-01', userId: 'user-1', draft: draft(), now: '2026-07-17T12:00:00.000Z' });
+    const layer = stageCustomProductForForecast(product, true);
+
+    expect(consumeCustomProductForecastHandoff(true, 'severe')).toBeNull();
+    expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).not.toBeNull();
+    expect(consumeCustomProductForecastHandoff(true, 'custom')).toEqual(layer);
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
   });
 });

@@ -97,7 +97,7 @@ describe('CustomProductsPage', () => {
     expect(customProducts.setProductStatus).toHaveBeenCalledWith(product, 'archived');
     expect(customProducts.deleteProduct).toHaveBeenCalledWith(product);
     expect(customProducts.useProduct).toHaveBeenCalledWith(product);
-    expect(mockNavigate).toHaveBeenCalledWith('/forecast');
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
   });
 
   test('keeps editing and new-map use unavailable without premium while retaining deletion', async () => {
@@ -135,7 +135,7 @@ describe('CustomProductsPage', () => {
     expect(screen.queryByRole('button', { name: /Duplicate/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Use in Forecast/i }));
     expect(customProducts.useProduct).toHaveBeenCalledWith(builtInProduct);
-    expect(mockNavigate).toHaveBeenCalledWith('/forecast');
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
   });
 
   test('disables every product mutation while an action is pending', () => {
