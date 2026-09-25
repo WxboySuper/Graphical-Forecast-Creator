@@ -113,6 +113,15 @@ export const clearCloudSessionStorage = ({ userId, workspaceId }: CloudSessionSc
   removeCloudSessionStorageValue(CLOUD_CYCLE_META_KEY);
 };
 
+/** One legacy handoff and the workspace slot it wants to move into. */
+interface LegacyCloudHandoff {
+  payload: string;
+  meta: string | null;
+  workspaceId: ForecastWorkspaceId;
+  /** Account the legacy key was scoped to, or null for the anonymous scope. */
+  ownerUserId: string | null;
+}
+
 /**
  * Copies one legacy handoff into the workspace slot of the scope it was keyed
  * for. Returns true when the legacy copy is safe to drop: either the write
@@ -120,11 +129,7 @@ export const clearCloudSessionStorage = ({ userId, workspaceId }: CloudSessionSc
  * false when nothing could be written, so the caller keeps the only copy.
  * Existing target values are never overwritten.
  */
-const stageLegacyCloudSession = (
-  payload: string,
-  meta: string | null,
-  { workspaceId, ownerUserId }: { workspaceId: ForecastWorkspaceId; ownerUserId: string | null },
-): boolean => {
+const stageLegacyCloudSession = ({ payload, meta, workspaceId, ownerUserId }: LegacyCloudHandoff): boolean => {
   const scope = { userId: ownerUserId, workspaceId };
   const targetPayloadKey = getCloudSessionStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, scope);
   const targetMetaKey = getCloudSessionStorageKey(CLOUD_CYCLE_META_KEY, scope);
@@ -162,7 +167,7 @@ const migrateLegacyCloudSessionPair = ({
   const workspaceId = payload === null ? null : resolveLegacyHandoffWorkspace(payload);
   const migrated = payload === null || workspaceId === null
     ? true
-    : stageLegacyCloudSession(payload, meta, { workspaceId, ownerUserId });
+    : stageLegacyCloudSession({ payload, meta, workspaceId, ownerUserId });
   if (!migrated) return;
 
   removeCloudSessionStorageValue(payloadKey);
