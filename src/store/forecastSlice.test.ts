@@ -1038,6 +1038,22 @@ describe('forecastSlice undo/redo', () => {
         expect(day48State.forecastCycle.currentDay).toBe(4);
         expect(day48State.forecastCycle.days[4]).toBeDefined();
       });
+
+      it('clears active workflow metadata when starting a plain blank cycle', () => {
+        let state = reducer(undefined, startBlankCycle({
+          workflowTemplate: testWorkflowTemplate,
+          cycleDate: '2026-07-04',
+        }));
+        expect(state.workflowMetadata).toBeDefined();
+        expect(state.isWorkflowActive).toBe(true);
+
+        state = reducer(state, startBlankCycle({ cycleDate: '2026-07-05' }));
+
+        expect(state.forecastCycle.cycleDate).toBe('2026-07-05');
+        expect(state.workflowMetadata).toBeUndefined();
+        expect(state.workflowTemplate).toBeUndefined();
+        expect(state.isWorkflowActive).toBe(false);
+      });
     });
 
     it('validates completion against the active workflow groupings only', () => {
