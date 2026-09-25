@@ -30,17 +30,6 @@ export const removeCloudSessionStorageValue = (key: string): void => {
   }
 };
 
-/**
- * Removes the handoff copies owned by one workspace plus the pre-workspace
- * anonymous copies, leaving every other workspace's staged handoff in place.
- */
-export const clearCloudSessionStorage = ({ userId, workspaceId }: CloudSessionScope): void => {
-  for (const baseKey of [CLOUD_CYCLE_PAYLOAD_KEY, CLOUD_CYCLE_META_KEY]) {
-    removeCloudSessionStorageValue(getCloudSessionStorageKey(baseKey, { userId, workspaceId }));
-    if (!userId) removeCloudSessionStorageValue(baseKey);
-  }
-};
-
 /** Reads one session value, treating unavailable browser storage as empty. */
 const readCloudSessionValue = (key: string): string | null => {
   try {
@@ -97,6 +86,34 @@ const resolveLegacyHandoffWorkspace = (payload: string): ForecastWorkspaceId | n
 };
 
 /**
+ * Returns whether the unscoped legacy handoff belongs to the workspace being
+ * cleared. Those keys carry no workspace, so a payload that will not classify
+ * and a meta entry with no payload both stay put: neither can be attributed to
+ * this workspace, and deleting either would destroy the only copy.
+ */
+const ownsLegacyCloudSessionPair = (workspaceId: ForecastWorkspaceId): boolean => {
+  const payload = readCloudSessionValue(CLOUD_CYCLE_PAYLOAD_KEY);
+  if (payload === null) return false;
+  const owner = resolveLegacyHandoffWorkspace(payload);
+  return owner !== null && owner === workspaceId;
+};
+
+/**
+ * Removes the handoff copies owned by one workspace, plus the unscoped
+ * pre-workspace pair when its payload belongs to that same workspace. Every
+ * other workspace's staged handoff and any unattributable legacy value stays in
+ * place.
+ */
+export const clearCloudSessionStorage = ({ userId, workspaceId }: CloudSessionScope): void => {
+  for (const baseKey of [CLOUD_CYCLE_PAYLOAD_KEY, CLOUD_CYCLE_META_KEY]) {
+    removeCloudSessionStorageValue(getCloudSessionStorageKey(baseKey, { userId, workspaceId }));
+  }
+  if (userId || !ownsLegacyCloudSessionPair(workspaceId)) return;
+  removeCloudSessionStorageValue(CLOUD_CYCLE_PAYLOAD_KEY);
+  removeCloudSessionStorageValue(CLOUD_CYCLE_META_KEY);
+};
+
+/**
  * Copies one legacy handoff into the workspace slot of the scope it was keyed
  * for. Returns true when the legacy copy is safe to drop: either the write
  * landed, or a payload already staged under the new keys superseded it. Returns
@@ -116,11 +133,11 @@ const stageLegacyCloudSession = (
   // legacy copy is superseded without touching it.
   if (readCloudSessionValue(targetPayloadKey) !== null) return true;
 
-  // The payload slot is free but the metadata slot this pair needs is taken.
-  // Writing the payload alone would pair it with someone else's metadata, and
-  // dropping the legacy pair would destroy the only copy, so keep it and let a
-  // later mount retry once the slot clears.
-  if (meta !== null && readCloudSessionValue(targetMetaKey) !== null) return false;
+  // The payload slot is free but the metadata slot is taken, so writing would
+  // pair this payload with someone else's metadata whether or not the legacy
+  // pair carries metadata of its own. Dropping the legacy pair would destroy
+  // the only copy, so keep it and let a later mount retry once the slot clears.
+  if (readCloudSessionValue(targetMetaKey) !== null) return false;
 
   writeCloudSessionValue(targetPayloadKey, payload);
   if (meta !== null) writeCloudSessionValue(targetMetaKey, meta);

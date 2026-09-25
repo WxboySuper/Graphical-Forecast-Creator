@@ -42,9 +42,42 @@ describe('cloud session storage', () => {
 
     expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
     expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
-    expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
+    // An unscoped value that will not classify cannot be attributed to Severe,
+    // so clearing Severe leaves it alone.
+    expect(sessionStorage.getItem('cloudCyclePayload')).toBe('pre-workspace-payload');
     expect(sessionStorage.getItem('cloudCyclePayload:custom:anonymous')).toBe('custom-payload');
     expect(sessionStorage.getItem('cloudCycleMeta:custom:anonymous')).toBe('custom-meta');
+  });
+
+  test('clearing Severe keeps an unscoped handoff owned by Custom', () => {
+    const payload = JSON.stringify({ schemaVersion: 1, workspaceId: 'custom', forecast: validForecast() });
+    const meta = JSON.stringify({ id: 'custom-1', label: 'Custom save' });
+    sessionStorage.setItem(CLOUD_CYCLE_PAYLOAD_KEY, payload);
+    sessionStorage.setItem(CLOUD_CYCLE_META_KEY, meta);
+
+    clearCloudSessionStorage({ workspaceId: 'severe' });
+
+    expect(sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY)).toBe(payload);
+    expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBe(meta);
+  });
+
+  test('clearing Severe removes an unscoped handoff owned by Severe', () => {
+    sessionStorage.setItem(CLOUD_CYCLE_PAYLOAD_KEY, JSON.stringify(validForecast()));
+    sessionStorage.setItem(CLOUD_CYCLE_META_KEY, JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
+
+    clearCloudSessionStorage({ workspaceId: 'severe' });
+
+    expect(sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY)).toBeNull();
+    expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBeNull();
+  });
+
+  test('clearing keeps an unscoped meta entry that has no payload to attribute', () => {
+    const meta = JSON.stringify({ id: 'legacy-1', label: 'Legacy save' });
+    sessionStorage.setItem(CLOUD_CYCLE_META_KEY, meta);
+
+    clearCloudSessionStorage({ workspaceId: 'severe' });
+
+    expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBe(meta);
   });
 
   test('clearing a signed-in workspace only touches that account scope', () => {
@@ -126,6 +159,21 @@ describe('cloud session storage', () => {
     // Nothing was written, so the legacy pair is still the only copy.
     expect(sessionStorage.getItem('cloudCyclePayload:user-user-1')).toBe(payload);
     expect(sessionStorage.getItem('cloudCycleMeta:user-user-1')).toBe(legacyMeta);
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-1')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:user-user-1')).toBe(stagedMeta);
+  });
+
+  test('keeps a legacy payload without meta when the target metadata slot is taken', () => {
+    const payload = JSON.stringify(validForecast());
+    const stagedMeta = JSON.stringify({ id: 'other-1', label: 'Other save' });
+    sessionStorage.setItem('cloudCyclePayload:user-user-1', payload);
+    sessionStorage.setItem('cloudCycleMeta:severe:user-user-1', stagedMeta);
+
+    migrateLegacyCloudSessionStorage('user-1');
+
+    // The legacy payload carries no meta, but the occupied target meta still
+    // makes that slot unsafe to write into, so the payload stays put.
+    expect(sessionStorage.getItem('cloudCyclePayload:user-user-1')).toBe(payload);
     expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-1')).toBeNull();
     expect(sessionStorage.getItem('cloudCycleMeta:severe:user-user-1')).toBe(stagedMeta);
   });
