@@ -1,6 +1,6 @@
 # v1.7 feature exposure workstreams
 
-Single adoption manifest for every unfinished v1.7 workstream registered in `src/config/featureExposure.ts`. Completing this adoption is tracked in FND-14 (#530).
+Single adoption manifest for v1.7 workstreams registered in `src/config/featureExposure.ts`, including unfinished temporary work and completed graduated work. Completing the remaining adoption is tracked in FND-14 (#530).
 
 ## Adoption rule
 

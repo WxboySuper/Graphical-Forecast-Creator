@@ -105,14 +105,24 @@ function validateV17RestrictedTargets(featureKey, definition, acknowledgements, 
 function validateV17TemporaryLifecycle(featureKey, definition, errors) {
   const graduated = V17_GRADUATED_WORKSTREAM_KEYS.includes(featureKey);
 
-  if (definition.temporary === false && !graduated) {
+  if (graduated) {
+    if (definition.temporary !== false) {
+      errors.push(`Graduated v1.7 workstream "${featureKey}" must remain permanent after release.`);
+    }
+    if (definition.removalCondition !== undefined) {
+      errors.push(`Graduated v1.7 workstream "${featureKey}" cannot declare a removalCondition after leaving the temporary lifecycle.`);
+    }
+    return;
+  }
+
+  if (definition.temporary === false) {
     errors.push(
       `v1.7 workstream "${featureKey}" cannot adopt permanent state; only graduated keys (${V17_GRADUATED_WORKSTREAM_KEYS.join(', ')}) may leave the temporary lifecycle.`
     );
     return;
   }
 
-  if (!graduated && definition.temporary !== true) {
+  if (definition.temporary !== true) {
     errors.push(
       `v1.7 workstream "${featureKey}" must remain temporary until it graduates from the v1.7 lifecycle.`
     );

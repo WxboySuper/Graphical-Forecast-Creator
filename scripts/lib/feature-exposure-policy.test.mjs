@@ -446,22 +446,39 @@ describe('feature exposure policy', () => {
     });
   });
 
-  it('fails when an unreleased v1.7 workstream leaves the temporary lifecycle', () => {
-    const registry = {
-      ...v17WorkstreamRegistry,
-      tropicalWorkspace: {
-        exposure: { ...ALL_OFF },
-        owner: 'WxboySuper',
-        addedDate: '2026-06-20',
-        temporary: false,
-        serverBacked: false,
-        trackingIssue: 432,
-      },
-    };
-    assertPolicyErrors(registry, [/tropicalWorkspace.*cannot adopt permanent state/], emptySurfaces, {
-      acknowledgements: v17Acknowledgements,
+  for (const featureKey of ['autoTstm', 'tropicalWorkspace', 'collaborationRoom']) {
+    it(`fails when unreleased v1.7 workstream ${featureKey} leaves the temporary lifecycle`, () => {
+      const registry = {
+        ...v17WorkstreamRegistry,
+        [featureKey]: { ...v17WorkstreamRegistry[featureKey], temporary: false, removalCondition: undefined },
+      };
+      assertPolicyErrors(registry, [new RegExp(`${featureKey}.*cannot adopt permanent state`)], emptySurfaces, {
+        acknowledgements: v17Acknowledgements,
+      });
     });
-  });
+  }
+
+  for (const featureKey of ['forecastWorkflowV2', 'verificationRelaunch', 'customProducts']) {
+    it(`fails when graduated v1.7 workstream ${featureKey} regresses to temporary`, () => {
+      const registry = {
+        ...v17WorkstreamRegistry,
+        [featureKey]: { ...v17WorkstreamRegistry[featureKey], temporary: true, removalCondition: 'Revert after launch.' },
+      };
+      assertPolicyErrors(registry, [new RegExp(`Graduated v1\\.7 workstream "${featureKey}" must remain permanent`)], emptySurfaces, {
+        acknowledgements: v17Acknowledgements,
+      });
+    });
+
+    it(`fails when graduated v1.7 workstream ${featureKey} has a stale removal condition`, () => {
+      const registry = {
+        ...v17WorkstreamRegistry,
+        [featureKey]: { ...v17WorkstreamRegistry[featureKey], removalCondition: 'Stale condition.' },
+      };
+      assertPolicyErrors(registry, [new RegExp(`Graduated v1\\.7 workstream "${featureKey}" cannot declare a removalCondition`)], emptySurfaces, {
+        acknowledgements: v17Acknowledgements,
+      });
+    });
+  }
 
   it('fails when all v1.7 workstream keys are removed from the registry', () => {
     const registry = {
