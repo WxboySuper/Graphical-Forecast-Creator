@@ -100,12 +100,34 @@ describe('cloud session storage', () => {
   test('leaves a handoff already staged under the workspace keys in place', () => {
     const staged = JSON.stringify(validForecast());
     sessionStorage.setItem('cloudCyclePayload:severe:anonymous', staged);
+    sessionStorage.setItem('cloudCycleMeta:severe:anonymous', JSON.stringify({ id: 'new-1', label: 'New save' }));
     sessionStorage.setItem(CLOUD_CYCLE_PAYLOAD_KEY, JSON.stringify({ ...validForecast(), cycleDate: 'older' }));
+    sessionStorage.setItem(CLOUD_CYCLE_META_KEY, JSON.stringify({ id: 'old-1', label: 'Old save' }));
 
     migrateLegacyCloudSessionStorage();
 
     expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBe(staged);
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous'))
+      .toBe(JSON.stringify({ id: 'new-1', label: 'New save' }));
     expect(sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY)).toBeNull();
+    expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBeNull();
+  });
+
+  test('keeps the legacy pair when only the target metadata slot is taken', () => {
+    const payload = JSON.stringify(validForecast());
+    const legacyMeta = JSON.stringify({ id: 'severe-1', label: 'Severe save' });
+    const stagedMeta = JSON.stringify({ id: 'other-1', label: 'Other save' });
+    sessionStorage.setItem('cloudCyclePayload:user-user-1', payload);
+    sessionStorage.setItem('cloudCycleMeta:user-user-1', legacyMeta);
+    sessionStorage.setItem('cloudCycleMeta:severe:user-user-1', stagedMeta);
+
+    migrateLegacyCloudSessionStorage('user-1');
+
+    // Nothing was written, so the legacy pair is still the only copy.
+    expect(sessionStorage.getItem('cloudCyclePayload:user-user-1')).toBe(payload);
+    expect(sessionStorage.getItem('cloudCycleMeta:user-user-1')).toBe(legacyMeta);
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-1')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:user-user-1')).toBe(stagedMeta);
   });
 
   test('routes a legacy handoff to the workspace its envelope names', () => {

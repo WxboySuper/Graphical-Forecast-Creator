@@ -98,9 +98,10 @@ const resolveLegacyHandoffWorkspace = (payload: string): ForecastWorkspaceId | n
 
 /**
  * Copies one legacy handoff into the workspace slot of the scope it was keyed
- * for, but only while that slot is empty, so a handoff already staged under the
- * new keys keeps its value. Returns false when storage refused the write, which
- * tells the caller to leave the legacy copy alone instead of destroying it.
+ * for. Returns true when the legacy copy is safe to drop: either the write
+ * landed, or a payload already staged under the new keys superseded it. Returns
+ * false when nothing could be written, so the caller keeps the only copy.
+ * Existing target values are never overwritten.
  */
 const stageLegacyCloudSession = (
   payload: string,
@@ -110,9 +111,16 @@ const stageLegacyCloudSession = (
   const scope = { userId: ownerUserId, workspaceId };
   const targetPayloadKey = getCloudSessionStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, scope);
   const targetMetaKey = getCloudSessionStorageKey(CLOUD_CYCLE_META_KEY, scope);
-  const targetIsFree = readCloudSessionValue(targetPayloadKey) === null
-    && (meta === null || readCloudSessionValue(targetMetaKey) === null);
-  if (!targetIsFree) return true;
+
+  // A payload already staged under the new keys is newer, so it wins and the
+  // legacy copy is superseded without touching it.
+  if (readCloudSessionValue(targetPayloadKey) !== null) return true;
+
+  // The payload slot is free but the metadata slot this pair needs is taken.
+  // Writing the payload alone would pair it with someone else's metadata, and
+  // dropping the legacy pair would destroy the only copy, so keep it and let a
+  // later mount retry once the slot clears.
+  if (meta !== null && readCloudSessionValue(targetMetaKey) !== null) return false;
 
   writeCloudSessionValue(targetPayloadKey, payload);
   if (meta !== null) writeCloudSessionValue(targetMetaKey, meta);
