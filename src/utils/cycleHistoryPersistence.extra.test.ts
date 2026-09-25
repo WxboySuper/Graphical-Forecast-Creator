@@ -6,6 +6,7 @@ type SavedCycle = {
   forecastCycle?: unknown;
   forecastData?: unknown;
   stats: unknown;
+  workspaceId?: string;
 };
 
 type StoreLike = {
@@ -37,18 +38,89 @@ describe('cycleHistoryPersistence', () => {
       label: 'L',
       forecastCycle: { some: 'fc' },
       stats: { total: 1 },
+      workspaceId: 'custom',
     };
 
     expect(() => mod.saveCycleHistoryToStorage([savedCycle as never])).not.toThrow();
 
     const loaded = mod.loadCycleHistoryFromStorage();
     expect(loaded.length).toBe(1);
+    expect(loaded[0].workspaceId).toBe('custom');
     expect(loaded[0].id).toBe('1');
     expect(loaded[0].forecastCycle).toEqual({ restored: true });
 
     const fileUtils = await import('./fileUtils');
     expect(fileUtils.serializeForecast).toHaveBeenCalled();
     expect(fileUtils.deserializeForecast).toHaveBeenCalled();
+  });
+
+  test('defaults malformed persisted workspace metadata to Severe', async () => {
+    jest.doMock('./fileUtils', () => ({
+      serializeForecast: jest.fn(() => ({ serialized: true })),
+      deserializeForecast: jest.fn(() => ({ restored: true })),
+    }));
+    jest.doMock('./forecastMetrics', () => ({
+      countForecastMetrics: jest.fn(() => ({ total: 1 })),
+    }));
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
+      id: 'malformed-workspace',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastData: { serialized: true },
+      workspaceId: 'not-a-workspace',
+      stats: { total: 1 },
+    }]));
+
+    const mod = await import('./cycleHistoryPersistence');
+    expect(mod.loadCycleHistoryFromStorage()[0]?.workspaceId).toBe('severe');
+  });
+
+  test('defaults legacy persisted records without workspace metadata to Severe', async () => {
+    jest.doMock('./fileUtils', () => ({
+      serializeForecast: jest.fn(() => ({ serialized: true })),
+      deserializeForecast: jest.fn(() => ({ restored: true })),
+    }));
+    jest.doMock('./forecastMetrics', () => ({
+      countForecastMetrics: jest.fn(() => ({ total: 1 })),
+    }));
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
+      id: 'legacy-no-workspace',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastData: { serialized: true },
+      stats: { total: 1 },
+    }]));
+
+    const mod = await import('./cycleHistoryPersistence');
+    const loaded = mod.loadCycleHistoryFromStorage();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.workspaceId).toBe('severe');
+  });
+
+  test('normalizes malformed workspace ownership on persistence write to Severe', async () => {
+    jest.doMock('./fileUtils', () => ({
+      serializeForecast: jest.fn(() => ({ serialized: true })),
+      deserializeForecast: jest.fn(() => ({ restored: true })),
+    }));
+    jest.doMock('./forecastMetrics', () => ({
+      countForecastMetrics: jest.fn(() => ({ total: 1 })),
+    }));
+
+    const mod = await import('./cycleHistoryPersistence');
+    mod.saveCycleHistoryToStorage([{
+      id: 'write-malformed',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastCycle: { some: 'fc' },
+      stats: { total: 1 },
+      workspaceId: 'not-a-workspace',
+    } as never]);
+
+    const raw = JSON.parse(localStorage.getItem('gfc-cycle-history') as string);
+    expect(raw.cycles[0].workspaceId).toBe('severe');
+    expect(mod.loadCycleHistoryFromStorage()[0]?.workspaceId).toBe('severe');
   });
 
   test('persists lifetime stats separately from the capped retained cycles', async () => {
@@ -142,6 +214,41 @@ describe('cycleHistoryPersistence', () => {
     expect(loaded[0].forecastCycle.days[1]?.data.wind?.get('30%')).toHaveLength(1);
   });
 
+  test('preserves top-level workflowMetadata on legacy hydration and ignores embedded cycleMetadata', async () => {
+    const workflowMetadata = {
+      id: 'WF-test-2026-04-22',
+      workflowId: 'test',
+      cycleDate: '2026-04-22',
+      status: 'in-progress',
+      outlookVersions: [],
+      createdAt: 'ts',
+      updatedAt: 'ts',
+    };
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
+      id: 'legacy-workflow',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastCycle: {},
+      stats: { forecastDays: 0, totalOutlooks: 0, totalFeatures: 0 },
+      workflowMetadata,
+    }]));
+
+    const mod = await import('./cycleHistoryPersistence');
+    const loaded = mod.loadCycleHistoryFromStorage();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.workflowMetadata).toEqual(workflowMetadata);
+
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
+      id: 'legacy-plain',
+      timestamp: 'ts',
+      cycleDate: '2026-04-22',
+      forecastCycle: {},
+      stats: { forecastDays: 0, totalOutlooks: 0, totalFeatures: 0 },
+    }]));
+    expect(mod.loadCycleHistoryFromStorage()[0]?.workflowMetadata).toBeUndefined();
+  });
+
   test('loadCycleHistoryFromStorage handles legacy format and computes stats when missing', async () => {
     jest.doMock('./forecastMetrics', () => ({
       countForecastMetrics: jest.fn(() => ({ computed: 42 })),
@@ -164,6 +271,7 @@ describe('cycleHistoryPersistence', () => {
     expect(loaded[0].id).toBe('legacy');
     expect(loaded[0].forecastCycle).toEqual({ foo: 'bar' });
     expect(loaded[0].stats).toEqual({});
+    expect(loaded[0].workspaceId).toBe('severe');
   });
 
   test('migrates legacy cycle history into a signed-in scope without overwriting account history', async () => {

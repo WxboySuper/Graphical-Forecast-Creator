@@ -7,7 +7,7 @@ import type { CycleMetadata } from '../types/workflow';
 import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './workflowMetadataContract';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
-import { DEFAULT_FORECAST_WORKSPACE, getForecastWorkspace, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { DEFAULT_FORECAST_WORKSPACE, resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -223,7 +223,7 @@ const normalizeStoredMetadata = ({
   return {
     id: readRequiredText(rawMetadata.id) ?? cycleId,
     userId: readRequiredText(rawMetadata.userId) ?? fallbackUserId,
-    workspaceId: getForecastWorkspace(rawMetadata.workspaceId as ForecastWorkspaceId)?.id ?? DEFAULT_FORECAST_WORKSPACE,
+    workspaceId: resolveForecastWorkspaceId(rawMetadata.workspaceId as string | undefined),
     label,
     cycleDate,
     createdAt: readTimestampString(rawMetadata.createdAt),

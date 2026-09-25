@@ -88,6 +88,10 @@ const WORKSPACES_BY_LEGACY_PATH = new Map<string, ForecastWorkspaceDefinition>(
 export const getForecastWorkspace = (id: string): ForecastWorkspaceDefinition | undefined =>
   WORKSPACES_BY_ID.get(id as ForecastWorkspaceId);
 
+/** Returns the validated workspace id, falling back to Severe for missing or unknown values. */
+export const resolveForecastWorkspaceId = (workspaceId: string | undefined | null): ForecastWorkspaceId =>
+  getForecastWorkspace(workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+
 /** Returns the registered workspace for a canonical path, or undefined for malformed input. */
 export const getForecastWorkspaceByPath = (path: string): ForecastWorkspaceDefinition | undefined =>
   WORKSPACES_BY_PATH.get(path as `/forecast/${ForecastWorkspaceId}`);
