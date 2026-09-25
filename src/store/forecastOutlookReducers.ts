@@ -1,3 +1,9 @@
+/**
+ * Forecast outlook reducers: this module applies Redux transitions for hazard
+ * geometry, probabilities, and outlook-specific editing state. It owns pure
+ * state updates and draft-safe normalization while persistence, UI orchestration,
+ * and map lifecycle behavior remain outside the reducer boundary.
+ */
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Feature } from 'geojson';
 import { original } from 'immer';

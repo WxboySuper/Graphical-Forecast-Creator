@@ -1,3 +1,9 @@
+/**
+ * Forecast-cycle persistence helpers: this module prepares active forecast
+ * state for saved-cycle storage, cloning, metrics, and hydration boundaries.
+ * It owns serialization-adjacent state shaping but not cloud transport,
+ * browser storage access, or page-level save orchestration.
+ */
 import { cloneForecastCycle } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import type { ForecastState, SavedCycle } from './forecastSlice';
