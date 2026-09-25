@@ -34,14 +34,16 @@ function hasValidAcknowledgementTrackingIssue(acknowledgement) {
   return typeof acknowledgement?.trackingIssue === 'number' && acknowledgement.trackingIssue > 0;
 }
 
+/** v1.7 workstreams that stay gated behind a removal condition. */
+export const V17_TEMPORARY_WORKSTREAM_KEYS = ['autoTstm', 'tropicalWorkspace', 'collaborationRoom'];
+
+/** v1.7 workstreams that ship for good and never declare a removal condition. */
+export const V17_PERMANENT_WORKSTREAM_KEYS = ['forecastWorkflowV2', 'verificationRelaunch', 'customProducts'];
+
 /** Canonical v1.7 workstream keys — keep aligned with featureExposure.test.ts and v17WorkstreamAdoption.exposure.test.ts */
 export const V17_WORKSTREAM_KEYS = [
-  'autoTstm',
-  'forecastWorkflowV2',
-  'verificationRelaunch',
-  'customProducts',
-  'tropicalWorkspace',
-  'collaborationRoom',
+  ...V17_TEMPORARY_WORKSTREAM_KEYS,
+  ...V17_PERMANENT_WORKSTREAM_KEYS,
 ];
 
 /** Adds an error when the registry declares only part of the v1.7 workstream key set. */
@@ -94,9 +96,42 @@ function validateV17RestrictedTargets(featureKey, definition, acknowledgements, 
   }
 }
 
+/** Returns true when a registry entry declares a non-empty removalCondition. */
+function hasRemovalCondition(definition) {
+  return typeof definition.removalCondition === 'string' && definition.removalCondition.trim().length > 0;
+}
+
+/** Adds violations when a temporary v1.7 workstream is missing its lifecycle metadata. */
+function validateTemporaryV17Workstream(featureKey, definition, errors) {
+  if (definition.temporary !== true) {
+    errors.push(`Temporary v1.7 workstream "${featureKey}" must declare temporary: true.`);
+  }
+  if (!hasRemovalCondition(definition)) {
+    errors.push(`Temporary v1.7 workstream "${featureKey}" must declare a non-empty removalCondition.`);
+  }
+}
+
+/** Adds violations when a permanent v1.7 workstream carries temporary lifecycle metadata. */
+function validatePermanentV17Workstream(featureKey, definition, errors) {
+  if (definition.temporary !== false) {
+    errors.push(`Permanent v1.7 workstream "${featureKey}" must declare temporary: false.`);
+  }
+  if (hasRemovalCondition(definition)) {
+    errors.push(`Permanent v1.7 workstream "${featureKey}" must not declare a removalCondition.`);
+  }
+}
+
 /** Adds lifecycle violations for one v1.7 workstream registry entry. */
 function validateV17WorkstreamLifecycle(featureKey, definition, contract, errors) {
   const { acknowledgements } = contract;
+
+  if (V17_TEMPORARY_WORKSTREAM_KEYS.includes(featureKey)) {
+    validateTemporaryV17Workstream(featureKey, definition, errors);
+  } else if (V17_PERMANENT_WORKSTREAM_KEYS.includes(featureKey)) {
+    validatePermanentV17Workstream(featureKey, definition, errors);
+  } else {
+    errors.push(`v1.7 workstream "${featureKey}" must belong to a declared lifecycle classification.`);
+  }
 
   validateV17LocalDevelopmentExposure(featureKey, definition, acknowledgements, errors);
   validateV17RestrictedTargets(featureKey, definition, acknowledgements, errors);
