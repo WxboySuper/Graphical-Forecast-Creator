@@ -20,15 +20,27 @@ interface OpenFreeMapBasemapOptions {
   vectorBaseGroup: LayerGroup;
   vectorReferenceGroup: LayerGroup;
   requestRef: MutableRefObject<number>;
-  /** Caller-owned request id. The helper never increments the counter itself. */
+  /** Caller-owned request id from beginOpenFreeMapBasemapRequest. */
   requestId: number;
   logPrefix: string;
 }
 
 /**
+ * Starts the next basemap request: increments the caller's counter and
+ * returns the fresh id. Every style change calls this before branching so a
+ * pending vector load from an earlier selection can never apply.
+ */
+export const beginOpenFreeMapBasemapRequest = (
+  requestRef: MutableRefObject<number>,
+): number => {
+  requestRef.current += 1;
+  return requestRef.current;
+};
+
+/**
  * Replaces both vector groups after a successful load, falling back to raster
- * tiles and labels when vector loading fails. Callers own request-id
- * increments and all raster/blank layer setup.
+ * tiles and labels when vector loading fails. Callers take the id from
+ * beginOpenFreeMapBasemapRequest and own all raster/blank layer setup.
  */
 export const loadOpenFreeMapBasemap = ({
   style,

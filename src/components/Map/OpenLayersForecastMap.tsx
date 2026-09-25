@@ -74,7 +74,10 @@ import {
   GHOST_REFERENCE_LAYER_Z_INDEX,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
-import { loadOpenFreeMapBasemap } from "./openLayersBasemap";
+import {
+  beginOpenFreeMapBasemapRequest,
+  loadOpenFreeMapBasemap,
+} from "./openLayersBasemap";
 import type { CustomCategoryStyle } from "../../types/customProducts";
 import {
   BLANK_LAND_FILL_STYLE,
@@ -1012,8 +1015,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
       // Every style change invalidates any OpenFreeMap request started by a
       // previous selection, including a switch back to a raster or blank map.
-      const requestId = vectorStyleRequestRef.current + 1;
-      vectorStyleRequestRef.current = requestId;
+      const requestId = beginOpenFreeMapBasemapRequest(vectorStyleRequestRef);
 
       /** Ensure state boundaries remain available above outlook polygons in every map style. */
       const loadUsStatesBoundaries = () => {
